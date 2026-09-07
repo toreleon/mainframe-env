@@ -4,43 +4,77 @@ Status: **Diagnostic probes; zero coverage credit; not catalog authorities**
 
 Each subsystem catalog cites an IBM publication, and nothing in the repository
 checks a catalog against the publication it names. These probes build an
-independent machine projection from the published PDF and diff it against the
-committed catalog.
+independent machine projection from the published source and diff it against
+the committed catalog.
 
-`www.ibm.com/docs` returns 403 to every scripted HTTP client here, including
-the URLs recorded in the 0.9 CICS manifest, so the first probes read older
-editions from the legacy `publib*.boulder.ibm.com/epubs/pdf/` hosts and carried
-a version skew against their catalogs.
-
-A real browser is not blocked. `conformance/tools/browser_fetch.py` attaches to
-a Chrome listening on a debugging port and issues same-origin `fetch` calls
-from inside the page, which reaches the current editions. The RACF reference
-retrieved that way hashes to
-`sha256:f4c8860aeb4d00b78f9257b28b2d880bd7571d74e2e00b2b1424b203801d5a46` —
-byte-for-byte the digest already pinned in `conformance/0.2/tools/
-extract_official_catalogs.py` and in `command-language.json`. The pinned
-sources are therefore reproducible, and probes can drop the skew caveat as
-each one is moved onto the pinned edition.
+Every probe now runs on the pinned edition. `www.ibm.com/docs` returns 403 to
+scripted HTTP clients, so `conformance/tools/browser_fetch.py` attaches to a
+Chrome listening on a debugging port and issues same-origin `fetch` calls from
+inside the page. `conformance/tools/fetch_pinned_sources.py` drives that over
+the baseline index and verifies each download against the digest the catalog
+was extracted from.
 
 IBM publication bytes are not retained in the repository.
 
-## Sources
+## The pins are reproducible
 
-| Subsystem | Publication | Digest | Catalog compared |
+`conformance/0.2/catalogs/index.json` records a URL and a sha256 for every
+baseline. Re-fetching all six PDF sources returns those exact bytes:
+
+| Baseline | Publication | Bytes | Pin |
 |---|---|---|---|
-| COBOL | Enterprise COBOL for z/OS 6.4 Language Reference, `igy6lr40.pdf`, 906 pages | `sha256:eef69c81ab8bcd569eaa2a47f430ff70c5518d4929cff26e7ab1ed6170f5c0bc` | `conformance/0.3/cobol/language.json` (6.5) |
-| RACF | z/OS 3.2 Security Server RACF Command Language Reference, `icha400_v3r2.pdf`, 746 pages — the pinned edition, fetched through Chrome | `sha256:f4c8860aeb4d00b78f9257b28b2d880bd7571d74e2e00b2b1424b203801d5a46` | `conformance/0.5/racf/command-language.json` (z/OS 3.2) |
-| JCL | z/OS V2R2 MVS JCL Reference, `iea3b611.pdf`, 756 pages | `sha256:54c9a37d1a3a7cc3832cf95079e595ae532a12b98b60da5d38515846bb1908d3` | `conformance/0.2/catalogs/jcl-jes2.json` (z/OS 3.2) |
+| cobol | SC27-8713-04, Enterprise COBOL 6.5 Language Reference, 916 pages | 4,385,427 | matches |
+| jcl-jes2 | SA23-1385-70, z/OS 3.2 MVS JCL Reference, 758 pages | 3,652,434 | matches |
+| dataset-vsam-ams | SC23-6846-70, z/OS 3.2 DFSMS Access Method Services, 610 pages | 2,857,720 | matches |
+| racf-saf | SA23-2292-70, z/OS 3.2 RACF Command Language Reference, 746 pages | 3,735,292 | matches |
+| zosmf | SC27-8430-70, z/OSMF Programming Guide, 1478 pages | 7,025,714 | matches |
+| db2 | Db2 13 for z/OS SQL Reference, 3186 pages | 14,056,820 | **differs** (pinned 14,051,668) |
+
+Five of six are byte-identical to their pin, so the version skew the earlier
+probes carried is gone. Db2 differs because the SQL Reference is republished at
+a stable URL — the baseline itself records "last updated 2026-08-13" — which is
+a re-pin decision for a reviewer, not something a probe should do silently.
+
+The four HTML baselines are not reproducible this way. Their pinned digests are
+much smaller than anything the site serves (`mq.html` is pinned at 8,698 bytes),
+and neither the served page (77,862 bytes of application shell) nor the rendered
+DOM (204,570 bytes) hashes to them. The topic content itself comes from a
+separate endpoint — `www.ibm.com/docs/api/v1/content/<product>%2F<topic>.html
+?parsebody=true&lang=en` — which returns 10,245 bytes for that same MQ topic.
+That is the right shape for the pin but not the same bytes, so the HTML pins
+need a recorded retrieval method before they can be re-verified.
+
+## Row identity checks out everywhere
+
+Every PDF-backed catalog row carries a `pdf-page:N;outline:TITLE` locator.
+`conformance/tools/verify_outline_locators.py` resolves each one against the
+pinned publication's outline. This audits row *identity* rather than row
+*content*, but it is uniform, and it covers the two baselines that have no
+syntax reader of their own.
+
+**845 of 845 outline-located rows resolve exactly** — the heading exists, at the
+recorded page, in the pinned edition:
+
+| Baseline | Rows | Exact | Not an outline locator |
+|---|---|---|---|
+| cobol | 173 | 173 | 0 |
+| jcl-jes2 | 237 | 217 | 20 (`pdf-page:47;table:1`) |
+| dataset-vsam-ams | 36 | 31 | 5 (`roadmap-normalization:`) |
+| racf-saf | 48 | 34 | 14 (`html-table:`) |
+| zosmf | 216 | 216 | 0 |
+| db2 | 174 | 174 | 0 |
+
+No heading was missing and none had moved. Whatever else is thin about these
+catalogs, their inventories are anchored to the publications they cite.
 
 ## Each publication needs its own reader
 
-The three books present syntax in three different ways, so one extractor does
-not carry over:
+Syntax is where the books diverge, and one extractor does not carry over:
 
-- **COBOL** draws railroad diagrams as inline vector art in the PDF. The reader
-  replays the page content stream for coordinates, decodes subset fonts through
-  their `/ToUnicode` CMaps, separates keywords from operands by font style, and
-  uses stroked rails to tell diagrams from equally sized code samples.
+- **COBOL** draws railroad diagrams as inline vector art. The reader replays
+  the page content stream for coordinates, decodes subset fonts through their
+  `/ToUnicode` CMaps, separates keywords from operands by font style, and uses
+  stroked rails to tell diagrams from equally sized code samples.
 
   The PDF is not the only option. The 6.5 web topic, fetched through the
   browser, carries the same DITA markup CICS uses — `class="syntaxdiagram"`,
@@ -55,10 +89,44 @@ not carry over:
   names (`RV ARY`), and splits top-level operands from segment members by line
   shape, because the book contains unbalanced syntax lines that make a running
   parenthesis counter diverge.
+- **AMS** documents parameters as flush-left headings under `Required
+  Parameters` / `Optional Parameters`, with indented subparameters and prose
+  beneath them, so column position does the parsing. `Abbreviation:` lines are
+  collected alongside.
 - **JCL** publishes its inventory in the outline itself: one chapter per
   statement, one entry per parameter. The reader needs no syntax parsing.
 
 ## Results
+
+### JCL — 204 statement parameters, all confirmed
+
+| Unit | catalog | source | shared |
+|---|---|---|---|
+| dd-parameters | 74 | 74 | 74 |
+| exec-parameters | 19 | 19 | 19 |
+| job-parameters | 35 | 35 | 35 |
+| output-parameters | 76 | 76 | 76 |
+
+On the pinned 3.2 edition the match is exact in every unit. The nine
+differences the earlier V2R2 run reported — `DSKEYLBL`, `NULLOVRD`, `ROACCESS`,
+`ABDISPCC`, `TVSAMCOM`, `TVSMSG`, `EMAIL`, `GDGBIAS`, and the apostrophe in
+`PROGRAMMER'S NAME` — were all edition skew. The JCL catalog is fully confirmed
+by its publication.
+
+### AMS — 889 parameters against a catalog that records none
+
+All 31 functional commands are located. The publication documents **889
+parameters and 512 abbreviations**; `conformance/0.6/ams/grammar.json` records
+`keywords: ["ALLOCATE"]` and nothing else, so its parameter inventory is
+**zero for every command**.
+
+The spread is wide: `ALLOCATE` 80, `ALTER` 75, `DEFINE CLUSTER` 64, `DCOLLECT`
+60, `REPRO` 54, down to `VERIFY` 2. Abbreviations are a second surface the
+catalog does not carry at all — `DELETE` alone documents `AIX`, `CL`, `GDG`,
+`LIBENT`, `NVSAM`, `PGSPC`, `TNAME`, `UCAT`, `VOLENTRY`, `VOLENT`.
+
+This is the largest gap any probe has found, and unlike the others it needs no
+interpretation: the field is empty.
 
 ### COBOL — 44 procedure statements
 
@@ -68,8 +136,10 @@ not carry over:
 | Named formats | — | 59 |
 | Operand naming | 33 undefined placeholders | 75 named operands |
 
-20 rows have more source diagrams than catalog forms; 37 rows use a keyword
-that appears in no catalog form, 137 distinct keywords in total. Only
+Moving from the 6.4 edition to the pinned 6.5 changed almost nothing (137
+missing keywords became 136), which settles the question the earlier run left
+open: this gap is not edition skew. 20 rows have more source diagrams than
+catalog forms; 36 rows use a keyword that appears in no catalog form. Only
 `CANCEL`, `CONTINUE`, `EVALUATE`, `GOBACK`, `RELEASE`, `STOP` and `UNSTRING`
 are keyword-complete. The gap concentrates where the sketch collapses a format
 family: `SET` has one form against 16 named source formats, `INSPECT` one
@@ -77,33 +147,26 @@ against four, `DIVIDE` one against five.
 
 ### RACF — 34 command families
 
-Against the pinned edition, 23 of 34 commands were located. The catalog records
-319 operands and the projection 323, sharing 177.
+25 of 34 commands are now located, up from 23, after two reader fixes: a
+footnote carried across a page break was truncating blocks at the page
+boundary, and commands with no alias (`[subsystem-prefix]RACLINK`) open their
+block without the brace group the opener required.
 
-One finding is already firm: **every located command carries a source alias**
-(`AD`, `AU`, `ALU`, `PE`, `RDEF`) that the catalog does not record. `aliases`
-is empty on every row except `PASSWORD`. Five catalog rows carry no operands at
-all.
+| | |
+|---|---|
+| Catalog operands (located rows) | 333 |
+| Source operands | 534 |
+| Shared | 244 |
+| Only in catalog | 89 |
 
-The operand counts are **not yet a clean audit**. The reader was tuned against
-the V2R2 layout; on the pinned edition it still truncates some blocks, so part
-of the 142 names reported as catalog-only (`ADDSD`'s `AUDIT`, `DATA`, `FROM`,
-`GENERIC`) are present in the publication and missed by the reader. Those
-counts need the reader retuned before any of them is read as a catalog gap.
+The alias finding is firm: **every located command carries a source alias**
+(`AD`, `AU`, `ALU`, `PE`, `RDEF`), and `aliases` is empty on every catalog row
+except `PASSWORD`. Five catalog rows carry no operands at all.
 
-### JCL — 204 statement parameters
-
-| Unit | catalog | source | shared | only in catalog |
-|---|---|---|---|---|
-| dd-parameters | 74 | 71 | 71 | `DSKEYLBL`, `NULLOVRD`, `ROACCESS` |
-| exec-parameters | 19 | 16 | 16 | `ABDISPCC`, `TVSAMCOM`, `TVSMSG` |
-| job-parameters | 35 | 33 | 32 | `EMAIL`, `GDGBIAS`, `PROGRAMMER'S NAME` |
-| output-parameters | 76 | 76 | 76 | — |
-
-195 of 204 match exactly. Every remaining difference is explained by the
-V2R2-to-3.2 edition gap except `PROGRAMMER'S NAME`, where the catalog uses a
-straight apostrophe and the publication a typographic one. The JCL catalog is
-the only one of the three that the publication substantially confirms.
+The operand counts are better than the first run — only-in-catalog fell from
+142 to 89 — but they are still a reader-limited comparison rather than a clean
+audit, because nine commands remain unlocated and some blocks may still close
+early.
 
 ## Known limitations
 
@@ -111,18 +174,26 @@ the only one of the three that the publication substantially confirms.
   two-token guard that rejects figure callouts; alternation is inferred from
   horizontal overlap, so a stacked group whose main line is a bare rail reports
   its members as optional; fragments resolve to `PHRASE n` markers.
-- RACF: 11 commands are not located, mostly operator commands whose blocks the
-  brace pattern does not reach; segment nesting is recovered by line shape, so
-  a segment opened inline rather than on its own line leaks its members to top
-  level. Unanchored matches are flagged rather than dropped.
+- RACF: nine commands are not located. `RACDCERT`, `RACMAP`, `RACPRIV` and
+  `RACPRMCK` publish one syntax block per function (`RACDCERT ALTMAP(...)`)
+  rather than one per command, and `DISPLAY`, `RESTART`, `SIGNOFF`, `STOP` and
+  `TARGET` are operator commands whose blocks the opener does not reach.
+  Segment nesting is recovered by line shape, so a segment opened inline rather
+  than on its own line leaks its members to top level. Unanchored matches are
+  flagged rather than dropped.
+- AMS: the reader takes flush-left headings, so a parameter the typesetter
+  indented is missed and a value the typesetter did not indent is counted.
+  Single-character names are excluded because the reference sets value letters
+  (`AVGREC(U|K|M)`) on their own lines.
 - JCL: parameters documented outside a `... parameter` outline entry are not
   seen.
+- Locator audit: an outline title that appears more than once matches any of
+  its pages, so a row pointing at the wrong occurrence still reads as exact.
 
 ## Not yet covered
 
 | Subsystem | State |
 |---|---|
-| AMS/VSAM | `dgt3i210.pdf` (V2R2, `sha256:2a4f659300852727466e4d4be03a9581eaee6b80c14c0d6939491832e4269f41`) retrieved; one chapter per command with a `<CMD> Parameters` section. Reader not written. `conformance/0.6/ams/grammar.json` records no parameters at all, so the whole inventory is currently unchecked. |
-| DB2 | Publication not located on a reachable host. |
-| z/OSMF | REST families rather than a command language; a syntax projection does not apply without a different comparison model. |
-| IMS, MQ | The 0.2 baseline pins HTML sources, not PDFs, so the PDF readers do not apply. |
+| Db2 | Retrieved and its 174 rows resolve against the outline, but the SQL Reference has been republished since the pin. No syntax reader; statement syntax is drawn as railroad diagrams like COBOL's. |
+| z/OSMF | REST families rather than a command language. Its 216 rows resolve against the outline; a syntax projection does not apply without a different comparison model. |
+| CICS, IMS, MQ | HTML baselines. The 0.9 CICS DITA reader already covers CICS; IMS and MQ pin small HTML snapshots whose retrieval method is not recorded, so their digests cannot be re-verified yet. |

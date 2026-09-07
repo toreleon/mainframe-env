@@ -1,0 +1,30 @@
+{
+  "baseline_id": "ibm-zos-3.2-racf-saf-2026",
+  "coverage_credit": 0,
+  "schema_version": "mainframe-env.outline-locator-audit@1",
+  "source": {
+    "outline_titles": 150,
+    "pages": 746,
+    "path": "racf-saf.pdf",
+    "retained_in_repository": false,
+    "sha256": "sha256:f4c8860aeb4d00b78f9257b28b2d880bd7571d74e2e00b2b1424b203801d5a46"
+  },
+  "units": [
+    {
+      "counts": {
+        "exact": 34
+      },
+      "rows": 34,
+      "unit": "racf-command-families",
+      "unresolved": []
+    },
+    {
+      "counts": {
+        "skipped": 14
+      },
+      "rows": 14,
+      "unit": "racroute-request-types",
+      "unresolved": []
+    }
+  ]
+}

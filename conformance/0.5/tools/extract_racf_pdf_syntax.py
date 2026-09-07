@@ -45,6 +45,12 @@ def is_prose(line: str) -> bool:
     return len(line.split()) >= 5
 SECTION = re.compile(r"^\s*(Parameters|Operands|Description|Examples?|Authorization)\b")
 
+# A syntax block runs across pages, and the page furniture it runs through —
+# footnotes carried over from the authority table, running heads — is prose.
+# Ending the block at the first prose line truncates it at the page break, so
+# an interruption this short is skipped and the block resumes.
+PROSE_TOLERANCE = 12
+
 
 def digest(path: Path) -> str:
     return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
@@ -69,7 +75,12 @@ def find_block(text: list[str], keyword: str) -> tuple[list[str], int, bool] | N
     preferred; an unanchored occurrence is still returned, but flagged so a
     reviewer can see it was matched on the brace alone.
     """
-    opener = re.compile(r"\{\s*" + spaced(keyword) + r"\s*(\||\})")
+    # Two shapes open a block: `{ADDSD | AD}` when the command has an alias,
+    # and a bare `[subsystem-prefix]RVARY` when it has none.
+    name = spaced(keyword)
+    opener = re.compile(
+        r"\{\s*" + name + r"\s*(?:\||\})|\[\s*subsystem-prefix\s*\]\s*" + name + r"\b"
+    )
     fallback: tuple[list[str], int, bool] | None = None
     for number, page in enumerate(text):
         lines = page.splitlines()
@@ -84,6 +95,7 @@ def find_block(text: list[str], keyword: str) -> tuple[list[str], int, bool] | N
             cursor = index + 1
             source = lines
             page_number = number
+            interrupted = 0
             while True:
                 if cursor >= len(source):
                     page_number += 1
@@ -102,7 +114,12 @@ def find_block(text: list[str], keyword: str) -> tuple[list[str], int, bool] | N
                     cursor += 1
                     continue
                 if not BLOCK_LINE.match(candidate) and is_prose(candidate):
-                    break
+                    interrupted += 1
+                    if interrupted > PROSE_TOLERANCE:
+                        break
+                    cursor += 1
+                    continue
+                interrupted = 0
                 block.append(candidate)
                 cursor += 1
             if anchored:

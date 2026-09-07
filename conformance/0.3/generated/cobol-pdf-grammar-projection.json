@@ -41,7 +41,7 @@
               "value": "identifier-1"
             }
           ],
-          "page": 335,
+          "page": 339,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -132,7 +132,7 @@
               "value": "DATE"
             }
           ],
-          "page": 337,
+          "page": 341,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -199,7 +199,7 @@
         "ACCEPT identifier-2 FROM DATE"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0001",
-      "start_page": 335,
+      "start_page": 339,
       "title": "ACCEPT statement"
     },
     {
@@ -284,7 +284,7 @@
               "value": "END-ADD"
             }
           ],
-          "page": 339,
+          "page": 343,
           "rail_line_count": 3,
           "rail_lines": [
             {
@@ -463,7 +463,7 @@
               "value": "END-ADD"
             }
           ],
-          "page": 340,
+          "page": 344,
           "rail_line_count": 4,
           "rail_lines": [
             {
@@ -653,7 +653,7 @@
               "value": "END-ADD"
             }
           ],
-          "page": 340,
+          "page": 344,
           "rail_line_count": 3,
           "rail_lines": [
             {
@@ -757,7 +757,7 @@
         "ADD CORRESPONDING identifier-1 TO identifier-2 SIZE ERROR imperative-statement-1 NOT SIZE ERROR imperative-statement-2 END-ADD"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0002",
-      "start_page": 339,
+      "start_page": 343,
       "title": "ADD statement"
     },
     {
@@ -812,7 +812,7 @@
               "value": "data-name-2"
             }
           ],
-          "page": 341,
+          "page": 345,
           "rail_line_count": 2,
           "rail_lines": [
             {
@@ -878,7 +878,7 @@
         "ALLOCATE arithmetic-expression-1 CHARACTERS LOC integer-1 RETURNING data-name-2"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0003",
-      "start_page": 341,
+      "start_page": 345,
       "title": "ALLOCATE statement"
     },
     {
@@ -914,7 +914,7 @@
               "value": "procedure-name-2"
             }
           ],
-          "page": 345,
+          "page": 350,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -955,7 +955,7 @@
         "ALTER procedure-name-1 TO procedure-name-2"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0004",
-      "start_page": 345,
+      "start_page": 350,
       "title": "ALTER statement"
     },
     {
@@ -976,7 +976,7 @@
               "value": "integer-4"
             }
           ],
-          "page": 346,
+          "page": 351,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -1058,7 +1058,7 @@
               "value": "imperative-statement-2"
             }
           ],
-          "page": 347,
+          "page": 351,
           "rail_line_count": 2,
           "rail_lines": [
             {
@@ -1142,7 +1142,7 @@
         "EXCEPTION imperative-statement-1 NOT-EXCEPTION-PHRASE NOT EXCEPTION imperative-statement-2"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0005",
-      "start_page": 346,
+      "start_page": 351,
       "title": "CALL statement"
     },
     {
@@ -1171,7 +1171,7 @@
               "value": "identifier-1"
             }
           ],
-          "page": 354,
+          "page": 359,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -1205,7 +1205,7 @@
         "CANCEL identifier-1"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0006",
-      "start_page": 354,
+      "start_page": 359,
       "title": "CANCEL statement"
     },
     {
@@ -1302,7 +1302,7 @@
               "value": "1"
             }
           ],
-          "page": 355,
+          "page": 360,
           "rail_line_count": 2,
           "rail_lines": [
             {
@@ -1424,7 +1424,7 @@
               "value": "file-name-1"
             }
           ],
-          "page": 356,
+          "page": 360,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -1518,7 +1518,7 @@
               "value": "file-name-1"
             }
           ],
-          "page": 356,
+          "page": 361,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -1595,7 +1595,7 @@
         "CLOSE file-name-1"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0007",
-      "start_page": 355,
+      "start_page": 360,
       "title": "CLOSE statement"
     },
     {
@@ -1673,7 +1673,7 @@
               "value": "END-COMPUTE"
             }
           ],
-          "page": 359,
+          "page": 363,
           "rail_line_count": 4,
           "rail_lines": [
             {
@@ -1776,7 +1776,7 @@
         "COMPUTE identifier-1 = arithmetic-expression SIZE ERROR imperative-statement-1 NOT SIZE ERROR imperative-statement-2 END-COMPUTE"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0008",
-      "start_page": 358,
+      "start_page": 363,
       "title": "COMPUTE statement"
     },
     {
@@ -1788,7 +1788,7 @@
       "id": "continue",
       "linear_forms": [],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0009",
-      "start_page": 359,
+      "start_page": 364,
       "title": "CONTINUE statement"
     },
     {
@@ -1848,7 +1848,7 @@
               "value": "END-DELETE"
             }
           ],
-          "page": 360,
+          "page": 364,
           "rail_line_count": 3,
           "rail_lines": [
             {
@@ -1927,7 +1927,7 @@
         "DELETE file-name-1 INVALID imperative-statement-1 NOT INVALID imperative-statement-2 END-DELETE"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0010",
-      "start_page": 360,
+      "start_page": 364,
       "title": "DELETE statement"
     },
     {
@@ -1984,7 +1984,7 @@
               "value": "NO ADVANCING"
             }
           ],
-          "page": 361,
+          "page": 366,
           "rail_line_count": 2,
           "rail_lines": [
             {
@@ -2053,7 +2053,7 @@
         "DISPLAY identifier-1 NO ADVANCING"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0011",
-      "start_page": 361,
+      "start_page": 366,
       "title": "DISPLAY statement"
     },
     {
@@ -2138,7 +2138,7 @@
               "value": "END-DIVIDE"
             }
           ],
-          "page": 363,
+          "page": 368,
           "rail_line_count": 3,
           "rail_lines": [
             {
@@ -2315,7 +2315,7 @@
               "value": "END-DIVIDE"
             }
           ],
-          "page": 364,
+          "page": 369,
           "rail_line_count": 4,
           "rail_lines": [
             {
@@ -2514,7 +2514,7 @@
               "value": "END-DIVIDE"
             }
           ],
-          "page": 364,
+          "page": 369,
           "rail_line_count": 4,
           "rail_lines": [
             {
@@ -2727,7 +2727,7 @@
               "value": "END-DIVIDE"
             }
           ],
-          "page": 365,
+          "page": 370,
           "rail_line_count": 3,
           "rail_lines": [
             {
@@ -2947,7 +2947,7 @@
               "value": "END-DIVIDE"
             }
           ],
-          "page": 365,
+          "page": 370,
           "rail_line_count": 3,
           "rail_lines": [
             {
@@ -3078,7 +3078,7 @@
         "DIVIDE identifier-1 BY identifier-2 GIVING identifier-3 SIZE ERROR imperative-statement-1 NOT SIZE ERROR imperative-statement-2 END-DIVIDE"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0012",
-      "start_page": 363,
+      "start_page": 368,
       "title": "DIVIDE statement"
     },
     {
@@ -3138,7 +3138,7 @@
               "value": "identifier-1"
             }
           ],
-          "page": 367,
+          "page": 372,
           "rail_line_count": 2,
           "rail_lines": [
             {
@@ -3210,7 +3210,7 @@
         "ENTRY literal-1 USING identifier-1"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0013",
-      "start_page": 366,
+      "start_page": 371,
       "title": "ENTRY statement"
     },
     {
@@ -3222,7 +3222,7 @@
       "id": "evaluate",
       "linear_forms": [],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0014",
-      "start_page": 367,
+      "start_page": 372,
       "title": "EVALUATE statement"
     },
     {
@@ -3247,7 +3247,7 @@
               "value": "EXIT"
             }
           ],
-          "page": 371,
+          "page": 376,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -3286,7 +3286,7 @@
               "value": "EXIT PERFORM"
             }
           ],
-          "page": 372,
+          "page": 377,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -3329,7 +3329,7 @@
               "value": "PARAGRAPH"
             }
           ],
-          "page": 372,
+          "page": 377,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -3365,7 +3365,7 @@
         "EXIT PARAGRAPH"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0015",
-      "start_page": 370,
+      "start_page": 375,
       "title": "EXIT statement"
     },
     {
@@ -3386,7 +3386,7 @@
               "value": "DATA-NAME-1"
             }
           ],
-          "page": 373,
+          "page": 378,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -3412,7 +3412,7 @@
         "FREE DATA-NAME-1"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0016",
-      "start_page": 373,
+      "start_page": 378,
       "title": "FREE statement"
     },
     {
@@ -3424,7 +3424,7 @@
       "id": "goback",
       "linear_forms": [],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0017",
-      "start_page": 373,
+      "start_page": 378,
       "title": "GOBACK statement"
     },
     {
@@ -3456,7 +3456,7 @@
               "value": "procedure-name-1"
             }
           ],
-          "page": 374,
+          "page": 379,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -3516,7 +3516,7 @@
               "value": "identifier-1"
             }
           ],
-          "page": 375,
+          "page": 380,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -3584,7 +3584,7 @@
               "value": "."
             }
           ],
-          "page": 375,
+          "page": 380,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -3627,7 +3627,7 @@
         "paragraph-name . GO ."
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0018",
-      "start_page": 374,
+      "start_page": 379,
       "title": "GO TO statement"
     },
     {
@@ -3697,7 +3697,7 @@
               "value": "1"
             }
           ],
-          "page": 376,
+          "page": 381,
           "rail_line_count": 3,
           "rail_lines": [
             {
@@ -3785,7 +3785,7 @@
         "IF condition-1 statement-1 1 1"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0019",
-      "start_page": 376,
+      "start_page": 381,
       "title": "IF statement"
     },
     {
@@ -3890,7 +3890,7 @@
               "value": "DEFAULT"
             }
           ],
-          "page": 378,
+          "page": 383,
           "rail_line_count": 4,
           "rail_lines": [
             {
@@ -4021,7 +4021,7 @@
         "INITIALIZE identifier-1 ALL VALUE REPLACING category-name BY identifier-2 DEFAULT"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0020",
-      "start_page": 378,
+      "start_page": 383,
       "title": "INITIALIZE statement"
     },
     {
@@ -4051,7 +4051,7 @@
               "value": "TALLYING"
             }
           ],
-          "page": 381,
+          "page": 386,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -4153,7 +4153,7 @@
               "value": "identifier-4"
             }
           ],
-          "page": 381,
+          "page": 386,
           "rail_line_count": 3,
           "rail_lines": [
             {
@@ -4269,7 +4269,7 @@
               "value": "REPLACING"
             }
           ],
-          "page": 382,
+          "page": 387,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -4408,7 +4408,7 @@
               "value": "TALLYING"
             }
           ],
-          "page": 382,
+          "page": 387,
           "rail_line_count": 4,
           "rail_lines": [
             {
@@ -4607,7 +4607,7 @@
               "value": "identifier-3"
             }
           ],
-          "page": 382,
+          "page": 387,
           "rail_line_count": 2,
           "rail_lines": [
             {
@@ -4753,7 +4753,7 @@
               "value": "identifier-5"
             }
           ],
-          "page": 382,
+          "page": 387,
           "rail_line_count": 2,
           "rail_lines": [
             {
@@ -4876,7 +4876,7 @@
               "value": "identifier-4"
             }
           ],
-          "page": 383,
+          "page": 388,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -4960,7 +4960,7 @@
               "value": "identifier-7"
             }
           ],
-          "page": 383,
+          "page": 388,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -5044,7 +5044,7 @@
               "value": "identifier-4"
             }
           ],
-          "page": 383,
+          "page": 388,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -5099,7 +5099,7 @@
         "BEFORE identifier-4"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0021",
-      "start_page": 381,
+      "start_page": 386,
       "title": "INSPECT statement"
     },
     {
@@ -5160,7 +5160,7 @@
               "value": "literal-1"
             }
           ],
-          "page": 390,
+          "page": 395,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -5299,7 +5299,7 @@
               "value": "END-INVOKE"
             }
           ],
-          "page": 390,
+          "page": 395,
           "rail_line_count": 4,
           "rail_lines": [
             {
@@ -5463,7 +5463,7 @@
               "value": "1"
             }
           ],
-          "page": 394,
+          "page": 399,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -5536,7 +5536,7 @@
         "1"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0022",
-      "start_page": 390,
+      "start_page": 395,
       "title": "INVOKE statement"
     },
     {
@@ -5557,56 +5557,68 @@
               "kind": "keyword",
               "rail_line": 2,
               "relation": "optional",
+              "value": "CHARACTERS"
+            },
+            {
+              "kind": "keyword",
+              "rail_line": 2,
+              "relation": "optional",
+              "value": "IN"
+            },
+            {
+              "kind": "keyword",
+              "rail_line": 3,
+              "relation": "optional",
               "value": "ALSO"
             },
             {
               "kind": "operand",
-              "rail_line": 2,
+              "rail_line": 3,
               "relation": "optional",
               "value": "indicating-phrase-1"
             },
             {
               "alternative_to": "identifier-6",
               "kind": "operand",
-              "rail_line": 3,
+              "rail_line": 4,
               "relation": "alternative",
               "value": "literal-3"
             },
             {
               "kind": "keyword",
-              "rail_line": 3,
+              "rail_line": 4,
               "relation": "optional",
               "value": "FROM CODEPAGE"
             },
             {
               "kind": "keyword",
-              "rail_line": 4,
+              "rail_line": 5,
               "relation": "optional",
               "value": "OF"
             },
             {
               "kind": "keyword",
-              "rail_line": 4,
+              "rail_line": 5,
               "relation": "optional",
               "value": "IS"
             },
             {
               "alternative_to": "literal-1",
               "kind": "keyword",
-              "rail_line": 4,
+              "rail_line": 5,
               "relation": "alternative",
               "value": "OMITTED"
             },
             {
               "kind": "operand",
-              "rail_line": 5,
+              "rail_line": 6,
               "relation": "optional",
               "value": "when-phrase"
             },
             {
               "alternative_to": "identifier-5",
               "kind": "operand",
-              "rail_line": 5,
+              "rail_line": 6,
               "relation": "alternative",
               "value": "generic-suppression-phrase"
             }
@@ -5627,6 +5639,14 @@
             {
               "kind": "operand",
               "value": "identifier-2"
+            },
+            {
+              "kind": "keyword",
+              "value": "COUNT BYTES"
+            },
+            {
+              "kind": "operand",
+              "value": "identifier-11"
             },
             {
               "kind": "keyword",
@@ -5673,8 +5693,8 @@
               "value": "identifier-5"
             }
           ],
-          "page": 398,
-          "rail_line_count": 6,
+          "page": 403,
+          "rail_line_count": 7,
           "rail_lines": [
             {
               "branches": [],
@@ -5711,6 +5731,33 @@
               "main": [
                 {
                   "kind": "keyword",
+                  "value": "COUNT BYTES"
+                },
+                {
+                  "kind": "operand",
+                  "value": "identifier-11"
+                }
+              ]
+            },
+            {
+              "branches": [
+                {
+                  "kind": "keyword",
+                  "rail_line": 2,
+                  "relation": "optional",
+                  "value": "CHARACTERS"
+                },
+                {
+                  "kind": "keyword",
+                  "rail_line": 2,
+                  "relation": "optional",
+                  "value": "IN"
+                }
+              ],
+              "index": 2,
+              "main": [
+                {
+                  "kind": "keyword",
                   "value": "COUNT"
                 },
                 {
@@ -5723,18 +5770,18 @@
               "branches": [
                 {
                   "kind": "keyword",
-                  "rail_line": 2,
+                  "rail_line": 3,
                   "relation": "optional",
                   "value": "ALSO"
                 },
                 {
                   "kind": "operand",
-                  "rail_line": 2,
+                  "rail_line": 3,
                   "relation": "optional",
                   "value": "indicating-phrase-1"
                 }
               ],
-              "index": 2,
+              "index": 3,
               "main": [
                 {
                   "kind": "keyword",
@@ -5751,18 +5798,18 @@
                 {
                   "alternative_to": "identifier-6",
                   "kind": "operand",
-                  "rail_line": 3,
+                  "rail_line": 4,
                   "relation": "alternative",
                   "value": "literal-3"
                 },
                 {
                   "kind": "keyword",
-                  "rail_line": 3,
+                  "rail_line": 4,
                   "relation": "optional",
                   "value": "FROM CODEPAGE"
                 }
               ],
-              "index": 3,
+              "index": 4,
               "main": [
                 {
                   "kind": "keyword",
@@ -5778,25 +5825,25 @@
               "branches": [
                 {
                   "kind": "keyword",
-                  "rail_line": 4,
+                  "rail_line": 5,
                   "relation": "optional",
                   "value": "OF"
                 },
                 {
                   "kind": "keyword",
-                  "rail_line": 4,
+                  "rail_line": 5,
                   "relation": "optional",
                   "value": "IS"
                 },
                 {
                   "alternative_to": "literal-1",
                   "kind": "keyword",
-                  "rail_line": 4,
+                  "rail_line": 5,
                   "relation": "alternative",
                   "value": "OMITTED"
                 }
               ],
-              "index": 4,
+              "index": 5,
               "main": [
                 {
                   "kind": "keyword",
@@ -5816,19 +5863,19 @@
               "branches": [
                 {
                   "kind": "operand",
-                  "rail_line": 5,
+                  "rail_line": 6,
                   "relation": "optional",
                   "value": "when-phrase"
                 },
                 {
                   "alternative_to": "identifier-5",
                   "kind": "operand",
-                  "rail_line": 5,
+                  "rail_line": 6,
                   "relation": "alternative",
                   "value": "generic-suppression-phrase"
                 }
               ],
-              "index": 5,
+              "index": 6,
               "main": [
                 {
                   "kind": "keyword",
@@ -5841,7 +5888,7 @@
               ]
             }
           ],
-          "row_count": 13
+          "row_count": 15
         },
         {
           "branches": [
@@ -5904,7 +5951,7 @@
               "value": "END-JSON"
             }
           ],
-          "page": 398,
+          "page": 403,
           "rail_line_count": 3,
           "rail_lines": [
             {
@@ -6261,7 +6308,7 @@
               "value": "NULL"
             }
           ],
-          "page": 399,
+          "page": 404,
           "rail_line_count": 5,
           "rail_lines": [
             {
@@ -6574,12 +6621,12 @@
       ],
       "id": "json-generate",
       "linear_forms": [
-        "JSON GENERATE identifier-1 FROM identifier-2 COUNT identifier-3 INDICATING indicating-phrase-1 ENCODING identifier-6 NAME identifier-4 literal-1 SUPPRESS identifier-5",
+        "JSON GENERATE identifier-1 FROM identifier-2 COUNT BYTES identifier-11 COUNT identifier-3 INDICATING indicating-phrase-1 ENCODING identifier-6 NAME identifier-4 literal-1 SUPPRESS identifier-5",
         "CONVERTING converting-phrase EXCEPTION imperative-statement-1 NOT EXCEPTION imperative-statement-2 END-JSON",
         "WHEN ZERO when-phrase identifier-7 BOOLEAN identifier-8 NULL fig-con-1 identifier-9 NULL"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0023",
-      "start_page": 397,
+      "start_page": 402,
       "title": "JSON GENERATE statement"
     },
     {
@@ -6641,7 +6688,7 @@
               "value": "ignoring-phrase-1"
             }
           ],
-          "page": 411,
+          "page": 416,
           "rail_line_count": 2,
           "rail_lines": [
             {
@@ -6794,7 +6841,7 @@
               "value": "identifier-4"
             }
           ],
-          "page": 411,
+          "page": 416,
           "rail_line_count": 4,
           "rail_lines": [
             {
@@ -6932,18 +6979,6 @@
               "rail_line": 2,
               "relation": "optional",
               "value": "ON"
-            },
-            {
-              "kind": "keyword",
-              "rail_line": 3,
-              "relation": "optional",
-              "value": "JSON"
-            },
-            {
-              "kind": "operand",
-              "rail_line": 3,
-              "relation": "optional",
-              "value": "identifier-5"
             }
           ],
           "main_line": [
@@ -6978,18 +7013,10 @@
             {
               "kind": "keyword",
               "value": "END-JSON"
-            },
-            {
-              "kind": "keyword",
-              "value": "NULL FOR"
-            },
-            {
-              "kind": "keyword",
-              "value": "ALL"
             }
           ],
-          "page": 411,
-          "rail_line_count": 4,
+          "page": 416,
+          "rail_line_count": 3,
           "rail_lines": [
             {
               "branches": [
@@ -7067,36 +7094,9 @@
                   "value": "END-JSON"
                 }
               ]
-            },
-            {
-              "branches": [
-                {
-                  "kind": "keyword",
-                  "rail_line": 3,
-                  "relation": "optional",
-                  "value": "JSON"
-                },
-                {
-                  "kind": "operand",
-                  "rail_line": 3,
-                  "relation": "optional",
-                  "value": "identifier-5"
-                }
-              ],
-              "index": 3,
-              "main": [
-                {
-                  "kind": "keyword",
-                  "value": "NULL FOR"
-                },
-                {
-                  "kind": "keyword",
-                  "value": "ALL"
-                }
-              ]
             }
           ],
-          "row_count": 8
+          "row_count": 6
         },
         {
           "branches": [
@@ -7104,25 +7104,13 @@
               "kind": "keyword",
               "rail_line": 0,
               "relation": "optional",
-              "value": "IS"
-            },
-            {
-              "kind": "keyword",
-              "rail_line": 0,
-              "relation": "optional",
               "value": "JSON"
-            },
-            {
-              "kind": "keyword",
-              "rail_line": 0,
-              "relation": "optional",
-              "value": "IN"
             },
             {
               "kind": "operand",
               "rail_line": 0,
               "relation": "optional",
-              "value": "identifier-10"
+              "value": "identifier-5"
             },
             {
               "kind": "keyword",
@@ -7170,6 +7158,14 @@
           ],
           "main_line": [
             {
+              "kind": "keyword",
+              "value": "NULL FOR"
+            },
+            {
+              "kind": "keyword",
+              "value": "ALL"
+            },
+            {
               "kind": "operand",
               "value": "identifier-9"
             },
@@ -7179,19 +7175,7 @@
             },
             {
               "kind": "operand",
-              "value": "using-phrase-2"
-            },
-            {
-              "kind": "operand",
-              "value": "identifier-9"
-            },
-            {
-              "kind": "keyword",
-              "value": "NULL"
-            },
-            {
-              "kind": "operand",
-              "value": "using-phrase-2"
+              "value": "using-phrase-1"
             },
             {
               "kind": "operand",
@@ -7206,7 +7190,7 @@
               "value": "using-phrase-1"
             }
           ],
-          "page": 412,
+          "page": 417,
           "rail_line_count": 3,
           "rail_lines": [
             {
@@ -7215,40 +7199,24 @@
                   "kind": "keyword",
                   "rail_line": 0,
                   "relation": "optional",
-                  "value": "IS"
-                },
-                {
-                  "kind": "keyword",
-                  "rail_line": 0,
-                  "relation": "optional",
                   "value": "JSON"
-                },
-                {
-                  "kind": "keyword",
-                  "rail_line": 0,
-                  "relation": "optional",
-                  "value": "IN"
                 },
                 {
                   "kind": "operand",
                   "rail_line": 0,
                   "relation": "optional",
-                  "value": "identifier-10"
+                  "value": "identifier-5"
                 }
               ],
               "index": 0,
               "main": [
                 {
-                  "kind": "operand",
-                  "value": "identifier-9"
+                  "kind": "keyword",
+                  "value": "NULL FOR"
                 },
                 {
                   "kind": "keyword",
-                  "value": "NULL"
-                },
-                {
-                  "kind": "operand",
-                  "value": "using-phrase-2"
+                  "value": "ALL"
                 }
               ]
             },
@@ -7291,7 +7259,7 @@
                 },
                 {
                   "kind": "operand",
-                  "value": "using-phrase-2"
+                  "value": "using-phrase-1"
                 }
               ]
             },
@@ -7369,17 +7337,18 @@
               "value": "condition-name-2"
             },
             {
-              "kind": "operand",
-              "rail_line": 1,
-              "relation": "optional",
-              "value": "condition-name-3"
-            },
-            {
               "alternative_to": "condition-name-1",
               "kind": "keyword",
               "rail_line": 1,
               "relation": "alternative",
               "value": "AND"
+            },
+            {
+              "alternative_to": "condition-name-1",
+              "kind": "operand",
+              "rail_line": 1,
+              "relation": "alternative",
+              "value": "condition-name-3"
             },
             {
               "kind": "operand",
@@ -7388,12 +7357,6 @@
               "value": "literal-2"
             },
             {
-              "kind": "operand",
-              "rail_line": 1,
-              "relation": "optional",
-              "value": "literal-3"
-            },
-            {
               "alternative_to": "condition-name-1",
               "kind": "keyword",
               "rail_line": 1,
@@ -7401,101 +7364,9 @@
               "value": "AND"
             },
             {
-              "kind": "keyword",
-              "rail_line": 2,
-              "relation": "optional",
-              "value": "USING"
-            },
-            {
-              "kind": "operand",
-              "rail_line": 2,
-              "relation": "optional",
-              "value": "condition-name-2"
-            },
-            {
-              "alternative_to": "condition-name-1",
-              "kind": "keyword",
-              "rail_line": 2,
-              "relation": "alternative",
-              "value": "AND"
-            },
-            {
               "alternative_to": "condition-name-1",
               "kind": "operand",
-              "rail_line": 2,
-              "relation": "alternative",
-              "value": "condition-name-3"
-            },
-            {
-              "kind": "operand",
-              "rail_line": 2,
-              "relation": "optional",
-              "value": "literal-2"
-            },
-            {
-              "alternative_to": "condition-name-1",
-              "kind": "keyword",
-              "rail_line": 2,
-              "relation": "alternative",
-              "value": "AND"
-            },
-            {
-              "alternative_to": "condition-name-1",
-              "kind": "operand",
-              "rail_line": 2,
-              "relation": "alternative",
-              "value": "literal-3"
-            },
-            {
-              "alternative_to": "condition-name-1",
-              "kind": "operand",
-              "rail_line": 2,
-              "relation": "alternative",
-              "value": "condition-name-1"
-            },
-            {
-              "kind": "keyword",
-              "rail_line": 2,
-              "relation": "optional",
-              "value": "USING"
-            },
-            {
-              "kind": "operand",
-              "rail_line": 2,
-              "relation": "optional",
-              "value": "condition-name-2"
-            },
-            {
-              "alternative_to": "condition-name-1",
-              "kind": "keyword",
-              "rail_line": 2,
-              "relation": "alternative",
-              "value": "AND"
-            },
-            {
-              "alternative_to": "condition-name-1",
-              "kind": "operand",
-              "rail_line": 2,
-              "relation": "alternative",
-              "value": "condition-name-3"
-            },
-            {
-              "kind": "operand",
-              "rail_line": 2,
-              "relation": "optional",
-              "value": "literal-2"
-            },
-            {
-              "alternative_to": "condition-name-1",
-              "kind": "keyword",
-              "rail_line": 2,
-              "relation": "alternative",
-              "value": "AND"
-            },
-            {
-              "alternative_to": "condition-name-1",
-              "kind": "operand",
-              "rail_line": 2,
+              "rail_line": 1,
               "relation": "alternative",
               "value": "literal-3"
             }
@@ -7516,14 +7387,10 @@
             {
               "kind": "operand",
               "value": "condition-name-1"
-            },
-            {
-              "kind": "operand",
-              "value": "condition-name-1"
             }
           ],
-          "page": 412,
-          "rail_line_count": 3,
+          "page": 417,
+          "rail_line_count": 2,
           "rail_lines": [
             {
               "branches": [
@@ -7577,17 +7444,18 @@
                   "value": "condition-name-2"
                 },
                 {
-                  "kind": "operand",
-                  "rail_line": 1,
-                  "relation": "optional",
-                  "value": "condition-name-3"
-                },
-                {
                   "alternative_to": "condition-name-1",
                   "kind": "keyword",
                   "rail_line": 1,
                   "relation": "alternative",
                   "value": "AND"
+                },
+                {
+                  "alternative_to": "condition-name-1",
+                  "kind": "operand",
+                  "rail_line": 1,
+                  "relation": "alternative",
+                  "value": "condition-name-3"
                 },
                 {
                   "kind": "operand",
@@ -7596,17 +7464,18 @@
                   "value": "literal-2"
                 },
                 {
-                  "kind": "operand",
-                  "rail_line": 1,
-                  "relation": "optional",
-                  "value": "literal-3"
-                },
-                {
                   "alternative_to": "condition-name-1",
                   "kind": "keyword",
                   "rail_line": 1,
                   "relation": "alternative",
                   "value": "AND"
+                },
+                {
+                  "alternative_to": "condition-name-1",
+                  "kind": "operand",
+                  "rail_line": 1,
+                  "relation": "alternative",
+                  "value": "literal-3"
                 }
               ],
               "index": 1,
@@ -7616,131 +7485,165 @@
                   "value": "condition-name-1"
                 }
               ]
+            }
+          ],
+          "row_count": 5
+        },
+        {
+          "branches": [
+            {
+              "kind": "keyword",
+              "rail_line": 0,
+              "relation": "optional",
+              "value": "'+'"
+            },
+            {
+              "kind": "keyword",
+              "rail_line": 0,
+              "relation": "optional",
+              "value": "'-'"
+            },
+            {
+              "kind": "keyword",
+              "rail_line": 0,
+              "relation": "optional",
+              "value": "SPACE"
+            },
+            {
+              "kind": "keyword",
+              "rail_line": 0,
+              "relation": "optional",
+              "value": "'.'"
+            },
+            {
+              "kind": "keyword",
+              "rail_line": 0,
+              "relation": "optional",
+              "value": "[0-9]"
+            },
+            {
+              "kind": "keyword",
+              "rail_line": 1,
+              "relation": "optional",
+              "value": "\""
+            }
+          ],
+          "main_line": [
+            {
+              "kind": "keyword",
+              "value": "\""
+            },
+            {
+              "kind": "keyword",
+              "value": "[0-9]"
+            },
+            {
+              "kind": "keyword",
+              "value": "'.'"
+            },
+            {
+              "kind": "keyword",
+              "value": "[0-9]"
+            },
+            {
+              "kind": "keyword",
+              "value": "SPACE"
+            }
+          ],
+          "page": 429,
+          "rail_line_count": 3,
+          "rail_lines": [
+            {
+              "branches": [
+                {
+                  "kind": "keyword",
+                  "rail_line": 0,
+                  "relation": "optional",
+                  "value": "'+'"
+                },
+                {
+                  "kind": "keyword",
+                  "rail_line": 0,
+                  "relation": "optional",
+                  "value": "'-'"
+                },
+                {
+                  "kind": "keyword",
+                  "rail_line": 0,
+                  "relation": "optional",
+                  "value": "SPACE"
+                },
+                {
+                  "kind": "keyword",
+                  "rail_line": 0,
+                  "relation": "optional",
+                  "value": "'.'"
+                },
+                {
+                  "kind": "keyword",
+                  "rail_line": 0,
+                  "relation": "optional",
+                  "value": "[0-9]"
+                }
+              ],
+              "index": 0,
+              "main": [
+                {
+                  "kind": "keyword",
+                  "value": "\""
+                },
+                {
+                  "kind": "keyword",
+                  "value": "[0-9]"
+                }
+              ]
             },
             {
               "branches": [
                 {
                   "kind": "keyword",
-                  "rail_line": 2,
+                  "rail_line": 1,
                   "relation": "optional",
-                  "value": "USING"
-                },
-                {
-                  "kind": "operand",
-                  "rail_line": 2,
-                  "relation": "optional",
-                  "value": "condition-name-2"
-                },
-                {
-                  "alternative_to": "condition-name-1",
-                  "kind": "keyword",
-                  "rail_line": 2,
-                  "relation": "alternative",
-                  "value": "AND"
-                },
-                {
-                  "alternative_to": "condition-name-1",
-                  "kind": "operand",
-                  "rail_line": 2,
-                  "relation": "alternative",
-                  "value": "condition-name-3"
-                },
-                {
-                  "kind": "operand",
-                  "rail_line": 2,
-                  "relation": "optional",
-                  "value": "literal-2"
-                },
-                {
-                  "alternative_to": "condition-name-1",
-                  "kind": "keyword",
-                  "rail_line": 2,
-                  "relation": "alternative",
-                  "value": "AND"
-                },
-                {
-                  "alternative_to": "condition-name-1",
-                  "kind": "operand",
-                  "rail_line": 2,
-                  "relation": "alternative",
-                  "value": "literal-3"
-                },
-                {
-                  "alternative_to": "condition-name-1",
-                  "kind": "operand",
-                  "rail_line": 2,
-                  "relation": "alternative",
-                  "value": "condition-name-1"
-                },
-                {
-                  "kind": "keyword",
-                  "rail_line": 2,
-                  "relation": "optional",
-                  "value": "USING"
-                },
-                {
-                  "kind": "operand",
-                  "rail_line": 2,
-                  "relation": "optional",
-                  "value": "condition-name-2"
-                },
-                {
-                  "alternative_to": "condition-name-1",
-                  "kind": "keyword",
-                  "rail_line": 2,
-                  "relation": "alternative",
-                  "value": "AND"
-                },
-                {
-                  "alternative_to": "condition-name-1",
-                  "kind": "operand",
-                  "rail_line": 2,
-                  "relation": "alternative",
-                  "value": "condition-name-3"
-                },
-                {
-                  "kind": "operand",
-                  "rail_line": 2,
-                  "relation": "optional",
-                  "value": "literal-2"
-                },
-                {
-                  "alternative_to": "condition-name-1",
-                  "kind": "keyword",
-                  "rail_line": 2,
-                  "relation": "alternative",
-                  "value": "AND"
-                },
-                {
-                  "alternative_to": "condition-name-1",
-                  "kind": "operand",
-                  "rail_line": 2,
-                  "relation": "alternative",
-                  "value": "literal-3"
+                  "value": "\""
                 }
               ],
+              "index": 1,
+              "main": [
+                {
+                  "kind": "keyword",
+                  "value": "'.'"
+                },
+                {
+                  "kind": "keyword",
+                  "value": "[0-9]"
+                }
+              ]
+            },
+            {
+              "branches": [],
               "index": 2,
               "main": [
                 {
-                  "kind": "operand",
-                  "value": "condition-name-1"
+                  "kind": "keyword",
+                  "value": "SPACE"
                 }
               ]
             }
           ],
-          "row_count": 13
+          "row_count": 7
         }
       ],
       "id": "json-parse",
       "linear_forms": [
         "JSON PARSE identifier-1 INTO identifier-2 IGNORING ignoring-phrase-1",
         "INDICATING indicating-phrase-1 ENCODING identifier-6 NAME identifier-3 literal-1 SUPPRESS identifier-4",
-        "CONVERTING converting-phrase-1 EXCEPTION imperative-statement-1 NOT EXCEPTION imperative-statement-2 END-JSON NULL FOR ALL",
-        "identifier-9 NULL using-phrase-2 identifier-9 NULL using-phrase-2 identifier-7 BOOLEAN using-phrase-1",
-        "identifier-8 NULL fig-con-1 condition-name-1 condition-name-1"
+        "CONVERTING converting-phrase-1 EXCEPTION imperative-statement-1 NOT EXCEPTION imperative-statement-2 END-JSON",
+        "NULL FOR ALL identifier-9 NULL using-phrase-1 identifier-7 BOOLEAN using-phrase-1",
+        "identifier-8 NULL fig-con-1 condition-name-1",
+        "\" [0-9] '.' [0-9] SPACE"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
-      "start_page": 410,
+      "start_page": 416,
       "title": "JSON PARSE statement"
     },
     {
@@ -7761,7 +7664,7 @@
               "value": "file-name-1"
             }
           ],
-          "page": 424,
+          "page": 433,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -7898,7 +7801,7 @@
               "value": "file-name-4"
             }
           ],
-          "page": 424,
+          "page": 433,
           "rail_line_count": 3,
           "rail_lines": [
             {
@@ -8043,7 +7946,7 @@
         "ASCENDING data-name-1 file-name-2 file-name-3 GIVING file-name-4"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0025",
-      "start_page": 424,
+      "start_page": 433,
       "title": "MERGE statement"
     },
     {
@@ -8083,7 +7986,7 @@
               "value": "identifier-2"
             }
           ],
-          "page": 428,
+          "page": 437,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -8151,7 +8054,7 @@
               "value": "identifier-2"
             }
           ],
-          "page": 428,
+          "page": 437,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -8198,7 +8101,7 @@
         "MOVE CORRESPONDING identifier-1 TO identifier-2"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0026",
-      "start_page": 428,
+      "start_page": 437,
       "title": "MOVE statement"
     },
     {
@@ -8280,7 +8183,7 @@
               "value": "END-MULTIPLY"
             }
           ],
-          "page": 434,
+          "page": 443,
           "rail_line_count": 4,
           "rail_lines": [
             {
@@ -8463,7 +8366,7 @@
               "value": "END-MULTIPLY"
             }
           ],
-          "page": 434,
+          "page": 443,
           "rail_line_count": 5,
           "rail_lines": [
             {
@@ -8590,7 +8493,7 @@
         "MULTIPLY identifier-1 BY identifier-2 GIVING identifier-3 SIZE ERROR imperative-statement-1 NOT SIZE ERROR imperative-statement-2 END-MULTIPLY"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0027",
-      "start_page": 434,
+      "start_page": 443,
       "title": "MULTIPLY statement"
     },
     {
@@ -8690,7 +8593,7 @@
               "value": "1"
             }
           ],
-          "page": 436,
+          "page": 445,
           "rail_line_count": 5,
           "rail_lines": [
             {
@@ -8850,7 +8753,7 @@
               "value": "file-name-4"
             }
           ],
-          "page": 436,
+          "page": 445,
           "rail_line_count": 4,
           "rail_lines": [
             {
@@ -8948,7 +8851,7 @@
               "value": "file-name-4"
             }
           ],
-          "page": 437,
+          "page": 446,
           "rail_line_count": 3,
           "rail_lines": [
             {
@@ -9008,7 +8911,7 @@
         "OPEN INPUT file-name-1 OUTPUT file-name-2 EXTEND file-name-4"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0028",
-      "start_page": 436,
+      "start_page": 445,
       "title": "OPEN statement"
     },
     {
@@ -9067,7 +8970,7 @@
               "value": "procedure-name-1"
             }
           ],
-          "page": 441,
+          "page": 450,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -9200,7 +9103,7 @@
               "value": "PERFORM"
             }
           ],
-          "page": 445,
+          "page": 454,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -9346,7 +9249,7 @@
               "value": "PERFORM"
             }
           ],
-          "page": 445,
+          "page": 454,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -9455,7 +9358,7 @@
               "value": "condition-1"
             }
           ],
-          "page": 446,
+          "page": 455,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -9727,7 +9630,7 @@
               "value": "condition-2"
             }
           ],
-          "page": 447,
+          "page": 456,
           "rail_line_count": 4,
           "rail_lines": [
             {
@@ -9986,7 +9889,7 @@
         "PERFORM VARYING identifier-2 FROM AFTER identifier-5 FROM identifier-6 PHRASE 3 BY identifier-7 UNTIL condition-2"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0029",
-      "start_page": 440,
+      "start_page": 449,
       "title": "PERFORM statement"
     },
     {
@@ -10072,7 +9975,7 @@
               "value": "END-READ"
             }
           ],
-          "page": 452,
+          "page": 461,
           "rail_line_count": 3,
           "rail_lines": [
             {
@@ -10244,7 +10147,7 @@
               "value": "END-READ"
             }
           ],
-          "page": 452,
+          "page": 461,
           "rail_line_count": 4,
           "rail_lines": [
             {
@@ -10357,7 +10260,7 @@
         "READ file-name-1 KEY data-name-1 INVALID imperative-statement-3 NOT INVALID imperative-statement-4 END-READ"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0030",
-      "start_page": 452,
+      "start_page": 461,
       "title": "READ statement"
     },
     {
@@ -10391,7 +10294,7 @@
               "value": "record-name-1"
             }
           ],
-          "page": 457,
+          "page": 466,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -10430,7 +10333,7 @@
         "RELEASE record-name-1"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0031",
-      "start_page": 457,
+      "start_page": 466,
       "title": "RELEASE statement"
     },
     {
@@ -10506,7 +10409,7 @@
               "value": "END-RETURN"
             }
           ],
-          "page": 459,
+          "page": 468,
           "rail_line_count": 3,
           "rail_lines": [
             {
@@ -10601,7 +10504,7 @@
         "RETURN file-name-1 END imperative-statement-1 NOT END imperative-statement-2 END-RETURN"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0032",
-      "start_page": 458,
+      "start_page": 467,
       "title": "RETURN statement"
     },
     {
@@ -10667,7 +10570,7 @@
               "value": "END-REWRITE"
             }
           ],
-          "page": 460,
+          "page": 469,
           "rail_line_count": 3,
           "rail_lines": [
             {
@@ -10752,7 +10655,7 @@
         "REWRITE record-name-1 INVALID imperative-statement-1 NOT INVALID imperative-statement-2 END-REWRITE"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0033",
-      "start_page": 460,
+      "start_page": 469,
       "title": "REWRITE statement"
     },
     {
@@ -10834,7 +10737,7 @@
               "value": "imperative-statement-2"
             }
           ],
-          "page": 462,
+          "page": 471,
           "rail_line_count": 3,
           "rail_lines": [
             {
@@ -10932,7 +10835,7 @@
         "SEARCH identifier-1 END imperative-statement-1 WHEN condition-1 imperative-statement-2"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0034",
-      "start_page": 462,
+      "start_page": 471,
       "title": "SEARCH statement"
     },
     {
@@ -11000,7 +10903,7 @@
               "value": "index-name-2"
             }
           ],
-          "page": 469,
+          "page": 478,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -11085,7 +10988,7 @@
               "value": "identifier-3"
             }
           ],
-          "page": 470,
+          "page": 479,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -11156,7 +11059,7 @@
               "value": "ON"
             }
           ],
-          "page": 470,
+          "page": 479,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -11220,7 +11123,7 @@
               "value": "TRUE"
             }
           ],
-          "page": 471,
+          "page": 480,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -11317,7 +11220,7 @@
               "value": "identifier-6"
             }
           ],
-          "page": 471,
+          "page": 480,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -11470,7 +11373,7 @@
               "value": "TO"
             }
           ],
-          "page": 473,
+          "page": 482,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -11597,7 +11500,7 @@
               "value": "object-reference-id-2"
             }
           ],
-          "page": 474,
+          "page": 483,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -11672,7 +11575,7 @@
               "value": "identifier-2"
             }
           ],
-          "page": 474,
+          "page": 483,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -11725,7 +11628,7 @@
         "SET LENGTH OF identifier-1 TO identifier-2"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0035",
-      "start_page": 468,
+      "start_page": 477,
       "title": "SET statement"
     },
     {
@@ -11749,7 +11652,7 @@
               "value": "file-name-1"
             }
           ],
-          "page": 475,
+          "page": 484,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -11933,7 +11836,7 @@
               "value": "file-name-3"
             }
           ],
-          "page": 475,
+          "page": 484,
           "rail_line_count": 5,
           "rail_lines": [
             {
@@ -12145,7 +12048,7 @@
               "value": "data-name-2"
             }
           ],
-          "page": 476,
+          "page": 485,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -12241,7 +12144,7 @@
               "value": "alphabet-name-1"
             }
           ],
-          "page": 476,
+          "page": 485,
           "rail_line_count": 3,
           "rail_lines": [
             {
@@ -12348,7 +12251,7 @@
         "ASCENDING DUPLICATES SEQUENCE alphabet-name-1"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0036",
-      "start_page": 475,
+      "start_page": 484,
       "title": "SORT statement"
     },
     {
@@ -12356,326 +12259,11 @@
         "START file [KEY IS relation data] [INVALID KEY statements] [END-START]"
       ],
       "format_titles": [],
-      "forms": [
-        {
-          "branches": [
-            {
-              "kind": "keyword",
-              "rail_line": 1,
-              "relation": "optional",
-              "value": "IS"
-            },
-            {
-              "kind": "keyword",
-              "rail_line": 1,
-              "relation": "optional",
-              "value": "TO"
-            },
-            {
-              "kind": "keyword",
-              "rail_line": 1,
-              "relation": "optional",
-              "value": "="
-            },
-            {
-              "kind": "keyword",
-              "rail_line": 1,
-              "relation": "optional",
-              "value": "GREATER"
-            },
-            {
-              "kind": "keyword",
-              "rail_line": 1,
-              "relation": "optional",
-              "value": "THAN"
-            },
-            {
-              "kind": "keyword",
-              "rail_line": 1,
-              "relation": "optional",
-              "value": ">"
-            },
-            {
-              "kind": "keyword",
-              "rail_line": 1,
-              "relation": "optional",
-              "value": "NOT LESS"
-            },
-            {
-              "kind": "keyword",
-              "rail_line": 1,
-              "relation": "optional",
-              "value": "THAN"
-            },
-            {
-              "kind": "keyword",
-              "rail_line": 1,
-              "relation": "optional",
-              "value": "NOT <"
-            },
-            {
-              "kind": "keyword",
-              "rail_line": 1,
-              "relation": "optional",
-              "value": "GREATER"
-            },
-            {
-              "kind": "keyword",
-              "rail_line": 1,
-              "relation": "optional",
-              "value": "OR EQUAL"
-            },
-            {
-              "alternative_to": "EQUAL",
-              "kind": "keyword",
-              "rail_line": 1,
-              "relation": "alternative",
-              "value": "THAN"
-            },
-            {
-              "kind": "keyword",
-              "rail_line": 1,
-              "relation": "optional",
-              "value": "TO"
-            },
-            {
-              "kind": "keyword",
-              "rail_line": 1,
-              "relation": "optional",
-              "value": ">="
-            },
-            {
-              "kind": "keyword",
-              "rail_line": 2,
-              "relation": "optional",
-              "value": "KEY"
-            },
-            {
-              "kind": "keyword",
-              "rail_line": 3,
-              "relation": "optional",
-              "value": "KEY"
-            }
-          ],
-          "main_line": [
-            {
-              "kind": "keyword",
-              "value": "START"
-            },
-            {
-              "kind": "operand",
-              "value": "file-name-1"
-            },
-            {
-              "kind": "keyword",
-              "value": "KEY"
-            },
-            {
-              "kind": "keyword",
-              "value": "EQUAL"
-            },
-            {
-              "kind": "operand",
-              "value": "data-name-1"
-            },
-            {
-              "kind": "keyword",
-              "value": "INVALID"
-            },
-            {
-              "kind": "operand",
-              "value": "imperative-statement-1"
-            },
-            {
-              "kind": "keyword",
-              "value": "NOT INVALID"
-            },
-            {
-              "kind": "operand",
-              "value": "imperative-statement-2"
-            },
-            {
-              "kind": "keyword",
-              "value": "END-START"
-            }
-          ],
-          "page": 483,
-          "rail_line_count": 4,
-          "rail_lines": [
-            {
-              "branches": [],
-              "index": 0,
-              "main": [
-                {
-                  "kind": "keyword",
-                  "value": "START"
-                },
-                {
-                  "kind": "operand",
-                  "value": "file-name-1"
-                }
-              ]
-            },
-            {
-              "branches": [
-                {
-                  "kind": "keyword",
-                  "rail_line": 1,
-                  "relation": "optional",
-                  "value": "IS"
-                },
-                {
-                  "kind": "keyword",
-                  "rail_line": 1,
-                  "relation": "optional",
-                  "value": "TO"
-                },
-                {
-                  "kind": "keyword",
-                  "rail_line": 1,
-                  "relation": "optional",
-                  "value": "="
-                },
-                {
-                  "kind": "keyword",
-                  "rail_line": 1,
-                  "relation": "optional",
-                  "value": "GREATER"
-                },
-                {
-                  "kind": "keyword",
-                  "rail_line": 1,
-                  "relation": "optional",
-                  "value": "THAN"
-                },
-                {
-                  "kind": "keyword",
-                  "rail_line": 1,
-                  "relation": "optional",
-                  "value": ">"
-                },
-                {
-                  "kind": "keyword",
-                  "rail_line": 1,
-                  "relation": "optional",
-                  "value": "NOT LESS"
-                },
-                {
-                  "kind": "keyword",
-                  "rail_line": 1,
-                  "relation": "optional",
-                  "value": "THAN"
-                },
-                {
-                  "kind": "keyword",
-                  "rail_line": 1,
-                  "relation": "optional",
-                  "value": "NOT <"
-                },
-                {
-                  "kind": "keyword",
-                  "rail_line": 1,
-                  "relation": "optional",
-                  "value": "GREATER"
-                },
-                {
-                  "kind": "keyword",
-                  "rail_line": 1,
-                  "relation": "optional",
-                  "value": "OR EQUAL"
-                },
-                {
-                  "alternative_to": "EQUAL",
-                  "kind": "keyword",
-                  "rail_line": 1,
-                  "relation": "alternative",
-                  "value": "THAN"
-                },
-                {
-                  "kind": "keyword",
-                  "rail_line": 1,
-                  "relation": "optional",
-                  "value": "TO"
-                },
-                {
-                  "kind": "keyword",
-                  "rail_line": 1,
-                  "relation": "optional",
-                  "value": ">="
-                }
-              ],
-              "index": 1,
-              "main": [
-                {
-                  "kind": "keyword",
-                  "value": "KEY"
-                },
-                {
-                  "kind": "keyword",
-                  "value": "EQUAL"
-                },
-                {
-                  "kind": "operand",
-                  "value": "data-name-1"
-                }
-              ]
-            },
-            {
-              "branches": [
-                {
-                  "kind": "keyword",
-                  "rail_line": 2,
-                  "relation": "optional",
-                  "value": "KEY"
-                }
-              ],
-              "index": 2,
-              "main": [
-                {
-                  "kind": "keyword",
-                  "value": "INVALID"
-                },
-                {
-                  "kind": "operand",
-                  "value": "imperative-statement-1"
-                }
-              ]
-            },
-            {
-              "branches": [
-                {
-                  "kind": "keyword",
-                  "rail_line": 3,
-                  "relation": "optional",
-                  "value": "KEY"
-                }
-              ],
-              "index": 3,
-              "main": [
-                {
-                  "kind": "keyword",
-                  "value": "NOT INVALID"
-                },
-                {
-                  "kind": "operand",
-                  "value": "imperative-statement-2"
-                },
-                {
-                  "kind": "keyword",
-                  "value": "END-START"
-                }
-              ]
-            }
-          ],
-          "row_count": 17
-        }
-      ],
+      "forms": [],
       "id": "start",
-      "linear_forms": [
-        "START file-name-1 KEY EQUAL data-name-1 INVALID imperative-statement-1 NOT INVALID imperative-statement-2 END-START"
-      ],
+      "linear_forms": [],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0037",
-      "start_page": 483,
+      "start_page": 492,
       "title": "START statement"
     },
     {
@@ -12704,7 +12292,7 @@
               "value": "RUN"
             }
           ],
-          "page": 485,
+          "page": 494,
           "rail_line_count": 1,
           "rail_lines": [
             {
@@ -12738,7 +12326,7 @@
         "STOP RUN"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0038",
-      "start_page": 485,
+      "start_page": 494,
       "title": "STOP statement"
     },
     {
@@ -12863,7 +12451,7 @@
               "value": "END-STRING"
             }
           ],
-          "page": 486,
+          "page": 495,
           "rail_line_count": 3,
           "rail_lines": [
             {
@@ -13007,7 +12595,7 @@
         "STRING identifier-1 DELIMITED identifier-2 OVERFLOW imperative-statement-1 NOT OVERFLOW imperative-statement-2 END-STRING"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0039",
-      "start_page": 485,
+      "start_page": 494,
       "title": "STRING statement"
     },
     {
@@ -13090,7 +12678,7 @@
               "value": "END-SUBTRACT"
             }
           ],
-          "page": 490,
+          "page": 499,
           "rail_line_count": 4,
           "rail_lines": [
             {
@@ -13273,7 +12861,7 @@
               "value": "END-SUBTRACT"
             }
           ],
-          "page": 491,
+          "page": 500,
           "rail_line_count": 5,
           "rail_lines": [
             {
@@ -13465,7 +13053,7 @@
               "value": "END-SUBTRACT"
             }
           ],
-          "page": 491,
+          "page": 500,
           "rail_line_count": 4,
           "rail_lines": [
             {
@@ -13573,7 +13161,7 @@
         "SUBTRACT CORRESPONDING identifier-1 FROM identifier-2 ROUNDED SIZE ERROR imperative-statement-1 NOT SIZE ERROR imperative-statement-2 END-SUBTRACT"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0040",
-      "start_page": 490,
+      "start_page": 499,
       "title": "SUBTRACT statement"
     },
     {
@@ -13585,7 +13173,7 @@
       "id": "unstring",
       "linear_forms": [],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0041",
-      "start_page": 493,
+      "start_page": 502,
       "title": "UNSTRING statement"
     },
     {
@@ -13775,7 +13363,7 @@
               "value": "imperative-statement-2"
             }
           ],
-          "page": 500,
+          "page": 509,
           "rail_line_count": 6,
           "rail_lines": [
             {
@@ -14051,7 +13639,7 @@
               "value": "END-WRITE"
             }
           ],
-          "page": 500,
+          "page": 509,
           "rail_line_count": 3,
           "rail_lines": [
             {
@@ -14199,7 +13787,7 @@
               "value": "END-WRITE"
             }
           ],
-          "page": 501,
+          "page": 510,
           "rail_line_count": 3,
           "rail_lines": [
             {
@@ -14297,7 +13885,7 @@
         "WRITE record-name-1 AFTER identifier-2 END-WRITE"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0042",
-      "start_page": 499,
+      "start_page": 508,
       "title": "WRITE statement"
     },
     {
@@ -14539,7 +14127,7 @@
               "value": "END-XML"
             }
           ],
-          "page": 507,
+          "page": 516,
           "rail_line_count": 10,
           "rail_lines": [
             {
@@ -15043,7 +14631,7 @@
               "value": "when-phrase"
             }
           ],
-          "page": 508,
+          "page": 517,
           "rail_line_count": 2,
           "rail_lines": [
             {
@@ -15266,7 +14854,7 @@
         "WHEN ZERO when-phrase"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0043",
-      "start_page": 507,
+      "start_page": 516,
       "title": "XML GENERATE statement"
     },
     {
@@ -15406,7 +14994,7 @@
               "value": "END-XML"
             }
           ],
-          "page": 517,
+          "page": 526,
           "rail_line_count": 6,
           "rail_lines": [
             {
@@ -15585,16 +15173,16 @@
         "XML PARSE identifier-1 RETURNING NATIONAL VALIDATING identifier-2 THROUGH procedure-name-2 EXCEPTION imperative-statement-1 NOT EXCEPTION imperative-statement-2 END-XML"
       ],
       "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044",
-      "start_page": 517,
+      "start_page": 526,
       "title": "XML PARSE statement"
     }
   ],
   "schema_version": "mainframe-env.cobol-pdf-grammar-projection@1",
   "source": {
-    "pages": 906,
-    "path": "igy6lr40.pdf",
+    "pages": 916,
+    "path": "cobol.pdf",
     "retained_in_repository": false,
-    "sha256": "sha256:eef69c81ab8bcd569eaa2a47f430ff70c5518d4929cff26e7ab1ed6170f5c0bc"
+    "sha256": "sha256:8b86cbd2d838d8f460dcbe8d1e74d2266799ce1534f4cfdbc08469c36748e85e"
   },
   "unit": "procedure_statements",
   "unmatched_outline_titles": []
