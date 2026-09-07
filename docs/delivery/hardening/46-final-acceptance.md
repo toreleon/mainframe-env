@@ -1,45 +1,51 @@
-# Hardening review #46 — integrated acceptance
+# Hardening review #46 — integrated local acceptance
 
 ## Status
 
-Pending one exact integrated full-assurance candidate. The eleven independently
-reviewable findings tracked by #47 through #57 are implemented, merged, and closed,
-but this document deliberately does not treat child-PR success as release-level
-acceptance for #46.
+Accepted for tracker closure on 2026-09-07 under the controller-approved local-CI policy. Hosted GitHub Actions is not used as the closure authority for this acceptance.
 
-The published `mainframe-env-v0.8.2` tag predates the final #57, #56 disposition,
-and #54 assurance-tier merges, so that tag is not evidence that the complete #46
-set passed together.
+All eleven independently reviewable findings tracked by #47 through #57 are implemented, merged, and closed. The published `mainframe-env-v0.8.2` tag predates the final #57, #56 disposition, and #54 assurance-tier merges, so that tag is not retroactively treated as evidence for the complete hardening set.
 
-## Integrated closure rule
+## Exact local candidate
 
-Close #46 only after a single candidate containing every #47-#57 disposition has
-all selected permanent gates green and a full assurance campaign records that same
-candidate. At minimum the receipt must include formatting, workspace tests, Clippy,
-complete conformance, evidence seal, runtime architecture, the affected backend
-parity tier, and the behavioral-mutation tier when selected. Skipped work is not a
-pass.
+The final offline campaign passed on:
 
-Licensed IBM differential credit is unchanged by this hardening campaign. Local,
-model, GnuCOBOL, synthetic, and reference evidence cannot be promoted to licensed
-IBM equivalence.
+- commit: `4fb596a5589d53511e624d90d8759302b5063af4`
+- tree: `1816b2dc8e28a8e6813fa9e84a6beaf26420c150`
+- `rustc 1.98.0 (88d9e12ae 2026-08-18)`
+- `cargo 1.98.0 (797e8a9bc 2026-08-05)`
+- Linux x86-64 sandbox using the locked offline Cargo vendor bundle
 
-## CI candidate handling
+The source worktree was required to be clean before and after the campaign.
 
-The selector computes the candidate from the event checkout. Downstream jobs now
-checkout the same event ref normally and fail closed unless `git rev-parse HEAD`
-exactly equals the selector candidate. This avoids requiring checkout to rediscover
-a synthetic pull-request merge object by raw SHA while preserving exact-candidate
-identity.
+## Local campaign result
 
-For build-selected runs, `v0-foundation` records the selector plan again inside the
-exact-candidate assurance receipt, so the selector does not upload a duplicate plan
-artifact. A selector-only plan is retained when no build tier is selected. Short
-retention is intentional for these reproducible CI receipts; repository sources,
-contracts, and tests remain the durable reproduction authority.
+The exact candidate passed:
 
-## Closure record
+- `cargo fmt --all -- --check`;
+- 12/12 assurance-selector unit tests;
+- `cargo xtask spec --check`;
+- `cargo xtask schemas --check`;
+- `cargo xtask cobol-exit --check`;
+- `cargo test --workspace --all-features --locked --no-fail-fast`;
+- `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`;
+- `cargo check --workspace --all-targets --all-features --locked`;
+- warnings-denied workspace documentation;
+- `cargo xtask architecture --check`;
+- `cargo xtask conformance --check`;
+- `cargo xtask evidence seal --check`;
+- `cargo xtask runtime-architecture --check`;
+- store unit tests;
+- memory/SQLite Move contract tests;
+- memory/SQLite canonical-effect contract tests; and
+- the bounded behavioral-mutation campaign: 4 killed, 0 survived, 0 invalid, 0 timed out.
 
-Do not mark this section accepted until the full campaign has actually run on the
-integrated candidate. Record the candidate commit/tree, workflow run, gate summary,
-and explicit release-level acceptance here before closing #46.
+The sandbox has no PostgreSQL server or container runtime, so PostgreSQL cases are not relabeled as local passes. The already reviewed #51/#57 PostgreSQL receipts remain the backend-specific evidence; skipped PostgreSQL tests receive no new evidence credit here.
+
+## Closure findings
+
+The integrated campaign found repository-level assurance metadata drift after the child work had merged and corrected it in the accepted local candidate. Those corrections do not broaden licensed-equivalence claims or substitute local evidence for IBM differential evidence.
+
+## Evidence boundary
+
+This acceptance closes the September 5 correctness/evidence hardening tracker. It does not grant licensed IBM equivalence. Local, model, GnuCOBOL, synthetic, and reference evidence remain distinct from licensed differential evidence, and the existing licensed campaigns remain pending under their own certification gates.
