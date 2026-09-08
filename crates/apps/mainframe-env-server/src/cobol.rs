@@ -292,7 +292,7 @@ impl CobolProgram {
                 cancellation_requested: false,
             }
         };
-        observation.cancellation_requested |= invocation.cancellation.is_some();
+        observation.cancellation_requested |= invocation.cancellation_requested();
         if let Some(binding) = invocation.bindings.get("jes.work-id") {
             if binding.schema() != "mainframe-env.jes-work@1" {
                 return Err(ExecutionControlError::Unavailable);

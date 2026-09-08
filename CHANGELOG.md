@@ -33,6 +33,8 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Moved synchronous z/OSMF backend calls to a bounded four-worker lane and
+  propagated finite HTTP deadlines plus live cancellation into invocations.
 - Filtered dataset catalog listings through a discrete SAF decision per name
   and derived pagination hints only from resources visible to the principal.
 - Fenced every work-lease transition by a monotonic epoch and observed clock,

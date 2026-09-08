@@ -10,6 +10,7 @@
     ["mainframe-env-server", "mainframe-env-spool"],
     ["mainframe-env-spool", "mainframe-env-execution-api"],
     ["mainframe-env-spool", "mainframe-env-host-api"],
-    ["mainframe-env-spool", "mainframe-env-store-api"]
+    ["mainframe-env-spool", "mainframe-env-store-api"],
+    ["mainframe-env-zosmf", "mainframe-env-execution-api"]
   ]
 }

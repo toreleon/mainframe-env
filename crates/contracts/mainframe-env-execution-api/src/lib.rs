@@ -7,8 +7,8 @@ mod identity;
 mod machine;
 
 pub use context::{
-    BoundedPayload, Cancellation, Invocation, InvocationLimits, InvocationProblem, Principal,
-    ResourceLimits, ServiceClass,
+    BoundedPayload, Cancellation, CancellationProbe, Invocation, InvocationLimits,
+    InvocationProblem, Principal, ResourceLimits, ServiceClass,
 };
 pub use identity::{
     ArtifactRef, CancellationId, CapabilityId, ExecutionId, IdempotencyKey, IdentityProblem,

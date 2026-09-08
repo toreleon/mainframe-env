@@ -21,6 +21,13 @@ candidate name before emitting it. Pagination scans are bounded and `moreRows`
 is based only on an additional authorized name, so a denied dataset cannot be
 inferred from a name, row count, or continuation hint.
 
+Every synchronous product call runs on a four-worker gateway lane with a
+bounded queue rather than on a Tokio runtime worker. The HTTP timeout starts
+before queueing, supplies an absolute deadline and live cancellation probe to
+the domain invocation, and can return 408 while an uncooperative blocking call
+finishes on its isolated worker. That call retains its lane slot until it exits;
+timed-out queued work is discarded before backend dispatch.
+
 Stable JSON errors contain `category`, `message`, and numeric `status`.
 Malformed input is 400, authentication failure 401, authorization failure 403,
 missing resources and unadvertised routes 404, state/idempotency conflicts 409,

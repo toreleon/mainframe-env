@@ -10,7 +10,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:0356db3690dea63dc7b8611ff1f1b31e864486e07b8fd72c1b229af33e21e0bf",
+      "sha256": "sha256:73d75fa5c49e1445858ae6f420f6b9e1dd04e47a8199b4cf7fa66b13de5de3f4",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -401,7 +401,7 @@
       "path": "docs/architecture/EXECUTION-AND-DURABILITY.md",
       "relative_links": 0,
       "scope": "execution lifecycle, effects, work, checkpoints, and durability",
-      "sha256": "sha256:6b174521255e025d87502135e931e32c58ffbcd789b8c4013df0fb28b98d29cb",
+      "sha256": "sha256:8f32ff9c31ab506e98b6f35cdd59499c7836c74245b0f12cadef6a920b1bdc47",
       "status": "Accepted by repository owner",
       "title": "Execution and Durability Architecture",
       "xtask_commands": 0
@@ -693,7 +693,7 @@
       "path": "docs/delivery/ZOSMF-API.md",
       "relative_links": 0,
       "scope": "public z/OSMF-compatible routes, requests, and responses",
-      "sha256": "sha256:487d41609bbda1ea3ff36a289057d1d8dff380f3acac8b03ff3e4033af7fd8b3",
+      "sha256": "sha256:40726f1c6925d459392b14c1e567a37d29642e2b5e1fc6cccc840e2a8c5e336e",
       "status": "Frozen for mainframe-env 0.1.0",
       "title": "z/OSMF 0.1 compatibility API",
       "xtask_commands": 0

@@ -125,6 +125,13 @@ Every lane has a bounded queue, concurrency semaphore, admission policy,
 deadline behavior, and saturation metrics. Work is accounted until terminal
 state or durable suspension, not only until an HTTP response is returned.
 
+The z/OSMF adapter places synchronous composition calls on a dedicated bounded
+OS-thread lane. Request cancellation is a live shared probe on the invocation,
+not merely cancellation of the HTTP future, and the absolute gateway deadline
+replaces unbounded invocation deadlines. A timed-out call keeps its worker
+capacity until it cooperatively exits, while Tokio remains free to return the
+timeout and serve unrelated work.
+
 Suspended sessions own bounded serialized state but no dedicated CPU worker or
 OS thread.
 

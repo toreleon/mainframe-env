@@ -1200,7 +1200,7 @@ impl BatchService {
             return Ok(None);
         };
         self.ensure_spool_migrated(invocation, &id)?;
-        if cancelled || invocation.cancellation.is_some() {
+        if cancelled || invocation.cancellation_requested() {
             return self.cancel(invocation, &id).map(Some);
         }
         let mut job = {

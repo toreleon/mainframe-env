@@ -37,7 +37,7 @@ impl ScopedHostService {
         let sequence = request.sequence;
         let result = if request.run_unit != invocation.run_unit_id {
             Err(HostProblem::Malformed)
-        } else if cancellation_requested || invocation.cancellation.is_some() {
+        } else if cancellation_requested || invocation.cancellation_requested() {
             Err(HostProblem::Cancelled)
         } else if now_tick >= invocation.deadline_tick || now_tick >= request.deadline_tick {
             Err(HostProblem::TimedOut)
@@ -155,8 +155,9 @@ mod tests {
     use super::*;
     use crate::{CapabilityDescriptor, HostProvider, HostRequest, RegistrySnapshot, StateRequest};
     use mainframe_env_execution_api::{
-        ArtifactRef, CapabilityId, ExecutionId, IdempotencyKey, InvocationLimits, Principal,
-        PrincipalId, RequestId, ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
+        ArtifactRef, CancellationProbe, CapabilityId, ExecutionId, IdempotencyKey,
+        InvocationLimits, Principal, PrincipalId, RequestId, ResourceLimits, RunUnitId, Selector,
+        ServiceClass, TraceId,
     };
     use std::collections::{BTreeMap, BTreeSet};
 
@@ -248,18 +249,23 @@ mod tests {
     }
     #[test]
     fn identity_cancellation_and_deadline_fail_before_provider() {
-        let invocation = invocation(true);
-        let cancelled = service().invoke(&invocation, 1, true, request(&invocation.run_unit_id));
+        let active = invocation(true);
+        let cancelled = service().invoke(&active, 1, true, request(&active.run_unit_id));
+        assert_eq!(cancelled.effect.outcome, Err(HostProblem::Cancelled));
+        let probe = CancellationProbe::new();
+        let live = invocation(true).with_cancellation_probe(probe.clone());
+        probe.request();
+        let cancelled = service().invoke(&live, 1, false, request(&live.run_unit_id));
         assert_eq!(cancelled.effect.outcome, Err(HostProblem::Cancelled));
         let timed_out = service().invoke(
-            &invocation,
-            invocation.deadline_tick,
+            &active,
+            active.deadline_tick,
             false,
-            request(&invocation.run_unit_id),
+            request(&active.run_unit_id),
         );
         assert_eq!(timed_out.effect.outcome, Err(HostProblem::TimedOut));
         let other_run = RunUnitId::new("other", InvocationLimits::default()).unwrap();
-        let malformed = service().invoke(&invocation, 1, false, request(&other_run));
+        let malformed = service().invoke(&active, 1, false, request(&other_run));
         assert_eq!(malformed.effect.outcome, Err(HostProblem::Malformed));
     }
     #[test]

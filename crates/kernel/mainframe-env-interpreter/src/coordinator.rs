@@ -444,7 +444,7 @@ fn check_control(
     if let Some(journal) = journal.as_mut() {
         journal.tick = control.now_tick;
     }
-    let terminal = if control.cancellation_requested || invocation.cancellation.is_some() {
+    let terminal = if control.cancellation_requested || invocation.cancellation_requested() {
         Some((
             ExecutionState::Cancelled,
             LifecycleEventKind::Cancelled,

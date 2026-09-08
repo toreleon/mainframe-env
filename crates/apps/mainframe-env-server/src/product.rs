@@ -48,7 +48,8 @@ use mainframe_env_store_api::{
     ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError, WorkRecord, WorkState,
 };
 use mainframe_env_zosmf::{
-    Authentication, GatewayProblem, GatewayRequest, GatewayResponse, ZosmfBackend, ZosmfLimits,
+    Authentication, GatewayCallContext, GatewayProblem, GatewayRequest, GatewayResponse,
+    ZosmfBackend, ZosmfLimits,
 };
 use ring::hmac;
 use ring::rand::{SecureRandom, SystemRandom};
@@ -56,6 +57,7 @@ use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -253,6 +255,26 @@ const MAX_AUTH_SESSIONS: usize = 65_536;
 const MAX_AUTH_SESSIONS_PER_USER: usize = 8;
 const AUTH_SESSION_ABSOLUTE_TTL_MILLIS: u64 = 8 * 60 * 60 * 1000;
 const AUTH_SESSION_IDLE_TTL_MILLIS: u64 = 30 * 60 * 1000;
+
+thread_local! {
+    static GATEWAY_CALL_CONTEXT: RefCell<Option<GatewayCallContext>> = const { RefCell::new(None) };
+}
+
+struct GatewayCallContextScope(Option<GatewayCallContext>);
+
+impl GatewayCallContextScope {
+    fn enter(context: GatewayCallContext) -> Self {
+        Self(GATEWAY_CALL_CONTEXT.with(|current| current.replace(Some(context))))
+    }
+}
+
+impl Drop for GatewayCallContextScope {
+    fn drop(&mut self) {
+        GATEWAY_CALL_CONTEXT.with(|current| {
+            current.replace(self.0.take());
+        });
+    }
+}
 
 struct DurableApplicationsV2 {
     installer: ApplicationInstallerV2,
@@ -1700,6 +1722,7 @@ impl ProductServer {
             ZosmfLimits {
                 max_body_bytes: self.config.max_body_bytes,
                 max_concurrency: self.config.max_concurrency,
+                max_blocking: self.config.max_concurrency.min(4),
                 timeout: Duration::from_millis(self.config.timeout_millis),
                 max_page_items: 1000,
             },
@@ -1787,6 +1810,16 @@ impl ProductServer {
         result
     }
 
+    fn handle_with_context(
+        &self,
+        authentication: Authentication,
+        request: GatewayRequest,
+        context: GatewayCallContext,
+    ) -> Result<GatewayResponse, GatewayProblem> {
+        let _scope = GatewayCallContextScope::enter(context);
+        self.handle(authentication, request)
+    }
+
     fn recover_local_wakeups(&self) -> Result<(), HostProblem> {
         for notification in self
             .store
@@ -1806,6 +1839,14 @@ impl ProductServer {
         authentication: Authentication,
         request: GatewayRequest,
     ) -> Result<GatewayResponse, GatewayProblem> {
+        if let Some(context) = current_gateway_call_context() {
+            if context.cancellation_requested() {
+                return Err(gateway_problem(HostProblem::Cancelled));
+            }
+            if context.deadline_elapsed() {
+                return Err(gateway_problem(HostProblem::TimedOut));
+            }
+        }
         if matches!(request, GatewayRequest::Info) {
             return Ok(GatewayResponse::json(
                 StatusCode::OK,
@@ -3029,8 +3070,8 @@ impl ProductServer {
         let idempotency_key = mutation.map(|mutation| mutation.idempotency_key.clone());
         let result = self.host.invoke(
             &invocation,
-            1,
-            false,
+            session_tick().map_err(gateway_problem)?,
+            invocation.cancellation_requested(),
             EffectRequest {
                 run_unit: invocation.run_unit_id.clone(),
                 sequence: mutation.map_or(sequence, |mutation| mutation.sequence),
@@ -3149,8 +3190,8 @@ impl ProductServer {
             .map_err(gateway_problem)?;
         let result = self.host.invoke(
             &invocation,
-            1,
-            false,
+            session_tick().map_err(gateway_problem)?,
+            invocation.cancellation_requested(),
             EffectRequest {
                 run_unit: invocation.run_unit_id.clone(),
                 sequence: 1,
@@ -3290,7 +3331,16 @@ impl ProductServer {
             .cloned()
             .map(|capability| (capability, "1".to_string()))
             .collect();
-        Invocation::new(
+        let context = current_gateway_call_context();
+        let deadline_tick = context.as_ref().map_or_else(
+            || {
+                session_tick()?
+                    .checked_add(self.config.timeout_millis)
+                    .ok_or(HostProblem::ResourceExhausted)
+            },
+            |context| Ok(context.deadline_tick()),
+        )?;
+        let invocation = Invocation::new(
             RequestId::new(format!("request-{sequence}"), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
             ExecutionId::new(format!("execution-{sequence}"), limits)
@@ -3309,7 +3359,7 @@ impl ProductServer {
             .map_err(|_| HostProblem::InfrastructureFailure)?,
             service_class,
             0,
-            u64::MAX,
+            deadline_tick,
             TraceId::new(format!("trace-{sequence}"), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
             IdempotencyKey::new(format!("request-{sequence}"), limits)
@@ -3320,7 +3370,12 @@ impl ProductServer {
             limits,
         )
         .and_then(|invocation| invocation.with_provider_generations(generations, limits))
-        .map_err(|_| HostProblem::InfrastructureFailure)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+        Ok(if let Some(context) = context {
+            invocation.with_cancellation_probe(context.cancellation_probe())
+        } else {
+            invocation
+        })
     }
 
     fn mutation(&self) -> Result<Mutation, HostProblem> {
@@ -3615,8 +3670,9 @@ impl ZosmfBackend for ProductServer {
         &self,
         authentication: Authentication,
         request: GatewayRequest,
+        context: GatewayCallContext,
     ) -> Result<GatewayResponse, GatewayProblem> {
-        self.handle(authentication, request)
+        self.handle_with_context(authentication, request, context)
     }
 }
 
@@ -3801,6 +3857,10 @@ fn current_tick() -> Result<u64, GatewayProblem> {
             .as_millis(),
     )
     .map_err(|_| gateway_problem(HostProblem::ResourceExhausted))
+}
+
+fn current_gateway_call_context() -> Option<GatewayCallContext> {
+    GATEWAY_CALL_CONTEXT.with(|current| current.borrow().clone())
 }
 
 fn session_tick() -> Result<u64, HostProblem> {
@@ -6185,6 +6245,7 @@ mod tests {
     #[test]
     fn invocation_grants_are_selector_scoped_and_generation_pinned() {
         let server = ProductServer::memory(config()).unwrap();
+        let before = session_tick().unwrap();
         let invocation = server
             .invocation(
                 "IBMUSER",
@@ -6193,6 +6254,8 @@ mod tests {
                 &["host.dataset.read"],
             )
             .unwrap();
+        assert!(invocation.deadline_tick >= before + server.config.timeout_millis);
+        assert!(invocation.deadline_tick <= session_tick().unwrap() + server.config.timeout_millis);
         assert_eq!(invocation.principal.grants().len(), 1);
         let capability =
             CapabilityId::new("host.dataset.read", InvocationLimits::default()).unwrap();
@@ -6203,6 +6266,23 @@ mod tests {
         assert!(!invocation.principal.has_grant(
             &CapabilityId::new("host.cics.execute", InvocationLimits::default()).unwrap()
         ));
+
+        let deadline = session_tick().unwrap() + 1_000;
+        let context = GatewayCallContext::new(deadline).unwrap();
+        let cancellation = context.cancellation_probe();
+        let _scope = GatewayCallContextScope::enter(context);
+        let controlled = server
+            .invocation(
+                "IBMUSER",
+                "zosmf:dataset",
+                ServiceClass::System,
+                &["host.dataset.read"],
+            )
+            .unwrap();
+        assert_eq!(controlled.deadline_tick, deadline);
+        assert!(!controlled.cancellation_requested());
+        cancellation.request();
+        assert!(controlled.cancellation_requested());
     }
 
     #[test]
