@@ -281,7 +281,7 @@ pub struct ConformanceCase {
     expected: Vec<ObservationRef>,
     recovery: Option<RecoveryRef>,
     oracle: Option<OracleRef>,
-    reviewed_rule: Option<ReviewedRuleRef>,
+    reviewed_rules: Vec<ReviewedRuleRef>,
     scenario: Option<ScenarioId>,
 }
 
@@ -368,8 +368,8 @@ impl ConformanceCase {
     }
 
     #[must_use]
-    pub fn reviewed_rule(&self) -> Option<&ReviewedRuleRef> {
-        self.reviewed_rule.as_ref()
+    pub fn reviewed_rules(&self) -> &[ReviewedRuleRef] {
+        &self.reviewed_rules
     }
 
     #[must_use]
@@ -1489,7 +1489,7 @@ struct RawCase {
     recovery: Option<String>,
     oracle: Option<String>,
     #[serde(default)]
-    reviewed_rule: Option<String>,
+    reviewed_rules: Vec<String>,
     #[serde(default)]
     scenario: Option<String>,
 }
@@ -1759,13 +1759,10 @@ fn compile_case(
     if gate == CoverageGate::Differential && oracle.is_none() {
         return Err(SpecProblem::OracleReceiptRequired);
     }
-    let reviewed_rule = raw
-        .reviewed_rule
-        .map(|value| ReviewedRuleRef::new(value, limits))
-        .transpose()?;
-    if reviewed_rule
-        .as_ref()
-        .is_some_and(|rule| !row.reviewed_rules.contains(rule))
+    let reviewed_rules = compile_refs(raw.reviewed_rules, ReviewedRuleRef::new, limits)?;
+    if reviewed_rules
+        .iter()
+        .any(|rule| !row.reviewed_rules.contains(rule))
     {
         return Err(SpecProblem::UnknownRegistryRef(
             "case reviewed rule is outside row specification".into(),
@@ -1785,7 +1782,7 @@ fn compile_case(
         expected,
         recovery,
         oracle,
-        reviewed_rule,
+        reviewed_rules,
         scenario,
     })
 }
@@ -3137,6 +3134,42 @@ mod conformance_tests {
         assert_eq!(spec.obligations().count(), 2);
         assert_eq!(spec.cases().count(), 2);
         assert!(!spec.expected_shards().is_empty());
+    }
+
+    #[test]
+    fn reviewed_rule_provenance_is_typed_and_changes_spec_identity() {
+        let mut value = document();
+        value["registries"]["reviewed_rules"] = json!([{
+            "id": "mock.reviewed-rule",
+            "digest": "sha256:1212121212121212121212121212121212121212121212121212121212121212"
+        }]);
+        value["rows"][0]["reviewed_rules"] = json!(["mock.reviewed-rule"]);
+        value["cases"][0]["reviewed_rules"] = json!(["mock.reviewed-rule"]);
+        let original = compile(&value).unwrap();
+        assert_eq!(
+            original.rows().next().unwrap().reviewed_rules()[0].as_str(),
+            "mock.reviewed-rule"
+        );
+        assert_eq!(
+            original
+                .cases()
+                .find(|case| case.test_id().as_str() == "mock.valid")
+                .unwrap()
+                .reviewed_rules()[0]
+                .as_str(),
+            "mock.reviewed-rule"
+        );
+
+        value["registries"]["reviewed_rules"][0]["digest"] =
+            json!("sha256:3434343434343434343434343434343434343434343434343434343434343434");
+        let changed = compile(&value).unwrap();
+        assert_ne!(original.spec_digest(), changed.spec_digest());
+
+        value["cases"][0]["reviewed_rules"] = json!(["mock.missing-rule"]);
+        assert!(matches!(
+            compile(&value),
+            Err(SpecProblem::UnknownRegistryRef(_))
+        ));
     }
 
     #[test]

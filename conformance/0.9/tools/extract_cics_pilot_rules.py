@@ -26,7 +26,7 @@ import docs_api  # noqa: E402
 MAX_TOPIC_BYTES = 2 * 1024 * 1024
 MAX_TOPICS = 32
 MAX_FRAGMENTS = 20_000
-BLOCKS = frozenset({"h2", "p", "li", "dt", "dd"})
+BLOCKS = frozenset({"h2", "p", "li", "dt", "dd", "tr"})
 
 
 @dataclass(eq=False)

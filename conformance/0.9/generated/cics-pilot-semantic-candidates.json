@@ -138,7 +138,7 @@
     },
     {
       "applicability": [
-        "local closed file resource"
+        "local file resource with open status CLOSED and enable status UNENABLED"
       ],
       "classification": "candidate",
       "cues": {
@@ -153,7 +153,7 @@
       },
       "fragment_sha256": "5aa284b73dd977e176e62d197eb05608dfaaa80cc31e3432f356037bc1530eda",
       "interpretations": [
-        "Reading a closed unavailable file reports NOTOPEN with RESP 19 and RESP2 60."
+        "Reading a local file that is both CLOSED and UNENABLED reports NOTOPEN with RESP 19 and RESP2 60; CLOSED and ENABLED instead permits CICS to open the file, while DISABLED is a distinct condition."
       ],
       "locator": "topic:SSJL4D_6.x/reference-applications/commands-api/dfhp4_read.html;section:dfhp43w__conditions;path:div[1]/article[1]/div[2]/section[7]/dl[1]/dd[14]/dl[1]/dd[1];fragment-sha256:5aa284b73dd977e176e62d197eb05608dfaaa80cc31e3432f356037bc1530eda",
       "rule_ids": [
@@ -372,7 +372,7 @@
       "topic_sha256": "d0c41514d9cb8e4fb3ac635054852d22d8cd645bf45372fda71335b1cfb6f76a"
     }
   ],
-  "compile_rules_sha256": "c393e5f2f0771072da0c462821b829d08e800e68a11f11f4eb1372e924994cf0",
+  "compile_rules_sha256": "280d6d628d6e306b8fb5561d6c93e0422f950ba27a57d336a505ea04cab0e020",
   "coverage_credit": 0,
   "extractor_version": "cics-dita-fragments@1",
   "inventory": [
@@ -905,6 +905,46 @@
       "rule_ids": [],
       "section": "dfhp3001-gen110__VSAMdatasets__title__1",
       "tag": "li",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3c00110.html",
+      "topic_sha256": "49b4fa39b83a676be8306742498bd46e0646148af76a7ead3b492b609c982e59"
+    },
+    {
+      "classification": "outside-scope",
+      "fragment_sha256": "104f9ad09235da94b3257d578bfaca8fb1ec04450f3531ac684d03eb3e41a26c",
+      "locator": "topic:SSJL4D_6.x/applications/designing/dfhp3c00110.html;section:dfhp3001-gen110__VSAMdatasets__title__1;path:div[1]/article[1]/div[2]/section#dfhp3001-gen110__VSAMdatasets/div[1]/ul[1]/li[2]/div[1]/div[1]/table#dfhp3001-gen110__dfhp318/thead[1]/tr[1];fragment-sha256:104f9ad09235da94b3257d578bfaca8fb1ec04450f3531ac684d03eb3e41a26c",
+      "rule_ids": [],
+      "section": "dfhp3001-gen110__VSAMdatasets__title__1",
+      "tag": "tr",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3c00110.html",
+      "topic_sha256": "49b4fa39b83a676be8306742498bd46e0646148af76a7ead3b492b609c982e59"
+    },
+    {
+      "classification": "outside-scope",
+      "fragment_sha256": "939a7e5116676a7573512a03c9db9bdf1327e33574d7fc2d7e633c649f44dcf2",
+      "locator": "topic:SSJL4D_6.x/applications/designing/dfhp3c00110.html;section:dfhp3001-gen110__VSAMdatasets__title__1;path:div[1]/article[1]/div[2]/section#dfhp3001-gen110__VSAMdatasets/div[1]/ul[1]/li[2]/div[1]/div[1]/table#dfhp3001-gen110__dfhp318/tbody[1]/tr[1];fragment-sha256:939a7e5116676a7573512a03c9db9bdf1327e33574d7fc2d7e633c649f44dcf2",
+      "rule_ids": [],
+      "section": "dfhp3001-gen110__VSAMdatasets__title__1",
+      "tag": "tr",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3c00110.html",
+      "topic_sha256": "49b4fa39b83a676be8306742498bd46e0646148af76a7ead3b492b609c982e59"
+    },
+    {
+      "classification": "outside-scope",
+      "fragment_sha256": "6bb2f2be3a65ad98e50cd1930f081becfe6ed0a1c26cc289c843e7f4fa22bfa0",
+      "locator": "topic:SSJL4D_6.x/applications/designing/dfhp3c00110.html;section:dfhp3001-gen110__VSAMdatasets__title__1;path:div[1]/article[1]/div[2]/section#dfhp3001-gen110__VSAMdatasets/div[1]/ul[1]/li[2]/div[1]/div[1]/table#dfhp3001-gen110__dfhp318/tbody[1]/tr[2];fragment-sha256:6bb2f2be3a65ad98e50cd1930f081becfe6ed0a1c26cc289c843e7f4fa22bfa0",
+      "rule_ids": [],
+      "section": "dfhp3001-gen110__VSAMdatasets__title__1",
+      "tag": "tr",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3c00110.html",
+      "topic_sha256": "49b4fa39b83a676be8306742498bd46e0646148af76a7ead3b492b609c982e59"
+    },
+    {
+      "classification": "outside-scope",
+      "fragment_sha256": "aa1cffb63a42a7be1eb7235f1c6d3d7b045a0551e877b69c1891827f03e58684",
+      "locator": "topic:SSJL4D_6.x/applications/designing/dfhp3c00110.html;section:dfhp3001-gen110__VSAMdatasets__title__1;path:div[1]/article[1]/div[2]/section#dfhp3001-gen110__VSAMdatasets/div[1]/ul[1]/li[2]/div[1]/div[1]/table#dfhp3001-gen110__dfhp318/tbody[1]/tr[3];fragment-sha256:aa1cffb63a42a7be1eb7235f1c6d3d7b045a0551e877b69c1891827f03e58684",
+      "rule_ids": [],
+      "section": "dfhp3001-gen110__VSAMdatasets__title__1",
+      "tag": "tr",
       "topic_path": "SSJL4D_6.x/applications/designing/dfhp3c00110.html",
       "topic_sha256": "49b4fa39b83a676be8306742498bd46e0646148af76a7ead3b492b609c982e59"
     },
@@ -2613,7 +2653,7 @@
     },
     {
       "applicability": [
-        "local closed file resource"
+        "local file resource with open status CLOSED and enable status UNENABLED"
       ],
       "classification": "candidate",
       "cues": {
@@ -2628,7 +2668,7 @@
       },
       "fragment_sha256": "5aa284b73dd977e176e62d197eb05608dfaaa80cc31e3432f356037bc1530eda",
       "interpretations": [
-        "Reading a closed unavailable file reports NOTOPEN with RESP 19 and RESP2 60."
+        "Reading a local file that is both CLOSED and UNENABLED reports NOTOPEN with RESP 19 and RESP2 60; CLOSED and ENABLED instead permits CICS to open the file, while DISABLED is a distinct condition."
       ],
       "locator": "topic:SSJL4D_6.x/reference-applications/commands-api/dfhp4_read.html;section:dfhp43w__conditions;path:div[1]/article[1]/div[2]/section[7]/dl[1]/dd[14]/dl[1]/dd[1];fragment-sha256:5aa284b73dd977e176e62d197eb05608dfaaa80cc31e3432f356037bc1530eda",
       "rule_ids": [
@@ -4266,8 +4306,8 @@
     "candidates": 14,
     "conflicting": 0,
     "informative": 15,
-    "normative_fragments": 365,
-    "outside_scope": 336,
+    "normative_fragments": 369,
+    "outside_scope": 340,
     "topics": 9,
     "unsupported": 0
   }

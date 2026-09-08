@@ -4,12 +4,17 @@
   "capture_contract": "mainframe-env.cics-oracle-capture@1",
   "required_scenarios": [
     "plain-read",
-    "rewrite-without-update",
-    "read-update-rewrite",
-    "commit-rollback-boundary",
+    "read-update",
     "missing-record",
     "unauthorized",
-    "closed-file"
+    "closed-file",
+    "requires-read-update",
+    "rewrite-record",
+    "forbidden-mutation-on-invreq",
+    "context-invalidated-at-syncpoint",
+    "commit-boundary",
+    "rollback-boundary",
+    "durable-restart"
   ],
   "origin_policy": {
     "kind": "licensed-ibm",

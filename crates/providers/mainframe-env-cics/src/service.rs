@@ -83,7 +83,12 @@ pub struct CicsFileDefinition {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CicsFileStatus {
     Open,
+    /// The file is closed and enabled, so the next online file request auto-opens it.
+    ClosedEnabled,
+    /// The file is closed and unavailable to implicit open; file requests receive NOTOPEN.
     Closed,
+    /// The file is disabled; this is distinct from the CLOSED + UNENABLED state.
+    Disabled,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1777,6 +1782,10 @@ impl CicsService {
         } else {
             self.clear_undo(run)?;
         }
+        // A syncpoint ends every no-token file update context regardless of
+        // whether the unit of work commits or rolls back.
+        run.current_records.clear();
+        run.current_record_values.clear();
         if self
             .store
             .put_provider_state(
@@ -2080,7 +2089,9 @@ impl CicsService {
             }
             let status = match value.bytes() {
                 b"OPEN" => CicsFileStatus::Open,
-                b"CLOSED" => CicsFileStatus::Closed,
+                b"CLOSED-ENABLED" => CicsFileStatus::ClosedEnabled,
+                b"CLOSED" | b"CLOSED-UNENABLED" => CicsFileStatus::Closed,
+                b"DISABLED" => CicsFileStatus::Disabled,
                 _ => return Err(HostProblem::Malformed),
             };
             if requested.insert(normalized, status).is_some() {
@@ -2171,17 +2182,62 @@ impl CicsService {
             }
         }
         let definition = {
-            let state = self.lock()?;
-            if state
-                .file_statuses
-                .get(&logical_name)
-                .is_some_and(|record| record.status == CicsFileStatus::Closed)
-            {
-                return Err(HostProblem::Condition {
-                    name: "NOTOPEN".into(),
-                    response: 19,
-                    response2: 60,
-                });
+            let mut state = self.lock()?;
+            match state.file_statuses.get(&logical_name).copied() {
+                Some(DurableFileStatus {
+                    status: CicsFileStatus::Closed,
+                    ..
+                }) => {
+                    return Err(HostProblem::Condition {
+                        name: "NOTOPEN".into(),
+                        response: 19,
+                        response2: 60,
+                    });
+                }
+                Some(DurableFileStatus {
+                    status: CicsFileStatus::Disabled,
+                    ..
+                }) => {
+                    return Err(HostProblem::Condition {
+                        name: "DISABLED".into(),
+                        response: 84,
+                        response2: 0,
+                    });
+                }
+                Some(
+                    current @ DurableFileStatus {
+                        status: CicsFileStatus::ClosedEnabled,
+                        ..
+                    },
+                ) => {
+                    let version = current
+                        .version
+                        .checked_add(1)
+                        .ok_or(HostProblem::ResourceExhausted)?;
+                    self.store
+                        .put_provider_state(
+                            ProviderStateRecord {
+                                namespace: "cics-file-status".into(),
+                                key: logical_name.clone(),
+                                version,
+                                payload: encode_file_status(CicsFileStatus::Open),
+                            },
+                            Some(current.version),
+                        )
+                        .map_err(store_error)?;
+                    state.file_statuses.insert(
+                        logical_name.clone(),
+                        DurableFileStatus {
+                            status: CicsFileStatus::Open,
+                            version,
+                        },
+                    );
+                }
+                Some(DurableFileStatus {
+                    status: CicsFileStatus::Open,
+                    ..
+                })
+                | None => {}
             }
             state.file_aliases.get(&logical_name).cloned()
         };
@@ -3867,14 +3923,18 @@ fn decode_file_definition(bytes: &[u8]) -> Result<CicsFileDefinition, HostProble
 fn encode_file_status(status: CicsFileStatus) -> Vec<u8> {
     match status {
         CicsFileStatus::Open => b"OPEN".to_vec(),
+        CicsFileStatus::ClosedEnabled => b"CLOSED-ENABLED".to_vec(),
         CicsFileStatus::Closed => b"CLOSED".to_vec(),
+        CicsFileStatus::Disabled => b"DISABLED".to_vec(),
     }
 }
 
 fn decode_file_status(bytes: &[u8]) -> Result<CicsFileStatus, HostProblem> {
     match bytes {
         b"OPEN" => Ok(CicsFileStatus::Open),
-        b"CLOSED" => Ok(CicsFileStatus::Closed),
+        b"CLOSED-ENABLED" => Ok(CicsFileStatus::ClosedEnabled),
+        b"CLOSED" | b"CLOSED-UNENABLED" => Ok(CicsFileStatus::Closed),
+        b"DISABLED" => Ok(CicsFileStatus::Disabled),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }
@@ -5637,6 +5697,75 @@ mod tests {
                 response2: 60,
             })
         );
+
+        let enable_closed = request(
+            CicsOperation::SetFileStatus,
+            BTreeMap::from([("TRANSACT".into(), status(b"CLOSED-ENABLED"))]),
+            4,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, enable_closed.clone(), 4),
+                enable_closed,
+            )
+            .unwrap();
+        let auto_open_read = request(
+            CicsOperation::Read,
+            BTreeMap::from([("FILE".into(), argument(b"TRANSACT"))]),
+            5,
+        );
+        assert_ne!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, auto_open_read.clone(), 5),
+                auto_open_read
+            ),
+            Err(HostProblem::Condition {
+                name: "NOTOPEN".into(),
+                response: 19,
+                response2: 60,
+            })
+        );
+        assert_eq!(service.file_status("TRANSACT"), Ok(CicsFileStatus::Open));
+
+        let disable = request(
+            CicsOperation::SetFileStatus,
+            BTreeMap::from([("TRANSACT".into(), status(b"DISABLED"))]),
+            6,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, disable.clone(), 6),
+                disable,
+            )
+            .unwrap();
+        let disabled_read = request(
+            CicsOperation::Read,
+            BTreeMap::from([("FILE".into(), argument(b"TRANSACT"))]),
+            7,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, disabled_read.clone(), 7),
+                disabled_read
+            ),
+            Err(HostProblem::Condition {
+                name: "DISABLED".into(),
+                response: 84,
+                response2: 0,
+            })
+        );
+
+        let close_again = request(
+            CicsOperation::SetFileStatus,
+            BTreeMap::from([("TRANSACT".into(), status(b"CLOSED-UNENABLED"))]),
+            8,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, close_again.clone(), 8),
+                close_again,
+            )
+            .unwrap();
         drop(service);
         let restarted = CicsService::open(authorities(), store, CicsLimits::default()).unwrap();
         assert_eq!(

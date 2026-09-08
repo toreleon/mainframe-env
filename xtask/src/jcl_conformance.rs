@@ -772,10 +772,14 @@ mod tests {
         let spec = compile_shared_spec(&root).unwrap();
         let dataset_handlers = dataset_conformance_runtime();
         let jcl_handlers = runtime();
+        let cics_handlers = cics_pilot_runtime();
+        let cobol_move_handlers = cobol_move_pilot_runtime();
         combined_conformance_runtime(
             &spec,
             &dataset_handlers,
             &jcl_handlers,
+            &cics_handlers,
+            &cobol_move_handlers,
             ConformanceLimits::default(),
         )
         .unwrap();

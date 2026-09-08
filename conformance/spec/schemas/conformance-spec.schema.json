@@ -93,7 +93,7 @@
         "expected": {"type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
         "recovery": {"anyOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
         "oracle": {"anyOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
-        "reviewed_rule": {"anyOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
+        "reviewed_rules": {"type": "array", "maxItems": 256, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
         "scenario": {"anyOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]}
       }
     },

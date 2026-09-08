@@ -26,10 +26,12 @@ reads; the old rollback test uses `OPTION.UPDATE`; and a regression proves that
 a plain read cannot reach the dataset rewrite authority.
 
 The audit also found three response-boundary gaps needed by the pilot: missing
-keyed reads lost RESP2 80, file-security denial lost RESP2 101, and a closed
-file returned the repository's synthetic `DISABLED` result instead of the
-reviewed NOTOPEN 19/60 result. These are product-owned mappings and are fixed in
-the CICS service, not in the conformance comparator.
+keyed reads lost RESP2 80, file-security denial lost RESP2 101, and the file
+resource model did not distinguish CLOSED+UNENABLED, CLOSED+ENABLED, and
+DISABLED. The provider now returns NOTOPEN 19/60 only for CLOSED+UNENABLED,
+auto-opens CLOSED+ENABLED, and preserves DISABLED as a separate condition.
+These are product-owned mappings and are fixed in the CICS service, not in the
+conformance comparator.
 
 ## Reproduced commands
 
@@ -65,15 +67,20 @@ The selected forms and behaviors are:
 - `READ ... UPDATE`, followed by no-token `REWRITE`;
 - `SYNCPOINT` commit and `SYNCPOINT ROLLBACK`;
 - invalid REWRITE without an update read, missing key, denied file access, and
-  a closed file;
+  a CLOSED+UNENABLED file, plus a CLOSED+ENABLED auto-open control;
 - update-context invalidation at a syncpoint; and
 - a committed A→B transition followed by B→C and rollback to B.
 
-Every case starts from explicit setup and reads final bytes through an owned
+Every case starts from explicit setup and reads boundary bytes through an owned
 dataset read API. Intermediate command status is emitted by the compiled COBOL
-program. The comparator consumes independent values from
-`conformance/0.9/cics/pilot-fixtures.json`; it does not call CICS or dataset
-semantic helpers to compute expectations.
+program. One bounded scenario execution may supply several credits, but every
+credit selects only its own typed commands, resource state, and boundary
+snapshots. A failure therefore does not make unrelated obligations fail. All
+expected command statuses and records, including both SYNCPOINT steps and the
+post-SYNCPOINT invalid REWRITE, come from
+`conformance/0.9/cics/pilot-fixtures.json`; raw application output is retained
+for diagnostics only. The comparator does not call CICS or dataset semantic
+helpers to compute expectations.
 
 Out of scope remains pending, not non-applicable: TOKEN and multiple
 outstanding updates, RLS, remote files/function shipping, BDAM and data tables,
@@ -93,8 +100,8 @@ repository, with a manifest digest of
 It reuses the IBM content endpoint, byte digest, locator and no-retained-bytes
 policy established by #78/#81.
 
-The bounded extractor inventories 365 selected structural fragments. It emits
-14 candidate fragments, 336 explicit outside-scope dispositions, 15
+The bounded extractor inventories 369 selected structural fragments. It emits
+14 candidate fragments, 340 explicit outside-scope dispositions, 15
 informative headings, zero unsupported fragments, and zero conflicts. Candidate
 records preserve topic and fragment digests, structural locators, applicability,
 negation/conditional cues and required links without retaining publication
@@ -110,6 +117,13 @@ rejects a missing, duplicate, extra or unknown per-credit observation before it
 can derive a ledger. It then evaluates the same typed observation registry used
 by ordinary `ConformanceCase` bindings. A scenario-bound case cannot fall back
 to the ordinary one-case driver route.
+
+The twelve obligation credits are separate comparator observations, not twelve
+separate product launches. The scenario shares bounded setup where appropriate,
+then records command-level results and owned storage snapshots for each credit.
+Durable-restart credit is claimed only by the SQLite profile and requires all
+three fault-boundary reopen observations; the memory profile is explicitly not
+claimed rather than passing vacuously.
 
 This is not a workflow interpreter: the CICS driver is ordinary bounded Rust
 that owns setup and calls the compiler, ABI/interpreter, CICS, dataset/security
@@ -138,11 +152,9 @@ or shard batches fail closed.
 
 ## Review gate
 
-`conformance/0.9/cics/pilot-rule-review.json` is intentionally
-`pending-maintainer`. The extractor's interpretations and eleven proposed
-accepted fragments are not promoted into current Conformance IR merely because
-they are schema-valid or agent-produced. `cargo xtask spec --check` enforces
-that boundary: while review is pending, no CICS row may appear in the compiled
-spec. A maintainer must accept or correct the finite decisions in repository or
-PR review before CF-03 and the scenario credits can be promoted. This is the
-only dependency that cannot be satisfied by additional local execution.
+The maintainer review supplied on 2026-09-08 accepted eleven rules, deferred the
+three locking fragments, and required the NOTOPEN applicability and observation
+isolation corrections recorded above. `conformance/0.9/cics/pilot-rule-review.json`
+is now `accepted`, and `cargo xtask spec --check` promotes only those accepted
+rules into the compiled Conformance IR. Any return to proposed/unknown decisions,
+projection drift, or stale review digest fails before scenario execution.

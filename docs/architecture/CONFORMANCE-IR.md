@@ -55,7 +55,7 @@ pub struct ConformanceCase {
     pub expected: Vec<ObservationRef>,
     pub recovery: Option<RecoveryRef>,
     pub oracle: Option<OracleRef>,
-    pub reviewed_rule: Option<ReviewedRuleRef>,
+    pub reviewed_rules: Vec<ReviewedRuleRef>,
     pub scenario: Option<ScenarioId>,
 }
 ```

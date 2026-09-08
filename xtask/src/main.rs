@@ -11,8 +11,10 @@ mod work_package_seal;
 
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use mainframe_env_conformance::{
-    DatasetConformanceRuntime, RACF_ORACLE_RELATIVE_PATH, RacfOracleCampaign,
-    dataset_conformance_runtime, gnucobol_reference_fixture_digest, licensed_fixture_digest,
+    CicsOracleExpectation, CicsOracleImport, CicsOracleObservation, CicsPilotRuntime,
+    CobolMovePilotRuntime, DatasetConformanceRuntime, RACF_ORACLE_RELATIVE_PATH,
+    RacfOracleCampaign, cics_pilot_runtime, cobol_move_pilot_runtime, dataset_conformance_runtime,
+    gnucobol_reference_fixture_digest, import_cics_oracle_capture, licensed_fixture_digest,
     run_dataset_reference_simulation, run_gnucobol_reference_campaign,
     verify_carddemo_application_package_from_env, verify_carddemo_base_batch_from_env,
     verify_carddemo_base_online_from_env, verify_carddemo_batch_programs_from_env,
@@ -122,6 +124,17 @@ struct CobolReferenceArgs {
 }
 
 #[derive(Debug, Args)]
+struct CicsOracleArgs {
+    #[arg(long)]
+    capture: PathBuf,
+    #[arg(
+        long,
+        help = "Optional raw 32-byte Ed25519 public key from the protected runner"
+    )]
+    public_key: Option<PathBuf>,
+}
+
+#[derive(Debug, Args)]
 struct WorkPackageSealArgs {
     #[arg(long)]
     id: String,
@@ -178,6 +191,7 @@ enum XtaskCommand {
     CobolLanguage(CheckArgs),
     CobolExit(CheckArgs),
     CobolReference(CobolReferenceArgs),
+    CicsOracle(CicsOracleArgs),
     JclCatalog(CheckArgs),
     JclConformance(CheckArgs),
     JclExit(CheckArgs),
@@ -409,6 +423,11 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             "cobol-reference",
             args,
             check_cobol_reference(root, &args.receipt)
+        ),
+        XtaskCommand::CicsOracle(args) => (
+            "cics-oracle",
+            false,
+            import_cics_oracle(root, &args.capture, args.public_key.as_deref()),
         ),
         XtaskCommand::JclCatalog(args) => checked!(
             "jcl-catalog",
@@ -835,6 +854,7 @@ fn check_spec(root: &Path) -> TaskResult {
     check_cobol_language_generated(root)?;
     let spec = compile_shared_spec(root)?;
     check_cics_pilot_inputs(root, &spec)?;
+    check_cobol_move_pilot_inputs(root, &spec)?;
     if let Ok(receipt_path) = env::var("MAINFRAME_ENV_COBOL65_LICENSED_ORACLE_RECEIPT") {
         let receipt_path = fs::canonicalize(PathBuf::from(receipt_path))
             .map_err(|error| format!("licensed COBOL receipt: {error}"))?;
@@ -1001,11 +1021,46 @@ fn check_cics_pilot_inputs(root: &Path, spec: &CompiledSpec) -> TaskResult {
                 .is_some_and(Vec::is_empty),
         "CICS pilot environment or independent comparison policy drifted",
     )?;
+    let durable_profiles = environment["profiles"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|profile| profile["durable_restart_credit"] == true)
+        .filter_map(|profile| profile["id"].as_str())
+        .collect::<BTreeSet<_>>();
+    let fixture_durable_profiles = fixture["expected"]["durable_restart"]["claimed_profiles"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .collect::<BTreeSet<_>>();
+    require(
+        durable_profiles == BTreeSet::from(["sqlite"])
+            && fixture_durable_profiles == durable_profiles
+            && fixture["expected"]["closed_unenabled"]["precondition"]["open_status"] == "CLOSED"
+            && fixture["expected"]["closed_unenabled"]["precondition"]["enable_status"]
+                == "UNENABLED"
+            && fixture["expected"]["closed_enabled"]["precondition"]["enable_status"] == "ENABLED",
+        "CICS closed-file or durable-profile applicability drifted",
+    )?;
+    let adapter_scenarios = adapter["required_scenarios"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .collect::<BTreeSet<_>>();
+    let licensed_fixture_scenarios = fixture["licensed_expected_observations"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|observation| observation["scenario_id"].as_str())
+        .collect::<BTreeSet<_>>();
     require(
         adapter["schema_version"] == "mainframe-env.cics-licensed-differential-adapter@1"
             && adapter["required_scenarios"]
                 .as_array()
-                .is_some_and(|scenarios| scenarios.len() == 7)
+                .is_some_and(|scenarios| scenarios.len() == 12)
+            && adapter_scenarios == licensed_fixture_scenarios
             && adapter["origin_policy"]["trusted_authority_id"] == "ibm-cics-protected-runner"
             && adapter["origin_policy"]["self_declared_origin_is_evidence"] == false
             && adapter["licensed_campaign_status"] == "not-run"
@@ -1039,6 +1094,246 @@ fn check_cics_pilot_inputs(root: &Path, spec: &CompiledSpec) -> TaskResult {
         .status()
         .map_err(|error| format!("CICS pilot extractor tests: {error}"))?;
     require(status.success(), "CICS pilot extractor tests failed")
+}
+
+fn check_cobol_move_pilot_inputs(root: &Path, spec: &CompiledSpec) -> TaskResult {
+    let manifest_path = root.join("conformance/0.9/manifests/cobol-numeric-move-topics.json");
+    if !manifest_path.is_file() {
+        return Ok(());
+    }
+    let manifest = json(&manifest_path)?;
+    let topics = array(&manifest, "topics", &manifest_path)?;
+    require(
+        topics.len() == 5
+            && manifest["topic_count"].as_u64() == Some(5)
+            && topics
+                .iter()
+                .map(|topic| topic["bytes"].as_u64().unwrap_or(0))
+                .sum::<u64>()
+                == manifest["total_bytes"].as_u64().unwrap_or(u64::MAX),
+        "COBOL MOVE pilot topic manifest is incomplete",
+    )?;
+    let mut lines = topics
+        .iter()
+        .map(|topic| {
+            Ok(format!(
+                "{} {}\n",
+                text(topic, "topic_path", &manifest_path)?,
+                text(topic, "sha256", &manifest_path)?
+            ))
+        })
+        .collect::<TaskResult<Vec<_>>>()?;
+    lines.sort();
+    let manifest_digest = format!("{:x}", Sha256::digest(lines.concat().as_bytes()));
+    require(
+        manifest["topic_manifest_digest"].as_str() == Some(&manifest_digest),
+        "COBOL MOVE pilot topic-manifest digest drifted",
+    )?;
+
+    let projection_path =
+        root.join("conformance/0.9/generated/cobol-move-semantic-candidates.json");
+    let review_path = root.join("conformance/0.9/cobol/move-rule-review.json");
+    let fixture_path = root.join("conformance/0.9/cobol/move-fixture.json");
+    let projection = json(&projection_path)?;
+    let review = json(&review_path)?;
+    let fixture = json(&fixture_path)?;
+    require(
+        projection["coverage_credit"].as_u64() == Some(0)
+            && projection["retained_publication_bytes"].as_bool() == Some(false)
+            && projection["topic_manifest_digest"] == manifest["topic_manifest_digest"],
+        "COBOL MOVE candidate evidence boundary drifted",
+    )?;
+    require(
+        review["candidate_projection_sha256"].as_str()
+            == Some(&format!("sha256:{}", file_digest(&projection_path)?)),
+        "COBOL MOVE rule review is stale against its projection",
+    )?;
+    let totals = &projection["totals"];
+    let inventory = array(&projection, "inventory", &projection_path)?;
+    require(
+        totals["normative_fragments"].as_u64() == Some(inventory.len() as u64)
+            && totals["normative_fragments"]
+                == review["inventory_disposition"]["normative_fragments"]
+            && totals["candidates"] == review["inventory_disposition"]["candidate_fragments"]
+            && totals["outside_scope"]
+                == review["inventory_disposition"]["outside_scope_fragments"]
+            && totals["unsupported"] == review["inventory_disposition"]["unsupported_fragments"]
+            && totals["conflicting"] == review["inventory_disposition"]["conflicting_fragments"],
+        "COBOL MOVE source-fragment review counts are stale",
+    )?;
+    let candidate_rules = array(&projection, "candidates", &projection_path)?
+        .iter()
+        .flat_map(|candidate| {
+            candidate["rule_ids"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+        })
+        .collect::<BTreeSet<_>>();
+    let decisions = array(&review, "decisions", &review_path)?;
+    let reviewed = decisions
+        .iter()
+        .map(|decision| text(decision, "rule_id", &review_path).map(str::to_string))
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        candidate_rules == reviewed
+            && fixture["row_id"] == "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0026"
+            && fixture["comparison_policy"]["normalizable_fields"]
+                .as_array()
+                .is_some_and(Vec::is_empty),
+        "COBOL MOVE candidate decisions or exact-byte fixture are incomplete",
+    )?;
+    let promoted = spec
+        .scenarios()
+        .any(|scenario| scenario.scenario_id().as_str() == "cobol.numeric-move.local");
+    match review["review_status"].as_str() {
+        Some("pending-maintainer") => require(
+            !promoted,
+            "unreviewed COBOL MOVE candidates were promoted into Conformance IR",
+        ),
+        Some("accepted") => require(
+            promoted
+                && decisions
+                    .iter()
+                    .all(|decision| decision["decision"] == "accepted"),
+            "accepted COBOL MOVE review is not promoted through the shared scenario runner",
+        ),
+        _ => Err("COBOL MOVE pilot review status is unknown".into()),
+    }
+}
+
+fn import_cics_oracle(
+    root: &Path,
+    capture_path: &Path,
+    public_key_path: Option<&Path>,
+) -> TaskResult {
+    let canonical_root = fs::canonicalize(root).map_err(|error| error.to_string())?;
+    let capture_path =
+        fs::canonicalize(capture_path).map_err(|error| format!("CICS oracle capture: {error}"))?;
+    require(
+        !capture_path.starts_with(&canonical_root),
+        "CICS oracle capture must remain outside the candidate tree",
+    )?;
+    let capture = fs::read(&capture_path).map_err(|error| error.to_string())?;
+    let public_key = public_key_path
+        .map(|path| fs::read(path).map_err(|error| format!("CICS oracle public key: {error}")))
+        .transpose()?;
+    if let Some(key) = &public_key {
+        require(
+            key.len() == 32,
+            "CICS oracle Ed25519 public key must contain exactly 32 raw bytes",
+        )?;
+    }
+    let adapter_path = root.join("conformance/0.9/oracles/cics-licensed-differential.json");
+    let fixture_path = root.join("conformance/0.9/cics/pilot-fixtures.json");
+    let review_path = root.join("conformance/0.9/cics/pilot-rule-review.json");
+    let environment_path = root.join("conformance/0.9/cics/pilot-environment.json");
+    let adapter = json(&adapter_path)?;
+    let fixture = json(&fixture_path)?;
+    let review = json(&review_path)?;
+    let required_scenarios = array(&adapter, "required_scenarios", &adapter_path)?
+        .iter()
+        .map(|value| {
+            value
+                .as_str()
+                .map(str::to_string)
+                .ok_or_else(|| "CICS oracle required scenario is not a string".to_string())
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    let spec = compile_shared_spec(root)?;
+    let candidate = candidate_digest(root)?;
+    let fixture_digest = format!("sha256:{}", file_digest(&fixture_path)?);
+    let review_digest = format!("sha256:{}", file_digest(&review_path)?);
+    let environment_digest = format!("sha256:{}", file_digest(&environment_path)?);
+    let comparison_policy = text(&fixture["comparison_policy"], "version", &fixture_path)?;
+    let expected_observations = fixture["licensed_expected_observations"]
+        .as_array()
+        .ok_or_else(|| "CICS licensed expected observations are missing".to_string())?
+        .iter()
+        .map(|value| {
+            serde_json::from_value::<CicsOracleObservation>(value.clone())
+                .map_err(|error| format!("CICS licensed expected observation: {error}"))
+        })
+        .collect::<TaskResult<Vec<_>>>()?
+        .into_iter()
+        .map(|observation| (observation.scenario_id.clone(), observation))
+        .collect::<BTreeMap<_, _>>();
+    let expected = CicsOracleExpectation {
+        candidate_digest: &candidate,
+        spec_digest: spec.spec_digest(),
+        fixture_digest: &fixture_digest,
+        source_review_digest: &review_digest,
+        environment_manifest_digest: &environment_digest,
+        comparison_policy,
+        required_scenarios: &required_scenarios,
+        expected_observations: &expected_observations,
+    };
+    let outcome = import_cics_oracle_capture(&capture, &expected, public_key.as_deref())?;
+    match outcome {
+        CicsOracleImport::AdapterContractValid => println!(
+            "cics-oracle adapter-contract=valid licensed-credit=0 differential=pending capture={}",
+            capture_path.display()
+        ),
+        CicsOracleImport::Licensed {
+            authority,
+            run_job_id,
+            receipt_digest,
+        } => {
+            require(
+                review["review_status"] == "accepted"
+                    && spec
+                        .scenarios()
+                        .any(|scenario| scenario.scenario_id().as_str() == "cics.file-uow.local"),
+                "licensed CICS capture cannot import before reviewed pilot promotion",
+            )?;
+            println!(
+                "cics-oracle protected-origin={authority} run-job={run_job_id} receipt={receipt_digest} licensed-credit=1 scoped-pilot-only"
+            );
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod docs_driven_pipeline_tests {
+    use super::*;
+
+    #[test]
+    fn stale_source_review_fails_the_fast_spec_gate_before_execution() {
+        let source_root = repository_root().unwrap();
+        let spec = compile_shared_spec(&source_root).unwrap();
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = env::temp_dir().join(format!(
+            "mainframe-env-cics-review-negative-{}-{nonce}",
+            std::process::id()
+        ));
+        for relative in [
+            "conformance/0.9/manifests/cics-file-uow-topics.json",
+            "conformance/0.9/generated/cics-pilot-semantic-candidates.json",
+            "conformance/0.9/cics/pilot-rule-review.json",
+            "conformance/0.9/cics/pilot-environment.json",
+            "conformance/0.9/cics/pilot-fixtures.json",
+            "conformance/0.9/oracles/cics-licensed-differential.json",
+            "conformance/0.9/schemas/cics-licensed-differential-adapter.schema.json",
+        ] {
+            let source = source_root.join(relative);
+            let target = root.join(relative);
+            fs::create_dir_all(target.parent().unwrap()).unwrap();
+            fs::copy(source, target).unwrap();
+        }
+        let review_path = root.join("conformance/0.9/cics/pilot-rule-review.json");
+        let mut review = json(&review_path).unwrap();
+        review["candidate_projection_sha256"] = Value::String(format!("sha256:{}", "f".repeat(64)));
+        fs::write(&review_path, pretty_json(&review).unwrap()).unwrap();
+        let problem = check_cics_pilot_inputs(&root, &spec).unwrap_err();
+        let _ = fs::remove_dir_all(&root);
+        assert!(problem.contains("stale against its candidate projection"));
+    }
 }
 
 fn check_dataset_fixture_bindings(root: &Path, spec: &CompiledSpec) -> TaskResult {
@@ -3646,6 +3941,7 @@ fn compile_shared_spec(root: &Path) -> TaskResult<CompiledSpec> {
     let spec_path = root.join("conformance/spec/v1/spec.json");
     let mut spec_value = json(&spec_path)?;
     augment_ams_spec(root, &mut spec_value)?;
+    augment_docs_driven_pilots(root, &mut spec_value)?;
     let bytes = serde_json::to_vec(&spec_value).map_err(|error| error.to_string())?;
     CompiledSpec::compile_json(
         &catalog_digest,
@@ -3762,6 +4058,418 @@ fn augment_ams_spec(root: &Path, spec: &mut Value) -> TaskResult {
     Ok(())
 }
 
+fn augment_docs_driven_pilots(root: &Path, spec: &mut Value) -> TaskResult {
+    augment_cics_pilot_spec(root, spec)?;
+    augment_cobol_move_pilot_spec(root, spec)
+}
+
+fn registry_values_mut<'a>(spec: &'a mut Value, name: &str) -> TaskResult<&'a mut Vec<Value>> {
+    let registries = spec
+        .get_mut("registries")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| "conformance registries are missing".to_string())?;
+    if name == "reviewed_rules" && !registries.contains_key(name) {
+        registries.insert(name.into(), Value::Array(Vec::new()));
+    }
+    registries
+        .get_mut(name)
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| format!("conformance registry {name} is missing"))
+}
+
+fn document_values_mut<'a>(spec: &'a mut Value, name: &str) -> TaskResult<&'a mut Vec<Value>> {
+    spec.get_mut(name)
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| format!("conformance spec {name} are missing"))
+}
+
+fn augment_cics_pilot_spec(root: &Path, spec: &mut Value) -> TaskResult {
+    let review_path = root.join("conformance/0.9/cics/pilot-rule-review.json");
+    if !review_path.is_file() {
+        return Ok(());
+    }
+    let review = json(&review_path)?;
+    if review["review_status"] == "pending-maintainer" {
+        return Ok(());
+    }
+    require(
+        review["review_status"] == "accepted",
+        "CICS pilot review status is unknown",
+    )?;
+    let decisions = array(&review, "decisions", &review_path)?;
+    require(
+        decisions.iter().all(|decision| {
+            decision["decision"] == "accepted" || decision["decision"] == "defer-pending"
+        }),
+        "CICS pilot cannot promote proposed or unknown review decisions",
+    )?;
+    let review_digest = format!("sha256:{}", file_digest(&review_path)?);
+    let accepted_rules = decisions
+        .iter()
+        .filter(|decision| decision["decision"] == "accepted")
+        .map(|decision| text(decision, "rule_id", &review_path).map(str::to_string))
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    let expected_rules = BTreeSet::from([
+        "cics.read.update-context".to_string(),
+        "cics.read.notfound-80".to_string(),
+        "cics.file.notauth-101".to_string(),
+        "cics.read.notopen-60".to_string(),
+        "cics.rewrite.requires-read-update".to_string(),
+        "cics.rewrite.invreq-30".to_string(),
+        "cics.update.context-lifetime".to_string(),
+        "cics.syncpoint.commit".to_string(),
+        "cics.syncpoint.rollback".to_string(),
+        "cics.recovery.current-uow-only".to_string(),
+        "cics.recovery.backout-logging".to_string(),
+    ]);
+    require(
+        accepted_rules == expected_rules,
+        "CICS pilot accepted rule set is incomplete",
+    )?;
+
+    for (registry, values) in [
+        (
+            "operations",
+            vec!["cics.file.read", "cics.file.rewrite", "cics.uow.syncpoint"],
+        ),
+        ("input_shapes", vec!["cics.file-uow.fixture"]),
+        (
+            "transitions",
+            vec![
+                "cics.file.read-transition",
+                "cics.file.rewrite-transition",
+                "cics.uow.syncpoint-transition",
+            ],
+        ),
+        ("conditions", vec!["cics.file.condition"]),
+        ("recoveries", vec!["cics.uow.rollback"]),
+        (
+            "drivers",
+            vec!["cics.pilot.product-path", "cics.pilot.readback-path"],
+        ),
+        (
+            "scenario_steps",
+            vec![
+                "cics.pilot.compile",
+                "cics.pilot.invoke",
+                "cics.pilot.provider-effects",
+                "cics.pilot.readback",
+            ],
+        ),
+        (
+            "failure_points",
+            vec![
+                "cics.file.before-intent",
+                "cics.file.after-intent",
+                "cics.file.after-mutation",
+            ],
+        ),
+    ] {
+        registry_values_mut(spec, registry)?
+            .extend(values.into_iter().map(|value| Value::String(value.into())));
+    }
+    let obligations = vec![
+        (
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0156",
+            "plain-read",
+            vec!["recognized", "executed", "conditioned"],
+            vec!["cics.read.update-context"],
+        ),
+        (
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0156",
+            "read-update",
+            vec!["recognized", "validated", "executed", "conditioned"],
+            vec!["cics.read.update-context"],
+        ),
+        (
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0156",
+            "missing-record",
+            vec!["validated", "conditioned"],
+            vec!["cics.read.notfound-80"],
+        ),
+        (
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0156",
+            "unauthorized",
+            vec!["validated", "conditioned"],
+            vec!["cics.file.notauth-101"],
+        ),
+        (
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0156",
+            "closed-file",
+            vec!["validated", "conditioned"],
+            vec!["cics.read.notopen-60"],
+        ),
+        (
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0181",
+            "requires-read-update",
+            vec!["validated", "conditioned"],
+            vec![
+                "cics.rewrite.requires-read-update",
+                "cics.rewrite.invreq-30",
+            ],
+        ),
+        (
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0181",
+            "rewrite-record",
+            vec!["recognized", "executed", "conditioned"],
+            vec!["cics.rewrite.requires-read-update"],
+        ),
+        (
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0181",
+            "forbidden-mutation-on-invreq",
+            vec!["executed", "conditioned"],
+            vec!["cics.rewrite.invreq-30"],
+        ),
+        (
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0181",
+            "context-invalidated-at-syncpoint",
+            vec!["validated", "conditioned", "recovered"],
+            vec!["cics.update.context-lifetime"],
+        ),
+        (
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0218",
+            "commit-boundary",
+            vec!["recognized", "executed", "recovered"],
+            vec!["cics.syncpoint.commit", "cics.recovery.current-uow-only"],
+        ),
+        (
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0218",
+            "rollback-boundary",
+            vec!["recognized", "executed", "recovered"],
+            vec!["cics.syncpoint.rollback", "cics.recovery.current-uow-only"],
+        ),
+        (
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0218",
+            "durable-restart",
+            vec!["recovered"],
+            vec!["cics.syncpoint.rollback", "cics.recovery.backout-logging"],
+        ),
+    ];
+    registry_values_mut(spec, "observations")?.extend(
+        obligations
+            .iter()
+            .map(|(_, obligation, _, _)| Value::String(format!("cics.pilot.{obligation}"))),
+    );
+    registry_values_mut(spec, "fixtures")?.push(json!({
+        "id": "cics.file-uow.pilot-v1",
+        "digest": format!("sha256:{}", file_digest(&root.join("conformance/0.9/cics/pilot-fixtures.json"))?)
+    }));
+    registry_values_mut(spec, "reviewed_rules")?.extend(
+        accepted_rules
+            .iter()
+            .map(|rule| json!({"id": rule, "digest": review_digest})),
+    );
+    let all_gates = vec![
+        "recognized",
+        "validated",
+        "executed",
+        "conditioned",
+        "recovered",
+        "differential",
+    ];
+    let rows = [
+        (
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0156",
+            "cics.file.read",
+            "cics.file.read-transition",
+            None,
+        ),
+        (
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0181",
+            "cics.file.rewrite",
+            "cics.file.rewrite-transition",
+            Some("cics.uow.rollback"),
+        ),
+        (
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0218",
+            "cics.uow.syncpoint",
+            "cics.uow.syncpoint-transition",
+            Some("cics.uow.rollback"),
+        ),
+    ];
+    for (row_id, operation, transition, recovery) in rows {
+        let row_obligations = obligations
+            .iter()
+            .filter(|(row, _, _, _)| *row == row_id)
+            .collect::<Vec<_>>();
+        let reviewed_rules = row_obligations
+            .iter()
+            .flat_map(|(_, _, _, rules)| rules.iter().copied())
+            .collect::<BTreeSet<_>>();
+        document_values_mut(spec, "rows")?.push(json!({
+            "row_id": row_id,
+            "operation": operation,
+            "input": "cics.file-uow.fixture",
+            "preconditions": [],
+            "transition": transition,
+            "postconditions": row_obligations.iter().map(|(_, obligation, _, _)| format!("cics.pilot.{obligation}")).collect::<Vec<_>>(),
+            "conditions": ["cics.file.condition"],
+            "recovery": recovery,
+            "oracle": null,
+            "applicable_gates": all_gates,
+            "obligations": row_obligations.iter().map(|(_, obligation, _, _)| *obligation).collect::<Vec<_>>(),
+            "reviewed_rules": reviewed_rules,
+        }));
+    }
+    let mut credits = Vec::new();
+    for (row_id, obligation, gates, rules) in obligations {
+        document_values_mut(spec, "obligations")?.push(json!({
+            "row_id": row_id,
+            "obligation_id": obligation,
+            "applicable_gates": gates,
+        }));
+        let recovery = if row_id.ends_with(":0156") {
+            None
+        } else {
+            Some("cics.uow.rollback")
+        };
+        for gate in gates {
+            document_values_mut(spec, "cases")?.push(json!({
+                "spec_version": "mainframe-env.conformance-ir@1",
+                "row_id": row_id,
+                "obligation_id": obligation,
+                "gate": gate,
+                "test_id": format!("cics.pilot.{obligation}.{gate}"),
+                "driver": "cics.pilot.product-path",
+                "input": "cics.file-uow.pilot-v1",
+                "preconditions": [],
+                "expected": [format!("cics.pilot.{obligation}")],
+                "recovery": recovery,
+                "oracle": null,
+                "reviewed_rules": rules,
+                "scenario": "cics.file-uow.local",
+            }));
+            credits.push(json!({
+                "row_id": row_id,
+                "obligation_id": obligation,
+                "gate": gate,
+            }));
+        }
+    }
+    document_values_mut(spec, "scenarios")?.push(json!({
+        "scenario_id": "cics.file-uow.local",
+        "drivers": ["cics.pilot.product-path", "cics.pilot.readback-path"],
+        "ordered_steps": ["cics.pilot.compile", "cics.pilot.invoke", "cics.pilot.provider-effects", "cics.pilot.readback"],
+        "failure_points": ["cics.file.before-intent", "cics.file.after-intent", "cics.file.after-mutation"],
+        "credits": credits,
+    }));
+    Ok(())
+}
+
+fn augment_cobol_move_pilot_spec(root: &Path, spec: &mut Value) -> TaskResult {
+    let review_path = root.join("conformance/0.9/cobol/move-rule-review.json");
+    if !review_path.is_file() {
+        return Ok(());
+    }
+    let review = json(&review_path)?;
+    if review["review_status"] == "pending-maintainer" {
+        return Ok(());
+    }
+    require(
+        review["review_status"] == "accepted",
+        "COBOL MOVE review status is unknown",
+    )?;
+    let decisions = array(&review, "decisions", &review_path)?;
+    require(
+        decisions
+            .iter()
+            .all(|decision| decision["decision"] == "accepted"),
+        "COBOL MOVE cannot promote proposed review decisions",
+    )?;
+    let rules = decisions
+        .iter()
+        .map(|decision| text(decision, "rule_id", &review_path).map(str::to_string))
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        rules.len() == 7,
+        "COBOL MOVE accepted rule set is incomplete",
+    )?;
+    let review_digest = format!("sha256:{}", file_digest(&review_path)?);
+    for (registry, values) in [
+        (
+            "drivers",
+            vec![
+                "cobol.numeric-move.product-path",
+                "cobol.numeric-move.byte-readback",
+            ],
+        ),
+        (
+            "scenario_steps",
+            vec!["cobol.numeric-move.compile", "cobol.numeric-move.execute"],
+        ),
+    ] {
+        registry_values_mut(spec, registry)?
+            .extend(values.into_iter().map(|value| Value::String(value.into())));
+    }
+    registry_values_mut(spec, "observations")?
+        .push(Value::String("cobol.numeric-move.exact-bytes".into()));
+    registry_values_mut(spec, "fixtures")?.push(json!({
+        "id": "cobol.numeric-move.floating-sign-v1",
+        "digest": format!("sha256:{}", file_digest(&root.join("conformance/0.9/cobol/move-fixture.json"))?)
+    }));
+    registry_values_mut(spec, "reviewed_rules")?.extend(
+        rules
+            .iter()
+            .map(|rule| json!({"id": rule, "digest": review_digest})),
+    );
+    let row_id = "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0026";
+    let rows = document_values_mut(spec, "rows")?;
+    let row = rows
+        .iter_mut()
+        .find(|row| row["row_id"] == row_id)
+        .ok_or("COBOL MOVE row is missing from current Conformance IR")?;
+    row["obligations"]
+        .as_array_mut()
+        .ok_or("COBOL MOVE obligations are missing")?
+        .retain(|obligation| obligation != "runtime-normal");
+    row["obligations"]
+        .as_array_mut()
+        .unwrap()
+        .push(Value::String("numeric-move-bytes".into()));
+    row["postconditions"]
+        .as_array_mut()
+        .ok_or("COBOL MOVE postconditions are missing")?
+        .push(Value::String("cobol.numeric-move.exact-bytes".into()));
+    row["reviewed_rules"] = Value::Array(rules.iter().cloned().map(Value::String).collect());
+    document_values_mut(spec, "obligations")?.retain(|obligation| {
+        !(obligation["row_id"] == row_id && obligation["obligation_id"] == "runtime-normal")
+    });
+    document_values_mut(spec, "cases")?
+        .retain(|case| !(case["row_id"] == row_id && case["obligation_id"] == "runtime-normal"));
+    document_values_mut(spec, "obligations")?.push(json!({
+        "row_id": row_id,
+        "obligation_id": "numeric-move-bytes",
+        "applicable_gates": ["executed"],
+    }));
+    document_values_mut(spec, "cases")?.push(json!({
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": row_id,
+        "obligation_id": "numeric-move-bytes",
+        "gate": "executed",
+        "test_id": "cobol.numeric-move.bytes.executed",
+        "driver": "cobol.numeric-move.product-path",
+        "input": "cobol.numeric-move.floating-sign-v1",
+        "preconditions": [],
+        "expected": ["cobol.numeric-move.exact-bytes"],
+        "recovery": null,
+        "oracle": "cobol.enterprise-6.5.licensed",
+        "reviewed_rules": rules,
+        "scenario": "cobol.numeric-move.local",
+    }));
+    document_values_mut(spec, "scenarios")?.push(json!({
+        "scenario_id": "cobol.numeric-move.local",
+        "drivers": ["cobol.numeric-move.product-path", "cobol.numeric-move.byte-readback"],
+        "ordered_steps": ["cobol.numeric-move.compile", "cobol.numeric-move.execute"],
+        "failure_points": [],
+        "credits": [{
+            "row_id": row_id,
+            "obligation_id": "numeric-move-bytes",
+            "gate": "executed",
+        }],
+    }));
+    Ok(())
+}
+
 fn official_catalog_rows(root: &Path) -> TaskResult<Vec<OfficialCatalogRow>> {
     let index_path = root.join("conformance/0.2/catalogs/index.json");
     let index = json(&index_path)?;
@@ -3843,6 +4551,14 @@ fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> T
     if dataset_racf_or_jcl_selected {
         return check_focused_dataset_or_jcl_conformance_interface(root, args);
     }
+    let cics_selected = args.subsystem.as_deref() == Some("cics")
+        || args
+            .replay
+            .as_deref()
+            .is_some_and(|replay| replay.starts_with("cics."));
+    if cics_selected {
+        return run_focused_cics(root, args);
+    }
     let cobol_selected = args.subsystem.as_deref() == Some("cobol")
         || args
             .replay
@@ -3870,7 +4586,16 @@ fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> T
     };
     let dataset_handlers = dataset_conformance_runtime();
     let jcl_handlers = jcl_conformance::runtime();
-    let runtime = combined_conformance_runtime(&spec, &dataset_handlers, &jcl_handlers, limits)?;
+    let cics_handlers = cics_pilot_runtime();
+    let cobol_move_handlers = cobol_move_pilot_runtime();
+    let runtime = combined_conformance_runtime(
+        &spec,
+        &dataset_handlers,
+        &jcl_handlers,
+        &cics_handlers,
+        &cobol_move_handlers,
+        limits,
+    )?;
     let context = RunnerContext::new(candidate_digest(root)?, "local", limits)
         .map_err(|problem| problem.to_string())?;
     let report = ConformanceRunner::new(&spec, runtime, limits)
@@ -3902,6 +4627,83 @@ fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> T
         failed
     );
     require(failed == 0, "focused conformance produced failing verdicts")
+}
+
+fn run_focused_cics(root: &Path, args: &ConformanceArgs) -> TaskResult {
+    require(
+        args.shard.is_none(),
+        "CICS pilot scenario execution does not accept --shard",
+    )?;
+    let (gate, local_gate) = parse_focused_gate(args.gate.as_deref())?;
+    require(
+        gate.is_none() && (args.gate.is_none() || local_gate),
+        "CICS pilot scenario execution accepts only --gate local",
+    )?;
+    let limits = ConformanceLimits::default();
+    let spec = compile_shared_spec(root)?;
+    let scenario_id = if let Some(replay) = args.replay.as_deref() {
+        spec.cases()
+            .find(|case| case.test_id().as_str() == replay)
+            .and_then(|case| case.scenario())
+            .ok_or_else(|| format!("CICS replay {replay} is not scenario-bound"))?
+            .as_str()
+            .to_string()
+    } else {
+        "cics.file-uow.local".to_string()
+    };
+    let selection =
+        RunnerSelection::scenario(scenario_id, limits).map_err(|problem| problem.to_string())?;
+    let dataset_handlers = dataset_conformance_runtime();
+    let jcl_handlers = jcl_conformance::runtime();
+    let cics_handlers = cics_pilot_runtime();
+    let cobol_move_handlers = cobol_move_pilot_runtime();
+    let runtime = combined_conformance_runtime(
+        &spec,
+        &dataset_handlers,
+        &jcl_handlers,
+        &cics_handlers,
+        &cobol_move_handlers,
+        limits,
+    )?;
+    let context = RunnerContext::new_with_environment_manifest(
+        candidate_digest(root)?,
+        "local",
+        format!(
+            "sha256:{}",
+            file_digest(&root.join("conformance/0.9/cics/pilot-environment.json"))?
+        ),
+        limits,
+    )
+    .map_err(|problem| problem.to_string())?;
+    let report = ConformanceRunner::new(&spec, runtime, limits)
+        .run(&selection, &context)
+        .map_err(|problem| problem.to_string())?;
+    let mut passed = 0usize;
+    let mut failed = 0usize;
+    for event in report.batches.iter().flat_map(|batch| batch.events.iter()) {
+        println!(
+            "{}",
+            String::from_utf8(
+                event
+                    .canonical_json()
+                    .map_err(|problem| problem.to_string())?,
+            )
+            .map_err(|error| error.to_string())?
+        );
+        match event.verdict {
+            Verdict::Pass => passed += 1,
+            Verdict::Fail => failed += 1,
+        }
+    }
+    println!(
+        "cics-pilot-ledger spec-digest={} batches={} verdicts={} pass={} fail={}",
+        spec.spec_digest(),
+        report.batches.len(),
+        passed + failed,
+        passed,
+        failed
+    );
+    require(failed == 0, "CICS pilot produced failing verdicts")
 }
 
 fn check_cobol_exit(root: &Path) -> TaskResult {
@@ -3941,7 +4743,16 @@ fn check_cobol_exit(root: &Path) -> TaskResult {
         .map_err(|problem| problem.to_string())?;
     let dataset_handlers = dataset_conformance_runtime();
     let jcl_handlers = jcl_conformance::runtime();
-    let runtime = combined_conformance_runtime(&spec, &dataset_handlers, &jcl_handlers, limits)?;
+    let cics_handlers = cics_pilot_runtime();
+    let cobol_move_handlers = cobol_move_pilot_runtime();
+    let runtime = combined_conformance_runtime(
+        &spec,
+        &dataset_handlers,
+        &jcl_handlers,
+        &cics_handlers,
+        &cobol_move_handlers,
+        limits,
+    )?;
     let report = ConformanceRunner::new(&spec, runtime, limits)
         .run(&selection, &context)
         .map_err(|problem| problem.to_string())?;
@@ -4147,10 +4958,14 @@ fn check_focused_dataset_or_jcl_conformance_interface(
         .map_err(|problem| problem.to_string())?;
         let dataset_handlers = dataset_conformance_runtime();
         let jcl_handlers = jcl_conformance::runtime();
+        let cics_handlers = cics_pilot_runtime();
+        let cobol_move_handlers = cobol_move_pilot_runtime();
         let runtime = combined_conformance_runtime(
             &spec,
             &dataset_handlers,
             &jcl_handlers,
+            &cics_handlers,
+            &cobol_move_handlers,
             ConformanceLimits::default(),
         )
         .map_err(|problem| problem.to_string())?;
@@ -4218,7 +5033,16 @@ fn run_focused_racf(
         .map_err(|problem| problem.to_string())?;
     let dataset_handlers = dataset_conformance_runtime();
     let jcl_handlers = jcl_conformance::runtime();
-    let runtime = combined_conformance_runtime(spec, &dataset_handlers, &jcl_handlers, limits)?;
+    let cics_handlers = cics_pilot_runtime();
+    let cobol_move_handlers = cobol_move_pilot_runtime();
+    let runtime = combined_conformance_runtime(
+        spec,
+        &dataset_handlers,
+        &jcl_handlers,
+        &cics_handlers,
+        &cobol_move_handlers,
+        limits,
+    )?;
     let report = ConformanceRunner::new(spec, runtime, limits)
         .run(&selection, &context)
         .map_err(|problem| problem.to_string())?;
@@ -4279,7 +5103,16 @@ fn run_focused_jcl(
         .map_err(|problem| problem.to_string())?;
     let dataset_handlers = dataset_conformance_runtime();
     let jcl_handlers = jcl_conformance::runtime();
-    let runtime = combined_conformance_runtime(spec, &dataset_handlers, &jcl_handlers, limits)?;
+    let cics_handlers = cics_pilot_runtime();
+    let cobol_move_handlers = cobol_move_pilot_runtime();
+    let runtime = combined_conformance_runtime(
+        spec,
+        &dataset_handlers,
+        &jcl_handlers,
+        &cics_handlers,
+        &cobol_move_handlers,
+        limits,
+    )?;
     let report = ConformanceRunner::new(spec, runtime, limits)
         .run(&selection, &context)
         .map_err(|problem| problem.to_string())?;
@@ -4357,6 +5190,8 @@ fn combined_conformance_runtime<'a>(
     spec: &CompiledSpec,
     dataset: &'a DatasetConformanceRuntime,
     jcl: &'a jcl_conformance::JclConformanceRuntime,
+    cics: &'a CicsPilotRuntime,
+    cobol_move: &'a CobolMovePilotRuntime,
     limits: ConformanceLimits,
 ) -> Result<RuntimeRegistry<'a>, String> {
     let cobol = mainframe_env_conformance::cobol_conformance_handlers(limits)?;
@@ -4382,7 +5217,24 @@ fn combined_conformance_runtime<'a>(
         jcl.observations(limits)
             .map_err(|problem| problem.to_string())?,
     );
-    mainframe_env_conformance::racf_runtime_with(spec, drivers, predicates, observations, limits)
+    let mut scenario_drivers = cics
+        .bind(spec, &mut drivers, &mut observations, limits)
+        .map_err(|problem| problem.to_string())?;
+    scenario_drivers.extend(
+        cobol_move
+            .bind(spec, &mut drivers, &mut observations, limits)
+            .map_err(|problem| problem.to_string())?,
+    );
+    let runtime = mainframe_env_conformance::racf_runtime_with(
+        spec,
+        drivers,
+        predicates,
+        observations,
+        limits,
+    )
+    .map_err(|problem| problem.to_string())?;
+    runtime
+        .with_scenario_drivers(spec, scenario_drivers, limits)
         .map_err(|problem| problem.to_string())
 }
 

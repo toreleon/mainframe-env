@@ -15,6 +15,9 @@
     "key_offset": 0,
     "key_length": 2,
     "recoverable": true,
+    "closed_file_probe": {"open_status": "CLOSED", "enable_status": "UNENABLED"},
+    "closed_enabled_control": {"open_status": "CLOSED", "enable_status": "ENABLED", "expected_transition": "OPEN"},
+    "disabled_is_distinct": true,
     "initial_record_hex": "c1c1f1f1"
   },
   "security": {

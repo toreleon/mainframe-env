@@ -37,9 +37,11 @@ job logs containing secrets, or unredacted system configuration in the capture.
    digest.
 2. Create the disposable recoverable KSDS and seed `AA11` through supported CICS
    resource and data-management paths.
-3. Compile and run the seven scoped scenario programs named in
+3. Compile and run the twelve obligation-scoped observations named in
    `conformance/0.9/oracles/cics-licensed-differential.json` through the licensed
-   Enterprise COBOL and CICS entry points.
+   Enterprise COBOL and CICS entry points. Shared setup/program execution is
+   allowed, but the capture must emit one exact observation per name. The
+   durable-restart observation includes all three declared fault boundaries.
 4. Capture application-visible output and read the business record back after
    each mutation/commit/rollback boundary. Internal traces are optional
    diagnostics and are not compared.
@@ -52,15 +54,33 @@ job logs containing secrets, or unredacted system configuration in the capture.
 ## Import and comparison
 
 The importer first checks size and schema, exact scenario closure, raw-capture
-digest, candidate/spec/fixture/source/environment identity, authority identity,
-and Ed25519 signature. It then maps the application output and record hex into
-the same typed comparison boundary used by the local pilot. Missing,
-malformed/truncated, wrong-candidate, wrong-spec, wrong-environment, unknown,
-duplicate or forged captures fail before a verdict can be emitted.
+digest, candidate/spec/fixture/source/environment identity, and every captured
+application output and record against the reviewed expectations in
+`pilot-fixtures.json`. Licensed origin additionally requires the protected
+authority identity and Ed25519 signature. A valid signature with mismatched
+behavior does not grant credit. Missing, malformed/truncated, wrong-candidate,
+wrong-spec, wrong-environment, unknown, duplicate, behavior-mismatched or forged
+captures fail before a verdict can be emitted.
 
 Offline Rust tests exercise valid local/model captures, malformed and missing
-observations, identity mismatches, protected signatures, and forged licensed
-metadata. Those tests validate plumbing only and grant zero IBM credit. A live
+observations, identity and behavior mismatches, protected signatures, and forged
+licensed metadata. Those tests validate plumbing only and grant zero IBM credit. A live
 import must retain the protected run/job identity and raw artifact digest in the
 shared verdict boundary. Until that import occurs, report exactly: **adapter
 ready; licensed campaign not run; differential pending**.
+
+Run the importer from the exact candidate checkout. Both capture and protected
+public key stay outside the repository; the key file is the raw 32-byte
+Ed25519 public key:
+
+```text
+cargo xtask cics-oracle \
+  --capture /protected-handoff/cics-pilot-capture.json \
+  --public-key /protected-handoff/cics-oracle-ed25519.pub
+```
+
+For a local/model/synthetic adapter-contract fixture, omit `--public-key`. The
+command then reports `licensed-credit=0 differential=pending`. It derives the
+candidate, compiled-spec, fixture, accepted-review, comparison-policy and
+environment identities from the current checkout; a capture for any other
+candidate fails instead of being normalized or re-bound.

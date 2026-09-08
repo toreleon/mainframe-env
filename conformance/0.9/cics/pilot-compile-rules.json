@@ -44,8 +44,8 @@
       "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_read.html",
       "sections": ["dfhp43w__conditions"],
       "all": ["NOTOPEN.*60", "returned"],
-      "interpretation": "Reading a closed unavailable file reports NOTOPEN with RESP 19 and RESP2 60.",
-      "applicability": "local closed file resource"
+      "interpretation": "Reading a local file that is both CLOSED and UNENABLED reports NOTOPEN with RESP 19 and RESP2 60; CLOSED and ENABLED instead permits CICS to open the file, while DISABLED is a distinct condition.",
+      "applicability": "local file resource with open status CLOSED and enable status UNENABLED"
     },
     {
       "id": "cics.rewrite.requires-read-update",

@@ -1,0 +1,70 @@
+{
+  "schema_version": "mainframe-env.cobol-move-compile-rules@1",
+  "extractor_version": "cobol-move-dita-fragments@1",
+  "release": "Enterprise COBOL for z/OS 6.5",
+  "sources": [
+    {"topic_path": "SS6SG3_6.5/lr/ref/rldadar.html", "sections": ["__lead__"]},
+    {"topic_path": "SS6SG3_6.5/lr/ref/rlpsmove.html", "sections": ["__lead__"]},
+    {"topic_path": "SS6SG3_6.5/lr/ref/rlpsmovea.html", "sections": ["__lead__"]},
+    {"topic_path": "SS6SG3_6.5/lr/rlpsmovea1.html", "sections": ["__lead__"]},
+    {"topic_path": "SS6SG3_6.5/lr/rlpsmovea2.html", "sections": ["__lead__"]}
+  ],
+  "compile_rules": [
+    {
+      "id": "cobol.move.elementary-scope",
+      "topic_path": "SS6SG3_6.5/lr/ref/rlpsmovea.html",
+      "sections": ["__lead__"],
+      "all": ["elementary move", "receiving item", "elementary data item"],
+      "interpretation": "The pilot is an elementary move with elementary numeric sending and numeric-edited receiving items.",
+      "applicability": "elementary items only; MOVE CORRESPONDING and group moves excluded"
+    },
+    {
+      "id": "cobol.move.conversion-and-editing",
+      "topic_path": "SS6SG3_6.5/lr/rlpsmovea1.html",
+      "sections": ["__lead__"],
+      "all": ["conversion.*internal representation", "editing.*receiving"],
+      "interpretation": "MOVE converts the internal numeric representation and applies editing required by the receiving item.",
+      "applicability": "COMP-5 numeric sender to DISPLAY numeric-edited receiver"
+    },
+    {
+      "id": "cobol.move.decimal-alignment",
+      "topic_path": "SS6SG3_6.5/lr/rlpsmovea1.html",
+      "sections": ["__lead__"],
+      "all": ["alignment by decimal point", "zero filling"],
+      "interpretation": "Numeric and numeric-edited moves align on the decimal point and zero-fill where editing does not replace zeros.",
+      "applicability": "integer source and numeric-edited receiver"
+    },
+    {
+      "id": "cobol.move.signed-receiver",
+      "topic_path": "SS6SG3_6.5/lr/rlpsmovea1.html",
+      "sections": ["__lead__"],
+      "all": ["receiving item is signed", "sign of the sending item"],
+      "interpretation": "A signed receiver receives the sender sign with the conversion required by its representation.",
+      "applicability": "signed COMP-5 sender and floating-minus edited receiver"
+    },
+    {
+      "id": "cobol.move.numeric-editing",
+      "topic_path": "SS6SG3_6.5/lr/rlpsmovea1.html",
+      "sections": ["__lead__"],
+      "all": ["receiving item is numeric-edited", "picture character string"],
+      "interpretation": "The numeric-edited receiver is formatted according to its PICTURE string.",
+      "applicability": "PIC ----9 receiver"
+    },
+    {
+      "id": "cobol.move.integer-to-edited-valid",
+      "topic_path": "SS6SG3_6.5/lr/rlpsmovea2.html",
+      "sections": ["__lead__"],
+      "all": ["^Numeric integer and ZERO sending item", "Yes"],
+      "interpretation": "A numeric integer sender is valid for a numeric-edited receiving item.",
+      "applicability": "numeric integer to numeric-edited"
+    },
+    {
+      "id": "cobol.move.edited-alignment",
+      "topic_path": "SS6SG3_6.5/lr/ref/rldadar.html",
+      "sections": ["__lead__"],
+      "all": ["aligned on the decimal point", "editing causes replacement of leading zeros"],
+      "interpretation": "Numeric-edited receivers align on the decimal point and may replace leading zeros as directed by editing.",
+      "applicability": "PIC ----9 receiver"
+    }
+  ]
+}

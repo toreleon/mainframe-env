@@ -1,6 +1,6 @@
-#[cfg(test)]
-use mainframe_env_cics::CicsFileFaultPoint;
-use mainframe_env_cics::{CicsFileDefinition, CicsLimits, CicsService, cics_provider};
+use mainframe_env_cics::{
+    CicsFileDefinition, CicsFileFaultPoint, CicsLimits, CicsService, cics_provider,
+};
 use mainframe_env_coverage::{
     CompiledSpec, ConformanceDriver, ConformanceLimits, ConformanceObservation,
     ConformanceScenarioDriver, DriverOutput, DriverRef, FixtureRef, ObservationCheck,
@@ -35,7 +35,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 const FIXTURES: &str = include_str!("../../../../conformance/0.9/cics/pilot-fixtures.json");
 const ENVIRONMENT: &str = include_str!("../../../../conformance/0.9/cics/pilot-environment.json");
 
-const HAPPY_SOURCE: &str = r#"IDENTIFICATION DIVISION.
+const COMMIT_SOURCE: &str = r#"IDENTIFICATION DIVISION.
 PROGRAM-ID. CICSPILOT.
 DATA DIVISION.
 WORKING-STORAGE SECTION.
@@ -45,22 +45,62 @@ WORKING-STORAGE SECTION.
 PROCEDURE DIVISION.
 EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD('AA') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
 DISPLAY 'PLAIN:' RESP-X ':' RESP2-X ':' REC-X.
-EXEC CICS REWRITE FILE('ACCTDAT') FROM('AA22') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
-DISPLAY 'INVALID:' RESP-X ':' RESP2-X.
 EXEC CICS READ FILE('ACCTDAT') UPDATE INTO(REC-X) RIDFLD('AA') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
 DISPLAY 'UPDATE1:' RESP-X ':' RESP2-X ':' REC-X.
 EXEC CICS REWRITE FILE('ACCTDAT') FROM('AA22') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
 DISPLAY 'REWRITE1:' RESP-X ':' RESP2-X.
 EXEC CICS SYNCPOINT RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
 DISPLAY 'COMMIT:' RESP-X ':' RESP2-X.
+STOP RUN.
+"#;
+
+const CONTEXT_SOURCE: &str = r#"IDENTIFICATION DIVISION.
+PROGRAM-ID. CICSCTX.
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 REC-X PIC X(4).
+01 RESP-X PIC 9(3) VALUE 0.
+01 RESP2-X PIC 9(3) VALUE 0.
+PROCEDURE DIVISION.
+EXEC CICS READ FILE('ACCTDAT') UPDATE INTO(REC-X) RIDFLD('AA') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
+DISPLAY 'CTXREAD:' RESP-X ':' RESP2-X ':' REC-X.
+EXEC CICS SYNCPOINT RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
+DISPLAY 'CTXSYNC:' RESP-X ':' RESP2-X.
+EXEC CICS REWRITE FILE('ACCTDAT') FROM('AA33') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
+DISPLAY 'CTXREWRITE:' RESP-X ':' RESP2-X.
+STOP RUN.
+"#;
+
+const ROLLBACK_SOURCE: &str = r#"IDENTIFICATION DIVISION.
+PROGRAM-ID. CICSROLL.
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 REC-X PIC X(4).
+01 RESP-X PIC 9(3) VALUE 0.
+01 RESP2-X PIC 9(3) VALUE 0.
+PROCEDURE DIVISION.
 EXEC CICS READ FILE('ACCTDAT') UPDATE INTO(REC-X) RIDFLD('AA') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
 DISPLAY 'UPDATE2:' RESP-X ':' RESP2-X ':' REC-X.
 EXEC CICS REWRITE FILE('ACCTDAT') FROM('AA33') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
 DISPLAY 'REWRITE2:' RESP-X ':' RESP2-X.
+EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD('AA') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
+DISPLAY 'PREBACKOUT:' RESP-X ':' RESP2-X ':' REC-X.
 EXEC CICS SYNCPOINT ROLLBACK RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
 DISPLAY 'ROLLBACK:' RESP-X ':' RESP2-X.
 EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD('AA') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
 DISPLAY 'FINAL:' RESP-X ':' RESP2-X ':' REC-X.
+STOP RUN.
+"#;
+
+const INVALID_REWRITE_SOURCE: &str = r#"IDENTIFICATION DIVISION.
+PROGRAM-ID. CICSINV.
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 RESP-X PIC 9(3) VALUE 0.
+01 RESP2-X PIC 9(3) VALUE 0.
+PROCEDURE DIVISION.
+EXEC CICS REWRITE FILE('ACCTDAT') FROM('AA22') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
+DISPLAY 'INVALID:' RESP-X ':' RESP2-X.
 STOP RUN.
 "#;
 
@@ -74,7 +114,6 @@ WORKING-STORAGE SECTION.
 PROCEDURE DIVISION.
 "#;
 
-#[cfg(test)]
 const RESTART_MUTATE_SOURCE: &str = r#"IDENTIFICATION DIVISION.
 PROGRAM-ID. CICSCRASH.
 DATA DIVISION.
@@ -89,7 +128,6 @@ DISPLAY 'UNREACHED'.
 STOP RUN.
 "#;
 
-#[cfg(test)]
 const RESTART_ROLLBACK_SOURCE: &str = r#"IDENTIFICATION DIVISION.
 PROGRAM-ID. CICSRECOVER.
 DATA DIVISION.
@@ -105,16 +143,27 @@ STOP RUN.
 static PROFILE_NONCE: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct CicsCommandObservation {
+    pub resp: u64,
+    pub resp2: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub record_hex: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct CicsDurableRestartObservation {
+    pub fault_point_records: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CicsPilotProfileObservation {
     pub profile: String,
-    pub happy_output: String,
-    pub record_after_invalid_hex: String,
-    pub final_record_hex: String,
-    pub missing_output: String,
-    pub unauthorized_output: String,
-    pub record_after_unauthorized_hex: String,
-    pub closed_output: String,
-    pub record_after_closed_hex: String,
+    pub commands: BTreeMap<String, CicsCommandObservation>,
+    pub record_snapshots: BTreeMap<String, String>,
+    pub resource_states: BTreeMap<String, String>,
+    pub raw_application_outputs: BTreeMap<String, String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub durable_restart: Option<CicsDurableRestartObservation>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -129,6 +178,7 @@ pub struct CicsPilotReport {
 
 pub struct CicsPilotRuntime {
     case_driver: ScenarioOnlyDriver,
+    readback_driver: ScenarioOnlyDriver,
     scenario_driver: CicsPilotScenarioDriver,
     observations: Vec<CicsPilotObservation>,
 }
@@ -151,6 +201,7 @@ pub fn cics_pilot_runtime() -> CicsPilotRuntime {
     ];
     CicsPilotRuntime {
         case_driver: ScenarioOnlyDriver,
+        readback_driver: ScenarioOnlyDriver,
         scenario_driver: CicsPilotScenarioDriver,
         observations: obligations
             .into_iter()
@@ -167,19 +218,23 @@ impl CicsPilotRuntime {
         observations: &mut Vec<(ObservationRef, &'a dyn ConformanceObservation)>,
         limits: ConformanceLimits,
     ) -> Result<Vec<(ScenarioId, &'a dyn ConformanceScenarioDriver)>, SpecProblem> {
+        let id = ScenarioId::new("cics.file-uow.local", limits)?;
+        if spec.scenario(&id).is_none() {
+            return Ok(Vec::new());
+        }
         drivers.push((
             DriverRef::new("cics.pilot.product-path", limits)?,
             &self.case_driver,
+        ));
+        drivers.push((
+            DriverRef::new("cics.pilot.readback-path", limits)?,
+            &self.readback_driver,
         ));
         for observation in &self.observations {
             observations.push((
                 ObservationRef::new(format!("cics.pilot.{}", observation.obligation), limits)?,
                 observation,
             ));
-        }
-        let id = ScenarioId::new("cics.file-uow.local", limits)?;
-        if spec.scenario(&id).is_none() {
-            return Ok(Vec::new());
         }
         Ok(vec![(id, &self.scenario_driver)])
     }
@@ -234,9 +289,32 @@ impl ConformanceObservation for CicsPilotObservation {
     fn evaluate(&self, output: &DriverOutput) -> Result<ObservationCheck, String> {
         let report: CicsPilotReport =
             serde_json::from_slice(output.bytes()).map_err(|error| error.to_string())?;
+        let fixtures: Value = serde_json::from_str(FIXTURES).map_err(|error| error.to_string())?;
+        let expected_policy = fixtures["comparison_policy"]["version"]
+            .as_str()
+            .ok_or_else(|| "CICS pilot comparison policy is missing".to_string())?;
+        let expected_identity = serde_json::json!({
+            "schema_version": "mainframe-env.cics-pilot-observation@1",
+            "environment_manifest_digest": digest(ENVIRONMENT.as_bytes()),
+            "fixture_digest": digest(FIXTURES.as_bytes()),
+            "comparison_policy": expected_policy,
+            "differential_credit": 0,
+        });
+        let actual_identity = serde_json::json!({
+            "schema_version": report.schema_version,
+            "environment_manifest_digest": report.environment_manifest_digest,
+            "fixture_digest": report.fixture_digest,
+            "comparison_policy": report.comparison_policy,
+            "differential_credit": report.differential_credit,
+        });
         let (matched, expected, actual) = compare_obligation(self.obligation, &report)?;
-        ObservationCheck::new(matched, expected, actual, ConformanceLimits::default())
-            .map_err(|problem| problem.to_string())
+        ObservationCheck::new(
+            matched && expected_identity == actual_identity,
+            format!("identity={expected_identity}; {expected}"),
+            format!("identity={actual_identity}; {actual}"),
+            ConformanceLimits::default(),
+        )
+        .map_err(|problem| problem.to_string())
     }
 }
 
@@ -256,11 +334,15 @@ pub fn run_cics_pilot_profiles() -> Result<CicsPilotReport, String> {
     fs::create_dir(&directory).map_err(|error| error.to_string())?;
     let database = directory.join("state.db");
     let url = format!("sqlite://{}?mode=rwc", database.display());
-    let sqlite: Arc<dyn ProviderStateStore> = Arc::new(
-        SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144)
-            .map_err(|error| error.to_string())?,
-    );
-    let sqlite_observation = run_profile("sqlite", sqlite);
+    let sqlite_observation = (|| {
+        let sqlite: Arc<dyn ProviderStateStore> = Arc::new(
+            SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144)
+                .map_err(|error| error.to_string())?,
+        );
+        let mut observation = run_profile("sqlite", sqlite)?;
+        observation.durable_restart = Some(run_durable_restart_profile(&directory)?);
+        Ok::<_, String>(observation)
+    })();
     let _ = fs::remove_dir_all(&directory);
 
     Ok(CicsPilotReport {
@@ -295,16 +377,45 @@ fn run_profile(
     let outer = pilot_outer_host(cics.clone())
         .map_err(|problem| format!("{profile} outer host: {problem}"))?;
 
-    let happy_output = execute_source(
-        HAPPY_SOURCE,
-        "CICSPILOT",
+    let invalid_output = execute_source(
+        INVALID_REWRITE_SOURCE,
+        "CICSINV",
         "IBMUSER",
-        &format!("{profile}-happy"),
+        &format!("{profile}-invalid"),
         outer.clone(),
     )
-    .map_err(|problem| format!("{profile} happy path: {problem}"))?;
-    let record_after_invalid_hex = extract_record_after_invalid(&happy_output)?;
-    let final_record_hex = read_record_hex(&dataset)?;
+    .map_err(|problem| format!("{profile} invalid rewrite path: {problem}"))?;
+    let record_after_invalid_hex = read_record_hex(&dataset)?;
+
+    let commit_output = execute_source(
+        COMMIT_SOURCE,
+        "CICSPILOT",
+        "IBMUSER",
+        &format!("{profile}-commit"),
+        outer.clone(),
+    )
+    .map_err(|problem| format!("{profile} commit path: {problem}"))?;
+    let record_after_commit_hex = read_record_hex(&dataset)?;
+
+    let context_output = execute_source(
+        CONTEXT_SOURCE,
+        "CICSCTX",
+        "IBMUSER",
+        &format!("{profile}-context"),
+        outer.clone(),
+    )
+    .map_err(|problem| format!("{profile} context path: {problem}"))?;
+    let record_after_context_hex = read_record_hex(&dataset)?;
+
+    let rollback_output = execute_source(
+        ROLLBACK_SOURCE,
+        "CICSROLL",
+        "IBMUSER",
+        &format!("{profile}-rollback"),
+        outer.clone(),
+    )
+    .map_err(|problem| format!("{profile} rollback path: {problem}"))?;
+    let record_after_rollback_hex = read_record_hex(&dataset)?;
 
     let missing_output = execute_read_case(
         "MISSING",
@@ -341,26 +452,158 @@ fn run_profile(
         .map_err(|problem| problem.to_string())?;
     cics.register_run(closed_invocation.clone(), &session, "PIL1", "ME01", "S001")
         .map_err(|problem| problem.to_string())?;
-    close_file(&cics, &closed_invocation)
-        .map_err(|problem| format!("{profile} close setup: {problem}"))?;
-    let closed_output = drive_artifact(&closed_artifact, closed_invocation, outer)
+    set_file_status(
+        &cics,
+        &closed_invocation,
+        "CLOSED-UNENABLED",
+        "close-unenabled",
+    )
+    .map_err(|problem| format!("{profile} close setup: {problem}"))?;
+    let closed_output = drive_artifact(&closed_artifact, closed_invocation, outer.clone())
         .map_err(|problem| format!("{profile} closed path: {problem}"))?;
     let record_after_closed_hex = read_record_hex(&dataset)?;
 
+    let enabled_source = read_source_with_record("CLOSEDENABLED", "AA");
+    let enabled_artifact = crate::compile(&enabled_source)?;
+    let enabled_invocation = pilot_invocation(
+        &enabled_artifact,
+        "IBMUSER",
+        &format!("{profile}-closed-enabled"),
+        "CICSNEG",
+    )?;
+    let enabled_session = SessionId::new(
+        format!("{profile}-closed-enabled-session"),
+        InvocationLimits::default().max_binding_bytes,
+    )
+    .map_err(|problem| problem.to_string())?;
+    cics.create_session(&enabled_session, 24, 80)
+        .map_err(|problem| problem.to_string())?;
+    cics.register_run(
+        enabled_invocation.clone(),
+        &enabled_session,
+        "PIL1",
+        "ME01",
+        "S002",
+    )
+    .map_err(|problem| problem.to_string())?;
+    set_file_status(
+        &cics,
+        &enabled_invocation,
+        "CLOSED-ENABLED",
+        "close-enabled",
+    )
+    .map_err(|problem| format!("{profile} closed-enabled setup: {problem}"))?;
+    let enabled_output = drive_artifact(&enabled_artifact, enabled_invocation, outer)
+        .map_err(|problem| format!("{profile} closed-enabled path: {problem}"))?;
+    let record_after_closed_enabled_hex = read_record_hex(&dataset)?;
+
+    let commands = BTreeMap::from([
+        (
+            "plain_read".into(),
+            parse_command(&commit_output, "PLAIN", true)?,
+        ),
+        (
+            "rewrite_without_update".into(),
+            parse_command(&invalid_output, "INVALID", false)?,
+        ),
+        (
+            "read_update".into(),
+            parse_command(&commit_output, "UPDATE1", true)?,
+        ),
+        (
+            "rewrite_commit".into(),
+            parse_command(&commit_output, "REWRITE1", false)?,
+        ),
+        (
+            "syncpoint_commit".into(),
+            parse_command(&commit_output, "COMMIT", false)?,
+        ),
+        (
+            "context_read_update".into(),
+            parse_command(&context_output, "CTXREAD", true)?,
+        ),
+        (
+            "context_syncpoint".into(),
+            parse_command(&context_output, "CTXSYNC", false)?,
+        ),
+        (
+            "rewrite_after_syncpoint".into(),
+            parse_command(&context_output, "CTXREWRITE", false)?,
+        ),
+        (
+            "rollback_read_update".into(),
+            parse_command(&rollback_output, "UPDATE2", true)?,
+        ),
+        (
+            "rewrite_before_rollback".into(),
+            parse_command(&rollback_output, "REWRITE2", false)?,
+        ),
+        (
+            "read_before_rollback".into(),
+            parse_command(&rollback_output, "PREBACKOUT", true)?,
+        ),
+        (
+            "syncpoint_rollback".into(),
+            parse_command(&rollback_output, "ROLLBACK", false)?,
+        ),
+        (
+            "final_read".into(),
+            parse_command(&rollback_output, "FINAL", true)?,
+        ),
+        (
+            "missing_record".into(),
+            parse_command(&missing_output, "MISSING", false)?,
+        ),
+        (
+            "unauthorized".into(),
+            parse_command(&unauthorized_output, "UNAUTHORIZED", false)?,
+        ),
+        (
+            "closed_unenabled".into(),
+            parse_command(&closed_output, "CLOSED", false)?,
+        ),
+        (
+            "closed_enabled".into(),
+            parse_command(&enabled_output, "CLOSEDENABLED", true)?,
+        ),
+    ]);
+
     Ok(CicsPilotProfileObservation {
         profile: profile.into(),
-        happy_output,
-        record_after_invalid_hex,
-        final_record_hex,
-        missing_output,
-        unauthorized_output,
-        record_after_unauthorized_hex,
-        closed_output,
-        record_after_closed_hex,
+        commands,
+        record_snapshots: BTreeMap::from([
+            ("after_invalid_rewrite".into(), record_after_invalid_hex),
+            ("after_commit".into(), record_after_commit_hex),
+            ("after_context_rewrite".into(), record_after_context_hex),
+            ("after_rollback".into(), record_after_rollback_hex),
+            ("after_unauthorized".into(), record_after_unauthorized_hex),
+            ("after_closed_unenabled".into(), record_after_closed_hex),
+            (
+                "after_closed_enabled".into(),
+                record_after_closed_enabled_hex,
+            ),
+        ]),
+        resource_states: BTreeMap::from([(
+            "after_closed_enabled".into(),
+            format!(
+                "{:?}",
+                cics.file_status("ACCTDAT").map_err(|e| e.to_string())?
+            ),
+        )]),
+        raw_application_outputs: BTreeMap::from([
+            ("invalid_rewrite".into(), invalid_output),
+            ("commit".into(), commit_output),
+            ("context".into(), context_output),
+            ("rollback".into(), rollback_output),
+            ("missing_record".into(), missing_output),
+            ("unauthorized".into(), unauthorized_output),
+            ("closed_unenabled".into(), closed_output),
+            ("closed_enabled".into(), enabled_output),
+        ]),
+        durable_restart: None,
     })
 }
 
-#[cfg(test)]
 fn restart_mutate(url: &str, fault_point: CicsFileFaultPoint) -> Result<(), String> {
     let store: Arc<dyn ProviderStateStore> = Arc::new(
         SqliteStateStore::open(url, 64 * 1024 * 1024, 262_144)
@@ -409,8 +652,7 @@ fn restart_mutate(url: &str, fault_point: CicsFileFaultPoint) -> Result<(), Stri
     Ok(())
 }
 
-#[cfg(test)]
-fn restart_recover(url: &str) -> Result<(), String> {
+fn restart_recover(url: &str) -> Result<String, String> {
     let store: Arc<dyn ProviderStateStore> = Arc::new(
         SqliteStateStore::open(url, 64 * 1024 * 1024, 262_144)
             .map_err(|error| error.to_string())?,
@@ -441,10 +683,32 @@ fn restart_recover(url: &str) -> Result<(), String> {
     if output != "RECOVERED:000:000\n" {
         return Err(format!("unexpected restart output: {output:?}"));
     }
-    if read_record_hex(&dataset)? != hex(&encode("AA11")?) {
+    let recovered = read_record_hex(&dataset)?;
+    if recovered != hex(&encode("AA11")?) {
         return Err("restart rollback did not restore the pre-UOW record".into());
     }
-    Ok(())
+    Ok(recovered)
+}
+
+fn run_durable_restart_profile(
+    directory: &std::path::Path,
+) -> Result<CicsDurableRestartObservation, String> {
+    let mut fault_point_records = BTreeMap::new();
+    for (name, point) in [
+        ("before-intent", CicsFileFaultPoint::BeforeIntent),
+        ("after-intent", CicsFileFaultPoint::AfterIntent),
+        ("after-mutation", CicsFileFaultPoint::AfterMutation),
+    ] {
+        let url = format!(
+            "sqlite://{}?mode=rwc",
+            directory.join(format!("restart-{name}.db")).display()
+        );
+        restart_mutate(&url, point)?;
+        fault_point_records.insert(name.into(), restart_recover(&url)?);
+    }
+    Ok(CicsDurableRestartObservation {
+        fault_point_records,
+    })
 }
 
 fn seed_dataset(dataset: &DatasetService, profile: &str) -> Result<(), String> {
@@ -570,6 +834,12 @@ fn read_source(label: &str, key: &str) -> String {
     )
 }
 
+fn read_source_with_record(label: &str, key: &str) -> String {
+    format!(
+        "{READ_SOURCE_PREFIX}EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD('{key}') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nDISPLAY '{label}:' RESP-X ':' RESP2-X ':' REC-X.\nSTOP RUN.\n"
+    )
+}
+
 fn pilot_invocation(
     artifact: &mainframe_env_compiler_api::PublishedArtifact,
     principal: &str,
@@ -656,14 +926,19 @@ fn drive_artifact(
     }
 }
 
-fn close_file(cics: &CicsService, invocation: &Invocation) -> Result<(), String> {
+fn set_file_status(
+    cics: &CicsService,
+    invocation: &Invocation,
+    status: &str,
+    identity: &str,
+) -> Result<(), String> {
     let payload = BoundedPayload::new(
         "mainframe-env.cics.file-status@1",
-        b"CLOSED".to_vec(),
+        status.as_bytes().to_vec(),
         InvocationLimits::default(),
     )
     .map_err(|problem| problem.to_string())?;
-    let mut close_mutation = mutation(1, "close-file")?;
+    let mut close_mutation = mutation(1, identity)?;
     close_mutation.transaction = Some("PIL1".into());
     let request = CicsRequest {
         operation: CicsOperation::SetFileStatus,
@@ -702,16 +977,218 @@ fn read_record_hex(dataset: &DatasetService) -> Result<String, String> {
     }
 }
 
-fn extract_record_after_invalid(output: &str) -> Result<String, String> {
-    let line = output
+fn parse_command(
+    output: &str,
+    label: &str,
+    has_record: bool,
+) -> Result<CicsCommandObservation, String> {
+    let prefix = format!("{label}:");
+    let matches = output
         .lines()
-        .find(|line| line.starts_with("UPDATE1:"))
-        .ok_or_else(|| "CICS pilot UPDATE1 observation is missing".to_string())?;
-    let record = line
-        .rsplit(':')
-        .next()
-        .ok_or_else(|| "CICS pilot UPDATE1 record is missing".to_string())?;
-    Ok(hex(&encode(record)?))
+        .filter(|line| line.starts_with(&prefix))
+        .collect::<Vec<_>>();
+    if matches.len() != 1 {
+        return Err(format!(
+            "CICS pilot expected exactly one {label} observation, found {}",
+            matches.len()
+        ));
+    }
+    let fields = matches[0].split(':').collect::<Vec<_>>();
+    let expected_fields = if has_record { 4 } else { 3 };
+    if fields.len() != expected_fields || fields[0] != label {
+        return Err(format!(
+            "malformed CICS pilot {label} observation: {:?}",
+            matches[0]
+        ));
+    }
+    let resp = fields[1]
+        .parse::<u64>()
+        .map_err(|_| format!("invalid CICS pilot {label} RESP"))?;
+    let resp2 = fields[2]
+        .parse::<u64>()
+        .map_err(|_| format!("invalid CICS pilot {label} RESP2"))?;
+    let record_hex = has_record
+        .then(|| encode(fields[3]).map(|bytes| hex(&bytes)))
+        .transpose()?;
+    Ok(CicsCommandObservation {
+        resp,
+        resp2,
+        record_hex,
+    })
+}
+
+fn fixture_u64(value: &Value, field: &str, fixture: &str) -> Result<u64, String> {
+    value[field]
+        .as_u64()
+        .ok_or_else(|| format!("CICS fixture {fixture}.{field} is missing"))
+}
+
+fn expected_command(expected: &Value, fixture: &str) -> Result<CicsCommandObservation, String> {
+    let value = expected
+        .get(fixture)
+        .ok_or_else(|| format!("CICS fixture {fixture} is missing"))?;
+    let record_hex = value
+        .get("record")
+        .map(|record| {
+            record
+                .as_str()
+                .ok_or_else(|| format!("CICS fixture {fixture}.record is invalid"))
+                .and_then(|record| encode(record).map(|bytes| hex(&bytes)))
+        })
+        .transpose()?;
+    Ok(CicsCommandObservation {
+        resp: fixture_u64(value, "resp", fixture)?,
+        resp2: fixture_u64(value, "resp2", fixture)?,
+        record_hex,
+    })
+}
+
+fn expected_record_after(expected: &Value, fixture: &str) -> Result<String, String> {
+    let record = expected
+        .get(fixture)
+        .and_then(|value| value.get("record_after"))
+        .and_then(Value::as_str)
+        .ok_or_else(|| format!("CICS fixture {fixture}.record_after is missing"))?;
+    encode(record).map(|bytes| hex(&bytes))
+}
+
+fn profile_evidence(
+    profile: &CicsPilotProfileObservation,
+    expected: &Value,
+    commands: &[(&str, &str)],
+    snapshots: &[(&str, &str)],
+    resource_states: &[(&str, &str)],
+) -> Result<(bool, String, String), String> {
+    let mut expected_commands = BTreeMap::new();
+    let mut actual_commands = BTreeMap::new();
+    for (actual_key, fixture_key) in commands {
+        expected_commands.insert(
+            (*actual_key).to_string(),
+            expected_command(expected, fixture_key)?,
+        );
+        actual_commands.insert(
+            (*actual_key).to_string(),
+            profile
+                .commands
+                .get(*actual_key)
+                .cloned()
+                .ok_or_else(|| format!("{} command {actual_key} is missing", profile.profile))?,
+        );
+    }
+    let mut expected_snapshots = BTreeMap::new();
+    let mut actual_snapshots = BTreeMap::new();
+    for (actual_key, fixture_key) in snapshots {
+        expected_snapshots.insert(
+            (*actual_key).to_string(),
+            expected_record_after(expected, fixture_key)?,
+        );
+        actual_snapshots.insert(
+            (*actual_key).to_string(),
+            profile
+                .record_snapshots
+                .get(*actual_key)
+                .cloned()
+                .ok_or_else(|| format!("{} snapshot {actual_key} is missing", profile.profile))?,
+        );
+    }
+    let mut expected_states = BTreeMap::new();
+    let mut actual_states = BTreeMap::new();
+    for (actual_key, fixture_key) in resource_states {
+        let state = expected
+            .get(*fixture_key)
+            .and_then(|value| value.get("resource_state_after"))
+            .and_then(Value::as_str)
+            .ok_or_else(|| format!("CICS fixture {fixture_key}.resource_state_after is missing"))?;
+        expected_states.insert((*actual_key).to_string(), state.to_string());
+        actual_states.insert(
+            (*actual_key).to_string(),
+            profile
+                .resource_states
+                .get(*actual_key)
+                .cloned()
+                .ok_or_else(|| {
+                    format!("{} resource state {actual_key} is missing", profile.profile)
+                })?,
+        );
+    }
+    let expected_value = serde_json::json!({
+        "profile": profile.profile,
+        "commands": expected_commands,
+        "record_snapshots": expected_snapshots,
+        "resource_states": expected_states,
+    });
+    let actual_value = serde_json::json!({
+        "profile": profile.profile,
+        "commands": actual_commands,
+        "record_snapshots": actual_snapshots,
+        "resource_states": actual_states,
+    });
+    Ok((
+        expected_value == actual_value,
+        expected_value.to_string(),
+        actual_value.to_string(),
+    ))
+}
+
+fn durable_restart_evidence(
+    report: &CicsPilotReport,
+    expected: &Value,
+) -> Result<(bool, String, String), String> {
+    let fixture = expected
+        .get("durable_restart")
+        .ok_or_else(|| "CICS durable_restart fixture is missing".to_string())?;
+    let claimed_profiles = fixture["claimed_profiles"]
+        .as_array()
+        .ok_or_else(|| "CICS durable_restart claimed_profiles is missing".to_string())?
+        .iter()
+        .map(|profile| {
+            profile
+                .as_str()
+                .map(str::to_string)
+                .ok_or_else(|| "CICS durable_restart profile is invalid".to_string())
+        })
+        .collect::<Result<BTreeSet<_>, _>>()?;
+    let fault_points = fixture["fault_points"]
+        .as_array()
+        .ok_or_else(|| "CICS durable_restart fault_points is missing".to_string())?
+        .iter()
+        .map(|point| {
+            point
+                .as_str()
+                .map(str::to_string)
+                .ok_or_else(|| "CICS durable_restart fault point is invalid".to_string())
+        })
+        .collect::<Result<BTreeSet<_>, _>>()?;
+    let expected_record = expected_record_after(expected, "durable_restart")?;
+    let expected_records = claimed_profiles
+        .iter()
+        .map(|profile| {
+            (
+                profile.clone(),
+                fault_points
+                    .iter()
+                    .map(|point| (point.clone(), expected_record.clone()))
+                    .collect::<BTreeMap<_, _>>(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let actual_records = report
+        .profiles
+        .iter()
+        .filter_map(|profile| {
+            profile
+                .durable_restart
+                .as_ref()
+                .map(|restart| (profile.profile.clone(), restart.fault_point_records.clone()))
+        })
+        .collect::<BTreeMap<_, _>>();
+    let expected_value = serde_json::json!({"claimed_profile_records": expected_records});
+    let actual_value = serde_json::json!({"claimed_profile_records": actual_records});
+    Ok((
+        expected_value == actual_value,
+        expected_value.to_string(),
+        actual_value.to_string(),
+    ))
 }
 
 fn compare_obligation(
@@ -720,76 +1197,6 @@ fn compare_obligation(
 ) -> Result<(bool, String, String), String> {
     let fixtures: Value = serde_json::from_str(FIXTURES).map_err(|error| error.to_string())?;
     let expected = &fixtures["expected"];
-    let expected_happy = format!(
-        "PLAIN:{:03}:{:03}:{}\nINVALID:{:03}:{:03}\nUPDATE1:{:03}:{:03}:{}\nREWRITE1:{:03}:{:03}\nCOMMIT:000:000\nUPDATE2:000:000:{}\nREWRITE2:000:000\nROLLBACK:{:03}:{:03}\nFINAL:000:000:{}\n",
-        expected["plain_read"]["resp"].as_u64().unwrap_or(u64::MAX),
-        expected["plain_read"]["resp2"].as_u64().unwrap_or(u64::MAX),
-        expected["plain_read"]["record"]
-            .as_str()
-            .unwrap_or("missing"),
-        expected["rewrite_without_update"]["resp"]
-            .as_u64()
-            .unwrap_or(u64::MAX),
-        expected["rewrite_without_update"]["resp2"]
-            .as_u64()
-            .unwrap_or(u64::MAX),
-        expected["read_update"]["resp"].as_u64().unwrap_or(u64::MAX),
-        expected["read_update"]["resp2"]
-            .as_u64()
-            .unwrap_or(u64::MAX),
-        expected["read_update"]["record"]
-            .as_str()
-            .unwrap_or("missing"),
-        expected["rewrite_commit"]["resp"]
-            .as_u64()
-            .unwrap_or(u64::MAX),
-        expected["rewrite_commit"]["resp2"]
-            .as_u64()
-            .unwrap_or(u64::MAX),
-        expected["rewrite_commit"]["record_after"]
-            .as_str()
-            .unwrap_or("missing"),
-        expected["rollback"]["resp"].as_u64().unwrap_or(u64::MAX),
-        expected["rollback"]["resp2"].as_u64().unwrap_or(u64::MAX),
-        expected["rollback"]["record_after"]
-            .as_str()
-            .unwrap_or("missing"),
-    );
-    let expected_missing = format!(
-        "MISSING:{:03}:{:03}\n",
-        expected["missing_record"]["resp"]
-            .as_u64()
-            .unwrap_or(u64::MAX),
-        expected["missing_record"]["resp2"]
-            .as_u64()
-            .unwrap_or(u64::MAX)
-    );
-    let expected_unauthorized = format!(
-        "UNAUTHORIZED:{:03}:{:03}\n",
-        expected["unauthorized"]["resp"]
-            .as_u64()
-            .unwrap_or(u64::MAX),
-        expected["unauthorized"]["resp2"]
-            .as_u64()
-            .unwrap_or(u64::MAX)
-    );
-    let expected_closed = format!(
-        "CLOSED:{:03}:{:03}\n",
-        expected["closed_file"]["resp"].as_u64().unwrap_or(u64::MAX),
-        expected["closed_file"]["resp2"]
-            .as_u64()
-            .unwrap_or(u64::MAX)
-    );
-    let expected_record = hex(&encode(
-        expected["rollback"]["record_after"]
-            .as_str()
-            .ok_or_else(|| "rollback expected record is missing".to_string())?,
-    )?);
-    let expected_initial = hex(&encode(
-        expected["rewrite_without_update"]["record_after"]
-            .as_str()
-            .ok_or_else(|| "invalid rewrite expected record is missing".to_string())?,
-    )?);
     let known = [
         "plain-read",
         "read-update",
@@ -807,57 +1214,80 @@ fn compare_obligation(
     if !known.contains(&obligation) {
         return Err(format!("unknown CICS pilot obligation {obligation}"));
     }
+    if obligation == "durable-restart" {
+        return durable_restart_evidence(report, expected);
+    }
+    let (commands, snapshots, resource_states): (
+        Vec<(&str, &str)>,
+        Vec<(&str, &str)>,
+        Vec<(&str, &str)>,
+    ) = match obligation {
+        "plain-read" => (vec![("plain_read", "plain_read")], vec![], vec![]),
+        "read-update" => (vec![("read_update", "read_update")], vec![], vec![]),
+        "requires-read-update" => (
+            vec![("rewrite_without_update", "rewrite_without_update")],
+            vec![],
+            vec![],
+        ),
+        "rewrite-record" => (
+            vec![("rewrite_commit", "rewrite_commit")],
+            vec![("after_commit", "rewrite_commit")],
+            vec![],
+        ),
+        "forbidden-mutation-on-invreq" => (
+            vec![],
+            vec![("after_invalid_rewrite", "rewrite_without_update")],
+            vec![],
+        ),
+        "context-invalidated-at-syncpoint" => (
+            vec![
+                ("context_read_update", "context_read_update"),
+                ("context_syncpoint", "context_syncpoint"),
+                ("rewrite_after_syncpoint", "rewrite_after_syncpoint"),
+            ],
+            vec![("after_context_rewrite", "rewrite_after_syncpoint")],
+            vec![],
+        ),
+        "commit-boundary" => (
+            vec![("syncpoint_commit", "syncpoint_commit")],
+            vec![("after_commit", "syncpoint_commit")],
+            vec![],
+        ),
+        "rollback-boundary" => (
+            vec![
+                ("rollback_read_update", "rollback_read_update"),
+                ("rewrite_before_rollback", "rewrite_before_rollback"),
+                ("read_before_rollback", "read_before_rollback"),
+                ("syncpoint_rollback", "syncpoint_rollback"),
+                ("final_read", "final_read"),
+            ],
+            vec![("after_rollback", "syncpoint_rollback")],
+            vec![],
+        ),
+        "missing-record" => (vec![("missing_record", "missing_record")], vec![], vec![]),
+        "unauthorized" => (
+            vec![("unauthorized", "unauthorized")],
+            vec![("after_unauthorized", "unauthorized")],
+            vec![],
+        ),
+        "closed-file" => (
+            vec![
+                ("closed_unenabled", "closed_unenabled"),
+                ("closed_enabled", "closed_enabled"),
+            ],
+            vec![
+                ("after_closed_unenabled", "closed_unenabled"),
+                ("after_closed_enabled", "closed_enabled"),
+            ],
+            vec![("after_closed_enabled", "closed_enabled")],
+        ),
+        _ => unreachable!("obligation was checked above"),
+    };
     let checks = report
         .profiles
         .iter()
-        .map(|profile| match obligation {
-            "plain-read"
-            | "read-update"
-            | "requires-read-update"
-            | "rewrite-record"
-            | "context-invalidated-at-syncpoint"
-            | "commit-boundary"
-            | "rollback-boundary" => (
-                profile.happy_output == expected_happy,
-                expected_happy.clone(),
-                profile.happy_output.clone(),
-            ),
-            "forbidden-mutation-on-invreq" => (
-                profile.record_after_invalid_hex == expected_initial,
-                expected_initial.clone(),
-                profile.record_after_invalid_hex.clone(),
-            ),
-            "missing-record" => (
-                profile.missing_output == expected_missing,
-                expected_missing.clone(),
-                profile.missing_output.clone(),
-            ),
-            "unauthorized" => (
-                profile.unauthorized_output == expected_unauthorized
-                    && profile.record_after_unauthorized_hex == expected_record,
-                format!("{expected_unauthorized}record={expected_record}"),
-                format!(
-                    "{}record={}",
-                    profile.unauthorized_output, profile.record_after_unauthorized_hex
-                ),
-            ),
-            "closed-file" => (
-                profile.closed_output == expected_closed
-                    && profile.record_after_closed_hex == expected_record,
-                format!("{expected_closed}record={expected_record}"),
-                format!(
-                    "{}record={}",
-                    profile.closed_output, profile.record_after_closed_hex
-                ),
-            ),
-            "durable-restart" => (
-                profile.profile != "sqlite" || profile.final_record_hex == expected_record,
-                format!("sqlite-record={expected_record}"),
-                format!("{}-record={}", profile.profile, profile.final_record_hex),
-            ),
-            _ => unreachable!("obligation was checked above"),
-        })
-        .collect::<Vec<_>>();
+        .map(|profile| profile_evidence(profile, expected, &commands, &snapshots, &resource_states))
+        .collect::<Result<Vec<_>, _>>()?;
     let matched = checks.iter().all(|check| check.0);
     let expected = checks
         .iter()
@@ -960,7 +1390,9 @@ mod tests {
                 restart_mutate(&url, point).unwrap();
                 std::process::exit(86);
             }
-            "recover" => restart_recover(&url).unwrap(),
+            "recover" => {
+                restart_recover(&url).unwrap();
+            }
             other => panic!("unknown restart worker phase {other}"),
         }
     }
@@ -1005,23 +1437,86 @@ mod tests {
 
     #[test]
     fn cics_pilot_comparator_rejects_status_and_state_perturbations_independently() {
+        fn failed_obligations(report: &CicsPilotReport) -> BTreeSet<&'static str> {
+            [
+                "plain-read",
+                "read-update",
+                "missing-record",
+                "unauthorized",
+                "closed-file",
+                "requires-read-update",
+                "rewrite-record",
+                "forbidden-mutation-on-invreq",
+                "context-invalidated-at-syncpoint",
+                "commit-boundary",
+                "rollback-boundary",
+                "durable-restart",
+            ]
+            .into_iter()
+            .filter(|obligation| !compare_obligation(obligation, report).unwrap().0)
+            .collect()
+        }
+
         let report = run_cics_pilot_profiles().unwrap();
         let mut false_status = report.clone();
-        false_status.profiles[0].happy_output = false_status.profiles[0]
-            .happy_output
-            .replace("INVALID:016:030", "INVALID:000:000");
-        assert!(
-            !compare_obligation("requires-read-update", &false_status)
-                .unwrap()
-                .0
+        false_status.profiles[0]
+            .commands
+            .get_mut("rewrite_without_update")
+            .unwrap()
+            .resp = 0;
+        assert_eq!(
+            failed_obligations(&false_status),
+            BTreeSet::from(["requires-read-update"])
         );
 
-        let mut forbidden_mutation = report;
-        forbidden_mutation.profiles[0].record_after_invalid_hex = hex(&encode("AA22").unwrap());
+        let mut forbidden_mutation = report.clone();
+        forbidden_mutation.profiles[0].record_snapshots.insert(
+            "after_invalid_rewrite".into(),
+            hex(&encode("AA22").unwrap()),
+        );
+        assert_eq!(
+            failed_obligations(&forbidden_mutation),
+            BTreeSet::from(["forbidden-mutation-on-invreq"])
+        );
+
+        let mut rollback_status = report.clone();
+        rollback_status.profiles[0]
+            .commands
+            .get_mut("syncpoint_rollback")
+            .unwrap()
+            .resp = 16;
+        assert_eq!(
+            failed_obligations(&rollback_status),
+            BTreeSet::from(["rollback-boundary"])
+        );
+
+        let mut durable_missing = report;
+        durable_missing
+            .profiles
+            .iter_mut()
+            .find(|profile| profile.profile == "sqlite")
+            .unwrap()
+            .durable_restart = None;
+        assert_eq!(
+            failed_obligations(&durable_missing),
+            BTreeSet::from(["durable-restart"])
+        );
+
+        let mut stale_identity = run_cics_pilot_profiles().unwrap();
+        stale_identity.environment_manifest_digest =
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
+        let output = DriverOutput::new(
+            serde_json::to_vec(&stale_identity).unwrap(),
+            ConformanceLimits::default(),
+        )
+        .unwrap();
         assert!(
-            !compare_obligation("forbidden-mutation-on-invreq", &forbidden_mutation)
-                .unwrap()
-                .0
+            !CicsPilotObservation {
+                obligation: "plain-read"
+            }
+            .evaluate(&output)
+            .unwrap()
+            .matched
         );
     }
 }

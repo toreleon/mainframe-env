@@ -3,7 +3,7 @@ use base64::engine::general_purpose::STANDARD;
 use ring::signature::{ED25519, UnparsedPublicKey};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 const MAX_CAPTURE_BYTES: usize = 1024 * 1024;
 const CAPTURE_CONTRACT: &str = "mainframe-env.cics-oracle-capture@1";
@@ -49,6 +49,7 @@ pub struct CicsOracleExpectation<'a> {
     pub environment_manifest_digest: &'a str,
     pub comparison_policy: &'a str,
     pub required_scenarios: &'a BTreeSet<String>,
+    pub expected_observations: &'a BTreeMap<String, CicsOracleObservation>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -111,6 +112,15 @@ pub fn import_cics_oracle_capture(
     if scenarios.len() != capture.observations.len() || &scenarios != expected.required_scenarios {
         return Err("CICS oracle scenario set is missing, duplicate, or unknown".into());
     }
+    if expected
+        .expected_observations
+        .keys()
+        .cloned()
+        .collect::<BTreeSet<_>>()
+        != *expected.required_scenarios
+    {
+        return Err("CICS oracle reviewed expectation set is incomplete".into());
+    }
     if capture.observations.iter().any(|observation| {
         observation.application_output.len() > 16 * 1024
             || observation.record_hex.len() > 16 * 1024
@@ -125,6 +135,18 @@ pub fn import_cics_oracle_capture(
     let raw = serde_json::to_vec(&capture.observations).map_err(|error| error.to_string())?;
     if capture.raw_capture_digest != digest(&raw) {
         return Err("CICS oracle raw-capture digest does not match its observations".into());
+    }
+    for observation in &capture.observations {
+        let reviewed = expected
+            .expected_observations
+            .get(&observation.scenario_id)
+            .ok_or_else(|| "CICS oracle reviewed observation is missing".to_string())?;
+        if observation != reviewed {
+            return Err(format!(
+                "CICS oracle observation {} does not match the reviewed comparison fixture",
+                observation.scenario_id
+            ));
+        }
     }
     if capture.origin.run_job_id.is_empty() || capture.origin.run_job_id.len() > 256 {
         return Err("CICS oracle run/job identity is missing or too large".into());
@@ -245,7 +267,20 @@ mod tests {
         }
     }
 
-    fn expectation<'a>(required: &'a BTreeSet<String>) -> CicsOracleExpectation<'a> {
+    fn expected_observations(
+        capture: &CicsOracleCapture,
+    ) -> BTreeMap<String, CicsOracleObservation> {
+        capture
+            .observations
+            .iter()
+            .map(|observation| (observation.scenario_id.clone(), observation.clone()))
+            .collect()
+    }
+
+    fn expectation<'a>(
+        required: &'a BTreeSet<String>,
+        observations: &'a BTreeMap<String, CicsOracleObservation>,
+    ) -> CicsOracleExpectation<'a> {
         CicsOracleExpectation {
             candidate_digest: D,
             spec_digest: D,
@@ -254,16 +289,19 @@ mod tests {
             environment_manifest_digest: D,
             comparison_policy: "policy@1",
             required_scenarios: required,
+            expected_observations: observations,
         }
     }
 
     #[test]
     fn local_model_and_synthetic_captures_validate_plumbing_with_zero_credit() {
         let required = scenarios();
+        let reviewed = expected_observations(&capture("local"));
         for kind in ["local", "model", "synthetic"] {
             let bytes = serde_json::to_vec(&capture(kind)).unwrap();
             let outcome =
-                import_cics_oracle_capture(&bytes, &expectation(&required), None).unwrap();
+                import_cics_oracle_capture(&bytes, &expectation(&required, &reviewed), None)
+                    .unwrap();
             assert_eq!(outcome.licensed_credit(), 0);
         }
     }
@@ -271,13 +309,16 @@ mod tests {
     #[test]
     fn malformed_missing_and_wrong_identity_captures_fail_closed() {
         let required = scenarios();
-        assert!(import_cics_oracle_capture(b"{", &expectation(&required), None).is_err());
+        let reviewed = expected_observations(&capture("local"));
+        assert!(
+            import_cics_oracle_capture(b"{", &expectation(&required, &reviewed), None).is_err()
+        );
         let mut missing = capture("local");
         missing.observations.pop();
         assert!(
             import_cics_oracle_capture(
                 &serde_json::to_vec(&missing).unwrap(),
-                &expectation(&required),
+                &expectation(&required, &reviewed),
                 None,
             )
             .is_err()
@@ -288,7 +329,7 @@ mod tests {
         assert!(
             import_cics_oracle_capture(
                 &serde_json::to_vec(&wrong).unwrap(),
-                &expectation(&required),
+                &expectation(&required, &reviewed),
                 None,
             )
             .is_err()
@@ -299,10 +340,11 @@ mod tests {
     fn valid_looking_forged_ibm_origin_cannot_grant_credit() {
         let required = scenarios();
         let forged = capture("licensed-ibm");
+        let reviewed = expected_observations(&forged);
         assert!(
             import_cics_oracle_capture(
                 &serde_json::to_vec(&forged).unwrap(),
-                &expectation(&required),
+                &expectation(&required, &reviewed),
                 None,
             )
             .unwrap_err()
@@ -317,12 +359,13 @@ mod tests {
         let document = Ed25519KeyPair::generate_pkcs8(&random).unwrap();
         let key = Ed25519KeyPair::from_pkcs8(document.as_ref()).unwrap();
         let mut signed = capture("licensed-ibm");
+        let reviewed = expected_observations(&signed);
         signed.origin.signature =
             Some(STANDARD.encode(key.sign(&signed_payload(&signed).unwrap())));
         let bytes = serde_json::to_vec(&signed).unwrap();
         let outcome = import_cics_oracle_capture(
             &bytes,
-            &expectation(&required),
+            &expectation(&required, &reviewed),
             Some(key.public_key().as_ref()),
         )
         .unwrap();
@@ -332,10 +375,28 @@ mod tests {
         assert!(
             import_cics_oracle_capture(
                 &serde_json::to_vec(&signed).unwrap(),
-                &expectation(&required),
+                &expectation(&required, &reviewed),
                 Some(key.public_key().as_ref()),
             )
             .is_err()
+        );
+    }
+
+    #[test]
+    fn signed_or_local_capture_with_mismatched_behavior_cannot_grant_credit() {
+        let required = scenarios();
+        let mut actual = capture("local");
+        let reviewed = expected_observations(&actual);
+        actual.observations[0].record_hex = "c1c1f9f9".into();
+        actual.raw_capture_digest = digest(&serde_json::to_vec(&actual.observations).unwrap());
+        assert!(
+            import_cics_oracle_capture(
+                &serde_json::to_vec(&actual).unwrap(),
+                &expectation(&required, &reviewed),
+                None,
+            )
+            .unwrap_err()
+            .contains("reviewed comparison fixture")
         );
     }
 }

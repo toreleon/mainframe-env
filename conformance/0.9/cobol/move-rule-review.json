@@ -1,0 +1,30 @@
+{
+  "schema_version": "mainframe-env.cobol-move-rule-review@1",
+  "review_status": "pending-maintainer",
+  "candidate_projection_sha256": "sha256:3260d2158a58e1d9a7b1c2d5a2ebe5cdad0583640a295bd3a7f245181e0c388a",
+  "topic_manifest_digest": "2eabe41382c2718e80fbdebe0b759c199443710a8710ad32872b9cc9f0bc74e9",
+  "inventory_disposition": {
+    "normative_fragments": 154,
+    "candidate_fragments": 7,
+    "proposed_accepted_fragments": 7,
+    "outside_scope_fragments": 147,
+    "informative_fragments": 0,
+    "unsupported_fragments": 0,
+    "conflicting_fragments": 0
+  },
+  "decisions": [
+    {"rule_id": "cobol.move.elementary-scope", "decision": "proposed-accept"},
+    {"rule_id": "cobol.move.conversion-and-editing", "decision": "proposed-accept"},
+    {"rule_id": "cobol.move.decimal-alignment", "decision": "proposed-accept"},
+    {"rule_id": "cobol.move.signed-receiver", "decision": "proposed-accept"},
+    {"rule_id": "cobol.move.numeric-editing", "decision": "proposed-accept"},
+    {"rule_id": "cobol.move.integer-to-edited-valid", "decision": "proposed-accept"},
+    {"rule_id": "cobol.move.edited-alignment", "decision": "proposed-accept"}
+  ],
+  "old_new_mapping": {
+    "old_current_binding": "cobol.statement-runtime.move / runtime-normal / executed",
+    "proposed_replacement": "cobol.numeric-move.bytes / numeric-move-bytes / executed",
+    "cutover_rule": "After maintainer review, replace the overlapping runtime-normal claim for this scoped MOVE behavior; do not retain two current coverage authorities.",
+    "historical_evidence": "unchanged and bound to its original spec digest"
+  }
+}
