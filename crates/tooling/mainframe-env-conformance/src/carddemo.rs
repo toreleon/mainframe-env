@@ -7210,7 +7210,7 @@ async fn exercise_mq_authorization_routes(
     let mut typed_invocation =
         authorization_invocation("mq-typed-route", true, ServiceClass::Interactive)?;
     typed_invocation.artifact = ArtifactRef::new(
-        format!("sha256:{}", typed_artifact.id().to_hex()),
+        typed_artifact.content_id().to_reference(),
         InvocationLimits::default(),
     )
     .map_err(|_| CorpusProblem::new("carddemo.mq.route", "artifact reference invalid"))?;
@@ -8795,7 +8795,7 @@ fn ims_artifact_invocation(
 ) -> Result<Invocation, CorpusProblem> {
     let mut invocation = ims_invocation(run, granted, generation)?;
     invocation.artifact = ArtifactRef::new(
-        format!("sha256:{}", artifact.id().to_hex()),
+        artifact.content_id().to_reference(),
         InvocationLimits::default(),
     )
     .map_err(|_| CorpusProblem::new("carddemo.ims.invocation", "artifact invalid"))?;

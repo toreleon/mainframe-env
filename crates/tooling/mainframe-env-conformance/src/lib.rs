@@ -165,7 +165,7 @@ pub fn invocation(artifact: &PublishedArtifact, output_limit: u64) -> Invocation
         RunUnitId::new("fixture-run", l).unwrap(),
         None,
         Selector::new("program:COBOL:HELLO", l).unwrap(),
-        ArtifactRef::new(format!("sha256:{}", artifact.id().to_hex()), l).unwrap(),
+        ArtifactRef::new(artifact.content_id().to_reference(), l).unwrap(),
         Principal::new(PrincipalId::new("IBMUSER", l).unwrap(), BTreeSet::new(), l).unwrap(),
         ServiceClass::Batch,
         0,

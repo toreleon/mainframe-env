@@ -86,8 +86,9 @@ fn run(cli: Cli) -> Result<(), String> {
                     diagnostics,
                 } => {
                     println!(
-                        "artifact sha256:{} bytes={} diagnostics={}",
-                        artifact.id().to_hex(),
+                        "artifact {} semantic={} bytes={} diagnostics={}",
+                        artifact.content_id().to_reference(),
+                        artifact.semantic_id().to_reference(),
                         artifact.payload().len(),
                         diagnostics.len()
                     );
@@ -134,7 +135,7 @@ fn run(cli: Cli) -> Result<(), String> {
             };
             let limits = InvocationLimits::default();
             let invocation = invocation(
-                ArtifactRef::new(format!("sha256:{}", artifact.id().to_hex()), limits)
+                ArtifactRef::new(artifact.content_id().to_reference(), limits)
                     .map_err(|error| error.to_string())?,
             )?;
             let mut machine = ReferenceMachine::from_binary(

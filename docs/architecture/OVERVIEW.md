@@ -94,8 +94,17 @@ SourceBundle
   -> PublishedArtifact
 ```
 
-Stage constructors are private. A later stage cannot be fabricated by calling a
-validator and ignoring its result.
+Frontend parsed and semantic stages remain compiler-private. The public proof
+chain consumes verified HIR into lowered MIR, legalized MIR, and finally an
+artifact whose bytes are encoded internally. A later stage cannot be
+fabricated by supplying completeness, an identity, an unrelated source, or
+arbitrary payload bytes.
+
+Artifact identity has two non-interchangeable forms: `SemanticArtifactId`
+describes source/compiler/manifest meaning and uses the
+`semantic-sha256:` namespace; `ArtifactContentId` is the SHA-256 of the exact
+published payload and is the only identity serialized as a runtime `sha256:`
+artifact reference.
 
 ## Conformance model
 

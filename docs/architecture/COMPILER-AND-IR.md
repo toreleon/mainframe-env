@@ -68,6 +68,17 @@ grammars and protocols, not imposed as a universal frontend framework.
 | `LegalizedMir` | Every executable operation has a registered schema and backend route |
 | `PublishedArtifact` | Immutable bytes and compatibility metadata committed atomically |
 
+Parsed and semantic construction is private to the compiler implementation.
+The executable proof chain consumes verified HIR into lowered MIR and then
+legalized MIR; publication encodes that legal module internally. Semantic
+artifact identity uses `semantic-sha256:`, while the exact payload digest alone
+uses the runtime `sha256:` artifact-reference namespace.
+
+This distinction is artifact contract `mainframe-env.artifact@2`. Version 1
+compiler outputs used a semantic digest in the `sha256:` namespace and are not
+silently reinterpreted; they must be rebuilt so every executable reference can
+be verified against the exact payload bytes.
+
 Analyze mode may return partial syntax, AST, semantic, or HIR results with
 diagnostics and completeness metadata. It may never construct a publishable or
 executable artifact.

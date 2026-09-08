@@ -879,7 +879,7 @@ fn pilot_invocation(
         None,
         Selector::new(format!("program:COBOL:{program}"), limits)
             .map_err(|problem| problem.to_string())?,
-        ArtifactRef::new(format!("sha256:{}", artifact.id().to_hex()), limits)
+        ArtifactRef::new(artifact.content_id().to_reference(), limits)
             .map_err(|problem| problem.to_string())?,
         Principal::new(
             PrincipalId::new(principal, limits).map_err(|problem| problem.to_string())?,

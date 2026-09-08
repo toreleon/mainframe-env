@@ -730,7 +730,7 @@ impl Program for CobolProgram {
             .map_err(|_| HostProblem::InfrastructureFailure)?,
             Some(parent.execution_id.clone()),
             Selector::new("program:COBOL", limits).map_err(|_| HostProblem::Malformed)?,
-            ArtifactRef::new(format!("sha256:{}", artifact.id().to_hex()), limits)
+            ArtifactRef::new(artifact.content_id().to_reference(), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
             Principal::new(
                 parent.principal.id().clone(),
