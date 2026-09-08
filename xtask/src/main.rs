@@ -99,7 +99,11 @@ struct EvidenceArgs {
 struct ConformanceArgs {
     #[arg(long)]
     subsystem: Option<String>,
-    #[arg(long)]
+    #[arg(
+        long,
+        value_name = "GATE",
+        help = "One coverage gate, or local for all non-differential gates"
+    )]
     gate: Option<String>,
     #[arg(long)]
     shard: Option<u16>,
@@ -3695,20 +3699,20 @@ fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> T
         "selected subsystem product driver registry is not installed",
     )?;
     let limits = ConformanceLimits::default();
-    let gate = args.gate.as_deref().map(parse_coverage_gate).transpose()?;
+    let (gate, local_gate) = parse_focused_gate(args.gate.as_deref())?;
     let spec = compile_shared_spec(root)?;
     let selection = if let Some(replay) = args.replay.as_deref() {
         RunnerSelection::replay(replay, limits).map_err(|problem| problem.to_string())?
     } else {
-        RunnerSelection::focused(
+        make_focused_selection(
             args.subsystem
                 .as_deref()
                 .ok_or("focused conformance requires --subsystem")?,
             gate,
+            local_gate,
             args.shard,
             limits,
-        )
-        .map_err(|problem| problem.to_string())?
+        )?
     };
     let dataset_handlers = dataset_conformance_runtime();
     let jcl_handlers = jcl_conformance::runtime();
@@ -3928,7 +3932,7 @@ fn check_focused_dataset_or_jcl_conformance_interface(
     root: &Path,
     args: &ConformanceArgs,
 ) -> TaskResult {
-    let gate = args.gate.as_deref().map(parse_coverage_gate).transpose()?;
+    let (gate, local_gate) = parse_focused_gate(args.gate.as_deref())?;
     let spec = compile_shared_spec(root)?;
     let selected = spec
         .cases()
@@ -3943,7 +3947,7 @@ fn check_focused_dataset_or_jcl_conformance_interface(
                 .subsystem
                 .as_deref()
                 .is_some_and(|subsystem| subsystem == row.subsystem());
-            let gate_matches = gate.is_none_or(|gate| gate == case.key().gate);
+            let gate_matches = focused_gate_matches(case.key().gate, gate, local_gate);
             let shard_matches = args.shard.is_none_or(|bucket| {
                 spec.expected_shards().iter().any(|(shard, bindings)| {
                     shard.bucket == bucket && bindings.contains(case.key())
@@ -3969,17 +3973,18 @@ fn check_focused_dataset_or_jcl_conformance_interface(
     if is_dataset {
         let selection = if let Some(replay) = args.replay.as_deref() {
             RunnerSelection::replay(replay, ConformanceLimits::default())
+                .map_err(|problem| problem.to_string())
         } else {
-            RunnerSelection::focused(
+            make_focused_selection(
                 args.subsystem
                     .as_deref()
                     .ok_or("dataset conformance subsystem is missing")?,
                 gate,
+                local_gate,
                 args.shard,
                 ConformanceLimits::default(),
             )
-        }
-        .map_err(|problem| problem.to_string())?;
+        }?;
         let context = RunnerContext::new(
             repository_digest(root)?,
             "local-focused",
@@ -4036,15 +4041,16 @@ fn check_focused_dataset_or_jcl_conformance_interface(
         "selected subsystem product driver registry is not installed",
     )?;
     if racf_selected {
-        return run_focused_racf(root, args, gate, &spec, selected);
+        return run_focused_racf(root, args, gate, local_gate, &spec, selected);
     }
-    run_focused_jcl(root, args, gate, &spec, selected)
+    run_focused_jcl(root, args, gate, local_gate, &spec, selected)
 }
 
 fn run_focused_racf(
     root: &Path,
     args: &ConformanceArgs,
     gate: Option<CoverageGate>,
+    local_gate: bool,
     spec: &CompiledSpec,
     selected: usize,
 ) -> TaskResult {
@@ -4052,8 +4058,7 @@ fn run_focused_racf(
     let selection = if let Some(replay) = args.replay.as_deref() {
         RunnerSelection::replay(replay, limits).map_err(|problem| problem.to_string())?
     } else {
-        RunnerSelection::focused("racf-saf", gate, args.shard, limits)
-            .map_err(|problem| problem.to_string())?
+        make_focused_selection("racf-saf", gate, local_gate, args.shard, limits)?
     };
     let context = RunnerContext::new(repository_digest(root)?, "local-deterministic", limits)
         .map_err(|problem| problem.to_string())?;
@@ -4100,6 +4105,7 @@ fn run_focused_jcl(
     root: &Path,
     args: &ConformanceArgs,
     gate: Option<CoverageGate>,
+    local_gate: bool,
     spec: &CompiledSpec,
     selected: usize,
 ) -> TaskResult {
@@ -4107,13 +4113,13 @@ fn run_focused_jcl(
     let selection = if let Some(replay) = args.replay.as_deref() {
         RunnerSelection::replay(replay, limits).map_err(|problem| problem.to_string())?
     } else {
-        RunnerSelection::focused(
+        make_focused_selection(
             args.subsystem.as_deref().unwrap_or("jcl-jes2"),
             gate,
+            local_gate,
             args.shard,
             limits,
-        )
-        .map_err(|problem| problem.to_string())?
+        )?
     };
     let context = RunnerContext::new(repository_digest(root)?, "local-deterministic", limits)
         .map_err(|problem| problem.to_string())?;
@@ -4319,6 +4325,41 @@ fn parse_coverage_gate(value: &str) -> TaskResult<CoverageGate> {
         .into_iter()
         .find(|gate| gate.slug() == value)
         .ok_or_else(|| format!("unknown coverage gate {value}"))
+}
+
+fn parse_focused_gate(value: Option<&str>) -> TaskResult<(Option<CoverageGate>, bool)> {
+    match value {
+        Some("local") => Ok((None, true)),
+        Some(value) => Ok((Some(parse_coverage_gate(value)?), false)),
+        None => Ok((None, false)),
+    }
+}
+
+fn focused_gate_matches(
+    candidate: CoverageGate,
+    selected: Option<CoverageGate>,
+    local: bool,
+) -> bool {
+    if local {
+        candidate != CoverageGate::Differential
+    } else {
+        selected.is_none_or(|gate| gate == candidate)
+    }
+}
+
+fn make_focused_selection(
+    subsystem: &str,
+    gate: Option<CoverageGate>,
+    local: bool,
+    shard: Option<u16>,
+    limits: ConformanceLimits,
+) -> TaskResult<RunnerSelection> {
+    let selection = if local {
+        RunnerSelection::local(subsystem, shard, limits)
+    } else {
+        RunnerSelection::focused(subsystem, gate, shard, limits)
+    };
+    selection.map_err(|problem| problem.to_string())
 }
 
 fn generate_evidence_seal(root: &Path) -> TaskResult {
@@ -12256,16 +12297,18 @@ mod tests {
         fs::create_dir_all(root.join("member/src")).expect("member directory");
         fs::create_dir_all(root.join(".claude/worktrees/probe/src"))
             .expect("nested worktree directory");
-        fs::write(root.join(".git"), b"gitdir: candidate\n")
-            .expect("candidate worktree marker");
+        fs::write(root.join(".git"), b"gitdir: candidate\n").expect("candidate worktree marker");
         fs::write(root.join("Cargo.toml"), b"[workspace]\n").expect("root manifest");
         fs::write(
             root.join("member/Cargo.toml"),
             b"[package]\nname = \"member\"\nversion = \"0.1.0\"\n",
         )
         .expect("member manifest");
-        fs::write(root.join(".claude/worktrees/probe/.git"), b"gitdir: elsewhere\n")
-            .expect("worktree marker");
+        fs::write(
+            root.join(".claude/worktrees/probe/.git"),
+            b"gitdir: elsewhere\n",
+        )
+        .expect("worktree marker");
         fs::write(
             root.join(".claude/worktrees/probe/Cargo.toml"),
             b"[workspace]\n",
@@ -12278,16 +12321,14 @@ mod tests {
         .expect("nested build output");
 
         let mut manifests = Vec::new();
-        collect_named(&root, OsStr::new("Cargo.toml"), &mut manifests)
-            .expect("manifest inventory");
+        collect_named(&root, OsStr::new("Cargo.toml"), &mut manifests).expect("manifest inventory");
         manifests.sort();
         assert_eq!(
             manifests,
             vec![root.join("Cargo.toml"), root.join("member/Cargo.toml")]
         );
         let mut rust_files = Vec::new();
-        collect_extension(&root, OsStr::new("rs"), &mut rust_files)
-            .expect("Rust source inventory");
+        collect_extension(&root, OsStr::new("rs"), &mut rust_files).expect("Rust source inventory");
         assert!(rust_files.is_empty());
         check_publication_bytes(&root).expect("linked worktree bytes are another candidate");
         fs::remove_dir_all(&root).expect("clean up");
