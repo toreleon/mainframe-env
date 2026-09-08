@@ -23,7 +23,7 @@ pipeline {
         string(name: 'RELEASE_TAG', defaultValue: '',
                description: 'Existing post-migration mainframe-env-vX.Y.Z tag containing this Jenkins pipeline and its helpers.')
         string(name: 'RELEASE_TARGET', defaultValue: '',
-               description: 'Rust target triple; empty selects the Jenkins node host target.')
+               description: 'Supported target: aarch64-apple-darwin or x86_64-unknown-linux-gnu; empty selects the host only when it is one of those two.')
         booleanParam(name: 'PUBLISH_GITHUB_RELEASE', defaultValue: false,
                      description: 'Explicitly publish the generated offline Cargo bundle to the existing GitHub release.')
         string(name: 'GITHUB_CREDENTIAL_ID', defaultValue: 'mainframe-env-github-token',
@@ -353,7 +353,7 @@ pipeline {
                     target="$RELEASE_TARGET"
                     [[ -n "$target" ]] || target="$(rustc -vV | awk '/^host: /{print $2}')"
                     case "$target" in
-                      aarch64-apple-darwin|x86_64-apple-darwin|aarch64-unknown-linux-gnu|x86_64-unknown-linux-gnu) ;;
+                      aarch64-apple-darwin|x86_64-unknown-linux-gnu) ;;
                       *) echo "unsupported release target: $target" >&2; exit 1 ;;
                     esac
                     cargo xtask release --target "$target"

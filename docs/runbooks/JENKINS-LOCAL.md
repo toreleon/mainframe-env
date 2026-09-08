@@ -91,6 +91,10 @@ the Jenkins migration and all pipeline helper scripts, and point at its matching
 `VERSION`; Jenkins does not create product tags. Tags that predate this migration
 remain covered by their immutable historical release evidence and are rejected
 before checkout rather than failing later with missing helpers.
+Release receipts support `aarch64-apple-darwin` and
+`x86_64-unknown-linux-gnu`. An empty `RELEASE_TARGET` uses the host only when it
+is one of those targets; other hosts must select the supported cross target and
+have its Rust target and linker installed.
 
 ## Running the job
 
