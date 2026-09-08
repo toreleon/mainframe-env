@@ -38,12 +38,14 @@ use mainframe_env_ims::{ImsService, ims_providers};
 use mainframe_env_interpreter::{CoordinatorLimits, ExecutionCoordinator, ReferenceMachine};
 use mainframe_env_ir::CodecLimits;
 use mainframe_env_mq::{MqService, mq_providers};
-use mainframe_env_racf::{MemorySecretResolver, RacfService, SecretResolver, racf_providers};
+use mainframe_env_racf::{
+    MemorySecretResolver, PrincipalAuthenticationEpoch, RacfService, SecretResolver, racf_providers,
+};
 use mainframe_env_spool::{SpoolService, spool_providers};
 use mainframe_env_store::{LocalArtifactStore, MemoryStore};
 use mainframe_env_store_api::{
-    ArtifactRecord, ArtifactStore, CheckpointStore, PlatformStore, ProviderStateRecord,
-    ProviderStateStore, ProviderStateWrite, StoreError, WorkRecord, WorkState,
+    ArtifactRecord, ArtifactStore, CheckpointStore, PlatformStore, ProviderStateMutation,
+    ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError, WorkRecord, WorkState,
 };
 use mainframe_env_zosmf::{
     Authentication, GatewayProblem, GatewayRequest, GatewayResponse, ZosmfBackend, ZosmfLimits,
@@ -59,6 +61,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio_rustls::TlsAcceptor;
+use zeroize::Zeroizing;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ProductMetrics {
@@ -158,9 +161,41 @@ struct OnlineMachineContinuation {
     version: u64,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 struct AuthSession {
+    schema_version: String,
     user: String,
+    issued_tick: u64,
+    last_used_tick: u64,
+    absolute_expires_tick: u64,
+    idle_expires_tick: u64,
+    principal_epoch: String,
     version: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct AuthSessionIndex {
+    schema_version: String,
+    sessions: BTreeMap<String, String>,
+    version: u64,
+}
+
+#[derive(Clone)]
+struct VerifiedAuthentication {
+    user: String,
+    principal_epoch: PrincipalAuthenticationEpoch,
+}
+
+impl AuthSession {
+    fn expired(&self, now_tick: u64) -> bool {
+        now_tick >= self.absolute_expires_tick || now_tick >= self.idle_expires_tick
+    }
+
+    fn clock_regressed(&self, now_tick: u64) -> bool {
+        now_tick < self.issued_tick || now_tick < self.last_used_tick
+    }
 }
 
 struct ConsoleMessage {
@@ -208,6 +243,16 @@ const APPLICATION_V2_STATE_NAMESPACE: &str = "application-package-v2";
 const APPLICATION_V2_STATE_KEY: &str = "registry";
 const APPLICATION_PUBLICATION_NAMESPACE: &str = "application-publication-v2";
 const APPLICATION_PUBLICATION_CONTRACT: &str = "mainframe-env.application-publication@1";
+const AUTH_SESSION_NAMESPACE: &str = "auth-session-v2";
+const AUTH_SESSION_INDEX_NAMESPACE: &str = "auth-session-index-v2";
+const AUTH_SESSION_INDEX_KEY: &str = "global";
+const LEGACY_AUTH_SESSION_NAMESPACE: &str = "auth-session";
+const AUTH_SESSION_CONTRACT: &str = "mainframe-env.auth-session@3";
+const AUTH_SESSION_INDEX_CONTRACT: &str = "mainframe-env.auth-session-index@2";
+const MAX_AUTH_SESSIONS: usize = 65_536;
+const MAX_AUTH_SESSIONS_PER_USER: usize = 8;
+const AUTH_SESSION_ABSOLUTE_TTL_MILLIS: u64 = 8 * 60 * 60 * 1000;
+const AUTH_SESSION_IDLE_TTL_MILLIS: u64 = 30 * 60 * 1000;
 
 struct DurableApplicationsV2 {
     installer: ApplicationInstallerV2,
@@ -390,21 +435,34 @@ impl ProductServer {
                 ),
             ),
         };
-        let mut sessions = BTreeMap::new();
         for row in store
-            .list_provider_state("auth-session", 65536)
+            .list_provider_state(LEGACY_AUTH_SESSION_NAMESPACE, MAX_AUTH_SESSIONS)
             .map_err(store_error)?
         {
-            let user =
-                String::from_utf8(row.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
-            sessions.insert(
-                row.key,
-                AuthSession {
-                    user,
-                    version: row.version,
-                },
-            );
+            store
+                .delete_provider_state(LEGACY_AUTH_SESSION_NAMESPACE, &row.key, row.version)
+                .map_err(store_error)?;
         }
+        let mut sessions = BTreeMap::new();
+        let now_tick = session_tick()?;
+        let active_principals = racf.active_principal_epochs()?;
+        let stored_sessions = store
+            .list_provider_state(AUTH_SESSION_NAMESPACE, MAX_AUTH_SESSIONS)
+            .map_err(store_error)?;
+        for row in stored_sessions {
+            let session = decode_auth_session(&row)?;
+            let valid_principal = active_principals
+                .get(&session.user)
+                .is_some_and(|epoch| epoch.as_str() == session.principal_epoch.as_str());
+            if session.expired(now_tick) || session.clock_regressed(now_tick) || !valid_principal {
+                store
+                    .delete_provider_state(AUTH_SESSION_NAMESPACE, &row.key, row.version)
+                    .map_err(store_error)?;
+            } else if sessions.insert(row.key, session).is_some() {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+        }
+        reconcile_auth_session_index(&*store)?;
         let mut console = Vec::new();
         for row in store
             .list_provider_state("console-log", 65536)
@@ -1626,14 +1684,14 @@ impl ProductServer {
     }
 
     pub fn bootstrap_identity(&self, user: &str, secret: &[u8]) -> Result<(), HostProblem> {
-        let reference = format!("bootstrap:{user}");
-        self.secrets.insert(&reference, secret.to_vec());
-        let result = self.racf.add_user(
-            user,
-            &SecretRef::new(reference.clone(), HostLimits::default())?,
-        );
-        self.secrets.remove(&reference);
-        result
+        let principal = PrincipalId::new(user.to_ascii_uppercase(), InvocationLimits::default())
+            .map_err(|_| HostProblem::Malformed)?;
+        let reference = SecretRef::new(
+            format!("bootstrap:{}:{}", principal.as_str(), self.next_sequence()?),
+            HostLimits::default(),
+        )?;
+        let _scope = self.secrets.scoped(&reference, secret.to_vec())?;
+        self.racf.add_user(principal.as_str(), &reference)
     }
 
     pub fn router(self: &Arc<Self>) -> axum::Router {
@@ -1763,18 +1821,20 @@ impl ProductServer {
             ));
         }
         if matches!(request, GatewayRequest::Authenticate) {
-            let Authentication::Basic {
-                ref user,
-                ref secret,
-            } = authentication
-            else {
-                return Err(unauthenticated());
+            let (user, token) = match &authentication {
+                Authentication::Basic { user, secret } => {
+                    let verified = self.verify(user, secret).map_err(|_| unauthenticated())?;
+                    let token = self.create_session(&verified).map_err(gateway_problem)?;
+                    (verified.user, token)
+                }
+                Authentication::Bearer(token) => {
+                    self.rotate_session(token).map_err(gateway_problem)?
+                }
+                Authentication::Anonymous => return Err(unauthenticated()),
             };
-            self.verify(user, secret).map_err(|_| unauthenticated())?;
-            let token = self.create_session(user).map_err(gateway_problem)?;
             return Ok(GatewayResponse::json(
                 StatusCode::OK,
-                json!({"user":user.to_ascii_uppercase(),"token":token}),
+                json!({"user":user,"token":token}),
             ));
         }
         if matches!(request, GatewayRequest::Logout) {
@@ -2460,18 +2520,20 @@ impl ProductServer {
         }
     }
 
-    fn verify(&self, user: &str, secret: &[u8]) -> Result<(), HostProblem> {
+    fn verify(&self, user: &str, secret: &[u8]) -> Result<VerifiedAuthentication, HostProblem> {
+        let principal = PrincipalId::new(user.to_ascii_uppercase(), InvocationLimits::default())
+            .map_err(|_| HostProblem::Unauthorized)?;
         let sequence = self.next_sequence()?;
         let reference = format!("request:{sequence}");
-        self.secrets.insert(&reference, secret.to_vec());
-        let result = self.racf.authenticate(
-            &PrincipalId::new(user.to_ascii_uppercase(), InvocationLimits::default())
-                .map_err(|_| HostProblem::Unauthorized)?,
-            &SecretRef::new(reference.clone(), HostLimits::default())?,
-        );
-        self.secrets.remove(&reference);
-        match result? {
-            SecurityDecision::Allow => Ok(()),
+        let reference = SecretRef::new(reference, HostLimits::default())?;
+        let _scope = self.secrets.scoped(&reference, secret.to_vec())?;
+        let (decision, principal_epoch) =
+            self.racf.authenticate_with_epoch(&principal, &reference)?;
+        match (decision, principal_epoch) {
+            (SecurityDecision::Allow, Some(principal_epoch)) => Ok(VerifiedAuthentication {
+                user: principal.as_str().into(),
+                principal_epoch,
+            }),
             _ => Err(HostProblem::Unauthorized),
         }
     }
@@ -2479,61 +2541,349 @@ impl ProductServer {
     fn principal(&self, authentication: Authentication) -> Result<String, HostProblem> {
         match &authentication {
             Authentication::Basic { user, secret } => {
-                self.verify(user, secret)?;
-                Ok(user.to_ascii_uppercase())
+                self.verify(user, secret).map(|verified| verified.user)
             }
-            Authentication::Bearer(token) => self
-                .sessions
-                .lock()
-                .map_err(|_| HostProblem::InfrastructureFailure)?
-                .get(token)
-                .map(|session| session.user.clone())
-                .ok_or(HostProblem::Unauthorized),
+            Authentication::Bearer(token) => self.use_session(token),
             Authentication::Anonymous => Err(HostProblem::Unauthorized),
         }
     }
 
-    fn create_session(&self, user: &str) -> Result<String, HostProblem> {
-        let token = secure_random_token("session")?;
-        let mut sessions = self
+    fn cleanup_auth_sessions(&self, now_tick: u64) -> Result<(), HostProblem> {
+        let active_principals = self.racf.active_principal_epochs()?;
+        let rows = self
+            .store
+            .list_provider_state(AUTH_SESSION_NAMESPACE, MAX_AUTH_SESSIONS)
+            .map_err(store_error)?;
+        let mut retained = BTreeMap::new();
+        let mut stale = Vec::new();
+        for row in rows {
+            let session = decode_auth_session(&row)?;
+            if session.expired(now_tick)
+                || session.clock_regressed(now_tick)
+                || active_principals
+                    .get(&session.user)
+                    .is_none_or(|epoch| epoch.as_str() != session.principal_epoch.as_str())
+            {
+                stale.push(row.key);
+            } else {
+                retained.insert(row.key, session);
+            }
+        }
+        for key in stale {
+            self.revoke_session_key(&key)?;
+        }
+        *self
             .sessions
             .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        if sessions.len() >= 65536 {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        self.store
-            .put_provider_state(
-                ProviderStateRecord {
-                    namespace: "auth-session".into(),
-                    key: token.clone(),
-                    version: 1,
-                    payload: user.to_ascii_uppercase().into_bytes(),
+            .map_err(|_| HostProblem::InfrastructureFailure)? = retained;
+        Ok(())
+    }
+
+    fn revoke_session_key(&self, key: &str) -> Result<bool, HostProblem> {
+        const MAX_ATTEMPTS: usize = 4;
+        for _ in 0..MAX_ATTEMPTS {
+            let Some(record) = self
+                .store
+                .get_provider_state(AUTH_SESSION_NAMESPACE, key)
+                .map_err(store_error)?
+            else {
+                if let Ok(mut sessions) = self.sessions.lock() {
+                    sessions.remove(key);
+                }
+                return Ok(false);
+            };
+            let mut index = load_auth_session_index(&*self.store)?;
+            if index.sessions.remove(key).is_none() {
+                reconcile_auth_session_index(&*self.store)?;
+                continue;
+            }
+            let previous_index_version = index.version;
+            index.version = index
+                .version
+                .checked_add(1)
+                .ok_or(HostProblem::ResourceExhausted)?;
+            let mutations = vec![
+                ProviderStateMutation::Delete {
+                    namespace: AUTH_SESSION_NAMESPACE.into(),
+                    key: key.into(),
+                    expected_version: record.version,
                 },
-                None,
-            )
-            .map_err(store_error)?;
-        sessions.insert(
-            token.clone(),
-            AuthSession {
-                user: user.to_ascii_uppercase(),
+                ProviderStateMutation::Put(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: AUTH_SESSION_INDEX_NAMESPACE.into(),
+                        key: AUTH_SESSION_INDEX_KEY.into(),
+                        version: index.version,
+                        payload: encode_auth_session_index(&index)?,
+                    },
+                    expected_version: Some(previous_index_version),
+                }),
+            ];
+            match self.store.mutate_provider_states_atomic(mutations) {
+                Ok(()) => {
+                    if let Ok(mut sessions) = self.sessions.lock() {
+                        sessions.remove(key);
+                    }
+                    return Ok(true);
+                }
+                Err(StoreError::Conflict | StoreError::NotFound) => continue,
+                Err(problem) => return Err(store_error(problem)),
+            }
+        }
+        Err(HostProblem::InfrastructureFailure)
+    }
+
+    fn use_session(&self, token: &str) -> Result<String, HostProblem> {
+        let key = auth_session_key(token);
+        const MAX_ATTEMPTS: usize = 4;
+        for _ in 0..MAX_ATTEMPTS {
+            let Some(record) = self
+                .store
+                .get_provider_state(AUTH_SESSION_NAMESPACE, &key)
+                .map_err(store_error)?
+            else {
+                return Err(HostProblem::Unauthorized);
+            };
+            let mut session = decode_auth_session(&record)?;
+            let index = load_auth_session_index(&*self.store)?;
+            if index.sessions.get(&key) != Some(&session.user) {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            let now_tick = session_tick()?;
+            let principal = PrincipalId::new(&session.user, InvocationLimits::default())
+                .map_err(|_| HostProblem::Unauthorized)?;
+            let valid_principal = self
+                .racf
+                .active_principal_epoch(&principal)?
+                .is_some_and(|epoch| epoch.as_str() == session.principal_epoch.as_str());
+            if session.expired(now_tick) || !valid_principal {
+                self.revoke_session_key(&key)?;
+                return Err(HostProblem::Unauthorized);
+            }
+            if session.clock_regressed(now_tick) {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            let previous_version = session.version;
+            session.last_used_tick = now_tick;
+            session.idle_expires_tick = now_tick
+                .checked_add(AUTH_SESSION_IDLE_TTL_MILLIS)
+                .ok_or(HostProblem::ResourceExhausted)?
+                .min(session.absolute_expires_tick);
+            session.version = session
+                .version
+                .checked_add(1)
+                .ok_or(HostProblem::ResourceExhausted)?;
+            match self.store.put_provider_state(
+                ProviderStateRecord {
+                    namespace: AUTH_SESSION_NAMESPACE.into(),
+                    key: key.clone(),
+                    version: session.version,
+                    payload: encode_auth_session(&session)?,
+                },
+                Some(previous_version),
+            ) {
+                Ok(()) => {
+                    let user = session.user.clone();
+                    self.sessions
+                        .lock()
+                        .map_err(|_| HostProblem::InfrastructureFailure)?
+                        .insert(key, session);
+                    return Ok(user);
+                }
+                Err(StoreError::Conflict) => continue,
+                Err(problem) => return Err(store_error(problem)),
+            }
+        }
+        Err(HostProblem::InfrastructureFailure)
+    }
+
+    fn create_session(&self, verified: &VerifiedAuthentication) -> Result<String, HostProblem> {
+        let now_tick = session_tick()?;
+        self.cleanup_auth_sessions(now_tick)?;
+        const MAX_ATTEMPTS: usize = 4;
+        for _ in 0..MAX_ATTEMPTS {
+            let principal = PrincipalId::new(&verified.user, InvocationLimits::default())
+                .map_err(|_| HostProblem::Unauthorized)?;
+            if self.racf.active_principal_epoch(&principal)?.as_ref()
+                != Some(&verified.principal_epoch)
+            {
+                return Err(HostProblem::Unauthorized);
+            }
+            let mut index = load_auth_session_index(&*self.store)?;
+            if index.sessions.len() >= MAX_AUTH_SESSIONS
+                || index
+                    .sessions
+                    .values()
+                    .filter(|user| *user == &verified.user)
+                    .count()
+                    >= MAX_AUTH_SESSIONS_PER_USER
+            {
+                return Err(HostProblem::ResourceExhausted);
+            }
+            let token = Zeroizing::new(secure_random_token("session")?);
+            let key = auth_session_key(&token);
+            if index.sessions.contains_key(&key) {
+                continue;
+            }
+            let session = AuthSession {
+                schema_version: AUTH_SESSION_CONTRACT.into(),
+                user: verified.user.clone(),
+                issued_tick: now_tick,
+                last_used_tick: now_tick,
+                absolute_expires_tick: now_tick
+                    .checked_add(AUTH_SESSION_ABSOLUTE_TTL_MILLIS)
+                    .ok_or(HostProblem::ResourceExhausted)?,
+                idle_expires_tick: now_tick
+                    .checked_add(AUTH_SESSION_IDLE_TTL_MILLIS)
+                    .ok_or(HostProblem::ResourceExhausted)?,
+                principal_epoch: verified.principal_epoch.as_str().into(),
                 version: 1,
-            },
-        );
-        Ok(token)
+            };
+            let previous_index_version = index.version;
+            index.sessions.insert(key.clone(), verified.user.clone());
+            index.version = index
+                .version
+                .checked_add(1)
+                .ok_or(HostProblem::ResourceExhausted)?;
+            let mutations = vec![
+                ProviderStateMutation::Put(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: AUTH_SESSION_NAMESPACE.into(),
+                        key: key.clone(),
+                        version: 1,
+                        payload: encode_auth_session(&session)?,
+                    },
+                    expected_version: None,
+                }),
+                ProviderStateMutation::Put(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: AUTH_SESSION_INDEX_NAMESPACE.into(),
+                        key: AUTH_SESSION_INDEX_KEY.into(),
+                        version: index.version,
+                        payload: encode_auth_session_index(&index)?,
+                    },
+                    expected_version: Some(previous_index_version),
+                }),
+            ];
+            match self.store.mutate_provider_states_atomic(mutations) {
+                Ok(()) => {
+                    self.sessions
+                        .lock()
+                        .map_err(|_| HostProblem::InfrastructureFailure)?
+                        .insert(key, session);
+                    return Ok(token.to_string());
+                }
+                Err(StoreError::Conflict | StoreError::AlreadyExists) => continue,
+                Err(problem) => return Err(store_error(problem)),
+            }
+        }
+        Err(HostProblem::InfrastructureFailure)
+    }
+
+    fn rotate_session(&self, token: &str) -> Result<(String, String), HostProblem> {
+        let old_key = auth_session_key(token);
+        const MAX_ATTEMPTS: usize = 4;
+        for _ in 0..MAX_ATTEMPTS {
+            let old_record = self
+                .store
+                .get_provider_state(AUTH_SESSION_NAMESPACE, &old_key)
+                .map_err(store_error)?
+                .ok_or(HostProblem::Unauthorized)?;
+            let old_session = decode_auth_session(&old_record)?;
+            let mut index = load_auth_session_index(&*self.store)?;
+            if index.sessions.get(&old_key) != Some(&old_session.user) {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            let now_tick = session_tick()?;
+            let principal = PrincipalId::new(&old_session.user, InvocationLimits::default())
+                .map_err(|_| HostProblem::Unauthorized)?;
+            if old_session.expired(now_tick)
+                || self
+                    .racf
+                    .active_principal_epoch(&principal)?
+                    .is_none_or(|epoch| epoch.as_str() != old_session.principal_epoch.as_str())
+            {
+                self.revoke_session_key(&old_key)?;
+                return Err(HostProblem::Unauthorized);
+            }
+            if old_session.clock_regressed(now_tick) {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            let new_token = Zeroizing::new(secure_random_token("session")?);
+            let new_key = auth_session_key(&new_token);
+            if index.sessions.contains_key(&new_key) {
+                continue;
+            }
+            let new_session = AuthSession {
+                schema_version: AUTH_SESSION_CONTRACT.into(),
+                user: old_session.user.clone(),
+                issued_tick: old_session.issued_tick,
+                last_used_tick: now_tick,
+                absolute_expires_tick: old_session.absolute_expires_tick,
+                idle_expires_tick: now_tick
+                    .checked_add(AUTH_SESSION_IDLE_TTL_MILLIS)
+                    .ok_or(HostProblem::ResourceExhausted)?
+                    .min(old_session.absolute_expires_tick),
+                principal_epoch: old_session.principal_epoch,
+                version: 1,
+            };
+            index.sessions.remove(&old_key);
+            index
+                .sessions
+                .insert(new_key.clone(), new_session.user.clone());
+            let previous_index_version = index.version;
+            index.version = index
+                .version
+                .checked_add(1)
+                .ok_or(HostProblem::ResourceExhausted)?;
+            let mutations = vec![
+                ProviderStateMutation::Delete {
+                    namespace: AUTH_SESSION_NAMESPACE.into(),
+                    key: old_key.clone(),
+                    expected_version: old_record.version,
+                },
+                ProviderStateMutation::Put(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: AUTH_SESSION_NAMESPACE.into(),
+                        key: new_key.clone(),
+                        version: new_session.version,
+                        payload: encode_auth_session(&new_session)?,
+                    },
+                    expected_version: None,
+                }),
+                ProviderStateMutation::Put(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: AUTH_SESSION_INDEX_NAMESPACE.into(),
+                        key: AUTH_SESSION_INDEX_KEY.into(),
+                        version: index.version,
+                        payload: encode_auth_session_index(&index)?,
+                    },
+                    expected_version: Some(previous_index_version),
+                }),
+            ];
+            match self.store.mutate_provider_states_atomic(mutations) {
+                Ok(()) => {
+                    let mut sessions = self
+                        .sessions
+                        .lock()
+                        .map_err(|_| HostProblem::InfrastructureFailure)?;
+                    sessions.remove(&old_key);
+                    sessions.insert(new_key, new_session.clone());
+                    return Ok((new_session.user, new_token.to_string()));
+                }
+                Err(StoreError::Conflict | StoreError::NotFound | StoreError::AlreadyExists) => {
+                    continue;
+                }
+                Err(problem) => return Err(store_error(problem)),
+            }
+        }
+        Err(HostProblem::InfrastructureFailure)
     }
 
     fn logout_token(&self, token: &str) -> Result<(), HostProblem> {
-        let mut sessions = self
-            .sessions
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let version = sessions.get(token).ok_or(HostProblem::NotFound)?.version;
-        self.store
-            .delete_provider_state("auth-session", token, version)
-            .map_err(store_error)?;
-        sessions.remove(token);
-        Ok(())
+        let key = auth_session_key(token);
+        self.revoke_session_key(&key)?
+            .then_some(())
+            .ok_or(HostProblem::NotFound)
     }
 
     fn dataset_call(
@@ -3388,6 +3738,193 @@ fn current_tick() -> Result<u64, GatewayProblem> {
     .map_err(|_| gateway_problem(HostProblem::ResourceExhausted))
 }
 
+fn session_tick() -> Result<u64, HostProblem> {
+    u64::try_from(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .as_millis(),
+    )
+    .map_err(|_| HostProblem::ResourceExhausted)
+}
+
+fn auth_session_key(token: &str) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"mainframe-env.auth-session-token@2\0");
+    digest.update((token.len() as u64).to_be_bytes());
+    digest.update(token.as_bytes());
+    hex_digest(&digest.finalize())
+}
+
+fn encode_auth_session(session: &AuthSession) -> Result<Vec<u8>, HostProblem> {
+    serde_json::to_vec(session).map_err(|_| HostProblem::InfrastructureFailure)
+}
+
+fn decode_auth_session(record: &ProviderStateRecord) -> Result<AuthSession, HostProblem> {
+    if record.namespace != AUTH_SESSION_NAMESPACE
+        || record.key.len() != 64
+        || !record
+            .key
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let session: AuthSession =
+        serde_json::from_slice(&record.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
+    PrincipalId::new(&session.user, InvocationLimits::default())
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    if session.schema_version != AUTH_SESSION_CONTRACT
+        || session.version != record.version
+        || session.principal_epoch.len() != 71
+        || !session.principal_epoch.starts_with("sha256:")
+        || !session.principal_epoch[7..]
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        || session.issued_tick > session.last_used_tick
+        || session.last_used_tick >= session.idle_expires_tick
+        || session.idle_expires_tick > session.absolute_expires_tick
+        || session
+            .absolute_expires_tick
+            .checked_sub(session.issued_tick)
+            .is_none_or(|lifetime| lifetime == 0 || lifetime > AUTH_SESSION_ABSOLUTE_TTL_MILLIS)
+        || session
+            .idle_expires_tick
+            .checked_sub(session.last_used_tick)
+            .is_none_or(|lifetime| lifetime == 0 || lifetime > AUTH_SESSION_IDLE_TTL_MILLIS)
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(session)
+}
+
+fn encode_auth_session_index(index: &AuthSessionIndex) -> Result<Vec<u8>, HostProblem> {
+    serde_json::to_vec(index).map_err(|_| HostProblem::InfrastructureFailure)
+}
+
+fn decode_auth_session_index(
+    record: &ProviderStateRecord,
+) -> Result<AuthSessionIndex, HostProblem> {
+    if record.namespace != AUTH_SESSION_INDEX_NAMESPACE || record.key != AUTH_SESSION_INDEX_KEY {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let index: AuthSessionIndex =
+        serde_json::from_slice(&record.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
+    if index.schema_version != AUTH_SESSION_INDEX_CONTRACT
+        || index.version != record.version
+        || index.version == 0
+        || index.sessions.len() > MAX_AUTH_SESSIONS
+        || index.sessions.iter().any(|(key, user)| {
+            key.len() != 64
+                || !key
+                    .bytes()
+                    .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+                || PrincipalId::new(user, InvocationLimits::default()).is_err()
+        })
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(index)
+}
+
+fn stored_auth_session_entries(
+    store: &dyn PlatformStore,
+) -> Result<BTreeMap<String, String>, HostProblem> {
+    let rows = store
+        .list_provider_state(AUTH_SESSION_NAMESPACE, MAX_AUTH_SESSIONS)
+        .map_err(store_error)?;
+    rows.into_iter()
+        .map(|row| {
+            let session = decode_auth_session(&row)?;
+            Ok((row.key, session.user))
+        })
+        .collect()
+}
+
+fn reconcile_auth_session_index(store: &dyn PlatformStore) -> Result<(), HostProblem> {
+    reconcile_auth_session_index_with_scan_hook(store, || {})
+}
+
+fn reconcile_auth_session_index_with_scan_hook(
+    store: &dyn PlatformStore,
+    mut after_scan: impl FnMut(),
+) -> Result<(), HostProblem> {
+    const MAX_ATTEMPTS: usize = 4;
+    for _ in 0..MAX_ATTEMPTS {
+        let before = store
+            .get_provider_state(AUTH_SESSION_INDEX_NAMESPACE, AUTH_SESSION_INDEX_KEY)
+            .map_err(store_error)?;
+        let mut sessions = stored_auth_session_entries(store)?;
+        after_scan();
+        let current = store
+            .get_provider_state(AUTH_SESSION_INDEX_NAMESPACE, AUTH_SESSION_INDEX_KEY)
+            .map_err(store_error)?;
+        if before != current {
+            continue;
+        }
+        let (version, expected_version) = match &current {
+            Some(record) => {
+                let index = decode_auth_session_index(record)?;
+                for (key, indexed_user) in &index.sessions {
+                    if sessions.contains_key(key) {
+                        continue;
+                    }
+                    if let Some(session_record) = store
+                        .get_provider_state(AUTH_SESSION_NAMESPACE, key)
+                        .map_err(store_error)?
+                    {
+                        let session = decode_auth_session(&session_record)?;
+                        if &session.user != indexed_user {
+                            return Err(HostProblem::InfrastructureFailure);
+                        }
+                        sessions.insert(key.clone(), session.user);
+                    }
+                }
+                if index.sessions == sessions {
+                    return Ok(());
+                }
+                (
+                    index
+                        .version
+                        .checked_add(1)
+                        .ok_or(HostProblem::ResourceExhausted)?,
+                    Some(index.version),
+                )
+            }
+            None => (1, None),
+        };
+        let index = AuthSessionIndex {
+            schema_version: AUTH_SESSION_INDEX_CONTRACT.into(),
+            sessions,
+            version,
+        };
+        match store.put_provider_state(
+            ProviderStateRecord {
+                namespace: AUTH_SESSION_INDEX_NAMESPACE.into(),
+                key: AUTH_SESSION_INDEX_KEY.into(),
+                version,
+                payload: encode_auth_session_index(&index)?,
+            },
+            expected_version,
+        ) {
+            Ok(()) => return Ok(()),
+            Err(StoreError::Conflict | StoreError::AlreadyExists) => continue,
+            Err(problem) => return Err(store_error(problem)),
+        }
+    }
+    Err(HostProblem::InfrastructureFailure)
+}
+
+fn load_auth_session_index(store: &dyn PlatformStore) -> Result<AuthSessionIndex, HostProblem> {
+    store
+        .get_provider_state(AUTH_SESSION_INDEX_NAMESPACE, AUTH_SESSION_INDEX_KEY)
+        .map_err(store_error)?
+        .as_ref()
+        .map(decode_auth_session_index)
+        .transpose()?
+        .ok_or(HostProblem::InfrastructureFailure)
+}
+
 fn terminal_json(snapshot: &CicsTerminalSnapshot) -> Value {
     json!({
         "schema_version":"mainframe-env.cics-terminal@1",
@@ -4100,6 +4637,365 @@ mod tests {
         assert!(time.bytes().all(|byte| byte.is_ascii_digit()));
     }
 
+    #[test]
+    fn authentication_scopes_do_not_leak_invalid_request_secrets() {
+        let server = ProductServer::memory(config()).unwrap();
+        let invalid = "X".repeat(InvocationLimits::default().max_binding_bytes + 1);
+        assert!(matches!(
+            server.verify(&invalid, b"secret-that-must-not-remain"),
+            Err(HostProblem::Unauthorized)
+        ));
+        assert_eq!(server.secrets.entry_count(), 0);
+    }
+
+    #[test]
+    fn restored_session_ttls_are_bounded_and_clock_rollback_fails_closed() {
+        let mut session = AuthSession {
+            schema_version: AUTH_SESSION_CONTRACT.into(),
+            user: "IBMUSER".into(),
+            issued_tick: 10,
+            last_used_tick: 10,
+            absolute_expires_tick: 10 + AUTH_SESSION_ABSOLUTE_TTL_MILLIS,
+            idle_expires_tick: 10 + AUTH_SESSION_IDLE_TTL_MILLIS,
+            principal_epoch: format!("sha256:{:064x}", 1),
+            version: 1,
+        };
+        let record = |session: &AuthSession| ProviderStateRecord {
+            namespace: AUTH_SESSION_NAMESPACE.into(),
+            key: "a".repeat(64),
+            version: session.version,
+            payload: encode_auth_session(session).unwrap(),
+        };
+        assert_eq!(decode_auth_session(&record(&session)).unwrap(), session);
+        assert!(session.clock_regressed(9));
+        session.absolute_expires_tick += 1;
+        assert_eq!(
+            decode_auth_session(&record(&session)),
+            Err(HostProblem::InfrastructureFailure)
+        );
+    }
+
+    #[test]
+    fn bearer_sessions_store_only_hashes_expire_and_follow_principal_epoch() {
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_identity("IBMUSER", b"TESTPASS").unwrap();
+        let verified = server.verify("IBMUSER", b"TESTPASS").unwrap();
+        let token = server.create_session(&verified).unwrap();
+        let key = auth_session_key(&token);
+        assert_ne!(key, token);
+        let rows = server
+            .store
+            .list_provider_state(AUTH_SESSION_NAMESPACE, MAX_AUTH_SESSIONS)
+            .unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].key, key);
+        assert!(!String::from_utf8_lossy(&rows[0].payload).contains(&token));
+        assert_eq!(
+            server
+                .principal(Authentication::Bearer(token.clone()))
+                .unwrap(),
+            "IBMUSER"
+        );
+        let (rotated_user, rotated) = server.rotate_session(&token).unwrap();
+        assert_eq!(rotated_user, "IBMUSER");
+        assert_ne!(rotated, token);
+        assert_eq!(
+            server.principal(Authentication::Bearer(token)),
+            Err(HostProblem::Unauthorized)
+        );
+        assert_eq!(
+            server
+                .principal(Authentication::Bearer(rotated.clone()))
+                .unwrap(),
+            "IBMUSER"
+        );
+
+        server
+            .racf
+            .set_user_state("IBMUSER", false, true, false)
+            .unwrap();
+        assert_eq!(
+            server.principal(Authentication::Bearer(rotated)),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(
+            server
+                .store
+                .list_provider_state(AUTH_SESSION_NAMESPACE, MAX_AUTH_SESSIONS)
+                .unwrap()
+                .is_empty()
+        );
+
+        server
+            .racf
+            .set_user_state("IBMUSER", false, false, false)
+            .unwrap();
+        let stale_verified = server.verify("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .racf
+            .set_user_state("IBMUSER", false, false, true)
+            .unwrap();
+        server
+            .racf
+            .set_user_state("IBMUSER", false, false, false)
+            .unwrap();
+        assert_eq!(
+            server.create_session(&stale_verified),
+            Err(HostProblem::Unauthorized)
+        );
+        let verified = server.verify("IBMUSER", b"TESTPASS").unwrap();
+        let expired = server.create_session(&verified).unwrap();
+        let expired_key = auth_session_key(&expired);
+        let mut expired_session = server.sessions.lock().unwrap()[&expired_key].clone();
+        let previous_version = expired_session.version;
+        expired_session.issued_tick = 0;
+        expired_session.last_used_tick = 0;
+        expired_session.idle_expires_tick = 1;
+        expired_session.absolute_expires_tick = 2;
+        expired_session.version += 1;
+        server
+            .store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: AUTH_SESSION_NAMESPACE.into(),
+                    key: expired_key,
+                    version: expired_session.version,
+                    payload: encode_auth_session(&expired_session).unwrap(),
+                },
+                Some(previous_version),
+            )
+            .unwrap();
+        assert_eq!(
+            server.principal(Authentication::Bearer(expired)),
+            Err(HostProblem::Unauthorized)
+        );
+    }
+
+    #[test]
+    fn deleted_and_recreated_principal_cannot_reuse_an_authentication_epoch() {
+        use mainframe_env_racf::CommandContext;
+
+        let server = ProductServer::memory(config()).unwrap();
+        let admin_reference = SecretRef::new("test:epoch-admin", HostLimits::default()).unwrap();
+        let _admin_secret = server
+            .secrets
+            .scoped(&admin_reference, b"ADMIN-PASS1".to_vec())
+            .unwrap();
+        server
+            .racf
+            .bootstrap_administrator("RACFADM", &admin_reference)
+            .unwrap();
+        let admin = PrincipalId::new("RACFADM", InvocationLimits::default()).unwrap();
+        let command = |id, tick| CommandContext::new(admin.clone(), id, "EPOCH-ABA", tick).unwrap();
+        server
+            .racf
+            .execute_command(
+                &command("EPOCH-ADD-1", 2),
+                "ADDUSER USER1 PASSWORD('VALID-PASS1')",
+            )
+            .unwrap();
+
+        let stale_verified = server.verify("USER1", b"VALID-PASS1").unwrap();
+        let stale_token = server.create_session(&stale_verified).unwrap();
+        server
+            .racf
+            .execute_command(&command("EPOCH-DELETE", 3), "DELUSER USER1")
+            .unwrap();
+        server
+            .racf
+            .execute_command(
+                &command("EPOCH-ADD-2", 4),
+                "ADDUSER USER1 PASSWORD('VALID-PASS1')",
+            )
+            .unwrap();
+
+        assert_eq!(
+            server.principal(Authentication::Bearer(stale_token)),
+            Err(HostProblem::Unauthorized)
+        );
+        assert_eq!(
+            server.create_session(&stale_verified),
+            Err(HostProblem::Unauthorized)
+        );
+        let fresh_verified = server.verify("USER1", b"VALID-PASS1").unwrap();
+        assert_ne!(
+            stale_verified.principal_epoch,
+            fresh_verified.principal_epoch
+        );
+        assert!(server.create_session(&fresh_verified).is_ok());
+    }
+
+    #[test]
+    fn sessions_are_per_user_bounded_and_legacy_raw_tokens_are_revoked_on_open() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: LEGACY_AUTH_SESSION_NAMESPACE.into(),
+                    key: "raw-legacy-bearer".into(),
+                    version: 1,
+                    payload: b"IBMUSER".to_vec(),
+                },
+                None,
+            )
+            .unwrap();
+        let server = ProductServer::open(
+            config(),
+            store.clone(),
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+        )
+        .unwrap();
+        assert!(
+            store
+                .list_provider_state(LEGACY_AUTH_SESSION_NAMESPACE, MAX_AUTH_SESSIONS)
+                .unwrap()
+                .is_empty()
+        );
+        server.bootstrap_identity("IBMUSER", b"TESTPASS").unwrap();
+        let verified = server.verify("IBMUSER", b"TESTPASS").unwrap();
+        let tokens = (0..MAX_AUTH_SESSIONS_PER_USER)
+            .map(|_| server.create_session(&verified).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            server.create_session(&verified),
+            Err(HostProblem::ResourceExhausted)
+        );
+        let expired_key = auth_session_key(tokens.last().unwrap());
+        let mut expired = server.sessions.lock().unwrap()[&expired_key].clone();
+        let previous_version = expired.version;
+        expired.issued_tick = 0;
+        expired.last_used_tick = 0;
+        expired.idle_expires_tick = 1;
+        expired.absolute_expires_tick = 2;
+        expired.version += 1;
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: AUTH_SESSION_NAMESPACE.into(),
+                    key: expired_key,
+                    version: expired.version,
+                    payload: encode_auth_session(&expired).unwrap(),
+                },
+                Some(previous_version),
+            )
+            .unwrap();
+        drop(server);
+        let reopened = ProductServer::open(
+            config(),
+            store,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+        )
+        .unwrap();
+        assert_eq!(
+            reopened
+                .principal(Authentication::Bearer(tokens[0].clone()))
+                .unwrap(),
+            "IBMUSER"
+        );
+        assert_eq!(
+            reopened.principal(Authentication::Bearer(tokens.last().unwrap().clone())),
+            Err(HostProblem::Unauthorized)
+        );
+    }
+
+    #[test]
+    fn shared_store_session_quota_is_atomically_fenced_across_servers() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let first = ProductServer::open(
+            config(),
+            store.clone(),
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+        )
+        .unwrap();
+        first.bootstrap_identity("IBMUSER", b"TESTPASS").unwrap();
+        let second = ProductServer::open(
+            config(),
+            store,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+        )
+        .unwrap();
+        let first_verified = first.verify("IBMUSER", b"TESTPASS").unwrap();
+        let second_verified = first_verified.clone();
+        for _ in 0..(MAX_AUTH_SESSIONS_PER_USER - 1) {
+            first.create_session(&first_verified).unwrap();
+        }
+        let barrier = Arc::new(std::sync::Barrier::new(3));
+        let first_worker = {
+            let server = first.clone();
+            let barrier = barrier.clone();
+            let verified = first_verified.clone();
+            std::thread::spawn(move || {
+                barrier.wait();
+                server.create_session(&verified)
+            })
+        };
+        let second_worker = {
+            let server = second.clone();
+            let barrier = barrier.clone();
+            let verified = second_verified;
+            std::thread::spawn(move || {
+                barrier.wait();
+                server.create_session(&verified)
+            })
+        };
+        barrier.wait();
+        let results = [first_worker.join().unwrap(), second_worker.join().unwrap()];
+        assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+        assert_eq!(
+            results
+                .iter()
+                .filter(|result| { result.as_ref().err() == Some(&HostProblem::ResourceExhausted) })
+                .count(),
+            1
+        );
+        let index = load_auth_session_index(&*first.store).unwrap();
+        assert_eq!(index.sessions.len(), MAX_AUTH_SESSIONS_PER_USER);
+    }
+
+    #[test]
+    fn session_index_reconciliation_retries_a_concurrent_create_snapshot() {
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_identity("IBMUSER", b"TESTPASS").unwrap();
+        let verified = server.verify("IBMUSER", b"TESTPASS").unwrap();
+        let scanned = Arc::new(std::sync::Barrier::new(2));
+        let resume = Arc::new(std::sync::Barrier::new(2));
+        let worker = {
+            let store = server.store.clone();
+            let scanned = scanned.clone();
+            let resume = resume.clone();
+            std::thread::spawn(move || {
+                let mut pause = true;
+                reconcile_auth_session_index_with_scan_hook(&*store, || {
+                    if pause {
+                        pause = false;
+                        scanned.wait();
+                        resume.wait();
+                    }
+                })
+            })
+        };
+
+        scanned.wait();
+        let token = server.create_session(&verified).unwrap();
+        let key = auth_session_key(&token);
+        resume.wait();
+        worker.join().unwrap().unwrap();
+
+        let index = load_auth_session_index(&*server.store).unwrap();
+        assert_eq!(
+            index.sessions.get(&key).map(String::as_str),
+            Some("IBMUSER")
+        );
+        assert_eq!(
+            server.principal(Authentication::Bearer(token)).unwrap(),
+            "IBMUSER"
+        );
+    }
+
     fn config() -> ServerConfig {
         ServerConfig {
             store_profile: crate::StoreProfile::Memory,
@@ -4802,7 +5698,52 @@ mod tests {
         let session: Value =
             serde_json::from_slice(&to_bytes(authenticated.into_body(), 65536).await.unwrap())
                 .unwrap();
-        assert!(session["token"].as_str().unwrap().starts_with("session-"));
+        let original_token = session["token"].as_str().unwrap();
+        assert!(original_token.starts_with("session-"));
+        let rotated = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/zosmf/services/authenticate")
+                    .header("authorization", format!("Bearer {original_token}"))
+                    .header("x-csrf-zosmf-header", "true")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(rotated.status(), StatusCode::OK);
+        let rotated: Value =
+            serde_json::from_slice(&to_bytes(rotated.into_body(), 65536).await.unwrap()).unwrap();
+        let rotated_token = rotated["token"].as_str().unwrap();
+        assert_ne!(rotated_token, original_token);
+        let old = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(Method::GET)
+                    .uri("/zosmf/restjobs/jobs?owner=*")
+                    .header("authorization", format!("Bearer {original_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(old.status(), StatusCode::UNAUTHORIZED);
+        let renewed = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(Method::GET)
+                    .uri("/zosmf/restjobs/jobs?owner=*")
+                    .header("authorization", format!("Bearer {rotated_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(renewed.status(), StatusCode::OK);
         assert!(server.metrics().requests >= 4);
         assert!(server.ready());
         assert!(server.graceful_shutdown().await);
@@ -5140,6 +6081,7 @@ mod tests {
         let mut config = config();
         config.store_profile = crate::StoreProfile::Sqlite;
         config.sqlite_url = url.clone();
+        let token;
         {
             let store: Arc<dyn PlatformStore> =
                 Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 262144).unwrap());
@@ -5151,6 +6093,13 @@ mod tests {
             )
             .unwrap();
             server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+            let verified = server.verify("IBMUSER", b"TESTPASS").unwrap();
+            let original = server.create_session(&verified).unwrap();
+            token = server.rotate_session(&original).unwrap().1;
+            assert_eq!(
+                server.principal(Authentication::Bearer(original)),
+                Err(HostProblem::Unauthorized)
+            );
             server
                 .handle(
                     Authentication::Basic {
@@ -5188,10 +6137,7 @@ mod tests {
             .unwrap();
             let response = server
                 .handle(
-                    Authentication::Basic {
-                        user: "IBMUSER".into(),
-                        secret: b"TESTPASS".to_vec(),
-                    },
+                    Authentication::Bearer(token),
                     GatewayRequest::DatasetList {
                         pattern: "IBMUSER.**".into(),
                         start: None,

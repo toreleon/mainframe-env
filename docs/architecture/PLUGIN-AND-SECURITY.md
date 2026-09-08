@@ -88,6 +88,21 @@ failure.
   redaction when equality is necessary.
 - Long-lived credentials are never copied into compiler artifacts, machine
   checkpoints, or terminal state.
+- Ephemeral request secrets live in a bounded zeroizing scope that removes its
+  resolver entry on every return path. Password creation and change share one
+  policy and use a fresh CSPRNG salt; retained Argon2 verifiers enforce history
+  without deterministic salts.
+- HTTP bearer credentials are returned once and stored only through a
+  domain-separated digest. Version 3 sessions have absolute and idle expiry,
+  a per-user cap enforced through one durable CAS index across server
+  instances, and a non-reusable authentication epoch derived from the account's
+  randomly salted verifier and state version. Every use revalidates active
+  principal state and epoch, advances idle expiry by CAS, and removes expired
+  or revoked state. Deleting and recreating the same user cannot revive an old
+  session. Bearer authentication rotates the credential atomically while
+  preserving the absolute lifetime, so the previous token is immediately
+  invalid. Legacy raw-token rows are revoked and deleted during startup rather
+  than recovered.
 
 ## Transport security
 

@@ -141,7 +141,7 @@ fields.
 | TLS reference appears valid but startup fails | `MAINFRAME_ENV_TLS_KEY_PATH` is still required and must point to readable PEM key material |
 | Information route works but authentication cannot succeed | A fresh standalone deployment has no supported first-user bootstrap path |
 | Requests exceed `timeout_millis` | Backend dispatch is currently synchronous; see the pre-0.9 timeout finding |
-| New work fails after extended uptime | Inspect event, outbox, session, work, and provider replay capacities; automatic retention is not implemented |
+| New work fails after extended uptime | Sessions self-prune by absolute/idle expiry; inspect event, outbox, work, and provider replay capacities, whose general retention lifecycle is still pending |
 
 For SQLite recovery procedures see [Backup and restore](BACKUP-RESTORE.md). For
 capacity assumptions and failure modes see

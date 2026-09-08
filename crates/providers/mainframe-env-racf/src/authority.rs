@@ -16,6 +16,7 @@ use mainframe_env_host_api::{
     SecurityRequest,
 };
 use mainframe_env_store_api::ProviderStateStore;
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Deref;
 use std::sync::{Arc, Mutex};
@@ -23,6 +24,16 @@ use zeroize::Zeroizing;
 
 pub trait SecretResolver: Send + Sync {
     fn resolve(&self, reference: &SecretRef) -> Result<ResolvedSecret, HostProblem>;
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct PrincipalAuthenticationEpoch(String);
+
+impl PrincipalAuthenticationEpoch {
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 pub struct ResolvedSecret(Zeroizing<Vec<u8>>);
@@ -49,33 +60,147 @@ impl Deref for ResolvedSecret {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MemorySecretResolverLimits {
+    pub max_entries: usize,
+    pub max_total_bytes: usize,
+    pub max_secret_bytes: usize,
+    pub max_reference_bytes: usize,
+}
+
+impl Default for MemorySecretResolverLimits {
+    fn default() -> Self {
+        Self {
+            max_entries: 1024,
+            max_total_bytes: 4 * 1024 * 1024,
+            max_secret_bytes: 4096,
+            max_reference_bytes: 1024,
+        }
+    }
+}
+
 #[derive(Default)]
+struct MemorySecretState {
+    values: BTreeMap<String, Zeroizing<Vec<u8>>>,
+    total_bytes: usize,
+}
+
 pub struct MemorySecretResolver {
-    values: Mutex<BTreeMap<String, Zeroizing<Vec<u8>>>>,
+    state: Mutex<MemorySecretState>,
+    limits: MemorySecretResolverLimits,
+}
+
+impl Default for MemorySecretResolver {
+    fn default() -> Self {
+        Self::with_limits(MemorySecretResolverLimits::default())
+    }
+}
+
+pub struct EphemeralSecretScope {
+    resolver: Arc<MemorySecretResolver>,
+    reference: String,
+}
+
+impl Drop for EphemeralSecretScope {
+    fn drop(&mut self) {
+        self.resolver.remove(&self.reference);
+    }
 }
 
 impl MemorySecretResolver {
+    #[must_use]
+    pub fn with_limits(limits: MemorySecretResolverLimits) -> Self {
+        Self {
+            state: Mutex::new(MemorySecretState::default()),
+            limits,
+        }
+    }
+
     pub fn insert(&self, reference: &str, value: Vec<u8>) {
-        self.values
+        let _ = self.try_insert(reference, value);
+    }
+
+    pub fn try_insert(&self, reference: &str, value: Vec<u8>) -> Result<(), HostProblem> {
+        self.insert_bounded(reference, value, true)
+    }
+
+    fn insert_bounded(
+        &self,
+        reference: &str,
+        value: Vec<u8>,
+        replace: bool,
+    ) -> Result<(), HostProblem> {
+        let value = Zeroizing::new(value);
+        if reference.is_empty()
+            || reference.len() > self.limits.max_reference_bytes
+            || value.is_empty()
+            || value.len() > self.limits.max_secret_bytes
+        {
+            return Err(HostProblem::Malformed);
+        }
+        let mut state = self
+            .state
             .lock()
-            .expect("secret resolver mutex")
-            .insert(reference.into(), Zeroizing::new(value));
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let previous = state.values.get(reference).map(|value| value.len());
+        if previous.is_some() && !replace {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        let previous_bytes = previous.map_or(0, |length| reference.len().saturating_add(length));
+        let total = state
+            .total_bytes
+            .saturating_sub(previous_bytes)
+            .checked_add(reference.len())
+            .and_then(|total| total.checked_add(value.len()))
+            .ok_or(HostProblem::ResourceExhausted)?;
+        if (previous.is_none() && state.values.len() >= self.limits.max_entries)
+            || total > self.limits.max_total_bytes
+        {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        state.total_bytes = total;
+        state.values.insert(reference.into(), value);
+        Ok(())
+    }
+
+    pub fn scoped(
+        self: &Arc<Self>,
+        reference: &SecretRef,
+        value: Vec<u8>,
+    ) -> Result<EphemeralSecretScope, HostProblem> {
+        self.insert_bounded(reference.as_str(), value, false)?;
+        Ok(EphemeralSecretScope {
+            resolver: self.clone(),
+            reference: reference.as_str().into(),
+        })
     }
 
     pub fn remove(&self, reference: &str) {
-        if let Ok(mut values) = self.values.lock() {
-            values.remove(reference);
+        if let Ok(mut state) = self.state.lock()
+            && let Some(value) = state.values.remove(reference)
+        {
+            state.total_bytes = state
+                .total_bytes
+                .saturating_sub(reference.len().saturating_add(value.len()));
         }
+    }
+
+    #[must_use]
+    pub fn entry_count(&self) -> usize {
+        self.state
+            .lock()
+            .map_or(self.limits.max_entries, |state| state.values.len())
     }
 }
 
 impl SecretResolver for MemorySecretResolver {
     fn resolve(&self, reference: &SecretRef) -> Result<ResolvedSecret, HostProblem> {
-        let values = self
-            .values
+        let state = self
+            .state
             .lock()
             .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let value = values
+        let value = state
+            .values
             .get(reference.as_str())
             .ok_or(HostProblem::NotFound)?;
         ResolvedSecret::new(value.as_slice().to_vec())
@@ -157,6 +282,13 @@ pub struct RacfService {
     pub(crate) limits: RacfLimits,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum CredentialPolicyProblem {
+    Invalid,
+    Reused,
+    Infrastructure,
+}
+
 impl RacfService {
     pub fn open(
         store: Arc<dyn ProviderStateStore>,
@@ -202,8 +334,8 @@ impl RacfService {
             if !user_groups.is_subset(&groups) {
                 return Err(HostProblem::NotFound);
             }
-            let principal = self.password_principal(&user, &definition.credential)?;
-            if users.insert(user, (principal, user_groups)).is_some() {
+            let secret = self.secrets.resolve(&definition.credential)?;
+            if users.insert(user, (secret, user_groups)).is_some() {
                 return Err(HostProblem::IdempotencyConflict);
             }
         }
@@ -268,7 +400,8 @@ impl RacfService {
                     let profile = group_profile(group);
                     changed |= insert_exact(&mut snapshot.groups, group, profile)?;
                 }
-                for (user, (principal, user_groups)) in &users {
+                for (user, (secret, user_groups)) in &users {
+                    let principal = self.principal_for_secret(snapshot, user, secret)?;
                     changed |= insert_exact(&mut snapshot.principals, user, principal.clone())?;
                     for group in user_groups {
                         let connection = GroupConnection {
@@ -311,13 +444,14 @@ impl RacfService {
         credential: &SecretRef,
     ) -> Result<(), HostProblem> {
         let user = normalize(user, 8)?;
-        let mut principal = self.password_principal(&user, credential)?;
-        principal.attributes =
-            BTreeSet::from(["AUDITOR".into(), "OPERATIONS".into(), "SPECIAL".into()]);
+        let secret = self.secrets.resolve(credential)?;
         self.database.mutate(|snapshot| {
             if !snapshot.principals.is_empty() {
                 return Err(HostProblem::Unauthorized);
             }
+            let mut principal = self.principal_for_secret(snapshot, &user, &secret)?;
+            principal.attributes =
+                BTreeSet::from(["AUDITOR".into(), "OPERATIONS".into(), "SPECIAL".into()]);
             snapshot.principals.insert(user, principal);
             Ok(())
         })?;
@@ -357,7 +491,7 @@ impl RacfService {
 
     pub fn add_user(&self, user: &str, credential: &SecretRef) -> Result<(), HostProblem> {
         let user = normalize(user, 8)?;
-        let principal = self.password_principal(&user, credential)?;
+        let secret = self.secrets.resolve(credential)?;
         self.database.mutate(|snapshot| {
             if snapshot.principals.len() >= self.limits.max_users {
                 return Err(HostProblem::ResourceExhausted);
@@ -365,6 +499,7 @@ impl RacfService {
             if snapshot.principals.contains_key(&user) {
                 return Err(HostProblem::IdempotencyConflict);
             }
+            let principal = self.principal_for_secret(snapshot, &user, &secret)?;
             snapshot.principals.insert(user, principal);
             Ok(())
         })?;
@@ -529,23 +664,32 @@ impl RacfService {
         user: &PrincipalId,
         reference: &SecretRef,
     ) -> Result<SecurityDecision, HostProblem> {
+        self.authenticate_with_epoch(user, reference)
+            .map(|(decision, _)| decision)
+    }
+
+    pub fn authenticate_with_epoch(
+        &self,
+        user: &PrincipalId,
+        reference: &SecretRef,
+    ) -> Result<(SecurityDecision, Option<PrincipalAuthenticationEpoch>), HostProblem> {
         let snapshot = self.database.read()?;
         if !snapshot.subsystem.running || !snapshot.database_status.active {
-            return Ok(SecurityDecision::Deny);
+            return Ok((SecurityDecision::Deny, None));
         }
         let Some(principal) = snapshot.principals.get(user.as_str()) else {
-            return Ok(SecurityDecision::InvalidCredentials);
+            return Ok((SecurityDecision::InvalidCredentials, None));
         };
         match principal.state {
             PrincipalState::Revoked | PrincipalState::Suspended => {
-                return Ok(SecurityDecision::Revoked);
+                return Ok((SecurityDecision::Revoked, None));
             }
-            PrincipalState::Locked => return Ok(SecurityDecision::Locked),
-            PrincipalState::PasswordExpired => return Ok(SecurityDecision::Expired),
+            PrincipalState::Locked => return Ok((SecurityDecision::Locked, None)),
+            PrincipalState::PasswordExpired => return Ok((SecurityDecision::Expired, None)),
             PrincipalState::Active => {}
         }
         let Some(credential) = principal.credential.as_ref() else {
-            return Ok(SecurityDecision::InvalidCredentials);
+            return Ok((SecurityDecision::InvalidCredentials, None));
         };
         if credential.algorithm != "argon2id" {
             return Err(HostProblem::ProviderFailure);
@@ -556,9 +700,12 @@ impl RacfService {
         let valid = Argon2::default().verify_password(&secret, &parsed).is_ok();
         drop(secret);
         Ok(if valid {
-            SecurityDecision::Allow
+            (
+                SecurityDecision::Allow,
+                Some(principal_authentication_epoch(user.as_str(), principal)?),
+            )
         } else {
-            SecurityDecision::InvalidCredentials
+            (SecurityDecision::InvalidCredentials, None)
         })
     }
 
@@ -632,46 +779,130 @@ impl RacfService {
         Ok((profiles, more))
     }
 
-    fn password_principal(
+    fn principal_for_secret(
         &self,
-        user: &str,
-        credential: &SecretRef,
-    ) -> Result<PrincipalProfile, HostProblem> {
-        let secret = self.secrets.resolve(credential)?;
-        let principal = self.password_principal_from_bytes(user, &secret)?;
-        drop(secret);
-        Ok(principal)
-    }
-
-    pub(crate) fn password_principal_from_bytes(
-        &self,
+        snapshot: &crate::model::SecurityDatabaseSnapshot,
         user: &str,
         secret: &[u8],
     ) -> Result<PrincipalProfile, HostProblem> {
+        if let Some(existing) = snapshot.principals.get(user)
+            && let Some(credential) = existing.credential.as_ref()
+        {
+            let parsed = PasswordHash::new(&credential.encoded_verifier)
+                .map_err(|_| HostProblem::ProviderFailure)?;
+            if Argon2::default().verify_password(secret, &parsed).is_ok() {
+                return Ok(existing.clone());
+            }
+        }
+        let credential = self
+            .credential_from_bytes(&snapshot.policy, user, None, secret, false, 0)
+            .map_err(credential_host_problem)?;
+        Ok(principal_with_credential(user, credential))
+    }
+
+    pub(crate) fn credential_from_bytes(
+        &self,
+        policy: &crate::model::SecurityPolicyOptions,
+        user: &str,
+        current: Option<&CredentialVerifier>,
+        secret: &[u8],
+        phrase: bool,
+        tick: u64,
+    ) -> Result<CredentialVerifier, CredentialPolicyProblem> {
+        let minimum = if phrase {
+            policy.phrase_minimum
+        } else {
+            policy.password_minimum
+        };
+        if secret.len() < minimum || secret.len() > policy.password_maximum {
+            return Err(CredentialPolicyProblem::Invalid);
+        }
+        let (mut history_digests, mut history_verifiers) = current.map_or_else(
+            || (Vec::new(), Vec::new()),
+            |credential| retained_credential_history(credential, policy.password_history),
+        );
+        if let Some(current) = current {
+            let mut prior = Vec::with_capacity(1 + history_verifiers.len());
+            prior.push(current.encoded_verifier.as_str());
+            prior.extend(history_verifiers.iter().map(String::as_str));
+            for verifier in prior {
+                let parsed = PasswordHash::new(verifier)
+                    .map_err(|_| CredentialPolicyProblem::Infrastructure)?;
+                if Argon2::default().verify_password(secret, &parsed).is_ok() {
+                    return Err(CredentialPolicyProblem::Reused);
+                }
+            }
+            if !history_digests.is_empty() {
+                let legacy = Argon2::default()
+                    .hash_password_with_salt(secret, format!("mainframe-env:{user}").as_bytes())
+                    .map_err(|_| CredentialPolicyProblem::Infrastructure)?
+                    .to_string();
+                let legacy_digest = format!("sha256:{:x}", Sha256::digest(legacy.as_bytes()));
+                if history_digests.contains(&legacy_digest) {
+                    return Err(CredentialPolicyProblem::Reused);
+                }
+            }
+        }
         let verifier = Argon2::default()
-            .hash_password_with_salt(secret, format!("mainframe-env:{user}").as_bytes())
+            .hash_password(secret)
             .map(|hash| hash.to_string())
-            .map_err(|_| HostProblem::ProviderFailure)?;
-        Ok(PrincipalProfile {
-            id: user.into(),
-            kind: PrincipalKind::User,
-            owner: user.into(),
-            default_group: None,
-            state: PrincipalState::Active,
-            credential: Some(CredentialVerifier {
-                algorithm: "argon2id".into(),
-                encoded_verifier: verifier,
-                changed_tick: 0,
-                history_digests: Vec::new(),
-            }),
-            profile_template: None,
-            segments: BTreeMap::new(),
-            security_level: 0,
-            security_label: None,
-            categories: BTreeSet::new(),
-            attributes: BTreeSet::new(),
-            version: 1,
+            .map_err(|_| CredentialPolicyProblem::Infrastructure)?;
+        if let Some(current) = current {
+            history_verifiers.push(current.encoded_verifier.clone());
+        }
+        trim_credential_history(
+            &mut history_digests,
+            &mut history_verifiers,
+            policy.password_history,
+        );
+        Ok(CredentialVerifier {
+            algorithm: "argon2id".into(),
+            encoded_verifier: verifier,
+            changed_tick: tick,
+            history_digests,
+            history_verifiers,
         })
+    }
+
+    pub fn active_principal_epoch(
+        &self,
+        user: &PrincipalId,
+    ) -> Result<Option<PrincipalAuthenticationEpoch>, HostProblem> {
+        let snapshot = self.database.read()?;
+        if !snapshot.subsystem.running || !snapshot.database_status.active {
+            return Ok(None);
+        }
+        snapshot
+            .principals
+            .get(user.as_str())
+            .map_or(Ok(None), |principal| {
+                if principal.state == PrincipalState::Active && principal.credential.is_some() {
+                    principal_authentication_epoch(user.as_str(), principal).map(Some)
+                } else {
+                    Ok(None)
+                }
+            })
+    }
+
+    pub fn active_principal_epochs(
+        &self,
+    ) -> Result<BTreeMap<String, PrincipalAuthenticationEpoch>, HostProblem> {
+        let snapshot = self.database.read()?;
+        if !snapshot.subsystem.running || !snapshot.database_status.active {
+            return Ok(BTreeMap::new());
+        }
+        snapshot
+            .principals
+            .iter()
+            .try_fold(BTreeMap::new(), |mut epochs, (user, principal)| {
+                if principal.state == PrincipalState::Active && principal.credential.is_some() {
+                    epochs.insert(
+                        user.clone(),
+                        principal_authentication_epoch(user, principal)?,
+                    );
+                }
+                Ok(epochs)
+            })
     }
 
     fn audit(&self, event: AuditEvent) -> Result<SecurityDecision, HostProblem> {
@@ -729,6 +960,57 @@ impl RacfService {
             } => self.authorize(&principal, &class, &resource, intent),
             SecurityRequest::Audit(event) => self.audit(event),
         }
+    }
+}
+
+fn credential_host_problem(problem: CredentialPolicyProblem) -> HostProblem {
+    match problem {
+        CredentialPolicyProblem::Invalid => HostProblem::Malformed,
+        CredentialPolicyProblem::Reused => HostProblem::IdempotencyConflict,
+        CredentialPolicyProblem::Infrastructure => HostProblem::ProviderFailure,
+    }
+}
+
+fn retained_credential_history(
+    credential: &CredentialVerifier,
+    retain: usize,
+) -> (Vec<String>, Vec<String>) {
+    let mut legacy = credential.history_digests.clone();
+    let mut modern = credential.history_verifiers.clone();
+    trim_credential_history(&mut legacy, &mut modern, retain);
+    (legacy, modern)
+}
+
+pub(crate) fn trim_credential_history(
+    legacy: &mut Vec<String>,
+    modern: &mut Vec<String>,
+    retain: usize,
+) {
+    let excess = legacy
+        .len()
+        .saturating_add(modern.len())
+        .saturating_sub(retain);
+    let drop_legacy = excess.min(legacy.len());
+    legacy.drain(..drop_legacy);
+    let remaining = excess - drop_legacy;
+    modern.drain(..remaining.min(modern.len()));
+}
+
+fn principal_with_credential(user: &str, credential: CredentialVerifier) -> PrincipalProfile {
+    PrincipalProfile {
+        id: user.into(),
+        kind: PrincipalKind::User,
+        owner: user.into(),
+        default_group: None,
+        state: PrincipalState::Active,
+        credential: Some(credential),
+        profile_template: None,
+        segments: BTreeMap::new(),
+        security_level: 0,
+        security_label: None,
+        categories: BTreeSet::new(),
+        attributes: BTreeSet::new(),
+        version: 1,
     }
 }
 
@@ -952,6 +1234,35 @@ impl From<AccessIntent> for AccessLevel {
     }
 }
 
+fn principal_authentication_epoch(
+    user: &str,
+    principal: &PrincipalProfile,
+) -> Result<PrincipalAuthenticationEpoch, HostProblem> {
+    let credential = principal
+        .credential
+        .as_ref()
+        .ok_or(HostProblem::ProviderFailure)?;
+    let mut digest = Sha256::new();
+    digest.update(b"mainframe-env.racf-authentication-epoch@1\0");
+    for component in [
+        user.as_bytes(),
+        credential.algorithm.as_bytes(),
+        credential.encoded_verifier.as_bytes(),
+    ] {
+        digest.update(
+            u64::try_from(component.len())
+                .map_err(|_| HostProblem::ResourceExhausted)?
+                .to_be_bytes(),
+        );
+        digest.update(component);
+    }
+    digest.update(principal.version.to_be_bytes());
+    Ok(PrincipalAuthenticationEpoch(format!(
+        "sha256:{:x}",
+        digest.finalize()
+    )))
+}
+
 fn normalize(value: &str, max: usize) -> Result<String, HostProblem> {
     let value = value.to_ascii_uppercase();
     if value.is_empty()
@@ -1013,6 +1324,7 @@ mod tests {
     use super::*;
     use mainframe_env_store::{MemoryStore, SqliteStateStore};
     use static_assertions::assert_not_impl_any;
+    use std::sync::Barrier;
 
     assert_not_impl_any!(ResolvedSecret: Clone, std::fmt::Debug, std::fmt::Display, std::ops::DerefMut, serde::Serialize);
 
@@ -1027,6 +1339,152 @@ mod tests {
     fn resolved_secret_has_no_clone_debug_display_or_serialization() {
         let secret = ResolvedSecret::new(b"bounded-secret".to_vec()).unwrap();
         assert_eq!(&*secret, b"bounded-secret");
+    }
+
+    #[test]
+    fn memory_secret_scopes_are_bounded_and_remove_on_every_exit() {
+        let resolver = Arc::new(MemorySecretResolver::with_limits(
+            MemorySecretResolverLimits {
+                max_entries: 1,
+                max_total_bytes: 32,
+                max_secret_bytes: 16,
+                max_reference_bytes: 16,
+            },
+        ));
+        let reference = SecretRef::new("request:1", Default::default()).unwrap();
+        {
+            let _scope = resolver.scoped(&reference, b"PASSWORD".to_vec()).unwrap();
+            assert_eq!(resolver.entry_count(), 1);
+            assert_eq!(
+                resolver.try_insert("request:2", b"PASSWORD".to_vec()),
+                Err(HostProblem::ResourceExhausted)
+            );
+        }
+        assert_eq!(resolver.entry_count(), 0);
+        assert_eq!(
+            resolver.try_insert("request:2", vec![b'x'; 17]),
+            Err(HostProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn every_direct_credential_route_enforces_policy_and_random_salts() {
+        let (first, first_resolver) = setup();
+        first_resolver.insert("secret:weak", b"short".to_vec());
+        first_resolver.insert("secret:valid", b"VALID-PASSWORD".to_vec());
+        let weak = SecretRef::new("secret:weak", Default::default()).unwrap();
+        let valid = SecretRef::new("secret:valid", Default::default()).unwrap();
+        assert_eq!(first.add_user("USER1", &weak), Err(HostProblem::Malformed));
+        assert_eq!(
+            first.bootstrap_administrator("ADMIN", &weak),
+            Err(HostProblem::Malformed)
+        );
+        assert!(
+            first
+                .install_manifest(RacfManifest {
+                    groups: BTreeSet::new(),
+                    users: vec![RacfUserDefinition {
+                        user: "USER1".into(),
+                        credential: weak,
+                        groups: BTreeSet::new(),
+                    }],
+                    profiles: Vec::new(),
+                })
+                .is_err()
+        );
+        first.add_user("USER1", &valid).unwrap();
+        let first_verifier = first.database.read().unwrap().principals["USER1"]
+            .credential
+            .as_ref()
+            .unwrap()
+            .encoded_verifier
+            .clone();
+
+        let (second, second_resolver) = setup();
+        second_resolver.insert("secret:valid", b"VALID-PASSWORD".to_vec());
+        second.add_user("USER1", &valid).unwrap();
+        let second_verifier = second.database.read().unwrap().principals["USER1"]
+            .credential
+            .as_ref()
+            .unwrap()
+            .encoded_verifier
+            .clone();
+        assert_ne!(first_verifier, second_verifier);
+        assert_eq!(
+            second
+                .authenticate(
+                    &PrincipalId::new("USER1", InvocationLimits::default()).unwrap(),
+                    &valid,
+                )
+                .unwrap(),
+            SecurityDecision::Allow
+        );
+    }
+
+    #[test]
+    fn credential_history_limit_applies_across_legacy_and_random_salt_formats() {
+        let credential = CredentialVerifier {
+            algorithm: "argon2id".into(),
+            encoded_verifier: "current".into(),
+            changed_tick: 1,
+            history_digests: vec!["legacy-1".into(), "legacy-2".into(), "legacy-3".into()],
+            history_verifiers: vec!["modern-1".into(), "modern-2".into()],
+        };
+        let (legacy, modern) = retained_credential_history(&credential, 3);
+        assert_eq!(legacy, ["legacy-3"]);
+        assert_eq!(modern, ["modern-1", "modern-2"]);
+        let (legacy, modern) = retained_credential_history(&credential, 1);
+        assert!(legacy.is_empty());
+        assert_eq!(modern, ["modern-2"]);
+    }
+
+    struct BlockingSecretResolver {
+        entered: Arc<Barrier>,
+        release: Arc<Barrier>,
+    }
+
+    impl SecretResolver for BlockingSecretResolver {
+        fn resolve(&self, _: &SecretRef) -> Result<ResolvedSecret, HostProblem> {
+            self.entered.wait();
+            self.release.wait();
+            ResolvedSecret::new(b"PASSWORD".to_vec())
+        }
+    }
+
+    #[test]
+    fn direct_create_revalidates_policy_inside_the_committing_snapshot() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let entered = Arc::new(Barrier::new(2));
+        let release = Arc::new(Barrier::new(2));
+        let service = RacfService::open(
+            store,
+            Arc::new(BlockingSecretResolver {
+                entered: entered.clone(),
+                release: release.clone(),
+            }),
+            Default::default(),
+        )
+        .unwrap();
+        let worker = {
+            let service = service.clone();
+            std::thread::spawn(move || {
+                service.add_user(
+                    "USER1",
+                    &SecretRef::new("secret:user1", Default::default()).unwrap(),
+                )
+            })
+        };
+        entered.wait();
+        service
+            .database
+            .mutate(|snapshot| {
+                snapshot.policy.password_minimum = 12;
+                Ok(())
+            })
+            .unwrap();
+        release.wait();
+        assert_eq!(worker.join().unwrap(), Err(HostProblem::Malformed));
+        assert_eq!(service.database.summary().unwrap().principals, 0);
     }
 
     #[test]

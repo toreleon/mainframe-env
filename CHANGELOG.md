@@ -28,6 +28,10 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Bounded and zeroized transient authentication secrets, randomized and
+  unified credential policy, and replaced durable raw bearer tokens with
+  hashed, rotating, expiring sessions with a durable cross-server user quota
+  and non-reusable principal-authentication-epoch revocation.
 - Made schema discovery cover every versioned conformance directory and made
   CICS oracle imports validate the 0.9 schema before a closed typed origin is
   parsed or credited.

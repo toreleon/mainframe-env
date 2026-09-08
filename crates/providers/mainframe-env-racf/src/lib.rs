@@ -12,8 +12,10 @@ mod saf;
 
 pub use audit::SmfType80Record;
 pub use authority::{
-    MemorySecretResolver, RacfInstallReceipt, RacfLimits, RacfManifest, RacfProfileDefinition,
-    RacfService, RacfUserDefinition, ResolvedSecret, SecretResolver, racf_providers,
+    EphemeralSecretScope, MemorySecretResolver, MemorySecretResolverLimits,
+    PrincipalAuthenticationEpoch, RacfInstallReceipt, RacfLimits, RacfManifest,
+    RacfProfileDefinition, RacfService, RacfUserDefinition, ResolvedSecret, SecretResolver,
+    racf_providers,
 };
 pub use command::{
     CommandDescriptor, CommandDiagnostic, CommandDiagnosticCode, CommandDomain, CommandFamily,

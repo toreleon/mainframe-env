@@ -13,6 +13,7 @@ use tower::limit::ConcurrencyLimitLayer;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
+use zeroize::{Zeroize, Zeroizing};
 
 #[path = "generated/custom_routes.rs"]
 mod custom_routes;
@@ -27,8 +28,10 @@ pub enum Authentication {
 
 impl Drop for Authentication {
     fn drop(&mut self) {
-        if let Self::Basic { secret, .. } = self {
-            secret.fill(0);
+        match self {
+            Self::Basic { secret, .. } => secret.zeroize(),
+            Self::Bearer(token) => token.zeroize(),
+            Self::Anonymous => {}
         }
     }
 }
@@ -847,12 +850,14 @@ fn authentication(headers: &HeaderMap) -> Authentication {
     };
     if let Some(value) = value.strip_prefix("Basic ")
         && let Ok(decoded) = base64::engine::general_purpose::STANDARD.decode(value)
-        && let Some(separator) = decoded.iter().position(|byte| *byte == b':')
     {
-        return Authentication::Basic {
-            user: String::from_utf8_lossy(&decoded[..separator]).into_owned(),
-            secret: decoded[separator + 1..].to_vec(),
-        };
+        let decoded = Zeroizing::new(decoded);
+        if let Some(separator) = decoded.iter().position(|byte| *byte == b':') {
+            return Authentication::Basic {
+                user: String::from_utf8_lossy(&decoded[..separator]).into_owned(),
+                secret: decoded[separator + 1..].to_vec(),
+            };
+        }
     }
     value
         .strip_prefix("Bearer ")

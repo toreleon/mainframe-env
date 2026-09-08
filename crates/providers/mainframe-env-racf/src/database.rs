@@ -234,6 +234,7 @@ impl SecurityDatabase {
                             encoded_verifier: user.hash.clone(),
                             changed_tick: 0,
                             history_digests: Vec::new(),
+                            history_verifiers: Vec::new(),
                         }),
                         profile_template: None,
                         segments: BTreeMap::new(),

@@ -5,7 +5,11 @@ The authoritative route list is
 information, authentication, datasets/members/AMS, jobs/spool, and the bounded
 console subset. Mutating routes require `X-CSRF-ZOSMF-HEADER`. Requests are
 bounded before parsing and authenticated requests accept Basic credentials or
-a server-issued bearer session.
+a server-issued bearer session. Repeating the authentication request with a
+valid bearer atomically rotates it; the response returns the replacement and
+the prior token stops working. Sessions use hashed durable keys, absolute and
+idle expiry, a durable per-user quota, and non-reusable principal-authentication
+epoch revocation across account deletion and recreation.
 
 Stable JSON errors contain `category`, `message`, and numeric `status`.
 Malformed input is 400, authentication failure 401, authorization failure 403,

@@ -1,3 +1,4 @@
+use argon2::password_hash::phc::PasswordHash;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -141,7 +142,10 @@ pub(crate) struct CredentialVerifier {
     pub algorithm: String,
     pub encoded_verifier: String,
     pub changed_tick: u64,
+    #[serde(default)]
     pub history_digests: Vec<String>,
+    #[serde(default)]
+    pub history_verifiers: Vec<String>,
 }
 
 #[derive(Clone, Deserialize, Eq, PartialEq, Serialize)]
@@ -948,8 +952,22 @@ impl SecurityDatabaseSnapshot {
             if let Some(credential) = &principal.credential {
                 bounded(&credential.algorithm, 64)?;
                 bounded(&credential.encoded_verifier, limits.max_value_bytes)?;
+                if credential
+                    .history_digests
+                    .len()
+                    .saturating_add(credential.history_verifiers.len())
+                    > 128
+                {
+                    return Err(SecuritySchemaProblem::LimitExceeded);
+                }
                 for digest in &credential.history_digests {
                     digest_sha256(digest)?;
+                }
+                for verifier in &credential.history_verifiers {
+                    bounded(verifier, limits.max_value_bytes)?;
+                    if PasswordHash::new(verifier).is_err() {
+                        return Err(SecuritySchemaProblem::Malformed);
+                    }
                 }
             }
             self.validate_profile_segments(

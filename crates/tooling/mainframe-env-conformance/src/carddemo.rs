@@ -6600,7 +6600,7 @@ async fn exercise_full_certification() -> Result<FullCertificationExercise, Corp
         .bootstrap_user("IBMUSER", b"TESTPASS")
         .map_err(terminal_problem)?;
     memory
-        .bootstrap_identity("APPUSER", b"APPPASS")
+        .bootstrap_identity("APPUSER", b"APPPASS1")
         .map_err(terminal_problem)?;
     memory
         .racf_service()
@@ -6697,7 +6697,7 @@ async fn exercise_full_certification() -> Result<FullCertificationExercise, Corp
     }
     let appuser = format!(
         "Basic {}",
-        base64::engine::general_purpose::STANDARD.encode("APPUSER:APPPASS")
+        base64::engine::general_purpose::STANDARD.encode("APPUSER:APPPASS1")
     );
     let (status, body) = terminal_http(
         &app,

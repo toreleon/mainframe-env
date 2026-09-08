@@ -1,4 +1,5 @@
 use crate::RacfService;
+use crate::authority::{CredentialPolicyProblem, trim_credential_history};
 use crate::command::{
     CommandDiagnostic, CommandDiagnosticCode, CommandFamily, CommandLanguageLimits, ParsedCommand,
     ParsedOperand, diagnostic, parse_command,
@@ -494,42 +495,21 @@ fn replace_credential(
     offset: usize,
     tick: u64,
 ) -> Result<CredentialVerifier, SemanticProblem> {
-    let minimum = if phrase {
-        snapshot.policy.phrase_minimum
-    } else {
-        snapshot.policy.password_minimum
-    };
-    if secret.len() < minimum || secret.len() > snapshot.policy.password_maximum {
-        return Err(SemanticProblem::Invalid(offset));
-    }
-    let replacement = service
-        .password_principal_from_bytes(user, secret.as_bytes())
-        .map_err(|_| SemanticProblem::Invalid(offset))?;
-    let new_credential = replacement
-        .credential
-        .ok_or(SemanticProblem::Invalid(offset))?;
-    let new_digest = verifier_digest(&new_credential.encoded_verifier);
-    if current.is_some_and(|credential| {
-        credential.encoded_verifier == new_credential.encoded_verifier
-            || credential.history_digests.contains(&new_digest)
-    }) {
-        return Err(SemanticProblem::Conflict);
-    }
-    let mut history =
-        current.map_or_else(Vec::new, |credential| credential.history_digests.clone());
-    if let Some(credential) = current {
-        history.push(verifier_digest(&credential.encoded_verifier));
-    }
-    let retain = snapshot.policy.password_history;
-    if history.len() > retain {
-        history.drain(..history.len() - retain);
-    }
-    Ok(CredentialVerifier {
-        algorithm: new_credential.algorithm,
-        encoded_verifier: new_credential.encoded_verifier,
-        changed_tick: tick,
-        history_digests: history,
-    })
+    service
+        .credential_from_bytes(
+            &snapshot.policy,
+            user,
+            current,
+            secret.as_bytes(),
+            phrase,
+            tick,
+        )
+        .map_err(|problem| match problem {
+            CredentialPolicyProblem::Invalid | CredentialPolicyProblem::Infrastructure => {
+                SemanticProblem::Invalid(offset)
+            }
+            CredentialPolicyProblem::Reused => SemanticProblem::Conflict,
+        })
 }
 
 fn racdcert(
@@ -1260,6 +1240,17 @@ fn setropts(
         || snapshot.policy.password_history > 128
     {
         return Err(SemanticProblem::Invalid(0));
+    }
+    for credential in snapshot
+        .principals
+        .values_mut()
+        .filter_map(|principal| principal.credential.as_mut())
+    {
+        trim_credential_history(
+            &mut credential.history_digests,
+            &mut credential.history_verifiers,
+            snapshot.policy.password_history,
+        );
     }
     let consumed = [
         "ADDCREATOR",
@@ -2871,10 +2862,6 @@ fn operand_text(operand: &ParsedOperand) -> String {
     }
 }
 
-fn verifier_digest(value: &str) -> String {
-    format!("sha256:{:x}", Sha256::digest(value.as_bytes()))
-}
-
 fn normalized_digest(value: &str) -> Result<String, SemanticProblem> {
     if value.len() == 71
         && value.starts_with("sha256:")
@@ -3763,7 +3750,7 @@ mod tests {
             .credential
             .clone()
             .unwrap();
-        assert_eq!(credential.history_digests.len(), 1);
+        assert_eq!(credential.history_verifiers.len(), 1);
         drop(service);
 
         let reopened = RacfService::open(store, secrets, Default::default()).unwrap();
