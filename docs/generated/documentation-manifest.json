@@ -1,9 +1,9 @@
 {
   "counts": {
-    "markdown_documents": 180,
+    "markdown_documents": 182,
     "navigation_groups": 5,
-    "normative_documents": 36,
-    "xtask_commands": 156
+    "normative_documents": 38,
+    "xtask_commands": 160
   },
   "documents": [
     {
@@ -17,8 +17,8 @@
     {
       "normative": false,
       "path": "CONTRIBUTING.md",
-      "relative_links": 4,
-      "sha256": "sha256:412e8cd77b345e95932f762c0b1fcfe9f3be7a219208ce6dfd3a7e107f9b9e81",
+      "relative_links": 5,
+      "sha256": "sha256:1bc221148808ab8462dae0ccf6dd9911aab0080ca1b2f201b848c969be4595ae",
       "title": "Contributing to mainframe-env",
       "xtask_commands": 4
     },
@@ -301,8 +301,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 71,
-      "sha256": "sha256:3e00d8d26d1aaca51ee47c9fb068467678e746b5a24fb0c61116537344bda9e6",
+      "relative_links": 73,
+      "sha256": "sha256:0dd3dd892d5ca4f37e291abbb9b88064fa8b55d4c9f7fa5f03477a0d137fea5c",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -329,6 +329,18 @@
       "status": "Frozen for mainframe-env 0.2.0",
       "title": "Installed batch-controller registry",
       "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "CICS provider maintainers",
+      "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
+      "relative_links": 3,
+      "scope": "typed CICS operation descriptors, generated routing families, and provider semantic modules",
+      "sha256": "sha256:cb7537ea3af433d15dc8c3a85d76a66f21fdd44623fe9c87ea545f4c834c6ecd",
+      "status": "Implemented",
+      "title": "CICS command descriptor and semantic-family routing",
+      "xtask_commands": 2
     },
     {
       "applies_from": "mainframe-env 0.4.0",
@@ -443,21 +455,21 @@
       "normative": true,
       "owner": "architecture maintainers",
       "path": "docs/architecture/OVERVIEW.md",
-      "relative_links": 1,
+      "relative_links": 3,
       "scope": "system layers, dependency direction, and maintainability rules",
-      "sha256": "sha256:30f19cbc7b259b55dc64378baf089c2344f4ef1c4159dad3924505a6251c240b",
+      "sha256": "sha256:6979c4a0b21c3d0adfc84e98571e091c74d22fc94bcb1a25ab8d99da8418c837",
       "status": "Accepted by repository owner",
       "title": "Architecture Overview",
-      "xtask_commands": 0
+      "xtask_commands": 1
     },
     {
       "applies_from": "mainframe-env 0.8.3 development",
       "normative": true,
       "owner": "architecture maintainers",
       "path": "docs/architecture/PACKAGE-MAP.md",
-      "relative_links": 1,
+      "relative_links": 3,
       "scope": "current package ownership, dependency layers, and split boundaries",
-      "sha256": "sha256:efe1c54bcb867c3e6c597002a3118a98ef4c022128046976178c6fed4ed485ab",
+      "sha256": "sha256:4e09c1d3f8351a5bc56d0ce289b06f72547fc79b5de9ec59c28c8cafb0a3115b",
       "status": "Accepted; current topology governed by ADR-0009",
       "title": "0.1 Package Map",
       "xtask_commands": 0
@@ -675,10 +687,22 @@
       "xtask_commands": 2
     },
     {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "architecture maintainers",
+      "path": "docs/decisions/0010-rust-module-review-budgets.md",
+      "relative_links": 1,
+      "scope": "Rust production-module size, crate facades, generated sources, and CICS family growth",
+      "sha256": "sha256:c8387c5f638bd0454095d669f6ebc3cc8464e70733b27605d67051c4082c6a5d",
+      "status": "Accepted by repository owner",
+      "title": "ADR-0010: Enforce Rust module review budgets and stable split boundaries",
+      "xtask_commands": 1
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 9,
-      "sha256": "sha256:3213a156f8dd1fcfb314d2910ad88dd25d25884af4aa5dd7d074940325d12a21",
+      "relative_links": 10,
+      "sha256": "sha256:87e00d9bb2ab7f3a6eb60500aabe309a7ab3b416be6f00d5de0c13bea2e1a9f3",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1129,8 +1153,8 @@
     {
       "normative": false,
       "path": "docs/prompts/IMPLEMENT_MAINFRAME_ENV_0_1.md",
-      "relative_links": 0,
-      "sha256": "sha256:f38125869c2ddd341b8125c5274594f6d7869b78840fb0dc1d32e7f314e4c88a",
+      "relative_links": 1,
+      "sha256": "sha256:ed17d3bb57db14c32cddddadf81fc1dc04247e060199654da0b7566f6880797a",
       "title": "Execution Prompt — Implement mainframe-env 0.1 End to End",
       "xtask_commands": 8
     },
@@ -1647,6 +1671,10 @@
           "path": "docs/architecture/BATCH-CONTROLLER-REGISTRY.md"
         },
         {
+          "label": "CICS command routing",
+          "path": "docs/architecture/CICS-COMMAND-ROUTING.md"
+        },
+        {
           "label": "Db2 application catalog",
           "path": "docs/architecture/DB2-APPLICATION-CATALOG.md"
         },
@@ -1722,6 +1750,10 @@
         {
           "label": "ADR-0009: Current package topology",
           "path": "docs/decisions/0009-current-package-topology.md"
+        },
+        {
+          "label": "ADR-0010: Rust module review budgets",
+          "path": "docs/decisions/0010-rust-module-review-budgets.md"
         },
         {
           "label": "Decision index and template",
@@ -1887,7 +1919,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:c7b3071245c522ddb77ab71ee24d781383bfb5bcc314b906dc960339a28a6a3f",
+  "registry_sha256": "sha256:966d3bdad99cd075839c366e1f429c08432122fca2bc684c8c9c89eda50f4493",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

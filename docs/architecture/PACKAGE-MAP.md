@@ -20,6 +20,13 @@ A crate exists only when it enforces dependency direction, a versioned public
 contract, an independently selected provider, or an application boundary.
 Readability alone is handled with modules.
 
+Module readability is governed by
+[ADR-0010](../decisions/0010-rust-module-review-budgets.md) and the
+[machine budget inventory](../../conformance/0.9/inventory/module-budgets.json).
+New/non-exempt Rust modules have a hard 1,200-production-line maximum; an
+oversized legacy module must retain its exact non-growing ceiling and split at
+the recorded stable reason to change rather than creating an unjustified crate.
+
 ## Proposed 0.1 workspace
 
 ```text

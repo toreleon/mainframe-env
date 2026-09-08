@@ -7022,6 +7022,37 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         status.success(),
         "durable retention lifecycle architecture guard failed",
     )?;
+    let cics_descriptors = root.join("tools/generate_cics_descriptors.py");
+    require(
+        cics_descriptors.is_file(),
+        "CICS command descriptor generator is missing",
+    )?;
+    let status = Command::new("python3")
+        .arg("-B")
+        .arg(&cics_descriptors)
+        .arg("--check")
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("CICS command descriptor freshness guard: {error}"))?;
+    require(
+        status.success(),
+        "CICS command descriptor freshness guard failed",
+    )?;
+    let module_boundaries = root.join("tools/check_module_boundaries.py");
+    require(
+        module_boundaries.is_file(),
+        "Rust module boundary architecture guard is missing",
+    )?;
+    let status = Command::new("python3")
+        .arg("-B")
+        .arg(&module_boundaries)
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("Rust module boundary guard: {error}"))?;
+    require(
+        status.success(),
+        "Rust module boundary architecture guard failed",
+    )?;
     Ok(())
 }
 

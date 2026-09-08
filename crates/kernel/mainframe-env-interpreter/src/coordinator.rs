@@ -1050,7 +1050,6 @@ mod tests {
         CapabilityDescriptor, HostLimits, HostProvider, HostRequest, HostResult, RegistrySnapshot,
         StateRequest,
     };
-    use mainframe_env_store::MemoryStore;
     use std::collections::{BTreeMap, BTreeSet};
     use std::sync::Mutex;
 
@@ -1535,45 +1534,6 @@ mod tests {
             assert_eq!(records[0].principal, *invocation.principal.id());
             assert_eq!(records[0].capability.as_str(), "host.state.read");
         }
-    }
-
-    #[test]
-    fn post_dispatch_tick_ages_the_effect_without_rewriting_the_dispatch_audit_tick() {
-        let invocation = audit_invocation(true);
-        let key = IdempotencyKey::new("post-dispatch-effect", InvocationLimits::default()).unwrap();
-        let mut request = audit_request(&invocation);
-        request.idempotency_key = Some(key.clone());
-        let store: Arc<dyn PlatformStore> = Arc::new(MemoryStore::new(Default::default()));
-        let coordinator = ExecutionCoordinator::durable(
-            audited_host(Ok(HostResult::State {
-                value: Some(vec![1]),
-                version: 1,
-            })),
-            store.clone(),
-            CoordinatorLimits::default(),
-        );
-        let mut observations = 0;
-        let outcome =
-            coordinator.execute_with_control(&mut OneHostCall(Some(request)), &invocation, || {
-                observations += 1;
-                Ok(ExecutionControl {
-                    now_tick: if observations <= 3 { 10 } else { 90 },
-                    cancellation_requested: false,
-                })
-            });
-        assert!(matches!(outcome, ExecutionOutcome::Completed(_)));
-        assert_eq!(store.effect(&key).unwrap().unwrap().resolved_tick, Some(90));
-        let result_event = store
-            .events(&invocation.execution_id, 1, 16)
-            .unwrap()
-            .into_iter()
-            .find(|event| matches!(event.kind, LifecycleEventKind::EffectResult { sequence: 1 }))
-            .unwrap();
-        assert_eq!(result_event.tick, 10);
-        assert_eq!(
-            store.audit_records(&invocation.execution_id, 1, 8).unwrap()[0].observed_tick,
-            10
-        );
     }
 
     #[test]

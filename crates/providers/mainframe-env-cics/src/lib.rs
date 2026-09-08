@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 mod abi;
+mod generated;
 mod retention;
 mod service;
 

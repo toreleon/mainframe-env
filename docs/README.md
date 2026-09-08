@@ -49,6 +49,7 @@ explicitly names that authority as superseded.
 - [JES execution](architecture/JES-EXECUTION.md)
 - [Application packages](architecture/APPLICATION-PACKAGES.md)
 - [Batch controller registry](architecture/BATCH-CONTROLLER-REGISTRY.md)
+- [CICS command routing](architecture/CICS-COMMAND-ROUTING.md)
 - [Db2 application catalog](architecture/DB2-APPLICATION-CATALOG.md)
 - [Host ABI source libraries](architecture/HOST-ABI-SOURCE-LIBRARIES.md)
 - [Program and route registries](architecture/PROGRAM-AND-ROUTE-REGISTRIES.md)
@@ -70,6 +71,7 @@ explicitly names that authority as superseded.
 - [ADR-0007: CardDemo 0.1.1 release](decisions/0007-carddemo-0.1.1-release.md)
 - [ADR-0008: ICU license compliance](decisions/0008-icu-license-compliance.md)
 - [ADR-0009: Current package topology](decisions/0009-current-package-topology.md)
+- [ADR-0010: Rust module review budgets](decisions/0010-rust-module-review-budgets.md)
 - [Decision index and template](decisions/README.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.

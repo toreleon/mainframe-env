@@ -51,10 +51,14 @@ class ClassificationTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 module.apply_mutation(source, mutation)
 
+    def test_production_only_handler_can_be_mutated_without_a_test_suffix(self):
+        mutation = module.Mutation('test', 'test', 'ANCHOR', 'CHANGED')
+        self.assertEqual(module.apply_mutation('before ANCHOR after', mutation), 'before CHANGED after')
+
     def test_cics_product_mutation_anchors_are_unique_and_scenarios_are_unchanged(self):
-        source = (TOOL.parents[1] / module.CICS_SOURCE).read_text()
         scenarios = (TOOL.parents[1] / module.CICS_SCENARIOS).read_bytes()
         for mutation in module.CICS_MUTATIONS:
+            source = (TOOL.parents[1] / mutation.source).read_text()
             changed = module.apply_mutation(source, mutation)
             self.assertNotEqual(changed, source)
             self.assertEqual(

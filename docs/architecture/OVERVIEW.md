@@ -165,7 +165,14 @@ replacement.
   schema or catalog as its source.
 - Every crate README states ownership, non-goals, invariants, allowed
   dependencies, public surface, and verification entry points.
-- A soft module budget of roughly 800–1,200 lines triggers review, not automatic
-  splitting.
+- [ADR-0010](../decisions/0010-rust-module-review-budgets.md) enforces a hard
+  1,200-production-line limit for new/non-exempt Rust modules and exact,
+  non-growing ceilings with stable split boundaries for existing exceptions.
+- Generator-owned and test-only source handling, facade-only `lib.rs` files,
+  and the CICS descriptor/handler-family layout are checked mechanically by
+  `cargo xtask architecture-fast --check`.
+- The [CICS command-routing contract](CICS-COMMAND-ROUTING.md) freezes the
+  readable descriptor catalog and routes every typed operation through one of
+  seven reviewed semantic-family modules.
 - Architecture checks validate dependency direction and product-profile
   closures mechanically.

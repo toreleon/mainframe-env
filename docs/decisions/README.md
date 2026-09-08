@@ -13,6 +13,7 @@ ADRs capture decisions that constrain implementation and public contracts.
 | [0007](0007-carddemo-0.1.1-release.md) | release CardDemo-full 0.1.1 and canonicalize CARDDEMO naming | Accepted |
 | [0008](0008-icu-license-compliance.md) | retain the locked decNumber dependency under ICU and ship complete notices | Accepted |
 | [0009](0009-current-package-topology.md) | current 26-package topology and change governance | Accepted |
+| [0010](0010-rust-module-review-budgets.md) | hard Rust module budgets, facade ratchet, and CICS family layout | Accepted |
 
 An accepted ADR is immutable. A material change creates a superseding ADR and
 links to the previous decision.

@@ -11,6 +11,7 @@
     "docs/CHARTER.md",
     "docs/architecture/APPLICATION-PACKAGES.md",
     "docs/architecture/BATCH-CONTROLLER-REGISTRY.md",
+    "docs/architecture/CICS-COMMAND-ROUTING.md",
     "docs/architecture/COBOL-RUNTIME-SEMANTICS.md",
     "docs/architecture/COMPILER-AND-IR.md",
     "docs/architecture/CONFORMANCE-IR.md",
@@ -39,6 +40,7 @@
     "docs/decisions/0007-carddemo-0.1.1-release.md",
     "docs/decisions/0008-icu-license-compliance.md",
     "docs/decisions/0009-current-package-topology.md",
+    "docs/decisions/0010-rust-module-review-budgets.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
     "docs/delivery/VERIFICATION-STRATEGY.md",
@@ -62,6 +64,7 @@
         {"label": "JES execution", "path": "docs/architecture/JES-EXECUTION.md"},
         {"label": "Application packages", "path": "docs/architecture/APPLICATION-PACKAGES.md"},
         {"label": "Batch controller registry", "path": "docs/architecture/BATCH-CONTROLLER-REGISTRY.md"},
+        {"label": "CICS command routing", "path": "docs/architecture/CICS-COMMAND-ROUTING.md"},
         {"label": "Db2 application catalog", "path": "docs/architecture/DB2-APPLICATION-CATALOG.md"},
         {"label": "Host ABI source libraries", "path": "docs/architecture/HOST-ABI-SOURCE-LIBRARIES.md"},
         {"label": "Program and route registries", "path": "docs/architecture/PROGRAM-AND-ROUTE-REGISTRIES.md"},
@@ -85,6 +88,7 @@
         {"label": "ADR-0007: CardDemo 0.1.1 release", "path": "docs/decisions/0007-carddemo-0.1.1-release.md"},
         {"label": "ADR-0008: ICU license compliance", "path": "docs/decisions/0008-icu-license-compliance.md"},
         {"label": "ADR-0009: Current package topology", "path": "docs/decisions/0009-current-package-topology.md"},
+        {"label": "ADR-0010: Rust module review budgets", "path": "docs/decisions/0010-rust-module-review-budgets.md"},
         {"label": "Decision index and template", "path": "docs/decisions/README.md"}
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."

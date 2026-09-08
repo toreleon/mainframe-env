@@ -82,11 +82,13 @@ repository policy requires to remain external.
 
 ## Reviewability
 
-Keep modules and pull requests centered on one reason to change. The accepted
-architecture uses roughly 800–1,200 lines as a review trigger. Large release
-programs should use bounded work-package reviews while incomplete behavior
-remains unreachable from the public profile; the final integrated candidate
-must still pass the complete exit gate.
+Keep modules and pull requests centered on one reason to change.
+[ADR-0010](docs/decisions/0010-rust-module-review-budgets.md) enforces a hard
+1,200-production-line maximum for new/non-exempt Rust modules; reviewed legacy
+exceptions have exact non-growing ceilings and recorded stable split
+boundaries. Large release programs should use bounded work-package reviews
+while incomplete behavior remains unreachable from the public profile; the
+final integrated candidate must still pass the complete exit gate.
 
 Security-sensitive findings should follow [SECURITY.md](SECURITY.md), not a
 public issue.
