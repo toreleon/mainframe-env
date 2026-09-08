@@ -6922,6 +6922,21 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
             "canonical effect encoding architecture guard failed",
         )?;
     }
+    let provider_rows = root.join("tools/check_provider_rows.py");
+    require(
+        provider_rows.is_file(),
+        "provider row persistence architecture guard is missing",
+    )?;
+    let status = Command::new("python3")
+        .arg("-B")
+        .arg(&provider_rows)
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("provider row persistence guard: {error}"))?;
+    require(
+        status.success(),
+        "provider row persistence architecture guard failed",
+    )?;
     Ok(())
 }
 

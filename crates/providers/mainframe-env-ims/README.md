@@ -11,7 +11,8 @@ durable commit/rollback, replay, and host-provider registration.
 
 - Callers use typed `mainframe-env-host-api` requests and results.
 - Provider state is bounded by `ImsLimits` and persisted only through the owned
-  `ProviderStateStore` contract.
+  `ProviderStateStore` contract as versioned database, session, checkpoint,
+  unit-of-work, and replay rows.
 - Mutations require idempotency and preserve run-unit transaction boundaries.
 - Unknown outcomes, conditions, cancellation, and provider failures remain
   distinct.
@@ -36,6 +37,9 @@ the bounded installation and execution contract.
 - DRDA, network protocol, deployment, or UI behavior.
 - Licensed IBM equivalence from local/model results.
 - A multi-node storage architecture.
+
+The row layout and legacy migration rules are frozen in the
+[provider row contract](../../../docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md).
 
 ## Verification
 

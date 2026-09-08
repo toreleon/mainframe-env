@@ -5,7 +5,10 @@ use mainframe_env_host_api::{
     CapabilityDescriptor, EffectRequest, EffectResult, HostProblem, HostProvider, HostRequest,
     HostResult, ImsOperation, ImsRequest, ImsResult, ImsSegment, canonical_ims_request_digest,
 };
-use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
+use mainframe_env_store_api::{
+    ProviderStateMutation, ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
+};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -13,6 +16,13 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 const STATE_NAMESPACE: &str = "ims-state";
 const STATE_KEY: &str = "catalog";
+const ROW_STORE_SCHEMA: &str = "mainframe-env.ims-row-store@1";
+const OBJECT_ROW_SCHEMA: &str = "mainframe-env.ims-object-row@1";
+const DATABASE_NAMESPACE: &str = "ims-v1-database";
+const SESSION_NAMESPACE: &str = "ims-v1-session-index";
+const CHECKPOINT_NAMESPACE: &str = "ims-v1-checkpoint";
+const REPLAY_NAMESPACE: &str = "ims-v1-replay";
+const PENDING_NAMESPACE: &str = "ims-v1-unit-of-work";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ImsLimits {
@@ -198,16 +208,40 @@ impl RecordedResult {
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 struct State {
     definitions: Option<ImsApplicationDefinition>,
-    databases: BTreeMap<String, DatabaseState>,
-    sessions: BTreeMap<String, Session>,
-    checkpoints: BTreeMap<String, Session>,
-    replay: BTreeMap<String, RecordedResult>,
+    databases: BTreeMap<String, Arc<DatabaseState>>,
+    sessions: BTreeMap<String, Arc<Session>>,
+    checkpoints: BTreeMap<String, Arc<Session>>,
+    replay: BTreeMap<String, Arc<RecordedResult>>,
     #[serde(default)]
-    pending_undo: BTreeMap<String, BTreeMap<String, DatabaseState>>,
+    pending_undo: BTreeMap<String, Arc<BTreeMap<String, Arc<DatabaseState>>>>,
 }
 
+impl State {
+    /// Fork a transaction by sharing immutable object payloads until touched.
+    fn scoped_snapshot(&self) -> Self {
+        self.clone()
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct RowStoreManifest {
+    schema_version: String,
+    definitions: Option<ImsApplicationDefinition>,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ObjectRow<T> {
+    schema_version: String,
+    object_key: String,
+    value: T,
+}
+
+type RowVersions = BTreeMap<(String, String), u64>;
+
 struct DurableState {
-    version: u64,
+    versions: RowVersions,
     state: State,
 }
 
@@ -222,22 +256,11 @@ impl ImsService {
         store: Arc<dyn ProviderStateStore>,
         limits: ImsLimits,
     ) -> Result<Arc<Self>, HostProblem> {
-        let (version, state) = match store
-            .get_provider_state(STATE_NAMESPACE, STATE_KEY)
-            .map_err(store_error)?
-        {
-            Some(record) => (
-                record.version,
-                serde_json::from_slice(&record.payload)
-                    .map_err(|_| HostProblem::InfrastructureFailure)?,
-            ),
-            None => (0, State::default()),
-        };
-        validate_state(&state, limits)?;
+        let (state, versions) = load_or_migrate(&*store, limits)?;
         Ok(Arc::new(Self {
             store,
             limits,
-            durable: Mutex::new(DurableState { version, state }),
+            durable: Mutex::new(DurableState { versions, state }),
         }))
     }
 
@@ -259,7 +282,7 @@ impl ImsService {
             }
             return Ok(install_receipt(&definition, identity, true));
         }
-        let mut next = durable.state.clone();
+        let mut next = durable.state.scoped_snapshot();
         for database in &definition.databases {
             next.databases.entry(normalize(&database.name)).or_default();
         }
@@ -292,7 +315,7 @@ impl ImsService {
                 ReplayDigestFormat::CanonicalHostV1 => Err(HostProblem::IdempotencyConflict),
             };
         }
-        let mut next = durable.state.clone();
+        let mut next = durable.state.scoped_snapshot();
         let result = apply_request(
             &mut next,
             invocation.run_unit_id.as_str(),
@@ -314,7 +337,7 @@ impl ImsService {
             }
             next.replay.insert(
                 key.into(),
-                RecordedResult::from_result(request_sha256, &result),
+                Arc::new(RecordedResult::from_result(request_sha256, &result)),
             );
             validate_state(&next, self.limits)?;
             self.persist(&mut durable, next)?;
@@ -363,11 +386,12 @@ impl ImsService {
             }
             ReplayDigestFormat::LegacyDebugV0 => {}
         }
-        let mut next = durable.state.clone();
+        let mut next = durable.state.scoped_snapshot();
         let retained = next
             .replay
             .get_mut(key.as_str())
             .ok_or(HostProblem::NotFound)?;
+        let retained = Arc::make_mut(retained);
         retained.request_digest_format = ReplayDigestFormat::CanonicalHostV1;
         retained.request_sha256 = canonical;
         validate_state(&next, self.limits)?;
@@ -411,29 +435,347 @@ impl ImsService {
     }
 
     fn persist(&self, durable: &mut DurableState, state: State) -> Result<(), HostProblem> {
-        let payload = serde_json::to_vec(&state).map_err(|_| HostProblem::ProviderFailure)?;
-        if payload.len() > self.limits.max_state_bytes {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        let version = durable
-            .version
-            .checked_add(1)
-            .ok_or(HostProblem::ResourceExhausted)?;
-        self.store
-            .put_provider_state(
-                ProviderStateRecord {
-                    namespace: STATE_NAMESPACE.into(),
-                    key: STATE_KEY.into(),
-                    version,
-                    payload,
-                },
-                (durable.version != 0).then_some(durable.version),
-            )
-            .map_err(store_error)?;
-        durable.version = version;
+        let changes = row_changes(
+            &durable.state,
+            &state,
+            &durable.versions,
+            self.limits,
+            false,
+        )?;
+        commit_row_changes(&*self.store, changes, &mut durable.versions)?;
         durable.state = state;
         Ok(())
     }
+}
+
+struct RowChange {
+    namespace: String,
+    key: String,
+    next_version: Option<u64>,
+    mutation: ProviderStateMutation,
+}
+
+fn load_or_migrate(
+    store: &dyn ProviderStateStore,
+    limits: ImsLimits,
+) -> Result<(State, RowVersions), HostProblem> {
+    let Some(manifest_record) = store
+        .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+        .map_err(store_error)?
+    else {
+        ensure_row_namespaces_empty(store)?;
+        return Ok((State::default(), RowVersions::new()));
+    };
+    if manifest_record.namespace != STATE_NAMESPACE
+        || manifest_record.key != STATE_KEY
+        || manifest_record.version == 0
+        || manifest_record.payload.len() > limits.max_state_bytes
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    if let Ok(manifest) = serde_json::from_slice::<RowStoreManifest>(&manifest_record.payload) {
+        if manifest.schema_version != ROW_STORE_SCHEMA {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let mut versions = RowVersions::from([(
+            (STATE_NAMESPACE.into(), STATE_KEY.into()),
+            manifest_record.version,
+        )]);
+        let state = State {
+            definitions: manifest.definitions,
+            databases: load_row_map(
+                store,
+                DATABASE_NAMESPACE,
+                limits.max_databases,
+                limits,
+                &mut versions,
+            )?,
+            sessions: load_row_map(
+                store,
+                SESSION_NAMESPACE,
+                limits.max_sessions,
+                limits,
+                &mut versions,
+            )?,
+            checkpoints: load_row_map(
+                store,
+                CHECKPOINT_NAMESPACE,
+                limits.max_checkpoints,
+                limits,
+                &mut versions,
+            )?,
+            replay: load_row_map(
+                store,
+                REPLAY_NAMESPACE,
+                limits.max_replays,
+                limits,
+                &mut versions,
+            )?,
+            pending_undo: load_row_map(
+                store,
+                PENDING_NAMESPACE,
+                limits.max_sessions,
+                limits,
+                &mut versions,
+            )?,
+        };
+        validate_state(&state, limits)?;
+        return Ok((state, versions));
+    }
+
+    let legacy: State = serde_json::from_slice(&manifest_record.payload)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    validate_state(&legacy, limits)?;
+    ensure_row_namespaces_empty(store)?;
+    let mut versions = RowVersions::from([(
+        (STATE_NAMESPACE.into(), STATE_KEY.into()),
+        manifest_record.version,
+    )]);
+    let changes = row_changes(&State::default(), &legacy, &versions, limits, true)?;
+    commit_row_changes(store, changes, &mut versions)?;
+    Ok((legacy, versions))
+}
+
+fn ensure_row_namespaces_empty(store: &dyn ProviderStateStore) -> Result<(), HostProblem> {
+    for namespace in [
+        DATABASE_NAMESPACE,
+        SESSION_NAMESPACE,
+        CHECKPOINT_NAMESPACE,
+        REPLAY_NAMESPACE,
+        PENDING_NAMESPACE,
+    ] {
+        if !store
+            .list_provider_state(namespace, 1)
+            .map_err(store_error)?
+            .is_empty()
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+    }
+    Ok(())
+}
+
+fn load_row_map<T: DeserializeOwned>(
+    store: &dyn ProviderStateStore,
+    namespace: &str,
+    max: usize,
+    limits: ImsLimits,
+    versions: &mut RowVersions,
+) -> Result<BTreeMap<String, T>, HostProblem> {
+    let fetch = max.checked_add(1).ok_or(HostProblem::ResourceExhausted)?;
+    let records = store
+        .list_provider_state(namespace, fetch)
+        .map_err(store_error)?;
+    if records.len() > max {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let mut values = BTreeMap::new();
+    for record in records {
+        if record.namespace != namespace
+            || record.key.is_empty()
+            || record.version == 0
+            || record.payload.len() > limits.max_state_bytes
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let row: ObjectRow<T> = serde_json::from_slice(&record.payload)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        if row.schema_version != OBJECT_ROW_SCHEMA || row.object_key != record.key {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        versions.insert((namespace.into(), record.key.clone()), record.version);
+        if values.insert(record.key, row.value).is_some() {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+    }
+    Ok(values)
+}
+
+fn row_changes(
+    current: &State,
+    next: &State,
+    versions: &RowVersions,
+    limits: ImsLimits,
+    force_manifest_write: bool,
+) -> Result<Vec<RowChange>, HostProblem> {
+    let mut changes = Vec::new();
+    let current_manifest = RowStoreManifest {
+        schema_version: ROW_STORE_SCHEMA.into(),
+        definitions: current.definitions.clone(),
+    };
+    let next_manifest = RowStoreManifest {
+        schema_version: ROW_STORE_SCHEMA.into(),
+        definitions: next.definitions.clone(),
+    };
+    if force_manifest_write
+        || current_manifest != next_manifest
+        || !versions.contains_key(&(STATE_NAMESPACE.into(), STATE_KEY.into()))
+    {
+        let payload =
+            serde_json::to_vec(&next_manifest).map_err(|_| HostProblem::InfrastructureFailure)?;
+        changes.push(put_row_change(
+            STATE_NAMESPACE,
+            STATE_KEY,
+            payload,
+            versions,
+            limits.max_state_bytes,
+        )?);
+    }
+    map_arc_row_changes(
+        DATABASE_NAMESPACE,
+        &current.databases,
+        &next.databases,
+        versions,
+        limits,
+        &mut changes,
+    )?;
+    map_arc_row_changes(
+        SESSION_NAMESPACE,
+        &current.sessions,
+        &next.sessions,
+        versions,
+        limits,
+        &mut changes,
+    )?;
+    map_arc_row_changes(
+        CHECKPOINT_NAMESPACE,
+        &current.checkpoints,
+        &next.checkpoints,
+        versions,
+        limits,
+        &mut changes,
+    )?;
+    map_arc_row_changes(
+        REPLAY_NAMESPACE,
+        &current.replay,
+        &next.replay,
+        versions,
+        limits,
+        &mut changes,
+    )?;
+    map_arc_row_changes(
+        PENDING_NAMESPACE,
+        &current.pending_undo,
+        &next.pending_undo,
+        versions,
+        limits,
+        &mut changes,
+    )?;
+    Ok(changes)
+}
+
+fn map_arc_row_changes<T: Serialize>(
+    namespace: &str,
+    current: &BTreeMap<String, Arc<T>>,
+    next: &BTreeMap<String, Arc<T>>,
+    versions: &RowVersions,
+    limits: ImsLimits,
+    changes: &mut Vec<RowChange>,
+) -> Result<(), HostProblem> {
+    for (key, value) in next {
+        if !current
+            .get(key)
+            .is_some_and(|current| Arc::ptr_eq(current, value))
+        {
+            changes.push(put_row_change(
+                namespace,
+                key,
+                encode_object_row(key, value)?,
+                versions,
+                limits.max_state_bytes,
+            )?);
+        }
+    }
+    for key in current.keys().filter(|key| !next.contains_key(*key)) {
+        let version = versions
+            .get(&(namespace.into(), key.clone()))
+            .copied()
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        changes.push(RowChange {
+            namespace: namespace.into(),
+            key: key.clone(),
+            next_version: None,
+            mutation: ProviderStateMutation::Delete {
+                namespace: namespace.into(),
+                key: key.clone(),
+                expected_version: version,
+            },
+        });
+    }
+    Ok(())
+}
+
+fn encode_object_row<T: Serialize>(key: &str, value: &T) -> Result<Vec<u8>, HostProblem> {
+    serde_json::to_vec(&ObjectRow {
+        schema_version: OBJECT_ROW_SCHEMA.into(),
+        object_key: key.into(),
+        value,
+    })
+    .map_err(|_| HostProblem::InfrastructureFailure)
+}
+
+fn put_row_change(
+    namespace: &str,
+    key: &str,
+    payload: Vec<u8>,
+    versions: &RowVersions,
+    max_state_bytes: usize,
+) -> Result<RowChange, HostProblem> {
+    if payload.len() > max_state_bytes {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let current = versions.get(&(namespace.into(), key.into())).copied();
+    let next = current
+        .unwrap_or(0)
+        .checked_add(1)
+        .ok_or(HostProblem::ResourceExhausted)?;
+    Ok(RowChange {
+        namespace: namespace.into(),
+        key: key.into(),
+        next_version: Some(next),
+        mutation: ProviderStateMutation::Put(ProviderStateWrite {
+            record: ProviderStateRecord {
+                namespace: namespace.into(),
+                key: key.into(),
+                version: next,
+                payload,
+            },
+            expected_version: current,
+        }),
+    })
+}
+
+fn commit_row_changes(
+    store: &dyn ProviderStateStore,
+    changes: Vec<RowChange>,
+    versions: &mut RowVersions,
+) -> Result<(), HostProblem> {
+    if changes.is_empty() {
+        return Ok(());
+    }
+    let applied = changes
+        .iter()
+        .map(|change| {
+            (
+                (change.namespace.clone(), change.key.clone()),
+                change.next_version,
+            )
+        })
+        .collect::<Vec<_>>();
+    store
+        .mutate_provider_states_atomic(changes.into_iter().map(|change| change.mutation).collect())
+        .map_err(store_error)?;
+    for (key, version) in applied {
+        match version {
+            Some(version) => {
+                versions.insert(key, version);
+            }
+            None => {
+                versions.remove(&key);
+            }
+        }
+    }
+    Ok(())
 }
 
 fn install_receipt(
@@ -474,7 +816,9 @@ fn apply_request(
         }
         ImsOperation::Rollback => {
             if let Some(databases) = state.pending_undo.remove(run) {
-                state.databases = databases;
+                for (name, database) in databases.iter() {
+                    state.databases.insert(name.clone(), database.clone());
+                }
             }
             Ok(status("  "))
         }
@@ -509,14 +853,14 @@ fn schedule(
     }
     state.sessions.insert(
         run.into(),
-        Session {
+        Arc::new(Session {
             psb,
             pcb: request.pcb,
             root_position: 0,
             child_position: 0,
             current_root: None,
             last: None,
-        },
+        }),
     );
     Ok(status("  "))
 }
@@ -552,6 +896,7 @@ fn get_unique(
         };
         let result = segment(&root_definition.name, None, root.data.clone());
         let session = state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?;
+        let session = Arc::make_mut(session);
         session.current_root = Some(key.clone());
         session.child_position = 0;
         session.last = Some(SegmentLocation::Root { key });
@@ -590,6 +935,7 @@ fn get_unique(
     };
     let result = segment(&child_definition.name, Some(decode_key(&root_key)?), data);
     let session = state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?;
+    let session = Arc::make_mut(session);
     session.current_root = Some(root_key.clone());
     session.last = Some(SegmentLocation::Child {
         root_key,
@@ -606,6 +952,7 @@ fn get_next(state: &mut State, run: &str, _request: &ImsRequest) -> Result<ImsRe
         .ok_or(HostProblem::NotFound)?;
     let keys = database.roots.keys().cloned().collect::<Vec<_>>();
     let session = state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?;
+    let session = Arc::make_mut(session);
     let Some(key) = keys.get(session.root_position).cloned() else {
         return Ok(status("GB"));
     };
@@ -639,7 +986,10 @@ fn get_next_parent(
         .get(run)
         .cloned()
         .ok_or(HostProblem::NotFound)?;
-    let root_key = session_snapshot.current_root.ok_or(HostProblem::NotFound)?;
+    let root_key = session_snapshot
+        .current_root
+        .clone()
+        .ok_or(HostProblem::NotFound)?;
     let database = state
         .databases
         .get(&database_name)
@@ -655,6 +1005,7 @@ fn get_next_parent(
         (*data).clone(),
     );
     let session = state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?;
+    let session = Arc::make_mut(session);
     session.child_position += 1;
     session.last = Some(SegmentLocation::Child {
         root_key,
@@ -669,8 +1020,8 @@ fn insert(
     request: &ImsRequest,
     limits: ImsLimits,
 ) -> Result<ImsResult, HostProblem> {
-    begin_unit(state, run);
     let (database_name, root_definition, child_definition) = context(state, run)?;
+    begin_unit(state, run, &database_name)?;
     let target = request
         .segments
         .last()
@@ -680,6 +1031,7 @@ fn insert(
         .databases
         .get_mut(&database_name)
         .ok_or(HostProblem::NotFound)?;
+    let database = Arc::make_mut(database);
     if target == root_definition.name {
         validate_segment_data(&request.data, &root_definition, limits)?;
         let key = data_key(&request.data, &root_definition)?;
@@ -697,11 +1049,8 @@ fn insert(
             },
         );
         database.secondary_index.insert(key.clone(), key.clone());
-        state
-            .sessions
-            .get_mut(run)
-            .ok_or(HostProblem::NotFound)?
-            .last = Some(SegmentLocation::Root { key });
+        Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?).last =
+            Some(SegmentLocation::Root { key });
         return Ok(affected(1));
     }
     let child_definition = child_definition.ok_or(HostProblem::NotFound)?;
@@ -730,20 +1079,17 @@ fn insert(
     }
     root.children
         .insert(child_key.clone(), request.data.clone());
-    state
-        .sessions
-        .get_mut(run)
-        .ok_or(HostProblem::NotFound)?
-        .last = Some(SegmentLocation::Child {
-        root_key,
-        key: child_key,
-    });
+    Arc::make_mut(state.sessions.get_mut(run).ok_or(HostProblem::NotFound)?).last =
+        Some(SegmentLocation::Child {
+            root_key,
+            key: child_key,
+        });
     Ok(affected(1))
 }
 
 fn replace(state: &mut State, run: &str, request: &ImsRequest) -> Result<ImsResult, HostProblem> {
-    begin_unit(state, run);
     let (database_name, root_definition, child_definition) = context(state, run)?;
+    begin_unit(state, run, &database_name)?;
     let location = state
         .sessions
         .get(run)
@@ -753,6 +1099,7 @@ fn replace(state: &mut State, run: &str, request: &ImsRequest) -> Result<ImsResu
         .databases
         .get_mut(&database_name)
         .ok_or(HostProblem::NotFound)?;
+    let database = Arc::make_mut(database);
     match location {
         SegmentLocation::Root { key } => {
             if data_key(&request.data, &root_definition)? != key {
@@ -780,8 +1127,8 @@ fn replace(state: &mut State, run: &str, request: &ImsRequest) -> Result<ImsResu
 }
 
 fn delete(state: &mut State, run: &str) -> Result<ImsResult, HostProblem> {
-    begin_unit(state, run);
     let (database_name, _, _) = context(state, run)?;
+    begin_unit(state, run, &database_name)?;
     let location = state
         .sessions
         .get(run)
@@ -791,6 +1138,7 @@ fn delete(state: &mut State, run: &str) -> Result<ImsResult, HostProblem> {
         .databases
         .get_mut(&database_name)
         .ok_or(HostProblem::NotFound)?;
+    let database = Arc::make_mut(database);
     let (removed, next_location) = match location {
         SegmentLocation::Root { key } => {
             database.secondary_index.retain(|_, root| root != &key);
@@ -809,6 +1157,7 @@ fn delete(state: &mut State, run: &str) -> Result<ImsResult, HostProblem> {
         return Ok(status("GE"));
     }
     if let Some(session) = state.sessions.get_mut(run) {
+        let session = Arc::make_mut(session);
         match next_location {
             Some(location) => {
                 session.child_position = session.child_position.saturating_sub(1);
@@ -890,7 +1239,7 @@ fn load(
         database.secondary_index.insert(root_key.clone(), root_key);
         affected_count += 1;
     }
-    state.databases.insert(database_name, database);
+    state.databases.insert(database_name, Arc::new(database));
     Ok(affected(affected_count))
 }
 
@@ -954,12 +1303,22 @@ fn context(
     Ok((database_name, root, child))
 }
 
-fn begin_unit(state: &mut State, run: &str) {
-    if !state.pending_undo.contains_key(run) {
-        state
-            .pending_undo
-            .insert(run.into(), state.databases.clone());
+fn begin_unit(state: &mut State, run: &str, database_name: &str) -> Result<(), HostProblem> {
+    if state
+        .pending_undo
+        .get(run)
+        .is_some_and(|databases| databases.contains_key(database_name))
+    {
+        return Ok(());
     }
+    let original = state
+        .databases
+        .get(database_name)
+        .cloned()
+        .ok_or(HostProblem::NotFound)?;
+    Arc::make_mut(state.pending_undo.entry(run.into()).or_default())
+        .insert(database_name.into(), original);
+    Ok(())
 }
 
 fn database_definition(
@@ -1152,6 +1511,9 @@ fn validate_state(state: &State, limits: ImsLimits) -> Result<(), HostProblem> {
         || state.replay.len() > limits.max_replays
         || state.pending_undo.len() > limits.max_sessions
         || state.databases.len() > limits.max_databases
+        || state.sessions.keys().any(String::is_empty)
+        || state.checkpoints.keys().any(String::is_empty)
+        || state.pending_undo.keys().any(String::is_empty)
         || state.databases.values().any(|database| {
             database.roots.len() > limits.max_roots
                 || database.roots.values().any(|root| {
@@ -1164,10 +1526,98 @@ fn validate_state(state: &State, limits: ImsLimits) -> Result<(), HostProblem> {
                 })
         })
     {
-        Err(HostProblem::ResourceExhausted)
-    } else {
-        Ok(())
+        return Err(HostProblem::ResourceExhausted);
     }
+    let Some(definitions) = &state.definitions else {
+        return if state.databases.is_empty()
+            && state.sessions.is_empty()
+            && state.checkpoints.is_empty()
+            && state.pending_undo.is_empty()
+            && state.replay.is_empty()
+        {
+            Ok(())
+        } else {
+            Err(HostProblem::InfrastructureFailure)
+        };
+    };
+    validate_definition(definitions, limits)?;
+    let defined = definitions
+        .databases
+        .iter()
+        .map(|database| normalize(&database.name))
+        .collect::<BTreeSet<_>>();
+    if defined != state.databases.keys().cloned().collect()
+        || state
+            .databases
+            .iter()
+            .any(|(name, database)| !valid_database_state(definitions, name, database, limits))
+        || state
+            .sessions
+            .values()
+            .chain(state.checkpoints.values())
+            .any(|session| !valid_session(definitions, session))
+        || state.pending_undo.values().any(|databases| {
+            databases.iter().any(|(name, database)| {
+                !defined.contains(name)
+                    || !valid_database_state(definitions, name, database, limits)
+            })
+        })
+        || state.replay.keys().any(String::is_empty)
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(())
+}
+
+fn valid_database_state(
+    definitions: &ImsApplicationDefinition,
+    name: &str,
+    database: &DatabaseState,
+    limits: ImsLimits,
+) -> bool {
+    let Some(definition) = definitions
+        .databases
+        .iter()
+        .find(|definition| normalize(&definition.name) == name)
+    else {
+        return false;
+    };
+    let Some(root_definition) = definition
+        .segments
+        .iter()
+        .find(|segment| segment.parent.is_none())
+    else {
+        return false;
+    };
+    let child_definition = definition.segments.iter().find(|segment| {
+        segment
+            .parent
+            .as_ref()
+            .is_some_and(|parent| normalize(parent) == normalize(&root_definition.name))
+    });
+    database.secondary_index.len() == database.roots.len()
+        && database
+            .secondary_index
+            .iter()
+            .all(|(key, root)| key == root && database.roots.contains_key(root))
+        && database.roots.iter().all(|(key, root)| {
+            validate_segment_data(&root.data, root_definition, limits).is_ok()
+                && data_key(&root.data, root_definition).as_deref() == Ok(key.as_str())
+                && root.children.iter().all(|(key, child)| {
+                    child_definition.is_some_and(|definition| {
+                        validate_segment_data(child, definition, limits).is_ok()
+                            && data_key(child, definition).as_deref() == Ok(key.as_str())
+                    })
+                })
+        })
+}
+
+fn valid_session(definitions: &ImsApplicationDefinition, session: &Session) -> bool {
+    definitions
+        .psbs
+        .iter()
+        .find(|psb| normalize(&psb.name) == session.psb)
+        .is_some_and(|psb| session.pcb > 0 && usize::from(session.pcb) <= psb.pcbs.len())
 }
 
 fn request_digest(request: &ImsRequest) -> Result<[u8; 32], HostProblem> {
@@ -1244,7 +1694,7 @@ mod tests {
         ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
     };
     use mainframe_env_host_api::{ImsQualifier, Mutation};
-    use mainframe_env_store::MemoryStore;
+    use mainframe_env_store::{MemoryStore, SqliteStateStore};
 
     fn definition() -> ImsApplicationDefinition {
         ImsApplicationDefinition {
@@ -1341,11 +1791,11 @@ mod tests {
         digest: [u8; 32],
     ) {
         let row = store
-            .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+            .get_provider_state(REPLAY_NAMESPACE, key.as_str())
             .unwrap()
             .unwrap();
         let mut state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
-        let replay = state["replay"][key.as_str()].as_object_mut().unwrap();
+        let replay = state["value"].as_object_mut().unwrap();
         replay.remove("request_digest_format");
         replay.insert("request_sha256".into(), serde_json::json!(digest));
         let version = row.version;
@@ -1535,5 +1985,315 @@ mod tests {
         let restarted = ImsService::open(store, ImsLimits::default()).unwrap();
         assert_eq!(restarted.execute(&invocation, &insert), Ok(original));
         assert_eq!(restarted.hierarchy("AUTHDB").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn legacy_blob_migrates_atomically_to_versioned_scoped_rows_and_corruption_fails_closed() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let mut definitions = definition();
+        let mut other = definitions.databases[0].clone();
+        other.name = "OTHERDB".into();
+        other.secondary_index = Some("OTHERIX".into());
+        definitions.databases.push(other);
+        let legacy = State {
+            definitions: Some(definitions),
+            databases: BTreeMap::from([
+                ("AUTHDB".into(), Arc::new(DatabaseState::default())),
+                ("OTHERDB".into(), Arc::new(DatabaseState::default())),
+            ]),
+            sessions: BTreeMap::new(),
+            checkpoints: BTreeMap::new(),
+            replay: BTreeMap::new(),
+            pending_undo: BTreeMap::new(),
+        };
+        let legacy_payload = serde_json::to_vec(&legacy).unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: STATE_NAMESPACE.into(),
+                    key: STATE_KEY.into(),
+                    version: 1,
+                    payload: legacy_payload.clone(),
+                },
+                None,
+            )
+            .unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: DATABASE_NAMESPACE.into(),
+                    key: "ORPHAN".into(),
+                    version: 1,
+                    payload: encode_object_row("ORPHAN", &DatabaseState::default()).unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        assert!(matches!(
+            ImsService::open(store.clone(), Default::default()),
+            Err(HostProblem::InfrastructureFailure)
+        ));
+        assert_eq!(
+            store
+                .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+                .unwrap()
+                .unwrap()
+                .payload,
+            legacy_payload
+        );
+        store
+            .delete_provider_state(DATABASE_NAMESPACE, "ORPHAN", 1)
+            .unwrap();
+
+        let service = ImsService::open(store.clone(), Default::default()).unwrap();
+        let manifest_before = store
+            .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+            .unwrap()
+            .unwrap();
+        let manifest: RowStoreManifest = serde_json::from_slice(&manifest_before.payload).unwrap();
+        assert_eq!(manifest.schema_version, ROW_STORE_SCHEMA);
+        assert_eq!(manifest_before.version, 2);
+        assert_eq!(
+            store
+                .list_provider_state(DATABASE_NAMESPACE, 3)
+                .unwrap()
+                .len(),
+            2
+        );
+        let other_before = store
+            .get_provider_state(DATABASE_NAMESPACE, "OTHERDB")
+            .unwrap()
+            .unwrap();
+        let auth_version = store
+            .get_provider_state(DATABASE_NAMESPACE, "AUTHDB")
+            .unwrap()
+            .unwrap()
+            .version;
+        let invocation = invocation("row-scope");
+        service
+            .execute(
+                &invocation,
+                &request(ImsOperation::Schedule, 401, &[], &[], Vec::new()),
+            )
+            .unwrap();
+        service
+            .execute(
+                &invocation,
+                &request(
+                    ImsOperation::Insert,
+                    402,
+                    &["ROOT"],
+                    b"000402SCOP",
+                    Vec::new(),
+                ),
+            )
+            .unwrap();
+        assert_eq!(service.hierarchy("AUTHDB").unwrap().len(), 1);
+        assert_eq!(
+            store
+                .get_provider_state(DATABASE_NAMESPACE, "AUTHDB")
+                .unwrap()
+                .unwrap()
+                .version,
+            auth_version + 1
+        );
+        assert_eq!(
+            store
+                .get_provider_state(DATABASE_NAMESPACE, "OTHERDB")
+                .unwrap()
+                .unwrap(),
+            other_before
+        );
+        assert_eq!(
+            store
+                .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+                .unwrap()
+                .unwrap(),
+            manifest_before
+        );
+        drop(service);
+
+        let other = store
+            .get_provider_state(DATABASE_NAMESPACE, "OTHERDB")
+            .unwrap()
+            .unwrap();
+        let mut corrupt: serde_json::Value = serde_json::from_slice(&other.payload).unwrap();
+        corrupt["object_key"] = serde_json::json!("DIFFERENT");
+        let version = other.version;
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    version: version + 1,
+                    payload: serde_json::to_vec(&corrupt).unwrap(),
+                    ..other
+                },
+                Some(version),
+            )
+            .unwrap();
+        assert!(matches!(
+            ImsService::open(store, Default::default()),
+            Err(HostProblem::InfrastructureFailure)
+        ));
+    }
+
+    #[test]
+    fn empty_legacy_blob_is_always_replaced_by_a_versioned_manifest() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: STATE_NAMESPACE.into(),
+                    key: STATE_KEY.into(),
+                    version: 1,
+                    payload: serde_json::to_vec(&State::default()).unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+
+        drop(ImsService::open(store.clone(), Default::default()).unwrap());
+        let manifest = store
+            .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+            .unwrap()
+            .unwrap();
+        assert_eq!(manifest.version, 2);
+        assert_eq!(
+            serde_json::from_slice::<RowStoreManifest>(&manifest.payload)
+                .unwrap()
+                .schema_version,
+            ROW_STORE_SCHEMA
+        );
+    }
+
+    #[test]
+    fn sqlite_executes_and_reopens_the_versioned_row_layout() {
+        let store: Arc<dyn ProviderStateStore> =
+            Arc::new(SqliteStateStore::open("sqlite::memory:", 64 * 1024 * 1024, 262_144).unwrap());
+        let legacy = State {
+            definitions: Some(definition()),
+            databases: BTreeMap::from([("AUTHDB".into(), Arc::new(DatabaseState::default()))]),
+            ..State::default()
+        };
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: STATE_NAMESPACE.into(),
+                    key: STATE_KEY.into(),
+                    version: 1,
+                    payload: serde_json::to_vec(&legacy).unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        let service = ImsService::open(store.clone(), Default::default()).unwrap();
+        let invocation = invocation("sqlite-row");
+        service
+            .execute(
+                &invocation,
+                &request(ImsOperation::Schedule, 701, &[], &[], Vec::new()),
+            )
+            .unwrap();
+        service
+            .execute(
+                &invocation,
+                &request(
+                    ImsOperation::Insert,
+                    702,
+                    &["ROOT"],
+                    b"000702DATA",
+                    Vec::new(),
+                ),
+            )
+            .unwrap();
+        drop(service);
+
+        let reopened = ImsService::open(store.clone(), Default::default()).unwrap();
+        assert_eq!(reopened.hierarchy("AUTHDB").unwrap().len(), 1);
+        assert_eq!(
+            store
+                .list_provider_state(DATABASE_NAMESPACE, 2)
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(
+            serde_json::from_slice::<RowStoreManifest>(
+                &store
+                    .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+                    .unwrap()
+                    .unwrap()
+                    .payload
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn independent_database_rows_commit_from_separate_service_instances_without_global_cas() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let mut definitions = definition();
+        let mut other_database = definitions.databases[0].clone();
+        other_database.name = "OTHERDB".into();
+        other_database.secondary_index = Some("OTHERIX".into());
+        definitions.databases.push(other_database);
+        let mut other_psb = definitions.psbs[0].clone();
+        other_psb.name = "OTHERPSB".into();
+        other_psb.pcbs[0].database = "OTHERDB".into();
+        definitions.psbs.push(other_psb);
+        let installer = ImsService::open(store.clone(), Default::default()).unwrap();
+        installer.install(definitions).unwrap();
+        drop(installer);
+        let manifest = store
+            .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+            .unwrap()
+            .unwrap();
+        let left = ImsService::open(store.clone(), Default::default()).unwrap();
+        let right = ImsService::open(store.clone(), Default::default()).unwrap();
+        let left_worker = std::thread::spawn(move || {
+            let invocation = invocation("left-db");
+            left.execute(
+                &invocation,
+                &request(ImsOperation::Schedule, 911, &[], &[], Vec::new()),
+            )?;
+            left.execute(
+                &invocation,
+                &request(
+                    ImsOperation::Insert,
+                    912,
+                    &["ROOT"],
+                    b"000911LEFT",
+                    Vec::new(),
+                ),
+            )
+        });
+        let right_worker = std::thread::spawn(move || {
+            let invocation = invocation("right-db");
+            let mut schedule = request(ImsOperation::Schedule, 921, &[], &[], Vec::new());
+            schedule.psb = Some("OTHERPSB".into());
+            right.execute(&invocation, &schedule)?;
+            right.execute(
+                &invocation,
+                &request(
+                    ImsOperation::Insert,
+                    922,
+                    &["ROOT"],
+                    b"000921RGHT",
+                    Vec::new(),
+                ),
+            )
+        });
+        left_worker.join().unwrap().unwrap();
+        right_worker.join().unwrap().unwrap();
+
+        let reopened = ImsService::open(store.clone(), Default::default()).unwrap();
+        assert_eq!(reopened.hierarchy("AUTHDB").unwrap().len(), 1);
+        assert_eq!(reopened.hierarchy("OTHERDB").unwrap().len(), 1);
+        assert_eq!(
+            store
+                .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+                .unwrap()
+                .unwrap(),
+            manifest
+        );
     }
 }

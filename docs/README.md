@@ -53,6 +53,7 @@ explicitly names that authority as superseded.
 - [Host ABI source libraries](architecture/HOST-ABI-SOURCE-LIBRARIES.md)
 - [Program and route registries](architecture/PROGRAM-AND-ROUTE-REGISTRIES.md)
 - [Canonical effect encoding](contracts/EFFECT-CANONICAL-V1.md)
+- [Provider object-row persistence](contracts/PROVIDER-ROW-PERSISTENCE-V1.md)
 
 ## Architecture decisions
 

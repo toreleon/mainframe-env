@@ -21,6 +21,8 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Split Db2, IMS, and MQ durable state into independently versioned object,
+  index, cursor, unit-of-work, and replay rows with atomic legacy migration.
 - Assigned post-0.8.2 work the distinct `0.8.3` development identity and made
   released versus development state explicit in every version authority.
 - Replaced the live GitHub Actions assurance path with the capped local Jenkins
