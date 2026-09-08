@@ -536,6 +536,11 @@ impl BatchService {
         Ok(receipt)
     }
 
+    /// Parse and validate the immutable JCL plan used for admission decisions.
+    pub fn plan(&self, bundle: &JclBundle) -> Result<JobPlan, HostProblem> {
+        parse_jcl(bundle, self.jcl_limits)
+    }
+
     pub fn submit(
         &self,
         invocation: &Invocation,

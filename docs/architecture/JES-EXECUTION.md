@@ -60,6 +60,13 @@ against the durable job before dispatch, preserving multi-user isolation. The
 invocation also binds the durable work ID so installed COBOL execution observes
 cancellation changes made after dispatch.
 
+The capability set comes only from the validated `JobPlan`: typed DDs,
+recognized execution programs, and a durable installed-program binding.
+Searching raw JCL, comments, or inline data for `EXEC SQL`, `EXEC DLI`, MQ, or
+dataset spellings is prohibited. Db2, IMS, and MQ routing grants remain
+insufficient on their own; each provider resolves and SAF-authorizes its exact
+table, PSB/database, queue, or unit of work before dispatch.
+
 All workers share a persisted Unix-millisecond logical clock. A wall-clock
 advance moves it forward; an equal or regressed wall reading advances the
 stored logical value by one. Claims, periodic heartbeats, deferrals,

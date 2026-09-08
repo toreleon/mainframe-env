@@ -6992,6 +6992,21 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         status.success(),
         "durable storage profile architecture guard failed",
     )?;
+    let enterprise_authorization = root.join("tools/check_enterprise_authorization.py");
+    require(
+        enterprise_authorization.is_file(),
+        "enterprise authorization architecture guard is missing",
+    )?;
+    let status = Command::new("python3")
+        .arg("-B")
+        .arg(&enterprise_authorization)
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("enterprise authorization guard: {error}"))?;
+    require(
+        status.success(),
+        "enterprise authorization architecture guard failed",
+    )?;
     Ok(())
 }
 

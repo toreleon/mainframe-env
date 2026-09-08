@@ -1,6 +1,7 @@
 use mainframe_env_execution_api::{CapabilityId, IdempotencyKey, Invocation, InvocationLimits};
 use mainframe_env_host_api::{
-    CapabilityDescriptor, EffectRequest, EffectResult, HostProblem, HostProvider, HostRequest,
+    AccessIntent, CapabilityDescriptor, EffectRequest, EffectResult, EnterpriseAuthorizer,
+    EnterpriseResource, EnterpriseResourceClass, HostProblem, HostProvider, HostRequest,
     HostResult, MqOperation, MqRequest, MqResult, canonical_mq_request_digest,
 };
 use mainframe_env_store_api::{
@@ -176,6 +177,7 @@ pub struct MqService {
     limits: MqLimits,
     durable: Mutex<DurableState>,
     unknown_after_persist: AtomicBool,
+    authorizer: Option<Arc<dyn EnterpriseAuthorizer>>,
 }
 
 impl MqService {
@@ -183,12 +185,29 @@ impl MqService {
         store: Arc<dyn ProviderStateStore>,
         limits: MqLimits,
     ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_inner(store, limits, None)
+    }
+
+    pub fn open_authorized(
+        store: Arc<dyn ProviderStateStore>,
+        limits: MqLimits,
+        authorizer: Arc<dyn EnterpriseAuthorizer>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_inner(store, limits, Some(authorizer))
+    }
+
+    fn open_inner(
+        store: Arc<dyn ProviderStateStore>,
+        limits: MqLimits,
+        authorizer: Option<Arc<dyn EnterpriseAuthorizer>>,
+    ) -> Result<Arc<Self>, HostProblem> {
         let (state, versions) = load_or_migrate(&*store, limits)?;
         Ok(Arc::new(Self {
             store,
             limits,
             durable: Mutex::new(DurableState { versions, state }),
             unknown_after_persist: AtomicBool::new(false),
+            authorizer,
         }))
     }
 
@@ -234,6 +253,11 @@ impl MqService {
         request: &MqRequest,
     ) -> Result<MqResult, HostProblem> {
         let mut durable = self.lock()?;
+        if let Some(authorizer) = &self.authorizer {
+            for resource in mq_resources(&durable.state, invocation, request)? {
+                authorizer.authorize(invocation.principal.id(), &resource)?;
+            }
+        }
         let request_sha256 = request_digest(request)?;
         let replay_key = request
             .mutation
@@ -700,6 +724,44 @@ fn commit_row_changes(
     Ok(())
 }
 
+fn mq_resources(
+    state: &State,
+    invocation: &Invocation,
+    request: &MqRequest,
+) -> Result<Vec<EnterpriseResource>, HostProblem> {
+    let run = invocation.run_unit_id.as_str();
+    let intent = match request.operation {
+        MqOperation::Get => AccessIntent::Read,
+        MqOperation::Open | MqOperation::Close => AccessIntent::Execute,
+        MqOperation::Put | MqOperation::PutOne | MqOperation::Commit | MqOperation::Rollback => {
+            AccessIntent::Update
+        }
+    };
+    let mut queues = BTreeSet::new();
+    match request.operation {
+        MqOperation::Commit | MqOperation::Rollback => {
+            if let Some(pending) = state.pending.get(run) {
+                queues.extend(pending.puts.iter().map(|(queue, _)| queue.clone()));
+                queues.extend(pending.gets.iter().map(|(queue, _)| queue.clone()));
+            }
+        }
+        _ => {
+            queues.insert(resolve_queue(state, run, request)?);
+        }
+    }
+    if queues.is_empty() {
+        return Ok(vec![EnterpriseResource::new(
+            EnterpriseResourceClass::MqUnitOfWork,
+            "CURRENT",
+            intent,
+        )?]);
+    }
+    queues
+        .into_iter()
+        .map(|queue| EnterpriseResource::new(EnterpriseResourceClass::MqQueue, queue, intent))
+        .collect()
+}
+
 fn apply_request(
     state: &mut State,
     run: &str,
@@ -1132,6 +1194,22 @@ mod tests {
     use mainframe_env_host_api::Mutation;
     use mainframe_env_store::{MemoryStore, SqliteStateStore, StoreLimits};
 
+    #[derive(Default)]
+    struct DenyEnterprise {
+        seen: Mutex<Vec<EnterpriseResource>>,
+    }
+
+    impl EnterpriseAuthorizer for DenyEnterprise {
+        fn authorize(
+            &self,
+            _: &PrincipalId,
+            resource: &EnterpriseResource,
+        ) -> Result<(), HostProblem> {
+            self.seen.lock().unwrap().push(resource.clone());
+            Err(HostProblem::Unauthorized)
+        }
+    }
+
     fn invocation(run: &str) -> Invocation {
         let limits = InvocationLimits::default();
         Invocation::new(
@@ -1208,6 +1286,41 @@ mod tests {
                 Some(version),
             )
             .unwrap();
+    }
+
+    #[test]
+    fn mq_queue_denial_precedes_mutation() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let policy = Arc::new(DenyEnterprise::default());
+        let service =
+            MqService::open_authorized(store, MqLimits::default(), policy.clone()).unwrap();
+        service
+            .install(vec![MqQueueDefinition {
+                name: "DENIED.Q".into(),
+                trigger_program: None,
+            }])
+            .unwrap();
+        let mut put = request(MqOperation::PutOne, 700);
+        put.queue = Some("DENIED.Q".into());
+        put.message = b"must-not-commit".to_vec();
+        assert_eq!(
+            service.execute(&invocation("deny-mq"), &put),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(
+            service.lock().unwrap().state.queues["DENIED.Q"]
+                .messages
+                .is_empty()
+        );
+        assert_eq!(
+            policy.seen.lock().unwrap().as_slice(),
+            &[EnterpriseResource::new(
+                EnterpriseResourceClass::MqQueue,
+                "DENIED.Q",
+                AccessIntent::Update,
+            )
+            .unwrap()]
+        );
     }
 
     #[test]

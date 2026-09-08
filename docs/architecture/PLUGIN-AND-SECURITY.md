@@ -28,6 +28,15 @@ RACF/SAF is the authoritative 0.1 security provider. Policy errors and missing
 profiles fail closed. No authorization result is inferred from HTTP routing,
 possession of a Rust handle, or successful capability lookup.
 
+Db2, IMS, and MQ add a second, typed decision inside the provider boundary.
+`EnterpriseResource` closes the supported SAF classes (`DB2TABLE`, `DB2PLAN`,
+`DB2UOW`, `IMSPSB`, `IMSDB`, `IMSUOW`, `MQQUEUE`, and `MQUOW`) and pairs a
+bounded `ResourceName` with `AccessIntent`. The provider resolves cursor,
+session, handle, and pending-UOW state to the underlying table, PSB/database,
+or queue while holding its state fence, calls the mandatory production
+authorizer, and only then clones or mutates state. A broad host capability is a
+routing grant and never substitutes for this resource decision.
+
 ## Capability grants
 
 An invocation receives only grants needed by its selected workload, for
@@ -47,6 +56,12 @@ host.audit
 Capabilities identify permission families and interface versions. They do not
 contain provider references, credentials, filesystem paths, or mutable global
 state.
+
+Batch grants are derived from the immutable parsed JCL plan and the durable
+installed-program registry. Comments and inline records cannot add a grant.
+Installed COBOL programs receive the bounded host-interface routing set because
+their verified MIR may call those interfaces dynamically; the provider-level
+SAF decision still limits every concrete enterprise resource.
 
 ## Scoped service handles
 

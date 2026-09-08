@@ -11,6 +11,7 @@ pub use canonical::{
 };
 
 mod dataset;
+mod enterprise;
 mod names;
 mod registry;
 mod request;
@@ -31,6 +32,7 @@ pub use dataset::{
     SmsClasses, SpaceUnit, TvsRecordOperation, TvsUnitOfWorkReceipt, TvsUnitOfWorkState,
     VolumeKind, VolumeSelection, VsamAccessMode, VsamAttributes,
 };
+pub use enterprise::{EnterpriseAuthorizer, EnterpriseResource, EnterpriseResourceClass};
 pub use names::{
     ClassName, DatasetName, HostNameProblem, JobName, MemberName, MethodName, ProgramName,
     ResourceName, RuntimeServiceName, SessionId,

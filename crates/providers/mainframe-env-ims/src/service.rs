@@ -2,7 +2,8 @@ use mainframe_env_execution_api::{
     CapabilityId, IdempotencyKey, Invocation, InvocationLimits, ServiceClass,
 };
 use mainframe_env_host_api::{
-    CapabilityDescriptor, EffectRequest, EffectResult, HostProblem, HostProvider, HostRequest,
+    AccessIntent, CapabilityDescriptor, EffectRequest, EffectResult, EnterpriseAuthorizer,
+    EnterpriseResource, EnterpriseResourceClass, HostProblem, HostProvider, HostRequest,
     HostResult, ImsOperation, ImsRequest, ImsResult, ImsSegment, canonical_ims_request_digest,
 };
 use mainframe_env_store_api::{
@@ -249,6 +250,7 @@ pub struct ImsService {
     store: Arc<dyn ProviderStateStore>,
     limits: ImsLimits,
     durable: Mutex<DurableState>,
+    authorizer: Option<Arc<dyn EnterpriseAuthorizer>>,
 }
 
 impl ImsService {
@@ -256,11 +258,28 @@ impl ImsService {
         store: Arc<dyn ProviderStateStore>,
         limits: ImsLimits,
     ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_inner(store, limits, None)
+    }
+
+    pub fn open_authorized(
+        store: Arc<dyn ProviderStateStore>,
+        limits: ImsLimits,
+        authorizer: Arc<dyn EnterpriseAuthorizer>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_inner(store, limits, Some(authorizer))
+    }
+
+    fn open_inner(
+        store: Arc<dyn ProviderStateStore>,
+        limits: ImsLimits,
+        authorizer: Option<Arc<dyn EnterpriseAuthorizer>>,
+    ) -> Result<Arc<Self>, HostProblem> {
         let (state, versions) = load_or_migrate(&*store, limits)?;
         Ok(Arc::new(Self {
             store,
             limits,
             durable: Mutex::new(DurableState { versions, state }),
+            authorizer,
         }))
     }
 
@@ -297,6 +316,11 @@ impl ImsService {
         request: &ImsRequest,
     ) -> Result<ImsResult, HostProblem> {
         let mut durable = self.lock()?;
+        if let Some(authorizer) = &self.authorizer {
+            for resource in ims_resources(&durable.state, invocation, request)? {
+                authorizer.authorize(invocation.principal.id(), &resource)?;
+            }
+        }
         let request_sha256 = request_digest(request)?;
         let replay_key = request
             .mutation
@@ -790,6 +814,96 @@ fn install_receipt(
         identity,
         replayed,
     }
+}
+
+fn ims_resources(
+    state: &State,
+    invocation: &Invocation,
+    request: &ImsRequest,
+) -> Result<Vec<EnterpriseResource>, HostProblem> {
+    let run = invocation.run_unit_id.as_str();
+    let intent = if request.operation.is_mutating() {
+        AccessIntent::Update
+    } else {
+        AccessIntent::Read
+    };
+    let mut resources = Vec::new();
+    let mut databases = BTreeSet::new();
+    let psb = request
+        .psb
+        .as_ref()
+        .map(|psb| normalize(psb))
+        .or_else(|| state.sessions.get(run).map(|session| session.psb.clone()));
+    if let Some(psb) = psb {
+        resources.push(EnterpriseResource::new(
+            EnterpriseResourceClass::ImsPsb,
+            psb,
+            AccessIntent::Execute,
+        )?);
+    }
+    match request.operation {
+        ImsOperation::Load => {
+            let image: ImsLoadImage =
+                serde_json::from_slice(&request.data).map_err(|_| HostProblem::Malformed)?;
+            databases.insert(normalize(&image.database));
+        }
+        ImsOperation::Unload => {
+            if let Some(database) = request.psb.as_ref() {
+                databases.insert(normalize(database));
+            } else {
+                databases.insert(context(state, run)?.0);
+            }
+        }
+        ImsOperation::Commit | ImsOperation::Rollback => {
+            if let Some(pending) = state.pending_undo.get(run) {
+                databases.extend(pending.keys().cloned());
+            }
+        }
+        ImsOperation::Schedule => {
+            let psb = normalize(request.psb.as_deref().ok_or(HostProblem::Malformed)?);
+            let definition = state
+                .definitions
+                .as_ref()
+                .and_then(|definition| {
+                    definition
+                        .psbs
+                        .iter()
+                        .find(|candidate| normalize(&candidate.name) == psb)
+                })
+                .ok_or(HostProblem::NotFound)?;
+            let pcb = definition
+                .pcbs
+                .get(usize::from(request.pcb).saturating_sub(1))
+                .ok_or(HostProblem::NotFound)?;
+            databases.insert(normalize(&pcb.database));
+        }
+        _ => {
+            if let Ok((database, _, _)) = context(state, run) {
+                databases.insert(database);
+            }
+        }
+    }
+    if databases.is_empty()
+        && matches!(
+            request.operation,
+            ImsOperation::Commit | ImsOperation::Rollback
+        )
+    {
+        resources.push(EnterpriseResource::new(
+            EnterpriseResourceClass::ImsUnitOfWork,
+            "CURRENT",
+            AccessIntent::Update,
+        )?);
+    }
+    resources.extend(
+        databases
+            .into_iter()
+            .map(|database| {
+                EnterpriseResource::new(EnterpriseResourceClass::ImsDatabase, database, intent)
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+    );
+    Ok(resources)
 }
 
 fn apply_request(
@@ -1696,6 +1810,22 @@ mod tests {
     use mainframe_env_host_api::{ImsQualifier, Mutation};
     use mainframe_env_store::{MemoryStore, SqliteStateStore};
 
+    #[derive(Default)]
+    struct DenyEnterprise {
+        seen: Mutex<Vec<EnterpriseResource>>,
+    }
+
+    impl EnterpriseAuthorizer for DenyEnterprise {
+        fn authorize(
+            &self,
+            _: &PrincipalId,
+            resource: &EnterpriseResource,
+        ) -> Result<(), HostProblem> {
+            self.seen.lock().unwrap().push(resource.clone());
+            Err(HostProblem::Unauthorized)
+        }
+    }
+
     fn definition() -> ImsApplicationDefinition {
         ImsApplicationDefinition {
             databases: vec![ImsDatabaseDefinition {
@@ -1817,6 +1947,47 @@ mod tests {
             field: field.into(),
             value: value.to_vec(),
         }
+    }
+
+    #[test]
+    fn ims_database_denial_precedes_mutation() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let policy = Arc::new(DenyEnterprise::default());
+        let service =
+            ImsService::open_authorized(store, ImsLimits::default(), policy.clone()).unwrap();
+        service.install(definition()).unwrap();
+        let image = ImsLoadImage {
+            database: "AUTHDB".into(),
+            roots: vec![ImsLoadRoot {
+                data: b"ROOT01DATA".to_vec(),
+                children: Vec::new(),
+            }],
+        };
+        let denied = service.execute(
+            &invocation("deny-ims"),
+            &request(
+                ImsOperation::Load,
+                700,
+                &[],
+                &serde_json::to_vec(&image).unwrap(),
+                Vec::new(),
+            ),
+        );
+        assert_eq!(denied, Err(HostProblem::Unauthorized));
+        assert!(
+            service.lock().unwrap().state.databases["AUTHDB"]
+                .roots
+                .is_empty()
+        );
+        assert_eq!(
+            policy.seen.lock().unwrap().as_slice(),
+            &[EnterpriseResource::new(
+                EnterpriseResourceClass::ImsDatabase,
+                "AUTHDB",
+                AccessIntent::Update,
+            )
+            .unwrap()]
+        );
     }
 
     #[test]

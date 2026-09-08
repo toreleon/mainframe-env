@@ -11,9 +11,9 @@ use argon2::Argon2;
 use argon2::password_hash::{PasswordHasher, PasswordVerifier, phc::PasswordHash};
 use mainframe_env_execution_api::{CapabilityId, Invocation, InvocationLimits, PrincipalId};
 use mainframe_env_host_api::{
-    AccessIntent, AuditEvent, CapabilityDescriptor, EffectRequest, EffectResult, HostProblem,
-    HostProvider, HostRequest, HostResult, ResourceName, SecretRef, SecurityDecision,
-    SecurityRequest,
+    AccessIntent, AuditEvent, CapabilityDescriptor, EffectRequest, EffectResult,
+    EnterpriseAuthorizer, EnterpriseResource, HostProblem, HostProvider, HostRequest, HostResult,
+    ResourceName, SecretRef, SecurityDecision, SecurityRequest,
 };
 use mainframe_env_store_api::ProviderStateStore;
 use sha2::{Digest, Sha256};
@@ -204,6 +204,25 @@ impl SecretResolver for MemorySecretResolver {
             .get(reference.as_str())
             .ok_or(HostProblem::NotFound)?;
         ResolvedSecret::new(value.as_slice().to_vec())
+    }
+}
+
+impl EnterpriseAuthorizer for RacfService {
+    fn authorize(
+        &self,
+        principal: &PrincipalId,
+        resource: &EnterpriseResource,
+    ) -> Result<(), HostProblem> {
+        match RacfService::authorize(
+            self,
+            principal,
+            resource.class.saf_class(),
+            &resource.name,
+            resource.intent,
+        )? {
+            SecurityDecision::Allow => Ok(()),
+            _ => Err(HostProblem::Unauthorized),
+        }
     }
 }
 

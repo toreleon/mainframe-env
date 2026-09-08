@@ -10,7 +10,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:7937121853e33f5ba6a1469a60740de17b188f29a5b89c4f724dec9e693c5d14",
+      "sha256": "sha256:a0ab615b0d0e21da74f713c37aa30cfbc8c4b09fee2a64b731a5054fc90c0707",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -433,7 +433,7 @@
       "path": "docs/architecture/JES-EXECUTION.md",
       "relative_links": 0,
       "scope": "JES execution, scheduling, spool, and utility behavior",
-      "sha256": "sha256:92effd74484228c2db0a0154bcc8be2af527108817788af727a7f7ba7038d003",
+      "sha256": "sha256:9180b316068ad2f8f062009d51ac789332457c752002bc7ab9c8c8cf71ca276b",
       "status": "Normative from mainframe-env 0.8.0",
       "title": "JES execution, scheduling, spool, and utilities",
       "xtask_commands": 1
@@ -469,7 +469,7 @@
       "path": "docs/architecture/PLUGIN-AND-SECURITY.md",
       "relative_links": 0,
       "scope": "capability, provider, plugin, secret, and transport boundaries",
-      "sha256": "sha256:12654d01c310e049dd9690f0a98c32e7428245f002ef4f38fcb70885c919da6a",
+      "sha256": "sha256:4198a52a0304f12910e614592338594da446f8ed31b86b8987749ae61d1ae8d3",
       "status": "Accepted by repository owner",
       "title": "0.1 Security and Capability Architecture",
       "xtask_commands": 0

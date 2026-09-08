@@ -36,9 +36,9 @@ use mainframe_env_execution_api::{
 use mainframe_env_host_api::{
     AccessIntent, CapabilityDescriptor, CicsOperation, ClockRequest, DatasetAttributes,
     DatasetName, DatasetOrganization, DatasetRequest, DatasetResult, EffectRequest, EffectResult,
-    HostLimits, HostProblem, HostProvider, HostRequest, HostResult, MemberName, Mutation,
-    RecordFormat, RegistrySnapshot, ResourceName, ScopedHostService, SecretRef, SecurityDecision,
-    SessionId, TerminalRequest,
+    EnterpriseAuthorizer, HostLimits, HostProblem, HostProvider, HostRequest, HostResult,
+    MemberName, Mutation, RecordFormat, RegistrySnapshot, ResourceName, ScopedHostService,
+    SecretRef, SecurityDecision, SessionId, TerminalRequest,
 };
 use mainframe_env_ims::{ImsService, ims_providers};
 use mainframe_env_interpreter::{CoordinatorLimits, ExecutionCoordinator, ReferenceMachine};
@@ -320,7 +320,7 @@ const MAX_AUTH_SESSIONS_PER_USER: usize = 8;
 const AUTH_SESSION_ABSOLUTE_TTL_MILLIS: u64 = 8 * 60 * 60 * 1000;
 const AUTH_SESSION_IDLE_TTL_MILLIS: u64 = 30 * 60 * 1000;
 static NEXT_JES_WORKER_POOL: AtomicU64 = AtomicU64::new(1);
-const JES_ALLOWED_WORK_CAPABILITIES: [&str; 13] = [
+const JES_ALLOWED_WORK_CAPABILITIES: [&str; 15] = [
     "host.cics.execute",
     "host.clock",
     "host.dataset.read",
@@ -329,6 +329,8 @@ const JES_ALLOWED_WORK_CAPABILITIES: [&str; 13] = [
     "host.db2.write",
     "host.ims.read",
     "host.ims.write",
+    "host.mq.read",
+    "host.mq.write",
     "host.program.invoke",
     "host.security.authorize",
     "host.spool.read",
@@ -533,9 +535,22 @@ impl ProductServer {
         let provider_store: Arc<dyn ProviderStateStore> = store.clone();
         let racf = RacfService::open(provider_store.clone(), secrets.clone(), Default::default())?;
         let dataset = DatasetService::open(provider_store.clone(), Default::default())?;
-        let db2 = Db2Service::open(provider_store.clone(), Default::default())?;
-        let ims = ImsService::open(provider_store.clone(), Default::default())?;
-        let mq = MqService::open(provider_store.clone(), Default::default())?;
+        let enterprise_authorizer: Arc<dyn EnterpriseAuthorizer> = racf.clone();
+        let db2 = Db2Service::open_authorized(
+            provider_store.clone(),
+            Default::default(),
+            enterprise_authorizer.clone(),
+        )?;
+        let ims = ImsService::open_authorized(
+            provider_store.clone(),
+            Default::default(),
+            enterprise_authorizer.clone(),
+        )?;
+        let mq = MqService::open_authorized(
+            provider_store.clone(),
+            Default::default(),
+            enterprise_authorizer,
+        )?;
         let spool_artifacts: Arc<dyn ArtifactStore> = artifacts.clone();
         let spool =
             SpoolService::open(provider_store.clone(), spool_artifacts, Default::default())?;
@@ -1879,6 +1894,14 @@ impl ProductServer {
             ("JESJOBS", "JOB.**".into(), AccessIntent::Alter),
             ("FACILITY", "CONSOLE.**".into(), AccessIntent::Alter),
             ("TCICSTRN", "CICS.**".into(), AccessIntent::Execute),
+            ("DB2TABLE", "**".into(), AccessIntent::Alter),
+            ("DB2PLAN", "**".into(), AccessIntent::Control),
+            ("DB2UOW", "**".into(), AccessIntent::Control),
+            ("IMSPSB", "**".into(), AccessIntent::Execute),
+            ("IMSDB", "**".into(), AccessIntent::Alter),
+            ("IMSUOW", "**".into(), AccessIntent::Control),
+            ("MQQUEUE", "**".into(), AccessIntent::Alter),
+            ("MQUOW", "**".into(), AccessIntent::Control),
         ] {
             match self.racf.define_profile(class, &pattern, user, None) {
                 Ok(()) | Err(HostProblem::IdempotencyConflict) => {}
@@ -2711,8 +2734,10 @@ impl ProductServer {
                     .job_submission
                     .lock()
                     .map_err(|_| gateway_problem(HostProblem::InfrastructureFailure))?;
-                let capabilities = job_capabilities(&jcl);
                 let bundle = self.jcl_bundle(&principal, jcl)?;
+                let plan = self.batch.plan(&bundle).map_err(gateway_problem)?;
+                let capabilities =
+                    job_capabilities(self.store.as_ref(), &plan).map_err(gateway_problem)?;
                 let invocation = self
                     .invocation(
                         &principal,
@@ -5054,33 +5079,65 @@ fn wildcard(pattern: &str, value: &str) -> bool {
             .is_some_and(|prefix| value.starts_with(prefix))
 }
 
-fn job_capabilities(jcl: &[u8]) -> Vec<&'static str> {
-    let source = String::from_utf8_lossy(jcl).to_ascii_uppercase();
-    let mut capabilities = vec![
+fn job_capabilities(
+    store: &dyn ProviderStateStore,
+    plan: &mainframe_env_batch::JobPlan,
+) -> Result<Vec<&'static str>, HostProblem> {
+    let mut capabilities = BTreeSet::from([
         "host.security.authorize",
         "host.program.invoke",
         "host.spool.read",
         "host.spool.write",
-    ];
-    if source.contains("DSN=") || source.contains("DISP=") || source.contains("PGM=IDCAMS") {
+    ]);
+    if plan
+        .steps
+        .iter()
+        .flat_map(|step| &step.dds)
+        .any(|dd| dd.dataset.is_some())
+    {
         capabilities.extend(["host.dataset.read", "host.dataset.write"]);
     }
-    if source.contains("EXEC CICS") || source.contains("PGM=SDSF") {
-        capabilities.push("host.cics.execute");
+    for step in &plan.steps {
+        match step.program.as_str() {
+            "IDCAMS" => capabilities.extend(["host.dataset.read", "host.dataset.write"]),
+            "SDSF" => {
+                capabilities.extend([
+                    "host.cics.execute",
+                    "host.dataset.read",
+                    "host.dataset.write",
+                ]);
+            }
+            "IKJEFT01" => capabilities.extend(["host.db2.read", "host.db2.write"]),
+            "DFSRRC00" => capabilities.extend(["host.ims.read", "host.ims.write"]),
+            "COBOL" => extend_cobol_capabilities(&mut capabilities),
+            program => {
+                if store
+                    .get_provider_state("batch-program", program)
+                    .map_err(store_error)?
+                    .is_some()
+                {
+                    extend_cobol_capabilities(&mut capabilities);
+                }
+            }
+        }
     }
-    if source.contains("EXEC SQL") || source.contains("PGM=IKJEFT01") {
-        capabilities.extend(["host.db2.read", "host.db2.write"]);
-    }
-    if source.contains("EXEC DLI") || source.contains("PGM=DFSRRC00") {
-        capabilities.extend(["host.ims.read", "host.ims.write"]);
-    }
-    if source.contains("ASKTIME") || source.contains("FORMATTIME") {
-        capabilities.push("host.clock");
-    }
-    if source.contains("ACCEPT ") || source.contains("SYSIN") {
-        capabilities.push("host.terminal");
-    }
-    capabilities
+    Ok(capabilities.into_iter().collect())
+}
+
+fn extend_cobol_capabilities(capabilities: &mut BTreeSet<&'static str>) {
+    capabilities.extend([
+        "host.cics.execute",
+        "host.clock",
+        "host.dataset.read",
+        "host.dataset.write",
+        "host.db2.read",
+        "host.db2.write",
+        "host.ims.read",
+        "host.ims.write",
+        "host.mq.read",
+        "host.mq.write",
+        "host.terminal",
+    ]);
 }
 
 fn jcl_library_names(source: &str) -> Result<Vec<String>, HostProblem> {
@@ -5669,6 +5726,41 @@ mod tests {
             )),
             ..ServerConfig::default()
         }
+    }
+
+    #[test]
+    fn job_grants_come_from_the_verified_plan_not_comments_or_inline_data() {
+        let server = ProductServer::memory(config()).unwrap();
+        let inert = server
+            .batch
+            .plan(&JclBundle {
+                primary: "//SAFEJOB JOB CLASS=A\n//* PGM=DFSRRC00 EXEC SQL MQPUT\n//STEP1 EXEC PGM=IEFBR14\n//SYSIN DD *\nEXEC SQL DELETE FROM SECRET.TABLE; MQPUT\n/*\n".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        let grants = job_capabilities(server.store.as_ref(), &inert).unwrap();
+        for forbidden in [
+            "host.db2.read",
+            "host.db2.write",
+            "host.ims.read",
+            "host.ims.write",
+            "host.mq.read",
+            "host.mq.write",
+            "host.cics.execute",
+        ] {
+            assert!(!grants.contains(&forbidden), "unexpected grant {forbidden}");
+        }
+
+        let db2 = server
+            .batch
+            .plan(&JclBundle {
+                primary: "//DB2JOB JOB CLASS=A\n//STEP1 EXEC PGM=IKJEFT01\n".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        let grants = job_capabilities(server.store.as_ref(), &db2).unwrap();
+        assert!(grants.contains(&"host.db2.read"));
+        assert!(grants.contains(&"host.db2.write"));
     }
 
     fn worker_test_server(

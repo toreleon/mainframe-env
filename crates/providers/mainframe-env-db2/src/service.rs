@@ -6,8 +6,9 @@ use mainframe_env_execution_api::{
     CapabilityId, IdempotencyKey, Invocation, InvocationLimits, ServiceClass,
 };
 use mainframe_env_host_api::{
-    CapabilityDescriptor, Db2HostVariable, Db2Operation, Db2Request, Db2Result, Db2Row,
-    EffectRequest, EffectResult, HostProblem, HostProvider, HostRequest, HostResult,
+    AccessIntent, CapabilityDescriptor, Db2HostVariable, Db2Operation, Db2Request, Db2Result,
+    Db2Row, EffectRequest, EffectResult, EnterpriseAuthorizer, EnterpriseResource,
+    EnterpriseResourceClass, HostProblem, HostProvider, HostRequest, HostResult,
     canonical_db2_request_digest,
 };
 use mainframe_env_store_api::{
@@ -233,6 +234,7 @@ pub struct Db2Service {
     store: Arc<dyn ProviderStateStore>,
     limits: Db2Limits,
     durable: Mutex<DurableState>,
+    authorizer: Option<Arc<dyn EnterpriseAuthorizer>>,
 }
 
 impl Db2Service {
@@ -240,11 +242,28 @@ impl Db2Service {
         store: Arc<dyn ProviderStateStore>,
         limits: Db2Limits,
     ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_inner(store, limits, None)
+    }
+
+    pub fn open_authorized(
+        store: Arc<dyn ProviderStateStore>,
+        limits: Db2Limits,
+        authorizer: Arc<dyn EnterpriseAuthorizer>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_inner(store, limits, Some(authorizer))
+    }
+
+    fn open_inner(
+        store: Arc<dyn ProviderStateStore>,
+        limits: Db2Limits,
+        authorizer: Option<Arc<dyn EnterpriseAuthorizer>>,
+    ) -> Result<Arc<Self>, HostProblem> {
         let (state, versions) = load_or_migrate(&*store, limits)?;
         Ok(Arc::new(Self {
             store,
             limits,
             durable: Mutex::new(DurableState { versions, state }),
+            authorizer,
         }))
     }
 
@@ -362,6 +381,11 @@ impl Db2Service {
         request: &Db2Request,
     ) -> Result<Db2Result, HostProblem> {
         let mut durable = self.lock()?;
+        if let Some(authorizer) = &self.authorizer {
+            for resource in db2_resources(&durable.state, invocation, request, self.limits)? {
+                authorizer.authorize(invocation.principal.id(), &resource)?;
+            }
+        }
         let request_sha256 = request_digest(request)?;
         let replay_key = request
             .mutation
@@ -1311,6 +1335,97 @@ fn apply_request(
         Db2Operation::Rollback => rollback(state, run),
         Db2Operation::Extract => extract(state, run, request, limits),
     }
+}
+
+fn db2_resources(
+    state: &State,
+    invocation: &Invocation,
+    request: &Db2Request,
+    limits: Db2Limits,
+) -> Result<Vec<EnterpriseResource>, HostProblem> {
+    let run = invocation.run_unit_id.as_str();
+    let intent = if request.operation.is_mutating() {
+        AccessIntent::Update
+    } else {
+        AccessIntent::Read
+    };
+    let mut tables = BTreeSet::new();
+    match request.operation {
+        Db2Operation::ExecuteScript => {
+            tables.extend(
+                parse_create_tables(&request.statement, limits)?
+                    .into_iter()
+                    .map(|definition| definition.normalized_name()),
+            );
+            let words = sql_words(&request.statement);
+            for pair in words.windows(2) {
+                if pair[0].eq_ignore_ascii_case("INTO") {
+                    tables.insert(pair[1].trim_matches('"').to_ascii_uppercase());
+                }
+            }
+        }
+        Db2Operation::FreePlans => {
+            return Ok(vec![EnterpriseResource::new(
+                EnterpriseResourceClass::Db2Plan,
+                "ALL",
+                AccessIntent::Control,
+            )?]);
+        }
+        Db2Operation::Select | Db2Operation::Count | Db2Operation::Extract => {
+            if request
+                .statement
+                .to_ascii_uppercase()
+                .split_whitespace()
+                .eq(["SELECT", "1"])
+            {
+                tables.insert("SYSIBM.SYSDUMMY1".into());
+            } else {
+                tables.insert(table_for_operation(&request.statement, "FROM")?);
+            }
+        }
+        Db2Operation::Insert => {
+            tables.insert(table_for_operation(&request.statement, "INTO")?);
+        }
+        Db2Operation::Update => {
+            tables.insert(table_for_operation(&request.statement, "UPDATE")?);
+        }
+        Db2Operation::Delete => {
+            tables.insert(table_for_operation(&request.statement, "FROM")?);
+        }
+        Db2Operation::DeclareCursor => {
+            tables.insert(table_for_operation(&request.statement, "FROM")?);
+        }
+        Db2Operation::OpenCursor | Db2Operation::FetchCursor | Db2Operation::CloseCursor => {
+            let statement = if request.statement.to_ascii_uppercase().contains(" FROM ") {
+                Some(request.statement.as_str())
+            } else {
+                request.cursor.as_deref().and_then(|cursor| {
+                    state
+                        .cursor_declarations
+                        .get(&cursor_key(run, cursor))
+                        .map(String::as_str)
+                })
+            }
+            .ok_or(HostProblem::Malformed)?;
+            tables.insert(table_for_operation(statement, "FROM")?);
+        }
+        Db2Operation::Commit | Db2Operation::Rollback => {
+            if let Some(pending) = state.pending.get(run) {
+                tables.extend(pending.tables.keys().cloned());
+            }
+        }
+    }
+    if tables.is_empty() {
+        return Ok(vec![EnterpriseResource::new(
+            EnterpriseResourceClass::Db2UnitOfWork,
+            "CURRENT",
+            AccessIntent::Update,
+        )?]);
+    }
+    tables
+        .into_iter()
+        .map(|table| EnterpriseResource::new(EnterpriseResourceClass::Db2Table, table, intent))
+        .collect()
 }
 
 fn execute_script(
@@ -3062,6 +3177,22 @@ mod tests {
     use mainframe_env_store::{MemoryStore, SqliteStateStore};
     use std::collections::BTreeSet;
 
+    #[derive(Default)]
+    struct DenyEnterprise {
+        seen: Mutex<Vec<EnterpriseResource>>,
+    }
+
+    impl EnterpriseAuthorizer for DenyEnterprise {
+        fn authorize(
+            &self,
+            _: &PrincipalId,
+            resource: &EnterpriseResource,
+        ) -> Result<(), HostProblem> {
+            self.seen.lock().unwrap().push(resource.clone());
+            Err(HostProblem::Unauthorized)
+        }
+    }
+
     fn invocation(run: &str) -> Invocation {
         let limits = InvocationLimits::default();
         Invocation::new(
@@ -3117,6 +3248,38 @@ mod tests {
             max_rows: 64,
             mutation,
         }
+    }
+
+    #[test]
+    fn db2_table_denial_precedes_mutation() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let policy = Arc::new(DenyEnterprise::default());
+        let service =
+            Db2Service::open_authorized(store, Db2Limits::default(), policy.clone()).unwrap();
+        service.install_catalog(installed_catalog(1)).unwrap();
+        let denied = service.execute(
+            &invocation("deny-db2"),
+            &request(
+                Db2Operation::Insert,
+                700,
+                "INSERT INTO APP.CODE",
+                BTreeMap::from([
+                    ("CODE".into(), variable("70")),
+                    ("DESCRIPTION".into(), varchar_variable("DENIED")),
+                ]),
+            ),
+        );
+        assert_eq!(denied, Err(HostProblem::Unauthorized));
+        assert_eq!(service.table_rows("APP.CODE").unwrap().len(), 1);
+        assert_eq!(
+            policy.seen.lock().unwrap().as_slice(),
+            &[EnterpriseResource::new(
+                EnterpriseResourceClass::Db2Table,
+                "APP.CODE",
+                AccessIntent::Update,
+            )
+            .unwrap()]
+        );
     }
 
     fn retain_as_legacy_replay(
