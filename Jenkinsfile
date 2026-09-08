@@ -68,8 +68,10 @@ pipeline {
         stage('Checkout') {
             steps {
                 deleteDir()
-                sh 'mkdir -p "$TMPDIR"'
                 checkout scm
+                // Git checkout may clean untracked paths, including the build temp
+                // directory when it lives below WORKSPACE. Recreate it afterwards.
+                sh 'mkdir -p "$TMPDIR"'
                 sh '''#!/bin/bash
                     set -euo pipefail
                     if [[ "$RUN_MODE" == release && -n "$RELEASE_TAG" ]]; then
