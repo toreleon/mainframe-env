@@ -104,6 +104,7 @@ class SelectionTests(unittest.TestCase):
             'postgres-move',
             'postgres-effect',
             'postgres-atomic-invariants',
+            'postgres-work-leases',
             'postgres-durable',
             'postgres-carddemo-restart',
         ])

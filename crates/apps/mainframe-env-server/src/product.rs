@@ -2157,6 +2157,7 @@ impl ProductServer {
                         cancellation_requested: false,
                         worker_id: None,
                         lease_id: None,
+                        lease_epoch: 0,
                         lease_expiry_tick: None,
                         heartbeat_tick: None,
                         checkpoint_id: None,
@@ -2176,7 +2177,9 @@ impl ProductServer {
                         .lease_id
                         .as_deref()
                         .ok_or_else(|| gateway_problem(HostProblem::InfrastructureFailure))?;
-                    let _ = self.store.release(&claimed.work_id, lease, 2);
+                    let _ = self
+                        .store
+                        .release(&claimed.work_id, lease, claimed.lease_epoch, 1, 2);
                     return Err(gateway_problem(HostProblem::InfrastructureFailure));
                 }
                 let lease = claimed
@@ -2184,13 +2187,13 @@ impl ProductServer {
                     .clone()
                     .ok_or_else(|| gateway_problem(HostProblem::InfrastructureFailure))?;
                 self.store
-                    .heartbeat(&work_id, &lease, 2, 10)
+                    .heartbeat(&work_id, &lease, claimed.lease_epoch, 2, 10)
                     .map_err(store_error)
                     .map_err(gateway_problem)?;
                 match self.batch.run_next(&invocation, false) {
                     Ok(result) => {
                         self.store
-                            .complete(&work_id, &lease)
+                            .complete(&work_id, &lease, claimed.lease_epoch, 2)
                             .map_err(store_error)
                             .map_err(gateway_problem)?;
                         if result.is_none() {
@@ -2198,7 +2201,9 @@ impl ProductServer {
                         }
                     }
                     Err(problem) => {
-                        let _ = self.store.dead_letter(&work_id, &lease);
+                        let _ = self
+                            .store
+                            .dead_letter(&work_id, &lease, claimed.lease_epoch, 2);
                         return Err(gateway_problem(problem));
                     }
                 }

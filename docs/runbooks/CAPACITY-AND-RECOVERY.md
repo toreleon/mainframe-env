@@ -8,7 +8,8 @@ grows automatically.
 
 After process failure, reopen the store at migration head
 `0001-durable-state`. Running JES work returns to queued state until its attempt
-limit, expired work leases are reclaimable with a higher attempt, suspended
+limit, expired work leases are reclaimable only with a higher durable fencing
+epoch, and queued work at its deadline moves directly to dead letter. Suspended
 CICS sessions stay suspended, and incomplete effect intents remain explicit
 unknown outcomes. Local wakeups are reconstructible by scanning authoritative
 work rows. Dead-letter work requires an operator decision; it is never treated

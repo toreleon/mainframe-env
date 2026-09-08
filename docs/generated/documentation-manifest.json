@@ -10,7 +10,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:fc5fa88bf36fcb1fb792153e3de5f70f9ee8d48beba1955ac9e9f775b8874ec2",
+      "sha256": "sha256:591db24825e72ccd20ca72344fef6a98f880e23d52b1f8cad7b1a0a180051145",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -401,7 +401,7 @@
       "path": "docs/architecture/EXECUTION-AND-DURABILITY.md",
       "relative_links": 0,
       "scope": "execution lifecycle, effects, work, checkpoints, and durability",
-      "sha256": "sha256:9ae063c030a85244340dccf685921da4669991948279aac39e2791eff5d77bf7",
+      "sha256": "sha256:6b174521255e025d87502135e931e32c58ffbcd789b8c4013df0fb28b98d29cb",
       "status": "Accepted by repository owner",
       "title": "Execution and Durability Architecture",
       "xtask_commands": 0
@@ -1318,7 +1318,7 @@
       "normative": false,
       "path": "docs/runbooks/CAPACITY-AND-RECOVERY.md",
       "relative_links": 0,
-      "sha256": "sha256:096921895ab88e4f1502822adeb480cfbafe5f63a7ed31a4cfaff7050e26ac20",
+      "sha256": "sha256:5a41ff944c5910cbca6ddb892d7a8125668913374dd9f77be0c49bde0e39fa14",
       "title": "Capacity and recovery",
       "xtask_commands": 0
     },
@@ -1342,7 +1342,7 @@
       "normative": false,
       "path": "docs/runbooks/JENKINS-LOCAL.md",
       "relative_links": 1,
-      "sha256": "sha256:d5e99d674252befc9fecf5d76691f35e8143c390f59a12f79c00f149b345bb18",
+      "sha256": "sha256:cbee934562d87229a5be16f06de2a47cf40430de48f4bb8cc920d8ece99338e2",
       "title": "Local Jenkins CI",
       "xtask_commands": 0
     },

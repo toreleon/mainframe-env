@@ -33,6 +33,8 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Fenced every work-lease transition by a monotonic epoch and observed clock,
+  clamped leases to deadlines, and prevented expired queued work from running.
 - Made the offline Cargo archive reproducible twice in one digest-pinned GNU
   tar environment and made local and GitHub release assets immutable by digest.
 - Bounded and zeroized transient authentication secrets, randomized and

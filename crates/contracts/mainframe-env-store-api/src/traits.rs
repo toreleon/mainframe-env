@@ -40,6 +40,7 @@ pub trait WorkStore: Send + Sync {
         &self,
         work_id: &str,
         lease_id: &str,
+        lease_epoch: u64,
         now_tick: u64,
         lease_ticks: u64,
     ) -> Result<WorkRecord, StoreError>;
@@ -47,11 +48,25 @@ pub trait WorkStore: Send + Sync {
         &self,
         work_id: &str,
         lease_id: &str,
+        lease_epoch: u64,
+        now_tick: u64,
         available_tick: u64,
     ) -> Result<WorkRecord, StoreError>;
     fn request_cancellation(&self, work_id: &str) -> Result<WorkRecord, StoreError>;
-    fn dead_letter(&self, work_id: &str, lease_id: &str) -> Result<WorkRecord, StoreError>;
-    fn complete(&self, work_id: &str, lease_id: &str) -> Result<(), StoreError>;
+    fn dead_letter(
+        &self,
+        work_id: &str,
+        lease_id: &str,
+        lease_epoch: u64,
+        now_tick: u64,
+    ) -> Result<WorkRecord, StoreError>;
+    fn complete(
+        &self,
+        work_id: &str,
+        lease_id: &str,
+        lease_epoch: u64,
+        now_tick: u64,
+    ) -> Result<(), StoreError>;
 }
 
 pub trait OutboxStore: Send + Sync {

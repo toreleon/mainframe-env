@@ -248,10 +248,15 @@ impl WorkStore for MemoryStore {
     fn enqueue(&self, work: WorkRecord) -> Result<(), StoreError> {
         if work.work_id.is_empty()
             || work.attempt != 0
+            || work.lease_epoch != 0
             || work.max_attempts == 0
             || work.deadline_tick == 0
             || work.required_generation.is_empty()
             || work.state != WorkState::Queued
+            || work.worker_id.is_some()
+            || work.lease_id.is_some()
+            || work.lease_expiry_tick.is_some()
+            || work.heartbeat_tick.is_some()
             || work.payload.len() > self.limits.max_blob_bytes
         {
             return Err(StoreError::InvalidTransition);
@@ -280,9 +285,10 @@ impl WorkStore for MemoryStore {
         let mut state = self.lock()?;
         for work in state.work.values_mut() {
             if work.state == WorkState::Claimed
-                && work
+                && (work
                     .lease_expiry_tick
-                    .is_some_and(|expiry| expiry <= now_tick)
+                    .is_none_or(|expiry| expiry <= now_tick)
+                    || work.deadline_tick <= now_tick)
             {
                 work.state = if work.cancellation_requested {
                     WorkState::Cancelled
@@ -292,23 +298,31 @@ impl WorkStore for MemoryStore {
                     WorkState::Queued
                 };
                 clear_lease(work);
+            } else if work.state == WorkState::Queued && work.deadline_tick <= now_tick {
+                work.state = WorkState::DeadLetter;
+                clear_lease(work);
             }
         }
-        let Some(work) = state
-            .work
-            .values_mut()
-            .find(|work| work.state == WorkState::Queued && work.available_tick <= now_tick)
-        else {
+        let Some(work) = state.work.values_mut().find(|work| {
+            work.state == WorkState::Queued
+                && work.available_tick <= now_tick
+                && work.deadline_tick > now_tick
+        }) else {
             return Ok(None);
         };
         work.attempt = work.attempt.checked_add(1).ok_or(StoreError::Conflict)?;
+        work.lease_epoch = work
+            .lease_epoch
+            .checked_add(1)
+            .ok_or(StoreError::Conflict)?;
         work.state = WorkState::Claimed;
         work.worker_id = Some(worker.into());
-        work.lease_id = Some(format!("{worker}:{}", work.attempt));
+        work.lease_id = Some(format!("{worker}:{}", work.lease_epoch));
         work.lease_expiry_tick = Some(
             now_tick
                 .checked_add(lease_ticks)
-                .ok_or(StoreError::Conflict)?,
+                .ok_or(StoreError::Conflict)?
+                .min(work.deadline_tick),
         );
         work.heartbeat_tick = Some(now_tick);
         Ok(Some(work.clone()))
@@ -318,6 +332,7 @@ impl WorkStore for MemoryStore {
         &self,
         work_id: &str,
         lease_id: &str,
+        lease_epoch: u64,
         now_tick: u64,
         lease_ticks: u64,
     ) -> Result<WorkRecord, StoreError> {
@@ -326,19 +341,13 @@ impl WorkStore for MemoryStore {
         }
         let mut state = self.lock()?;
         let work = state.work.get_mut(work_id).ok_or(StoreError::NotFound)?;
-        if work.state != WorkState::Claimed
-            || work.lease_id.as_deref() != Some(lease_id)
-            || work
-                .lease_expiry_tick
-                .is_none_or(|expiry| expiry <= now_tick)
-        {
-            return Err(StoreError::LeaseConflict);
-        }
+        valid_lease(work, lease_id, lease_epoch, now_tick)?;
         work.heartbeat_tick = Some(now_tick);
         work.lease_expiry_tick = Some(
             now_tick
                 .checked_add(lease_ticks)
-                .ok_or(StoreError::LeaseConflict)?,
+                .ok_or(StoreError::LeaseConflict)?
+                .min(work.deadline_tick),
         );
         Ok(work.clone())
     }
@@ -347,14 +356,16 @@ impl WorkStore for MemoryStore {
         &self,
         work_id: &str,
         lease_id: &str,
+        lease_epoch: u64,
+        now_tick: u64,
         available_tick: u64,
     ) -> Result<WorkRecord, StoreError> {
         let mut state = self.lock()?;
         let work = state.work.get_mut(work_id).ok_or(StoreError::NotFound)?;
-        valid_lease(work, lease_id)?;
+        valid_lease(work, lease_id, lease_epoch, now_tick)?;
         work.state = if work.cancellation_requested {
             WorkState::Cancelled
-        } else if work.attempt >= work.max_attempts {
+        } else if work.attempt >= work.max_attempts || available_tick >= work.deadline_tick {
             WorkState::DeadLetter
         } else {
             WorkState::Queued
@@ -374,27 +385,53 @@ impl WorkStore for MemoryStore {
         Ok(work.clone())
     }
 
-    fn dead_letter(&self, work_id: &str, lease_id: &str) -> Result<WorkRecord, StoreError> {
+    fn dead_letter(
+        &self,
+        work_id: &str,
+        lease_id: &str,
+        lease_epoch: u64,
+        now_tick: u64,
+    ) -> Result<WorkRecord, StoreError> {
         let mut state = self.lock()?;
         let work = state.work.get_mut(work_id).ok_or(StoreError::NotFound)?;
-        valid_lease(work, lease_id)?;
+        valid_lease(work, lease_id, lease_epoch, now_tick)?;
         work.state = WorkState::DeadLetter;
         clear_lease(work);
         Ok(work.clone())
     }
 
-    fn complete(&self, work_id: &str, lease_id: &str) -> Result<(), StoreError> {
+    fn complete(
+        &self,
+        work_id: &str,
+        lease_id: &str,
+        lease_epoch: u64,
+        now_tick: u64,
+    ) -> Result<(), StoreError> {
         let mut state = self.lock()?;
         let work = state.work.get_mut(work_id).ok_or(StoreError::NotFound)?;
-        valid_lease(work, lease_id)?;
+        valid_lease(work, lease_id, lease_epoch, now_tick)?;
         work.state = WorkState::Completed;
         clear_lease(work);
         Ok(())
     }
 }
 
-fn valid_lease(work: &WorkRecord, lease_id: &str) -> Result<(), StoreError> {
-    if work.state == WorkState::Claimed && work.lease_id.as_deref() == Some(lease_id) {
+fn valid_lease(
+    work: &WorkRecord,
+    lease_id: &str,
+    lease_epoch: u64,
+    now_tick: u64,
+) -> Result<(), StoreError> {
+    if work.state == WorkState::Claimed
+        && lease_epoch != 0
+        && work.lease_epoch == lease_epoch
+        && work.lease_id.as_deref() == Some(lease_id)
+        && work
+            .lease_expiry_tick
+            .is_some_and(|expiry| expiry > now_tick)
+        && work.deadline_tick > now_tick
+        && work.heartbeat_tick.is_some_and(|tick| tick <= now_tick)
+    {
         Ok(())
     } else {
         Err(StoreError::LeaseConflict)
@@ -993,6 +1030,7 @@ mod tests {
                 cancellation_requested: false,
                 worker_id: None,
                 lease_id: None,
+                lease_epoch: 0,
                 lease_expiry_tick: None,
                 heartbeat_tick: None,
                 checkpoint_id: None,
@@ -1003,6 +1041,24 @@ mod tests {
         let first = store.claim("worker", 1, 1).unwrap().unwrap();
         let second = store.claim("worker", 2, 1).unwrap().unwrap();
         assert_eq!((first.attempt, second.attempt), (1, 2));
+        assert_eq!((first.lease_epoch, second.lease_epoch), (1, 2));
+        assert_eq!(
+            store.complete(
+                "work-1",
+                first.lease_id.as_deref().unwrap(),
+                first.lease_epoch,
+                2,
+            ),
+            Err(StoreError::LeaseConflict)
+        );
+        store
+            .complete(
+                "work-1",
+                second.lease_id.as_deref().unwrap(),
+                second.lease_epoch,
+                2,
+            )
+            .unwrap();
     }
 
     #[test]
@@ -1024,6 +1080,7 @@ mod tests {
                 cancellation_requested: false,
                 worker_id: None,
                 lease_id: None,
+                lease_epoch: 0,
                 lease_expiry_tick: None,
                 heartbeat_tick: None,
                 checkpoint_id: None,
@@ -1032,12 +1089,17 @@ mod tests {
             })
             .unwrap();
         let claimed = store.claim("worker", 1, 2).unwrap().unwrap();
-        let lease = claimed.lease_id.unwrap();
-        let heartbeat = store.heartbeat("bounded-work", &lease, 2, 10).unwrap();
+        let lease = claimed.lease_id.as_deref().unwrap();
+        let heartbeat = store
+            .heartbeat("bounded-work", lease, claimed.lease_epoch, 2, 10)
+            .unwrap();
         assert_eq!(heartbeat.heartbeat_tick, Some(2));
         assert!(store.claim("other", 3, 1).unwrap().is_none());
         assert_eq!(
-            store.release("bounded-work", &lease, 4).unwrap().state,
+            store
+                .release("bounded-work", lease, claimed.lease_epoch, 3, 4)
+                .unwrap()
+                .state,
             WorkState::DeadLetter
         );
     }

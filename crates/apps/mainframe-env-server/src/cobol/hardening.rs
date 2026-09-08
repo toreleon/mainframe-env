@@ -590,6 +590,7 @@ fn queued_control_work(inv: &Invocation, id: &str) -> mainframe_env_store_api::W
         cancellation_requested: false,
         worker_id: None,
         lease_id: None,
+        lease_epoch: 0,
         lease_expiry_tick: None,
         heartbeat_tick: None,
         checkpoint_id: None,

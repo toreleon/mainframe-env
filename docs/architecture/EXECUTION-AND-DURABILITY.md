@@ -171,7 +171,7 @@ Work claims use row state containing:
 ```text
 work ID and execution ID
 required selector and generation
-lease ID and worker ID
+lease ID, worker ID, and monotonic fencing epoch
 lease expiry and heartbeat
 monotonic attempt
 deadline and cancellation
@@ -183,6 +183,11 @@ terminal/dead-letter policy
 `FOR UPDATE SKIP LOCKED` may be used to select queue-like candidates, but the
 lease columns and state machine define ownership. A database row lock is not a
 durable lease and is not held while program code or user input waits.
+Queued work at or beyond its deadline is moved directly to dead letter and is
+never returned to a worker. Every heartbeat, release, completion, and explicit
+dead-letter transition supplies the observed clock and fencing epoch; the
+store's compare-and-swap transaction rejects expired, superseded, or
+clock-regressed owners. Lease expiry is clamped to the work deadline.
 
 State transition, current projection, effect record, and outbox notification
 are committed in one transaction where they share an authority boundary.
@@ -225,6 +230,8 @@ function; it is never silently coerced.
 - Dispatch is at least once.
 - A work item has at most one valid, unexpired owner lease according to the
   durable state machine.
+- A stale fencing epoch cannot heartbeat, release, complete, or dead-letter a
+  later claim, even when the same worker name is reused.
 - Lease expiry does not prove a side effect did not occur.
 - Mutating host services provide idempotency, a transaction, or an explicit
   non-retryable/unknown-outcome policy.

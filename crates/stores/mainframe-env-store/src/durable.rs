@@ -135,9 +135,14 @@ macro_rules! durable_implementations {
                 if work.work_id.is_empty()
                     || work.state != WorkState::Queued
                     || work.attempt != 0
+                    || work.lease_epoch != 0
                     || work.max_attempts == 0
                     || work.deadline_tick == 0
                     || work.required_generation.is_empty()
+                    || work.worker_id.is_some()
+                    || work.lease_id.is_some()
+                    || work.lease_expiry_tick.is_some()
+                    || work.heartbeat_tick.is_some()
                 {
                     return Err(StoreError::InvalidTransition);
                 }
@@ -157,61 +162,110 @@ macro_rules! durable_implementations {
                 if worker.is_empty() || lease_ticks == 0 {
                     return Err(StoreError::LeaseConflict);
                 }
-                for row in self.list_provider_state("durable-work", 65536)? {
-                    let mut work = decode_work(&row.payload)?;
-                    if work.state == WorkState::Claimed
-                        && work
-                            .lease_expiry_tick
-                            .is_some_and(|expiry| expiry <= now_tick)
-                    {
-                        work.state = if work.cancellation_requested {
-                            WorkState::Cancelled
-                        } else if work.attempt >= work.max_attempts
-                            || work.deadline_tick <= now_tick
+                for _ in 0..4 {
+                    let mut retry_scan = false;
+                    for row in self.list_provider_state("durable-work", 65536)? {
+                        let mut work = decode_work(&row.payload)?;
+                        if work.state == WorkState::Claimed
+                            && (work
+                                .lease_expiry_tick
+                                .is_none_or(|expiry| expiry <= now_tick)
+                                || work.deadline_tick <= now_tick)
                         {
-                            WorkState::DeadLetter
-                        } else {
-                            WorkState::Queued
-                        };
-                        work.worker_id = None;
-                        work.lease_id = None;
-                        work.lease_expiry_tick = None;
-                        work.heartbeat_tick = None;
-                        self.put_provider_state(
-                            state_record(
-                                "durable-work",
-                                &work.work_id,
-                                row.version + 1,
-                                encode_work(&work)?,
-                            ),
-                            Some(row.version),
-                        )?;
-                        continue;
-                    }
-                    if work.state == WorkState::Queued && work.available_tick <= now_tick {
-                        work.attempt = work.attempt.checked_add(1).ok_or(StoreError::Conflict)?;
-                        work.state = WorkState::Claimed;
-                        work.worker_id = Some(worker.into());
-                        work.lease_id = Some(format!("{worker}:{}", work.attempt));
-                        work.lease_expiry_tick = Some(
-                            now_tick
-                                .checked_add(lease_ticks)
-                                .ok_or(StoreError::Conflict)?,
-                        );
-                        work.heartbeat_tick = Some(now_tick);
-                        match self.put_provider_state(
-                            state_record(
-                                "durable-work",
-                                &work.work_id,
-                                row.version + 1,
-                                encode_work(&work)?,
-                            ),
-                            Some(row.version),
-                        ) {
-                            Ok(()) => return Ok(Some(work)),
-                            Err(StoreError::Conflict) => continue,
-                            Err(error) => return Err(error),
+                            work.state = if work.cancellation_requested {
+                                WorkState::Cancelled
+                            } else if work.attempt >= work.max_attempts
+                                || work.deadline_tick <= now_tick
+                            {
+                                WorkState::DeadLetter
+                            } else {
+                                WorkState::Queued
+                            };
+                            work.worker_id = None;
+                            work.lease_id = None;
+                            work.lease_expiry_tick = None;
+                            work.heartbeat_tick = None;
+                            match self.put_provider_state(
+                                state_record(
+                                    "durable-work",
+                                    &work.work_id,
+                                    row.version + 1,
+                                    encode_work(&work)?,
+                                ),
+                                Some(row.version),
+                            ) {
+                                Ok(()) if work.state == WorkState::Queued => {
+                                    retry_scan = true;
+                                    break;
+                                }
+                                Ok(()) => continue,
+                                Err(StoreError::Conflict) => {
+                                    retry_scan = true;
+                                    break;
+                                }
+                                Err(error) => return Err(error),
+                            }
                         }
+                        if work.state == WorkState::Queued && work.deadline_tick <= now_tick {
+                            work.state = WorkState::DeadLetter;
+                            clear_lease(&mut work);
+                            match self.put_provider_state(
+                                state_record(
+                                    "durable-work",
+                                    &work.work_id,
+                                    row.version + 1,
+                                    encode_work(&work)?,
+                                ),
+                                Some(row.version),
+                            ) {
+                                Ok(()) => continue,
+                                Err(StoreError::Conflict) => {
+                                    retry_scan = true;
+                                    break;
+                                }
+                                Err(error) => return Err(error),
+                            }
+                        }
+                        if work.state == WorkState::Queued
+                            && work.available_tick <= now_tick
+                            && work.deadline_tick > now_tick
+                        {
+                            work.attempt =
+                                work.attempt.checked_add(1).ok_or(StoreError::Conflict)?;
+                            work.lease_epoch = work
+                                .lease_epoch
+                                .checked_add(1)
+                                .ok_or(StoreError::Conflict)?;
+                            work.state = WorkState::Claimed;
+                            work.worker_id = Some(worker.into());
+                            work.lease_id = Some(format!("{worker}:{}", work.lease_epoch));
+                            work.lease_expiry_tick = Some(
+                                now_tick
+                                    .checked_add(lease_ticks)
+                                    .ok_or(StoreError::Conflict)?
+                                    .min(work.deadline_tick),
+                            );
+                            work.heartbeat_tick = Some(now_tick);
+                            match self.put_provider_state(
+                                state_record(
+                                    "durable-work",
+                                    &work.work_id,
+                                    row.version + 1,
+                                    encode_work(&work)?,
+                                ),
+                                Some(row.version),
+                            ) {
+                                Ok(()) => return Ok(Some(work)),
+                                Err(StoreError::Conflict) => {
+                                    retry_scan = true;
+                                    break;
+                                }
+                                Err(error) => return Err(error),
+                            }
+                        }
+                    }
+                    if !retry_scan {
+                        return Ok(None);
                     }
                 }
                 Ok(None)
@@ -221,6 +275,7 @@ macro_rules! durable_implementations {
                 &self,
                 work_id: &str,
                 lease_id: &str,
+                lease_epoch: u64,
                 now_tick: u64,
                 lease_ticks: u64,
             ) -> Result<WorkRecord, StoreError> {
@@ -231,19 +286,13 @@ macro_rules! durable_implementations {
                     .get_provider_state("durable-work", work_id)?
                     .ok_or(StoreError::NotFound)?;
                 let mut work = decode_work(&row.payload)?;
-                if work.state != WorkState::Claimed
-                    || work.lease_id.as_deref() != Some(lease_id)
-                    || work
-                        .lease_expiry_tick
-                        .is_none_or(|expiry| expiry <= now_tick)
-                {
-                    return Err(StoreError::LeaseConflict);
-                }
+                valid_lease(&work, lease_id, lease_epoch, now_tick)?;
                 work.heartbeat_tick = Some(now_tick);
                 work.lease_expiry_tick = Some(
                     now_tick
                         .checked_add(lease_ticks)
-                        .ok_or(StoreError::LeaseConflict)?,
+                        .ok_or(StoreError::LeaseConflict)?
+                        .min(work.deadline_tick),
                 );
                 self.put_provider_state(
                     state_record(
@@ -261,16 +310,19 @@ macro_rules! durable_implementations {
                 &self,
                 work_id: &str,
                 lease_id: &str,
+                lease_epoch: u64,
+                now_tick: u64,
                 available_tick: u64,
             ) -> Result<WorkRecord, StoreError> {
                 let row = self
                     .get_provider_state("durable-work", work_id)?
                     .ok_or(StoreError::NotFound)?;
                 let mut work = decode_work(&row.payload)?;
-                valid_lease(&work, lease_id)?;
+                valid_lease(&work, lease_id, lease_epoch, now_tick)?;
                 work.state = if work.cancellation_requested {
                     WorkState::Cancelled
-                } else if work.attempt >= work.max_attempts {
+                } else if work.attempt >= work.max_attempts || available_tick >= work.deadline_tick
+                {
                     WorkState::DeadLetter
                 } else {
                     WorkState::Queued
@@ -310,12 +362,18 @@ macro_rules! durable_implementations {
                 Ok(work)
             }
 
-            fn dead_letter(&self, work_id: &str, lease_id: &str) -> Result<WorkRecord, StoreError> {
+            fn dead_letter(
+                &self,
+                work_id: &str,
+                lease_id: &str,
+                lease_epoch: u64,
+                now_tick: u64,
+            ) -> Result<WorkRecord, StoreError> {
                 let row = self
                     .get_provider_state("durable-work", work_id)?
                     .ok_or(StoreError::NotFound)?;
                 let mut work = decode_work(&row.payload)?;
-                valid_lease(&work, lease_id)?;
+                valid_lease(&work, lease_id, lease_epoch, now_tick)?;
                 work.state = WorkState::DeadLetter;
                 clear_lease(&mut work);
                 self.put_provider_state(
@@ -330,12 +388,18 @@ macro_rules! durable_implementations {
                 Ok(work)
             }
 
-            fn complete(&self, work_id: &str, lease_id: &str) -> Result<(), StoreError> {
+            fn complete(
+                &self,
+                work_id: &str,
+                lease_id: &str,
+                lease_epoch: u64,
+                now_tick: u64,
+            ) -> Result<(), StoreError> {
                 let row = self
                     .get_provider_state("durable-work", work_id)?
                     .ok_or(StoreError::NotFound)?;
                 let mut work = decode_work(&row.payload)?;
-                valid_lease(&work, lease_id)?;
+                valid_lease(&work, lease_id, lease_epoch, now_tick)?;
                 work.state = WorkState::Completed;
                 clear_lease(&mut work);
                 self.put_provider_state(
@@ -1006,19 +1070,26 @@ fn event_kind_back(value: &str) -> Result<LifecycleEventKind, StoreError> {
 
 fn encode_work(work: &WorkRecord) -> Result<Vec<u8>, StoreError> {
     encode(
-        json!({"schema":1,"id":work.work_id,"execution":work.execution_id.as_str(),
+        json!({"schema":2,"id":work.work_id,"execution":work.execution_id.as_str(),
         "selector":work.required_selector.as_str(),"generation":work.required_generation,
         "artifact":work.artifact.as_str(),"state":work_state(work.state),"attempt":work.attempt,
         "max_attempts":work.max_attempts,"available":work.available_tick,"deadline":work.deadline_tick,
         "cancel":work.cancellation_requested,"worker":work.worker_id,"lease":work.lease_id,
+        "lease_epoch":work.lease_epoch,
         "expiry":work.lease_expiry_tick,"heartbeat":work.heartbeat_tick,
         "checkpoint":work.checkpoint_id,"effect":work.effect_sequence,"payload":binary(&work.payload)}),
     )
 }
 fn decode_work(bytes: &[u8]) -> Result<WorkRecord, StoreError> {
     let value = decode(bytes)?;
+    let schema = number(&value, "schema")?;
+    if !matches!(schema, 1 | 2) {
+        return Err(StoreError::IncompatibleVersion);
+    }
     let limits = InvocationLimits::default();
-    Ok(WorkRecord {
+    let attempt =
+        u32::try_from(number(&value, "attempt")?).map_err(|_| StoreError::IncompatibleVersion)?;
+    let work = WorkRecord {
         work_id: string(&value, "id")?.into(),
         execution_id: ExecutionId::new(string(&value, "execution")?, limits)
             .map_err(|_| StoreError::IncompatibleVersion)?,
@@ -1028,8 +1099,7 @@ fn decode_work(bytes: &[u8]) -> Result<WorkRecord, StoreError> {
         artifact: ArtifactRef::new(string(&value, "artifact")?, limits)
             .map_err(|_| StoreError::IncompatibleVersion)?,
         state: work_state_back(string(&value, "state")?)?,
-        attempt: u32::try_from(number(&value, "attempt")?)
-            .map_err(|_| StoreError::IncompatibleVersion)?,
+        attempt,
         max_attempts: u32::try_from(number(&value, "max_attempts")?)
             .map_err(|_| StoreError::IncompatibleVersion)?,
         available_tick: number(&value, "available")?,
@@ -1040,12 +1110,50 @@ fn decode_work(bytes: &[u8]) -> Result<WorkRecord, StoreError> {
             .ok_or(StoreError::IncompatibleVersion)?,
         worker_id: optional_string(&value, "worker")?,
         lease_id: optional_string(&value, "lease")?,
+        lease_epoch: if schema == 1 {
+            u64::from(attempt)
+        } else {
+            number(&value, "lease_epoch")?
+        },
         lease_expiry_tick: value.get("expiry").and_then(Value::as_u64),
         heartbeat_tick: value.get("heartbeat").and_then(Value::as_u64),
         checkpoint_id: optional_string(&value, "checkpoint")?,
         effect_sequence: number(&value, "effect")?,
         payload: binary_back(string(&value, "payload")?)?,
-    })
+    };
+    let expected_lease = work
+        .worker_id
+        .as_ref()
+        .map(|worker| format!("{worker}:{}", work.lease_epoch));
+    if work.work_id.is_empty()
+        || work.required_generation.is_empty()
+        || work.max_attempts == 0
+        || work.attempt > work.max_attempts
+        || work.deadline_tick == 0
+        || work.worker_id.as_ref().is_some_and(String::is_empty)
+        || work.lease_epoch != u64::from(work.attempt)
+        || (work.state == WorkState::Claimed
+            && (work.lease_epoch == 0
+                || work.worker_id.is_none()
+                || work.lease_id.as_ref() != expected_lease.as_ref()
+                || work.lease_expiry_tick.is_none()
+                || work.heartbeat_tick.is_none()
+                || work
+                    .lease_expiry_tick
+                    .is_some_and(|expiry| expiry > work.deadline_tick)
+                || work
+                    .heartbeat_tick
+                    .zip(work.lease_expiry_tick)
+                    .is_none_or(|(heartbeat, expiry)| heartbeat >= expiry)))
+        || (work.state != WorkState::Claimed
+            && (work.worker_id.is_some()
+                || work.lease_id.is_some()
+                || work.lease_expiry_tick.is_some()
+                || work.heartbeat_tick.is_some()))
+    {
+        return Err(StoreError::IncompatibleVersion);
+    }
+    Ok(work)
 }
 fn work_state(value: WorkState) -> &'static str {
     match value {
@@ -1295,8 +1403,22 @@ fn decode_outbox(bytes: &[u8], version: u64) -> Result<OutboxRecord, StoreError>
     })
 }
 
-fn valid_lease(work: &WorkRecord, lease_id: &str) -> Result<(), StoreError> {
-    if work.state == WorkState::Claimed && work.lease_id.as_deref() == Some(lease_id) {
+fn valid_lease(
+    work: &WorkRecord,
+    lease_id: &str,
+    lease_epoch: u64,
+    now_tick: u64,
+) -> Result<(), StoreError> {
+    if work.state == WorkState::Claimed
+        && lease_epoch != 0
+        && work.lease_epoch == lease_epoch
+        && work.lease_id.as_deref() == Some(lease_id)
+        && work
+            .lease_expiry_tick
+            .is_some_and(|expiry| expiry > now_tick)
+        && work.deadline_tick > now_tick
+        && work.heartbeat_tick.is_some_and(|tick| tick <= now_tick)
+    {
         Ok(())
     } else {
         Err(StoreError::LeaseConflict)
@@ -1370,6 +1492,7 @@ mod tests {
                     cancellation_requested: false,
                     worker_id: None,
                     lease_id: None,
+                    lease_epoch: 0,
                     lease_expiry_tick: None,
                     heartbeat_tick: None,
                     checkpoint_id: None,

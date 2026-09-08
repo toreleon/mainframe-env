@@ -85,6 +85,7 @@ pub struct WorkRecord {
     pub cancellation_requested: bool,
     pub worker_id: Option<String>,
     pub lease_id: Option<String>,
+    pub lease_epoch: u64,
     pub lease_expiry_tick: Option<u64>,
     pub heartbeat_tick: Option<u64>,
     pub checkpoint_id: Option<String>,

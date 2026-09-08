@@ -33,7 +33,7 @@ postgres_share() {
   printf '%s\n' "$share"
 }
 
-gates=(postgres-move postgres-effect postgres-atomic-invariants postgres-durable postgres-carddemo-restart)
+gates=(postgres-move postgres-effect postgres-atomic-invariants postgres-work-leases postgres-durable postgres-carddemo-restart)
 
 [[ "$action" == run || "$action" == smoke || "$action" == check || "$action" == cleanup \
   || "$action" == list ]] || { echo "usage: $0 [run|smoke|check|cleanup|list]" >&2; exit 2; }
@@ -124,6 +124,10 @@ for gate in "${gates[@]}"; do
     postgres-atomic-invariants)
       command=(cargo test --locked -p mainframe-env-store --test atomic_invariants_contract \
         postgres_atomic_invariants_contract -- --ignored --exact)
+      ;;
+    postgres-work-leases)
+      command=(cargo test --locked -p mainframe-env-store --test work_lease_contract \
+        postgres_work_deadlines_and_fencing_contract -- --ignored --exact)
       ;;
     postgres-durable)
       command=(cargo test --locked -p mainframe-env-store --lib \
