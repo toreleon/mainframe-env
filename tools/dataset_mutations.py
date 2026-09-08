@@ -102,6 +102,15 @@ COBOL_MOVE_EXPECTED_TESTS = {
 }
 COBOL_MOVE_MUTATIONS = (
     Mutation(
+        'cobol-reject-edited-truncation',
+        'Restore the pre-edit overflow guard so a numeric-edited MOVE errors instead of truncating',
+        'if layout.digits > 0\n'
+        '        && digits.len() > layout.digits\n'
+        '        && layout.category != LayoutCategory::NumericEdited\n'
+        '    {',
+        'if layout.digits > 0 && digits.len() > layout.digits {',
+    ),
+    Mutation(
         'cobol-ignore-floating-capacity',
         'Treat every floating-sign position as a numeric digit and lose the reviewed truncation boundary',
         'if floating_sign.is_some() {\n        let numeric_capacity = layout',

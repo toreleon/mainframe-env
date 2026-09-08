@@ -11339,7 +11339,10 @@ fn decode_binary_integer(bytes: &[u8]) -> Result<i128, MachineProblem> {
 
 fn encode_decimal(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, MachineProblem> {
     let digits = value.coefficient.unsigned_abs().to_string();
-    if layout.digits > 0 && digits.len() > layout.digits {
+    if layout.digits > 0
+        && digits.len() > layout.digits
+        && layout.category != LayoutCategory::NumericEdited
+    {
         return Err(MachineProblem::SizeError);
     }
     match layout.category {
@@ -11451,8 +11454,13 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
         // symbols are numeric positions. A leading placeholder lets the
         // existing picture walk consume that reserved insertion position.
         digits.insert(0, '0');
-    } else if digits.len() < layout.digits {
-        digits = format!("{}{}", "0".repeat(layout.digits - digits.len()), digits);
+    } else {
+        if digits.len() > layout.digits {
+            digits = digits[digits.len() - layout.digits..].to_string();
+        }
+        if digits.len() < layout.digits {
+            digits = format!("{}{}", "0".repeat(layout.digits - digits.len()), digits);
+        }
     }
     let mut digit_index = 0usize;
     let mut output = Vec::with_capacity(layout.length);
@@ -13476,6 +13484,16 @@ mod tests {
                 &layout,
                 Decimal {
                     coefficient: 99_999,
+                    scale: 0,
+                }
+            ),
+            Ok(b" 9999".to_vec())
+        );
+        assert_eq!(
+            encode_decimal(
+                &layout,
+                Decimal {
+                    coefficient: 999_999,
                     scale: 0,
                 }
             ),

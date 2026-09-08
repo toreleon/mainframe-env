@@ -1180,7 +1180,9 @@ fn check_cobol_move_pilot_inputs(root: &Path, spec: &CompiledSpec) -> TaskResult
     require(
         candidate_rules == reviewed
             && fixture["row_id"] == "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0026"
-            && fixture["expected_output_hex"] == "20203130300a202d3931310a20202020300a20393939390a"
+            && fixture["scope"]["values"] == json!([100, -911, 0, 99999, 999999])
+            && fixture["expected_output_hex"]
+                == "20203130300a202d3931310a20202020300a20393939390a20393939390a"
             && fixture["expectation_authority"]["kind"] == "maintainer-reviewed-golden"
             && fixture["expectation_authority"]["independent_control"]["observed_output_hex"]
                 == fixture["expected_output_hex"]
@@ -1916,6 +1918,16 @@ fn check_cobol_statement_bindings(
             Some("0029" | "0030" | "0031" | "0032" | "0034" | "0036" | "0044")
         ) {
             expected_obligations.insert("checkpoint-restart");
+        }
+        if row
+            .row_id()
+            .as_str()
+            .ends_with(":procedure-statements:0026")
+            && spec
+                .cases()
+                .any(|case| case.test_id().as_str() == "cobol.numeric-move.bytes.executed")
+        {
+            expected_obligations.insert("numeric-move-bytes");
         }
         if matches!(
             row.row_id().as_str().rsplit(':').next(),

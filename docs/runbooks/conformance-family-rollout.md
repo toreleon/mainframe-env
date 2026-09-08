@@ -11,7 +11,8 @@ route already exists. Record exact sender/receiver shapes, compiler options,
 environment, positive/negative/boundary values and exclusions. For the exercised
 proof this is the existing MOVE statement row, a signed `S9(9) COMP-5` sender,
 a `PIC ----9` numeric-edited receiver, default compiler options, and values 100,
--911, 0 and the five-digit truncation probe 99999. MOVE CORRESPONDING, group moves, decimal fractions,
+-911, 0, the five-digit capacity probe 99999, and the six-digit overflow-guard
+probe 999999. MOVE CORRESPONDING, group moves, decimal fractions,
 overflow, national/UTF-8, other editing pictures and licensed differential work
 remain outside this subset.
 
@@ -81,18 +82,20 @@ cargo test -p mainframe-env-conformance \
 ```
 
 The command was exercised locally. The positive, negative-sign, zero/padding
-and truncation-boundary values produce exact independent bytes. `99999` moved
-to `PIC ----9` yields space plus `9999`, matching the pinned IBM capacity rule
-and an external GnuCOBOL control. A comparator perturbation that removes the
-negative sign fails.
+and truncation-boundary values produce exact independent bytes. Both `99999`
+and `999999` moved to `PIC ----9` yield space plus `9999`, matching the pinned
+IBM capacity rule and an external GnuCOBOL control. The six-digit value also
+proves numeric-edited MOVE bypasses the pre-edit overflow error and truncates.
+A comparator perturbation that removes the negative sign fails.
 
 ## 6. Prove product adequacy
 
 Extend the existing disposable source-copy mutation campaign; do not create a
 new receipt family. Run the unchanged normal case against a product-source
-mutant. The MOVE campaign separately removes the reserved floating insertion
-position and suppresses the floating-minus output; the unchanged exact-byte
-case must kill both. Compile errors, empty test selection, timeouts or
+mutant. The MOVE campaign separately restores the invalid pre-edit overflow
+error, removes the reserved floating insertion position, and suppresses the
+floating-minus output; the unchanged exact-byte case must kill all three.
+Compile errors, empty test selection, timeouts or
 harness failures receive no kill credit.
 
 ## 7. Select appropriate CI tiers
@@ -120,7 +123,7 @@ and all exclusions; never describe this MOVE subset as whole-language coverage.
   observation binding, verdict/cache/ledger identity, Jenkins selector and source-copy
   mutation envelope.
 - Family-specific: six-topic source closure, eight compile rules, one
-  numeric-edited byte observation, one fixture, and two product mutants.
+  numeric-edited byte observation, one fixture, and three product mutants.
 - New generic primitives: none; the reviewed-rule identity already required by
   the CICS pilot is reused.
 - Unsupported/conflicting fragments: zero/zero in the selected MOVE corpus.
