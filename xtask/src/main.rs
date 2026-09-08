@@ -8750,9 +8750,47 @@ fn check_coverage(root: &Path) -> TaskResult {
     check_coverage_ledger(root, &index)?;
     topic_manifests::check(root)?;
     check_publication_bytes(root)?;
+    check_probe_record_figures(root)?;
     check_coverage_work_package_evidence(root)?;
     check_coverage_program_status(root)?;
     check_workload_ledger_consistency(root)
+}
+
+/// The probe record's numbers, against the artifacts they are drawn from.
+///
+/// `docs/research/publication-source-probe.md` went stale in five consecutive
+/// waves of this work, every time the same way: a change moved a count, the
+/// record had been written before it landed, and nobody diffs prose. Four
+/// hand-corrections each fixed the waves behind them and nothing about the next
+/// one. `report_probe_figures.py --check` ends that by recomputing every figure
+/// the record cites -- each carries a `<!--f:key-->` marker naming the figure --
+/// out of the committed catalogs, manifests, projections and ledger, and failing
+/// when a cited number and its artifact disagree.
+///
+/// It runs here because a checker nothing invokes is a checker that measures
+/// whether someone remembered. It is offline by construction: it reads only
+/// committed files and asks IBM nothing, which is what makes it a gate rather
+/// than a review activity. The guard is the same shape as the canonical effect
+/// encoding one above -- shell out, require success -- because the figures are
+/// derived by the same Python that derives the artifacts, and reimplementing
+/// that derivation in Rust would give two answers to check against each other
+/// rather than one answer to check the record against.
+fn check_probe_record_figures(root: &Path) -> TaskResult {
+    let checker = root.join("conformance/tools/report_probe_figures.py");
+    if !checker.is_file() {
+        return Ok(());
+    }
+    let status = Command::new("python3")
+        .arg("-B")
+        .arg(&checker)
+        .arg("--check")
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("probe record figure check: {error}"))?;
+    require(
+        status.success(),
+        "the probe record cites a figure its artifact does not produce",
+    )
 }
 
 /// The two markers IBM's content endpoint stamps into every body it serves.
