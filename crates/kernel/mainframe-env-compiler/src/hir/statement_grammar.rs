@@ -846,8 +846,10 @@ impl<'a> GrammarParser<'a> {
     }
 
     fn at_simple_stop(&self, kind: StatementKind, start: usize, index: usize) -> bool {
-        let json_suppression_when = kind == StatementKind::JsonGenerate
-            && self.tokens[index].is("WHEN")
+        let generate_suppression_when = matches!(
+            kind,
+            StatementKind::JsonGenerate | StatementKind::XmlGenerate
+        ) && self.tokens[index].is("WHEN")
             && self.tokens[start..index]
                 .iter()
                 .any(|token| token.is("SUPPRESS"))
@@ -871,7 +873,7 @@ impl<'a> GrammarParser<'a> {
             || self.at_terminator_at(kind, index)
             || self.at_any_terminator_at(index)
             || self.tokens[index].is("ELSE")
-            || (self.tokens[index].is("WHEN") && !json_suppression_when)
+            || (self.tokens[index].is("WHEN") && !generate_suppression_when)
     }
 
     fn is_label(&self) -> bool {
@@ -1369,8 +1371,9 @@ fn validate_simple_header(kind: StatementKind, tokens: &[Token<'_>]) -> Result<(
         StatementKind::Initialize => validate_initialize(tokens),
         StatementKind::Inspect => validate_inspect(tokens),
         StatementKind::Invoke => validate_call_like(tokens, true),
-        StatementKind::JsonGenerate | StatementKind::XmlGenerate => validate_generate(tokens),
+        StatementKind::JsonGenerate => validate_json_generate(tokens),
         StatementKind::JsonParse => validate_json_parse(tokens),
+        StatementKind::XmlGenerate => validate_xml_generate(tokens),
         StatementKind::XmlParse => validate_xml_parse(tokens),
         StatementKind::Merge => validate_sort_merge(tokens, false),
         StatementKind::Move => validate_move(tokens),
@@ -1921,7 +1924,7 @@ fn validate_inspect_positions(cursor: &mut Cursor<'_>) -> Result<(), &'static st
     Ok(())
 }
 
-fn validate_generate(tokens: &[Token<'_>]) -> Result<(), &'static str> {
+fn validate_json_generate(tokens: &[Token<'_>]) -> Result<(), &'static str> {
     let mut cursor = Cursor::new(tokens, 2);
     cursor.operand()?;
     cursor.expect("FROM")?;
@@ -1939,6 +1942,167 @@ fn validate_generate(tokens: &[Token<'_>]) -> Result<(), &'static str> {
     validate_json_suppress(&mut cursor, false)?;
     validate_json_converting(&mut cursor, false)?;
     cursor.finish()
+}
+
+/// The one XML GENERATE format published by the pinned Enterprise COBOL 6.5
+/// topic. Although JSON GENERATE has a superficially similar prefix, XML's
+/// railroad makes IN, WITH, IS and OF optional noise words and does not publish
+/// JSON's INDICATING or CONVERTING phrases.
+fn validate_xml_generate(tokens: &[Token<'_>]) -> Result<(), &'static str> {
+    let mut cursor = Cursor::new(tokens, 2);
+    cursor.operand()?;
+    cursor.expect("FROM")?;
+    cursor.operand()?;
+
+    if cursor.eat("COUNT") {
+        if cursor.at_any(&["BYTES", "CHARACTERS"]) {
+            return Err("XML GENERATE COUNT does not accept a JSON unit");
+        }
+        cursor.eat("IN");
+        cursor.operand()?;
+    }
+    validate_xml_with_phrases(&mut cursor)?;
+    validate_xml_namespace(&mut cursor)?;
+    validate_xml_names(&mut cursor)?;
+    validate_xml_types(&mut cursor)?;
+    validate_xml_suppress(&mut cursor)?;
+    cursor.finish()
+}
+
+fn validate_xml_with_phrases(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
+    let mut last_rank = 0u8;
+    loop {
+        let has_with = cursor.eat("WITH");
+        let rank = if cursor.eat("ENCODING") {
+            cursor.atom()?;
+            1
+        } else if cursor.eat("XML-DECLARATION") {
+            2
+        } else if cursor.eat("ATTRIBUTES") {
+            3
+        } else if !has_with {
+            break;
+        } else {
+            return Err("WITH requires ENCODING, XML-DECLARATION, or ATTRIBUTES");
+        };
+        if rank <= last_rank {
+            return Err("duplicate or reordered XML GENERATE WITH phrase");
+        }
+        last_rank = rank;
+    }
+    Ok(())
+}
+
+fn validate_xml_namespace(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
+    if !cursor.eat("NAMESPACE") {
+        return Ok(());
+    }
+    cursor.eat("IS");
+    cursor.operand()?;
+    if cursor.eat("NAMESPACE-PREFIX") {
+        cursor.eat("IS");
+        cursor.operand()?;
+    }
+    Ok(())
+}
+
+fn validate_xml_names(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
+    if !cursor.eat("NAME") {
+        return Ok(());
+    }
+    cursor.eat("OF");
+    let mut count = 0usize;
+    while !cursor.done() && !cursor.at_any(&["TYPE", "SUPPRESS"]) {
+        cursor.operand()?;
+        cursor.eat("IS");
+        cursor.literal()?;
+        count += 1;
+    }
+    (count > 0)
+        .then_some(())
+        .ok_or("NAME requires a data item and replacement")
+}
+
+fn validate_xml_types(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
+    if !cursor.eat("TYPE") {
+        return Ok(());
+    }
+    cursor.eat("OF");
+    let mut count = 0usize;
+    while !cursor.done() && !cursor.at("SUPPRESS") {
+        cursor.operand()?;
+        cursor.eat("IS");
+        if !(cursor.eat("ATTRIBUTE") || cursor.eat("ELEMENT") || cursor.eat("CONTENT")) {
+            return Err("TYPE requires ATTRIBUTE, ELEMENT, or CONTENT");
+        }
+        count += 1;
+    }
+    (count > 0)
+        .then_some(())
+        .ok_or("TYPE requires a data item and XML role")
+}
+
+fn validate_xml_suppress(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
+    if !cursor.eat("SUPPRESS") {
+        return Ok(());
+    }
+    let mut count = 0usize;
+    while !cursor.done() {
+        if cursor.at("WHEN") {
+            validate_xml_when(cursor)?;
+        } else if cursor.eat("EVERY") {
+            if cursor.eat("NUMERIC") || cursor.eat("NONNUMERIC") {
+                let _ = cursor.eat("ATTRIBUTE")
+                    || cursor.eat("ELEMENT")
+                    || cursor.eat("CONTENT");
+            } else if !(cursor.eat("ATTRIBUTE")
+                || cursor.eat("ELEMENT")
+                || cursor.eat("CONTENT"))
+            {
+                return Err("EVERY requires an XML class or role");
+            }
+            validate_xml_when(cursor)?;
+        } else if cursor.at_any(&["NUMERIC", "NONNUMERIC", "ATTRIBUTE", "ELEMENT", "CONTENT"])
+        {
+            return Err("generic XML suppression keywords require EVERY");
+        } else {
+            cursor.operand()?;
+            if cursor.at("WHEN") {
+                validate_xml_when(cursor)?;
+            }
+        }
+        count += 1;
+    }
+    (count > 0)
+        .then_some(())
+        .ok_or("SUPPRESS requires a data item or generic suppression phrase")
+}
+
+fn validate_xml_when(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
+    cursor.expect("WHEN")?;
+    validate_xml_suppression_value(cursor)?;
+    while cursor.eat("OR") {
+        validate_xml_suppression_value(cursor)?;
+    }
+    Ok(())
+}
+
+fn validate_xml_suppression_value(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
+    [
+        "SPACE",
+        "SPACES",
+        "ZERO",
+        "ZEROES",
+        "ZEROS",
+        "LOW-VALUE",
+        "LOW-VALUES",
+        "HIGH-VALUE",
+        "HIGH-VALUES",
+    ]
+    .iter()
+    .any(|value| cursor.eat(value))
+    .then_some(())
+    .ok_or("XML GENERATE WHEN requires a figurative constant")
 }
 
 fn validate_json_parse(tokens: &[Token<'_>]) -> Result<(), &'static str> {
@@ -2011,7 +2175,7 @@ fn validate_json_ignoring(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
     Ok(())
 }
 
-/// The words that open a phrase of the statement `validate_generate` and
+/// The words that open a phrase of the statement `validate_json_generate` and
 /// `validate_json_parse` read, in the order those rows' forms draw them.
 ///
 /// A repeating phrase has to know where the next phrase starts, and the answer
@@ -3075,9 +3239,13 @@ mod reserved_word_scope {
         for statement in [
             "XML GENERATE OUT FROM SRC.",
             "XML GENERATE OUT FROM SRC COUNT IN N.",
-            "XML GENERATE OUT FROM SRC ENCODING CP.",
+            "XML GENERATE OUT FROM SRC WITH ENCODING CP.",
+            "XML GENERATE OUT FROM SRC WITH XML-DECLARATION.",
+            "XML GENERATE OUT FROM SRC WITH ATTRIBUTES.",
+            "XML GENERATE OUT FROM SRC NAMESPACE IS NS NAMESPACE-PREFIX IS NSP.",
             "XML GENERATE OUT FROM SRC NAME OF A IS 'x'.",
             "XML GENERATE OUT FROM SRC NAME A IS 'x' B IS 'y'.",
+            "XML GENERATE OUT FROM SRC TYPE OF A IS ATTRIBUTE B IS ELEMENT C IS CONTENT.",
             "XML GENERATE OUT FROM SRC SUPPRESS A.",
             "XML PARSE DOC PROCESSING PROCEDURE P.",
             "XML PARSE DOC PROCESSING PROCEDURE P THROUGH Q.",
@@ -3137,11 +3305,6 @@ mod reserved_word_scope {
         // `validate_read`, `validate_start` or `validate_exit`, and putting the
         // word back in the union would not close one of them.
         for statement in [
-            "XML GENERATE OUT FROM SRC WITH ENCODING CP.",
-            "XML GENERATE OUT FROM SRC WITH XML-DECLARATION.",
-            "XML GENERATE OUT FROM SRC WITH ATTRIBUTES.",
-            "XML GENERATE OUT FROM SRC NAMESPACE IS NSP.",
-            "XML GENERATE OUT FROM SRC TYPE T IS ATTRIBUTE.",
             "XML PARSE DOC WITH ENCODING CP PROCESSING PROCEDURE P.",
             "XML PARSE DOC RETURNING NATIONAL PROCESSING PROCEDURE P.",
             "XML PARSE DOC VALIDATING WITH SCH PROCESSING PROCEDURE P.",
@@ -3387,24 +3550,29 @@ mod statement_scoped_phrases {
         // and `IGNORING` are context-sensitive, `ENCODING` and `INDICATING` are
         // in neither list -- so outside these statements they are data-names,
         // and the test below still passes them through INSPECT and COMPUTE.
-        // Inside a JSON GENERATE, JSON PARSE or XML GENERATE they now end the
-        // `NAME` and `SUPPRESS` lists wherever they stand, which means they can
-        // no longer be operands of those lists. Twenty such statements were
-        // accepted before this commit. The alternative is to keep swallowing an
-        // out-of-order phrase, and the reference draws the phrase.
+        // Inside a JSON GENERATE or JSON PARSE they now end the `NAME` and
+        // `SUPPRESS` lists wherever they stand, which means they can no longer
+        // be operands of those lists. XML GENERATE has its own phrase set and
+        // can use these nonreserved words as identifiers in its SUPPRESS list.
+        // The alternative for JSON is to keep swallowing an out-of-order
+        // phrase, and the reference draws the phrase.
         for word in ["ENCODING", "IGNORING", "INDICATING", "NAME"] {
             for statement in [
                 format!("JSON GENERATE OUT FROM SRC SUPPRESS {word}."),
                 format!("JSON GENERATE OUT FROM SRC SUPPRESS A {word}."),
                 format!("JSON GENERATE OUT FROM SRC NAME {word} IS 'x'."),
                 format!("JSON PARSE SRCJ INTO OUT SUPPRESS {word}."),
-                format!("XML GENERATE OUT FROM SRC SUPPRESS {word}."),
             ] {
                 assert!(
                     parse(&statement, 32).is_err(),
                     "{statement} reads {word} as an operand of the phrase it opens"
                 );
             }
+            let statement = format!("XML GENERATE OUT FROM SRC SUPPRESS {word}.");
+            assert!(
+                parse(&statement, 32).is_ok(),
+                "{statement} uses the nonreserved word as XML's identifier-8"
+            );
         }
         // The other twenty words the appendix omits are unaffected here.
         for word in OMITTED_FROM_THE_APPENDIX
@@ -3510,41 +3678,87 @@ mod statement_scoped_phrases {
     }
 
     #[test]
-    fn xml_generate_is_still_read_with_json_generates_phrases() {
-        // Not a defect this commit repairs, and not one any wave moved:
-        // `classify` sends both JSON GENERATE and XML GENERATE to
-        // `validate_generate` (`statement_grammar.rs`, the `StatementKind::
-        // JsonGenerate | StatementKind::XmlGenerate` arm), which implements
-        // JSON GENERATE's form. So XML GENERATE accepts JSON's bare `ENCODING`
-        // -- the XML row draws `WITH ENCODING` -- and JSON's `INDICATING` and
-        // `CONVERTING`, which the XML row does not draw at all, while none of
-        // XML GENERATE's own `WITH XML-DECLARATION`, `WITH ATTRIBUTES`,
-        // `NAMESPACE` or `TYPE ... IS ATTRIBUTE` phrases is implemented.
-        // Scoping a keyword read cannot reach that; it needs XML GENERATE to
-        // get a validator of its own, against its own row. This test is the
-        // record, and the day that validator is written it is what has to be
-        // deleted.
+    fn xml_generate_reads_its_own_published_phrases() {
+        // The pinned 6.5 topic gives XML GENERATE one Format. These examples
+        // cover the five phrases called out by the publication audit, plus the
+        // XML spelling of ENCODING and one statement that composes the format.
         for statement in [
+            "XML GENERATE OUT FROM SRC WITH XML-DECLARATION.",
+            "XML GENERATE OUT FROM SRC XML-DECLARATION.",
+            "XML GENERATE OUT FROM SRC WITH ATTRIBUTES.",
+            "XML GENERATE OUT FROM SRC ATTRIBUTES.",
+            "XML GENERATE OUT FROM SRC NAMESPACE IS NS.",
+            "XML GENERATE OUT FROM SRC NAMESPACE IS NS NAMESPACE-PREFIX IS NSP.",
+            "XML GENERATE OUT FROM SRC TYPE A IS ATTRIBUTE.",
+            "XML GENERATE OUT FROM SRC WITH ENCODING CP.",
             "XML GENERATE OUT FROM SRC ENCODING CP.",
+            "XML GENERATE OUT FROM SRC COUNT N.",
+            "XML GENERATE OUT FROM SRC SUPPRESS WHEN ZERO.",
+            "XML GENERATE OUT FROM SRC SUPPRESS EVERY ATTRIBUTE WHEN SPACES.",
+            "XML GENERATE OUT FROM SRC COUNT IN N WITH ENCODING CP WITH XML-DECLARATION WITH ATTRIBUTES NAMESPACE IS NS NAMESPACE-PREFIX IS NSP NAME OF A IS 'a' B IS 'b' TYPE OF A IS ATTRIBUTE B IS ELEMENT C IS CONTENT SUPPRESS A WHEN SPACES EVERY NUMERIC WHEN ZERO.",
+        ] {
+            assert!(
+                parse(statement, 32).is_ok(),
+                "{statement} is drawn by XML GENERATE's pinned Format"
+            );
+        }
+    }
+
+    #[test]
+    fn xml_generate_refuses_json_generates_bare_phrases() {
+        // This used to assert the opposite. XML GENERATE no longer borrows
+        // JSON GENERATE's validator. The pinned XML format has no INDICATING
+        // or CONVERTING phrase. Its railroad diagram places WITH on a bypass
+        // rail, so bare ENCODING is valid XML too; the original audit finding
+        // was wrong about that one spelling.
+        for statement in [
             "XML GENERATE OUT FROM SRC INDICATING A IS JSON NULL USING X IN B.",
             "XML GENERATE OUT FROM SRC CONVERTING A TO JSON NULL USING SPACE.",
         ] {
             assert!(
-                parse(statement, 32).is_ok(),
-                "{statement} is refused now, so XML GENERATE has stopped borrowing JSON's form"
+                parse(statement, 32).is_err(),
+                "{statement} belongs to JSON GENERATE, not XML GENERATE"
             );
         }
         for statement in [
-            "XML GENERATE OUT FROM SRC WITH ENCODING CP.",
-            "XML GENERATE OUT FROM SRC WITH XML-DECLARATION.",
-            "XML GENERATE OUT FROM SRC WITH ATTRIBUTES.",
-            "XML GENERATE OUT FROM SRC NAMESPACE IS NSP.",
-            "XML GENERATE OUT FROM SRC TYPE T IS ATTRIBUTE.",
+            "XML GENERATE OUT FROM SRC COUNT BYTES IN N.",
+            "XML GENERATE OUT FROM SRC NAMESPACE-PREFIX IS NSP.",
+            "XML GENERATE OUT FROM SRC NAME A IS OMITTED.",
+            "XML GENERATE OUT FROM SRC TYPE A IS BOOLEAN.",
+            "XML GENERATE OUT FROM SRC WITH ATTRIBUTES WITH XML-DECLARATION.",
+            "XML GENERATE OUT FROM SRC WITH XML-DECLARATION WITH XML-DECLARATION.",
+            "XML GENERATE OUT FROM SRC SUPPRESS NUMERIC WHEN ZERO.",
+            "XML GENERATE OUT FROM SRC SUPPRESS ATTRIBUTE WHEN ZERO.",
+            "XML GENERATE OUT FROM SRC SUPPRESS EVERY WHEN ZERO.",
         ] {
             assert!(
                 parse(statement, 32).is_err(),
-                "{statement} parses now, so XML GENERATE has gained its own phrases"
+                "{statement} is not drawn by XML GENERATE's pinned Format"
             );
+        }
+    }
+
+    #[test]
+    fn json_generate_keeps_every_implemented_phrase() {
+        // Splitting the validators must not narrow JSON GENERATE. This is the
+        // complete set of phrase shapes implemented by its dedicated reader.
+        for statement in [
+            "JSON GENERATE OUT FROM SRC.",
+            "JSON GENERATE OUT FROM SRC COUNT IN N.",
+            "JSON GENERATE OUT FROM SRC COUNT BYTES IN N.",
+            "JSON GENERATE OUT FROM SRC COUNT CHARACTERS IN N.",
+            "JSON GENERATE OUT FROM SRC INDICATING A IS JSON NULL USING X IN B ALSO C IS JSON NULL USING Y IN D.",
+            "JSON GENERATE OUT FROM SRC ENCODING CP.",
+            "JSON GENERATE OUT FROM SRC ENCODING FROM CODEPAGE.",
+            "JSON GENERATE OUT FROM SRC NAME OF A IS 'x'.",
+            "JSON GENERATE OUT FROM SRC NAME OF A IS OMITTED.",
+            "JSON GENERATE OUT FROM SRC SUPPRESS A WHEN SPACES OR ZERO.",
+            "JSON GENERATE OUT FROM SRC SUPPRESS EVERY NUMERIC WHEN ZERO.",
+            "JSON GENERATE OUT FROM SRC SUPPRESS EVERY NONNUMERIC WHEN SPACES.",
+            "JSON GENERATE OUT FROM SRC CONVERTING A TO JSON NULL USING SPACE ALSO B TO JSON BOOLEAN USING Y.",
+            "JSON GENERATE OUT FROM SRC COUNT IN N ENCODING CP NAME A IS 'x' SUPPRESS B CONVERTING C TO JSON BOOL USING Y.",
+        ] {
+            assert!(parse(statement, 32).is_ok(), "{statement} should parse");
         }
     }
 
