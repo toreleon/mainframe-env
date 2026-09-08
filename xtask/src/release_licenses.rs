@@ -23,6 +23,24 @@ pub(crate) struct ReleaseLicenseReport {
     pub(crate) production_packages: usize,
     pub(crate) third_party_packages: usize,
     pub(crate) unique_legal_texts: usize,
+    pub(crate) sbom_graph: ProductionGraph,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ProductionPackage {
+    pub(crate) name: String,
+    pub(crate) version: String,
+    pub(crate) license: Option<String>,
+    pub(crate) source: Option<String>,
+    pub(crate) workspace: bool,
+    pub(crate) has_binary: bool,
+    pub(crate) dependencies: BTreeSet<String>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ProductionGraph {
+    pub(crate) roots: BTreeSet<String>,
+    pub(crate) packages: BTreeMap<String, ProductionPackage>,
 }
 
 #[derive(Clone)]
@@ -141,6 +159,7 @@ fn generate_from_metadata(
     if pending.len() != PRODUCTION_ROOTS.len() {
         return Err("release license roots are incomplete or ambiguous".into());
     }
+    let roots = pending.iter().cloned().collect::<BTreeSet<_>>();
     let mut closure = BTreeSet::new();
     while let Some(id) = pending.pop() {
         if !closure.insert(id.clone()) {
@@ -157,16 +176,7 @@ fn generate_from_metadata(
             .and_then(Value::as_array)
             .ok_or("release dependency graph node has no deps")?
         {
-            let production_edge = dependency
-                .get("dep_kinds")
-                .and_then(Value::as_array)
-                .is_some_and(|kinds| {
-                    kinds.iter().any(|kind| {
-                        kind.get("kind").is_none_or(Value::is_null)
-                            || kind.get("kind").and_then(Value::as_str) == Some("build")
-                    })
-                });
-            if production_edge {
+            if production_dependency(dependency) {
                 pending.push(
                     dependency
                         .get("pkg")
@@ -177,6 +187,102 @@ fn generate_from_metadata(
             }
         }
     }
+
+    let mut sbom_pending = roots.iter().cloned().collect::<Vec<_>>();
+    let mut sbom_closure = BTreeSet::new();
+    while let Some(id) = sbom_pending.pop() {
+        if !sbom_closure.insert(id.clone()) {
+            continue;
+        }
+        if sbom_closure.len() > MAX_PRODUCTION_PACKAGES {
+            return Err("release SBOM dependency closure exceeds its bound".into());
+        }
+        let node = nodes_by_id
+            .get(&id)
+            .ok_or_else(|| format!("release dependency graph omits {id}"))?;
+        for dependency in node
+            .get("deps")
+            .and_then(Value::as_array)
+            .ok_or("release dependency graph node has no deps")?
+            .iter()
+            .filter(|dependency| runtime_dependency(dependency))
+        {
+            sbom_pending.push(
+                dependency
+                    .get("pkg")
+                    .and_then(Value::as_str)
+                    .ok_or("release dependency has no package id")?
+                    .to_string(),
+            );
+        }
+    }
+
+    let mut graph_packages = BTreeMap::new();
+    for id in &sbom_closure {
+        let package = packages_by_id
+            .get(id)
+            .ok_or_else(|| format!("release metadata omits package {id}"))?;
+        let node = nodes_by_id
+            .get(id)
+            .ok_or_else(|| format!("release dependency graph omits {id}"))?;
+        let name = field(package, "name")?;
+        let version = field(package, "version")?;
+        validate_inline_field(name, "package name")?;
+        validate_inline_field(version, "package version")?;
+        let dependencies = node
+            .get("deps")
+            .and_then(Value::as_array)
+            .ok_or("release dependency graph node has no deps")?
+            .iter()
+            .filter(|dependency| runtime_dependency(dependency))
+            .map(|dependency| {
+                dependency
+                    .get("pkg")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| "release dependency has no package id".to_string())
+            })
+            .filter_map(|result| match result {
+                Ok(dependency) if sbom_closure.contains(dependency) => {
+                    Some(Ok(dependency.to_string()))
+                }
+                Ok(_) => None,
+                Err(error) => Some(Err(error)),
+            })
+            .collect::<Result<BTreeSet<_>, _>>()?;
+        let has_binary = package
+            .get("targets")
+            .and_then(Value::as_array)
+            .is_some_and(|targets| {
+                targets.iter().any(|target| {
+                    target
+                        .get("kind")
+                        .and_then(Value::as_array)
+                        .is_some_and(|kinds| kinds.iter().any(|kind| kind.as_str() == Some("bin")))
+                })
+            });
+        graph_packages.insert(
+            id.clone(),
+            ProductionPackage {
+                name: name.into(),
+                version: version.into(),
+                license: package
+                    .get("license")
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
+                source: package
+                    .get("source")
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
+                workspace: workspace_members.contains(id),
+                has_binary,
+                dependencies,
+            },
+        );
+    }
+    let sbom_graph = ProductionGraph {
+        roots,
+        packages: graph_packages,
+    };
 
     let project_license = read_bounded(&root.join("LICENSE"))?;
     let project_notice = read_bounded(&root.join("NOTICE"))?;
@@ -354,7 +460,31 @@ fn generate_from_metadata(
         production_packages: closure.len(),
         third_party_packages: components.len(),
         unique_legal_texts: texts.len(),
+        sbom_graph,
     })
+}
+
+fn production_dependency(dependency: &Value) -> bool {
+    dependency
+        .get("dep_kinds")
+        .and_then(Value::as_array)
+        .is_some_and(|kinds| {
+            kinds.iter().any(|kind| {
+                kind.get("kind").is_none_or(Value::is_null)
+                    || kind.get("kind").and_then(Value::as_str) == Some("build")
+            })
+        })
+}
+
+fn runtime_dependency(dependency: &Value) -> bool {
+    dependency
+        .get("dep_kinds")
+        .and_then(Value::as_array)
+        .is_some_and(|kinds| {
+            kinds
+                .iter()
+                .any(|kind| kind.get("kind").is_none_or(Value::is_null))
+        })
 }
 
 fn field<'a>(value: &'a Value, name: &str) -> Result<&'a str, String> {

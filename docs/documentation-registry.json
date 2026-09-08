@@ -24,7 +24,10 @@
     "docs/architecture/PACKAGE-MAP.md",
     "docs/architecture/PLUGIN-AND-SECURITY.md",
     "docs/architecture/PROGRAM-AND-ROUTE-REGISTRIES.md",
+    "docs/architecture/RELEASE-BUILDER.md",
     "docs/contracts/EFFECT-CANONICAL-V1.md",
+    "docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md",
+    "docs/contracts/RELEASE-BUILD-V1.md",
     "docs/decisions/0001-technology-stack.md",
     "docs/decisions/0002-deterministic-core.md",
     "docs/decisions/0003-contract-serialization.md",
@@ -60,7 +63,10 @@
         {"label": "Db2 application catalog", "path": "docs/architecture/DB2-APPLICATION-CATALOG.md"},
         {"label": "Host ABI source libraries", "path": "docs/architecture/HOST-ABI-SOURCE-LIBRARIES.md"},
         {"label": "Program and route registries", "path": "docs/architecture/PROGRAM-AND-ROUTE-REGISTRIES.md"},
-        {"label": "Canonical effect encoding", "path": "docs/contracts/EFFECT-CANONICAL-V1.md"}
+        {"label": "Canonical effect encoding", "path": "docs/contracts/EFFECT-CANONICAL-V1.md"},
+        {"label": "Provider object-row persistence", "path": "docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md"},
+        {"label": "Target release build type", "path": "docs/contracts/RELEASE-BUILD-V1.md"},
+        {"label": "Release builder security model", "path": "docs/architecture/RELEASE-BUILDER.md"}
       ]
     },
     {

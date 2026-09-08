@@ -86,6 +86,15 @@ class SelectionTests(unittest.TestCase):
         self.assertIn('--gate msrv',jenkins)
         self.assertIn('cargo +1.95.0 check --workspace --all-targets --all-features --locked',jenkins)
         self.assertIn("command -v cargo-deny",jenkins)
+        self.assertIn("mainframe-env-release-ed25519-pkcs8",jenkins)
+        self.assertIn('MAINFRAME_ENV_RELEASE_INVOCATION_ID="${BUILD_URL:',jenkins)
+        for required in [
+            'config/release-attestation-policy.json',
+            'conformance/standards/cyclonedx/1.6/bom-1.6.schema.json.gz.b64',
+            'docs/architecture/RELEASE-BUILDER.md',
+            'docs/contracts/RELEASE-BUILD-V1.md',
+        ]:
+            self.assertIn(required,jenkins)
         bundle=(ROOT/'tools/package_offline_cargo_bundle.sh').read_text()
         for required in ['LICENSE','NOTICE','LICENSES/ICU.txt']:
             self.assertIn(f'"$root/{required}"',bundle)

@@ -54,6 +54,8 @@ explicitly names that authority as superseded.
 - [Program and route registries](architecture/PROGRAM-AND-ROUTE-REGISTRIES.md)
 - [Canonical effect encoding](contracts/EFFECT-CANONICAL-V1.md)
 - [Provider object-row persistence](contracts/PROVIDER-ROW-PERSISTENCE-V1.md)
+- [Target release build type](contracts/RELEASE-BUILD-V1.md)
+- [Release builder security model](architecture/RELEASE-BUILDER.md)
 
 ## Architecture decisions
 

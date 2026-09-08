@@ -7,6 +7,7 @@ mod evidence_seal;
 mod jcl_catalog;
 mod jcl_conformance;
 mod racf_catalog;
+mod release_attestation;
 mod release_licenses;
 mod topic_manifests;
 mod work_package_seal;
@@ -12330,10 +12331,27 @@ fn validate_release_target(target: &str) -> TaskResult {
 }
 
 fn check_release_license_notices(root: &Path) -> TaskResult {
+    release_attestation::validate_repository_policy(root)?;
+    let version = product_version(root)?;
+    let phase_base = command_text(
+        root,
+        "git",
+        &["log", "-1", "--format=%H", "--grep=^Complete ME.V6"],
+    )?;
+    let lock_digest = file_digest(&root.join("Cargo.lock"))?;
     for target in RETAINED_RELEASE_TARGETS {
         let report = release_licenses::generate(root, target)?;
+        let sbom = release_attestation::generate_sbom(
+            &report.sbom_graph,
+            target,
+            &version,
+            &phase_base,
+            &lock_digest,
+        )?;
+        let components = sbom["components"].as_array().map_or(0, Vec::len);
+        let dependency_entries = sbom["dependencies"].as_array().map_or(0, Vec::len);
         println!(
-            "license-notices target={target} production-packages={} third-party-packages={} unique-legal-texts={} bytes={}",
+            "license-notices target={target} production-packages={} third-party-packages={} unique-legal-texts={} bytes={} sbom-components={components} sbom-dependency-entries={dependency_entries}",
             report.production_packages,
             report.third_party_packages,
             report.unique_legal_texts,
@@ -12441,7 +12459,19 @@ fn generate_release_artifacts(root: &Path, target: &str) -> TaskResult {
     require_release_candidate(root)?;
     build_release_target(root, target)?;
     smoke_release_target(root, target)?;
-    let documents = release_documents(root, target)?;
+    let version = product_version(root)?;
+    let release_directory = root.join(release_target_directory(&version, target)?);
+    let retained = release_directory
+        .exists()
+        .then(|| retained_release_documents(root, target))
+        .transpose()?;
+    let retained_provenance = retained.as_ref().and_then(|documents| {
+        documents.iter().find_map(|(path, bytes)| {
+            (path.file_name() == Some(OsStr::new("provenance.intoto.json")))
+                .then_some(bytes.as_slice())
+        })
+    });
+    let documents = release_documents(root, target, retained_provenance)?;
     validate_release_documents(root, &documents, target)?;
     for (relative, bytes) in documents {
         let path = root.join(relative);
@@ -12461,7 +12491,13 @@ fn check_release_artifacts(root: &Path, target: &str) -> TaskResult {
     let retained = retained_release_documents(root, target)?;
     build_release_target(root, target)?;
     smoke_release_target(root, target)?;
-    let documents = release_documents(root, target)?;
+    let retained_provenance = retained
+        .iter()
+        .find_map(|(path, bytes)| {
+            (path.file_name() == Some(OsStr::new("provenance.intoto.json"))).then_some(bytes)
+        })
+        .ok_or("retained target evidence omits provenance.intoto.json")?;
+    let documents = release_documents(root, target, Some(retained_provenance))?;
     validate_release_documents(root, &documents, target)?;
     compare_release_documents(&retained, &documents)?;
     validate_checked_in_release_targets(root)?;
@@ -12619,7 +12655,14 @@ fn validate_retained_accepted_release(root: &Path, target: &str) -> TaskResult {
         .ok_or("retained accepted-release validation requires a later descendant")?;
     let retained = retained_release_documents_for_version(root, "0.2.0", target)?;
     let source_digest = accepted_0_2_release_source_digest(root)?;
-    validate_release_documents_for_identity(&retained, target, "0.2.0", "stable", &source_digest)?;
+    validate_release_documents_for_identity(
+        root,
+        &retained,
+        target,
+        "0.2.0",
+        "stable",
+        &source_digest,
+    )?;
     for (relative, actual) in &retained {
         let expected = git_file_bytes(root, &accepted, &relative.to_string_lossy())?;
         require(
@@ -12757,13 +12800,18 @@ fn validate_checked_in_release_targets_for_identity(
         validate_release_target(target)?;
         targets.insert(target.to_string());
         let documents = retained_release_documents_for_version(root, version, target)?;
-        validate_release_documents_for_identity(
-            &documents,
-            target,
-            version,
-            channel,
-            source_digest,
-        )?;
+        if version == product_version(root)? && full_license_notices_required(version)? {
+            validate_release_documents(root, &documents, target)?;
+        } else {
+            validate_release_documents_for_identity(
+                root,
+                &documents,
+                target,
+                version,
+                channel,
+                source_digest,
+            )?;
+        }
     }
     require(
         targets
@@ -12830,10 +12878,106 @@ fn validate_release_documents(
                 == Some(unique_legal_texts),
         "release manifest license metadata differs from the production closure",
     )?;
-    validate_release_documents_for_identity(documents, target, &version, channel, &source_digest)
+    let phase_base = manifest["phase_base_revision"]
+        .as_str()
+        .ok_or("release manifest phase base is missing")?;
+    let expected_sbom = release_attestation::generate_sbom(
+        &expected_notices.sbom_graph,
+        target,
+        &version,
+        phase_base,
+        &file_digest(&root.join("Cargo.lock"))?,
+    )?;
+    let actual_sbom = documents
+        .iter()
+        .find_map(|(path, bytes)| {
+            (path.file_name() == Some(OsStr::new("sbom.cdx.json"))).then_some(bytes)
+        })
+        .ok_or("target release receipt omits sbom.cdx.json")?;
+    require(
+        actual_sbom == &pretty_json(&expected_sbom)?,
+        "target release SBOM differs from the exact production dependency graph",
+    )?;
+    validate_current_provenance_exact(
+        root,
+        documents,
+        &manifest,
+        target,
+        &version,
+        &source_digest,
+    )?;
+    validate_release_documents_for_identity(
+        root,
+        documents,
+        target,
+        &version,
+        channel,
+        &source_digest,
+    )
+}
+
+fn validate_current_provenance_exact(
+    root: &Path,
+    documents: &BTreeMap<PathBuf, Vec<u8>>,
+    manifest: &Value,
+    target: &str,
+    version: &str,
+    source_digest: &str,
+) -> TaskResult {
+    let document = |name: &str| {
+        documents
+            .iter()
+            .find_map(|(path, bytes)| {
+                (path.file_name() == Some(OsStr::new(name))).then_some(bytes.as_slice())
+            })
+            .ok_or_else(|| format!("target release receipt omits {name}"))
+    };
+    let artifact_digest = |path: &str| {
+        manifest["artifacts"]
+            .as_array()
+            .and_then(|artifacts| {
+                artifacts.iter().find_map(|artifact| {
+                    (artifact["path"].as_str() == Some(path))
+                        .then(|| artifact["sha256"].as_str())
+                        .flatten()
+                })
+            })
+            .ok_or_else(|| format!("release manifest omits {path}"))
+    };
+    let provenance_bytes = document("provenance.intoto.json")?;
+    let statement = release_attestation::verify_envelope(root, provenance_bytes)?;
+    let invocation_id = release_attestation::invocation_id(&statement)?;
+    let manifest_digest = format!("{:x}", Sha256::digest(document("manifest.json")?));
+    let sbom_digest = format!("{:x}", Sha256::digest(document("sbom.cdx.json")?));
+    let build_inputs_digest = format!("{:x}", Sha256::digest(document("build-inputs.json")?));
+    let licenses_digest = format!("{:x}", Sha256::digest(document("LICENSES.md")?));
+    let source_commit = command_text(root, "git", &["rev-parse", "HEAD"])?;
+    let expected = release_attestation::provenance_statement(
+        root,
+        &release_attestation::ProvenanceMaterials {
+            version,
+            target,
+            source_commit: &source_commit,
+            source_digest: source_digest
+                .strip_prefix("sha256:")
+                .ok_or("release source digest prefix is invalid")?,
+            server_digest: artifact_digest("bin/mainframe-env-server")?,
+            cli_digest: artifact_digest("bin/mainframe-env")?,
+            manifest_digest: &manifest_digest,
+            sbom_digest: &sbom_digest,
+            build_inputs_digest: &build_inputs_digest,
+            licenses_digest: &licenses_digest,
+        },
+        invocation_id,
+    )?;
+    require(
+        statement == expected,
+        "signed provenance differs from the exact rebuilt release statement",
+    )
 }
 
 fn validate_release_documents_for_identity(
+    root: &Path,
     documents: &BTreeMap<PathBuf, Vec<u8>>,
     target: &str,
     version: &str,
@@ -12854,14 +12998,22 @@ fn validate_release_documents_for_identity(
         .map_err(|error| format!("release manifest: {error}"))?;
     let sbom: Value = serde_json::from_slice(document("sbom.cdx.json")?)
         .map_err(|error| format!("release SBOM: {error}"))?;
-    let provenance: Value = serde_json::from_slice(document("provenance.intoto.json")?)
-        .map_err(|error| format!("release provenance: {error}"))?;
+    let provenance_bytes = document("provenance.intoto.json")?;
+    let provenance: Value = if full_license_notices_required(version)? {
+        release_attestation::verify_envelope(root, provenance_bytes)?
+    } else {
+        serde_json::from_slice(provenance_bytes)
+            .map_err(|error| format!("release provenance: {error}"))?
+    };
     let checksums = std::str::from_utf8(document("checksums.sha256")?)
         .map_err(|error| format!("release checksums: {error}"))?;
     let licenses = std::str::from_utf8(document("LICENSES.md")?)
         .map_err(|error| format!("release licenses: {error}"))?;
     let build_inputs: Value = serde_json::from_slice(document("build-inputs.json")?)
         .map_err(|error| format!("release build inputs: {error}"))?;
+    if full_license_notices_required(version)? {
+        validate_current_source_binding(root, &provenance, source_digest, version)?;
+    }
     validate_license_document_binding(
         &manifest,
         &provenance,
@@ -12892,15 +13044,13 @@ fn validate_release_documents_for_identity(
         artifacts.iter().any(|artifact| {
             artifact["path"].as_str() == Some("build-inputs.json")
                 && artifact["sha256"].as_str() == Some(build_inputs_digest.as_str())
-        }) && provenance["predicate"]["buildDefinition"]["resolvedDependencies"]
-            .as_array()
-            .is_some_and(|dependencies| {
-                dependencies.iter().any(|dependency| {
-                    dependency["uri"].as_str() == Some("build-inputs.json")
-                        && dependency["digest"]["sha256"].as_str()
-                            == Some(build_inputs_digest.as_str())
-                })
-            }),
+        }) && provenance_descriptor_has_digest(
+            &provenance,
+            version,
+            "build-inputs",
+            "build-inputs.json",
+            &build_inputs_digest,
+        )?,
         "release build-input identity is not bound into manifest and provenance",
     )?;
     for artifact in artifacts {
@@ -12918,7 +13068,8 @@ fn validate_release_documents_for_identity(
             &format!("release checksums omit {path}"),
         )?;
     }
-    for (name, path) in [
+    let current_attestation = full_license_notices_required(version)?;
+    for (legacy_name, path) in [
         ("mainframe-env-server", "bin/mainframe-env-server"),
         ("mainframe-env", "bin/mainframe-env"),
     ] {
@@ -12930,14 +13081,201 @@ fn validate_release_documents_for_identity(
         require(
             provenance["subject"].as_array().is_some_and(|subjects| {
                 subjects.iter().any(|subject| {
-                    subject["name"].as_str() == Some(name)
+                    subject["name"].as_str()
+                        == Some(if current_attestation {
+                            path
+                        } else {
+                            legacy_name
+                        })
                         && subject["digest"]["sha256"].as_str() == Some(digest)
                 })
             }),
-            &format!("release provenance omits {name}"),
+            &format!("release provenance omits {path}"),
+        )?;
+    }
+    if current_attestation {
+        validate_current_attestation_bindings(
+            &manifest,
+            &sbom,
+            &provenance,
+            &build_inputs,
+            document("manifest.json")?,
+            document("sbom.cdx.json")?,
+            provenance_bytes,
+            document("LICENSES.md")?,
+            checksums,
+            version,
+            target,
         )?;
     }
     Ok(())
+}
+
+fn provenance_descriptor_has_digest(
+    provenance: &Value,
+    version: &str,
+    current_suffix: &str,
+    legacy_uri: &str,
+    digest: &str,
+) -> TaskResult<bool> {
+    let current = full_license_notices_required(version)?;
+    let (descriptors, expected_uri) = if current {
+        (
+            &provenance["predicate"]["runDetails"]["byproducts"],
+            format!(":{current_suffix}"),
+        )
+    } else {
+        (
+            &provenance["predicate"]["buildDefinition"]["resolvedDependencies"],
+            legacy_uri.to_string(),
+        )
+    };
+    Ok(descriptors.as_array().is_some_and(|values| {
+        values.iter().any(|value| {
+            let uri = value["uri"].as_str();
+            let uri_matches = if current {
+                uri.is_some_and(|candidate| candidate.ends_with(&expected_uri))
+            } else {
+                uri == Some(expected_uri.as_str())
+            };
+            uri_matches && value["digest"]["sha256"].as_str() == Some(digest)
+        })
+    }))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_current_attestation_bindings(
+    manifest: &Value,
+    sbom: &Value,
+    provenance: &Value,
+    build_inputs: &Value,
+    manifest_bytes: &[u8],
+    sbom_bytes: &[u8],
+    provenance_bytes: &[u8],
+    licenses_bytes: &[u8],
+    checksums: &str,
+    version: &str,
+    target: &str,
+) -> TaskResult {
+    let manifest_digest = format!("{:x}", Sha256::digest(manifest_bytes));
+    let sbom_digest = format!("{:x}", Sha256::digest(sbom_bytes));
+    let provenance_digest = format!("{:x}", Sha256::digest(provenance_bytes));
+    let build_inputs_bytes = pretty_json(build_inputs)?;
+    let build_inputs_digest = format!("{:x}", Sha256::digest(&build_inputs_bytes));
+    let licenses_digest = format!("{:x}", Sha256::digest(licenses_bytes));
+    for (suffix, digest) in [
+        ("manifest", manifest_digest.as_str()),
+        ("sbom", sbom_digest.as_str()),
+        ("build-inputs", build_inputs_digest.as_str()),
+        ("licenses", licenses_digest.as_str()),
+    ] {
+        require(
+            provenance["predicate"]["runDetails"]["byproducts"]
+                .as_array()
+                .is_some_and(|byproducts| {
+                    let uri = format!("urn:mainframe-env:release:{version}:{target}:{suffix}");
+                    byproducts.iter().any(|byproduct| {
+                        byproduct["uri"].as_str() == Some(uri.as_str())
+                            && byproduct["digest"]["sha256"].as_str() == Some(digest)
+                    })
+                }),
+            &format!("signed provenance omits or misidentifies the {suffix} byproduct"),
+        )?;
+    }
+    let component_count = sbom["components"]
+        .as_array()
+        .and_then(|values| u64::try_from(values.len()).ok())
+        .ok_or("release SBOM components are missing")?;
+    let dependency_count = sbom["dependencies"]
+        .as_array()
+        .and_then(|values| u64::try_from(values.len()).ok())
+        .ok_or("release SBOM dependency graph is missing")?;
+    require(
+        manifest["sbom"]["format"] == Value::String("CycloneDX".into())
+            && manifest["sbom"]["spec_version"] == Value::String("1.6".into())
+            && manifest["sbom"]["path"] == Value::String("sbom.cdx.json".into())
+            && manifest["sbom"]["sha256"] == Value::String(sbom_digest.clone())
+            && manifest["sbom"]["components"].as_u64() == Some(component_count)
+            && manifest["sbom"]["dependency_entries"].as_u64() == Some(dependency_count)
+            && provenance["predicate"]["runDetails"]["metadata"]["invocationId"]
+                == provenance["predicate"]["buildDefinition"]["internalParameters"]["invocationUri"],
+        "release manifest, SBOM, or invocation identity is not signed consistently",
+    )?;
+    let mut expected_checksums = manifest["artifacts"]
+        .as_array()
+        .ok_or("release manifest artifacts are missing")?
+        .iter()
+        .map(|artifact| {
+            let path = artifact["path"]
+                .as_str()
+                .ok_or("release artifact path is missing")?;
+            let digest = artifact["sha256"]
+                .as_str()
+                .ok_or("release artifact digest is missing")?;
+            Ok(format!("{digest}  {path}"))
+        })
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    for (path, digest) in [
+        ("manifest.json", manifest_digest.as_str()),
+        ("sbom.cdx.json", sbom_digest.as_str()),
+        ("provenance.intoto.json", provenance_digest.as_str()),
+        ("LICENSES.md", licenses_digest.as_str()),
+    ] {
+        expected_checksums.insert(format!("{digest}  {path}"));
+    }
+    let actual_checksum_lines = checksums
+        .lines()
+        .map(str::to_string)
+        .collect::<BTreeSet<_>>();
+    require(
+        checksums.lines().count() == expected_checksums.len()
+            && actual_checksum_lines == expected_checksums,
+        "release checksum file differs from the exact signed receipt set",
+    )?;
+    require(
+        provenance["predicate"]["buildDefinition"]["externalParameters"]["version"]
+            == Value::String(version.into())
+            && provenance["predicate"]["buildDefinition"]["externalParameters"]["target"]
+                == Value::String(target.into()),
+        "signed release parameters differ from the target identity",
+    )
+}
+
+fn validate_current_source_binding(
+    root: &Path,
+    provenance: &Value,
+    source_digest: &str,
+    version: &str,
+) -> TaskResult {
+    let commit = if product_version(root)? == version {
+        command_text(root, "git", &["rev-parse", "HEAD"])?
+    } else {
+        command_text(
+            root,
+            "git",
+            &["rev-parse", &format!("mainframe-env-v{version}^{{}}")],
+        )?
+    };
+    let uri = format!("git+https://github.com/toreleon/mainframe-env@{commit}");
+    let dependencies = provenance["predicate"]["buildDefinition"]["resolvedDependencies"]
+        .as_array()
+        .ok_or("signed provenance dependencies are missing")?;
+    require(
+        provenance["predicate"]["buildDefinition"]["externalParameters"]["source"]
+            == Value::String(uri.clone())
+            && dependencies
+                .iter()
+                .filter(|dependency| dependency["uri"].as_str() == Some(uri.as_str()))
+                .count()
+                == 1
+            && dependencies.iter().any(|dependency| {
+                dependency["uri"].as_str() == Some(uri.as_str())
+                    && dependency["digest"]["gitCommit"].as_str() == Some(commit.as_str())
+                    && dependency["digest"]["sha256"].as_str()
+                        == source_digest.strip_prefix("sha256:")
+            }),
+        "signed provenance is not bound to the exact source commit and content digest",
+    )
 }
 
 fn full_license_notices_required(version: &str) -> TaskResult<bool> {
@@ -12990,15 +13328,13 @@ fn validate_license_document_binding(
             && checksums
                 .lines()
                 .any(|line| line == format!("{licenses_digest}  LICENSES.md"))
-            && provenance["predicate"]["buildDefinition"]["resolvedDependencies"]
-                .as_array()
-                .is_some_and(|dependencies| {
-                    dependencies.iter().any(|dependency| {
-                        dependency["uri"].as_str() == Some("LICENSES.md")
-                            && dependency["digest"]["sha256"].as_str()
-                                == Some(licenses_digest.as_str())
-                    })
-                }),
+            && provenance_descriptor_has_digest(
+                provenance,
+                version,
+                "licenses",
+                "LICENSES.md",
+                &licenses_digest,
+            )?,
         "release license notices are incomplete or are not bound to the receipt",
     )
 }
@@ -13047,12 +13383,21 @@ fn validate_release_identity(
             && valid_license_header,
         "target release receipt metadata is inconsistent",
     )?;
+    let current_attestation = full_license_notices_required(version)?;
     require(
         provenance["predicate"]["buildDefinition"]["resolvedDependencies"]
             .as_array()
             .is_some_and(|dependencies| {
                 dependencies.iter().any(|dependency| {
-                    dependency["uri"].as_str() == Some("source-tree")
+                    let uri = dependency["uri"].as_str();
+                    let expected_uri = if current_attestation {
+                        uri.is_some_and(|value| {
+                            value.starts_with("git+https://github.com/toreleon/mainframe-env@")
+                        })
+                    } else {
+                        uri == Some("source-tree")
+                    };
+                    expected_uri
                         && dependency["digest"]["sha256"].as_str()
                             == source_digest.strip_prefix("sha256:")
                 })
@@ -13072,7 +13417,11 @@ fn validate_sha256_hex(value: &str, field: &str) -> TaskResult {
     )
 }
 
-fn release_documents(root: &Path, target: &str) -> TaskResult<BTreeMap<PathBuf, Vec<u8>>> {
+fn release_documents(
+    root: &Path,
+    target: &str,
+    retained_provenance: Option<&[u8]>,
+) -> TaskResult<BTreeMap<PathBuf, Vec<u8>>> {
     validate_release_target(target)?;
     let version = product_version(root)?;
     let release_config: toml::Value = read(&root.join("release.toml"))?
@@ -13123,68 +13472,7 @@ fn release_documents(root: &Path, target: &str) -> TaskResult<BTreeMap<PathBuf, 
         .join("\n");
     let cargo_version = command_text(root, "cargo", &["--version"])?;
     let source_digest = release_source_digest(root)?;
-    let metadata_output = Command::new("cargo")
-        .args(["metadata", "--format-version", "1", "--locked"])
-        .current_dir(root)
-        .output()
-        .map_err(|error| format!("cargo metadata: {error}"))?;
-    require(metadata_output.status.success(), "cargo metadata failed")?;
-    let metadata: Value = serde_json::from_slice(&metadata_output.stdout)
-        .map_err(|error| format!("cargo metadata JSON: {error}"))?;
-    let packages = metadata
-        .get("packages")
-        .and_then(Value::as_array)
-        .ok_or("cargo metadata has no packages")?;
-    let mut components = packages
-        .iter()
-        .filter(|package| {
-            !matches!(
-                package.get("name").and_then(Value::as_str),
-                Some("mainframe-env-conformance" | "xtask")
-            )
-        })
-        .map(|package| {
-            let name = package.get("name").and_then(Value::as_str).unwrap_or("");
-            let version = package.get("version").and_then(Value::as_str).unwrap_or("");
-            let license = package.get("license").and_then(Value::as_str);
-            let source = package.get("source").and_then(Value::as_str);
-            let mut component = json!({
-                "type":if name.starts_with("mainframe-env") {"application"} else {"library"},
-                "bom-ref":format!("pkg:cargo/{name}@{version}"),
-                "name":name,
-                "version":version,
-                "purl":format!("pkg:cargo/{name}@{version}")
-            });
-            if let Some(license) = license {
-                component["licenses"] = json!([{"expression":license}]);
-            }
-            if let Some(source) = source {
-                component["properties"] = json!([{"name":"cargo:source","value":source}]);
-            }
-            component
-        })
-        .collect::<Vec<_>>();
-    components.sort_by(|left, right| {
-        left["name"]
-            .as_str()
-            .cmp(&right["name"].as_str())
-            .then(left["version"].as_str().cmp(&right["version"].as_str()))
-    });
-    let sbom = json!({
-        "bomFormat":"CycloneDX",
-        "specVersion":"1.6",
-        "version":1,
-        "metadata":{
-            "component":{"type":"application","name":"mainframe-env","version":version},
-            "properties":[
-                {"name":"mainframe-env:phase-base","value":phase_base},
-                {"name":"mainframe-env:cargo-lock-sha256","value":lock_digest},
-                {"name":"mainframe-env:release-profile","value":"core-server"},
-                {"name":"mainframe-env:excluded-non-production-workspace-package-count","value":"2"}
-            ]
-        },
-        "components":components
-    });
+    let source_commit = command_text(root, "git", &["rev-parse", "HEAD"])?;
     let mut deterministic_environment = json!({
         "CARGO_INCREMENTAL":"0",
         "LC_ALL":"C",
@@ -13214,6 +13502,17 @@ fn release_documents(root: &Path, target: &str) -> TaskResult<BTreeMap<PathBuf, 
     let build_inputs_digest = format!("{:x}", Sha256::digest(&build_inputs_bytes));
     let license_report = release_licenses::generate(root, target)?;
     let licenses_digest = format!("{:x}", Sha256::digest(&license_report.bytes));
+    let sbom = release_attestation::generate_sbom(
+        &license_report.sbom_graph,
+        target,
+        &version,
+        &phase_base,
+        &lock_digest,
+    )?;
+    let sbom_bytes = pretty_json(&sbom)?;
+    let sbom_digest = format!("{:x}", Sha256::digest(&sbom_bytes));
+    let sbom_components = license_report.sbom_graph.packages.len();
+    let sbom_dependency_entries = sbom_components + 1;
     let project_license_digest = file_digest(&root.join("LICENSE"))?;
     let project_notice_digest = file_digest(&root.join("NOTICE"))?;
     let manifest = json!({
@@ -13227,6 +13526,15 @@ fn release_documents(root: &Path, target: &str) -> TaskResult<BTreeMap<PathBuf, 
         "profile":"release/core-server",
         "contracts":"conformance/0.2/inventory/versions.json",
         "migration_head":"0001-durable-state",
+        "sbom":{
+            "format":"CycloneDX",
+            "spec_version":"1.6",
+            "path":"sbom.cdx.json",
+            "sha256":sbom_digest,
+            "scope":"exact-target-production-closure",
+            "components":sbom_components,
+            "dependency_entries":sbom_dependency_entries
+        },
         "license_notices":{
             "schema_version":release_licenses::NOTICE_SCHEMA,
             "path":"LICENSES.md",
@@ -13248,37 +13556,50 @@ fn release_documents(root: &Path, target: &str) -> TaskResult<BTreeMap<PathBuf, 
         "tag":format!("mainframe-env-v{version}"),
         "published":false
     });
-    let provenance = json!({
-        "_type":"https://in-toto.io/Statement/v1",
-        "subject":[
-            {"name":"mainframe-env-server","digest":{"sha256":server_digest}},
-            {"name":"mainframe-env","digest":{"sha256":cli_digest}}
-        ],
-        "predicateType":"https://slsa.dev/provenance/v1",
-        "predicate":{
-            "buildDefinition":{
-                "buildType":"mainframe-env.cargo-release@1",
-                "externalParameters":{"profile":"release","locked":true,"all_features":true,"target":target},
-                "resolvedDependencies":[
-                    {"uri":"Cargo.lock","digest":{"sha256":lock_digest}},
-                    {"uri":"build-inputs.json","digest":{"sha256":build_inputs_digest}},
-                    {"uri":"LICENSES.md","digest":{"sha256":licenses_digest}},
-                    {"uri":"source-tree","digest":{"sha256":source_digest.trim_start_matches("sha256:")}}
-                ]
-            },
-            "runDetails":{"builder":{"id":format!("mainframe-env-cargo/{target}")},"metadata":{"invocationId":format!("mainframe-env-v{version}-{target}-local")}}
-        }
-    });
+    let manifest_bytes = pretty_json(&manifest)?;
+    let manifest_digest = format!("{:x}", Sha256::digest(&manifest_bytes));
+    let invocation_id = if let Some(envelope) = retained_provenance {
+        let statement = release_attestation::verify_envelope(root, envelope)?;
+        release_attestation::invocation_id(&statement)?.to_string()
+    } else {
+        release_attestation::release_invocation_id()?
+    };
+    let provenance_statement = release_attestation::provenance_statement(
+        root,
+        &release_attestation::ProvenanceMaterials {
+            version: &version,
+            target,
+            source_commit: &source_commit,
+            source_digest: source_digest
+                .strip_prefix("sha256:")
+                .ok_or("release source digest prefix is invalid")?,
+            server_digest: &server_digest,
+            cli_digest: &cli_digest,
+            manifest_digest: &manifest_digest,
+            sbom_digest: &sbom_digest,
+            build_inputs_digest: &build_inputs_digest,
+            licenses_digest: &licenses_digest,
+        },
+        &invocation_id,
+    )?;
+    let provenance_bytes = if let Some(envelope) = retained_provenance {
+        let retained_statement = release_attestation::verify_envelope(root, envelope)?;
+        require(
+            retained_statement == provenance_statement,
+            "retained signed provenance differs from the rebuilt target",
+        )?;
+        envelope.to_vec()
+    } else {
+        release_attestation::sign_statement(root, &provenance_statement)?
+    };
+    let provenance_digest = format!("{:x}", Sha256::digest(&provenance_bytes));
     let checksums = format!(
-        "{server_digest}  bin/mainframe-env-server\n{cli_digest}  bin/mainframe-env\n{config_digest}  config/mainframe-env.toml\n{sqlite_migration}  migrations/sqlite/0001-durable-state.sql\n{postgres_migration}  migrations/postgres/0001-durable-state.sql\n{build_inputs_digest}  build-inputs.json\n{licenses_digest}  LICENSES.md\n"
+        "{server_digest}  bin/mainframe-env-server\n{cli_digest}  bin/mainframe-env\n{config_digest}  config/mainframe-env.toml\n{sqlite_migration}  migrations/sqlite/0001-durable-state.sql\n{postgres_migration}  migrations/postgres/0001-durable-state.sql\n{manifest_digest}  manifest.json\n{sbom_digest}  sbom.cdx.json\n{provenance_digest}  provenance.intoto.json\n{build_inputs_digest}  build-inputs.json\n{licenses_digest}  LICENSES.md\n"
     );
     Ok(BTreeMap::from([
-        (directory.join("manifest.json"), pretty_json(&manifest)?),
-        (directory.join("sbom.cdx.json"), pretty_json(&sbom)?),
-        (
-            directory.join("provenance.intoto.json"),
-            pretty_json(&provenance)?,
-        ),
+        (directory.join("manifest.json"), manifest_bytes),
+        (directory.join("sbom.cdx.json"), sbom_bytes),
+        (directory.join("provenance.intoto.json"), provenance_bytes),
         (directory.join("checksums.sha256"), checksums.into_bytes()),
         (directory.join("LICENSES.md"), license_report.bytes),
         (directory.join("build-inputs.json"), build_inputs_bytes),
@@ -14135,8 +14456,8 @@ mod tests {
             "project_license":{"path":"LICENSE","sha256":"a".repeat(64)},
             "project_notice":{"path":"NOTICE","sha256":"b".repeat(64)}
         }});
-        let provenance = json!({"predicate":{"buildDefinition":{"resolvedDependencies":[{
-            "uri":"LICENSES.md","digest":{"sha256":digest}
+        let provenance = json!({"predicate":{"runDetails":{"byproducts":[{
+            "uri":"urn:mainframe-env:release:0.8.3:test:licenses","digest":{"sha256":digest}
         }]}}});
         let checksums = format!("{digest}  LICENSES.md\n");
         validate_license_document_binding(
@@ -14167,6 +14488,147 @@ mod tests {
             )
             .is_ok()
         );
+    }
+
+    #[test]
+    fn current_release_bindings_reject_byproduct_and_checksum_tampering() {
+        let version = "0.8.3";
+        let target = "aarch64-apple-darwin";
+        let build_inputs = json!({"schema_version":"mainframe-env.release-build-inputs@1"});
+        let build_inputs_bytes = pretty_json(&build_inputs).unwrap();
+        let build_inputs_digest = format!("{:x}", Sha256::digest(&build_inputs_bytes));
+        let licenses = b"complete notices\n";
+        let licenses_digest = format!("{:x}", Sha256::digest(licenses));
+        let sbom = json!({"components":[{}],"dependencies":[{},{}]});
+        let sbom_bytes = pretty_json(&sbom).unwrap();
+        let sbom_digest = format!("{:x}", Sha256::digest(&sbom_bytes));
+        let mut manifest = json!({
+            "artifacts":[{"path":"build-inputs.json","sha256":build_inputs_digest}],
+            "sbom":{
+                "format":"CycloneDX",
+                "spec_version":"1.6",
+                "path":"sbom.cdx.json",
+                "sha256":sbom_digest,
+                "components":1,
+                "dependency_entries":2
+            }
+        });
+        let manifest_bytes = pretty_json(&manifest).unwrap();
+        let manifest_digest = format!("{:x}", Sha256::digest(&manifest_bytes));
+        let provenance_bytes = b"signed DSSE envelope\n";
+        let provenance_digest = format!("{:x}", Sha256::digest(provenance_bytes));
+        let descriptor = |suffix: &str, digest: &str| {
+            json!({
+                "uri":format!("urn:mainframe-env:release:{version}:{target}:{suffix}"),
+                "digest":{"sha256":digest}
+            })
+        };
+        let provenance = json!({"predicate":{
+            "buildDefinition":{
+                "externalParameters":{"version":version,"target":target},
+                "internalParameters":{"invocationUri":"urn:uuid:one"}
+            },
+            "runDetails":{
+                "metadata":{"invocationId":"urn:uuid:one"},
+                "byproducts":[
+                    descriptor("manifest", &manifest_digest),
+                    descriptor("sbom", &sbom_digest),
+                    descriptor("build-inputs", &build_inputs_digest),
+                    descriptor("licenses", &licenses_digest)
+                ]
+            }
+        }});
+        let checksums = format!(
+            "{build_inputs_digest}  build-inputs.json\n{manifest_digest}  manifest.json\n{sbom_digest}  sbom.cdx.json\n{provenance_digest}  provenance.intoto.json\n{licenses_digest}  LICENSES.md\n"
+        );
+        validate_current_attestation_bindings(
+            &manifest,
+            &sbom,
+            &provenance,
+            &build_inputs,
+            &manifest_bytes,
+            &sbom_bytes,
+            provenance_bytes,
+            licenses,
+            &checksums,
+            version,
+            target,
+        )
+        .unwrap();
+
+        let mut tampered = provenance.clone();
+        tampered["predicate"]["runDetails"]["byproducts"][1]["digest"]["sha256"] =
+            Value::String("0".repeat(64));
+        assert!(
+            validate_current_attestation_bindings(
+                &manifest,
+                &sbom,
+                &tampered,
+                &build_inputs,
+                &manifest_bytes,
+                &sbom_bytes,
+                provenance_bytes,
+                licenses,
+                &checksums,
+                version,
+                target,
+            )
+            .is_err()
+        );
+        manifest["sbom"]["sha256"] = Value::String("0".repeat(64));
+        assert!(
+            validate_current_attestation_bindings(
+                &manifest,
+                &sbom,
+                &provenance,
+                &build_inputs,
+                &manifest_bytes,
+                &sbom_bytes,
+                provenance_bytes,
+                licenses,
+                &checksums,
+                version,
+                target,
+            )
+            .is_err()
+        );
+        assert!(
+            validate_current_attestation_bindings(
+                &json!({"artifacts":[]}),
+                &sbom,
+                &provenance,
+                &build_inputs,
+                &manifest_bytes,
+                &sbom_bytes,
+                provenance_bytes,
+                licenses,
+                "",
+                version,
+                target,
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn signed_release_documents_round_trip_when_enabled() {
+        if env::var("MAINFRAME_ENV_RELEASE_INTEGRATION").as_deref() != Ok("1") {
+            return;
+        }
+        let root = repository_root().unwrap();
+        let target = host_target(&root).unwrap();
+        build_release_target(&root, &target).unwrap();
+        smoke_release_target(&root, &target).unwrap();
+        let documents = release_documents(&root, &target, None).unwrap();
+        validate_release_documents(&root, &documents, &target).unwrap();
+        let provenance = documents
+            .iter()
+            .find_map(|(path, bytes)| {
+                (path.file_name() == Some(OsStr::new("provenance.intoto.json"))).then_some(bytes)
+            })
+            .unwrap();
+        let rebuilt = release_documents(&root, &target, Some(provenance)).unwrap();
+        compare_release_documents(&documents, &rebuilt).unwrap();
     }
 
     #[test]

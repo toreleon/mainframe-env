@@ -10,3 +10,7 @@ LICENSES/ICU.txt and in each target release's generated LICENSES.md.
 Complete license and attribution texts for every third-party package in a
 target binary's production dependency closure are generated into LICENSES.md
 before release receipts are written.
+
+This repository retains the official CycloneDX 1.6 JSON schemas, Copyright (c)
+OWASP Foundation, under the Apache License 2.0. Their exact upstream revision
+and digests are recorded beside the compressed schema sources.

@@ -160,8 +160,10 @@ A release candidate/final release produces, as applicable:
 - SQL migration bundle and migration digest;
 - operation, capability, route, diagnostic, and compatibility catalogs;
 - public API and crate documentation;
-- license notices and SBOM;
-- checksums and build/source provenance;
+- complete license notices and an official-schema-validated CycloneDX SBOM of
+  the exact target production closure and dependency graph;
+- checksums and a verified Ed25519 DSSE envelope carrying an in-toto Statement
+  with SLSA Provenance v1 at the documented builder's honest Build Level 1;
 - compatibility/evidence summary and known limitations;
 - backup, restore, upgrade, rollback, and capacity runbooks; and
 - release manifest mapping every artifact to source commit, content digest,
@@ -171,6 +173,14 @@ Offline Cargo bundles additionally retain `SUPPLY-CHAIN/BUILD-INPUTS.json`,
 which binds the exact vendored tree, source revision, locked CI/controller
 inputs, and build-tool executable identities. CI input changes follow
 `docs/runbooks/CI-SUPPLY-CHAIN.md`.
+
+Release provenance is accepted only for the signer/builder pair in
+`config/release-attestation-policy.json`. Verification authenticates the DSSE
+payload before parsing, requires a run-unique invocation URI, binds both binary
+subjects plus manifest/SBOM/build-input/license byproducts, and re-derives the
+SBOM from the CLI/server target-filtered normal closure. The local Jenkins trust
+boundary and deliberate Build Level 1 limit are documented in
+`docs/architecture/RELEASE-BUILDER.md`.
 
 Raw credentials, local absolute paths, uncontrolled raw evidence, temporary
 files, oracle binaries, test datasets, and current OpenMainframe implementation

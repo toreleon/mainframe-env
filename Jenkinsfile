@@ -86,6 +86,13 @@ pipeline {
                         tools/supply_chain.py
                         tools/ci-inputs.lock.json
                         tools/jenkins/controller-plugins.lock.json
+                        config/release-attestation-policy.json
+                        conformance/standards/cyclonedx/1.6/README.md
+                        conformance/standards/cyclonedx/1.6/bom-1.6.schema.json.gz.b64
+                        conformance/standards/cyclonedx/1.6/jsf-0.82.schema.json.gz.b64
+                        conformance/standards/cyclonedx/1.6/spdx.schema.json.gz.b64
+                        docs/architecture/RELEASE-BUILDER.md
+                        docs/contracts/RELEASE-BUILD-V1.md
                         tools/dataset_mutations.py
                         tools/jenkins/disk_guard.py
                         tools/jenkins/postgres_parity.sh
@@ -373,34 +380,37 @@ pipeline {
         stage('Release verification and offline Cargo bundle') {
             when { expression { env.MAINFRAME_ENV_CI_EVENT == 'tag' } }
             steps {
-                sh '''#!/bin/bash
-                    set -euo pipefail
-                    tag="${MAINFRAME_ENV_RELEASE_TAG:-}"
-                    [[ "$tag" =~ ^mainframe-env-v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$ ]] || {
-                      echo "release mode requires an existing mainframe-env-vX.Y.Z tag" >&2
-                      exit 1
-                    }
-                    version="${tag#mainframe-env-v}"
-                    [[ "$(tr -d '[:space:]' < VERSION)" == "$version" ]] || {
-                      echo "VERSION does not match $tag" >&2
-                      exit 1
-                    }
-                    [[ "$(git rev-parse HEAD)" == "$(git rev-parse --verify "refs/tags/$tag^{commit}")" ]] || {
-                      echo "HEAD is not the release tag commit" >&2
-                      exit 1
-                    }
-                    target="$RELEASE_TARGET"
-                    [[ -n "$target" ]] || target="$(rustc -vV | awk '/^host: /{print $2}')"
-                    case "$target" in
-                      aarch64-apple-darwin|x86_64-unknown-linux-gnu) ;;
-                      *) echo "unsupported release target: $target" >&2; exit 1 ;;
-                    esac
-                    "$MAINFRAME_ENV_PYTHON" -B tools/supply_chain.py check --runtime release
-                    cargo xtask release --target "$target"
-                    git diff --exit-code -- "release/$version/targets/$target"
-                    cargo xtask release --check --target "$target"
-                    tools/package_offline_cargo_bundle.sh --tag "$tag" --out "$CARGO_TARGET_DIR/jenkins-artifacts"
-                '''
+                withCredentials([file(credentialsId: 'mainframe-env-release-ed25519-pkcs8', variable: 'MAINFRAME_ENV_RELEASE_SIGNING_KEY')]) {
+                    sh '''#!/bin/bash
+                        set -euo pipefail
+                        tag="${MAINFRAME_ENV_RELEASE_TAG:-}"
+                        [[ "$tag" =~ ^mainframe-env-v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$ ]] || {
+                          echo "release mode requires an existing mainframe-env-vX.Y.Z tag" >&2
+                          exit 1
+                        }
+                        version="${tag#mainframe-env-v}"
+                        [[ "$(tr -d '[:space:]' < VERSION)" == "$version" ]] || {
+                          echo "VERSION does not match $tag" >&2
+                          exit 1
+                        }
+                        [[ "$(git rev-parse HEAD)" == "$(git rev-parse --verify "refs/tags/$tag^{commit}")" ]] || {
+                          echo "HEAD is not the release tag commit" >&2
+                          exit 1
+                        }
+                        target="$RELEASE_TARGET"
+                        [[ -n "$target" ]] || target="$(rustc -vV | awk '/^host: /{print $2}')"
+                        case "$target" in
+                          aarch64-apple-darwin|x86_64-unknown-linux-gnu) ;;
+                          *) echo "unsupported release target: $target" >&2; exit 1 ;;
+                        esac
+                        export MAINFRAME_ENV_RELEASE_INVOCATION_ID="${BUILD_URL:?Jenkins BUILD_URL is required for signed provenance}"
+                        "$MAINFRAME_ENV_PYTHON" -B tools/supply_chain.py check --runtime release
+                        cargo xtask release --target "$target"
+                        git diff --exit-code -- "release/$version/targets/$target"
+                        cargo xtask release --check --target "$target"
+                        tools/package_offline_cargo_bundle.sh --tag "$tag" --out "$CARGO_TARGET_DIR/jenkins-artifacts"
+                    '''
+                }
             }
         }
 

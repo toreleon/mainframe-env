@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 174,
+    "markdown_documents": 178,
     "navigation_groups": 5,
-    "normative_documents": 31,
+    "normative_documents": 34,
     "xtask_commands": 156
   },
   "documents": [
@@ -10,7 +10,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:73d75fa5c49e1445858ae6f420f6b9e1dd04e47a8199b4cf7fa66b13de5de3f4",
+      "sha256": "sha256:ef565dffc2a8b44642a55bd8270ab0373656d635e0d66123ed88c0261222e9ad",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -77,6 +77,14 @@
       "sha256": "sha256:30e5824717f946cf358039655fb4d10b738fdd73a64db769716a15c737dcc6d0",
       "title": "Shared Conformance IR v1",
       "xtask_commands": 1
+    },
+    {
+      "normative": false,
+      "path": "conformance/standards/cyclonedx/1.6/README.md",
+      "relative_links": 0,
+      "sha256": "sha256:04af15a957f538bfaa10d6870488b27454b3c26082030b719f30348b3ba2b45a",
+      "title": "Official CycloneDX 1.6 JSON schemas",
+      "xtask_commands": 0
     },
     {
       "normative": false,
@@ -225,24 +233,24 @@
     {
       "normative": false,
       "path": "crates/providers/mainframe-env-db2/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:6d7e11760733182110fe68a05ff22d4aa2e5a132a34f0de460a5b914600bd513",
+      "relative_links": 1,
+      "sha256": "sha256:98c63fd71740d6e31d4acb1999e03e4ea5aea2e5ccb282ba1007ca789f548185",
       "title": "mainframe-env-db2",
       "xtask_commands": 1
     },
     {
       "normative": false,
       "path": "crates/providers/mainframe-env-ims/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:237fcb0aac5f16187133060594e33a73419ffa34a97562fa83ba28487421d920",
+      "relative_links": 1,
+      "sha256": "sha256:8be91953090b8952cdd1008e32f8cc4f84d549432dc56b1958a3766d05fe52f4",
       "title": "mainframe-env-ims",
       "xtask_commands": 1
     },
     {
       "normative": false,
       "path": "crates/providers/mainframe-env-mq/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:bc65595acb0b6164ad77d6d6139d6a36a62434739fce7d3fab33a587c5a6cb67",
+      "relative_links": 1,
+      "sha256": "sha256:ebae6caf992399ae8a25d34aabe655f4d3b306132ab810abe37b040e880e63a8",
       "title": "mainframe-env-mq",
       "xtask_commands": 0
     },
@@ -293,8 +301,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 66,
-      "sha256": "sha256:9d66f5c713f57a7d35ce315922b884ae870bcd8eaa562552d804acceb2aa2b53",
+      "relative_links": 69,
+      "sha256": "sha256:36e8c0414812060dd1c06545724391318d84508b6240bdffdacce02cbe61cc71",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -479,6 +487,18 @@
       "xtask_commands": 3
     },
     {
+      "applies_from": "mainframe-env 0.8.3 development",
+      "normative": true,
+      "owner": "release and CI maintainers",
+      "path": "docs/architecture/RELEASE-BUILDER.md",
+      "relative_links": 0,
+      "scope": "trusted local Jenkins builder identity and signing boundary",
+      "sha256": "sha256:422659869aea5da87a4d9e8e62bcef4beb10d940761e64ceb653e003250774cb",
+      "status": "Implemented",
+      "title": "Release builder security model",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/compatibility/CARDDEMO-COPYBOOKS.md",
       "relative_links": 0,
@@ -496,6 +516,30 @@
       "sha256": "sha256:dd7246450d101a1e778870909d837110fc33c5793ee70ac04e52c3925120f2f8",
       "status": "Frozen contract; implementation deviations tracked before 0.9.0",
       "title": "Canonical host effect representation, version 1",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.8.3 development",
+      "normative": true,
+      "owner": "Db2, IMS, MQ, and store-contract maintainers",
+      "path": "docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md",
+      "relative_links": 0,
+      "scope": "provider object-row envelopes, manifests, migrations, and CAS boundaries",
+      "sha256": "sha256:c9e6d1e06b53be966773c0e1ac27dc768f5dcfe509a82ae1f17f04a35fb8b9bf",
+      "status": "Implemented",
+      "title": "Provider object-row persistence, version 1",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.8.3 development",
+      "normative": true,
+      "owner": "release and supply-chain maintainers",
+      "path": "docs/contracts/RELEASE-BUILD-V1.md",
+      "relative_links": 0,
+      "scope": "target release build inputs, outputs, and attestation contract",
+      "sha256": "sha256:cf39d539d7bb8a34734ac5f0ca21b1b37d8947a714ed72f732ba8a47af7ce1dc",
+      "status": "Implemented",
+      "title": "mainframe-env target release build type v1",
       "xtask_commands": 0
     },
     {
@@ -681,7 +725,7 @@
       "path": "docs/delivery/VERSIONING-AND-RELEASES.md",
       "relative_links": 0,
       "scope": "version authorities, release gates, artifacts, and publication",
-      "sha256": "sha256:456dda9f2bd971a5c3ab2b1ff99987fd23e997d6743ef15156f40953390884d2",
+      "sha256": "sha256:6e3885c2664892f2a88f6c5814af551cfe3b2f8e2b2d466ec9c7f86628773243",
       "status": "Accepted by repository owner",
       "title": "Versioning, Phase Commits, and Release Gates",
       "xtask_commands": 0
@@ -1262,7 +1306,7 @@
       "normative": false,
       "path": "docs/releases/0.8.md",
       "relative_links": 1,
-      "sha256": "sha256:3d0f134249a7297a5bbb9151ec209429fbb39c64671126df1dd5c0e06dbee69f",
+      "sha256": "sha256:93215e6b9e32dc7614d09ccb4c759941056981f8c450989f641d07d4e25b90e0",
       "title": "mainframe-env 0.8 release line",
       "xtask_commands": 0
     },
@@ -1334,7 +1378,7 @@
       "normative": false,
       "path": "docs/runbooks/CI-SUPPLY-CHAIN.md",
       "relative_links": 0,
-      "sha256": "sha256:84f22f5e7cd83bf4738966bc509cb99e7d0c1c8634ab41117f9618df8d932c41",
+      "sha256": "sha256:c6c2eae1ae970d22d8dbbb33b253dbc46e5e5748b93a0d2f7d8e62a0d2774da4",
       "title": "CI supply-chain inputs",
       "xtask_commands": 1
     },
@@ -1593,6 +1637,18 @@
         {
           "label": "Canonical effect encoding",
           "path": "docs/contracts/EFFECT-CANONICAL-V1.md"
+        },
+        {
+          "label": "Provider object-row persistence",
+          "path": "docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md"
+        },
+        {
+          "label": "Target release build type",
+          "path": "docs/contracts/RELEASE-BUILD-V1.md"
+        },
+        {
+          "label": "Release builder security model",
+          "path": "docs/architecture/RELEASE-BUILDER.md"
         }
       ],
       "heading": "Architecture and contracts"
@@ -1799,7 +1855,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:78c09bbf48262324102b8712cdf6d0154b1468e97d1db758e50f77263845819a",
+  "registry_sha256": "sha256:30442a6f79704be9a9df85f0e86d813303937298b6af7c8f4ff9389495d0c155",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

@@ -59,6 +59,11 @@ All notable changes to mainframe-env are documented here.
   reconciliation and credential-redacted RACF command digests.
 - Unified execution-journal, effect, checkpoint, and artifact invariants across
   memory, SQLite, and PostgreSQL stores, with hostile-record rollback contracts.
+- Replaced release-wide Cargo inventory with official-schema-validated
+  CycloneDX 1.6 SBOMs for each exact target production closure, including the
+  dependency graph; replaced unauthenticated local provenance with a signed
+  DSSE in-toto Statement, SLSA Provenance v1 fields, a reviewed Jenkins builder
+  identity, unique invocation identity, and tamper-failing verification.
 - Expanded the Rust 1.95.0 gate to the complete workspace, all targets, and all
   features; locked Jenkins and external CI inputs immutably; and embedded exact
   supply-chain input identities in offline Cargo bundles.

@@ -55,6 +55,28 @@ the same bytes again and launches the locked WAR directly; it does not run a
 package-manager shim. Jenkins also reruns repository, runtime, controller, and
 plugin validation as a blocking `supply-chain` gate.
 
+The unconditional `license-notices` gate also derives both advertised targets'
+exact CLI/server normal dependency closures, builds their dependency graphs,
+validates generated SBOMs against the retained official CycloneDX 1.6 schemas,
+and validates the release attestation trust policy. It therefore blocks prose-
+only pull requests, full runs, and tag runs when those release inputs drift.
+
+## Release provenance signing credential
+
+Before running a release-tag build, provision the release Ed25519 private key
+as a Jenkins **Secret file** credential named
+`mainframe-env-release-ed25519-pkcs8`. The file is PKCS#8 DER, readable only by
+the Jenkins account, and its derived public key must equal the key in
+`config/release-attestation-policy.json`. Never put the private key in Git,
+the workspace, a build parameter, a console value, or a release bundle.
+
+The tag stage exposes the secret only around release receipt generation, uses
+the unique Jenkins `BUILD_URL` as the invocation URI, and immediately verifies
+the resulting DSSE envelope against the repository policy. A missing,
+over-permissive, malformed, or mismatched key fails closed. Rotation requires a
+reviewed policy change, a new key ID, coordinated Jenkins credential update,
+and verification before the old key is retired.
+
 The host must already provide the exact versions in `tools/ci-inputs.lock.json`.
 The lock currently requires Rust/Cargo 1.98.0, Rust/Cargo 1.95.0 for MSRV,
 Python 3.12.13, Git 2.50.1, Docker 29.4.3, Java 21.0.12.1, cargo-deny 0.20.2,

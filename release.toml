@@ -38,4 +38,5 @@ migration_head = "0001-durable-state"
 [artifacts]
 content_address = "sha256"
 sbom_format = "CycloneDX-1.6"
-provenance_format = "SLSA-v1"
+provenance_format = "in-toto-Statement-v1+SLSA-Provenance-v1+DSSE-Ed25519"
+slsa_build_level = 1
