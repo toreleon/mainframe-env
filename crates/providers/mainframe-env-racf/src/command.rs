@@ -527,6 +527,7 @@ pub(crate) fn parse_command(
                 let mut depth = 1usize;
                 let mut context = vec![Some(name.clone())];
                 let mut pending_parent = None;
+                let mut flat_parent = None;
                 while index < tokens.len() && depth > 0 {
                     let value = &tokens[index];
                     match value.kind {
@@ -539,19 +540,29 @@ pub(crate) fn parse_command(
                                 ));
                             }
                             context.push(pending_parent.take());
+                            flat_parent = None;
                         }
                         TokenKind::RightParenthesis => {
                             depth -= 1;
                             context.pop();
                             pending_parent = None;
+                            flat_parent = None;
                         }
                         TokenKind::Word | TokenKind::Quoted if depth > 0 => {
                             if value.kind == TokenKind::Word {
                                 let nested = value.upper();
-                                let path = context
+                                let base_path = context
                                     .iter()
                                     .filter_map(Option::as_deref)
                                     .collect::<Vec<_>>();
+                                let inherited_flat = flat_parent.take();
+                                let mut path = base_path.clone();
+                                let opens_parenthesis = tokens
+                                    .get(index + 1)
+                                    .is_some_and(|next| next.kind == TokenKind::LeftParenthesis);
+                                if !opens_parenthesis {
+                                    path.extend(inherited_flat.as_deref());
+                                }
                                 if descriptor.syntax_tokens.iter().any(|syntax| {
                                     syntax.token == nested
                                         && syntax.behavior
@@ -569,9 +580,16 @@ pub(crate) fn parse_command(
                                         Some(&path),
                                     ));
                                 }
+                                // Inner grammars use both KEY(VALUE) and flat KEY VALUE. Keep one
+                                // preceding word as the role of a flat value. A word that opens
+                                // parentheses starts a new role and is checked at the enclosing
+                                // path, so `WHEN(TERMINAL PROGRAM)` preserves PROGRAM as data while
+                                // `WHEN(PROGRAM(...))` still fails loudly.
+                                flat_parent = Some(nested.clone());
                                 pending_parent = Some(nested);
                             } else {
                                 pending_parent = None;
+                                flat_parent = None;
                             }
                             if values.len() >= limits.max_values_per_operand {
                                 return Err(diagnostic(
@@ -581,7 +599,10 @@ pub(crate) fn parse_command(
                             }
                             values.push(Zeroizing::new(value.text.to_string()));
                         }
-                        TokenKind::Comma => pending_parent = None,
+                        TokenKind::Comma => {
+                            pending_parent = None;
+                            flat_parent = None;
+                        }
                         _ => {}
                     }
                     index += 1;
@@ -1025,6 +1046,10 @@ mod tests {
             "PERMIT APP ID(PROGRAM)",
             "PERMIT APP WHEN(TERMINAL(PROGRAM))",
             "PERMIT APP WHEN(CONSOLE(SYSID))",
+            "PERMIT APP WHEN(TERMINAL PROGRAM)",
+            "PERMIT APP WHEN(CONSOLE SYSID)",
+            "PERMIT APP WHEN(APPLICATION PROGRAM)",
+            "PERMIT APP WHEN(SYSTEM SYSID)",
             "PERMIT APP JES",
             "DELDSD RACF",
             "PERMIT APP 'VOLUME'",
@@ -1038,7 +1063,9 @@ mod tests {
     fn unsupported_syntax_tokens_fail_only_in_their_generated_context() {
         for input in [
             "ADDUSER USER1 OPERPARM(OPERATOR-CLASS(X))",
+            "ADDSD HLQ.DATA DFP(DATAKEY CKDS)",
             "PERMIT APP WHEN(PROGRAM(X))",
+            "RACDCERT EXPORT(CERT1 FORMAT CERTDER)",
             "RESTART OUTPUT",
         ] {
             let problem = validate_command(input, Default::default())
