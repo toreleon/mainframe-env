@@ -214,7 +214,7 @@ pipeline {
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py plan \
                       --event "$MAINFRAME_ENV_CI_EVENT" \
                       --ref "$MAINFRAME_ENV_CI_REF" \
-                      --base "$MAINFRAME_ENV_CI_BASE" \
+                      --base "${MAINFRAME_ENV_CI_BASE:-}" \
                       --output "$CARGO_TARGET_DIR/ci-assurance/plan.json" \
                       "${merge_args[@]}"
                 '''
@@ -344,7 +344,7 @@ pipeline {
             steps {
                 sh '''#!/bin/bash
                     set -euo pipefail
-                    tag="$MAINFRAME_ENV_RELEASE_TAG"
+                    tag="${MAINFRAME_ENV_RELEASE_TAG:-}"
                     [[ "$tag" =~ ^mainframe-env-v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$ ]] || {
                       echo "release mode requires an existing mainframe-env-vX.Y.Z tag" >&2
                       exit 1
@@ -384,7 +384,7 @@ pipeline {
                     sh '''#!/bin/bash
                         set -euo pipefail
                         command -v gh >/dev/null || { echo 'gh is required for publication' >&2; exit 1; }
-                        tag="$MAINFRAME_ENV_RELEASE_TAG"
+                        tag="${MAINFRAME_ENV_RELEASE_TAG:-}"
                         version="${tag#mainframe-env-v}"
                         archive="$CARGO_TARGET_DIR/jenkins-artifacts/mainframe-env-${version}-cargo-vendor.tar.gz"
                         if ! gh release view "$tag" >/dev/null 2>&1; then
