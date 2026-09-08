@@ -11960,6 +11960,11 @@ fn collect_named(root: &Path, name: &OsStr, files: &mut Vec<PathBuf>) -> TaskRes
     for entry in fs::read_dir(root).map_err(|error| format!("{}: {error}", root.display()))? {
         let path = entry.map_err(|error| error.to_string())?.path();
         if path.is_dir() {
+            // A nested Git worktree has a `.git` file rather than a `.git`
+            // directory. It is a separate checkout, not part of this candidate.
+            if linked_worktree_root(&path) {
+                continue;
+            }
             collect_named(&path, name, files)?;
         } else if path.file_name() == Some(name) {
             files.push(path);
@@ -11972,6 +11977,9 @@ fn collect_extension(root: &Path, extension: &OsStr, files: &mut Vec<PathBuf>) -
     for entry in fs::read_dir(root).map_err(|error| format!("{}: {error}", root.display()))? {
         let path = entry.map_err(|error| error.to_string())?.path();
         if path.is_dir() {
+            if linked_worktree_root(&path) {
+                continue;
+            }
             collect_extension(&path, extension, files)?;
         } else if path.extension() == Some(extension) {
             files.push(path);
@@ -11980,8 +11988,9 @@ fn collect_extension(root: &Path, extension: &OsStr, files: &mut Vec<PathBuf>) -
     Ok(())
 }
 
-/// Every file in the tree, minus the two directories at the workspace root that
-/// are not the tree: Cargo's build directory and git's object store.
+/// Every file in the tree, minus Cargo's root build directory, git's root
+/// object store, and any linked worktree nested below this checkout. A linked
+/// worktree is a separate candidate even when a tool stores it below this path.
 ///
 /// The skip used to read `file_name() == "target" || file_name() == ".git"`, and
 /// it was evaluated at every level of the recursion, so it said "the build
@@ -12025,6 +12034,10 @@ fn ignored_build_output(path: &Path) -> bool {
     path.file_name().is_some_and(|name| name == "__pycache__")
 }
 
+fn linked_worktree_root(path: &Path) -> bool {
+    path.join(".git").is_file()
+}
+
 fn collect_files_below(
     directory: &Path,
     not_the_tree: &[PathBuf; 2],
@@ -12035,7 +12048,10 @@ fn collect_files_below(
     {
         let path = entry.map_err(|error| error.to_string())?.path();
         if path.is_dir() {
-            if not_the_tree.contains(&path) || ignored_build_output(&path) {
+            if not_the_tree.contains(&path)
+                || ignored_build_output(&path)
+                || linked_worktree_root(&path)
+            {
                 continue;
             }
             collect_files_below(&path, not_the_tree, files)?;
@@ -12226,6 +12242,54 @@ mod tests {
         }
 
         check_publication_bytes(&root).expect("nothing is left planted");
+        fs::remove_dir_all(&root).expect("clean up");
+    }
+
+    #[test]
+    fn repository_inventories_do_not_enter_nested_git_worktrees() {
+        let root = std::env::temp_dir().join(format!(
+            "xtask-collect-named-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("member/src")).expect("member directory");
+        fs::create_dir_all(root.join(".claude/worktrees/probe/src"))
+            .expect("nested worktree directory");
+        fs::write(root.join(".git"), b"gitdir: candidate\n")
+            .expect("candidate worktree marker");
+        fs::write(root.join("Cargo.toml"), b"[workspace]\n").expect("root manifest");
+        fs::write(
+            root.join("member/Cargo.toml"),
+            b"[package]\nname = \"member\"\nversion = \"0.1.0\"\n",
+        )
+        .expect("member manifest");
+        fs::write(root.join(".claude/worktrees/probe/.git"), b"gitdir: elsewhere\n")
+            .expect("worktree marker");
+        fs::write(
+            root.join(".claude/worktrees/probe/Cargo.toml"),
+            b"[workspace]\n",
+        )
+        .expect("nested root manifest");
+        fs::write(
+            root.join(".claude/worktrees/probe/src/leak.rs"),
+            served_topic(),
+        )
+        .expect("nested build output");
+
+        let mut manifests = Vec::new();
+        collect_named(&root, OsStr::new("Cargo.toml"), &mut manifests)
+            .expect("manifest inventory");
+        manifests.sort();
+        assert_eq!(
+            manifests,
+            vec![root.join("Cargo.toml"), root.join("member/Cargo.toml")]
+        );
+        let mut rust_files = Vec::new();
+        collect_extension(&root, OsStr::new("rs"), &mut rust_files)
+            .expect("Rust source inventory");
+        assert!(rust_files.is_empty());
+        check_publication_bytes(&root).expect("linked worktree bytes are another candidate");
         fs::remove_dir_all(&root).expect("clean up");
     }
 

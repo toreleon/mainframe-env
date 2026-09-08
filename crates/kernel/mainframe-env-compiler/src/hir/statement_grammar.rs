@@ -1841,7 +1841,7 @@ const INSPECT_TALLY_COUNTS: &[&str] = &["CHARACTERS", "ALL", "LEADING"];
 /// `TALLYING {identifier-2 FOR {CHARACTERS [position]... | {ALL|LEADING} {{identifier-3|literal-1} [position]...}...}...}...`
 ///
 /// Three lists nest here and each needs to know where the next one starts.
-/// `ALL` and `LEADING` carry as many operands as follow them -- CardDemo's
+/// `ALL` and `LEADING` carry as many operands as follow them -- the accepted
 /// `TALLYING WS-NO-ACTIONS-SELECTED FOR ALL SPACES LOW-VALUES` counts two
 /// characters into one field -- so an operand ends that list only when a word
 /// that opens another count follows it, or when the operand turns out to be the
