@@ -1,0 +1,43 @@
+{
+  "schema_version": "mainframe-env.cics-pilot-environment@1",
+  "environment_id": "cics-file-uow-local-v1",
+  "profiles": [
+    {"id": "memory", "store_adapter": "mainframe-env-memory", "durable_restart_credit": false},
+    {"id": "sqlite", "store_adapter": "mainframe-env-sqlite", "durable_restart_credit": true}
+  ],
+  "encoding": {"ccsid": 37, "record_bytes_are_compared_exactly": true},
+  "resource": {
+    "file": "ACCTDAT",
+    "dataset": "PILOT.ACCTDAT",
+    "organization": "key-sequenced",
+    "record_format": "fixed",
+    "logical_record_length": 4,
+    "key_offset": 0,
+    "key_length": 2,
+    "recoverable": true,
+    "initial_record_hex": "c1c1f1f1"
+  },
+  "security": {
+    "transaction_class": "TCICSTRN",
+    "file_resource_class": "DATASET",
+    "allowed_principal": "IBMUSER",
+    "denied_principal": "DENIED",
+    "file_denial_resp": 70,
+    "file_denial_resp2": 101
+  },
+  "providers": {
+    "compiler": "mainframe-env-compiler",
+    "interpreter": "mainframe-env-interpreter",
+    "cics": "mainframe-env-cics",
+    "dataset": "mainframe-env-dataset",
+    "security": "cics-pilot-security-v1"
+  },
+  "excluded": [
+    "TOKEN and concurrent outstanding updates",
+    "RLS and remote function shipping",
+    "BDAM and data tables",
+    "multi-owner locking and deadlock ordering",
+    "PostgreSQL profile",
+    "licensed IBM differential execution"
+  ]
+}

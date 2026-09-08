@@ -21,6 +21,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 mod abi;
 mod carddemo;
+mod cics_licensed;
+mod cics_pilot;
 mod cobol_assurance;
 mod cobol_clauses;
 mod cobol_conditions;
@@ -73,6 +75,12 @@ pub use carddemo::{
     verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
     verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
     verify_carddemo_vsam_from_env,
+};
+pub use cics_licensed::{
+    CicsOracleCapture, CicsOracleExpectation, CicsOracleImport, import_cics_oracle_capture,
+};
+pub use cics_pilot::{
+    CicsPilotReport, CicsPilotRuntime, cics_pilot_runtime, run_cics_pilot_profiles,
 };
 pub use dataset::{
     DatasetConformanceRuntime, dataset_conformance_runtime, run_dataset_conformance,

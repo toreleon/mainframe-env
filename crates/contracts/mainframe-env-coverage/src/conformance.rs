@@ -94,6 +94,7 @@ typed_id!(TestId);
 typed_id!(ScenarioId);
 typed_id!(ScenarioStepRef);
 typed_id!(FailurePointRef);
+typed_id!(ReviewedRuleRef);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OfficialCatalogRow {
@@ -173,6 +174,7 @@ pub struct RowSpec {
     oracle: Option<OracleRef>,
     applicable_gates: BTreeSet<CoverageGate>,
     obligations: Vec<ObligationId>,
+    reviewed_rules: Vec<ReviewedRuleRef>,
 }
 
 impl RowSpec {
@@ -230,6 +232,11 @@ impl RowSpec {
     pub fn obligations(&self) -> &[ObligationId] {
         &self.obligations
     }
+
+    #[must_use]
+    pub fn reviewed_rules(&self) -> &[ReviewedRuleRef] {
+        &self.reviewed_rules
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -274,6 +281,8 @@ pub struct ConformanceCase {
     expected: Vec<ObservationRef>,
     recovery: Option<RecoveryRef>,
     oracle: Option<OracleRef>,
+    reviewed_rule: Option<ReviewedRuleRef>,
+    scenario: Option<ScenarioId>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -357,6 +366,16 @@ impl ConformanceCase {
     pub fn recovery(&self) -> Option<&RecoveryRef> {
         self.recovery.as_ref()
     }
+
+    #[must_use]
+    pub fn reviewed_rule(&self) -> Option<&ReviewedRuleRef> {
+        self.reviewed_rule.as_ref()
+    }
+
+    #[must_use]
+    pub fn scenario(&self) -> Option<&ScenarioId> {
+        self.scenario.as_ref()
+    }
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -373,6 +392,7 @@ pub struct RegistryDeclarations {
     fixtures: BTreeMap<FixtureRef, String>,
     scenario_steps: BTreeSet<ScenarioStepRef>,
     failure_points: BTreeSet<FailurePointRef>,
+    reviewed_rules: BTreeMap<ReviewedRuleRef, String>,
 }
 
 impl RegistryDeclarations {
@@ -434,6 +454,11 @@ impl RegistryDeclarations {
     #[must_use]
     pub fn failure_points(&self) -> &BTreeSet<FailurePointRef> {
         &self.failure_points
+    }
+
+    #[must_use]
+    pub fn reviewed_rules(&self) -> &BTreeMap<ReviewedRuleRef, String> {
+        &self.reviewed_rules
     }
 
     fn fixture_digest(&self, fixture: &FixtureRef) -> Option<&str> {
@@ -609,6 +634,35 @@ impl CompiledSpec {
                 return Err(SpecProblem::DuplicateScenario(key.to_string()));
             }
         }
+        for (key, case) in &cases {
+            if let Some(scenario_id) = &case.scenario {
+                let scenario = scenarios.get(scenario_id).ok_or_else(|| {
+                    SpecProblem::InvalidScenario(format!(
+                        "{} names missing scenario {scenario_id}",
+                        format_binding(key)
+                    ))
+                })?;
+                if !scenario.credits.contains(key) {
+                    return Err(SpecProblem::InvalidScenario(format!(
+                        "{} is not credited by scenario {scenario_id}",
+                        format_binding(key)
+                    )));
+                }
+            }
+        }
+        for scenario in scenarios.values() {
+            for credit in &scenario.credits {
+                if cases.get(credit).and_then(|case| case.scenario.as_ref())
+                    != Some(&scenario.scenario_id)
+                {
+                    return Err(SpecProblem::InvalidScenario(format!(
+                        "{} is not bound back to scenario {}",
+                        format_binding(credit),
+                        scenario.scenario_id
+                    )));
+                }
+            }
+        }
         let mut expected_shards = BTreeMap::<ShardKey, BTreeSet<BindingKey>>::new();
         for key in cases.keys() {
             let catalog_row = catalog
@@ -726,6 +780,7 @@ pub struct CacheIdentityInput<'a> {
     pub fixture_digest: &'a str,
     pub oracle_digest: Option<&'a str>,
     pub environment_class: &'a str,
+    pub environment_manifest_digest: &'a str,
     pub shard: &'a ShardKey,
     pub binding: &'a BindingKey,
 }
@@ -746,6 +801,7 @@ impl CacheIdentity {
         if let Some(oracle) = input.oracle_digest {
             validate_digest(oracle)?;
         }
+        validate_digest(input.environment_manifest_digest)?;
         if input.runner_version != CONFORMANCE_RUNNER_VERSION_V1 {
             return Err(SpecProblem::UnsafeCacheKey("runner version".into()));
         }
@@ -764,6 +820,7 @@ impl CacheIdentity {
             input.fixture_digest,
             input.oracle_digest.unwrap_or("none"),
             input.environment_class,
+            input.environment_manifest_digest,
             input.shard.subsystem.as_str(),
             input.shard.family.as_str(),
             input.shard.gate.slug(),
@@ -806,6 +863,11 @@ impl Verdict {
 pub struct VerdictEvent {
     pub schema_version: &'static str,
     pub spec_version: String,
+    pub candidate_digest: String,
+    pub catalog_digest: String,
+    pub spec_digest: String,
+    pub runner_version: &'static str,
+    pub environment_manifest_digest: String,
     pub key: BindingKey,
     pub test_id: TestId,
     pub verdict: Verdict,
@@ -824,6 +886,10 @@ impl VerdictEvent {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         spec_version: impl Into<String>,
+        candidate_digest: impl Into<String>,
+        catalog_digest: impl Into<String>,
+        spec_digest: impl Into<String>,
+        environment_manifest_digest: impl Into<String>,
         key: BindingKey,
         test_id: TestId,
         verdict: Verdict,
@@ -840,6 +906,18 @@ impl VerdictEvent {
         let spec_version = spec_version.into();
         if spec_version != CONFORMANCE_SPEC_VERSION_V1 {
             return Err(SpecProblem::StaleSpecVersion(spec_version));
+        }
+        let candidate_digest = candidate_digest.into();
+        let catalog_digest = catalog_digest.into();
+        let spec_digest = spec_digest.into();
+        let environment_manifest_digest = environment_manifest_digest.into();
+        for digest in [
+            &candidate_digest,
+            &catalog_digest,
+            &spec_digest,
+            &environment_manifest_digest,
+        ] {
+            validate_digest(digest)?;
         }
         let observation_digest = observation_digest.into();
         let cache_identity = cache_identity.into();
@@ -864,6 +942,11 @@ impl VerdictEvent {
         Ok(Self {
             schema_version: CONFORMANCE_VERDICT_CONTRACT,
             spec_version,
+            candidate_digest,
+            catalog_digest,
+            spec_digest,
+            runner_version: CONFORMANCE_RUNNER_VERSION_V1,
+            environment_manifest_digest,
             key,
             test_id,
             verdict,
@@ -883,6 +966,11 @@ impl VerdictEvent {
         serde_json::to_vec(&serde_json::json!({
             "schema_version": self.schema_version,
             "spec_version": self.spec_version,
+            "candidate_digest": self.candidate_digest,
+            "catalog_digest": self.catalog_digest,
+            "spec_digest": self.spec_digest,
+            "runner_version": self.runner_version,
+            "environment_manifest_digest": self.environment_manifest_digest,
             "row_id": self.key.row_id.as_str(),
             "obligation_id": self.key.obligation_id.as_str(),
             "gate": self.key.gate.slug(),
@@ -1175,6 +1263,16 @@ fn validate_verdict_event(
     if event.spec_version != spec.spec_version {
         return Err(SpecProblem::StaleSpecVersion(event.spec_version.clone()));
     }
+    if event.runner_version != CONFORMANCE_RUNNER_VERSION_V1
+        || event.candidate_digest != context.candidate_digest
+        || event.catalog_digest != spec.catalog_digest
+        || event.spec_digest != spec.spec_digest
+        || event.environment_manifest_digest != context.environment_manifest_digest
+    {
+        return Err(SpecProblem::ConflictingVerdict(format!(
+            "{binding}: execution identity"
+        )));
+    }
     validate_digest(&event.observation_digest)?;
     validate_digest(&event.cache_identity)?;
     validate_text(&event.source_locator, limits.max_locator_bytes)?;
@@ -1243,6 +1341,7 @@ fn validate_verdict_event(
             fixture_digest,
             oracle_digest,
             environment_class: &context.environment_class,
+            environment_manifest_digest: &context.environment_manifest_digest,
             shard,
             binding: &event.key,
         },
@@ -1338,6 +1437,8 @@ struct RawRegistries {
     fixtures: Vec<RawArtifactEntry>,
     scenario_steps: Vec<String>,
     failure_points: Vec<String>,
+    #[serde(default)]
+    reviewed_rules: Vec<RawArtifactEntry>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1361,6 +1462,8 @@ struct RawRowSpec {
     oracle: Option<String>,
     applicable_gates: Vec<String>,
     obligations: Vec<String>,
+    #[serde(default)]
+    reviewed_rules: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1385,6 +1488,10 @@ struct RawCase {
     expected: Vec<String>,
     recovery: Option<String>,
     oracle: Option<String>,
+    #[serde(default)]
+    reviewed_rule: Option<String>,
+    #[serde(default)]
+    scenario: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1430,6 +1537,12 @@ fn compile_registries(
             raw.failure_points,
             FailurePointRef::new,
             "failure-point",
+            limits,
+        )?,
+        reviewed_rules: compile_artifacts(
+            raw.reviewed_rules,
+            ReviewedRuleRef::new,
+            "reviewed-rule",
             limits,
         )?,
     })
@@ -1484,6 +1597,7 @@ fn compile_row(
     enforce_ref_limit(raw.postconditions.len(), limits)?;
     enforce_ref_limit(raw.conditions.len(), limits)?;
     enforce_ref_limit(raw.obligations.len(), limits)?;
+    enforce_ref_limit(raw.reviewed_rules.len(), limits)?;
     let row_id = OfficialRowId::new(raw.row_id, limits)?;
     let catalog_row = catalog
         .get(&row_id)
@@ -1525,6 +1639,10 @@ fn compile_row(
     if obligations.is_empty() {
         return Err(SpecProblem::MissingObligation(row_id.to_string()));
     }
+    let reviewed_rules = compile_refs(raw.reviewed_rules, ReviewedRuleRef::new, limits)?;
+    for reviewed_rule in &reviewed_rules {
+        require_registry_map(&registries.reviewed_rules, reviewed_rule, "reviewed-rule")?;
+    }
     Ok(RowSpec {
         row_id,
         operation,
@@ -1537,6 +1655,7 @@ fn compile_row(
         oracle,
         applicable_gates,
         obligations,
+        reviewed_rules,
     })
 }
 
@@ -1640,6 +1759,22 @@ fn compile_case(
     if gate == CoverageGate::Differential && oracle.is_none() {
         return Err(SpecProblem::OracleReceiptRequired);
     }
+    let reviewed_rule = raw
+        .reviewed_rule
+        .map(|value| ReviewedRuleRef::new(value, limits))
+        .transpose()?;
+    if reviewed_rule
+        .as_ref()
+        .is_some_and(|rule| !row.reviewed_rules.contains(rule))
+    {
+        return Err(SpecProblem::UnknownRegistryRef(
+            "case reviewed rule is outside row specification".into(),
+        ));
+    }
+    let scenario = raw
+        .scenario
+        .map(|value| ScenarioId::new(value, limits))
+        .transpose()?;
     Ok(ConformanceCase {
         spec_version: spec_version.into(),
         key,
@@ -1650,6 +1785,8 @@ fn compile_case(
         expected,
         recovery,
         oracle,
+        reviewed_rule,
+        scenario,
     })
 }
 
@@ -1944,10 +2081,45 @@ pub trait ConformanceObservation: Send + Sync {
     fn evaluate(&self, output: &DriverOutput) -> Result<ObservationCheck, String>;
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScenarioObservationBundle {
+    observations: BTreeMap<BindingKey, DriverOutput>,
+}
+
+impl ScenarioObservationBundle {
+    pub fn new(
+        observations: Vec<(BindingKey, DriverOutput)>,
+        limits: ConformanceLimits,
+    ) -> Result<Self, SpecProblem> {
+        if observations.len() > limits.max_scenario_credits {
+            return Err(SpecProblem::LimitExceeded("scenario observations"));
+        }
+        let mut bounded = BTreeMap::new();
+        for (key, output) in observations {
+            if bounded.insert(key.clone(), output).is_some() {
+                return Err(SpecProblem::DuplicateVerdict(format_binding(&key)));
+            }
+        }
+        Ok(Self {
+            observations: bounded,
+        })
+    }
+
+    #[must_use]
+    pub fn observations(&self) -> &BTreeMap<BindingKey, DriverOutput> {
+        &self.observations
+    }
+}
+
+pub trait ConformanceScenarioDriver: Send + Sync {
+    fn execute(&self, scenario: &ScenarioSpec) -> Result<ScenarioObservationBundle, String>;
+}
+
 pub struct RuntimeRegistry<'a> {
     drivers: BTreeMap<DriverRef, &'a dyn ConformanceDriver>,
     predicates: BTreeMap<PredicateRef, &'a dyn ConformancePredicate>,
     observations: BTreeMap<ObservationRef, &'a dyn ConformanceObservation>,
+    scenario_drivers: BTreeMap<ScenarioId, &'a dyn ConformanceScenarioDriver>,
 }
 
 impl<'a> RuntimeRegistry<'a> {
@@ -1978,7 +2150,31 @@ impl<'a> RuntimeRegistry<'a> {
             drivers,
             predicates,
             observations,
+            scenario_drivers: BTreeMap::new(),
         })
+    }
+
+    pub fn with_scenario_drivers(
+        mut self,
+        spec: &CompiledSpec,
+        scenario_drivers: Vec<(ScenarioId, &'a dyn ConformanceScenarioDriver)>,
+        limits: ConformanceLimits,
+    ) -> Result<Self, SpecProblem> {
+        if scenario_drivers.len() > limits.max_scenarios {
+            return Err(SpecProblem::LimitExceeded("scenario runtime entries"));
+        }
+        let scenario_drivers = runtime_map(scenario_drivers, "scenario-driver")?;
+        let expected = spec.scenarios.keys().collect::<BTreeSet<_>>();
+        let actual = scenario_drivers.keys().collect::<BTreeSet<_>>();
+        if actual != expected {
+            return Err(SpecProblem::RuntimeRegistryIncomplete(format!(
+                "scenario-driver: declared={} bound={}",
+                expected.len(),
+                actual.len()
+            )));
+        }
+        self.scenario_drivers = scenario_drivers;
+        Ok(self)
     }
 }
 
@@ -2017,6 +2213,7 @@ fn require_runtime_closure<'a, T: Ord + std::fmt::Display + 'a>(
 pub struct RunnerContext {
     candidate_digest: String,
     environment_class: String,
+    environment_manifest_digest: String,
 }
 
 impl RunnerContext {
@@ -2029,10 +2226,38 @@ impl RunnerContext {
         let environment_class = environment_class.into();
         validate_digest(&candidate_digest)?;
         validate_token(&environment_class, limits)?;
+        let mut digest = Sha256::new();
+        digest_field(&mut digest, b"mainframe-env.environment-class@1");
+        digest_field(&mut digest, environment_class.as_bytes());
         Ok(Self {
             candidate_digest,
             environment_class,
+            environment_manifest_digest: format!("sha256:{:x}", digest.finalize()),
         })
+    }
+
+    pub fn new_with_environment_manifest(
+        candidate_digest: impl Into<String>,
+        environment_class: impl Into<String>,
+        environment_manifest_digest: impl Into<String>,
+        limits: ConformanceLimits,
+    ) -> Result<Self, SpecProblem> {
+        let candidate_digest = candidate_digest.into();
+        let environment_class = environment_class.into();
+        let environment_manifest_digest = environment_manifest_digest.into();
+        validate_digest(&candidate_digest)?;
+        validate_token(&environment_class, limits)?;
+        validate_digest(&environment_manifest_digest)?;
+        Ok(Self {
+            candidate_digest,
+            environment_class,
+            environment_manifest_digest,
+        })
+    }
+
+    #[must_use]
+    pub fn environment_manifest_digest(&self) -> &str {
+        &self.environment_manifest_digest
     }
 }
 
@@ -2048,6 +2273,7 @@ pub enum RunnerSelection {
         shard: Option<u16>,
     },
     Replay(TestId),
+    Scenario(ScenarioId),
 }
 
 impl RunnerSelection {
@@ -2081,6 +2307,13 @@ impl RunnerSelection {
         let subsystem = subsystem.into();
         validate_token(&subsystem, limits)?;
         Ok(Self::Local { subsystem, shard })
+    }
+
+    pub fn scenario(
+        scenario_id: impl Into<String>,
+        limits: ConformanceLimits,
+    ) -> Result<Self, SpecProblem> {
+        Ok(Self::Scenario(ScenarioId::new(scenario_id, limits)?))
     }
 
     fn includes(&self, spec: &CompiledSpec, key: &BindingKey, case: &ConformanceCase) -> bool {
@@ -2118,6 +2351,7 @@ impl RunnerSelection {
                     })
             }
             Self::Replay(test_id) => case.test_id == *test_id,
+            Self::Scenario(scenario_id) => case.scenario.as_ref() == Some(scenario_id),
         }
     }
 }
@@ -2159,6 +2393,9 @@ impl<'a> ConformanceRunner<'a> {
         selection: &RunnerSelection,
         context: &RunnerContext,
     ) -> Result<ConformanceRunReport, SpecProblem> {
+        if let RunnerSelection::Scenario(scenario_id) = selection {
+            return self.run_scenario(scenario_id, context);
+        }
         let selected = self
             .spec
             .cases
@@ -2198,11 +2435,74 @@ impl<'a> ConformanceRunner<'a> {
         Ok(ConformanceRunReport { batches, ledger })
     }
 
-    fn run_case(
+    pub fn run_scenario(
+        &self,
+        scenario_id: &ScenarioId,
+        context: &RunnerContext,
+    ) -> Result<ConformanceRunReport, SpecProblem> {
+        let scenario = self
+            .spec
+            .scenario(scenario_id)
+            .ok_or_else(|| SpecProblem::InvalidScenario(scenario_id.to_string()))?;
+        let driver = self
+            .runtime
+            .scenario_drivers
+            .get(scenario_id)
+            .ok_or_else(|| {
+                SpecProblem::RuntimeRegistryIncomplete(format!("scenario-driver:{scenario_id}"))
+            })?;
+        let bundle = catch_unwind(AssertUnwindSafe(|| driver.execute(scenario)))
+            .map_err(|_| SpecProblem::RuntimeFailure(format!("scenario {scenario_id} panicked")))?
+            .map_err(SpecProblem::RuntimeFailure)?;
+        let expected = scenario.credits.iter().cloned().collect::<BTreeSet<_>>();
+        let actual = bundle.observations.keys().cloned().collect::<BTreeSet<_>>();
+        if expected != actual {
+            return Err(SpecProblem::InvalidScenario(format!(
+                "{scenario_id} observation set is incomplete or contains unknown credits"
+            )));
+        }
+        let mut batches = BTreeMap::<ShardKey, Vec<VerdictEvent>>::new();
+        for key in &scenario.credits {
+            let case = self
+                .spec
+                .case(key)
+                .ok_or_else(|| SpecProblem::UnknownBinding(format_binding(key)))?;
+            let shard = self
+                .spec
+                .shard_for_binding(key)
+                .cloned()
+                .ok_or(SpecProblem::IncompleteShardSet)?;
+            let output = bundle
+                .observations
+                .get(key)
+                .ok_or_else(|| SpecProblem::MissingVerdict(format_binding(key)))?;
+            let event = self.run_observed_case(case, &shard, context, output)?;
+            batches.entry(shard).or_default().push(event);
+        }
+        let mut batches = batches
+            .into_iter()
+            .map(|(shard, mut events)| {
+                events.sort_by(|left, right| left.key.cmp(&right.key));
+                VerdictBatch { shard, events }
+            })
+            .collect::<Vec<_>>();
+        batches.sort_by(|left, right| left.shard.cmp(&right.shard));
+        let selection = RunnerSelection::Scenario(scenario_id.clone());
+        validate_verdict_batches(self.spec, &selection, &batches)?;
+        let events = batches
+            .iter()
+            .flat_map(|batch| batch.events.iter().cloned())
+            .collect();
+        let ledger = DerivedConformanceLedger::derive_partial(self.spec, context, events)?;
+        Ok(ConformanceRunReport { batches, ledger })
+    }
+
+    fn run_observed_case(
         &self,
         case: &ConformanceCase,
         shard: &ShardKey,
         context: &RunnerContext,
+        output: &DriverOutput,
     ) -> Result<VerdictEvent, SpecProblem> {
         let fixture_digest = self
             .spec
@@ -2228,6 +2528,110 @@ impl<'a> ConformanceRunner<'a> {
                 fixture_digest,
                 oracle_digest,
                 environment_class: &context.environment_class,
+                environment_manifest_digest: &context.environment_manifest_digest,
+                shard,
+                binding: &case.key,
+            },
+            self.limits,
+        )?;
+        let mut expected = Vec::new();
+        let mut actual = Vec::new();
+        let mut matched = true;
+        for observation in &case.expected {
+            let handler = self.runtime.observations.get(observation).ok_or_else(|| {
+                SpecProblem::RuntimeRegistryIncomplete(format!("observation:{observation}"))
+            })?;
+            match catch_unwind(AssertUnwindSafe(|| handler.evaluate(output))) {
+                Ok(Ok(check)) => {
+                    matched &= check.matched;
+                    expected.push(format!("{observation}:{}", check.expected));
+                    actual.push(format!("{observation}:{}", check.actual));
+                }
+                Ok(Err(problem)) => {
+                    matched = false;
+                    expected.push(format!("{observation}=evaluated"));
+                    actual.push(format!("{observation}=error:{problem}"));
+                }
+                Err(_) => {
+                    matched = false;
+                    expected.push(format!("{observation}=evaluated"));
+                    actual.push(format!("{observation}=panic"));
+                }
+            }
+        }
+        let expected = bounded_projection(&expected, self.limits.max_observation_bytes);
+        let actual = bounded_projection(&actual, self.limits.max_observation_bytes);
+        let mut observation_hash = Sha256::new();
+        digest_field(&mut observation_hash, expected.as_bytes());
+        digest_field(&mut observation_hash, actual.as_bytes());
+        digest_field(&mut observation_hash, output.bytes());
+        let catalog = self
+            .spec
+            .catalog_rows
+            .get(&case.key.row_id)
+            .ok_or_else(|| SpecProblem::UnknownRow(case.key.row_id.to_string()))?;
+        VerdictEvent::new(
+            self.spec.spec_version(),
+            &context.candidate_digest,
+            self.spec.catalog_digest(),
+            self.spec.spec_digest(),
+            &context.environment_manifest_digest,
+            case.key.clone(),
+            case.test_id.clone(),
+            if matched {
+                Verdict::Pass
+            } else {
+                Verdict::Fail
+            },
+            format!("sha256:{:x}", observation_hash.finalize()),
+            cache.identity,
+            catalog.source_locator.clone(),
+            case.driver.clone(),
+            case.input.clone(),
+            expected,
+            actual,
+            output.oracle_receipt_digest.clone(),
+            self.limits,
+        )
+    }
+
+    fn run_case(
+        &self,
+        case: &ConformanceCase,
+        shard: &ShardKey,
+        context: &RunnerContext,
+    ) -> Result<VerdictEvent, SpecProblem> {
+        if let Some(scenario) = &case.scenario {
+            return Err(SpecProblem::InvalidScenario(format!(
+                "{} must execute through scenario {scenario}",
+                format_binding(&case.key)
+            )));
+        }
+        let fixture_digest = self
+            .spec
+            .registries
+            .fixture_digest(&case.input)
+            .ok_or_else(|| SpecProblem::UnknownRegistryRef(case.input.to_string()))?;
+        let oracle_digest = case
+            .oracle
+            .as_ref()
+            .map(|oracle| {
+                self.spec
+                    .registries
+                    .oracle_digest(oracle)
+                    .ok_or_else(|| SpecProblem::UnknownRegistryRef(oracle.to_string()))
+            })
+            .transpose()?;
+        let cache = CacheIdentity::new(
+            CacheIdentityInput {
+                candidate_digest: &context.candidate_digest,
+                catalog_digest: self.spec.catalog_digest(),
+                spec_digest: self.spec.spec_digest(),
+                runner_version: CONFORMANCE_RUNNER_VERSION_V1,
+                fixture_digest,
+                oracle_digest,
+                environment_class: &context.environment_class,
+                environment_manifest_digest: &context.environment_manifest_digest,
                 shard,
                 binding: &case.key,
             },
@@ -2318,6 +2722,10 @@ impl<'a> ConformanceRunner<'a> {
             .ok_or_else(|| SpecProblem::UnknownRow(case.key.row_id.to_string()))?;
         VerdictEvent::new(
             self.spec.spec_version(),
+            &context.candidate_digest,
+            self.spec.catalog_digest(),
+            self.spec.spec_digest(),
+            &context.environment_manifest_digest,
             case.key.clone(),
             case.test_id.clone(),
             if matched {
@@ -2419,6 +2827,8 @@ mod conformance_tests {
         "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
     const ORACLE_RECEIPT: &str =
         "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+    const ENVIRONMENT_DIGEST: &str =
+        "sha256:9999999999999999999999999999999999999999999999999999999999999999";
 
     fn limits() -> ConformanceLimits {
         ConformanceLimits::default()
@@ -2747,6 +3157,7 @@ mod conformance_tests {
                 "gate": "recognized"
             }]
         }]);
+        value["cases"][0]["scenario"] = json!("mock.cross-subsystem");
         let spec = compile(&value).unwrap();
         let scenario = spec.scenarios().next().unwrap();
         assert_eq!(scenario.scenario_id().as_str(), "mock.cross-subsystem");
@@ -2771,6 +3182,130 @@ mod conformance_tests {
         assert!(matches!(
             compile(&value),
             Err(SpecProblem::UnknownRegistryRef(_))
+        ));
+    }
+
+    #[test]
+    fn scenario_driver_executes_once_and_missing_per_credit_observations_fail_closed() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        struct ScenarioEcho {
+            calls: AtomicUsize,
+            omit: bool,
+        }
+        impl ConformanceScenarioDriver for ScenarioEcho {
+            fn execute(
+                &self,
+                scenario: &ScenarioSpec,
+            ) -> Result<ScenarioObservationBundle, String> {
+                self.calls.fetch_add(1, Ordering::SeqCst);
+                let values = if self.omit {
+                    Vec::new()
+                } else {
+                    scenario
+                        .credits()
+                        .iter()
+                        .map(|key| {
+                            DriverOutput::new(b"ok".to_vec(), limits())
+                                .map(|output| (key.clone(), output))
+                        })
+                        .collect::<Result<Vec<_>, _>>()
+                        .map_err(|problem| problem.to_string())?
+                };
+                ScenarioObservationBundle::new(values, limits())
+                    .map_err(|problem| problem.to_string())
+            }
+        }
+
+        let mut value = document();
+        value["registries"]["drivers"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!("mock.second-driver"));
+        value["cases"][0]["scenario"] = json!("mock.cross-subsystem");
+        value["scenarios"] = json!([{
+            "scenario_id": "mock.cross-subsystem",
+            "drivers": ["mock.driver", "mock.second-driver"],
+            "ordered_steps": ["mock.step.prepare", "mock.step.commit"],
+            "failure_points": [],
+            "credits": [{
+                "row_id": "official:mock:0001",
+                "obligation_id": "valid-form",
+                "gate": "recognized"
+            }]
+        }]);
+        let spec = compile(&value).unwrap();
+        let scenario_id = ScenarioId::new("mock.cross-subsystem", limits()).unwrap();
+        let driver = ScenarioEcho {
+            calls: AtomicUsize::new(0),
+            omit: false,
+        };
+        let runtime = RuntimeRegistry::new(
+            &spec,
+            vec![
+                (DriverRef::new("mock.driver", limits()).unwrap(), &ECHO),
+                (
+                    DriverRef::new("mock.second-driver", limits()).unwrap(),
+                    &ECHO,
+                ),
+            ],
+            vec![(
+                PredicateRef::new("fixture.ready", limits()).unwrap(),
+                &READY,
+            )],
+            vec![(
+                ObservationRef::new("output.exact", limits()).unwrap(),
+                &EXACT,
+            )],
+            limits(),
+        )
+        .unwrap()
+        .with_scenario_drivers(&spec, vec![(scenario_id.clone(), &driver)], limits())
+        .unwrap();
+        let report = ConformanceRunner::new(&spec, runtime, limits())
+            .run(&RunnerSelection::Scenario(scenario_id.clone()), &context())
+            .unwrap();
+        assert_eq!(driver.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            report
+                .batches
+                .iter()
+                .flat_map(|batch| &batch.events)
+                .filter(|event| event.verdict == Verdict::Pass)
+                .count(),
+            1
+        );
+
+        let incomplete = ScenarioEcho {
+            calls: AtomicUsize::new(0),
+            omit: true,
+        };
+        let runtime = RuntimeRegistry::new(
+            &spec,
+            vec![
+                (DriverRef::new("mock.driver", limits()).unwrap(), &ECHO),
+                (
+                    DriverRef::new("mock.second-driver", limits()).unwrap(),
+                    &ECHO,
+                ),
+            ],
+            vec![(
+                PredicateRef::new("fixture.ready", limits()).unwrap(),
+                &READY,
+            )],
+            vec![(
+                ObservationRef::new("output.exact", limits()).unwrap(),
+                &EXACT,
+            )],
+            limits(),
+        )
+        .unwrap()
+        .with_scenario_drivers(&spec, vec![(scenario_id.clone(), &incomplete)], limits())
+        .unwrap();
+        assert!(matches!(
+            ConformanceRunner::new(&spec, runtime, limits())
+                .run(&RunnerSelection::Scenario(scenario_id), &context()),
+            Err(SpecProblem::InvalidScenario(_))
         ));
     }
 
@@ -2846,6 +3381,13 @@ mod conformance_tests {
         assert_eq!(
             projection["schema_version"],
             json!(CONFORMANCE_VERDICT_CONTRACT)
+        );
+        assert_eq!(projection["candidate_digest"], json!(CANDIDATE_DIGEST));
+        assert_eq!(projection["catalog_digest"], json!(CATALOG_DIGEST));
+        assert_eq!(projection["spec_digest"], json!(spec.spec_digest()));
+        assert_eq!(
+            projection["environment_manifest_digest"],
+            json!(context().environment_manifest_digest())
         );
         assert_eq!(first.identity().unwrap().len(), 71);
         let ledger: Value =
@@ -2948,6 +3490,18 @@ mod conformance_tests {
         assert!(matches!(
             rejected(&spec, |event| event.schema_version =
                 "mainframe-env.conformance-verdict@0"),
+            SpecProblem::ConflictingVerdict(_)
+        ));
+        assert!(matches!(
+            rejected(&spec, |event| {
+                event.candidate_digest =
+                    "sha256:1212121212121212121212121212121212121212121212121212121212121212".into()
+            }),
+            SpecProblem::ConflictingVerdict(_)
+        ));
+        assert!(matches!(
+            rejected(&spec, |event| event.environment_manifest_digest =
+                ENVIRONMENT_DIGEST.into()),
             SpecProblem::ConflictingVerdict(_)
         ));
         let wrong_context = RunnerContext::new(
@@ -3117,6 +3671,7 @@ mod conformance_tests {
             fixture_digest: FIXTURE_DIGEST,
             oracle_digest: None,
             environment_class: "local",
+            environment_manifest_digest: ENVIRONMENT_DIGEST,
             shard,
             binding,
         };
@@ -3125,12 +3680,22 @@ mod conformance_tests {
             CacheIdentityInput {
                 candidate_digest:
                     "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-                ..base
+                ..base.clone()
             },
             limits(),
         )
         .unwrap();
         assert_ne!(original, changed);
+        let changed_environment = CacheIdentity::new(
+            CacheIdentityInput {
+                environment_manifest_digest:
+                    "sha256:1212121212121212121212121212121212121212121212121212121212121212",
+                ..base.clone()
+            },
+            limits(),
+        )
+        .unwrap();
+        assert_ne!(original, changed_environment);
 
         let mut wrong_shard = shard.clone();
         wrong_shard.bucket = (wrong_shard.bucket + 1) % wrong_shard.bucket_count;
@@ -3144,6 +3709,7 @@ mod conformance_tests {
                     fixture_digest: FIXTURE_DIGEST,
                     oracle_digest: None,
                     environment_class: "local",
+                    environment_manifest_digest: ENVIRONMENT_DIGEST,
                     shard: &wrong_shard,
                     binding,
                 },
@@ -3163,11 +3729,15 @@ mod conformance_tests {
         assert_eq!(
             VerdictEvent::new(
                 CONFORMANCE_SPEC_VERSION_V1,
+                CANDIDATE_DIGEST,
+                CATALOG_DIGEST,
+                CATALOG_DIGEST,
+                ENVIRONMENT_DIGEST,
                 key,
                 TestId::new("oracle.test", limits()).unwrap(),
                 Verdict::Pass,
-                CATALOG_DIGEST,
                 CANDIDATE_DIGEST,
+                FIXTURE_DIGEST,
                 "official-page:1",
                 DriverRef::new("mock.driver", limits()).unwrap(),
                 FixtureRef::new("mock.fixture", limits()).unwrap(),

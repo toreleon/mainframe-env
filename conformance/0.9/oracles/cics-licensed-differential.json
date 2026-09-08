@@ -1,0 +1,35 @@
+{
+  "schema_version": "mainframe-env.cics-licensed-differential-adapter@1",
+  "pilot_id": "cics-file-uow-local-v1",
+  "capture_contract": "mainframe-env.cics-oracle-capture@1",
+  "required_scenarios": [
+    "plain-read",
+    "rewrite-without-update",
+    "read-update-rewrite",
+    "commit-rollback-boundary",
+    "missing-record",
+    "unauthorized",
+    "closed-file"
+  ],
+  "origin_policy": {
+    "kind": "licensed-ibm",
+    "trusted_authority_id": "ibm-cics-protected-runner",
+    "signature_algorithm": "ed25519",
+    "public_key_source": "MAINFRAME_ENV_CICS_ORACLE_PUBLIC_KEY",
+    "self_declared_origin_is_evidence": false,
+    "local_model_and_synthetic_credit": 0
+  },
+  "environment_manifest_fields": [
+    "cics_version_and_maintenance",
+    "enterprise_cobol_version",
+    "compiler_options",
+    "encoding",
+    "file_resource_definition",
+    "recoverability",
+    "principal_and_saf_configuration",
+    "initial_record_bytes"
+  ],
+  "handoff": "docs/runbooks/cics-licensed-pilot.md",
+  "licensed_campaign_status": "not-run",
+  "differential_gate": "pending"
+}

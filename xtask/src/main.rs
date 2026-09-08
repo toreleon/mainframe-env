@@ -834,6 +834,7 @@ fn check_spec(root: &Path) -> TaskResult {
     verify_cobol_function_fixtures()?;
     check_cobol_language_generated(root)?;
     let spec = compile_shared_spec(root)?;
+    check_cics_pilot_inputs(root, &spec)?;
     if let Ok(receipt_path) = env::var("MAINFRAME_ENV_COBOL65_LICENSED_ORACLE_RECEIPT") {
         let receipt_path = fs::canonicalize(PathBuf::from(receipt_path))
             .map_err(|error| format!("licensed COBOL receipt: {error}"))?;
@@ -889,6 +890,155 @@ fn check_spec(root: &Path) -> TaskResult {
         spec.expected_shards().len(),
     );
     Ok(())
+}
+
+fn check_cics_pilot_inputs(root: &Path, spec: &CompiledSpec) -> TaskResult {
+    let manifest_path = root.join("conformance/0.9/manifests/cics-file-uow-topics.json");
+    if !manifest_path.is_file() {
+        return Ok(());
+    }
+    let manifest = json(&manifest_path)?;
+    let topics = array(&manifest, "topics", &manifest_path)?;
+    require(
+        topics.len() == 9
+            && manifest["topic_count"].as_u64() == Some(9)
+            && topics
+                .iter()
+                .map(|topic| topic["bytes"].as_u64().unwrap_or(0))
+                .sum::<u64>()
+                == manifest["total_bytes"].as_u64().unwrap_or(u64::MAX),
+        "CICS pilot topic manifest is incomplete",
+    )?;
+    let mut lines = topics
+        .iter()
+        .map(|topic| {
+            Ok(format!(
+                "{} {}\n",
+                text(topic, "topic_path", &manifest_path)?,
+                text(topic, "sha256", &manifest_path)?
+            ))
+        })
+        .collect::<TaskResult<Vec<_>>>()?;
+    lines.sort();
+    let manifest_digest = format!("{:x}", Sha256::digest(lines.concat().as_bytes()));
+    require(
+        manifest["topic_manifest_digest"].as_str() == Some(&manifest_digest),
+        "CICS pilot topic-manifest digest drifted",
+    )?;
+
+    let candidates_path =
+        root.join("conformance/0.9/generated/cics-pilot-semantic-candidates.json");
+    let review_path = root.join("conformance/0.9/cics/pilot-rule-review.json");
+    let environment_path = root.join("conformance/0.9/cics/pilot-environment.json");
+    let fixture_path = root.join("conformance/0.9/cics/pilot-fixtures.json");
+    let adapter_path = root.join("conformance/0.9/oracles/cics-licensed-differential.json");
+    let candidates = json(&candidates_path)?;
+    let review = json(&review_path)?;
+    let environment = json(&environment_path)?;
+    let fixture = json(&fixture_path)?;
+    let adapter = json(&adapter_path)?;
+    let adapter_schema_path =
+        root.join("conformance/0.9/schemas/cics-licensed-differential-adapter.schema.json");
+    validate_schema_instance(&json(&adapter_schema_path)?, &adapter, &adapter_path)?;
+    require(
+        candidates["coverage_credit"].as_u64() == Some(0)
+            && candidates["retained_publication_bytes"].as_bool() == Some(false)
+            && candidates["topic_manifest_digest"] == manifest["topic_manifest_digest"],
+        "CICS pilot candidate evidence boundary drifted",
+    )?;
+    let expected_projection = format!("sha256:{}", file_digest(&candidates_path)?);
+    require(
+        review["candidate_projection_sha256"].as_str() == Some(&expected_projection),
+        "CICS pilot rule review is stale against its candidate projection",
+    )?;
+    let inventory = array(&candidates, "inventory", &candidates_path)?;
+    let totals = &candidates["totals"];
+    require(
+        totals["normative_fragments"].as_u64() == Some(inventory.len() as u64)
+            && totals["normative_fragments"]
+                == review["inventory_disposition"]["normative_fragments"]
+            && totals["candidates"] == review["inventory_disposition"]["candidate_fragments"]
+            && totals["unsupported"] == review["inventory_disposition"]["unsupported_fragments"]
+            && totals["conflicting"] == review["inventory_disposition"]["conflicting_fragments"]
+            && totals["outside_scope"]
+                == review["inventory_disposition"]["outside_scope_fragments"]
+            && totals["informative"] == review["inventory_disposition"]["informative_fragments"],
+        "CICS pilot source-fragment review counts are stale",
+    )?;
+    let candidate_rules = array(&candidates, "candidates", &candidates_path)?
+        .iter()
+        .flat_map(|candidate| {
+            candidate["rule_ids"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+        })
+        .collect::<BTreeSet<_>>();
+    let decisions = array(&review, "decisions", &review_path)?;
+    let reviewed_rules = decisions
+        .iter()
+        .map(|decision| text(decision, "rule_id", &review_path).map(str::to_string))
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        candidate_rules == reviewed_rules
+            && decisions.iter().all(|decision| {
+                matches!(
+                    decision["decision"].as_str(),
+                    Some("proposed-accept" | "accepted" | "defer-pending")
+                )
+            }),
+        "CICS pilot candidate decisions are incomplete or unknown",
+    )?;
+    require(
+        environment["profiles"]
+            .as_array()
+            .is_some_and(|profiles| profiles.len() == 2)
+            && environment["resource"]["recoverable"].as_bool() == Some(true)
+            && fixture["comparison_policy"]["normalizable_fields"]
+                .as_array()
+                .is_some_and(Vec::is_empty),
+        "CICS pilot environment or independent comparison policy drifted",
+    )?;
+    require(
+        adapter["schema_version"] == "mainframe-env.cics-licensed-differential-adapter@1"
+            && adapter["required_scenarios"]
+                .as_array()
+                .is_some_and(|scenarios| scenarios.len() == 7)
+            && adapter["origin_policy"]["trusted_authority_id"] == "ibm-cics-protected-runner"
+            && adapter["origin_policy"]["self_declared_origin_is_evidence"] == false
+            && adapter["licensed_campaign_status"] == "not-run"
+            && adapter["differential_gate"] == "pending",
+        "CICS licensed adapter readiness or pending boundary drifted",
+    )?;
+    let cics_promoted = spec.rows().any(|row| {
+        spec.catalog_row(row.row_id())
+            .is_some_and(|catalog| catalog.subsystem() == "cics")
+    });
+    match review["review_status"].as_str() {
+        Some("pending-maintainer") => require(
+            !cics_promoted,
+            "unreviewed CICS candidates were promoted into Conformance IR",
+        )?,
+        Some("accepted") => require(
+            cics_promoted
+                && decisions.iter().all(|decision| {
+                    decision["decision"] == "accepted" || decision["decision"] == "defer-pending"
+                }),
+            "accepted CICS review is not fully promoted or dispositioned",
+        )?,
+        _ => return Err("CICS pilot review status is unknown".into()),
+    }
+    let tests = root.join("conformance/0.9/tools/tests");
+    let status = Command::new("python3")
+        .args(["-B", "-m", "unittest", "discover", "-s"])
+        .arg(&tests)
+        .args(["-p", "test_*.py"])
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("CICS pilot extractor tests: {error}"))?;
+    require(status.success(), "CICS pilot extractor tests failed")
 }
 
 fn check_dataset_fixture_bindings(root: &Path, spec: &CompiledSpec) -> TaskResult {
@@ -961,6 +1111,10 @@ fn validate_conformance_projections(schema_directory: &Path, spec: &CompiledSpec
 
     let event = VerdictEvent::new(
         spec.spec_version(),
+        "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+        spec.catalog_digest(),
+        spec.spec_digest(),
+        context.environment_manifest_digest(),
         BindingKey {
             row_id: OfficialRowId::new("schema:smoke:row", limits)
                 .map_err(|problem| problem.to_string())?,

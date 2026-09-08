@@ -1,0 +1,115 @@
+{
+  "schema_version": "mainframe-env.cics-pilot-compile-rules@1",
+  "extractor_version": "cics-dita-fragments@1",
+  "release": "CICS TS 6.x documentation snapshot 2026-09-08",
+  "max_link_depth": 1,
+  "sources": [
+    {"topic_path": "SSJL4D_6.x/administering/recovery/dfht2c0034.html", "sections": ["__lead__", "dfht2c00-gen34__title__2"]},
+    {"topic_path": "SSJL4D_6.x/applications/designing/dfhp3a5.html", "sections": ["__lead__", "dfhp3a5__token-option__title__1"]},
+    {"topic_path": "SSJL4D_6.x/applications/designing/dfhp3c00110.html", "sections": ["dfhp3001-gen110__VSAMdatasets__title__1"]},
+    {"topic_path": "SSJL4D_6.x/applications/designing/dfht5b0054.html", "sections": ["__lead__"]},
+    {"topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_read.html", "sections": ["dfhp43w__description", "dfhp43w__options", "dfhp43w__conditions"]},
+    {"topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_rewrite.html", "sections": ["dfhp44y__description", "dfhp44y__options", "dfhp44y__conditions"]},
+    {"topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_syncpoint.html", "sections": ["dfhp46b__description", "dfhp46b__conditions"]},
+    {"topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_syncpointrollback.html", "sections": ["dfhp46c__options", "dfhp46c__conditions"]},
+    {"topic_path": "SSJL4D_6.x/reference-diagnostics/components/dfhs3c00353.html", "sections": ["dfhs3c00-gen353__title__3", "dfhs3c00-gen353__title__7"]}
+  ],
+  "compile_rules": [
+    {
+      "id": "cics.read.update-context",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_read.html",
+      "sections": ["dfhp43w__options"],
+      "all": ["record.*obtained for updating", "option is omitted.*read-only"],
+      "interpretation": "READ with UPDATE establishes the update context needed by a later REWRITE; omitting UPDATE is read-only.",
+      "applicability": "local keyed recoverable VSAM-compatible file; no TOKEN"
+    },
+    {
+      "id": "cics.read.notfound-80",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_read.html",
+      "sections": ["dfhp43w__conditions"],
+      "all": ["attempt to retrieve", "unsuccessful"],
+      "interpretation": "A missing keyed record reports NOTFND with RESP 13 and RESP2 80.",
+      "applicability": "local keyed file read"
+    },
+    {
+      "id": "cics.file.notauth-101",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_read.html",
+      "sections": ["dfhp43w__conditions"],
+      "all": ["resource security check", "FILE"],
+      "interpretation": "A failed file resource security check reports NOTAUTH with RESP 70 and RESP2 101.",
+      "applicability": "file resource security enabled"
+    },
+    {
+      "id": "cics.read.notopen-60",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_read.html",
+      "sections": ["dfhp43w__conditions"],
+      "all": ["NOTOPEN.*60", "returned"],
+      "interpretation": "Reading a closed unavailable file reports NOTOPEN with RESP 19 and RESP2 60.",
+      "applicability": "local closed file resource"
+    },
+    {
+      "id": "cics.rewrite.requires-read-update",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_rewrite.html",
+      "sections": ["dfhp44y__description"],
+      "all": ["must always precede", "read.*UPDATE"],
+      "interpretation": "REWRITE is valid only after a READ with UPDATE for the record.",
+      "applicability": "local keyed file; no TOKEN"
+    },
+    {
+      "id": "cics.rewrite.invreq-30",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_rewrite.html",
+      "sections": ["dfhp44y__conditions"],
+      "all": ["REWRITE.*without a token", "no previous READ for UPDATE"],
+      "interpretation": "REWRITE without a preceding no-token READ UPDATE reports INVREQ with RESP 16 and RESP2 30.",
+      "applicability": "local keyed file; no TOKEN"
+    },
+    {
+      "id": "cics.update.context-lifetime",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3a5.html",
+      "sections": ["__lead__"],
+      "all": ["READ UPDATE", "remains valid until", "SYNCPOINT"],
+      "interpretation": "The no-token update context is invalidated by REWRITE, UNLOCK, eligible DELETE, or SYNCPOINT.",
+      "applicability": "local keyed file update context"
+    },
+    {
+      "id": "cics.syncpoint.commit",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_syncpoint.html",
+      "sections": ["dfhp46b__description"],
+      "all": ["all changes", "recoverable resources", "committed"],
+      "interpretation": "SYNCPOINT commits changes to recoverable resources since the prior syncpoint.",
+      "applicability": "recoverable local file UOW"
+    },
+    {
+      "id": "cics.syncpoint.rollback",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_syncpointrollback.html",
+      "sections": ["dfhp46c__options"],
+      "all": ["all changes", "recoverable resources", "backed out"],
+      "interpretation": "SYNCPOINT ROLLBACK backs out changes to recoverable resources since the prior syncpoint.",
+      "applicability": "recoverable local file UOW"
+    },
+    {
+      "id": "cics.recovery.current-uow-only",
+      "topic_path": "SSJL4D_6.x/administering/recovery/dfht2c0034.html",
+      "sections": ["dfht2c00-gen34__title__2"],
+      "all": ["changes made within", "UOW", "backed out"],
+      "interpretation": "Failure or explicit rollback backs out the current UOW; work committed at an earlier syncpoint remains committed.",
+      "applicability": "recoverable resources"
+    },
+    {
+      "id": "cics.locking.pending",
+      "topic_path": "SSJL4D_6.x/reference-diagnostics/components/dfhs3c00353.html",
+      "sections": ["dfhs3c00-gen353__title__3"],
+      "all": ["prevent", "more than one unit of work", "updated"],
+      "interpretation": "Concurrent update locking is normative but excluded from this single-owner pilot and remains pending.",
+      "applicability": "concurrent units of work; outside pilot"
+    },
+    {
+      "id": "cics.recovery.backout-logging",
+      "topic_path": "SSJL4D_6.x/reference-diagnostics/components/dfhs3c00353.html",
+      "sections": ["dfhs3c00-gen353__title__7"],
+      "all": ["automatic logging", "recoverable files"],
+      "interpretation": "Updates to recoverable files require recovery information sufficient to restore state after failure.",
+      "applicability": "recoverable local file"
+    }
+  ]
+}

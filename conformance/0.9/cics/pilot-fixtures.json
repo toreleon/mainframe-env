@@ -1,0 +1,22 @@
+{
+  "schema_version": "mainframe-env.cics-pilot-fixtures@1",
+  "fixture_id": "cics.file-uow.pilot-v1",
+  "initial": {"key": "AA", "record": "AA11"},
+  "updates": {"committed": "AA22", "rolled_back": "AA33"},
+  "expected": {
+    "plain_read": {"condition": "NORMAL", "resp": 0, "resp2": 0, "record": "AA11"},
+    "rewrite_without_update": {"condition": "INVREQ", "resp": 16, "resp2": 30, "record_after": "AA11"},
+    "read_update": {"condition": "NORMAL", "resp": 0, "resp2": 0, "record": "AA11"},
+    "rewrite_commit": {"condition": "NORMAL", "resp": 0, "resp2": 0, "record_after": "AA22"},
+    "rollback": {"condition": "NORMAL", "resp": 0, "resp2": 0, "record_after": "AA22"},
+    "missing_record": {"condition": "NOTFND", "resp": 13, "resp2": 80},
+    "unauthorized": {"condition": "NOTAUTH", "resp": 70, "resp2": 101, "record_after": "AA22"},
+    "closed_file": {"condition": "NOTOPEN", "resp": 19, "resp2": 60, "record_after": "AA22"}
+  },
+  "comparison_policy": {
+    "version": "cics-file-uow-comparison@1",
+    "exact_fields": ["condition", "resp", "resp2", "application_output", "record_bytes"],
+    "normalizable_fields": [],
+    "unspecified_fields": ["internal_trace_order", "provider_state_versions", "timestamps"]
+  }
+}

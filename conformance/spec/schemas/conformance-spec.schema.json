@@ -45,6 +45,7 @@
         "fixtures": {"type": "array", "maxItems": 100000, "items": {"$ref": "#/$defs/artifact"}},
         "scenario_steps": {"$ref": "#/$defs/ids"},
         "failure_points": {"$ref": "#/$defs/ids"}
+        ,"reviewed_rules": {"type": "array", "maxItems": 100000, "items": {"$ref": "#/$defs/artifact"}}
       }
     },
     "row": {
@@ -62,7 +63,8 @@
         "recovery": {"anyOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
         "oracle": {"anyOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
         "applicable_gates": {"$ref": "#/$defs/gates"},
-        "obligations": {"type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
+        "obligations": {"type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "reviewed_rules": {"type": "array", "maxItems": 256, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
       }
     },
     "obligation": {
@@ -90,7 +92,9 @@
         "preconditions": {"type": "array", "maxItems": 256, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
         "expected": {"type": "array", "minItems": 1, "maxItems": 256, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
         "recovery": {"anyOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
-        "oracle": {"anyOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]}
+        "oracle": {"anyOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
+        "reviewed_rule": {"anyOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
+        "scenario": {"anyOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]}
       }
     },
     "credit": {

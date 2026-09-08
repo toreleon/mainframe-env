@@ -1,0 +1,31 @@
+{
+  "schema_version": "mainframe-env.cics-pilot-rule-review@1",
+  "review_status": "pending-maintainer",
+  "candidate_projection_sha256": "sha256:cdf8c7bc19dcab203cc556911cda4872cecedb3188fd7bcb39a54619734dff9c",
+  "topic_manifest_digest": "fb318cc37ebb5a985317bd68a67d0d9614bc4f27edca8a7c4df0464602847007",
+  "review_boundary": "The interpretations below are proposed from the pinned fragments. They are not promoted into Conformance IR until a maintainer records acceptance in repository or PR review.",
+  "inventory_disposition": {
+    "normative_fragments": 365,
+    "candidate_fragments": 14,
+    "proposed_accepted_fragments": 11,
+    "deferred_fragments": 3,
+    "outside_scope_fragments": 336,
+    "informative_fragments": 15,
+    "unsupported_fragments": 0,
+    "conflicting_fragments": 0
+  },
+  "decisions": [
+    {"rule_id": "cics.read.update-context", "decision": "proposed-accept", "obligations": ["plain-read", "read-update"]},
+    {"rule_id": "cics.read.notfound-80", "decision": "proposed-accept", "obligations": ["missing-record"]},
+    {"rule_id": "cics.file.notauth-101", "decision": "proposed-accept", "obligations": ["unauthorized"]},
+    {"rule_id": "cics.read.notopen-60", "decision": "proposed-accept", "obligations": ["closed-file"]},
+    {"rule_id": "cics.rewrite.requires-read-update", "decision": "proposed-accept", "obligations": ["requires-read-update", "rewrite-record"]},
+    {"rule_id": "cics.rewrite.invreq-30", "decision": "proposed-accept", "obligations": ["requires-read-update", "forbidden-mutation-on-invreq"]},
+    {"rule_id": "cics.update.context-lifetime", "decision": "proposed-accept", "obligations": ["context-invalidated-at-syncpoint"]},
+    {"rule_id": "cics.syncpoint.commit", "decision": "proposed-accept", "obligations": ["commit-boundary"]},
+    {"rule_id": "cics.syncpoint.rollback", "decision": "proposed-accept", "obligations": ["rollback-boundary", "durable-restart"]},
+    {"rule_id": "cics.recovery.current-uow-only", "decision": "proposed-accept", "obligations": ["commit-boundary", "rollback-boundary"]},
+    {"rule_id": "cics.recovery.backout-logging", "decision": "proposed-accept", "obligations": ["durable-restart"]},
+    {"rule_id": "cics.locking.pending", "decision": "defer-pending", "obligations": [], "reason": "Multi-owner concurrency is excluded from the single-owner pilot; the rules remain pending and are not non-applicable."}
+  ]
+}
