@@ -44,6 +44,9 @@ const RELEASE_DOCUMENTS: [&str; 6] = [
     "provenance.intoto.json",
     "sbom.cdx.json",
 ];
+// The round-five snapshot still seals these exact historical Git objects, while
+// the current repository must keep them retired rather than restoring old CI.
+const RETIRED_RETAINED_PATHS: [&str; 1] = [".github/workflows/ci.yml"];
 
 #[derive(Clone, Copy)]
 struct SealProfile {
@@ -800,6 +803,13 @@ fn validate_changed_scope(
     let retained = retained_paths();
     for relative in actual.iter().chain(retained.iter()) {
         let stage = command_text(root, "git", &["ls-files", "--stage", "--", relative])?;
+        if RETIRED_RETAINED_PATHS.contains(&relative.as_str()) {
+            require(
+                stage.is_empty(),
+                &format!("retired sealed content path is tracked again: {relative}"),
+            )?;
+            continue;
+        }
         let mode = stage.split_whitespace().next().unwrap_or_default();
         validate_regular_git_mode(mode, relative)?;
     }
@@ -1182,6 +1192,8 @@ mod tests {
         for mode in ["120000", "160000", "040000", ""] {
             assert!(validate_regular_git_mode(mode, "not-regular").is_err());
         }
+        assert!(RETIRED_RETAINED_PATHS.contains(&".github/workflows/ci.yml"));
+        assert!(!RETIRED_RETAINED_PATHS.contains(&ROUND_FOUR_RECEIPT_PATH));
     }
 
     #[test]
