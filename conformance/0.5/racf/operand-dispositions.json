@@ -1,8 +1,8 @@
 {
-  "schema_version": "mainframe-env.racf-operand-dispositions@1",
+  "schema_version": "mainframe-env.racf-operand-dispositions@2",
   "baseline_id": "ibm-zos-3.2-racf-saf-2026",
   "coverage_credit": 0,
-  "description": "Disposition of every operand name that conformance/0.5/racf/command-language.json carried but the RACF publication does not publish as a top-level operand of that command, measured against the pinned topics via conformance/0.5/generated/racf-html-syntax-projection.json. Baseline: the 68 names across 21 families reported before this change; 6 were applied, leaving 62 across 19 families.",
+  "description": "Disposition of both directions of the RACF command operand projection. The catalog-only baseline retains its original applied/deferred record. Every source-only and syntax-only name is classified per command; syntax-only runtime behavior is scoped to explicit command or operand contexts. The xtask gate enforces exact set equality and generates fail-closed runtime recognition.",
   "baseline_catalog_only_names": 68,
   "baseline_catalog_only_families": 21,
   "applied_names": 6,
@@ -778,5 +778,1824 @@
       "reason": "not-published-for-this-command",
       "note": "the name does not occur anywhere in the pinned TARGET topic"
     }
-  ]
+  ],
+  "source_only_names": 429,
+  "source_only_families": 32,
+  "implemented_source_only_names": 0,
+  "unsupported_source_only_names": 429,
+  "catalog_gap_source_only_names": 0,
+  "syntax_only_names": 76,
+  "syntax_only_families": 17,
+  "implemented_syntax_only_names": 4,
+  "unsupported_syntax_only_names": 68,
+  "catalog_gap_syntax_only_names": 0,
+  "publication_dispositions": [
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0001",
+      "keyword": "ADDGROUP",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "AT",
+          "ONLYAT",
+          "NOTERMUACC"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [],
+        "catalog_gaps": [],
+        "context_only": []
+      },
+      "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
+      "syntax_contexts": []
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0002",
+      "keyword": "ADDSD",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "AT",
+          "ONLYAT",
+          "CSDATA",
+          "NOCSDATA",
+          "ERASE",
+          "FGENERIC",
+          "FILESEQ",
+          "FVOLUME",
+          "TAPE",
+          "SETONLY",
+          "NOSET",
+          "RETPD",
+          "SECLEVEL",
+          "TME"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "NO",
+          "CKDS"
+        ],
+        "context_only": [],
+        "catalog_gaps": []
+      },
+      "emulator_behavior": "Publication-only top-level operands use the source_only classification. Syntax-only words are interpreted only in the command-level or enclosing-operand contexts recorded here; analysis-only tokens remain ordinary data.",
+      "syntax_contexts": [
+        {
+          "name": "NO",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "CSDATA"
+          ],
+          "note": "The pinned syntax places NO within CSDATA; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "CKDS",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "DFP"
+          ],
+          "note": "The pinned syntax places CKDS within DFP; only that nested operand context returns UnsupportedCapability before effects."
+        }
+      ]
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0003",
+      "keyword": "ADDUSER",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "ADDCATEGORY",
+          "AT",
+          "ONLYAT",
+          "CLAUTH",
+          "NOCLAUTH",
+          "NOCONTAIN",
+          "OIDCARD",
+          "NOOIDCARD",
+          "ROAUDIT",
+          "NOROAUDIT",
+          "SECLEVEL",
+          "WHEN"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "OPERATOR-CLASS",
+          "OPERATOR-ID",
+          "OPERATOR-PRIORITY",
+          "TIMEOUT-VALUE",
+          "FORCE",
+          "NOFORCE",
+          "WAADDR1",
+          "WAADDR2",
+          "WAADDR3",
+          "WAADDR4"
+        ],
+        "context_only": [],
+        "catalog_gaps": []
+      },
+      "emulator_behavior": "Publication-only top-level operands use the source_only classification. Syntax-only words are interpreted only in the command-level or enclosing-operand contexts recorded here; analysis-only tokens remain ordinary data.",
+      "syntax_contexts": [
+        {
+          "name": "OPERATOR-CLASS",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "CICS",
+            "OPERPARM"
+          ],
+          "note": "The pinned syntax places OPERATOR-CLASS within CICS, OPERPARM; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "OPERATOR-ID",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "CICS",
+            "OPERPARM"
+          ],
+          "note": "The pinned syntax places OPERATOR-ID within CICS, OPERPARM; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "OPERATOR-PRIORITY",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "CICS",
+            "OPERPARM"
+          ],
+          "note": "The pinned syntax places OPERATOR-PRIORITY within CICS, OPERPARM; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "TIMEOUT-VALUE",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "CICS",
+            "OPERPARM"
+          ],
+          "note": "The pinned syntax places TIMEOUT-VALUE within CICS, OPERPARM; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "FORCE",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "CICS"
+          ],
+          "note": "The pinned syntax places FORCE within CICS; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "NOFORCE",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "CICS"
+          ],
+          "note": "The pinned syntax places NOFORCE within CICS; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "WAADDR1",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "WORKATTR"
+          ],
+          "note": "The pinned syntax places WAADDR1 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "WAADDR2",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "WORKATTR"
+          ],
+          "note": "The pinned syntax places WAADDR2 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "WAADDR3",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "WORKATTR"
+          ],
+          "note": "The pinned syntax places WAADDR3 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "WAADDR4",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "WORKATTR"
+          ],
+          "note": "The pinned syntax places WAADDR4 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+        }
+      ]
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0004",
+      "keyword": "ALTDSD",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "DELCATEGORY",
+          "ADDVOL",
+          "DELVOL",
+          "ALTVOL",
+          "AT",
+          "ONLYAT",
+          "CSDATA",
+          "NOCSDATA",
+          "NODFP",
+          "ERASE",
+          "NOERASE",
+          "NOSET",
+          "GLOBALAUDIT",
+          "RETPD",
+          "SECLEVEL",
+          "NOSECLEVEL",
+          "TME",
+          "NOTME"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "NO",
+          "CKDS"
+        ],
+        "context_only": [],
+        "catalog_gaps": []
+      },
+      "emulator_behavior": "Publication-only top-level operands use the source_only classification. Syntax-only words are interpreted only in the command-level or enclosing-operand contexts recorded here; analysis-only tokens remain ordinary data.",
+      "syntax_contexts": [
+        {
+          "name": "NO",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "CSDATA"
+          ],
+          "note": "The pinned syntax places NO within CSDATA; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "CKDS",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "DFP"
+          ],
+          "note": "The pinned syntax places CKDS within DFP; only that nested operand context returns UnsupportedCapability before effects."
+        }
+      ]
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0005",
+      "keyword": "ALTGROUP",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "AT",
+          "ONLYAT",
+          "NOCSDATA",
+          "NODFP",
+          "NOOMVS",
+          "NOOVM",
+          "NOTME"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "NO"
+        ],
+        "context_only": [],
+        "catalog_gaps": []
+      },
+      "emulator_behavior": "Publication-only top-level operands use the source_only classification. Syntax-only words are interpreted only in the command-level or enclosing-operand contexts recorded here; analysis-only tokens remain ordinary data.",
+      "syntax_contexts": [
+        {
+          "name": "NO",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "CSDATA"
+          ],
+          "note": "The pinned syntax places NO within CSDATA; only that nested operand context returns UnsupportedCapability before effects."
+        }
+      ]
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0006",
+      "keyword": "ALTUSER",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "ADDCATEGORY",
+          "DELCATEGORY",
+          "AT",
+          "ONLYAT",
+          "NOCICS",
+          "CLAUTH",
+          "NOCLAUTH",
+          "NOCSDATA",
+          "NODATA",
+          "NODCE",
+          "NODFP",
+          "NOEIM",
+          "EXPIRED",
+          "NOEXPIRED",
+          "GROUP",
+          "NOKERB",
+          "NOLANGUAGE",
+          "NOLNOTES",
+          "NOMFA",
+          "NOMODEL",
+          "NONDS",
+          "NONETVIEW",
+          "OIDCARD",
+          "NOOIDCARD",
+          "NOOMVS",
+          "NOOPERPARM",
+          "NOOVM",
+          "NOPHRASE",
+          "PWCLEAN",
+          "PWCONVERT",
+          "NOPROXY",
+          "NORESUME",
+          "NOREVOKE",
+          "CONTAIN",
+          "NOCONTAIN",
+          "NEVERCONTAIN",
+          "ALLOWCONTAIN",
+          "ROAUDIT",
+          "NOROAUDIT",
+          "NOSECLABEL",
+          "SECLEVEL",
+          "NOSECLEVEL",
+          "NOTSO",
+          "UAUDIT",
+          "NOUAUDIT",
+          "WHEN",
+          "NOWORKATTR"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "FORCE",
+          "NOFORCE",
+          "WAADDR1",
+          "NOWAADDR1",
+          "WAADDR2",
+          "NOWAADDR2",
+          "WAADDR3",
+          "NOWAADDR3",
+          "WAADDR4",
+          "NOWAADDR4"
+        ],
+        "context_only": [],
+        "catalog_gaps": []
+      },
+      "emulator_behavior": "Publication-only top-level operands use the source_only classification. Syntax-only words are interpreted only in the command-level or enclosing-operand contexts recorded here; analysis-only tokens remain ordinary data.",
+      "syntax_contexts": [
+        {
+          "name": "FORCE",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "CICS"
+          ],
+          "note": "The pinned syntax places FORCE within CICS; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "NOFORCE",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "CICS"
+          ],
+          "note": "The pinned syntax places NOFORCE within CICS; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "WAADDR1",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "WORKATTR"
+          ],
+          "note": "The pinned syntax places WAADDR1 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "NOWAADDR1",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "WORKATTR"
+          ],
+          "note": "The pinned syntax places NOWAADDR1 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "WAADDR2",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "WORKATTR"
+          ],
+          "note": "The pinned syntax places WAADDR2 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "NOWAADDR2",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "WORKATTR"
+          ],
+          "note": "The pinned syntax places NOWAADDR2 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "WAADDR3",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "WORKATTR"
+          ],
+          "note": "The pinned syntax places WAADDR3 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "NOWAADDR3",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "WORKATTR"
+          ],
+          "note": "The pinned syntax places NOWAADDR3 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "WAADDR4",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "WORKATTR"
+          ],
+          "note": "The pinned syntax places WAADDR4 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "NOWAADDR4",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "WORKATTR"
+          ],
+          "note": "The pinned syntax places NOWAADDR4 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+        }
+      ]
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0007",
+      "keyword": "CONNECT",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "AT",
+          "ONLYAT",
+          "NORESUME",
+          "NOREVOKE"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [],
+        "catalog_gaps": [],
+        "context_only": []
+      },
+      "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
+      "syntax_contexts": []
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0008",
+      "keyword": "DELDSD",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "AT",
+          "ONLYAT"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [],
+        "context_only": [
+          "RACF"
+        ],
+        "catalog_gaps": []
+      },
+      "emulator_behavior": "Publication-only top-level operands use the source_only classification. Syntax-only words are interpreted only in the command-level or enclosing-operand contexts recorded here; analysis-only tokens remain ordinary data.",
+      "syntax_contexts": [
+        {
+          "name": "RACF",
+          "runtime_behavior": "analysis-only",
+          "command_level": false,
+          "within_operands": [],
+          "note": "RACF is emitted by syntax text but is not an executable keyword in an unambiguous command or operand context; arbitrary occurrences remain data."
+        }
+      ]
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0009",
+      "keyword": "DELGROUP",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "AT",
+          "ONLYAT"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [],
+        "catalog_gaps": [],
+        "context_only": []
+      },
+      "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
+      "syntax_contexts": []
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0010",
+      "keyword": "DELUSER",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "AT",
+          "ONLYAT"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [],
+        "catalog_gaps": [],
+        "context_only": []
+      },
+      "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
+      "syntax_contexts": []
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0011",
+      "keyword": "DISPLAY",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "APPL",
+          "POE",
+          "GROUP",
+          "SECLABEL"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [],
+        "catalog_gaps": [],
+        "context_only": []
+      },
+      "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
+      "syntax_contexts": []
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0012",
+      "keyword": "LISTDSD",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "AT",
+          "ONLYAT",
+          "CSDATA",
+          "DATASET",
+          "DFP",
+          "DSNS",
+          "NOGENERIC",
+          "STATISTICS",
+          "TME"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [],
+        "catalog_gaps": [],
+        "context_only": []
+      },
+      "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
+      "syntax_contexts": []
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0013",
+      "keyword": "LISTGRP",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "AT",
+          "ONLYAT"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [],
+        "catalog_gaps": [],
+        "context_only": []
+      },
+      "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
+      "syntax_contexts": []
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0014",
+      "keyword": "LISTUSER",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "AT",
+          "ONLYAT"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [],
+        "catalog_gaps": [],
+        "context_only": []
+      },
+      "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
+      "syntax_contexts": []
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0015",
+      "keyword": "PASSWORD",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "AT",
+          "ONLYAT",
+          "PHRASEINT",
+          "NOPHRASEINT"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [],
+        "catalog_gaps": [],
+        "context_only": []
+      },
+      "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
+      "syntax_contexts": []
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0016",
+      "keyword": "PERMIT",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "AT",
+          "ONLYAT",
+          "FCLASS",
+          "FGENERIC",
+          "FROM",
+          "FVOLUME",
+          "VOLUME"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [
+          "CONSOLE",
+          "TERMINAL"
+        ],
+        "deliberately_unimplemented": [
+          "ALL",
+          "STANDARD",
+          "APPCPORT",
+          "CRITERIA",
+          "JESINPUT",
+          "PROGRAM",
+          "SERVAUTH",
+          "SYSID"
+        ],
+        "context_only": [
+          "JES"
+        ],
+        "catalog_gaps": []
+      },
+      "emulator_behavior": "Publication-only top-level operands use the source_only classification. Syntax-only words are interpreted only in the command-level or enclosing-operand contexts recorded here; analysis-only tokens remain ordinary data.",
+      "syntax_contexts": [
+        {
+          "name": "ALL",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "RESET"
+          ],
+          "note": "The pinned syntax places ALL within RESET; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "STANDARD",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "RESET"
+          ],
+          "note": "The pinned syntax places STANDARD within RESET; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "APPCPORT",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "WHEN"
+          ],
+          "note": "The pinned syntax places APPCPORT within WHEN; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "CONSOLE",
+          "runtime_behavior": "implemented",
+          "command_level": false,
+          "within_operands": [
+            "WHEN"
+          ],
+          "note": "CONSOLE is consumed within WHEN by the current command processor; the scoped occurrence is not an unsupported capability."
+        },
+        {
+          "name": "CRITERIA",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "WHEN"
+          ],
+          "note": "The pinned syntax places CRITERIA within WHEN; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "JESINPUT",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "WHEN"
+          ],
+          "note": "The pinned syntax places JESINPUT within WHEN; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "JES",
+          "runtime_behavior": "analysis-only",
+          "command_level": false,
+          "within_operands": [],
+          "note": "JES is emitted by syntax text but is not an executable keyword in an unambiguous command or operand context; arbitrary occurrences remain data."
+        },
+        {
+          "name": "PROGRAM",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "WHEN"
+          ],
+          "note": "The pinned syntax places PROGRAM within WHEN; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "SERVAUTH",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "WHEN"
+          ],
+          "note": "The pinned syntax places SERVAUTH within WHEN; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "SYSID",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "WHEN"
+          ],
+          "note": "The pinned syntax places SYSID within WHEN; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "TERMINAL",
+          "runtime_behavior": "implemented",
+          "command_level": false,
+          "within_operands": [
+            "WHEN"
+          ],
+          "note": "TERMINAL is consumed within WHEN by the current command processor; the scoped occurrence is not an unsupported capability."
+        }
+      ]
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0017",
+      "keyword": "RACDCERT",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "TRUST",
+          "NOTRUST",
+          "HIGHTRUST",
+          "WITHLABEL",
+          "PASSWORD",
+          "PKDS",
+          "PCICC",
+          "ICSF",
+          "ADDRING",
+          "ADDTOKEN",
+          "NEWLABEL",
+          "ALTMAP",
+          "MULTIID",
+          "NEWCRITERIA",
+          "BIND",
+          "TOKEN",
+          "LABEL",
+          "DEFAULT",
+          "USAGE",
+          "FORCE",
+          "DELMAP",
+          "DELRING",
+          "DELTOKEN",
+          "DSN",
+          "FORMAT",
+          "PBE",
+          "SUBJECTSDN",
+          "SIZE",
+          "NOTBEFORE",
+          "NOTAFTER",
+          "SIGNWITH",
+          "RSA",
+          "DSA",
+          "NISTECC",
+          "BPECC",
+          "FROMICSF",
+          "SIGATTR",
+          "KEYUSAGE",
+          "ALTNAME",
+          "SEQNUM",
+          "LISTMAP",
+          "LISTRING",
+          "LISTTOKEN",
+          "MAP",
+          "IDNFILTER",
+          "SDNFILTER",
+          "CRITERIA",
+          "REKEY",
+          "REMOVE",
+          "ROLLOVER",
+          "UNBIND"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "SERIALNUMBER",
+          "ISSUERSDN",
+          "PERSONAL",
+          "CERTDER",
+          "CERTB64",
+          "PKCS7DER",
+          "PKCS7B64",
+          "PKCS12DER",
+          "PKCS12B64",
+          "AES",
+          "CN",
+          "OU",
+          "SP",
+          "DATE",
+          "TIME",
+          "RSAPSS"
+        ],
+        "context_only": [],
+        "catalog_gaps": []
+      },
+      "emulator_behavior": "Publication-only top-level operands use the source_only classification. Syntax-only words are interpreted only in the command-level or enclosing-operand contexts recorded here; analysis-only tokens remain ordinary data.",
+      "syntax_contexts": [
+        {
+          "name": "SERIALNUMBER",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "ALTER",
+            "DELETE",
+            "LIST"
+          ],
+          "note": "The pinned syntax places SERIALNUMBER within ALTER, DELETE, LIST; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "ISSUERSDN",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "ALTER",
+            "DELETE",
+            "LIST"
+          ],
+          "note": "The pinned syntax places ISSUERSDN within ALTER, DELETE, LIST; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "PERSONAL",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "BIND",
+            "CONNECT"
+          ],
+          "note": "The pinned syntax places PERSONAL within BIND, CONNECT; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "CERTDER",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "EXPORT"
+          ],
+          "note": "The pinned syntax places CERTDER within EXPORT; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "CERTB64",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "EXPORT"
+          ],
+          "note": "The pinned syntax places CERTB64 within EXPORT; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "PKCS7DER",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "EXPORT"
+          ],
+          "note": "The pinned syntax places PKCS7DER within EXPORT; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "PKCS7B64",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "EXPORT"
+          ],
+          "note": "The pinned syntax places PKCS7B64 within EXPORT; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "PKCS12DER",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "EXPORT"
+          ],
+          "note": "The pinned syntax places PKCS12DER within EXPORT; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "PKCS12B64",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "EXPORT"
+          ],
+          "note": "The pinned syntax places PKCS12B64 within EXPORT; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "AES",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "EXPORT"
+          ],
+          "note": "The pinned syntax places AES within EXPORT; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "CN",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "GENCERT"
+          ],
+          "note": "The pinned syntax places CN within GENCERT; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "OU",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "GENCERT"
+          ],
+          "note": "The pinned syntax places OU within GENCERT; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "SP",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "GENCERT"
+          ],
+          "note": "The pinned syntax places SP within GENCERT; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "DATE",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "GENCERT",
+            "REKEY"
+          ],
+          "note": "The pinned syntax places DATE within GENCERT, REKEY; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "TIME",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "GENCERT",
+            "REKEY"
+          ],
+          "note": "The pinned syntax places TIME within GENCERT, REKEY; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "RSAPSS",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "GENCERT",
+            "REKEY"
+          ],
+          "note": "The pinned syntax places RSAPSS within GENCERT, REKEY; only that nested operand context returns UnsupportedCapability before effects."
+        }
+      ]
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0018",
+      "keyword": "RACLINK",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "ID",
+          "APPROVE"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "NOPWSYNC",
+          "PWSYNC"
+        ],
+        "context_only": [],
+        "catalog_gaps": []
+      },
+      "emulator_behavior": "Publication-only top-level operands use the source_only classification. Syntax-only words are interpreted only in the command-level or enclosing-operand contexts recorded here; analysis-only tokens remain ordinary data.",
+      "syntax_contexts": [
+        {
+          "name": "NOPWSYNC",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "DEFINE"
+          ],
+          "note": "The pinned syntax places NOPWSYNC within DEFINE; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "PWSYNC",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "DEFINE"
+          ],
+          "note": "The pinned syntax places PWSYNC within DEFINE; only that nested operand context returns UnsupportedCapability before effects."
+        }
+      ]
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0019",
+      "keyword": "RACMAP",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "DELMAP",
+          "LISTMAP"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [
+          "NAME"
+        ],
+        "deliberately_unimplemented": [],
+        "context_only": [],
+        "catalog_gaps": []
+      },
+      "emulator_behavior": "Publication-only top-level operands use the source_only classification. Syntax-only words are interpreted only in the command-level or enclosing-operand contexts recorded here; analysis-only tokens remain ordinary data.",
+      "syntax_contexts": [
+        {
+          "name": "NAME",
+          "runtime_behavior": "implemented",
+          "command_level": false,
+          "within_operands": [
+            "MAP"
+          ],
+          "note": "NAME is consumed within MAP by the current command processor; the scoped occurrence is not an unsupported capability."
+        }
+      ]
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0022",
+      "keyword": "RALTER",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "DELCATEGORY",
+          "ADDMEM",
+          "DELMEM",
+          "ADDVOL",
+          "DELVOL",
+          "APPLDATA",
+          "NOAPPLDATA",
+          "AT",
+          "ONLYAT",
+          "CDTINFO",
+          "NOCDTINFO",
+          "CFDEF",
+          "NOCFDEF",
+          "CSDATA",
+          "NOCSDATA",
+          "DLFDATA",
+          "NODLFDATA",
+          "EIM",
+          "NOEIM",
+          "GLOBALAUDIT",
+          "ICSF",
+          "NOICSF",
+          "ICTX",
+          "NOICTX",
+          "IDTPARMS",
+          "NOIDTPARMS",
+          "JES",
+          "NOJES",
+          "KERB",
+          "NOKERB",
+          "MFA",
+          "NOMFA",
+          "MFPOLICY",
+          "NOMFPOLICY",
+          "PROXY",
+          "NOPROXY",
+          "SECLEVEL",
+          "NOSECLEVEL",
+          "SESSION",
+          "NOSESSION",
+          "SIGVER",
+          "NOSIGVER",
+          "SINGLEDSN",
+          "NOSINGLEDSN",
+          "SSIGNON",
+          "NOSSIGNON",
+          "STDATA",
+          "NOSTDATA",
+          "SVFMR",
+          "NOSVFMR",
+          "TIMEZONE",
+          "NOTIMEZONE",
+          "TME",
+          "NOTME",
+          "TVTOC",
+          "NOTVTOC",
+          "WHEN"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "UPPER",
+          "ASIS",
+          "NORMAL",
+          "REVERSE",
+          "EQUAL"
+        ],
+        "context_only": [
+          "REXX"
+        ],
+        "catalog_gaps": []
+      },
+      "emulator_behavior": "Publication-only top-level operands use the source_only classification. Syntax-only words are interpreted only in the command-level or enclosing-operand contexts recorded here; analysis-only tokens remain ordinary data.",
+      "syntax_contexts": [
+        {
+          "name": "UPPER",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "CDTINFO"
+          ],
+          "note": "The pinned syntax places UPPER within CDTINFO; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "ASIS",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "CDTINFO"
+          ],
+          "note": "The pinned syntax places ASIS within CDTINFO; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "NORMAL",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "CDTINFO"
+          ],
+          "note": "The pinned syntax places NORMAL within CDTINFO; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "REVERSE",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "CDTINFO"
+          ],
+          "note": "The pinned syntax places REVERSE within CDTINFO; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "EQUAL",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "CDTINFO"
+          ],
+          "note": "The pinned syntax places EQUAL within CDTINFO; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "REXX",
+          "runtime_behavior": "analysis-only",
+          "command_level": false,
+          "within_operands": [],
+          "note": "REXX is emitted by syntax text but is not an executable keyword in an unambiguous command or operand context; arbitrary occurrences remain data."
+        }
+      ]
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0023",
+      "keyword": "RDEFINE",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "ADDMEM",
+          "APPLDATA",
+          "AT",
+          "ONLYAT",
+          "CDTINFO",
+          "CFDEF",
+          "CSDATA",
+          "NOCSDATA",
+          "DLFDATA",
+          "EIM",
+          "FCLASS",
+          "FGENERIC",
+          "FROM",
+          "FVOLUME",
+          "ICSF",
+          "ICTX",
+          "IDTPARMS",
+          "JES",
+          "KERB",
+          "MFA",
+          "MFPOLICY",
+          "PROXY",
+          "SECLEVEL",
+          "SESSION",
+          "SIGVER",
+          "SINGLEDSN",
+          "SSIGNON",
+          "STDATA",
+          "SVFMR",
+          "TIMEZONE",
+          "TME",
+          "TVTOC",
+          "WHEN"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "NORMAL",
+          "REVERSE",
+          "EQUAL"
+        ],
+        "context_only": [
+          "REXX"
+        ],
+        "catalog_gaps": []
+      },
+      "emulator_behavior": "Publication-only top-level operands use the source_only classification. Syntax-only words are interpreted only in the command-level or enclosing-operand contexts recorded here; analysis-only tokens remain ordinary data.",
+      "syntax_contexts": [
+        {
+          "name": "NORMAL",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "CDTINFO"
+          ],
+          "note": "The pinned syntax places NORMAL within CDTINFO; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "REVERSE",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "CDTINFO"
+          ],
+          "note": "The pinned syntax places REVERSE within CDTINFO; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "EQUAL",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "CDTINFO"
+          ],
+          "note": "The pinned syntax places EQUAL within CDTINFO; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "REXX",
+          "runtime_behavior": "analysis-only",
+          "command_level": false,
+          "within_operands": [],
+          "note": "REXX is emitted by syntax text but is not an executable keyword in an unambiguous command or operand context; arbitrary occurrences remain data."
+        }
+      ]
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0024",
+      "keyword": "RDELETE",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "AT",
+          "ONLYAT",
+          "NOGENERIC"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [],
+        "catalog_gaps": [],
+        "context_only": []
+      },
+      "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
+      "syntax_contexts": []
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0025",
+      "keyword": "REMOVE",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "AT",
+          "ONLYAT"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [],
+        "catalog_gaps": [],
+        "context_only": []
+      },
+      "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
+      "syntax_contexts": []
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0026",
+      "keyword": "RESTART",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "COMMAND",
+          "CONNECTION",
+          "ENF",
+          "ENF86",
+          "MESSAGE",
+          "RACLINK",
+          "RECEIVE",
+          "SEND",
+          "SIGNAL"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "OUTPUT"
+        ],
+        "context_only": [],
+        "catalog_gaps": []
+      },
+      "emulator_behavior": "Publication-only top-level operands use the source_only classification. Syntax-only words are interpreted only in the command-level or enclosing-operand contexts recorded here; analysis-only tokens remain ordinary data.",
+      "syntax_contexts": [
+        {
+          "name": "OUTPUT",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": true,
+          "within_operands": [],
+          "note": "The pinned syntax presents OUTPUT as a command-level selector; this exact occurrence returns UnsupportedCapability before effects."
+        }
+      ]
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0027",
+      "keyword": "RLIST",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "AT",
+          "ONLYAT",
+          "CFDEF",
+          "CSDATA",
+          "DLFDATA",
+          "EIM",
+          "GENERIC",
+          "NOGENERIC",
+          "ICSF",
+          "ICTX",
+          "IDTPARMS",
+          "JES",
+          "KERB",
+          "MFA",
+          "MFPOLICY",
+          "NOYOURACC",
+          "PROXY",
+          "SESSION",
+          "SIGVER",
+          "SSIGNON",
+          "STATISTICS",
+          "STDATA",
+          "SVFMR",
+          "TME",
+          "TVTOC"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [],
+        "catalog_gaps": [],
+        "context_only": []
+      },
+      "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
+      "syntax_contexts": []
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0028",
+      "keyword": "RVARY",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "NOCLASSACT",
+          "NOLIST"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "NOTAPE"
+        ],
+        "context_only": [],
+        "catalog_gaps": []
+      },
+      "emulator_behavior": "Publication-only top-level operands use the source_only classification. Syntax-only words are interpreted only in the command-level or enclosing-operand contexts recorded here; analysis-only tokens remain ordinary data.",
+      "syntax_contexts": [
+        {
+          "name": "NOTAPE",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "INACTIVE"
+          ],
+          "note": "The pinned syntax places NOTAPE within INACTIVE; only that nested operand context returns UnsupportedCapability before effects."
+        }
+      ]
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0029",
+      "keyword": "SEARCH",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "GENERIC",
+          "NOGENERIC",
+          "TAPE",
+          "VSAM",
+          "NONVSAM",
+          "AT",
+          "ONLYAT",
+          "CATEGORY",
+          "EXPIRES",
+          "SECLEVEL",
+          "WARNING",
+          "GID",
+          "LIST",
+          "NOMASK",
+          "UID",
+          "USER",
+          "VOLUME"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [
+          "DATASET"
+        ],
+        "deliberately_unimplemented": [],
+        "context_only": [],
+        "catalog_gaps": []
+      },
+      "emulator_behavior": "Publication-only top-level operands use the source_only classification. Syntax-only words are interpreted only in the command-level or enclosing-operand contexts recorded here; analysis-only tokens remain ordinary data.",
+      "syntax_contexts": [
+        {
+          "name": "DATASET",
+          "runtime_behavior": "implemented",
+          "command_level": false,
+          "within_operands": [
+            "CLASS"
+          ],
+          "note": "DATASET is consumed within CLASS by the current command processor; the scoped occurrence is not an unsupported capability."
+        }
+      ]
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0030",
+      "keyword": "SET",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "FULLRRSFCOMM",
+          "GENERICANCHOR",
+          "INCLUDE",
+          "JESNODE",
+          "PWSYNC",
+          "NOPWSYNC"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [],
+        "catalog_gaps": [],
+        "context_only": []
+      },
+      "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
+      "syntax_contexts": []
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0031",
+      "keyword": "SETROPTS",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "ADSP",
+          "NOADSP",
+          "APPLAUDIT",
+          "NOAPPLAUDIT",
+          "AT",
+          "ONLYAT",
+          "CATDSNS",
+          "NOCATDSNS",
+          "COMPATMODE",
+          "NOCOMPATMODE",
+          "EGN",
+          "NOEGN",
+          "NOERASE",
+          "GENCMD",
+          "NOGENCMD",
+          "GENERICOWNER",
+          "ENHANCEDGENERICOWNER",
+          "NOGENERICOWNER",
+          "GENLIST",
+          "NOGENLIST",
+          "NOGLOBAL",
+          "GRPLIST",
+          "NOGRPLIST",
+          "NOINACTIVE",
+          "INITSTATS",
+          "NOINITSTATS",
+          "JES",
+          "KERBLVL",
+          "LANGUAGE",
+          "MLFSOBJ",
+          "MLIPCOBJ",
+          "MLNAMES",
+          "NOMLNAMES",
+          "MLQUIET",
+          "NOMLQUIET",
+          "MLS",
+          "NOMLS",
+          "MLSTABLE",
+          "NOMLSTABLE",
+          "NOMODEL",
+          "OPERAUDIT",
+          "NOOPERAUDIT",
+          "PREFIX",
+          "NOPREFIX",
+          "PROTECTALL",
+          "NOPROTECTALL",
+          "REALDSN",
+          "NOREALDSN",
+          "RETPD",
+          "RVARYPW",
+          "SAUDIT",
+          "NOSAUDIT",
+          "SECLABELCONTROL",
+          "NOSECLABELCONTROL",
+          "SECLBYSYSTEM",
+          "NOSECLBYSYSTEM",
+          "SESSIONINTERVAL",
+          "NOSESSIONINTERVAL",
+          "STATISTICS",
+          "NOSTATISTICS",
+          "TAPEDSN",
+          "NOTAPEDSN",
+          "TERMINAL",
+          "WHEN",
+          "NOWHEN"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "RULE",
+          "NORULE",
+          "NONE",
+          "READ",
+          "PROGRAM"
+        ],
+        "context_only": [],
+        "catalog_gaps": []
+      },
+      "emulator_behavior": "Publication-only top-level operands use the source_only classification. Syntax-only words are interpreted only in the command-level or enclosing-operand contexts recorded here; analysis-only tokens remain ordinary data.",
+      "syntax_contexts": [
+        {
+          "name": "RULE",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "PASSWORD"
+          ],
+          "note": "The pinned syntax places RULE within PASSWORD; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "NORULE",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "PASSWORD"
+          ],
+          "note": "The pinned syntax places NORULE within PASSWORD; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "NONE",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "TERMINAL"
+          ],
+          "note": "The pinned syntax places NONE within TERMINAL; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "READ",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "TERMINAL"
+          ],
+          "note": "The pinned syntax places READ within TERMINAL; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "PROGRAM",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "WHEN",
+            "NOWHEN"
+          ],
+          "note": "The pinned syntax places PROGRAM within WHEN, NOWHEN; only that nested operand context returns UnsupportedCapability before effects."
+        }
+      ]
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0032",
+      "keyword": "SIGNOFF",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "APPL",
+          "POE",
+          "GROUP",
+          "SECLABEL"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [],
+        "catalog_gaps": [],
+        "context_only": []
+      },
+      "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
+      "syntax_contexts": []
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0033",
+      "keyword": "STOP",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "ENF86"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [],
+        "catalog_gaps": [],
+        "context_only": []
+      },
+      "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
+      "syntax_contexts": []
+    },
+    {
+      "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0034",
+      "keyword": "TARGET",
+      "source_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "DENYINBOUND",
+          "ALLOWINBOUND",
+          "RESETDENYINBOUNDCOUNT",
+          "LISTPROTOCOL",
+          "MAIN",
+          "NEWMAIN",
+          "PLEXNEWMAIN",
+          "NEWPREFIX",
+          "SYSNAME",
+          "WDSQUAL",
+          "NEWWORKSPACE"
+        ],
+        "catalog_gaps": []
+      },
+      "syntax_only": {
+        "implemented": [],
+        "deliberately_unimplemented": [
+          "INMSG",
+          "OUTMSG"
+        ],
+        "context_only": [],
+        "catalog_gaps": []
+      },
+      "emulator_behavior": "Publication-only top-level operands use the source_only classification. Syntax-only words are interpreted only in the command-level or enclosing-operand contexts recorded here; analysis-only tokens remain ordinary data.",
+      "syntax_contexts": [
+        {
+          "name": "INMSG",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "PURGE"
+          ],
+          "note": "The pinned syntax places INMSG within PURGE; only that nested operand context returns UnsupportedCapability before effects."
+        },
+        {
+          "name": "OUTMSG",
+          "runtime_behavior": "unsupported-capability",
+          "command_level": false,
+          "within_operands": [
+            "PURGE"
+          ],
+          "note": "The pinned syntax places OUTMSG within PURGE; only that nested operand context returns UnsupportedCapability before effects."
+        }
+      ]
+    }
+  ],
+  "context_only_syntax_only_names": 4
 }

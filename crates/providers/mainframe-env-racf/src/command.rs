@@ -1,3 +1,4 @@
+use mainframe_env_host_api::HostProblem;
 use std::collections::BTreeSet;
 use std::fmt;
 use zeroize::Zeroizing;
@@ -28,6 +29,45 @@ pub struct CommandDescriptor {
     min_positionals: u64,
     max_positionals: u64,
     operands: &'static [&'static str],
+    unsupported_operands: &'static [&'static str],
+    syntax_tokens: &'static [SyntaxTokenDescriptor],
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SyntaxTokenBehavior {
+    Implemented,
+    UnsupportedCapability,
+    AnalysisOnly,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SyntaxTokenDescriptor {
+    token: &'static str,
+    behavior: SyntaxTokenBehavior,
+    command_level: bool,
+    within_operands: &'static [&'static str],
+}
+
+impl SyntaxTokenDescriptor {
+    #[must_use]
+    pub const fn token(self) -> &'static str {
+        self.token
+    }
+
+    #[must_use]
+    pub const fn behavior(self) -> SyntaxTokenBehavior {
+        self.behavior
+    }
+
+    #[must_use]
+    pub const fn command_level(self) -> bool {
+        self.command_level
+    }
+
+    #[must_use]
+    pub const fn within_operands(self) -> &'static [&'static str] {
+        self.within_operands
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -53,7 +93,10 @@ pub struct RacrouteDescriptor {
 }
 
 mod generated {
-    use super::{CommandDescriptor, CommandDomain, RacrouteDescriptor, SuppliedClassDescriptor};
+    use super::{
+        CommandDescriptor, CommandDomain, RacrouteDescriptor, SuppliedClassDescriptor,
+        SyntaxTokenBehavior, SyntaxTokenDescriptor,
+    };
     include!("generated/racf_command_catalog.rs");
 }
 
@@ -112,6 +155,16 @@ impl CommandDescriptor {
     #[must_use]
     pub const fn operands(self) -> &'static [&'static str] {
         self.operands
+    }
+
+    #[must_use]
+    pub const fn unsupported_operands(self) -> &'static [&'static str] {
+        self.unsupported_operands
+    }
+
+    #[must_use]
+    pub const fn syntax_tokens(self) -> &'static [SyntaxTokenDescriptor] {
+        self.syntax_tokens
     }
 }
 
@@ -203,6 +256,7 @@ pub enum CommandDiagnosticCode {
     UnknownOperand,
     DuplicateOperand,
     OperandValueLimit,
+    UnsupportedCapability,
     UnsupportedFamily,
     InvalidValue,
     Unauthorized,
@@ -230,6 +284,7 @@ impl CommandDiagnosticCode {
             Self::UnknownOperand => "MERSEC1012E",
             Self::DuplicateOperand => "MERSEC1013E",
             Self::OperandValueLimit => "MERSEC1014E",
+            Self::UnsupportedCapability => "MERSEC1015E",
             Self::UnsupportedFamily => "MERSEC2001E",
             Self::InvalidValue => "MERSEC2002E",
             Self::Unauthorized => "MERSEC2003E",
@@ -246,6 +301,15 @@ pub struct CommandDiagnostic {
     pub code: CommandDiagnosticCode,
     pub offset: usize,
     pub message: &'static str,
+    host_problem: Option<HostProblem>,
+}
+
+impl CommandDiagnostic {
+    /// The structured host failure attached to an executable capability boundary.
+    #[must_use]
+    pub const fn host_problem(&self) -> Option<&HostProblem> {
+        self.host_problem.as_ref()
+    }
 }
 
 impl fmt::Display for CommandDiagnostic {
@@ -260,7 +324,13 @@ impl fmt::Display for CommandDiagnostic {
     }
 }
 
-impl std::error::Error for CommandDiagnostic {}
+impl std::error::Error for CommandDiagnostic {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.host_problem
+            .as_ref()
+            .map(|problem| problem as &(dyn std::error::Error + 'static))
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ValidatedCommand {
@@ -402,6 +472,32 @@ pub(crate) fn parse_command(
         let required_positionals = usize::try_from(descriptor.min_positionals)
             .map_err(|_| diagnostic(CommandDiagnosticCode::PositionalCount, token.offset))?;
         let candidate = (token.kind == TokenKind::Word).then(|| token.upper());
+        if positionals.len() >= required_positionals
+            && let Some(name) = candidate.as_deref()
+            && descriptor.unsupported_operands.contains(&name)
+        {
+            return Err(unsupported_operand_diagnostic(
+                descriptor,
+                name,
+                token.offset,
+                None,
+            ));
+        }
+        if positionals.len() >= required_positionals
+            && let Some(name) = candidate.as_deref()
+            && descriptor.syntax_tokens.iter().any(|syntax| {
+                syntax.token == name
+                    && syntax.behavior == SyntaxTokenBehavior::UnsupportedCapability
+                    && syntax.command_level
+            })
+        {
+            return Err(unsupported_operand_diagnostic(
+                descriptor,
+                name,
+                token.offset,
+                None,
+            ));
+        }
         let allowed_operand = candidate.as_deref().is_some_and(|name| {
             descriptor.operands.contains(&name)
                 || descriptor.command_direction && matches!(name, "AT" | "ONLYAT")
@@ -443,6 +539,22 @@ pub(crate) fn parse_command(
                         }
                         TokenKind::RightParenthesis => depth -= 1,
                         TokenKind::Word | TokenKind::Quoted if depth > 0 => {
+                            if value.kind == TokenKind::Word {
+                                let nested = value.upper();
+                                if descriptor.syntax_tokens.iter().any(|syntax| {
+                                    syntax.token == nested
+                                        && syntax.behavior
+                                            == SyntaxTokenBehavior::UnsupportedCapability
+                                        && syntax.within_operands.contains(&name.as_str())
+                                }) {
+                                    return Err(unsupported_operand_diagnostic(
+                                        descriptor,
+                                        &nested,
+                                        value.offset,
+                                        Some(&name),
+                                    ));
+                                }
+                            }
                             if values.len() >= limits.max_values_per_operand {
                                 return Err(diagnostic(
                                     CommandDiagnosticCode::OperandValueLimit,
@@ -630,6 +742,9 @@ pub(crate) fn diagnostic(code: CommandDiagnosticCode, offset: usize) -> CommandD
         CommandDiagnosticCode::UnknownOperand => "operand is not supported by this command",
         CommandDiagnosticCode::DuplicateOperand => "operand occurs more than once",
         CommandDiagnosticCode::OperandValueLimit => "operand values exceed their limit",
+        CommandDiagnosticCode::UnsupportedCapability => {
+            "recognized RACF operand is deliberately unimplemented"
+        }
         CommandDiagnosticCode::UnsupportedFamily => "command execution belongs to a later package",
         CommandDiagnosticCode::InvalidValue => "command operand value is invalid",
         CommandDiagnosticCode::Unauthorized => "command authority check denied",
@@ -642,6 +757,38 @@ pub(crate) fn diagnostic(code: CommandDiagnosticCode, offset: usize) -> CommandD
         code,
         offset,
         message,
+        host_problem: None,
+    }
+}
+
+fn unsupported_operand_diagnostic(
+    descriptor: CommandDescriptor,
+    operand: &str,
+    offset: usize,
+    within: Option<&str>,
+) -> CommandDiagnostic {
+    let detail = within.map_or_else(
+        || {
+            format!(
+                "{} operand {operand} is not implemented by the RACF command processor",
+                descriptor.keyword
+            )
+        },
+        |parent| {
+            format!(
+                "{} syntax token {operand} within {parent} is not implemented by the RACF command processor",
+                descriptor.keyword
+            )
+        },
+    );
+    CommandDiagnostic {
+        code: CommandDiagnosticCode::UnsupportedCapability,
+        offset,
+        message: "recognized RACF operand is deliberately unimplemented",
+        host_problem: Some(HostProblem::UnsupportedCapability {
+            capability: "racf-command-operand".into(),
+            detail,
+        }),
     }
 }
 
@@ -819,6 +966,112 @@ mod tests {
             validate_command("ADDUSER", limits).unwrap_err().code,
             CommandDiagnosticCode::InputLimit
         );
+    }
+
+    #[test]
+    fn reviewed_unimplemented_operands_raise_structured_unsupported_capability() {
+        for input in [
+            "ADDGROUP OPER AT(NODE1)",
+            "ADDGROUP OPER NOTERMUACC",
+            "RACDCERT TRUST",
+        ] {
+            let problem = validate_command(input, Default::default())
+                .expect_err("reviewed unimplemented operand unexpectedly validated");
+            assert_eq!(problem.code, CommandDiagnosticCode::UnsupportedCapability);
+            assert!(matches!(
+                problem.host_problem(),
+                Some(HostProblem::UnsupportedCapability { capability, detail })
+                    if capability == "racf-command-operand"
+                        && detail.contains(input.split_whitespace().next().unwrap())
+            ));
+        }
+    }
+
+    #[test]
+    fn nested_tokens_and_reviewed_implemented_syntax_names_keep_their_scope() {
+        validate_command(
+            "PERMIT APP.RESOURCE CLASS(FACILITY) ID(USER1) ACCESS(READ) WHEN(TERMINAL TERM1)",
+            Default::default(),
+        )
+        .unwrap();
+        validate_command("SEARCH CLASS(DATASET)", Default::default()).unwrap();
+        validate_command("SETROPTS PROGRAM", Default::default()).unwrap();
+    }
+
+    #[test]
+    fn syntax_only_words_do_not_collide_with_positionals_or_unrelated_values() {
+        for input in [
+            "PERMIT APP PROGRAM",
+            "PERMIT APP ID(PROGRAM)",
+            "PERMIT APP JES",
+            "DELDSD RACF",
+            "PERMIT APP 'VOLUME'",
+        ] {
+            validate_command(input, Default::default())
+                .unwrap_or_else(|problem| panic!("{input} failed with {problem}"));
+        }
+    }
+
+    #[test]
+    fn unsupported_syntax_tokens_fail_only_in_their_generated_context() {
+        for input in [
+            "ADDUSER USER1 OPERPARM(OPERATOR-CLASS(X))",
+            "PERMIT APP WHEN(PROGRAM(X))",
+            "RESTART OUTPUT",
+        ] {
+            let problem = validate_command(input, Default::default())
+                .expect_err("scoped unsupported syntax unexpectedly validated");
+            assert_eq!(problem.code, CommandDiagnosticCode::UnsupportedCapability);
+            assert!(matches!(
+                problem.host_problem(),
+                Some(HostProblem::UnsupportedCapability { capability, .. })
+                    if capability == "racf-command-operand"
+            ));
+        }
+    }
+
+    #[test]
+    fn generated_unsupported_inventory_is_complete_and_command_scoped() {
+        assert_eq!(
+            command_descriptors()
+                .iter()
+                .map(|descriptor| descriptor.unsupported_operands().len())
+                .sum::<usize>(),
+            429
+        );
+        let syntax = command_descriptors()
+            .iter()
+            .flat_map(|descriptor| descriptor.syntax_tokens())
+            .collect::<Vec<_>>();
+        assert_eq!(syntax.len(), 76);
+        for (behavior, expected) in [
+            (SyntaxTokenBehavior::Implemented, 4),
+            (SyntaxTokenBehavior::UnsupportedCapability, 68),
+            (SyntaxTokenBehavior::AnalysisOnly, 4),
+        ] {
+            assert_eq!(
+                syntax
+                    .iter()
+                    .filter(|descriptor| descriptor.behavior() == behavior)
+                    .count(),
+                expected
+            );
+        }
+        assert!(syntax.iter().all(|descriptor| {
+            descriptor.behavior() != SyntaxTokenBehavior::UnsupportedCapability
+                || descriptor.command_level()
+                || !descriptor.within_operands().is_empty()
+        }));
+        let setropts = command_descriptors()
+            .iter()
+            .find(|descriptor| descriptor.keyword() == "SETROPTS")
+            .unwrap();
+        assert!(!setropts.unsupported_operands().contains(&"PROGRAM"));
+        assert!(setropts.syntax_tokens().iter().any(|syntax| {
+            syntax.token() == "PROGRAM"
+                && syntax.behavior() == SyntaxTokenBehavior::UnsupportedCapability
+                && syntax.within_operands() == ["WHEN", "NOWHEN"]
+        }));
     }
 
     #[test]

@@ -3422,6 +3422,23 @@ mod tests {
     }
 
     #[test]
+    fn deliberately_unimplemented_publication_operand_fails_before_any_effect() {
+        let (service, context) = setup();
+        let before = service.database().summary().unwrap();
+        let problem = service
+            .execute_command(&context, "ADDGROUP OPER AT(NODE1)")
+            .unwrap_err();
+        assert_eq!(problem.code, CommandDiagnosticCode::UnsupportedCapability);
+        assert!(matches!(
+            problem.host_problem(),
+            Some(HostProblem::UnsupportedCapability { capability, detail })
+                if capability == "racf-command-operand"
+                    && detail == "ADDGROUP operand AT is not implemented by the RACF command processor"
+        ));
+        assert_eq!(service.database().summary().unwrap(), before);
+    }
+
+    #[test]
     fn ordinary_altuser_self_service_cannot_grant_or_use_privileged_authority() {
         let (service, admin) = setup();
         service
@@ -3622,7 +3639,7 @@ mod tests {
     }
 
     #[test]
-    fn remote_only_direction_never_falls_through_to_local_destructive_handlers() {
+    fn remote_only_direction_is_an_explicit_capability_failure_before_local_effects() {
         let (service, admin) = setup();
         for (index, command) in ["ADDGROUP GROUP1", "ADDUSER USER1"].into_iter().enumerate() {
             service
@@ -3634,20 +3651,22 @@ mod tests {
             .into_iter()
             .enumerate()
         {
-            assert_eq!(
-                service
-                    .execute_command(&next(&admin, &format!("DIRECTION-DENY-{index}")), command,)
-                    .unwrap_err()
-                    .code,
-                CommandDiagnosticCode::InvalidValue
-            );
+            let problem = service
+                .execute_command(&next(&admin, &format!("DIRECTION-DENY-{index}")), command)
+                .unwrap_err();
+            assert_eq!(problem.code, CommandDiagnosticCode::UnsupportedCapability);
+            assert!(matches!(
+                problem.host_problem(),
+                Some(HostProblem::UnsupportedCapability { capability, .. })
+                    if capability == "racf-command-operand"
+            ));
         }
         let after = service.database().summary().unwrap();
         assert_eq!(
             (after.principals, after.groups),
             (before.principals, before.groups)
         );
-        assert_eq!(after.audits, before.audits + 2);
+        assert_eq!(after.audits, before.audits);
         assert!(
             service
                 .database

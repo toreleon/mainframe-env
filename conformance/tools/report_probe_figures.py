@@ -504,6 +504,17 @@ def racf(root: Path) -> Iterator[Figure]:
         "applied_names",
         "remaining_catalog_only_names",
         "remaining_catalog_only_families",
+        "source_only_names",
+        "source_only_families",
+        "implemented_source_only_names",
+        "unsupported_source_only_names",
+        "catalog_gap_source_only_names",
+        "syntax_only_names",
+        "syntax_only_families",
+        "implemented_syntax_only_names",
+        "unsupported_syntax_only_names",
+        "context_only_syntax_only_names",
+        "catalog_gap_syntax_only_names",
     ):
         yield Figure(f"racf.{name}", book[name], f"{dispositions} {name}")
     unapplied = [entry for entry in book["dispositions"] if not entry.get("applied")]

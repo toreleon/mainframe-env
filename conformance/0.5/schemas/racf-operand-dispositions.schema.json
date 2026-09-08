@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mainframe-env.invalid/schemas/racf-operand-dispositions-v1.json",
-  "title": "mainframe-env RACF catalog-only operand dispositions v1",
+  "$id": "https://mainframe-env.invalid/schemas/racf-operand-dispositions-v2.json",
+  "title": "mainframe-env RACF operand dispositions v2",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -14,10 +14,22 @@
     "applied_names",
     "remaining_catalog_only_names",
     "remaining_catalog_only_families",
-    "dispositions"
+    "source_only_names",
+    "source_only_families",
+    "implemented_source_only_names",
+    "unsupported_source_only_names",
+    "catalog_gap_source_only_names",
+    "syntax_only_names",
+    "syntax_only_families",
+    "implemented_syntax_only_names",
+    "unsupported_syntax_only_names",
+    "context_only_syntax_only_names",
+    "catalog_gap_syntax_only_names",
+    "dispositions",
+    "publication_dispositions"
   ],
   "properties": {
-    "schema_version": {"const": "mainframe-env.racf-operand-dispositions@1"},
+    "schema_version": {"const": "mainframe-env.racf-operand-dispositions@2"},
     "baseline_id": {"const": "ibm-zos-3.2-racf-saf-2026"},
     "coverage_credit": {"const": 0},
     "description": {"type": "string", "minLength": 32, "maxLength": 1024},
@@ -26,6 +38,17 @@
     "applied_names": {"type": "integer", "minimum": 0},
     "remaining_catalog_only_names": {"type": "integer", "minimum": 0},
     "remaining_catalog_only_families": {"type": "integer", "minimum": 0},
+    "source_only_names": {"type": "integer", "minimum": 0},
+    "source_only_families": {"type": "integer", "minimum": 0},
+    "implemented_source_only_names": {"type": "integer", "minimum": 0},
+    "unsupported_source_only_names": {"type": "integer", "minimum": 0},
+    "catalog_gap_source_only_names": {"type": "integer", "minimum": 0},
+    "syntax_only_names": {"type": "integer", "minimum": 0},
+    "syntax_only_families": {"type": "integer", "minimum": 0},
+    "implemented_syntax_only_names": {"type": "integer", "minimum": 0},
+    "unsupported_syntax_only_names": {"type": "integer", "minimum": 0},
+    "context_only_syntax_only_names": {"type": "integer", "minimum": 0},
+    "catalog_gap_syntax_only_names": {"type": "integer", "minimum": 0},
     "dispositions": {
       "type": "array",
       "minItems": 1,
@@ -79,6 +102,73 @@
             "then": {"required": ["published_under"]}
           }
         ]
+      }
+    },
+    "publication_dispositions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["row_id", "keyword", "source_only", "syntax_only", "syntax_contexts", "emulator_behavior"],
+        "properties": {
+          "row_id": {"type": "string", "pattern": "^ibm-zos-3\\.2-racf-saf-2026:racf-command-families:[0-9]{4}$"},
+          "keyword": {"type": "string", "pattern": "^[A-Z]+$", "maxLength": 16},
+          "source_only": {"$ref": "#/$defs/source_classification"},
+          "syntax_only": {"$ref": "#/$defs/syntax_classification"},
+          "syntax_contexts": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {"$ref": "#/$defs/syntax_context"}
+          },
+          "emulator_behavior": {"type": "string", "minLength": 32, "maxLength": 512}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "source_classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["implemented", "deliberately_unimplemented", "catalog_gaps"],
+      "properties": {
+        "implemented": {"$ref": "#/$defs/names"},
+        "deliberately_unimplemented": {"$ref": "#/$defs/names"},
+        "catalog_gaps": {"$ref": "#/$defs/names"}
+      }
+    },
+    "syntax_classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["implemented", "deliberately_unimplemented", "context_only", "catalog_gaps"],
+      "properties": {
+        "implemented": {"$ref": "#/$defs/names"},
+        "deliberately_unimplemented": {"$ref": "#/$defs/names"},
+        "context_only": {"$ref": "#/$defs/names"},
+        "catalog_gaps": {"$ref": "#/$defs/names"}
+      }
+    },
+    "syntax_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "runtime_behavior", "command_level", "within_operands", "note"],
+      "properties": {
+        "name": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]*$", "maxLength": 32},
+        "runtime_behavior": {
+          "enum": ["implemented", "unsupported-capability", "analysis-only"]
+        },
+        "command_level": {"type": "boolean"},
+        "within_operands": {"$ref": "#/$defs/names"},
+        "note": {"type": "string", "minLength": 24, "maxLength": 512}
+      }
+    },
+    "names": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z][A-Z0-9-]*$",
+        "maxLength": 32
       }
     }
   }
