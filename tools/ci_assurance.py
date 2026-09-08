@@ -20,7 +20,7 @@ SHARED = {
     'clippy.toml', 'deny.toml', 'release.toml', 'VERSION', 'Jenkinsfile',
 }
 PROSE = {'README.md', 'CHANGELOG.md', 'LICENSE', 'LICENSE.md', 'CONTRIBUTING.md', 'AGENTS.md'}
-PRIMARY = ['fmt', 'spec', 'cobol', 'tests', 'clippy']
+PRIMARY = ['fmt', 'spec', 'cobol', 'python-tooling-tests', 'tests', 'clippy']
 POLICY = ['supply-chain', 'cargo-deny', 'license-notices']
 FULL = ['targets', 'documentation', 'docs', 'conformance', 'certification', 'evidence-seal', 'runtime-architecture']
 SHA = re.compile(r'[0-9a-f]{40}\Z')
@@ -144,6 +144,8 @@ def record(root: Path, output: Path, gate: str, command: list[str], expect_tests
                 clean = re.sub(rb'\x1b\[[0-9;]*m', b'', line)
                 match = re.search(rb'test result: ok\. (\d+) passed;', clean)
                 if match: tests += int(match.group(1))
+                match = re.search(rb'tooling test result: ok\. (\d+) executed;', clean)
+                if match: tests = int(match.group(1))
             process.stdout.close()
             code = process.wait()
     except OSError as problem:

@@ -69,6 +69,7 @@ class SelectionTests(unittest.TestCase):
             self.assertIn('supply-chain',p['primary_gates'])
             self.assertIn('cargo-deny',p['primary_gates'])
             self.assertIn('msrv',p['primary_gates'])
+            self.assertIn('python-tooling-tests',p['primary_gates'])
 
     @patch.object(ci,'identity',return_value={'candidate':'a'*40,'tree':'b'*40})
     def test_dependency_policy_blocks_even_a_prose_only_pull_request(self,_):
@@ -91,6 +92,22 @@ class SelectionTests(unittest.TestCase):
         policy=(ROOT/'deny.toml').read_text()
         self.assertIn('crate = "decnumber-sys@=0.1.6"',policy)
         self.assertIn('allow = ["ICU"]',policy)
+
+    def test_jenkins_records_discovered_tooling_and_all_postgres_gates(self):
+        root = Path(__file__).resolve().parents[2]
+        pipeline = (root / 'Jenkinsfile').read_text()
+        self.assertIn('--gate python-tooling-tests --expect-tests -- "$MAINFRAME_ENV_PYTHON" -B tools/run_tooling_tests.py', pipeline)
+        listed = subprocess.check_output(
+            [root / 'tools/jenkins/postgres_parity.sh', 'list'], text=True
+        ).splitlines()
+        self.assertEqual(listed, [
+            'postgres-move',
+            'postgres-effect',
+            'postgres-atomic-invariants',
+            'postgres-durable',
+            'postgres-carddemo-restart',
+        ])
+        self.assertIn('postgres_parity.sh list', pipeline)
 
     @patch.object(ci,'identity',return_value={'candidate':'a'*40,'tree':'b'*40})
     @patch.object(ci.subprocess,'check_output',return_value=b'docs/README.md\0')
@@ -177,6 +194,15 @@ class SelectionTests(unittest.TestCase):
             code=ci.record(Path('.'),Path(d),'empty-test',[sys.executable,'-c','print("running 0 tests\\ntest result: ok. 0 passed; 0 failed;")'],True)
             self.assertNotEqual(code,0)
             self.assertEqual(json.loads((Path(d)/'empty-test.json').read_text())['status'],'failed')
+
+    @patch.object(ci,'identity',return_value={'candidate':'a'*40,'tree':'b'*40})
+    @patch.object(ci.subprocess,'check_output',side_effect=lambda *args, **kw: '' if kw.get('text') else b'')
+    def test_tooling_runner_marker_receives_nonempty_test_credit(self,_,__):
+        with tempfile.TemporaryDirectory() as d:
+            code=ci.record(Path('.'),Path(d),'python-tooling-tests',[sys.executable,'-c',"print('tooling test result: ok. 7 executed; 1 skipped;')"],True)
+            self.assertEqual(code,0)
+            receipt=json.loads((Path(d)/'python-tooling-tests.json').read_text())
+            self.assertEqual(receipt['observed_passed_tests'],7)
 
     @patch.object(ci,'identity',return_value={'candidate':'a'*40,'tree':'b'*40})
     @patch.object(ci.subprocess,'check_output',side_effect=lambda *args, **kw: '' if kw.get('text') else b'')

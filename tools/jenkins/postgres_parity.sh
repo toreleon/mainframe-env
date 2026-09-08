@@ -33,12 +33,19 @@ postgres_share() {
   printf '%s\n' "$share"
 }
 
-[[ "$action" == run || "$action" == smoke || "$action" == check || "$action" == cleanup ]] \
-  || { echo "usage: $0 [run|smoke|check|cleanup]" >&2; exit 2; }
+gates=(postgres-move postgres-effect postgres-atomic-invariants postgres-durable postgres-carddemo-restart)
+
+[[ "$action" == run || "$action" == smoke || "$action" == check || "$action" == cleanup \
+  || "$action" == list ]] || { echo "usage: $0 [run|smoke|check|cleanup|list]" >&2; exit 2; }
+
+if [[ "$action" == list ]]; then
+  printf '%s\n' "${gates[@]}"
+  exit 0
+fi
 
 if [[ "$action" == check ]]; then
   bin="$(postgres_bin)"
-  for tool in initdb pg_ctl pg_isready createdb psql pg_config; do
+  for tool in initdb pg_ctl pg_isready createdb dropdb psql pg_config; do
     [[ -x "$bin/$tool" ]] || { echo "missing PostgreSQL tool: $bin/$tool" >&2; exit 1; }
   done
   share="$(postgres_share "$bin")"
@@ -69,7 +76,7 @@ if [[ "$action" == cleanup ]]; then
 fi
 
 bin="$(postgres_bin)"
-for tool in initdb pg_ctl pg_isready createdb psql pg_config; do
+for tool in initdb pg_ctl pg_isready createdb dropdb psql pg_config; do
   [[ -x "$bin/$tool" ]] || { echo "missing PostgreSQL tool: $bin/$tool" >&2; exit 1; }
 done
 share="$(postgres_share "$bin")"
@@ -84,8 +91,8 @@ port=$((54000 + ${BUILD_NUMBER:-0} % 1000))
 "$bin/pg_ctl" -D "$data" -l "$log" \
   -o "-F -k $socket -p $port -h 127.0.0.1" start -w -t 30
 "$bin/pg_isready" -h 127.0.0.1 -p "$port" -U hardening -d postgres
-"$bin/createdb" -h 127.0.0.1 -p "$port" -U hardening mainframe_env
 if [[ "$action" == smoke ]]; then
+  "$bin/createdb" -h 127.0.0.1 -p "$port" -U hardening mainframe_env
   "$bin/psql" -h 127.0.0.1 -p "$port" -U hardening -d mainframe_env \
     -v ON_ERROR_STOP=1 -Atqc "select current_setting('server_version_num')::integer / 10000"
   exit 0
@@ -97,24 +104,39 @@ out="${CARGO_TARGET_DIR:?CARGO_TARGET_DIR must be set}/ci-backend"
 mkdir -p "$out"
 cp "$CARGO_TARGET_DIR/ci-assurance/plan.json" "$out/plan.json"
 
-"$python_bin" -B "$root/tools/ci_assurance.py" record --output "$out" \
-  --gate postgres-move --expect-tests -- \
-  cargo test --locked -p mainframe-env-store --test provider_move_contract \
-  postgres_move_contract -- --ignored --exact
-gates=(postgres-move)
-if [[ -f "$root/crates/stores/mainframe-env-store/tests/effect_encoding_contract.rs" ]]; then
+reset_database() {
+  "$bin/dropdb" -h 127.0.0.1 -p "$port" -U hardening --if-exists --force mainframe_env \
+    >/dev/null 2>&1
+  "$bin/createdb" -h 127.0.0.1 -p "$port" -U hardening mainframe_env
+}
+
+for gate in "${gates[@]}"; do
+  reset_database
+  case "$gate" in
+    postgres-move)
+      command=(cargo test --locked -p mainframe-env-store --test provider_move_contract \
+        postgres_move_contract -- --ignored --exact)
+      ;;
+    postgres-effect)
+      command=(cargo test --locked -p mainframe-env-store --test effect_encoding_contract \
+        postgres_effect_domains_cannot_be_mixed -- --ignored --exact)
+      ;;
+    postgres-atomic-invariants)
+      command=(cargo test --locked -p mainframe-env-store --test atomic_invariants_contract \
+        postgres_atomic_invariants_contract -- --ignored --exact)
+      ;;
+    postgres-durable)
+      command=(cargo test --locked -p mainframe-env-store --lib \
+        durable::tests::postgres18_migration_and_durable_contracts -- --ignored --exact)
+      ;;
+    postgres-carddemo-restart)
+      command=(cargo test --locked -p mainframe-env-conformance --lib \
+        carddemo::tests::carddemo_full_memory_sqlite_and_postgres_controls -- --ignored --exact)
+      ;;
+    *) echo "unknown PostgreSQL gate: $gate" >&2; exit 2 ;;
+  esac
   "$python_bin" -B "$root/tools/ci_assurance.py" record --output "$out" \
-    --gate postgres-effect --expect-tests -- \
-    cargo test --locked -p mainframe-env-store --test effect_encoding_contract \
-    postgres_effect_domains_cannot_be_mixed -- --ignored --exact
-  gates+=(postgres-effect)
-fi
-if [[ -f "$root/crates/stores/mainframe-env-store/tests/atomic_invariants_contract.rs" ]]; then
-  "$python_bin" -B "$root/tools/ci_assurance.py" record --output "$out" \
-    --gate postgres-atomic-invariants --expect-tests -- \
-    cargo test --locked -p mainframe-env-store --test atomic_invariants_contract \
-    postgres_atomic_invariants_contract -- --ignored --exact
-  gates+=(postgres-atomic-invariants)
-fi
+    --gate "$gate" --expect-tests -- "${command[@]}"
+done
 "$python_bin" -B "$root/tools/ci_assurance.py" summary --plan "$out/plan.json" \
   --directory "$out" --output "$out/summary.json" --gates "${gates[@]}"

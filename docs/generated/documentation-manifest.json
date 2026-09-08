@@ -10,7 +10,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:434b4059f552cdaae4d5058918edf61e314376e6af7b2d63f2d20e8c7f64abab",
+      "sha256": "sha256:ddfa12cf086d7383affceea9e8a8d8f8a003b3324365be5b93129b4c602083f4",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -1342,7 +1342,7 @@
       "normative": false,
       "path": "docs/runbooks/JENKINS-LOCAL.md",
       "relative_links": 1,
-      "sha256": "sha256:3a225008b18a3e1e4343fabbc2588dbc7cff8bb28452c2d6da459a22de413b1e",
+      "sha256": "sha256:d5e99d674252befc9fecf5d76691f35e8143c390f59a12f79c00f149b345bb18",
       "title": "Local Jenkins CI",
       "xtask_commands": 0
     },

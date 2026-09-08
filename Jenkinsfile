@@ -89,6 +89,7 @@ pipeline {
                         tools/dataset_mutations.py
                         tools/jenkins/disk_guard.py
                         tools/jenkins/postgres_parity.sh
+                        tools/run_tooling_tests.py
                         tools/package_offline_cargo_bundle.sh
                       )
                       for required_path in "${required_paths[@]}"; do
@@ -275,6 +276,7 @@ pipeline {
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate fmt -- cargo fmt --all -- --check
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate spec -- cargo xtask spec --check
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate cobol -- cargo xtask cobol-exit --check
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate python-tooling-tests --expect-tests -- "$MAINFRAME_ENV_PYTHON" -B tools/run_tooling_tests.py
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate tests --expect-tests -- cargo test --workspace --all-features --locked --no-fail-fast
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate clippy -- cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
                 '''
@@ -450,8 +452,8 @@ pipeline {
                 fi
                 backend="$CARGO_TARGET_DIR/ci-backend"
                 if [[ -f "$backend/plan.json" ]]; then
-                  gates=(postgres-move)
-                  [[ -f "$backend/postgres-effect.json" ]] && gates+=(postgres-effect)
+                  gates=()
+                  while IFS= read -r gate; do gates+=("$gate"); done < <(tools/jenkins/postgres_parity.sh list)
                   "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py summary --plan "$backend/plan.json" \
                     --directory "$backend" --output "$backend/summary.json" \
                     --gates "${gates[@]}"

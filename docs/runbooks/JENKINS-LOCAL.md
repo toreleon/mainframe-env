@@ -98,8 +98,18 @@ does not provide comparison metadata.
 Install the exact PostgreSQL version in `tools/ci-inputs.lock.json` on the node.
 When the changed-path plan selects the store obligation, Jenkins automatically
 creates a disposable cluster under `$WORKSPACE/.postgres`, runs the ignored
-backend parity contracts, and stops the cluster. Missing or version-drifted
-PostgreSQL tools fail the selected stage instead of turning it into a skip.
+provider-move, canonical-effect, atomic-invariant, migration/durable, and
+CardDemo restart contracts, and stops the cluster. The database is dropped and
+recreated before every contract so one suite cannot satisfy or contaminate
+another. Missing or version-drifted PostgreSQL tools fail the selected stage
+instead of turning it into a skip.
+
+Every build-bearing plan also records the `python-tooling-tests` gate.
+`tools/run_tooling_tests.py` discovers tracked `tools/tests` directories at any
+repository depth, runs every Python and shell test file, and syntax-checks all
+shipped shell tooling. Adding a new versioned conformance tool test therefore
+does not require another Jenkinsfile edit. Markdown-only plans remain bounded
+to the documentation-system gate.
 
 For optional GitHub Release publication, create a Secret Text credential named
 `mainframe-env-github-token`. Publication occurs only when both `release` mode

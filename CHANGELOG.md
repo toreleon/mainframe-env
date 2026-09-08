@@ -55,6 +55,9 @@ All notable changes to mainframe-env are documented here.
 - Added the complete Apache-2.0 project license and ICU attribution, generated
   deterministic full notices from each target production dependency closure,
   and made dependency-license policy a blocking CI and release gate.
+- Made CI discover every shipped Python and shell tooling test, and expanded
+  isolated PostgreSQL parity to cover durable migration and CardDemo restart
+  suites.
 - Made the macOS release build retain its required `LC_UUID` and required the
   exact target CLI and server binaries to pass launch, help, version, and
   readiness probes before release receipts can be written.
