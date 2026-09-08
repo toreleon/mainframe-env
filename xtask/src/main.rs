@@ -6285,6 +6285,14 @@ fn check_schemas(root: &Path) -> TaskResult {
         &json(&jes_package_additions)?,
         &jes_package_additions,
     )?;
+    let distribution_release = root.join("release/0.8.2/source-distribution.json");
+    let distribution_release_schema =
+        root.join("conformance/0.8/schemas/source-distribution-release.schema.json");
+    validate_schema_instance(
+        &json(&distribution_release_schema)?,
+        &json(&distribution_release)?,
+        &distribution_release,
+    )?;
     for (artifact, schema) in [
         (
             "conformance/0.8/evidence/carddemo-base-batch.json",
@@ -10732,13 +10740,15 @@ fn check_certification(root: &Path) -> TaskResult {
         .iter()
         .map(|row| text(row, "name", &packages_path).map(str::to_string))
         .collect::<TaskResult<BTreeSet<_>>>()?;
-    let additions_path = root.join("conformance/0.2/inventory/package-additions.json");
-    if additions_path.is_file() {
+    for additions_path in [
+        root.join("conformance/0.2/inventory/package-additions.json"),
+        root.join("conformance/0.8/inventory/package-additions.json"),
+    ] {
         let additions = json(&additions_path)?;
         for package in array(&additions, "packages", &additions_path)? {
             require(
                 package_names.insert(text(package, "name", &additions_path)?.to_string()),
-                "0.2 package addition duplicates a historical package",
+                "package addition duplicates an earlier inventory package",
             )?;
         }
     }
@@ -10918,7 +10928,9 @@ fn check_certification(root: &Path) -> TaskResult {
         workspace_tests.success(),
         "certification workspace tests failed",
     )?;
-    check_release_artifacts(root, &host_target(root)?)?;
+    if !validate_source_distribution_release(root)? {
+        check_release_artifacts(root, &host_target(root)?)?;
+    }
     Ok(())
 }
 
@@ -11276,6 +11288,131 @@ fn check_release_artifacts(root: &Path, target: &str) -> TaskResult {
     compare_release_documents(&retained, &documents)?;
     validate_checked_in_release_targets(root)?;
     Ok(())
+}
+
+fn validate_source_distribution_release(root: &Path) -> TaskResult<bool> {
+    let version = product_version(root)?;
+    let record_path = root.join(format!("release/{version}/source-distribution.json"));
+    if !record_path.is_file() {
+        return Ok(false);
+    }
+    let schema_path = root.join("conformance/0.8/schemas/source-distribution-release.schema.json");
+    let record = json(&record_path)?;
+    validate_schema_instance(&json(&schema_path)?, &record, &record_path)?;
+    require(
+        text(&record, "version", &record_path)? == version
+            && record["runtime_and_contract_changes"] == Value::Bool(true)
+            && record["published_assets"]["native_binaries"] == Value::Bool(false)
+            && record["published_assets"]["native_binary_receipts"] == Value::Bool(false),
+        "source-distribution release identity is inconsistent",
+    )?;
+    let tag = text(&record, "tag", &record_path)?;
+    let tag_commit = text(&record, "tag_commit", &record_path)?;
+    let peeled_tag = format!("{tag}^{{}}");
+    require(
+        command_text(root, "git", &["rev-parse", &peeled_tag])? == tag_commit,
+        "source-distribution release tag moved",
+    )?;
+    let ancestry = Command::new("git")
+        .args(["merge-base", "--is-ancestor", tag_commit, "HEAD"])
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("source-distribution release ancestry: {error}"))?;
+    require(
+        ancestry.success(),
+        "current candidate does not descend from the source-distribution release tag",
+    )?;
+    require(
+        !root.join(format!("release/{version}/targets")).exists(),
+        "source-distribution release unexpectedly carries target-binary receipts",
+    )?;
+    for digest in [
+        text(
+            &record["published_assets"]["archive"],
+            "sha256",
+            &record_path,
+        )?,
+        text(
+            &record["published_assets"]["checksum"],
+            "sha256",
+            &record_path,
+        )?,
+    ] {
+        validate_sha256_identity(digest, "distribution release asset digest")?;
+    }
+
+    let cargo_lock_digest = text(
+        &record["source_identity"],
+        "cargo_lock_sha256",
+        &record_path,
+    )?;
+    require(
+        cargo_lock_digest
+            == format!(
+                "sha256:{}",
+                git_file_digest(root, tag_commit, "Cargo.lock")?
+            ),
+        "source-distribution Cargo.lock identity drifted",
+    )?;
+    let workflow_commit = text(&record["verification"], "workflow_commit", &record_path)?;
+    let workflow_digest = text(&record["verification"], "workflow_sha256", &record_path)?;
+    let workflow_ancestry = Command::new("git")
+        .args(["merge-base", "--is-ancestor", tag_commit, workflow_commit])
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("source-distribution workflow ancestry: {error}"))?;
+    require(
+        workflow_ancestry.success()
+            && workflow_digest
+                == format!(
+                    "sha256:{}",
+                    git_file_digest(
+                        root,
+                        workflow_commit,
+                        ".github/workflows/offline-release-bundle.yml",
+                    )?
+                ),
+        "source-distribution workflow identity or ancestry drifted",
+    )?;
+
+    let retained_version = text(&record["prior_binary_receipts"], "version", &record_path)?;
+    let retained =
+        retained_release_documents_for_version(root, retained_version, "aarch64-apple-darwin")?;
+    let inputs = retained
+        .iter()
+        .find_map(|(path, bytes)| {
+            (path.file_name() == Some(OsStr::new("build-inputs.json"))).then_some(bytes)
+        })
+        .ok_or("retained runtime receipts omit build-inputs.json")?;
+    let inputs: Value = serde_json::from_slice(inputs)
+        .map_err(|error| format!("retained release build inputs: {error}"))?;
+    let source_digest = text(&inputs, "source_digest", &record_path)?;
+    validate_checked_in_release_targets_for_identity(
+        root,
+        retained_version,
+        "stable",
+        source_digest,
+    )?;
+    let retained_tag = format!("mainframe-env-v{retained_version}");
+    for retained_target in RETAINED_RELEASE_TARGETS {
+        for (relative, current) in
+            retained_release_documents_for_version(root, retained_version, retained_target)?
+        {
+            let tagged = git_file_bytes(root, &retained_tag, &relative.to_string_lossy())?;
+            require(
+                current == tagged,
+                &format!(
+                    "historical {retained_version} binary receipt drifted: {}",
+                    relative.display()
+                ),
+            )?;
+        }
+    }
+    println!(
+        "source-distribution release version={version} tag={tag} bundle={} native-binary-receipts=absent current-runtime-artifact-credit=0 prior-binary-receipts={retained_version}:historical-only",
+        text(&record["published_assets"]["archive"], "name", &record_path)?
+    );
+    Ok(true)
 }
 
 fn retained_accepted_release(root: &Path) -> TaskResult<Option<String>> {
