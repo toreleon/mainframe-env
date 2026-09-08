@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/racf-operand-dispositions-v1.json",
+  "title": "mainframe-env RACF catalog-only operand dispositions v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "baseline_id",
+    "coverage_credit",
+    "description",
+    "baseline_catalog_only_names",
+    "baseline_catalog_only_families",
+    "applied_names",
+    "remaining_catalog_only_names",
+    "remaining_catalog_only_families",
+    "dispositions"
+  ],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.racf-operand-dispositions@1"},
+    "baseline_id": {"const": "ibm-zos-3.2-racf-saf-2026"},
+    "coverage_credit": {"const": 0},
+    "description": {"type": "string", "minLength": 32, "maxLength": 1024},
+    "baseline_catalog_only_names": {"type": "integer", "minimum": 0},
+    "baseline_catalog_only_families": {"type": "integer", "minimum": 0},
+    "applied_names": {"type": "integer", "minimum": 0},
+    "remaining_catalog_only_names": {"type": "integer", "minimum": 0},
+    "remaining_catalog_only_families": {"type": "integer", "minimum": 0},
+    "dispositions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "row_id",
+          "keyword",
+          "operand_name",
+          "topic_id",
+          "topic_path",
+          "topic_sha256",
+          "applied",
+          "reason",
+          "note"
+        ],
+        "properties": {
+          "row_id": {"type": "string", "pattern": "^ibm-zos-3\\.2-racf-saf-2026:racf-command-families:[0-9]{4}$"},
+          "keyword": {"type": "string", "pattern": "^[A-Z]+$", "maxLength": 16},
+          "operand_name": {"type": "string", "pattern": "^[A-Z][A-Z0-9]+$", "maxLength": 32},
+          "topic_id": {"type": "string", "minLength": 1, "maxLength": 128},
+          "topic_path": {"type": "string", "minLength": 1, "maxLength": 256},
+          "topic_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "applied": {"type": "boolean"},
+          "reason": {
+            "enum": [
+              "renamed-to-published-operand",
+              "published-as-a-value-or-subordinate-term",
+              "catalog-fuses-operand-and-value",
+              "named-only-in-prose-not-in-the-syntax",
+              "not-published-for-this-command"
+            ]
+          },
+          "published_operand": {"type": "string", "pattern": "^[A-Z][A-Z0-9]+$", "maxLength": 32},
+          "published_form": {"type": "string", "minLength": 1, "maxLength": 128},
+          "published_under": {"type": "string", "minLength": 1, "maxLength": 64},
+          "note": {"type": "string", "minLength": 16, "maxLength": 512}
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"applied": {"const": true}}},
+            "then": {"required": ["published_operand", "published_form"]}
+          },
+          {
+            "if": {"properties": {"reason": {"const": "renamed-to-published-operand"}}},
+            "then": {"properties": {"applied": {"const": true}}}
+          },
+          {
+            "if": {"properties": {"reason": {"const": "published-as-a-value-or-subordinate-term"}}},
+            "then": {"required": ["published_under"]}
+          }
+        ]
+      }
+    }
+  }
+}

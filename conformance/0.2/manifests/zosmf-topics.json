@@ -1,0 +1,2391 @@
+{
+  "baseline_id": "ibm-zosmf-3.2-2026-07-27",
+  "book_href": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/abstract.htm",
+  "book_label": "IBM z/OS Management Facility Programming Guide",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "coverage_credit": 0,
+  "product": "SSLTBW_3.2.0",
+  "retained_in_repository": false,
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "snapshot_date": "2026-07-27",
+  "subsystem": "zosmf",
+  "target_version": "0.2.0",
+  "toc_sha256": "477a3de1989e3cb185f2dacdc7cea9bab8304ef148e7c9e5e8be55fe3f77dc2b",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/SSLTBW_3.2.0?lang=en",
+  "topic_count": 395,
+  "topic_manifest_digest": "146cb3faaebd146c6396cc57b04ad6e48b49533b37dfa34f1eca2411518cea9b",
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topics": [
+    {
+      "bytes": 19858,
+      "last_modified": "2026-02-25",
+      "sha256": "e66ebbf6d6735a3af1bc034ebff61f0e128158ebab268c5bf796ba740aa6d91a",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_AppLinkingMgr.htm"
+    },
+    {
+      "bytes": 17395,
+      "last_modified": "2026-01-29",
+      "sha256": "aefcc496e8b0ebb637cdd22d99c859f6321043987ba839928af5e48942d3dbb6",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_CreateDataSet.htm"
+    },
+    {
+      "bytes": 12964,
+      "last_modified": "2026-01-29",
+      "sha256": "e3ce9fb98ba4a56e63f1962e69499b1ca13f1ee9b3ec3c01d27fc68f88009cb5",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_CreateUnixFile.htm"
+    },
+    {
+      "bytes": 11155,
+      "last_modified": "2026-01-29",
+      "sha256": "db9c653974cdcf3c556850c5c02d7562a32b7ddc45e1c32a305d23a788437b68",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_DeleteDataSet.htm"
+    },
+    {
+      "bytes": 11840,
+      "last_modified": "2026-01-29",
+      "sha256": "edad8411dbe23b06178ef9ac1f5a567560c9e566b0051ad9c365da75fba15a94",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_DeletePartitionedDataSet.htm"
+    },
+    {
+      "bytes": 13434,
+      "last_modified": "2026-01-29",
+      "sha256": "4a5eaedcb2140f8c7ec4dce8a3000ece2b6a32aacc2a2b89fd184011e8720d3c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_DeletePurgeJob.htm"
+    },
+    {
+      "bytes": 10480,
+      "last_modified": "2026-07-29",
+      "sha256": "81e6544c4e0599149b729431c19746800f612ae121239d0bd14dd9748c29914f",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_DeleteUnixFile.htm"
+    },
+    {
+      "bytes": 8417,
+      "last_modified": "2026-01-29",
+      "sha256": "875d48c2914c2661b9082650e5464e8e01f12e9d7e4805764c1783d09abfc76d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_DeleteUnixzFsFilesystem.htm"
+    },
+    {
+      "bytes": 8943,
+      "last_modified": "2026-01-29",
+      "sha256": "1688eeaeee16022776d8c881813d0b92d079fb63814704d67ee934f54f502481",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_DeleteWRP.htm"
+    },
+    {
+      "bytes": 92464,
+      "last_modified": "2026-01-29",
+      "sha256": "31f2fa4eba4ee828065933f192df5d7910cf9bf7d9dade08a8775084b05d33ac",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_Error_Categories.htm"
+    },
+    {
+      "bytes": 11043,
+      "last_modified": "2026-01-29",
+      "sha256": "bdeb1720365145bb3a0509d5c49046cc8b2269ad4e635c939c15120a76f1ddf1",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GETListMVSSubsystems.htm"
+    },
+    {
+      "bytes": 34905,
+      "last_modified": "2026-01-29",
+      "sha256": "9282305e95297e7a3f6bbb70fb0673daf039e60b8968fa9d94b1e00c7a25040c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetCommandResponse.htm"
+    },
+    {
+      "bytes": 15600,
+      "last_modified": "2026-01-29",
+      "sha256": "d69d382e049ce9ddbe6cebb43ca4c7553b08bacdd74fd4dbc2e5ac22233d26b8",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetJobStatus.htm"
+    },
+    {
+      "bytes": 16079,
+      "last_modified": "2026-01-29",
+      "sha256": "e6cf7efc33b885bea9cb118835674c5ae2a196c650c94ac260f2e88ed4a32030",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetListDataSetMembers.htm"
+    },
+    {
+      "bytes": 17371,
+      "last_modified": "2026-01-29",
+      "sha256": "74e19d196aaf8bcb7ae4edaf7c28fb2ebd826b49fbb7ba9e2a9f175af8997e56",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetListDataSets.htm"
+    },
+    {
+      "bytes": 15639,
+      "last_modified": "2026-01-29",
+      "sha256": "704d011129cd9ecadbd5cc60da0835cee7abe5b0a9609706cc2ab419cadaf12e",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetListJobs.htm"
+    },
+    {
+      "bytes": 7245,
+      "last_modified": "2026-01-29",
+      "sha256": "4f852e5d1195ae17fbc9e03469ec88f435e8a57a1c6fd0cc6a6271006e4a6f0e",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetListOfEligibleHandlers.htm"
+    },
+    {
+      "bytes": 8637,
+      "last_modified": "2026-01-29",
+      "sha256": "11287f23e0bff170cff70486ea1be1bfee28c79f514da2bf23eab7c34fd466a9",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetListOfHandlers.htm"
+    },
+    {
+      "bytes": 11427,
+      "last_modified": "2026-01-29",
+      "sha256": "84784415908ec387ba220b0d931ec221e740fbd90c13b235e7e5fb79ba8e171a",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetListSpoolFiles.htm"
+    },
+    {
+      "bytes": 27283,
+      "last_modified": "2026-01-29",
+      "sha256": "26fcdd18695c2a71c524431d170a000e8d7603c826683685bd046d6cd38585ef",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetListUNIXfiles.htm"
+    },
+    {
+      "bytes": 11005,
+      "last_modified": "2026-01-29",
+      "sha256": "1ac970e77671a0fefbc18f9677a7661bb11f9aa294d966a47b49316cbf8173e4",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetListUnixFilesystems.htm"
+    },
+    {
+      "bytes": 40304,
+      "last_modified": "2026-01-29",
+      "sha256": "e4e82cc329eceb8861dc83859e7920bad8f93bd47df27c967b60ddb9b6bc2848",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetMessagesandLogs.htm"
+    },
+    {
+      "bytes": 11161,
+      "last_modified": "2026-01-29",
+      "sha256": "33c716b7968234b5e99b3e0dfc077b914e009111749cc14bde189c54faf19a63",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetNotificationsFromUser.htm"
+    },
+    {
+      "bytes": 37265,
+      "last_modified": "2026-02-25",
+      "sha256": "989a22c2701ca809062e9d58fa47aeab985d01f31b34f1a00a36a8fc9d982bda",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetReadDataSet.htm"
+    },
+    {
+      "bytes": 20522,
+      "last_modified": "2026-01-29",
+      "sha256": "d18ff25b7a813dfc1669d0e632424a2ea3854a6397dad7caec2769cd6fb0358f",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetReadUnixFile.htm"
+    },
+    {
+      "bytes": 12020,
+      "last_modified": "2026-01-29",
+      "sha256": "592c47fbeff0eca3665c7972efaa307925b0db920b54811530b81f50297728c0",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetRuntimeDiagnostics.htm"
+    },
+    {
+      "bytes": 38876,
+      "last_modified": "2026-01-29",
+      "sha256": "6e6e44be01cafe27cdced8f33ccbd2b90a76b84a5567671993cabfb5ca0fbdbd",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_GetUnsolicitedMsgs.htm"
+    },
+    {
+      "bytes": 126081,
+      "last_modified": "2026-01-29",
+      "sha256": "27d5640a0e1b262b440d337a8696bf5125d6fb9c02f3a34b1277f8fd7b6296a1",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_IssueCommand.htm"
+    },
+    {
+      "bytes": 53484,
+      "last_modified": "2026-01-29",
+      "sha256": "0da69802bd6613991141d275da62632952a023098aa2f6e264fd7c349fac09b9",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_JSON_Documents.htm"
+    },
+    {
+      "bytes": 12049,
+      "last_modified": "2026-01-29",
+      "sha256": "d2ef2c18cffbc5cf66c79512aa121ab33f6b7bbcc0731a9944564726d63cb55e",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_MountUnixFile.htm"
+    },
+    {
+      "bytes": 6741,
+      "last_modified": "2026-01-29",
+      "sha256": "d3d0966290f430bf8f551ec58a14d67439427a0be0c3f70a488f3438f68add3a",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_MvsSubsystemServices.htm"
+    },
+    {
+      "bytes": 9834,
+      "last_modified": "2026-01-29",
+      "sha256": "2d84489eccd2bbd5dd45448b8d2d445e6fca40ad49e0ccfe7bf5850049aefb88",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_NOTIFICATIONS.htm"
+    },
+    {
+      "bytes": 36284,
+      "last_modified": "2026-01-29",
+      "sha256": "34d096bdaa690e60e73ae4dd0a4b86a771da44ea1883dd6c136d3e3f6005e698",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_POSTExportDefinedSWInstance.htm"
+    },
+    {
+      "bytes": 29632,
+      "last_modified": "2026-01-29",
+      "sha256": "911f425a3c001aa1be6235fa17ab84f7f51eb28e74454f115add9af94a97a363",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PSI.htm"
+    },
+    {
+      "bytes": 13299,
+      "last_modified": "2026-01-29",
+      "sha256": "c93b1708577f805825bf0698a6c0ad8de90aa2ce31a8d7163b3ac2a0ec6bb610",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PUTIDCAMSAccessMethodsServices.htm"
+    },
+    {
+      "bytes": 12470,
+      "last_modified": "2026-01-29",
+      "sha256": "c748fe2adca82bf705a4dd77ec5c8a96097748d8edb1ede505f61257ccbc2be0",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PostCreateUnixzFsFilesystem.htm"
+    },
+    {
+      "bytes": 18892,
+      "last_modified": "2026-01-29",
+      "sha256": "c0e9cb561af846eef6baa8119402db9e7c764c9e031f591ff9f9b1be0ca4e0a9",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PostNotificationFromTask.htm"
+    },
+    {
+      "bytes": 16565,
+      "last_modified": "2026-01-29",
+      "sha256": "998a126ac05e6fdae0b9ea8edf08b29d0b191172686be2aeb31ddb23346b551a",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PostNotificationFromTaskOrUser.htm"
+    },
+    {
+      "bytes": 14380,
+      "last_modified": "2026-01-29",
+      "sha256": "53ba79b838c5522f9c85ed4c3c8cc3de78e6be779e6387f87b5ff35e00d5c186",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PrimeWRP.htm"
+    },
+    {
+      "bytes": 12985,
+      "last_modified": "2026-01-29",
+      "sha256": "06e1849860991944050e62178c19dfaf47e80387a4d5dfef3ecba5b4328038b3",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PutCancelJob.htm"
+    },
+    {
+      "bytes": 13437,
+      "last_modified": "2026-01-29",
+      "sha256": "a6304740b5e47f7fdcff83c0ef523fa4d0ee4e1a0607d8917b48f7d705fea1a7",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PutChangeJobClass.htm"
+    },
+    {
+      "bytes": 25848,
+      "last_modified": "2026-01-29",
+      "sha256": "5f501ca68eeb2ff8781bbc770e9f00b46f0e8b7988aa626b84e33a1adafc7935",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PutDataSetMemberUtilities.htm"
+    },
+    {
+      "bytes": 13574,
+      "last_modified": "2026-01-29",
+      "sha256": "2dee23fbfa715945b3422318624d227dfdd5cd690dcc85970f2bb445c48840b1",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PutHoldJob.htm"
+    },
+    {
+      "bytes": 13255,
+      "last_modified": "2026-01-29",
+      "sha256": "962fd1e993cd00aec74d073ce56b42cc221c56755e173040a22465b7b9a1b4d3",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PutReleaseJob.htm"
+    },
+    {
+      "bytes": 27699,
+      "last_modified": "2026-01-29",
+      "sha256": "68ab02cafa83b12c0d4d235a094fe450ad3a2409e5d8a2ae85e539e21e48efc2",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PutSubmitJob.htm"
+    },
+    {
+      "bytes": 43941,
+      "last_modified": "2026-01-29",
+      "sha256": "19487755f5f95e33f8c9acf8f6ce539b6f34b4b42249aa3c42457ddaf9289040",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PutUnixFileUtilities.htm"
+    },
+    {
+      "bytes": 29961,
+      "last_modified": "2026-04-29",
+      "sha256": "7060b9bbbc7d4b15e7097df0262bd2aceeeec8cb21ca5afeb1b2d9d4db935123",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PutWriteDataSet.htm"
+    },
+    {
+      "bytes": 16640,
+      "last_modified": "2026-01-29",
+      "sha256": "88073026a17e6ef48c5e38f7e338ad5a894618226f23a408e0fdaf5e26946164",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_PutWriteUnixFile.htm"
+    },
+    {
+      "bytes": 15344,
+      "last_modified": "2026-01-29",
+      "sha256": "fa49f10325b3bd184ed04cad53d10896b3951fd82342d421ffe6e49163bd729d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_RESTCONSOLE.htm"
+    },
+    {
+      "bytes": 55493,
+      "last_modified": "2026-01-29",
+      "sha256": "208e7bd3ab09c5e56e5a74ead7ced165d1205dc9bc8831d48e498cdf135b3738",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_RESTFILES.htm"
+    },
+    {
+      "bytes": 94928,
+      "last_modified": "2026-01-29",
+      "sha256": "af615b914fef208891200fb5df0718e15a862613957db08326131ba2e6cd88c7",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_RESTFILES_Error_Categories.htm"
+    },
+    {
+      "bytes": 116593,
+      "last_modified": "2026-01-29",
+      "sha256": "850f56a383a617d02ce53812896b19f7c00ab78da80388feb15ebffa074ad6f6",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_RESTFILES_JSON_Documents.htm"
+    },
+    {
+      "bytes": 43713,
+      "last_modified": "2026-01-29",
+      "sha256": "31c5cd96af6d8e5a16ee89bdeaf53eee9df2da7f23b6cd53e703a3856b0de23f",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_RESTJOBS.htm"
+    },
+    {
+      "bytes": 8435,
+      "last_modified": "2026-01-29",
+      "sha256": "733f8078ba3cacd6d5cde1283303266316733bdae2b0f1c247aad83d1c410f12",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_RESTJOBS_Tracing.htm"
+    },
+    {
+      "bytes": 13280,
+      "last_modified": "2026-01-29",
+      "sha256": "ead0e7c1333ba0c5a4cc245d915d4d53ff07b50a85600c61c11124bbe3a2c100",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_RegisterEventType.htm"
+    },
+    {
+      "bytes": 19253,
+      "last_modified": "2026-01-29",
+      "sha256": "5d4b86b38acbb6f4424679a49f911fac6755a2118f564c04d8ff43a52e20a307",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_RegisterHandler.htm"
+    },
+    {
+      "bytes": 21125,
+      "last_modified": "2026-01-29",
+      "sha256": "fc4efa8cd61a1029f184f4cd0063085a50e3d75568ebf6f373d67c26545317c5",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_RetrieveSpoolFileContents.htm"
+    },
+    {
+      "bytes": 26950,
+      "last_modified": "2026-01-29",
+      "sha256": "3ae203b7096e3d892870e1d1105389fa5491f50dfb7190a3976b5aad65a1fe67",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_SMWorkflowVariables.htm"
+    },
+    {
+      "bytes": 10760,
+      "last_modified": "2026-01-29",
+      "sha256": "cde45c7dd04eee6bd0689f0a2b7b6347e8157a94dfc44adb50321857f6fbdd70",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_UnmountUnixFile.htm"
+    },
+    {
+      "bytes": 4889,
+      "last_modified": "2026-01-29",
+      "sha256": "1c4b9f1a860c2b2d4f641e23cf2977970c32c6d639202d5e097ea71620079cee",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_UnregisterEventType.htm"
+    },
+    {
+      "bytes": 5288,
+      "last_modified": "2026-01-29",
+      "sha256": "57e824e358a78a048998bb70b4d74bca34341132081b6d0b385cf3a11fda4991",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_UnregisterHandler.htm"
+    },
+    {
+      "bytes": 89447,
+      "last_modified": "2026-06-24",
+      "sha256": "b722b88d96c5ea73b962e6a64aed167e4a2b7c1188023b74fc96ebcf3a045aae",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_ValidateParmLibSyntaxUpdates.htm"
+    },
+    {
+      "bytes": 11580,
+      "last_modified": "2026-01-29",
+      "sha256": "985496abadab0be067fc30d4baebe2b576830dd25a1fbb9966df0d6745246ece",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_WRP.htm"
+    },
+    {
+      "bytes": 14078,
+      "last_modified": "2026-01-29",
+      "sha256": "2d59c057249a39292485fb852513fb925bd8f27fc042093bfddacdece7837bef",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_servicedefWRP.htm"
+    },
+    {
+      "bytes": 12600,
+      "last_modified": "2026-01-29",
+      "sha256": "59cd623ab93e529caefd135b5461ddfa9e4537cc09d1506964992e87604baa27",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_API_servicedefWRPdep.htm"
+    },
+    {
+      "bytes": 74766,
+      "last_modified": "2026-01-29",
+      "sha256": "16cc00bbe271ac1524ce99ee9ab44d668eec2fd69c65bb9758a996b3cca120bf",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_EventTypes.htm"
+    },
+    {
+      "bytes": 5366,
+      "last_modified": "2026-01-29",
+      "sha256": "83f0b2acaba55688e7e37ea8bd4310e2298307ab4ac073a4335388300b315e1b",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_ParmlibManagementServices.htm"
+    },
+    {
+      "bytes": 82889,
+      "last_modified": "2026-02-25",
+      "sha256": "54855ca1578918a24f5867693b9ef703dcf4cf4a9b62d84c939740375721a211",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/IZUHPINFO_RESTServices.htm"
+    },
+    {
+      "bytes": 1990,
+      "last_modified": "2026-01-29",
+      "sha256": "7811e7556a05d90a18529d474e058833b2ab74ea2cb66918d504372d674d9840",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/abstract.htm"
+    },
+    {
+      "bytes": 6803,
+      "last_modified": "2026-01-29",
+      "sha256": "0c55fc83bc3ac4b9a54e6333ded246bdc8fc13eb29cca176d5e8d7cf9d861df1",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izua700soc-v3r1.htm"
+    },
+    {
+      "bytes": 12594,
+      "last_modified": "2026-07-29",
+      "sha256": "d18d298fda79f464d54ef8d3c05328aaff3e0668b55698ffecbe96e0a9571209",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izua700soc-v3r2.htm"
+    },
+    {
+      "bytes": 24526,
+      "last_modified": "2026-01-29",
+      "sha256": "cb7f339098c022a180af47f9cc8a4e83bd31f127d5ac1c404e4bdce02c416aa9",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_AddPortableSoftwareInstance.htm"
+    },
+    {
+      "bytes": 25583,
+      "last_modified": "2026-01-29",
+      "sha256": "fdf246acac5fca62af75bf52a20bae9b49c562963a7a801aaf40fd88a1fa9694",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_AddProdFeatFMID.htm"
+    },
+    {
+      "bytes": 28795,
+      "last_modified": "2026-01-29",
+      "sha256": "07e39ac75c6151a567fd207961b47fbc22172d5ba51aabbe55a8f9e6e7eb35c2",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_AddSoftwareInstance.htm"
+    },
+    {
+      "bytes": 16118,
+      "last_modified": "2026-01-29",
+      "sha256": "7b6b97e009842c65aeb8f8a5ff15cfe8a31b0b257225411956b3f5d6fca89a2d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_AppServerRoutingServices.htm"
+    },
+    {
+      "bytes": 8578,
+      "last_modified": "2026-01-29",
+      "sha256": "f8c0c96e61f0f43ea767880b195c9866fc259f9844461950d79a52934f49f256",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_AuthenticateMultiSys.htm"
+    },
+    {
+      "bytes": 9106,
+      "last_modified": "2026-01-29",
+      "sha256": "ee9a49a9d0376e7e84f50028df5fdae47b2ec7eb5ba7e6ce63c26c73a3ff6c16",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_AuthenticateProxy.htm"
+    },
+    {
+      "bytes": 26327,
+      "last_modified": "2026-01-29",
+      "sha256": "b24a76d057efc56d49d166a625bf251b63b214246132a06e7fc6a5125446c6ca",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_CheckMVSSystems.htm"
+    },
+    {
+      "bytes": 48915,
+      "last_modified": "2026-01-29",
+      "sha256": "5cbd7a9d9c8b1d6abd1bf3ac6dd3fdde6cd93f66f8ad62a048d555abdbb059aa",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_CloudResourceManagementServices.htm"
+    },
+    {
+      "bytes": 28550,
+      "last_modified": "2026-01-29",
+      "sha256": "28f619ec26cceb7dfdeb7f51566ed96cc87531837d2bdf672e5fe4f188b8d9ee",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_CloudResourcePoolServices.htm"
+    },
+    {
+      "bytes": 9734,
+      "last_modified": "2026-01-29",
+      "sha256": "625cfb5063b0a4c54d763100f72d2ef7c526fc0552213f4722a58736504bb029",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ComplianceRESTInterface.htm"
+    },
+    {
+      "bytes": 59675,
+      "last_modified": "2026-01-29",
+      "sha256": "33689caa4b3d7782aee050625167c86ebb555f0f70aac8fd8716b8c82e368c9e",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_CreateLparPoolEntry.htm"
+    },
+    {
+      "bytes": 7633,
+      "last_modified": "2026-01-29",
+      "sha256": "97e7bd70a0a2afc16badebdb720920a55dcf58b35caf3a9cf8b22fe676defe49",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_DELETEWebTokenAuthService.htm"
+    },
+    {
+      "bytes": 27975,
+      "last_modified": "2026-02-25",
+      "sha256": "a00c9d0973bb315585ca1998b88be7d4db1917a6e79d01433b26f85e3698eb5f",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_DeleteDataMultiSys.htm"
+    },
+    {
+      "bytes": 17488,
+      "last_modified": "2026-02-25",
+      "sha256": "2d9d40a1587cbb3c6ffb31803e93b7da4597e38703713e9c10c2fc1cbdf24e87",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_DeleteDataServer.htm"
+    },
+    {
+      "bytes": 7850,
+      "last_modified": "2026-01-29",
+      "sha256": "5cb400a72d9e2b5e15b71d8e1bd88b99739947d734cafc6c507718cd1700aeba",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_DeleteDeployment.htm"
+    },
+    {
+      "bytes": 8429,
+      "last_modified": "2026-01-29",
+      "sha256": "3de13ec7730de989e6a16ae0934f1135cb06c3058cca4acf040b383119b47d8c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_DeleteLparPoolEntry.htm"
+    },
+    {
+      "bytes": 10757,
+      "last_modified": "2026-01-29",
+      "sha256": "24e958b9d4f270a863579091a42bd66ab547678673f9ee580383308c66e9b39d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_DeletePersistData.htm"
+    },
+    {
+      "bytes": 9667,
+      "last_modified": "2026-01-29",
+      "sha256": "5525c3e77e69602c60dd9bf5ac4ce38f48311f4b555dd23968604a7543daa4d1",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_DeletePortableSoftwareInstance.htm"
+    },
+    {
+      "bytes": 9953,
+      "last_modified": "2026-01-29",
+      "sha256": "da5086a99330af651cb166d6619bdee2d5bb399ed965cf5e54364e857c38192f",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_DeleteSoftwareInstance.htm"
+    },
+    {
+      "bytes": 23747,
+      "last_modified": "2026-01-29",
+      "sha256": "6cc08c730fc05ed4c2462d8d9b4231dd24d784f9fc2a96d76a7aba633af39fd8",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_DeleteTempCatAliases.htm"
+    },
+    {
+      "bytes": 10756,
+      "last_modified": "2026-01-29",
+      "sha256": "02067ca08a3ef7f5950fa073fa2fdb2ac3efce809abc80989502f3b27281182c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_DeleteTenant.htm"
+    },
+    {
+      "bytes": 31538,
+      "last_modified": "2026-01-29",
+      "sha256": "86817b6023829b39f2c56f14c83e95f82450dac084cd1fd784127cd0e368fca6",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_DeploySoftwareInstances.htm"
+    },
+    {
+      "bytes": 9171,
+      "last_modified": "2026-01-29",
+      "sha256": "dfe0c202ee892152f21c3f2e6aca3d3c52f9e77dd32e0aa5b099270e6a590bec",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_EndTSOAS.htm"
+    },
+    {
+      "bytes": 12028,
+      "last_modified": "2026-01-29",
+      "sha256": "21dc246a1d319ec6ebb49dc3412c77f69c5f958224fe2f809ee130d4e3bfda7d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_GetDDS.htm"
+    },
+    {
+      "bytes": 12365,
+      "last_modified": "2026-01-29",
+      "sha256": "f1cc52ef97cd74edc7992e2cb4bb4e6f9ef8c903bec90f6caffccfe178b90a96",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_GetDataSetAttributes.htm"
+    },
+    {
+      "bytes": 51384,
+      "last_modified": "2026-01-29",
+      "sha256": "15880899d0c2985ef232c0eaef835bfddaa6dc2fbf850bc32a239b2f96b24594",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_GetDomainResourcePool.htm"
+    },
+    {
+      "bytes": 40639,
+      "last_modified": "2026-01-29",
+      "sha256": "904732af8add16f2a37fc762d0076e4f89ea393df8292a9f4d077dbaf912d0a8",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_GetDomains.htm"
+    },
+    {
+      "bytes": 14674,
+      "last_modified": "2026-01-29",
+      "sha256": "def89bcf61a3b218aa63b0f5396d11db95b9b10480d976fa7f6e3d7931d92d6f",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_GetDomainsHistory.htm"
+    },
+    {
+      "bytes": 48629,
+      "last_modified": "2026-01-29",
+      "sha256": "1bc0567926a8187e2030ba98c6f1a732281557d670cb677168ce95e8fc96f8c7",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_GetLparPoolEntry.htm"
+    },
+    {
+      "bytes": 17902,
+      "last_modified": "2026-01-29",
+      "sha256": "0ed9dc49facd65b8f17ccbb3cc6320c9ec52b92b10340f75e66de6fce9f09dfb",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_GetMeterData.htm"
+    },
+    {
+      "bytes": 48522,
+      "last_modified": "2026-01-29",
+      "sha256": "52e97fa20f2a7a2c7edcaa8203040fc00025f60e7d84c97e4ddb5c1f44bfbe8d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_GetResourcePool.htm"
+    },
+    {
+      "bytes": 14911,
+      "last_modified": "2026-01-29",
+      "sha256": "eea4cd3ed082413abd607a2f91cc78ce076863e84a1184c3f49024ab0f270861",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_GetResourcePoolHistory.htm"
+    },
+    {
+      "bytes": 14625,
+      "last_modified": "2026-02-25",
+      "sha256": "560b2423660dc7318dbc6cbded05819556be8728eaeaf1b4539eb1738643e9ed",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_GetRetrieveVersionInfo.htm"
+    },
+    {
+      "bytes": 19442,
+      "last_modified": "2026-01-29",
+      "sha256": "433de66c9070fde0957a40557bb1bfebce6cbcadbf34579e0c75da3d96278bc6",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_GetSecurityResources.htm"
+    },
+    {
+      "bytes": 35977,
+      "last_modified": "2026-01-29",
+      "sha256": "047f9018604f99321502ad67afddbe6b86060b48f1b44c6aec0bed1e4f300fda",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_GetTenants.htm"
+    },
+    {
+      "bytes": 14297,
+      "last_modified": "2026-01-29",
+      "sha256": "dc98b868f6672fdcecfc53f8027ba83583f11f602514d0cf2cec1c8fb6116422",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_GetTenantsHistory.htm"
+    },
+    {
+      "bytes": 47039,
+      "last_modified": "2026-01-29",
+      "sha256": "2c4e961c3bdd85732f3e48236ab9f356e53b55d3ec48dca58464c4320a73d97e",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListDomainResourcePools.htm"
+    },
+    {
+      "bytes": 26256,
+      "last_modified": "2026-01-29",
+      "sha256": "fc8a26fcc43f7106e664429072ddf484f2d5a4d2e670342254b21936f425381e",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListDomains.htm"
+    },
+    {
+      "bytes": 7936,
+      "last_modified": "2026-01-29",
+      "sha256": "46add9f435ad8646d0d2ca40a8ccb3a47063d55db26e157efb5f7242d09f981f",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListGroups.htm"
+    },
+    {
+      "bytes": 48256,
+      "last_modified": "2026-01-29",
+      "sha256": "5ab5697a1d9198105a30e818206bd4d46be56dc0a8a03fcb4cda7ca29ec7c58c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListLparPoolEntry.htm"
+    },
+    {
+      "bytes": 12595,
+      "last_modified": "2026-01-29",
+      "sha256": "691953b7c1bf68c62407f3c4831620dbc8e241f76060ffff9519c225ed1c4c8c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListPortableSoftwareInstances.htm"
+    },
+    {
+      "bytes": 44600,
+      "last_modified": "2026-01-29",
+      "sha256": "3fb62dde2fb779abf109a9636da5c6ab0c12ab4f2e08f06ca5f9ea6b38039b17",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListResourcePool.htm"
+    },
+    {
+      "bytes": 25994,
+      "last_modified": "2026-01-29",
+      "sha256": "b3992e9313dbedab0f4bcb8cea76ee48de2c71e4498ba269c1ac6da79439a57d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListSIDataSets.htm"
+    },
+    {
+      "bytes": 14212,
+      "last_modified": "2026-01-29",
+      "sha256": "5aaba7dd848a8885932f6e752ceea4d1655b2b6c0eaf3485921de123a32d93ba",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListSoftwareInstances.htm"
+    },
+    {
+      "bytes": 7908,
+      "last_modified": "2026-01-29",
+      "sha256": "6cdf38f2dc9d68f0fb343564847055f5c3b154ebb5580cf34e3022803e640f7c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListSysplexes.htm"
+    },
+    {
+      "bytes": 11511,
+      "last_modified": "2026-01-29",
+      "sha256": "33a51a69f4a7dba10d97614d92d39cd3da1fc9ac12dd8357905ac0d568220d06",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListSystems.htm"
+    },
+    {
+      "bytes": 11466,
+      "last_modified": "2026-01-29",
+      "sha256": "142eb70c8ef2f14ed4076c2090dec33df1da684e58e4a3bb9c564496fa68478e",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListSystemsInCPC.htm"
+    },
+    {
+      "bytes": 11765,
+      "last_modified": "2026-01-29",
+      "sha256": "57910639a74a422295524cf11c2b383e92093a0ccf8e5d5cbade078f7d6c93eb",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListSystemsInGroup.htm"
+    },
+    {
+      "bytes": 11355,
+      "last_modified": "2026-01-29",
+      "sha256": "eca357db79a7183133351594a9269405aca43358d00b41826304d98d51252835",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListSystemsInSysplex.htm"
+    },
+    {
+      "bytes": 49420,
+      "last_modified": "2026-01-29",
+      "sha256": "c35c048d493c692061eb6d4be588acfb9097c373494af25ac743a0ac89c5da6b",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListTemplateResourcePools.htm"
+    },
+    {
+      "bytes": 27822,
+      "last_modified": "2026-01-29",
+      "sha256": "008556893b012ecbac4916f42c2b0d5e0878e3d6157b9fa8b4558cc5fac943b4",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ListTenants.htm"
+    },
+    {
+      "bytes": 30277,
+      "last_modified": "2026-01-29",
+      "sha256": "a2a2c799d0a1df528b4601e8c3c66af3f93ac5c1d9dd88e5036f6046e6561049",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ManagementServicesCatalog.htm"
+    },
+    {
+      "bytes": 21402,
+      "last_modified": "2026-01-29",
+      "sha256": "c99bedcbecfce5702f9f29f712fccb803245b3b8c9224a360d806a6c65afd585",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_MissingCriticalUpdates.htm"
+    },
+    {
+      "bytes": 20771,
+      "last_modified": "2026-01-29",
+      "sha256": "f23346796e6ae71e6d46f5b95e5cc676b444ae6fed175d4c03a5eb9e03d62950",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_MissingFIXCATUpdates.htm"
+    },
+    {
+      "bytes": 57733,
+      "last_modified": "2026-01-29",
+      "sha256": "aaaa44d0f6df60cc2e8f53e00e3046e03726b8583217fe0644ebe014808093fa",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ModifyLparPoolEntry.htm"
+    },
+    {
+      "bytes": 33785,
+      "last_modified": "2026-01-29",
+      "sha256": "1e6b2337197156a84cec2b8c8db834f8958d28f701d63cbebd3a79f1d0c496b5",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ModifySoftwareInstance.htm"
+    },
+    {
+      "bytes": 61522,
+      "last_modified": "2026-01-29",
+      "sha256": "253df42a83ab0a764fbb68cd3d260de1924e26273c0f782548a6edfcb96231fe",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ObtainLparPoolEntry.htm"
+    },
+    {
+      "bytes": 24197,
+      "last_modified": "2026-02-25",
+      "sha256": "d8b98b31f76af0c0cef37d527d48aa12c1f210887ba1442b6debc4b6e0566472",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_POSTWebTokenAuthService.htm"
+    },
+    {
+      "bytes": 30347,
+      "last_modified": "2026-07-29",
+      "sha256": "949e9882a37294cf8000b833ff04a81efc21199b66b22cb5b3fa7f05c8e5e047",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_PUTWebTokenChangePWService.htm"
+    },
+    {
+      "bytes": 10987,
+      "last_modified": "2026-01-29",
+      "sha256": "4133510624774c5d0ad875bc91aca358c3dc2ff91f4012ba9fbc0e3c40c0bfb0",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_PersistData.htm"
+    },
+    {
+      "bytes": 12290,
+      "last_modified": "2026-01-29",
+      "sha256": "53415a4e02b6709d49edbf16efaf7342bdaaf758d996e975ca23733a76b4cd33",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_PersistenceServices.htm"
+    },
+    {
+      "bytes": 7653,
+      "last_modified": "2026-01-29",
+      "sha256": "a3cbabf7e2ee997fc0426ad548722f97283a0377ea698c6f9177d901ec82ec23",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_PingTSOAS.htm"
+    },
+    {
+      "bytes": 8530,
+      "last_modified": "2026-01-29",
+      "sha256": "eb7000bd340093d8ed7ea93a05995d857f49de46323f66e3c6fca3e6bebe89ff",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_PostRequestComplianceFacts.htm"
+    },
+    {
+      "bytes": 24646,
+      "last_modified": "2026-01-29",
+      "sha256": "192d7a7420245a34b5521308dfb09d5c0e0cab5edb805c221035c8c58df1c4ef",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_PublishedSoftwareCatalogServices.htm"
+    },
+    {
+      "bytes": 28128,
+      "last_modified": "2026-01-29",
+      "sha256": "61d1ce41c2d6c827ddd2ce4559befa34aa2395e739e64ddefb52f41dee93e855",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_PublishedSoftwareTemplateGetVariables.htm"
+    },
+    {
+      "bytes": 13155,
+      "last_modified": "2026-01-29",
+      "sha256": "bd28196e8022789e5376364339718e05af8aaab1c4807e66b759ac4f096bd95a",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_PublishedSoftwareTemplateHistory.htm"
+    },
+    {
+      "bytes": 51952,
+      "last_modified": "2026-01-29",
+      "sha256": "82946460d674b1936512dc504d03a62a7f0754bf32f15a5b55521bd90d69159f",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_PublishedSoftwareTemplateList.htm"
+    },
+    {
+      "bytes": 13895,
+      "last_modified": "2026-01-29",
+      "sha256": "ace95cc47f1d6d4d87f0957c5bcd32643d3162b3bc61d6afd2e84f7a3860cdf0",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_PublishedSoftwareTemplateModify.htm"
+    },
+    {
+      "bytes": 32604,
+      "last_modified": "2026-02-25",
+      "sha256": "33793cf1185b62d22b3547010dbc0210999a2424ea6042079ec9a727067711c2",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_PublishedSoftwareTemplateRun.htm"
+    },
+    {
+      "bytes": 117946,
+      "last_modified": "2026-01-29",
+      "sha256": "2b88d8c43e3d82ff3f22a22b5d9cb4d073c2070986ccf68257ee51e3353f81f7",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_PublishedSoftwareTemplateView.htm"
+    },
+    {
+      "bytes": 6523,
+      "last_modified": "2026-01-29",
+      "sha256": "8f4e0a3f9272d8c87a3549013a655cbecb480935a49439186c93205ffb0403f8",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_PublishedSoftwareTemplateViewDoc.htm"
+    },
+    {
+      "bytes": 30083,
+      "last_modified": "2026-01-29",
+      "sha256": "335ba6e2878e160d69fefe42d49a0ce18f4e9c2f434037cc76cbf3d679f614d0",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_PutTenant.htm"
+    },
+    {
+      "bytes": 6843,
+      "last_modified": "2026-02-25",
+      "sha256": "705ac9ab4fe757d3a4001560cb0942c53aacb56e10683cb63fdf52c5e718faa9",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_QueryService.htm"
+    },
+    {
+      "bytes": 19988,
+      "last_modified": "2026-01-29",
+      "sha256": "eadd17078203f8091bcfb519f47cd7a4c5b9826c76e3d2c21c6631b6ce365973",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_RPAddClassificationRule.htm"
+    },
+    {
+      "bytes": 31468,
+      "last_modified": "2026-01-29",
+      "sha256": "2286e12ab6fbc58c5b7790f24fb78b553f07a79afbfef107f385921dead89f47",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_RPObtainIP.htm"
+    },
+    {
+      "bytes": 27849,
+      "last_modified": "2026-01-29",
+      "sha256": "a23bea69a11ed1e9997a9b91f31be59f9fb49ecabe54728a9f9f6e9529c09a00",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_RPObtainPort.htm"
+    },
+    {
+      "bytes": 20703,
+      "last_modified": "2026-01-29",
+      "sha256": "27264c52f502235143b9ace689766707d6f6ea102e31c5dd6c01423de0b3c6b5",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_RPObtainSNAAppl.htm"
+    },
+    {
+      "bytes": 20334,
+      "last_modified": "2026-01-29",
+      "sha256": "1533ec32d8200cceed2dff17ef0fcdee746d1b527e71d40778dccea2ac4aef2d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_RPReleaseIP.htm"
+    },
+    {
+      "bytes": 20046,
+      "last_modified": "2026-01-29",
+      "sha256": "03b167495ed911be1e57b98b8bd03e8568f96b2c9934ce3369a213794d61db5b",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_RPReleasePort.htm"
+    },
+    {
+      "bytes": 16301,
+      "last_modified": "2026-01-29",
+      "sha256": "43e3b1ab952f894f65a60ba11c03bcef4a2cd29d7f8f72ca9026a7465cbf2b9f",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_RPReleaseSNAAppl.htm"
+    },
+    {
+      "bytes": 17303,
+      "last_modified": "2026-01-29",
+      "sha256": "4d50a6e5f33ef3d710182b1a6ca7775491e62a1dfddc39f33e50d7e01505c2a6",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_RPRemoveClassificationRule.htm"
+    },
+    {
+      "bytes": 7448,
+      "last_modified": "2026-01-29",
+      "sha256": "294638aa6fa714f55ea3f78869e3840562249788b4611c0700d4e64525923e4d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ReceiveMsgTSOAS.htm"
+    },
+    {
+      "bytes": 7554,
+      "last_modified": "2026-01-29",
+      "sha256": "ef6ed26acbdb9ac77713d488dd1fda1a1b86859128d90c32e7fc795f186b061c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ReceiveMsgTSOApp.htm"
+    },
+    {
+      "bytes": 16704,
+      "last_modified": "2026-01-29",
+      "sha256": "2146a8db8802715686336893465224f3db3188aff01e0e0c1151e607b4dcfeee",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ReleaseLparPoolEntry.htm"
+    },
+    {
+      "bytes": 7057,
+      "last_modified": "2026-01-29",
+      "sha256": "ece807496fc3b1377cda2d30428401d2c0cf140c42cf7057f0293e04a1cc5cc1",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ResourceUsage.htm"
+    },
+    {
+      "bytes": 31623,
+      "last_modified": "2026-01-29",
+      "sha256": "d11d1631ac2ed80dda67497c616beb4849fd0d6dc3846ce9a41d9c3a166c203d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_RetrieveDataOneSys.htm"
+    },
+    {
+      "bytes": 25238,
+      "last_modified": "2026-01-29",
+      "sha256": "d0988aa2515487c50ec4eaeb39d27fdad7d66ae623946e72e4f694edb16fe4b1",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_RetrieveDataServer.htm"
+    },
+    {
+      "bytes": 10929,
+      "last_modified": "2026-01-29",
+      "sha256": "f4e348f979946ee13dff1b01678662862e26990c2f9b47b0c78f13b308b74ca7",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_RetrievePersistData.htm"
+    },
+    {
+      "bytes": 11509,
+      "last_modified": "2026-01-29",
+      "sha256": "63ef2d537e634d3dafd1ff3b5955a4e1d5fe87e1bb63497e9b1a1091f1afd272",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_Retrieve_zOSsystemUUID.htm"
+    },
+    {
+      "bytes": 40104,
+      "last_modified": "2026-01-29",
+      "sha256": "c0070f4b127999fc1563015367035fcca9c02cc986ec386f2a04e80168f19713",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SCAProvisionSecurityResourcesJSONFile.htm"
+    },
+    {
+      "bytes": 52010,
+      "last_modified": "2026-01-29",
+      "sha256": "3ede927830e8969f998982963083e2e9c08aa208f7a3a49782a8a51f00d6833d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SCAValidateSecurityResourcesJSONFile.htm"
+    },
+    {
+      "bytes": 48745,
+      "last_modified": "2026-01-29",
+      "sha256": "bb99abae3ffd28ff4913b6b2efab4bba0e5c6eab2ba15b986b2e90d0ac185af8",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SCAValidateSecurityResourcesPostBody.htm"
+    },
+    {
+      "bytes": 27612,
+      "last_modified": "2026-01-29",
+      "sha256": "3bd6a6608df63fd0d81270eafcf2e20fce4842421494ce7a290278fae32ce098",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SCAValidateSecurityResourcesProvision.htm"
+    },
+    {
+      "bytes": 22011,
+      "last_modified": "2026-01-29",
+      "sha256": "da8ba63a8504f06fa2c0b80629f632e4a23aa8c4ce4ff786fffae0a86168e5ef",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SMPE_CSI_Query_REST.htm"
+    },
+    {
+      "bytes": 21498,
+      "last_modified": "2026-02-25",
+      "sha256": "69538fde8ad5d70596459ac5c6202b741756adf18e48fbc38d66e41e80127e4b",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SSINCreate.htm"
+    },
+    {
+      "bytes": 19458,
+      "last_modified": "2026-02-25",
+      "sha256": "e90d5c497e6c2644d4132fa74ec299baa6e1e18007e90b612effcdceb6c61b05",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SSINCreateUniqueVariable.htm"
+    },
+    {
+      "bytes": 18884,
+      "last_modified": "2026-02-25",
+      "sha256": "3f95acc00d3d54ab7614733d30a029ac2af8bfca16f83fb8425f41c3fccfbe02",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SSINCreateVariable.htm"
+    },
+    {
+      "bytes": 18183,
+      "last_modified": "2026-02-25",
+      "sha256": "c254a1c7a0464967c9978c2357486dd38575e4f580b7a2a83db1c4362040c211",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SSINList.htm"
+    },
+    {
+      "bytes": 15642,
+      "last_modified": "2026-01-29",
+      "sha256": "d1f0536573bf69624b66ba1f7a396cbc7f13852f1c82c358dbd1133bde3bdcc6",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SSINServices.htm"
+    },
+    {
+      "bytes": 11916,
+      "last_modified": "2026-01-29",
+      "sha256": "476968a8465d203077a5ba4aec00acca132f9f9be00d8956f03b6ee95df733c0",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SecurityConfigurationAssistantServices.htm"
+    },
+    {
+      "bytes": 8646,
+      "last_modified": "2026-01-29",
+      "sha256": "098ddf2d813d2e6674e8b04dab7ed6e0f31f766a2cb91cc83f9c4db22edd9231",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SendMsgTSOAS.htm"
+    },
+    {
+      "bytes": 7615,
+      "last_modified": "2026-01-29",
+      "sha256": "49b0b425029a9d073b61da284ce0e3fc5d0e082e41603e4fddd95ac347d5c668",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SendMsgTSOApp.htm"
+    },
+    {
+      "bytes": 10328,
+      "last_modified": "2026-01-29",
+      "sha256": "bf1990b748500be86ab1e4c2bfdddf8e25ae679a87c0fbfdecb5a1cf887e5479",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SettingsDeletePersistData.htm"
+    },
+    {
+      "bytes": 8644,
+      "last_modified": "2026-01-29",
+      "sha256": "972a1ed860d0de64036309c8d073dcc2acc6a2d73c8d60df5689fa27c04e72ec",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SettingsPersistData.htm"
+    },
+    {
+      "bytes": 8711,
+      "last_modified": "2026-01-29",
+      "sha256": "79240824799764987c75da45b3eaa11ceb7e9c7fa9d6b291af2beece298aa9a8",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SettingsRetrievePersistData.htm"
+    },
+    {
+      "bytes": 11215,
+      "last_modified": "2026-01-29",
+      "sha256": "f995bfc2fb2c41c5698ea159afea1c0a4cd38c3bbc73a9df20027891ead77ea6",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SettingsServices.htm"
+    },
+    {
+      "bytes": 65293,
+      "last_modified": "2026-01-29",
+      "sha256": "9cd72202e2284261e219a15355bfa17fe8ba51b33786515b38aa1a5e8d3297a9",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareCatalogServices.htm"
+    },
+    {
+      "bytes": 44682,
+      "last_modified": "2026-01-29",
+      "sha256": "affe76f7b5ea2bc7a0b066577ce9fcb96763b583b47a7c06b348d81621e06e5d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareMgmtServices.htm"
+    },
+    {
+      "bytes": 99615,
+      "last_modified": "2026-02-25",
+      "sha256": "cd859aba2a1db3b2694830fb72ed4a6b651fb45124a2dc990f2924758f648631",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareObjectCreateNew.htm"
+    },
+    {
+      "bytes": 13067,
+      "last_modified": "2026-01-29",
+      "sha256": "fc26731d2348c6d6998c507efb3394d4da425f73f31c7e347dbb45b4303f1fdd",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareObjectDelete.htm"
+    },
+    {
+      "bytes": 13061,
+      "last_modified": "2026-01-29",
+      "sha256": "16d9ca989a287aa1bffaf8adc84613bba247b56266ae733d05d060ba009e99db",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareObjectDeleteAction.htm"
+    },
+    {
+      "bytes": 23704,
+      "last_modified": "2026-02-25",
+      "sha256": "9751d08d0a3901c68aed87464ca452d24a7a72364b102b7d8a5a08878b459f62",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareObjectDoActions.htm"
+    },
+    {
+      "bytes": 29232,
+      "last_modified": "2026-02-25",
+      "sha256": "3ea2f26c4ce9582b62e25ca5d8a6ae2656f128fcff1cd763e22f8ec1f1b40b65",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareObjectGetAction.htm"
+    },
+    {
+      "bytes": 59325,
+      "last_modified": "2026-02-25",
+      "sha256": "9984d540b9aea8f88201a40689a9e7f10282a6d023055b6794dedb1a1f05a91f",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareObjectList.htm"
+    },
+    {
+      "bytes": 25218,
+      "last_modified": "2026-02-25",
+      "sha256": "60a72d089ad320740db61047fec56b9ff0bc0718513d0480a87755916f785e4d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareObjectListActions.htm"
+    },
+    {
+      "bytes": 14339,
+      "last_modified": "2026-02-25",
+      "sha256": "f2b54e19a6141bae70ace5d9a3cc65039fd11b250e8a5430a242242e1b727eee",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareObjectResumeActionWorkflow.htm"
+    },
+    {
+      "bytes": 13511,
+      "last_modified": "2026-02-25",
+      "sha256": "a1f486c55ad3b1cb35aaf6b1c597b92101c7e098cfa10c06960643a3bbcedf56",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareObjectResumeProvWorkflow.htm"
+    },
+    {
+      "bytes": 102654,
+      "last_modified": "2026-02-25",
+      "sha256": "7299e5d3fcc757e5507ce7ebc3e7e519ae9b834d982367db28779550c541d55c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareObjectRetrieveInfo.htm"
+    },
+    {
+      "bytes": 18590,
+      "last_modified": "2026-01-29",
+      "sha256": "f8f93a6d887c99c4305eb77803f8c0f7a749c655a368fd47a0d662b35f9fcfa6",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareObjectRetrieveKeyValueVars.htm"
+    },
+    {
+      "bytes": 21774,
+      "last_modified": "2026-02-25",
+      "sha256": "75309d6c27adf8285e89483429c9df1465158af6097767de98525ab838b802d1",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareObjectRetrieveVars.htm"
+    },
+    {
+      "bytes": 14183,
+      "last_modified": "2026-02-25",
+      "sha256": "4629f9ed4fe3911d87072bbefad7911fd8a142fd7784156c225351522849161a",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareObjectRetryActionWorkflow.htm"
+    },
+    {
+      "bytes": 13413,
+      "last_modified": "2026-02-25",
+      "sha256": "b387315e904bfd51f6bac6885d97bce405485dca4df3db0a29c6ed65c9009d91",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareObjectRetryProvWorkflow.htm"
+    },
+    {
+      "bytes": 48213,
+      "last_modified": "2026-02-25",
+      "sha256": "507589635748ad8597e96c2972ca6a5a30595cd34443189169a2d92d6b2e9678",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareObjectUpdate.htm"
+    },
+    {
+      "bytes": 20266,
+      "last_modified": "2026-02-25",
+      "sha256": "9183b8202f23fa92efa0b777e0d980edeed11d810fb567b0deca7d856d9aade8",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareObjectUpdateVars.htm"
+    },
+    {
+      "bytes": 39045,
+      "last_modified": "2026-01-29",
+      "sha256": "54e40784c2b378d5ec1f0dd9f24e2798f277097db3727b28779b1b41dbe6a819",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareProvisioningServices.htm"
+    },
+    {
+      "bytes": 14001,
+      "last_modified": "2026-01-29",
+      "sha256": "305b54d881ee290445ff968d446c17aa8134531a84d7f9f11b4a2a80e010be87",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareTemplateAddApproval.htm"
+    },
+    {
+      "bytes": 9518,
+      "last_modified": "2026-01-29",
+      "sha256": "e7de085da4cd91bbd3ecf00ab71c2dbfdff1532e0f2b5ec13c280af37e6f1312",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareTemplateApproveApproval.htm"
+    },
+    {
+      "bytes": 16494,
+      "last_modified": "2026-01-29",
+      "sha256": "3cdfe3508f6c004421924e80d7507a82371830d250e53d417b80e318ac63281c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareTemplateApproveBatch.htm"
+    },
+    {
+      "bytes": 12387,
+      "last_modified": "2026-01-29",
+      "sha256": "1867dc9876f4c9281858152b88d53cfe805f0ca0c2c2f1d66aa2e12158f38774",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareTemplateArchive.htm"
+    },
+    {
+      "bytes": 26211,
+      "last_modified": "2026-01-29",
+      "sha256": "78618f04a31e4596012b3c6bcc7a555901afe45b43651952e54b4fa55f1f6650",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareTemplateCreateBasedOn.htm"
+    },
+    {
+      "bytes": 59730,
+      "last_modified": "2026-01-29",
+      "sha256": "1b7c1da72a15be077cc3aeeb72849af99d1305a4841acda36b656300ee9fa9c3",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareTemplateCreateNew.htm"
+    },
+    {
+      "bytes": 58682,
+      "last_modified": "2026-01-29",
+      "sha256": "623f452aa3d3a70bca011ce0848904239a76d32742a462fd1680fd27fb0acdd9",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareTemplateCreateNewVersion.htm"
+    },
+    {
+      "bytes": 11964,
+      "last_modified": "2026-01-29",
+      "sha256": "5cde10a7ebbb9582cf87d5981490e1af51a4eb338f63786ccaac59659c601d68",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareTemplateDelete.htm"
+    },
+    {
+      "bytes": 6692,
+      "last_modified": "2026-01-29",
+      "sha256": "4a5c81cae6287f1862cad8a1db51489c8e19b0a8a5d60c15db2cea196597e6cf",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareTemplateDeleteApproval.htm"
+    },
+    {
+      "bytes": 134484,
+      "last_modified": "2026-01-29",
+      "sha256": "b690597b1ce154412edda8262f09f48b06687d4c4715d879741a07d7d8397c87",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareTemplateGet.htm"
+    },
+    {
+      "bytes": 22418,
+      "last_modified": "2026-01-29",
+      "sha256": "8e04b9c8906e6475d34b2816a7063ae01d36a6efbd2787ab212e69f2d930ba25",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareTemplateGetApproval.htm"
+    },
+    {
+      "bytes": 7016,
+      "last_modified": "2026-01-29",
+      "sha256": "d7058788b32f7eb7d79fd6a50b3b69cd28617789e91bc9de44b6c785245f91e5",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareTemplateGetDoc.htm"
+    },
+    {
+      "bytes": 12866,
+      "last_modified": "2026-01-29",
+      "sha256": "1e006b41c97f793c64cd1c944cb026fda54bd9a35887afd11daacff097b9ac41",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareTemplateGetHistory.htm"
+    },
+    {
+      "bytes": 16474,
+      "last_modified": "2026-01-29",
+      "sha256": "3441b5102844a881083cd4c78aa0f979cb81a8dce634f8f06e805d41386ccecf",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareTemplateGetSource.htm"
+    },
+    {
+      "bytes": 27373,
+      "last_modified": "2026-01-29",
+      "sha256": "092b910b2456c4a91e7e9cf92d580cb5b8bf02a0d5fbe34d64a01d86cb610039",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareTemplateGetVariables.htm"
+    },
+    {
+      "bytes": 51182,
+      "last_modified": "2026-01-29",
+      "sha256": "2165b4945e4fea2398e9916d257ce2a7c2d5baf23ac36cb6a09f442270443a73",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareTemplateList.htm"
+    },
+    {
+      "bytes": 25591,
+      "last_modified": "2026-01-29",
+      "sha256": "36ea5f9e844f56260aa6cd4f802ba1a0d6295b62dcb8158cca5ff4ff1824556a",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareTemplateListApproval.htm"
+    },
+    {
+      "bytes": 37208,
+      "last_modified": "2026-02-25",
+      "sha256": "c96bed063ce4475ae2146094c2170bd2af74fbd66b6012b93eca1fa445022ddf",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareTemplateModify.htm"
+    },
+    {
+      "bytes": 18818,
+      "last_modified": "2026-01-29",
+      "sha256": "68ea588ca7d7ac19fbaa33e0e0668feb245889588707e4a377d145070c3dc515",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareTemplatePublish.htm"
+    },
+    {
+      "bytes": 7114,
+      "last_modified": "2026-01-29",
+      "sha256": "e3ef15f6a6473488bf8335936d953ffe024ddac07e81d585e2692a623d7fa788",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareTemplateRefresh.htm"
+    },
+    {
+      "bytes": 9579,
+      "last_modified": "2026-01-29",
+      "sha256": "9bc6ffd7c7cf3b71385df54765a233a753d8f931a477bcbb4cc1c46d157c2907",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareTemplateRejectApproval.htm"
+    },
+    {
+      "bytes": 6694,
+      "last_modified": "2026-01-29",
+      "sha256": "5bc4acc6a1bba9ee4cee8e89dcd6db57ccfa471326380dcec46c180666ff9569",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareTemplateSecurityComplete.htm"
+    },
+    {
+      "bytes": 31553,
+      "last_modified": "2026-01-29",
+      "sha256": "85c7daad26a6f93aa5ad5c8a15174064241e1d6cf9f0950cf830dcc3489a1ce1",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareTemplateTest.htm"
+    },
+    {
+      "bytes": 20274,
+      "last_modified": "2026-01-29",
+      "sha256": "b6fbd804320353ea21372b0fb7f2aad38b5bef61766fe41eb1d0010e618ee256",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SoftwareUpdateSearch.htm"
+    },
+    {
+      "bytes": 12738,
+      "last_modified": "2026-01-29",
+      "sha256": "b65477f6b1f876e90ae0c1bfe97489a5547e76337e8e43dae3d70e4809d29093",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StartApp.htm"
+    },
+    {
+      "bytes": 26800,
+      "last_modified": "2026-01-29",
+      "sha256": "790a7a27113860e10f74ff1e9b308281a0aad0debca0ab353e3f98786231b042",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StartTSOAS.htm"
+    },
+    {
+      "bytes": 42085,
+      "last_modified": "2026-01-29",
+      "sha256": "bbcf09bdcfef2b5e03239feb09cff6946ad8360b597f98e74c0325320534c7b5",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgt.htm"
+    },
+    {
+      "bytes": 18499,
+      "last_modified": "2026-01-29",
+      "sha256": "58abc09a0b8bbf97ed95ed741d290e8c1f04ebe000d9b5fe3ef8cb5f8dca3030",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtACSGetList.htm"
+    },
+    {
+      "bytes": 20346,
+      "last_modified": "2026-02-25",
+      "sha256": "d94cef7548613d7139350c1807c8dc03c01e3f16f1729c44dafb217299164c5c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGetACSroutine.htm"
+    },
+    {
+      "bytes": 23932,
+      "last_modified": "2026-01-29",
+      "sha256": "08ca9080d289e414731f75030bf41e32462e1f876ec643b6e4103a4b55301973",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGetBaseConfig.htm"
+    },
+    {
+      "bytes": 102341,
+      "last_modified": "2026-02-25",
+      "sha256": "3ac610959ffc59afa314d5e48881a18efe4c6bf1de2d5b78855881c5772c56b6",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGetDataClassDefinition.htm"
+    },
+    {
+      "bytes": 114464,
+      "last_modified": "2026-01-29",
+      "sha256": "7a8486b21f2fb324bc66f86c1ea6032169a21a6d3c4a99efa411511519a54c3e",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGetDataClasses.htm"
+    },
+    {
+      "bytes": 79822,
+      "last_modified": "2026-05-20",
+      "sha256": "d153c1ccc83c79de35362ddc14bf42bfb84c45eaff0619854255d2fcdde2d81a",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGetMgtClassDefinition.htm"
+    },
+    {
+      "bytes": 51852,
+      "last_modified": "2026-01-29",
+      "sha256": "a6683481be1e3bf5998706dc2d07cc28cdcf8ad214e853fb671570765869d751",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGetStorageClassDefinition.htm"
+    },
+    {
+      "bytes": 60341,
+      "last_modified": "2026-01-29",
+      "sha256": "803f5b4ef64b6235206b0f27700c600fea21d8b449f16e7f816ac039995754dd",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGetStorageClasses.htm"
+    },
+    {
+      "bytes": 10772,
+      "last_modified": "2026-01-29",
+      "sha256": "29bd9246cae02032475ed8ed899dec7b559f290df7964b2c0bfaa08dcb1480ce",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGroupActivateSCDS.htm"
+    },
+    {
+      "bytes": 34294,
+      "last_modified": "2026-01-29",
+      "sha256": "65011c03978ae54b0aef7b9e0049916eaf506fda6fa5c73fa86398164505b2f3",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGroupDefineList.htm"
+    },
+    {
+      "bytes": 11738,
+      "last_modified": "2026-01-29",
+      "sha256": "8d5f8d2f046d79b5853e18b0ceaafe070953d1b5b9ac72adc2662d9ac3ff36d5",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGroupGetActivationResult.htm"
+    },
+    {
+      "bytes": 96425,
+      "last_modified": "2026-02-25",
+      "sha256": "5f7ee02e840d524109601e5f664151899e27b47bf0833bbcab75ff3681905e0a",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGroupGetDefinition.htm"
+    },
+    {
+      "bytes": 112430,
+      "last_modified": "2026-01-29",
+      "sha256": "3a3db54696bbd11eb32885909c68f839f1855dfb724357d29f5e59df0a58aac2",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGroupGetList.htm"
+    },
+    {
+      "bytes": 8589,
+      "last_modified": "2026-01-29",
+      "sha256": "d6e54211f3308422f56e4c266f7efa10ccb79d75dd42e5e474a4b4e482124fe2",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtGroupValidateSCDS.htm"
+    },
+    {
+      "bytes": 75859,
+      "last_modified": "2026-05-20",
+      "sha256": "8e688a37a7e8297d0aefa019f64177a8152d05eaa152e9db36b86cc91ac162cc",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtMgtClassGetList.htm"
+    },
+    {
+      "bytes": 32538,
+      "last_modified": "2026-02-25",
+      "sha256": "e313794d48eb3768d49ce6e96d802bc76af6bca98a6d674839f8454dc1490f58",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtVolumeGetDefinition.htm"
+    },
+    {
+      "bytes": 40416,
+      "last_modified": "2026-01-29",
+      "sha256": "9dbd3034e032f6656095dd828114a940c36bf2a7a33916dd901c69a43db75352",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgtVolumeGetList.htm"
+    },
+    {
+      "bytes": 286878,
+      "last_modified": "2026-01-29",
+      "sha256": "5db1695f71086a7ffee8e7ec948b6cb448b01bc88b009d11f440236b59ff6f0f",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_StgMgt_Error_Categories.htm"
+    },
+    {
+      "bytes": 24886,
+      "last_modified": "2026-01-29",
+      "sha256": "9c011e72f740b511bb99cb4b88285907d8b322929771497a51a7ffbbaf5a2a68",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SysRoutingServices.htm"
+    },
+    {
+      "bytes": 18747,
+      "last_modified": "2026-01-29",
+      "sha256": "1c75a9d5e2f97eed15faa8f728234c017e2d93d52d2e82f9dc4d67723018a480",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SysplexMgmt.htm"
+    },
+    {
+      "bytes": 7034,
+      "last_modified": "2026-01-29",
+      "sha256": "c7bbd84bb798c7dd2fe7a905b9124ebf7978618e6d5b671cadf2bb7bd723ced4",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SysplexMgmtActivateCFRMPolicy.htm"
+    },
+    {
+      "bytes": 27772,
+      "last_modified": "2026-01-29",
+      "sha256": "b5d12af7e51aab5db4adfa6fcaf839b7ab96663519a7ca1e2e018b2546de3f7e",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SysplexMgmtAddCFRMPolicies.htm"
+    },
+    {
+      "bytes": 7077,
+      "last_modified": "2026-01-29",
+      "sha256": "95a5f88ca74f602ba8056eee4313aec5276fb3f334accddd9e3bb8716ffab19d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SysplexMgmtCopyExistingCFRMPolicy.htm"
+    },
+    {
+      "bytes": 7992,
+      "last_modified": "2026-01-29",
+      "sha256": "6a42c54ac14d4a1f352834adb7003d9bcd6a520fc929b9067a2a2d849ded9566",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SysplexMgmtDeleteMultipleCFRMPolicies.htm"
+    },
+    {
+      "bytes": 8263,
+      "last_modified": "2026-01-29",
+      "sha256": "c823fbe1d26532e4c5ba14a468262eb2bf45de6f2ef54017e99774dd806131af",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SysplexMgmtGetCFRMPolicies.htm"
+    },
+    {
+      "bytes": 26869,
+      "last_modified": "2026-01-29",
+      "sha256": "c87b06841548ebc3435580d2a2440bf7981ea3d94ff26231a822b9b3c06b69a1",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SysplexMgmtGetCFRMPolicyProperties.htm"
+    },
+    {
+      "bytes": 27000,
+      "last_modified": "2026-01-29",
+      "sha256": "6eb1019b2104c5c55769dbba4fdeffea02f1c9e2fccf223803c98623e525cc2b",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SysplexMgmtModifyCFRMPolicy.htm"
+    },
+    {
+      "bytes": 7128,
+      "last_modified": "2026-01-29",
+      "sha256": "7fa1dabe16abfaeddf02956193220dc6ae9b86918246445d7ea0cd47d59146fb",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SysplexMgmtRenameCFRMPolicy.htm"
+    },
+    {
+      "bytes": 13665,
+      "last_modified": "2026-01-29",
+      "sha256": "7048b75776882efb4c80ded9c6566feb6292e52768da520d23ecec4d5a9b0031",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SysplexMgmt_ErrorReport.htm"
+    },
+    {
+      "bytes": 17808,
+      "last_modified": "2026-01-29",
+      "sha256": "b6ad9fac5877c79d5a38bc036f26824f43f1da74276d3e5f9a016cc50ce899bc",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SystemVariableServices.htm"
+    },
+    {
+      "bytes": 15977,
+      "last_modified": "2026-02-25",
+      "sha256": "81be8fdd66b9541c25b3c8bb4e55c42a3d1bb0d01eef906d0ecd1bc3e9fa6719",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SystemVariablesCreate.htm"
+    },
+    {
+      "bytes": 9884,
+      "last_modified": "2026-01-29",
+      "sha256": "af398d2ce311b2ab8012a5581a46ccee1ec4dba417ed3260469f33d4f5640abb",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SystemVariablesDelete.htm"
+    },
+    {
+      "bytes": 13695,
+      "last_modified": "2026-02-25",
+      "sha256": "d74ac6e8738f39ed9b205f9aeac0ce8a29af538b31a48e925f8c5e5eef2453e0",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SystemVariablesExport.htm"
+    },
+    {
+      "bytes": 18057,
+      "last_modified": "2026-01-29",
+      "sha256": "ce3d8e3ca8beff95533f2514f99fc180c36204c1f36fded92b6bdf0a6efca7f7",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SystemVariablesGetAll.htm"
+    },
+    {
+      "bytes": 13386,
+      "last_modified": "2026-01-29",
+      "sha256": "4a4433410d9747f2f6d7a08ac36c47341644ca4ad42984690cc1fcb089375bf9",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_SystemVariablesImport.htm"
+    },
+    {
+      "bytes": 29082,
+      "last_modified": "2026-01-29",
+      "sha256": "e9a047ce0509e5eb7558f0a4814a97804ffc20b8c34ca2d040219b3681c8df66",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_TSOServices.htm"
+    },
+    {
+      "bytes": 13039,
+      "last_modified": "2026-01-29",
+      "sha256": "9c053693393506050bcbd730234b43d9389ceb43a202619c9fbdf40711d3c34e",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_TenantAddTenantConsumer.htm"
+    },
+    {
+      "bytes": 13201,
+      "last_modified": "2026-02-25",
+      "sha256": "d76f22a82e84fa81256449c48c1bb5d27707090ceca40ee079793f6ec66c362c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_TenantAddTenantDescription.htm"
+    },
+    {
+      "bytes": 12652,
+      "last_modified": "2026-02-25",
+      "sha256": "24b3106d15b9c79256134e340724bb610ba252984587df732a45771eae0cafa6",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_TenantAddTenantGroups.htm"
+    },
+    {
+      "bytes": 13304,
+      "last_modified": "2026-01-29",
+      "sha256": "00de361f9fdda9d601d5f800e825c0ef1e575b88f3725eb1c62036f08789f40f",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_TenantAssignSolutionID.htm"
+    },
+    {
+      "bytes": 16057,
+      "last_modified": "2026-01-29",
+      "sha256": "8546cc0b39dbf1d1bb7429f168140927869edefd926da6405d6d8a0234988400",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_TenantCappingProperties.htm"
+    },
+    {
+      "bytes": 10593,
+      "last_modified": "2026-01-29",
+      "sha256": "0ccb893030d15c21d11e5d6b8149b830b17f20d40ff7025381852fcf6d5a93cb",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_TenantDisableCPUCapping.htm"
+    },
+    {
+      "bytes": 10797,
+      "last_modified": "2026-01-29",
+      "sha256": "a916bdcaa9e55bf82f6fad5d58ac6686a01cd3c30e6887985217da13e40129a2",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_TenantDisableMemoryCapping.htm"
+    },
+    {
+      "bytes": 10466,
+      "last_modified": "2026-02-25",
+      "sha256": "4bc0859794fb81a984415be8e73ef49192444a12187a98c61e2b8cbfc0198345",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_TenantDisableMetering.htm"
+    },
+    {
+      "bytes": 11748,
+      "last_modified": "2026-01-29",
+      "sha256": "0b560060bb0d72415a5e24171660a643ee8220e6089afdd4d0206153b0b0a856",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_TenantEnableCPUCapping.htm"
+    },
+    {
+      "bytes": 11857,
+      "last_modified": "2026-01-29",
+      "sha256": "0a77b8021319ff89690a91c31742c63e3379d2cec40a4f55993dd796aecd3b90",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_TenantEnableMemoryCapping.htm"
+    },
+    {
+      "bytes": 10381,
+      "last_modified": "2026-01-29",
+      "sha256": "5e439232411193fbb5d4a290d4ee431b08378a1535167580b85b7873e1cdfb09",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_TenantEnableMetering.htm"
+    },
+    {
+      "bytes": 13804,
+      "last_modified": "2026-02-25",
+      "sha256": "e2bceec5bebbb4301bd5f404e915b94def6dadcb934466d48594f034df0d110e",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_TenantMemoryCapping.htm"
+    },
+    {
+      "bytes": 13585,
+      "last_modified": "2026-01-29",
+      "sha256": "345e1057b3577e41e409573a2fd03cb3beda6063c345c92cd73e9e1c77a4ff7e",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_TenantRemoveTenantConsumer.htm"
+    },
+    {
+      "bytes": 12879,
+      "last_modified": "2026-02-25",
+      "sha256": "e9c403efb33a2b38557c4af54e6849e8a6714401536a28f126c5b0322304e765",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_TenantRemoveTenantGroups.htm"
+    },
+    {
+      "bytes": 13257,
+      "last_modified": "2026-02-25",
+      "sha256": "b91d28126b4d1b42600b0fc2b46ddafe3d5974ca79d6edd73c3526b2a8ea8206",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_TenantUpdateSecurityState.htm"
+    },
+    {
+      "bytes": 14611,
+      "last_modified": "2026-01-29",
+      "sha256": "f956d4b1ca658458dd6f02feb22e708f23393015cfa2f7ae226bbbc13ca6bb63",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_TopologyServices.htm"
+    },
+    {
+      "bytes": 26549,
+      "last_modified": "2026-02-25",
+      "sha256": "88b4b564ee0d30053786b9fb0d06e3b6fdfbc66a9e340cda8af22995038be778",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_UpdateDataMultiSys.htm"
+    },
+    {
+      "bytes": 15755,
+      "last_modified": "2026-02-25",
+      "sha256": "c7d562a260112b921678457eb49495cce419f74cce230c8e31d73ee1408ab17c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_UpdateDataServer.htm"
+    },
+    {
+      "bytes": 28017,
+      "last_modified": "2026-01-29",
+      "sha256": "d4c432c3431348663b5ef4104d3248cde40f094086db1ef1bf013280f38098bb",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ValidateStatusSystem.htm"
+    },
+    {
+      "bytes": 22220,
+      "last_modified": "2026-01-29",
+      "sha256": "17398b85f201d4ef87fcc5848e2d15602b69c62d3b3917ef3a2e24febaa154f8",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ViewPropPortableSoftwareInstance.htm"
+    },
+    {
+      "bytes": 27553,
+      "last_modified": "2026-01-29",
+      "sha256": "d6f0cfcb41b823b82243dd9ea646f1e35977e5cf50a6208e2217c8d347af182a",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_ViewPropSoftwareInstance.htm"
+    },
+    {
+      "bytes": 9518,
+      "last_modified": "2026-01-29",
+      "sha256": "bdd2b26f179b0936bdc18166eeb33f07c4517daff890c1dabc5639c74d81c2ad",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WebTokenAuthServices.htm"
+    },
+    {
+      "bytes": 9972,
+      "last_modified": "2026-01-29",
+      "sha256": "52f0e964767f4441d774bef6baede0a58c9ac0978781372249d51e8b8667bf9c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowArchiveDelete.htm"
+    },
+    {
+      "bytes": 14847,
+      "last_modified": "2026-01-29",
+      "sha256": "40ecc8106cc85719923332f07685fadf64ab3b826410ac4012af2b5a459b3899",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowArchiveList.htm"
+    },
+    {
+      "bytes": 13864,
+      "last_modified": "2026-01-29",
+      "sha256": "ef62c472eda5e9ea0138b8d3c7b881398ea38ec07f867860c457737ee776d096",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowArchiveNew.htm"
+    },
+    {
+      "bytes": 131768,
+      "last_modified": "2026-01-29",
+      "sha256": "0aa21081a7b2bdff850f71432b73ef118f97cb32e1197cbb22b2ac101e486890",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowArchiveRetrieveInfo.htm"
+    },
+    {
+      "bytes": 11480,
+      "last_modified": "2026-01-29",
+      "sha256": "d15694ddac3a44df412c8193ee63e32e107f4c767f25db00aff681985b667730",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowCancel.htm"
+    },
+    {
+      "bytes": 47646,
+      "last_modified": "2026-04-29",
+      "sha256": "e9095b6fdf7d6956359f98975b3fe7adbb146bc0ed0da43d48d86b2e27d64b75",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowCreateNew.htm"
+    },
+    {
+      "bytes": 11252,
+      "last_modified": "2026-01-29",
+      "sha256": "f4c6bc2a6ce133dbf6bb1bb17dca01efdfef763b46b32f0b9ae9965b48e3ef0a",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowDelete.htm"
+    },
+    {
+      "bytes": 18153,
+      "last_modified": "2026-01-29",
+      "sha256": "94c5886b3cd3fc65044a2dc10477df8cbbf99721f724f1d7738369d539b724dc",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowListWorkflows.htm"
+    },
+    {
+      "bytes": 113378,
+      "last_modified": "2026-01-29",
+      "sha256": "e17bfe58db024865ee80fc233f667cc725b0962ae0aa1dd300a81e99e5adca14",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowRetrieveDefinition.htm"
+    },
+    {
+      "bytes": 181911,
+      "last_modified": "2026-01-29",
+      "sha256": "0b0b0d58b02139fb090e4fb55dc84d8344ca5fd477181caef9e37957b45afeb8",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowRetrieveInfo.htm"
+    },
+    {
+      "bytes": 25261,
+      "last_modified": "2026-01-29",
+      "sha256": "fecfee33ba4645bbd37aab46a4dd1a5051c89f2b120f4fd854bdfe266cd062cf",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowServices.htm"
+    },
+    {
+      "bytes": 34540,
+      "last_modified": "2026-01-29",
+      "sha256": "0e5add2f5b3e044da1c4bf65165ffc8166a5edd56e5532044cd7a20dae325d32",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_WorkflowStart.htm"
+    },
+    {
+      "bytes": 15970,
+      "last_modified": "2026-01-29",
+      "sha256": "fb1441581880d0fd4ab7de1c7eb09aecdb73273c3b55db11e40996484dae31c1",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_getResponseTSO.htm"
+    },
+    {
+      "bytes": 43603,
+      "last_modified": "2026-01-29",
+      "sha256": "69485ee2ea5aeb0ead66ce56cca96d5b917befe14cdc55ebe8034150aa96cab9",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_issueTSOcommand.htm"
+    },
+    {
+      "bytes": 57013,
+      "last_modified": "2026-01-29",
+      "sha256": "68b8b8fe14161217a5d112b10e6868f184bb39b26574b88b1f105fdb90f1661d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_CreateServiceInstance.htm"
+    },
+    {
+      "bytes": 6230,
+      "last_modified": "2026-01-29",
+      "sha256": "5bffa7805569d4b169b532796415d862a1bdfc0e6e5927debce10749fcd2389f",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_DeleteServiceInstance.htm"
+    },
+    {
+      "bytes": 99190,
+      "last_modified": "2026-01-29",
+      "sha256": "d36cd0d872ec9aa2248c5767d5448d92bf887210b58074855db02f15a6a5377a",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_GetCatalogServiceDetails.htm"
+    },
+    {
+      "bytes": 23166,
+      "last_modified": "2026-01-29",
+      "sha256": "075b65797c807cc467227a9171a0af8277112b186c25ef26d78754559fcd98e8",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_GetCatalogServiceList.htm"
+    },
+    {
+      "bytes": 7770,
+      "last_modified": "2026-01-29",
+      "sha256": "a08a3849ecad32b5b964fc0e9a69790523fa67f2d0d274c52ec5e60d6e73e928",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_GetCategoryDetails.htm"
+    },
+    {
+      "bytes": 18542,
+      "last_modified": "2026-01-29",
+      "sha256": "61d2e90c6651835211ff0862fb0b471c8921f062e0bf5bd151107a721f4021d8",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_GetCategoryList.htm"
+    },
+    {
+      "bytes": 45405,
+      "last_modified": "2026-01-29",
+      "sha256": "c27b8e939d73f9b831e038ab780e56eb841435ad85a5cad9010bc76286e4c0a6",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_GetServiceInstanceDetails.htm"
+    },
+    {
+      "bytes": 18840,
+      "last_modified": "2026-01-29",
+      "sha256": "df7c224d7c4ca711bc97d1e2dee85dd5ed5327d85d571fb9aa6046aaa121a213",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_GetServiceInstanceList.htm"
+    },
+    {
+      "bytes": 10926,
+      "last_modified": "2026-01-29",
+      "sha256": "590f29c5fbb2c945ab656af9293a66ff9edd1256303b6c4e9857c82edec37bf9",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_ModifyServiceInstance.htm"
+    },
+    {
+      "bytes": 17354,
+      "last_modified": "2026-01-29",
+      "sha256": "ef93aa2e45ded72f3412dee5870f8a7aec99934b8cd0cdbf36e7f953c8f3189d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_PerformActionOnServiceInstance.htm"
+    },
+    {
+      "bytes": 11980,
+      "last_modified": "2026-01-29",
+      "sha256": "e3d5055c977bef9c77e12b21a944f53cb4ef8b0a571b036c181d876af03682ac",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_SettingsGetJobStatements.htm"
+    },
+    {
+      "bytes": 11386,
+      "last_modified": "2026-01-29",
+      "sha256": "cc39e2e7c3283ed87d908ea7ff9125de5e71996a156c3ff7066914ef23112b9b",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_API_zmsc_SettingsGetTargetSystems.htm"
+    },
+    {
+      "bytes": 8048,
+      "last_modified": "2026-01-29",
+      "sha256": "0683896bce6ba5d503b8d25e9f6ba671303775295e81a2b8d76d0694ebdc4b7e",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_AboutProdInfoFiles.htm"
+    },
+    {
+      "bytes": 7022,
+      "last_modified": "2026-01-29",
+      "sha256": "314f21db592eec72465e084a81ee9c8e4829635c2a6d439386f470efcf8820d8",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_AnchorHelp.htm"
+    },
+    {
+      "bytes": 23231,
+      "last_modified": "2026-01-29",
+      "sha256": "1044f7ab6bd2c6e17fab7012322d77ec34ea27f9fd837d387653e158bb139f5d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_AppLinkAPIs.htm"
+    },
+    {
+      "bytes": 11369,
+      "last_modified": "2026-01-29",
+      "sha256": "d38bdc9921332c717400d7339f93f0e4ae7c76942e997f2aed4a8696903a16e8",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_Cancel_SU_REST_API.htm"
+    },
+    {
+      "bytes": 27559,
+      "last_modified": "2026-01-29",
+      "sha256": "0311a9f404d72b6c9a9446348b115a321f49d85bdd5acee14ea9897574d2d6bb",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_ClientLogger.htm"
+    },
+    {
+      "bytes": 31723,
+      "last_modified": "2026-02-25",
+      "sha256": "c55f7fd019c4e323094976cc7f15cc2ec0ccf5327516738eb9e6a0ce424a839d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_CloudProvisioning.htm"
+    },
+    {
+      "bytes": 13335,
+      "last_modified": "2026-01-29",
+      "sha256": "b39aa01d50584315445add1f65a410917176b5500ae0ed869fb165373ac3d8c6",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_Copy_SU_Output_REST_API.htm"
+    },
+    {
+      "bytes": 12077,
+      "last_modified": "2026-01-29",
+      "sha256": "98d2ff80a43217cc7eb4e6f8f87f85bfb0ccd15deaffe3877f80d87219c5c5ec",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_CoreAPIs.htm"
+    },
+    {
+      "bytes": 6679,
+      "last_modified": "2026-01-29",
+      "sha256": "aa1bd4c7d4234fb9d338a0240a6d45fa68c4d2e0926ab1901df471e5089ff7ea",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_CreateHelp.htm"
+    },
+    {
+      "bytes": 10582,
+      "last_modified": "2026-01-29",
+      "sha256": "5ff018def7140aa31371963e572d651e68fa1d497d0e386a6eb510aa69ad0251",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_CreatePlugin.htm"
+    },
+    {
+      "bytes": 11192,
+      "last_modified": "2026-01-29",
+      "sha256": "d1bfc3aab227a72f163c48cab5c4fa3e7083d82f1528ad79a432c06daab0de44",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_CreatePlugins.htm"
+    },
+    {
+      "bytes": 9015,
+      "last_modified": "2026-01-29",
+      "sha256": "0f65900c38388c46b3c6502edef2d43bf98a336b5558774b6d95cc7b51d7f800",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_CreateWebApp.htm"
+    },
+    {
+      "bytes": 7606,
+      "last_modified": "2026-01-29",
+      "sha256": "925c5f9da49f8200509a3c63ffe7bf7255645d26ed55b4dab88419dd5e715a1b",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_DescribePlugin.htm"
+    },
+    {
+      "bytes": 7450,
+      "last_modified": "2026-01-29",
+      "sha256": "02010d4d6b637d1d9b28f8f71e0fca40fd91bea539786d0147bff312b85ee0af",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_DevelopMsgChecklist.htm"
+    },
+    {
+      "bytes": 6395,
+      "last_modified": "2026-01-29",
+      "sha256": "28ae1cee4fdda9b01ca47237917de147f40ba87cbdfb7ac5d590659f55d964dc",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_DevelopMsgHelp.htm"
+    },
+    {
+      "bytes": 11059,
+      "last_modified": "2026-01-29",
+      "sha256": "ad59364228792c5b4ca6ffd4f2c2952019da2d24c508aad77c71c46a6f73bbd8",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_DevelopPanelHelp.htm"
+    },
+    {
+      "bytes": 2203,
+      "last_modified": "2026-01-29",
+      "sha256": "6a717712c26143aa423ee6a5ee626a76b97726e4022556e74dcbedc9e16e4e01",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_ExampleThirdPartyzOSMFplugin.htm"
+    },
+    {
+      "bytes": 14845,
+      "last_modified": "2026-01-29",
+      "sha256": "b60441fafa0a4f4e85c20ee2a7a8ccacfd048cfcf808b66c630e6f4964abfdc9",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_FunctionswithzOSMFwindow.htm"
+    },
+    {
+      "bytes": 31358,
+      "last_modified": "2026-03-25",
+      "sha256": "b72488f40e4f3de8486bb0f6d55f4768e78fd5ab758bda5d8455d5eaca0c3447",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_ImportPlugin.htm"
+    },
+    {
+      "bytes": 5171,
+      "last_modified": "2026-01-29",
+      "sha256": "3ccf32ba66b92f0f67899c9e6778ad725655e3bdd8fb74836c3d7251cb2e6774",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_LaunchTask.htm"
+    },
+    {
+      "bytes": 5704,
+      "last_modified": "2026-01-29",
+      "sha256": "2eda54dffb0ad5ede47248e2cfa4bdf240ab382da1ee9c3776335cf6da8286d3",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_LinkHelp.htm"
+    },
+    {
+      "bytes": 12743,
+      "last_modified": "2026-01-29",
+      "sha256": "f03f6f6bacd156b8ac7ac7aecfec91fc6bc9bfe79692f494ae3e3319b81f1f01",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_ModifyClientLoggerDefaults.htm"
+    },
+    {
+      "bytes": 24801,
+      "last_modified": "2026-01-29",
+      "sha256": "97317172d1baa54b41901e0e50db9cdb323cb070a490ff15afebd093691955d4",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_PrepareforCloudProvisioning.htm"
+    },
+    {
+      "bytes": 11229,
+      "last_modified": "2026-01-29",
+      "sha256": "a14cdeee870b5537a087c259f610599d1ae5b7450b8783c4010ceef344cd1b0f",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_ProcessofjoiningzOSMF.htm"
+    },
+    {
+      "bytes": 20269,
+      "last_modified": "2026-01-29",
+      "sha256": "e812d20f93f624b20dc03436b9cf778a36fa5541940c24bcf4973dcd1313ea02",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_Resume_SU_REST_API.htm"
+    },
+    {
+      "bytes": 31006,
+      "last_modified": "2026-01-29",
+      "sha256": "f164271a444b1f8b88f734581c41867aa5704466778ebb91a4f6987f748732a9",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_Retrieve_status_SU_REST_API.htm"
+    },
+    {
+      "bytes": 23091,
+      "last_modified": "2026-01-29",
+      "sha256": "2e7b092d2452893413fa47f8c8d0f110c545c1d4f2292346d0cc144baa3a68bc",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_Start_SU_REST_API.htm"
+    },
+    {
+      "bytes": 9866,
+      "last_modified": "2026-01-29",
+      "sha256": "cb7b5e3444ef6945a424fd7f5301a0fe77d9fe66434ce001f5c2c8904ed943b5",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_StructureHelpFiles.htm"
+    },
+    {
+      "bytes": 12275,
+      "last_modified": "2026-01-29",
+      "sha256": "f21ede9a6aeca13972383f93fc2e60ceab95b1084ae491fa027709d205eb7acf",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsTerms.htm"
+    },
+    {
+      "bytes": 12500,
+      "last_modified": "2026-01-29",
+      "sha256": "5d07ad6578c7774c45ec0a68da7ff39dba7dcd485ba180c2c68eb680718c06a4",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML.htm"
+    },
+    {
+      "bytes": 8228,
+      "last_modified": "2026-01-29",
+      "sha256": "77c865a1a324b3f07a27f5c7c01661c662c0497686100e1bbedc415213a11f85",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_EditingTheFile.htm"
+    },
+    {
+      "bytes": 6819,
+      "last_modified": "2026-01-29",
+      "sha256": "516d46292af0667d4344cf2b18e9a981724d905156b3bb9786501503fcf84d5f",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_Entities.htm"
+    },
+    {
+      "bytes": 9745,
+      "last_modified": "2026-01-29",
+      "sha256": "1126fc7ab19442b4a5d921e16ad0bd8c5b9a7232458ca8818069eeadef13c8bc",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_Intro.htm"
+    },
+    {
+      "bytes": 3909,
+      "last_modified": "2026-01-29",
+      "sha256": "ce2f7306b3c4230f2b673c81867a1ba3ae37cb6b0aa867fafa5477b1d771bd61",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_MessageManifest.htm"
+    },
+    {
+      "bytes": 18565,
+      "last_modified": "2026-01-29",
+      "sha256": "331cc81463b7b9a895541dcee0bb5ed8c4d32ee2fd4a938fb65997c511a3b715",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_Metadata.htm"
+    },
+    {
+      "bytes": 7344,
+      "last_modified": "2026-01-29",
+      "sha256": "be797e005c98692f2d84b084b5f50668ad67bd561998ba7fe4a9d87c43e4421b",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_PathName.htm"
+    },
+    {
+      "bytes": 224529,
+      "last_modified": "2026-02-25",
+      "sha256": "8b731db13117e4d7d068897b1f196ab52f7ffecdc65c5c74bc3d47294c96c946",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_Reference.htm"
+    },
+    {
+      "bytes": 7340,
+      "last_modified": "2026-01-29",
+      "sha256": "799a00c3ab90559d748ee15eafdd57fb8a298acdd46457f9378aaf0326f0592b",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_Samples.htm"
+    },
+    {
+      "bytes": 2280,
+      "last_modified": "2026-01-29",
+      "sha256": "7de7d59d31253fbee56f6009c0d37d8833b4b0dde5b20fb76167403de0888d1d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_Schema.htm"
+    },
+    {
+      "bytes": 11015,
+      "last_modified": "2026-01-29",
+      "sha256": "bf3492f08e73ecc02fd532db311f491fae9e53dfc0c988d2dd55ca711cef2348",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_Steps.htm"
+    },
+    {
+      "bytes": 21615,
+      "last_modified": "2026-01-29",
+      "sha256": "d13f27a07c776fb86667260c92ddf4c621639ea4b2f8809e7b629035242cf287",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_StepsAutomating.htm"
+    },
+    {
+      "bytes": 46190,
+      "last_modified": "2026-01-29",
+      "sha256": "fcf778cc73dd5a96339b82785dd1d75b4d9cd5e5f69837618f159c0b9ba49a6f",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_StepsCalledWorkflows.htm"
+    },
+    {
+      "bytes": 11647,
+      "last_modified": "2026-01-29",
+      "sha256": "019467fdc2789eee99f5ebdd0522a69eb172556eecda541f8145e218e4cc305c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_StepsConditional.htm"
+    },
+    {
+      "bytes": 9482,
+      "last_modified": "2026-01-29",
+      "sha256": "19cdf09680b6355f3d03cc2d68ae604e0cbcb48d66308219a1b61cbe9d91170b",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_StepsFeedback.htm"
+    },
+    {
+      "bytes": 10636,
+      "last_modified": "2026-01-29",
+      "sha256": "dff216f9d0b6797f2b7d25acd4236ed419a17363ae690300f657ab3db22df237",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_StepsParentsAndLeafs.htm"
+    },
+    {
+      "bytes": 34112,
+      "last_modified": "2026-01-29",
+      "sha256": "c434040743342acd60eddd547b5d5f3190efe082b9e3a112e7c2f1d264235df3",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_StepsRestSteps.htm"
+    },
+    {
+      "bytes": 2817,
+      "last_modified": "2026-01-29",
+      "sha256": "7726777ed8fe590258251814a7c77bf1130f5511eb50ddd5b5b168e84f485d7d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_StepsRichTranslate.htm"
+    },
+    {
+      "bytes": 29956,
+      "last_modified": "2026-01-29",
+      "sha256": "8f2e2917806ddef80925552160ece3ed28360ceaf41aa7e2e426e3b71ca70f3c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_StepsRunAsUser.htm"
+    },
+    {
+      "bytes": 43544,
+      "last_modified": "2026-01-29",
+      "sha256": "5e2d0b9622a5eb6cfc54ce37af0629af777ba53bcd62084d5692ca6ee772d474",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_StepsRunningPrograms.htm"
+    },
+    {
+      "bytes": 14449,
+      "last_modified": "2026-01-29",
+      "sha256": "3f8661f1620a7cdb98ebec77d75dd3fc82b31e55055e7786f98cc9d6f9055dcb",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_StepsRunningProgramsImmed.htm"
+    },
+    {
+      "bytes": 12310,
+      "last_modified": "2026-01-29",
+      "sha256": "625696220b2b7ff2db14c8d77663d83f6c16ba2f87e20d6335fb725c4c3cd671",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_StepsRunningProgramsInBatch.htm"
+    },
+    {
+      "bytes": 5608,
+      "last_modified": "2026-01-29",
+      "sha256": "4448c962b212e2028ddf73092452dca6ff120497a9ff567367a54f73cc42b69c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_StepsTranslatableStrings.htm"
+    },
+    {
+      "bytes": 9142,
+      "last_modified": "2026-01-29",
+      "sha256": "0c250524af27ea71b622b77c9be774d56de285c79e6494263aca571f63d9b33c",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_StepsVariables.htm"
+    },
+    {
+      "bytes": 6958,
+      "last_modified": "2026-01-29",
+      "sha256": "c6d73b8f62e30b3ffbacb7cb8baca5dbcd57df1d7c2becc97fa534541d3a1b68",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_Structure.htm"
+    },
+    {
+      "bytes": 10730,
+      "last_modified": "2026-01-29",
+      "sha256": "3c01e95dfd3cb3eb46c01620a4be8015ddb44f47d54c567f29c69a81011b602b",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_UpgradeTemplate.dita.htm"
+    },
+    {
+      "bytes": 10898,
+      "last_modified": "2026-01-29",
+      "sha256": "fd8a1c1d373f80d190a0c0ae5b21b83ac6690c77785a4cf203b1aa51c652b982",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_Variables.htm"
+    },
+    {
+      "bytes": 9017,
+      "last_modified": "2026-01-29",
+      "sha256": "8110d891a5398ebc800867ef206d8c4a7c6d692f5804a6216fdb27e3aaabb68b",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_VariablesArray.htm"
+    },
+    {
+      "bytes": 10883,
+      "last_modified": "2026-01-29",
+      "sha256": "ce6512a23a6b4e92589823a0772162198779a1252034de8e5711c5e2b7edb02d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_VariablesAtCreate.htm"
+    },
+    {
+      "bytes": 5026,
+      "last_modified": "2026-01-29",
+      "sha256": "fd0c68c1992893b836012548d2541deeaaf35b08aa24a643199d390adbdb1572",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_VariablesCallerScope.htm"
+    },
+    {
+      "bytes": 8727,
+      "last_modified": "2026-01-29",
+      "sha256": "4535cfef07e1dbef60dbb450d40193dc056f0ce25994f0ef23420f5afc5e03fe",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_VariablesElement.htm"
+    },
+    {
+      "bytes": 9374,
+      "last_modified": "2026-01-29",
+      "sha256": "86973d0de3983899f5bda62a9bf7ff026701609ca1a43aa42b7fcbee74eb7e3b",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_VariablesHowToRef.htm"
+    },
+    {
+      "bytes": 15445,
+      "last_modified": "2026-01-29",
+      "sha256": "2cc1b3bc26ea3ff5e2e8ee92a5dad0053f45c0fbbf2e04e8b8958bd92df8183f",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_VariablesInputFile.htm"
+    },
+    {
+      "bytes": 13808,
+      "last_modified": "2026-01-29",
+      "sha256": "b211a09209b3572af0e4e0950e6b29acbe2bac23a132f6d637c7a72d515a99fb",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_VariablesInternal.htm"
+    },
+    {
+      "bytes": 15050,
+      "last_modified": "2026-01-29",
+      "sha256": "dfe02c0b742d688422773599ca0fc13d56148a897462bbacdb0615554d99d162",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_VariablesSubElements.htm"
+    },
+    {
+      "bytes": 11187,
+      "last_modified": "2026-01-29",
+      "sha256": "73bbabfda4ca0f0a8b4009e7da42026b3a43d7d5084282c736cc8e3bc2ef6ac2",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_VariablesSystemVars.htm"
+    },
+    {
+      "bytes": 9477,
+      "last_modified": "2026-01-29",
+      "sha256": "c0a9eb9f7695aa5b8d01175ab83bb1f8c26d73d01dfaf55b7d12f32158240507",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_VariablesVelocity.htm"
+    },
+    {
+      "bytes": 3624,
+      "last_modified": "2026-01-29",
+      "sha256": "2eedf552d645f664f667b36423c3137de4c5aa46f64c9708a1b51b46f0b5cf8d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_WorkflowsXML_WorkflowRootElement.htm"
+    },
+    {
+      "bytes": 7612,
+      "last_modified": "2026-01-29",
+      "sha256": "a7f3fd25bdfdca4fa6a9726f5179ce7d0720079ca3e81ddaf4684a4ebe6a397d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_cleanupBeforeDestroy.htm"
+    },
+    {
+      "bytes": 7177,
+      "last_modified": "2026-01-29",
+      "sha256": "2eeb427308e83e76e56874b7eadcc09186860e552222c924a6c2c524ed6707a3",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_cleanupBeforeDestroyComplete.htm"
+    },
+    {
+      "bytes": 5490,
+      "last_modified": "2026-01-29",
+      "sha256": "ea8d68ef8dcabba676ebcff05db46c68470c41833409b88e1acacdd2c5c4595a",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_download.htm"
+    },
+    {
+      "bytes": 4729,
+      "last_modified": "2026-01-29",
+      "sha256": "03682155e49eccca7bd51ae49b7c7d73bb09d2bced8e56c7fbaa23421ba50107",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_editorCompare.htm"
+    },
+    {
+      "bytes": 5186,
+      "last_modified": "2026-01-29",
+      "sha256": "4ddc2cbc783d8427672ebd461a301c06a16f65df693cfc342f018fe8e6c879ad",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_editorComparewithContent.htm"
+    },
+    {
+      "bytes": 7383,
+      "last_modified": "2026-01-29",
+      "sha256": "a56cec7eb1e51b3d74b18498639d7335e1554cbd5c729360cffa9ecaba8fe564",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_editorWithContent.htm"
+    },
+    {
+      "bytes": 4449,
+      "last_modified": "2026-01-29",
+      "sha256": "940811d369dc3e11f0c25ee46721649db9b09b9826a42d9186c1bb303e41bbc8",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_editorWithPath.htm"
+    },
+    {
+      "bytes": 16671,
+      "last_modified": "2026-01-29",
+      "sha256": "8018f4db1b97141cf3dc1e2f13fcefcaf172c7f7daacc90fd7cc0907d8bdb3b1",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_getEventFromUrl.htm"
+    },
+    {
+      "bytes": 7548,
+      "last_modified": "2026-01-29",
+      "sha256": "3cef2852a7b042d5135753fdaf5d0d6755ca907614b861dd23594b6d86e9aab7",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_getHandlers.htm"
+    },
+    {
+      "bytes": 4098,
+      "last_modified": "2026-01-29",
+      "sha256": "b9635ed1136309381db7d59227e61ba08e2e051461c6178b7f36f162aef45d10",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_getUserSessionId.htm"
+    },
+    {
+      "bytes": 5734,
+      "last_modified": "2026-01-29",
+      "sha256": "8b653747f3ff3a11a74c591ee04bf50f59f4137af4456aa6cfd56858367ee90d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_hasLaunchContext.htm"
+    },
+    {
+      "bytes": 7075,
+      "last_modified": "2026-01-29",
+      "sha256": "e24da6c299692a45e85a78ac118ae9754d8011cd9c86a3ffb8d8b9add69071a3",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_isContentChanged.htm"
+    },
+    {
+      "bytes": 7445,
+      "last_modified": "2026-01-29",
+      "sha256": "2e33e0be7019115457ebda5ff32bc804c6524f65485196e321fdf8e089c6178a",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_onLoadingComplete.htm"
+    },
+    {
+      "bytes": 5392,
+      "last_modified": "2026-01-29",
+      "sha256": "298ad49f26b1829657b881b258e2172fbdb46f577ac3fe8dd3de6a92d31641f8",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_programmaticallyCloseTab.htm"
+    },
+    {
+      "bytes": 5499,
+      "last_modified": "2026-01-29",
+      "sha256": "afd83faf1d8d9e091dd0d1cdfd60077a847da9b1fc892c1b8421b3d68fc19723",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_secure.htm"
+    },
+    {
+      "bytes": 5285,
+      "last_modified": "2026-01-29",
+      "sha256": "e59cf0e98a2356df11e18bd9a00e863168489dc2b191d2e947b121232e5db9a4",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_sendEvent.htm"
+    },
+    {
+      "bytes": 7534,
+      "last_modified": "2026-01-29",
+      "sha256": "1ca2d82fde2fa4834b3e7707a3b8911d31281255c72fbec85a2b04068fd778cb",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_shouldClose.htm"
+    },
+    {
+      "bytes": 9688,
+      "last_modified": "2026-01-29",
+      "sha256": "8b46f5ae449d47a28926c9854fb29bebb0874e49975f53c1ccaf6cae1b93aa9d",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_subscribe.htm"
+    },
+    {
+      "bytes": 8605,
+      "last_modified": "2026-01-29",
+      "sha256": "02b32671a4a63a6ae16161cc04f0370a88bc09f69cf11243f3b9b150270d4b15",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_upload.htm"
+    },
+    {
+      "bytes": 7721,
+      "last_modified": "2026-01-29",
+      "sha256": "08c4497fb07642ba4e6260904107d4b6d5759e5a6c004481558b72e9b97bacb1",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/izuprog_utilPathSelector.htm"
+    },
+    {
+      "bytes": 2406,
+      "last_modified": "2026-01-29",
+      "sha256": "429ac4a26bacda0ef192c65b61db790a7b3d18d6086a5d328bea0651f9835d49",
+      "topic_path": "SSLTBW_3.2.0/com.ibm.zos.v3r2.izua700/zossoc_main.htm"
+    }
+  ],
+  "total_bytes": 9761388
+}

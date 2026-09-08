@@ -16,7 +16,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0001",
           "rust_variant": "JclCommand",
           "sensitive": false,
-          "source_locator": "pdf-page:47;table:1",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:JCL command;table:idg6175__cjsts;row:1",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -32,7 +32,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0002",
           "rust_variant": "Command",
           "sensitive": false,
-          "source_locator": "pdf-page:47;table:1",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:COMMAND;table:idg6175__cjsts;row:2",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -50,7 +50,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0003",
           "rust_variant": "Comment",
           "sensitive": false,
-          "source_locator": "pdf-page:47;table:1",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:comment;table:idg6175__cjsts;row:3",
           "support": "available",
           "validation": "none"
         },
@@ -66,7 +66,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0004",
           "rust_variant": "Cntl",
           "sensitive": false,
-          "source_locator": "pdf-page:47;table:1",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:CNTL;table:idg6175__cjsts;row:4",
           "support": "deferred",
           "validation": "none"
         },
@@ -82,7 +82,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0005",
           "rust_variant": "Dd",
           "sensitive": false,
-          "source_locator": "pdf-page:47;table:1",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:DD;table:idg6175__cjsts;row:5",
           "support": "available",
           "validation": "none"
         },
@@ -100,7 +100,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0006",
           "rust_variant": "Delimiter",
           "sensitive": false,
-          "source_locator": "pdf-page:47;table:1",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:delimiter;table:idg6175__cjsts;row:6",
           "support": "available",
           "validation": "none"
         },
@@ -116,7 +116,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0007",
           "rust_variant": "Endcntl",
           "sensitive": false,
-          "source_locator": "pdf-page:47;table:1",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:ENDCNTL;table:idg6175__cjsts;row:7",
           "support": "deferred",
           "validation": "none"
         },
@@ -132,7 +132,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0008",
           "rust_variant": "Exec",
           "sensitive": false,
-          "source_locator": "pdf-page:47;table:1",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:EXEC;table:idg6175__cjsts;row:8",
           "support": "available",
           "validation": "none"
         },
@@ -148,7 +148,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0009",
           "rust_variant": "Export",
           "sensitive": false,
-          "source_locator": "pdf-page:47;table:1",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:EXPORT;table:idg6175__cjsts;row:9",
           "support": "available",
           "validation": "none"
         },
@@ -168,7 +168,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0010",
           "rust_variant": "Conditional",
           "sensitive": false,
-          "source_locator": "pdf-page:47;table:1",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:IF/THEN/ELSE/ENDIF;table:idg6175__cjsts;row:10",
           "support": "available",
           "validation": "none"
         },
@@ -184,7 +184,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0011",
           "rust_variant": "Include",
           "sensitive": false,
-          "source_locator": "pdf-page:48;table:1",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:INCLUDE;table:idg6175__cjsts;row:11",
           "support": "available",
           "validation": "none"
         },
@@ -200,7 +200,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0012",
           "rust_variant": "Jcllib",
           "sensitive": false,
-          "source_locator": "pdf-page:48;table:1",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:JCLLIB;table:idg6175__cjsts;row:12",
           "support": "available",
           "validation": "none"
         },
@@ -216,7 +216,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0013",
           "rust_variant": "Job",
           "sensitive": false,
-          "source_locator": "pdf-page:48;table:1",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:JOB;table:idg6175__cjsts;row:13",
           "support": "available",
           "validation": "none"
         },
@@ -234,7 +234,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0014",
           "rust_variant": "Null",
           "sensitive": false,
-          "source_locator": "pdf-page:48;table:1",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:null;table:idg6175__cjsts;row:14",
           "support": "available",
           "validation": "none"
         },
@@ -250,7 +250,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0015",
           "rust_variant": "Output",
           "sensitive": false,
-          "source_locator": "pdf-page:48;table:1",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:OUTPUT JCL;table:idg6175__cjsts;row:15",
           "support": "available",
           "validation": "none"
         },
@@ -266,7 +266,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0016",
           "rust_variant": "Pend",
           "sensitive": false,
-          "source_locator": "pdf-page:48;table:1",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:PEND;table:idg6175__cjsts;row:16",
           "support": "available",
           "validation": "none"
         },
@@ -282,7 +282,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0017",
           "rust_variant": "Proc",
           "sensitive": false,
-          "source_locator": "pdf-page:48;table:1",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:PROC;table:idg6175__cjsts;row:17",
           "support": "available",
           "validation": "none"
         },
@@ -298,7 +298,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0018",
           "rust_variant": "Schedule",
           "sensitive": false,
-          "source_locator": "pdf-page:48;table:1",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:SCHEDULE;table:idg6175__cjsts;row:18",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -314,7 +314,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0019",
           "rust_variant": "Set",
           "sensitive": false,
-          "source_locator": "pdf-page:48;table:1",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:SET;table:idg6175__cjsts;row:19",
           "support": "available",
           "validation": "none"
         },
@@ -330,7 +330,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jcl-statements:0020",
           "rust_variant": "Xmit",
           "sensitive": false,
-          "source_locator": "pdf-page:48;table:1",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_JCL_statements.htm;topic-id:statements-jcl;heading:XMIT;table:idg6175__cjsts;row:20",
           "support": "deferred",
           "validation": "jcl-value"
         }
@@ -354,7 +354,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0001",
           "rust_variant": "Command",
           "sensitive": false,
-          "source_locator": "pdf-page:643;outline:JES2 command statement",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xj2comd.htm;topic-id:statements-jes2-command-statement;heading:JES2 command statement",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -370,7 +370,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0002",
           "rust_variant": "Jobparm",
           "sensitive": false,
-          "source_locator": "pdf-page:645;outline:/*JOBPARM statement",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xj2jobpm.htm;topic-id:statements-jobparm-statement;heading:/*JOBPARM statement",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -386,7 +386,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0003",
           "rust_variant": "Message",
           "sensitive": false,
-          "source_locator": "pdf-page:650;outline:/*MESSAGE statement",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xj2mess.htm;topic-id:statements-message-statement;heading:/*MESSAGE statement",
           "support": "deferred",
           "validation": "text"
         },
@@ -402,7 +402,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0004",
           "rust_variant": "Netacct",
           "sensitive": false,
-          "source_locator": "pdf-page:651;outline:/*NETACCT statement",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xj2netac.htm;topic-id:statements-netacct-statement;heading:/*NETACCT statement",
           "support": "deferred",
           "validation": "text"
         },
@@ -418,7 +418,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0005",
           "rust_variant": "Notify",
           "sensitive": false,
-          "source_locator": "pdf-page:652;outline:/*NOTIFY statement",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xj2notif.htm;topic-id:statements-notify-statement;heading:/*NOTIFY statement",
           "support": "deferred",
           "validation": "name"
         },
@@ -434,7 +434,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0006",
           "rust_variant": "Output",
           "sensitive": false,
-          "source_locator": "pdf-page:653;outline:/*OUTPUT statement",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xj2outp.htm;topic-id:statements-output-statement;heading:/*OUTPUT statement",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -450,7 +450,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0007",
           "rust_variant": "Priority",
           "sensitive": false,
-          "source_locator": "pdf-page:660;outline:/*PRIORITY statement",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xj2prior.htm;topic-id:statements-priority-statement;heading:/*PRIORITY statement",
           "support": "deferred",
           "validation": "integer"
         },
@@ -466,7 +466,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0008",
           "rust_variant": "Route",
           "sensitive": false,
-          "source_locator": "pdf-page:661;outline:/*ROUTE statement",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xj2rout.htm;topic-id:statements-route-statement;heading:/*ROUTE statement",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -482,7 +482,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0009",
           "rust_variant": "Setup",
           "sensitive": false,
-          "source_locator": "pdf-page:664;outline:/*SETUP statement",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xj2setup.htm;topic-id:statements-setup-statement;heading:/*SETUP statement",
           "support": "deferred",
           "validation": "name-list"
         },
@@ -498,7 +498,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0010",
           "rust_variant": "Signoff",
           "sensitive": false,
-          "source_locator": "pdf-page:665;outline:/*SIGNOFF statement",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xj2soff.htm;topic-id:statements-signoff-statement;heading:/*SIGNOFF statement",
           "support": "deferred",
           "validation": "none"
         },
@@ -514,7 +514,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0011",
           "rust_variant": "Signon",
           "sensitive": false,
-          "source_locator": "pdf-page:666;outline:/*SIGNON statement",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xj2son.htm;topic-id:statements-signon-statement;heading:/*SIGNON statement",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -530,7 +530,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0012",
           "rust_variant": "Xeq",
           "sensitive": false,
-          "source_locator": "pdf-page:668;outline:/*XEQ statement",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xj2xeq.htm;topic-id:statements-xeq-statement;heading:/*XEQ statement",
           "support": "deferred",
           "validation": "name"
         },
@@ -546,7 +546,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:jes2-jecl-statements:0013",
           "rust_variant": "Xmit",
           "sensitive": false,
-          "source_locator": "pdf-page:669;outline:/*XMIT statement",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xj2xmit.htm;topic-id:statements-xmit-statement;heading:/*XMIT statement",
           "support": "deferred",
           "validation": "jcl-value"
         }
@@ -568,7 +568,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0001",
           "rust_variant": "Asterisk",
           "sensitive": false,
-          "source_locator": "pdf-page:141;outline:* Parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddaster.htm;topic-id:statement-parameter;heading:* Parameter",
           "support": "available",
           "validation": "none"
         },
@@ -584,7 +584,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0002",
           "rust_variant": "Accode",
           "sensitive": false,
-          "source_locator": "pdf-page:144;outline:ACCODE parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddaccod.htm;topic-id:statement-accode-parameter;heading:ACCODE parameter",
           "support": "deferred",
           "validation": "name"
         },
@@ -600,7 +600,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0003",
           "rust_variant": "Amp",
           "sensitive": false,
-          "source_locator": "pdf-page:145;outline:AMP parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddamp.htm;topic-id:statement-amp-parameter;heading:AMP parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -620,7 +620,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0004",
           "rust_variant": "Avgrec",
           "sensitive": false,
-          "source_locator": "pdf-page:152;outline:AVGREC parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddavgr.htm;topic-id:statement-avgrec-parameter;heading:AVGREC parameter",
           "support": "deferred",
           "validation": "enum"
         },
@@ -636,7 +636,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0005",
           "rust_variant": "Blksize",
           "sensitive": false,
-          "source_locator": "pdf-page:153;outline:BLKSIZE parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddblksz.htm;topic-id:statement-blksize-parameter;heading:BLKSIZE parameter",
           "support": "available",
           "validation": "integer"
         },
@@ -652,7 +652,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0006",
           "rust_variant": "Blkszlim",
           "sensitive": false,
-          "source_locator": "pdf-page:155;outline:BLKSZLIM parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xblkszlim.htm;topic-id:statement-blkszlim-parameter;heading:BLKSZLIM parameter",
           "support": "deferred",
           "validation": "integer"
         },
@@ -668,7 +668,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0007",
           "rust_variant": "Burst",
           "sensitive": false,
-          "source_locator": "pdf-page:156;outline:BURST parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddburst.htm;topic-id:statement-burst-parameter;heading:BURST parameter",
           "support": "deferred",
           "validation": "boolean"
         },
@@ -684,7 +684,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0008",
           "rust_variant": "Ccsid",
           "sensitive": false,
-          "source_locator": "pdf-page:157;outline:CCSID parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddccsid.htm;topic-id:statement-ccsid-parameter;heading:CCSID parameter",
           "support": "available",
           "validation": "integer"
         },
@@ -700,7 +700,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0009",
           "rust_variant": "Chars",
           "sensitive": false,
-          "source_locator": "pdf-page:160;outline:CHARS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddchars.htm;topic-id:statement-chars-parameter;heading:CHARS parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -716,7 +716,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0010",
           "rust_variant": "Chkpt",
           "sensitive": false,
-          "source_locator": "pdf-page:162;outline:CHKPT parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddchkpt.htm;topic-id:statement-chkpt-parameter;heading:CHKPT parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -732,7 +732,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0011",
           "rust_variant": "Cntl",
           "sensitive": false,
-          "source_locator": "pdf-page:163;outline:CNTL parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddcntl.htm;topic-id:statement-cntl-parameter;heading:CNTL parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -748,7 +748,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0012",
           "rust_variant": "Copies",
           "sensitive": false,
-          "source_locator": "pdf-page:164;outline:COPIES parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddcopy.htm;topic-id:statement-copies-parameter;heading:COPIES parameter",
           "support": "deferred",
           "validation": "integer-or-tuple"
         },
@@ -764,7 +764,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0013",
           "rust_variant": "Data",
           "sensitive": false,
-          "source_locator": "pdf-page:167;outline:DATA parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xdddata.htm;topic-id:statement-data-parameter;heading:DATA parameter",
           "support": "available",
           "validation": "none"
         },
@@ -780,7 +780,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0014",
           "rust_variant": "Dataclas",
           "sensitive": false,
-          "source_locator": "pdf-page:169;outline:DATACLAS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xdddatac.htm;topic-id:statement-dataclas-parameter;heading:DATACLAS parameter",
           "support": "deferred",
           "validation": "name"
         },
@@ -796,7 +796,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0015",
           "rust_variant": "Dcb",
           "sensitive": false,
-          "source_locator": "pdf-page:172;outline:DCB parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xdddcb.htm;topic-id:statement-dcb-parameter;heading:DCB parameter",
           "support": "available",
           "validation": "jcl-value"
         },
@@ -812,7 +812,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0016",
           "rust_variant": "Ddname",
           "sensitive": false,
-          "source_locator": "pdf-page:185;outline:DDNAME parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/ddname.htm;topic-id:statement-ddname-parameter;heading:DDNAME parameter",
           "support": "available",
           "validation": "backward-reference"
         },
@@ -828,7 +828,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0017",
           "rust_variant": "Dest",
           "sensitive": false,
-          "source_locator": "pdf-page:189;outline:DEST parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xdddest.htm;topic-id:statement-dest-parameter;heading:DEST parameter",
           "support": "deferred",
           "validation": "name"
         },
@@ -844,7 +844,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0018",
           "rust_variant": "Disp",
           "sensitive": false,
-          "source_locator": "pdf-page:193;outline:DISP parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xdddisp.htm;topic-id:statement-disp-parameter;heading:DISP parameter",
           "support": "available",
           "validation": "disposition"
         },
@@ -860,7 +860,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0019",
           "rust_variant": "Dlm",
           "sensitive": false,
-          "source_locator": "pdf-page:206;outline:DLM parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xdddlm.htm;topic-id:statement-dlm-parameter;heading:DLM parameter",
           "support": "available",
           "validation": "delimiter"
         },
@@ -876,7 +876,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0020",
           "rust_variant": "Dsid",
           "sensitive": false,
-          "source_locator": "pdf-page:207;outline:DSID Parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xdddsid.htm;topic-id:statement-dsid-parameter;heading:DSID Parameter",
           "support": "deferred",
           "validation": "integer"
         },
@@ -892,7 +892,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0021",
           "rust_variant": "Dskeylbl",
           "sensitive": false,
-          "source_locator": "pdf-page:209;outline:DSKEYLBL parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/dskeylbl.htm;topic-id:statement-dskeylbl-parameter;heading:DSKEYLBL parameter",
           "support": "deferred",
           "validation": "name"
         },
@@ -910,7 +910,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0022",
           "rust_variant": "Dsname",
           "sensitive": false,
-          "source_locator": "pdf-page:210;outline:DSNAME parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xdddsn.htm;topic-id:statement-dsname-parameter;heading:DSNAME parameter",
           "support": "available",
           "validation": "dataset"
         },
@@ -933,7 +933,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0023",
           "rust_variant": "Dsntype",
           "sensitive": false,
-          "source_locator": "pdf-page:217;outline:DSNTYPE parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xdddsnty.htm;topic-id:statement-dsntype-parameter;heading:DSNTYPE parameter",
           "support": "available",
           "validation": "enum"
         },
@@ -949,7 +949,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0024",
           "rust_variant": "Dummy",
           "sensitive": false,
-          "source_locator": "pdf-page:221;outline:DUMMY parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xdddummy.htm;topic-id:statement-dummy-parameter;heading:DUMMY parameter",
           "support": "available",
           "validation": "none"
         },
@@ -965,7 +965,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0025",
           "rust_variant": "Dynam",
           "sensitive": false,
-          "source_locator": "pdf-page:224;outline:DYNAM parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xdddynam.htm;topic-id:statement-dynam-parameter;heading:DYNAM parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -984,7 +984,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0026",
           "rust_variant": "Eattr",
           "sensitive": false,
-          "source_locator": "pdf-page:224;outline:EATTR parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddeattr.htm;topic-id:statement-eattr-parameter;heading:EATTR parameter",
           "support": "deferred",
           "validation": "enum"
         },
@@ -1000,7 +1000,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0027",
           "rust_variant": "Expdt",
           "sensitive": false,
-          "source_locator": "pdf-page:225;outline:EXPDT parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddexpdt.htm;topic-id:statement-expdt-parameter;heading:EXPDT parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -1016,7 +1016,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0028",
           "rust_variant": "Fcb",
           "sensitive": false,
-          "source_locator": "pdf-page:227;outline:FCB parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddfcb.htm;topic-id:statement-fcb-parameter;heading:FCB parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -1036,7 +1036,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0029",
           "rust_variant": "Filedata",
           "sensitive": false,
-          "source_locator": "pdf-page:230;outline:FILEDATA parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddfile.htm;topic-id:statement-filedata-parameter;heading:FILEDATA parameter",
           "support": "deferred",
           "validation": "enum"
         },
@@ -1052,7 +1052,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0030",
           "rust_variant": "Flash",
           "sensitive": false,
-          "source_locator": "pdf-page:231;outline:FLASH parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddflash.htm;topic-id:statement-flash-parameter;heading:FLASH parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -1071,7 +1071,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0031",
           "rust_variant": "Free",
           "sensitive": false,
-          "source_locator": "pdf-page:233;outline:FREE parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddfree.htm;topic-id:statement-free-parameter;heading:FREE parameter",
           "support": "deferred",
           "validation": "enum"
         },
@@ -1089,7 +1089,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0032",
           "rust_variant": "Freevol",
           "sensitive": false,
-          "source_locator": "pdf-page:235;outline:FREEVOL parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_FREEVOL_parameter.htm;topic-id:statement-freevol-parameter;heading:FREEVOL parameter",
           "support": "deferred",
           "validation": "enum"
         },
@@ -1109,7 +1109,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0033",
           "rust_variant": "Gdgorder",
           "sensitive": false,
-          "source_locator": "pdf-page:236;outline:GDGORDER parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_GDGORDER_parameter.htm;topic-id:statement-gdgorder-parameter;heading:GDGORDER parameter",
           "support": "deferred",
           "validation": "enum"
         },
@@ -1125,7 +1125,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0034",
           "rust_variant": "Hold",
           "sensitive": false,
-          "source_locator": "pdf-page:237;outline:HOLD parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddhold.htm;topic-id:statement-hold-parameter;heading:HOLD parameter",
           "support": "deferred",
           "validation": "boolean"
         },
@@ -1141,7 +1141,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0035",
           "rust_variant": "Keylabl1",
           "sensitive": false,
-          "source_locator": "pdf-page:240;outline:KEYLABL1 parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddkeylabl1.htm;topic-id:statement-keylabl1-parameter;heading:KEYLABL1 parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -1157,7 +1157,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0036",
           "rust_variant": "Keylabl2",
           "sensitive": false,
-          "source_locator": "pdf-page:241;outline:KEYLABL2 parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddkeylabl2.htm;topic-id:statement-keylabl2-parameter;heading:KEYLABL2 parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -1173,7 +1173,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0037",
           "rust_variant": "Keyencd1",
           "sensitive": false,
-          "source_locator": "pdf-page:242;outline:KEYENCD1 parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddkeyencd1.htm;topic-id:statement-keyencd1-parameter;heading:KEYENCD1 parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -1189,7 +1189,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0038",
           "rust_variant": "Keyencd2",
           "sensitive": false,
-          "source_locator": "pdf-page:243;outline:KEYENCD2 parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddkeyencd2.htm;topic-id:statement-keyencd2-parameter;heading:KEYENCD2 parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -1205,7 +1205,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0039",
           "rust_variant": "Keylen",
           "sensitive": false,
-          "source_locator": "pdf-page:244;outline:KEYLEN parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddkeyl.htm;topic-id:statement-keylen-parameter;heading:KEYLEN parameter",
           "support": "deferred",
           "validation": "integer"
         },
@@ -1221,7 +1221,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0040",
           "rust_variant": "Keyoff",
           "sensitive": false,
-          "source_locator": "pdf-page:246;outline:KEYOFF parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddkeyo.htm;topic-id:statement-keyoff-parameter;heading:KEYOFF parameter",
           "support": "deferred",
           "validation": "integer"
         },
@@ -1237,7 +1237,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0041",
           "rust_variant": "Label",
           "sensitive": false,
-          "source_locator": "pdf-page:247;outline:LABEL parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddlabel.htm;topic-id:statement-label-parameter;heading:LABEL parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -1253,7 +1253,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0042",
           "rust_variant": "Lgstream",
           "sensitive": false,
-          "source_locator": "pdf-page:252;outline:LGSTREAM parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xlgstrm.htm;topic-id:statement-lgstream-parameter;heading:LGSTREAM parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -1269,7 +1269,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0043",
           "rust_variant": "Like",
           "sensitive": false,
-          "source_locator": "pdf-page:254;outline:LIKE parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddlike.htm;topic-id:statement-like-parameter;heading:LIKE parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -1285,7 +1285,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0044",
           "rust_variant": "Lrecl",
           "sensitive": false,
-          "source_locator": "pdf-page:256;outline:LRECL parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddlrecl.htm;topic-id:statement-lrecl-parameter;heading:LRECL parameter",
           "support": "available",
           "validation": "integer-or-x"
         },
@@ -1301,7 +1301,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0045",
           "rust_variant": "Maxgens",
           "sensitive": false,
-          "source_locator": "pdf-page:258;outline:MAXGENS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddmaxgens.htm;topic-id:statement-maxgens-parameter;heading:MAXGENS parameter",
           "support": "deferred",
           "validation": "integer"
         },
@@ -1317,7 +1317,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0046",
           "rust_variant": "Mgmtclas",
           "sensitive": false,
-          "source_locator": "pdf-page:258;outline:MGMTCLAS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddmgmtc.htm;topic-id:statement-mgmtclas-parameter;heading:MGMTCLAS parameter",
           "support": "deferred",
           "validation": "name"
         },
@@ -1333,7 +1333,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0047",
           "rust_variant": "Modify",
           "sensitive": false,
-          "source_locator": "pdf-page:260;outline:MODIFY parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddmod.htm;topic-id:statement-modify-parameter;heading:MODIFY parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -1349,7 +1349,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0048",
           "rust_variant": "Nullovrd",
           "sensitive": false,
-          "source_locator": "pdf-page:262;outline:NULLOVRD parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/nullovrd.htm;topic-id:statement-nullovrd-parameter;heading:NULLOVRD parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -1365,7 +1365,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0049",
           "rust_variant": "Outlim",
           "sensitive": false,
-          "source_locator": "pdf-page:262;outline:OUTLIM parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddoutl.htm;topic-id:statement-outlim-parameter;heading:OUTLIM parameter",
           "support": "deferred",
           "validation": "integer"
         },
@@ -1381,7 +1381,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0050",
           "rust_variant": "Output",
           "sensitive": false,
-          "source_locator": "pdf-page:263;outline:OUTPUT parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddoutp.htm;topic-id:statement-output-parameter;heading:OUTPUT parameter",
           "support": "available",
           "validation": "output-reference"
         },
@@ -1397,7 +1397,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0051",
           "rust_variant": "Path",
           "sensitive": false,
-          "source_locator": "pdf-page:267;outline:PATH parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/hddpath.htm;topic-id:statement-path-parameter;heading:PATH parameter",
           "support": "deferred",
           "validation": "path"
         },
@@ -1413,7 +1413,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0052",
           "rust_variant": "Pathdisp",
           "sensitive": false,
-          "source_locator": "pdf-page:270;outline:PATHDISP parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/hddpisp.htm;topic-id:statement-pathdisp-parameter;heading:PATHDISP parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -1429,7 +1429,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0053",
           "rust_variant": "Pathmode",
           "sensitive": false,
-          "source_locator": "pdf-page:271;outline:PATHMODE parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/ddpmoda.htm;topic-id:statement-pathmode-parameter;heading:PATHMODE parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -1445,7 +1445,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0054",
           "rust_variant": "Pathopts",
           "sensitive": false,
-          "source_locator": "pdf-page:275;outline:PATHOPTS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/ddpoptc.htm;topic-id:statement-pathopts-parameter;heading:PATHOPTS parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -1461,7 +1461,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0055",
           "rust_variant": "Protect",
           "sensitive": false,
-          "source_locator": "pdf-page:281;outline:PROTECT parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddprot.htm;topic-id:statement-protect-parameter;heading:PROTECT parameter",
           "support": "deferred",
           "validation": "boolean"
         },
@@ -1477,7 +1477,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0056",
           "rust_variant": "Recfm",
           "sensitive": false,
-          "source_locator": "pdf-page:283;outline:RECFM parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddrecfm.htm;topic-id:statement-recfm-parameter;heading:RECFM parameter",
           "support": "available",
           "validation": "record-format"
         },
@@ -1498,7 +1498,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0057",
           "rust_variant": "Recorg",
           "sensitive": false,
-          "source_locator": "pdf-page:286;outline:RECORG parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddrecor.htm;topic-id:statement-recorg-parameter;heading:RECORG parameter",
           "support": "deferred",
           "validation": "enum"
         },
@@ -1514,7 +1514,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0058",
           "rust_variant": "Refdd",
           "sensitive": false,
-          "source_locator": "pdf-page:287;outline:REFDD parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddrefdd.htm;topic-id:statement-refdd-parameter;heading:REFDD parameter",
           "support": "deferred",
           "validation": "backward-reference"
         },
@@ -1530,7 +1530,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0059",
           "rust_variant": "Retpd",
           "sensitive": false,
-          "source_locator": "pdf-page:289;outline:RETPD parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddretpd.htm;topic-id:statement-retpd-parameter;heading:RETPD parameter",
           "support": "deferred",
           "validation": "integer"
         },
@@ -1550,7 +1550,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0060",
           "rust_variant": "Rls",
           "sensitive": false,
-          "source_locator": "pdf-page:291;outline:RLS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddrls.htm;topic-id:statement-rls-parameter;heading:RLS parameter",
           "support": "deferred",
           "validation": "enum"
         },
@@ -1566,7 +1566,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0061",
           "rust_variant": "Roaccess",
           "sensitive": false,
-          "source_locator": "pdf-page:293;outline:ROACCESS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddroa.htm;topic-id:statement-roaccess-parameter;heading:ROACCESS parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -1582,7 +1582,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0062",
           "rust_variant": "Secmodel",
           "sensitive": false,
-          "source_locator": "pdf-page:294;outline:SECMODEL parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddsecm.htm;topic-id:statement-secmodel-parameter;heading:SECMODEL parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -1598,7 +1598,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0063",
           "rust_variant": "Segment",
           "sensitive": false,
-          "source_locator": "pdf-page:296;outline:SEGMENT parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddseg.htm;topic-id:statement-segment-parameter;heading:SEGMENT parameter",
           "support": "deferred",
           "validation": "integer"
         },
@@ -1614,7 +1614,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0064",
           "rust_variant": "Space",
           "sensitive": false,
-          "source_locator": "pdf-page:297;outline:SPACE parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddspace.htm;topic-id:statement-space-parameter;heading:SPACE parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -1633,7 +1633,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0065",
           "rust_variant": "Spin",
           "sensitive": false,
-          "source_locator": "pdf-page:304;outline:SPIN parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddspin.htm;topic-id:statement-spin-parameter;heading:SPIN parameter",
           "support": "deferred",
           "validation": "enum"
         },
@@ -1649,7 +1649,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0066",
           "rust_variant": "Storclas",
           "sensitive": false,
-          "source_locator": "pdf-page:307;outline:STORCLAS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddstorc.htm;topic-id:statement-storclas-parameter;heading:STORCLAS parameter",
           "support": "deferred",
           "validation": "name"
         },
@@ -1665,7 +1665,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0067",
           "rust_variant": "Subsys",
           "sensitive": false,
-          "source_locator": "pdf-page:309;outline:SUBSYS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddsubsy.htm;topic-id:statement-subsys-parameter;heading:SUBSYS parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -1686,7 +1686,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0068",
           "rust_variant": "Symbols",
           "sensitive": false,
-          "source_locator": "pdf-page:312;outline:SYMBOLS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddsymbols.htm;topic-id:statement-symbols-parameter;heading:SYMBOLS parameter",
           "support": "deferred",
           "validation": "enum"
         },
@@ -1702,7 +1702,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0069",
           "rust_variant": "Symlist",
           "sensitive": false,
-          "source_locator": "pdf-page:313;outline:SYMLIST parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddsymlst.htm;topic-id:statement-symlist-parameter;heading:SYMLIST parameter",
           "support": "deferred",
           "validation": "name-list"
         },
@@ -1718,7 +1718,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0070",
           "rust_variant": "Sysout",
           "sensitive": false,
-          "source_locator": "pdf-page:315;outline:SYSOUT parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddsysot.htm;topic-id:statement-sysout-parameter;heading:SYSOUT parameter",
           "support": "available",
           "validation": "sysout"
         },
@@ -1737,7 +1737,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0071",
           "rust_variant": "Term",
           "sensitive": false,
-          "source_locator": "pdf-page:320;outline:TERM parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddterm.htm;topic-id:statement-term-parameter;heading:TERM parameter",
           "support": "deferred",
           "validation": "enum"
         },
@@ -1753,7 +1753,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0072",
           "rust_variant": "Ucs",
           "sensitive": false,
-          "source_locator": "pdf-page:321;outline:UCS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xdducs.htm;topic-id:statement-ucs-parameter;heading:UCS parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -1769,7 +1769,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0073",
           "rust_variant": "Unit",
           "sensitive": false,
-          "source_locator": "pdf-page:324;outline:UNIT parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddunit.htm;topic-id:statement-unit-parameter;heading:UNIT parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -1785,7 +1785,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:dd-parameters:0074",
           "rust_variant": "Volume",
           "sensitive": false,
-          "source_locator": "pdf-page:330;outline:VOLUME parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xddvol.htm;topic-id:statement-volume-parameter;heading:VOLUME parameter",
           "support": "deferred",
           "validation": "jcl-value"
         }
@@ -1807,7 +1807,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0001",
           "rust_variant": "Abdispcc",
           "sensitive": false,
-          "source_locator": "pdf-page:368;outline:ABDISPCC parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xexabdispcc.htm;topic-id:statement-abdispcc-parameter;heading:ABDISPCC parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -1823,7 +1823,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0002",
           "rust_variant": "Acct",
           "sensitive": false,
-          "source_locator": "pdf-page:369;outline:ACCT parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xexacct.htm;topic-id:statement-acct-parameter;heading:ACCT parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -1842,7 +1842,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0003",
           "rust_variant": "Addrspc",
           "sensitive": false,
-          "source_locator": "pdf-page:371;outline:ADDRSPC parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xexaddrs.htm;topic-id:statement-addrspc-parameter;heading:ADDRSPC parameter",
           "support": "deferred",
           "validation": "enum"
         },
@@ -1858,7 +1858,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0004",
           "rust_variant": "Ccsid",
           "sensitive": false,
-          "source_locator": "pdf-page:372;outline:CCSID parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_CCSID_parameter.htm;topic-id:es-ccsid-parameter;heading:CCSID parameter",
           "support": "available",
           "validation": "integer"
         },
@@ -1874,7 +1874,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0005",
           "rust_variant": "Cond",
           "sensitive": false,
-          "source_locator": "pdf-page:373;outline:COND parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xexcond.htm;topic-id:statement-cond-parameter;heading:COND parameter",
           "support": "available",
           "validation": "condition"
         },
@@ -1890,7 +1890,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0006",
           "rust_variant": "Dynamnbr",
           "sensitive": false,
-          "source_locator": "pdf-page:380;outline:DYNAMNBR parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xexdynam.htm;topic-id:statement-dynamnbr-parameter;heading:DYNAMNBR parameter",
           "support": "deferred",
           "validation": "integer"
         },
@@ -1906,7 +1906,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0007",
           "rust_variant": "Memlimit",
           "sensitive": false,
-          "source_locator": "pdf-page:381;outline:MEMLIMIT parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xexmeml.htm;topic-id:statement-memlimit-parameter;heading:MEMLIMIT parameter",
           "support": "deferred",
           "validation": "size"
         },
@@ -1922,7 +1922,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0008",
           "rust_variant": "Parm",
           "sensitive": false,
-          "source_locator": "pdf-page:382;outline:PARM parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xexparm.htm;topic-id:statement-parm-parameter;heading:PARM parameter",
           "support": "available",
           "validation": "text"
         },
@@ -1938,7 +1938,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0009",
           "rust_variant": "Parmdd",
           "sensitive": false,
-          "source_locator": "pdf-page:384;outline:PARMDD parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xexparmdd.htm;topic-id:statement-parmdd-parameter;heading:PARMDD parameter",
           "support": "deferred",
           "validation": "name"
         },
@@ -1954,7 +1954,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0010",
           "rust_variant": "Perform",
           "sensitive": false,
-          "source_locator": "pdf-page:386;outline:PERFORM parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xexperf.htm;topic-id:statement-perform-parameter;heading:PERFORM parameter",
           "support": "deferred",
           "validation": "integer"
         },
@@ -1970,7 +1970,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0011",
           "rust_variant": "Pgm",
           "sensitive": false,
-          "source_locator": "pdf-page:387;outline:PGM parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xexpgm.htm;topic-id:statement-pgm-parameter;heading:PGM parameter",
           "support": "available",
           "validation": "program"
         },
@@ -1988,7 +1988,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0012",
           "rust_variant": "ProcAndProcedureName",
           "sensitive": false,
-          "source_locator": "pdf-page:389;outline:PROC and procedure name parameters",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xexproc.htm;topic-id:statement-proc-procedure-name-parameters;heading:PROC and procedure name parameters",
           "support": "available",
           "validation": "procedure"
         },
@@ -2009,7 +2009,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0013",
           "rust_variant": "Rd",
           "sensitive": false,
-          "source_locator": "pdf-page:390;outline:RD parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xexrd.htm;topic-id:statement-rd-parameter;heading:RD parameter",
           "support": "deferred",
           "validation": "enum"
         },
@@ -2025,7 +2025,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0014",
           "rust_variant": "Region",
           "sensitive": false,
-          "source_locator": "pdf-page:393;outline:REGION parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xexreg.htm;topic-id:statement-region-parameter;heading:REGION parameter",
           "support": "deferred",
           "validation": "size"
         },
@@ -2041,7 +2041,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0015",
           "rust_variant": "Regionx",
           "sensitive": false,
-          "source_locator": "pdf-page:396;outline:REGIONX parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xexregexx.htm;topic-id:statement-regionx-parameter;heading:REGIONX parameter",
           "support": "deferred",
           "validation": "size-or-tuple"
         },
@@ -2057,7 +2057,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0016",
           "rust_variant": "Rlstmout",
           "sensitive": false,
-          "source_locator": "pdf-page:398;outline:RLSTMOUT parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xextvs.htm;topic-id:statement-rlstmout-parameter;heading:RLSTMOUT parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -2073,7 +2073,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0017",
           "rust_variant": "Time",
           "sensitive": false,
-          "source_locator": "pdf-page:399;outline:TIME parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xextime.htm;topic-id:statement-time-parameter;heading:TIME parameter",
           "support": "deferred",
           "validation": "time"
         },
@@ -2092,7 +2092,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0018",
           "rust_variant": "Tvsmsg",
           "sensitive": false,
-          "source_locator": "pdf-page:402;outline:TVSMSG parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xextvsmsg.htm;topic-id:statement-tvsmsg-parameter;heading:TVSMSG parameter",
           "support": "deferred",
           "validation": "enum"
         },
@@ -2111,7 +2111,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:exec-parameters:0019",
           "rust_variant": "Tvsamcom",
           "sensitive": false,
-          "source_locator": "pdf-page:403;outline:TVSAMCOM parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xextvsamcom.htm;topic-id:statement-tvsamcom-parameter;heading:TVSAMCOM parameter",
           "support": "deferred",
           "validation": "enum"
         }
@@ -2133,7 +2133,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0001",
           "rust_variant": "AccountingInformation",
           "sensitive": false,
-          "source_locator": "pdf-page:442;outline:Accounting information parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbacct.htm;topic-id:statement-accounting-information-parameter;heading:Accounting information parameter",
           "support": "available",
           "validation": "text"
         },
@@ -2152,7 +2152,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0002",
           "rust_variant": "Addrspc",
           "sensitive": false,
-          "source_locator": "pdf-page:444;outline:ADDRSPC parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbaddrs.htm;topic-id:js-addrspc-parameter;heading:ADDRSPC parameter",
           "support": "deferred",
           "validation": "enum"
         },
@@ -2168,7 +2168,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0003",
           "rust_variant": "Bytes",
           "sensitive": false,
-          "source_locator": "pdf-page:445;outline:BYTES parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/jbbytes.htm;topic-id:statement-bytes-parameter;heading:BYTES parameter",
           "support": "deferred",
           "validation": "integer-or-suffix"
         },
@@ -2184,7 +2184,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0004",
           "rust_variant": "Cards",
           "sensitive": false,
-          "source_locator": "pdf-page:447;outline:CARDS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/jbcards.htm;topic-id:statement-cards-parameter;heading:CARDS parameter",
           "support": "deferred",
           "validation": "integer-or-suffix"
         },
@@ -2200,7 +2200,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0005",
           "rust_variant": "Ccsid",
           "sensitive": false,
-          "source_locator": "pdf-page:449;outline:CCSID parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/iea3b6_CCSID_parameter1.htm;topic-id:js-ccsid-parameter;heading:CCSID parameter",
           "support": "available",
           "validation": "integer"
         },
@@ -2216,7 +2216,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0006",
           "rust_variant": "Class",
           "sensitive": false,
-          "source_locator": "pdf-page:450;outline:CLASS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbclass.htm;topic-id:statement-class-parameter;heading:CLASS parameter",
           "support": "available",
           "validation": "class"
         },
@@ -2232,7 +2232,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0007",
           "rust_variant": "Cond",
           "sensitive": false,
-          "source_locator": "pdf-page:451;outline:COND parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbcond.htm;topic-id:js-cond-parameter;heading:COND parameter",
           "support": "available",
           "validation": "condition"
         },
@@ -2252,7 +2252,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0008",
           "rust_variant": "Dsenqshr",
           "sensitive": false,
-          "source_locator": "pdf-page:453;outline:DSENQSHR parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/dsenqshr.htm;topic-id:statement-dsenqshr-parameter;heading:DSENQSHR parameter",
           "support": "deferred",
           "validation": "enum"
         },
@@ -2268,7 +2268,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0009",
           "rust_variant": "Email",
           "sensitive": false,
-          "source_locator": "pdf-page:455;outline:EMAIL parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/emailparm.htm;topic-id:statement-email-parameter;heading:EMAIL parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -2287,7 +2287,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0010",
           "rust_variant": "Gdgbias",
           "sensitive": false,
-          "source_locator": "pdf-page:455;outline:GDGBIAS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/gdgbias_parm.htm;topic-id:statement-gdgbias-parameter;heading:GDGBIAS parameter",
           "support": "deferred",
           "validation": "enum"
         },
@@ -2303,7 +2303,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0011",
           "rust_variant": "Group",
           "sensitive": false,
-          "source_locator": "pdf-page:456;outline:GROUP parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbgroup.htm;topic-id:statement-group-parameter;heading:GROUP parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -2322,7 +2322,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0012",
           "rust_variant": "Jeslog",
           "sensitive": false,
-          "source_locator": "pdf-page:457;outline:JESLOG parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbjlog.htm;topic-id:statement-jeslog-parameter;heading:JESLOG parameter",
           "support": "deferred",
           "validation": "enum"
         },
@@ -2338,7 +2338,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0013",
           "rust_variant": "Jobrc",
           "sensitive": false,
-          "source_locator": "pdf-page:459;outline:JOBRC parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbjobrc.htm;topic-id:statement-jobrc-parameter;heading:JOBRC parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -2354,7 +2354,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0014",
           "rust_variant": "Lines",
           "sensitive": false,
-          "source_locator": "pdf-page:460;outline:LINES parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/jblines.htm;topic-id:statement-lines-parameter;heading:LINES parameter",
           "support": "deferred",
           "validation": "integer-or-suffix"
         },
@@ -2370,7 +2370,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0015",
           "rust_variant": "Memlimit",
           "sensitive": false,
-          "source_locator": "pdf-page:461;outline:MEMLIMIT parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/jbmeml.htm;topic-id:js-memlimit-parameter;heading:MEMLIMIT parameter",
           "support": "deferred",
           "validation": "size"
         },
@@ -2386,7 +2386,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0016",
           "rust_variant": "Msgclass",
           "sensitive": false,
-          "source_locator": "pdf-page:462;outline:MSGCLASS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbmsgcl.htm;topic-id:statement-msgclass-parameter;heading:MSGCLASS parameter",
           "support": "available",
           "validation": "class"
         },
@@ -2402,7 +2402,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0017",
           "rust_variant": "Msglevel",
           "sensitive": false,
-          "source_locator": "pdf-page:464;outline:MSGLEVEL parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbmsgle.htm;topic-id:statement-msglevel-parameter;heading:MSGLEVEL parameter",
           "support": "available",
           "validation": "message-level"
         },
@@ -2418,7 +2418,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0018",
           "rust_variant": "Notify",
           "sensitive": false,
-          "source_locator": "pdf-page:466;outline:NOTIFY parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbnotif.htm;topic-id:statement-notify-parameter;heading:NOTIFY parameter",
           "support": "deferred",
           "validation": "name"
         },
@@ -2434,7 +2434,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0019",
           "rust_variant": "Pages",
           "sensitive": false,
-          "source_locator": "pdf-page:467;outline:PAGES parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/jbpages.htm;topic-id:statement-pages-parameter;heading:PAGES parameter",
           "support": "deferred",
           "validation": "integer-or-suffix"
         },
@@ -2450,7 +2450,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0020",
           "rust_variant": "Password",
           "sensitive": true,
-          "source_locator": "pdf-page:469;outline:PASSWORD parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbpassw.htm;topic-id:statement-password-parameter;heading:PASSWORD parameter",
           "support": "deferred",
           "validation": "secret"
         },
@@ -2466,7 +2466,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0021",
           "rust_variant": "Perform",
           "sensitive": false,
-          "source_locator": "pdf-page:471;outline:PERFORM parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbperf.htm;topic-id:js-perform-parameter;heading:PERFORM parameter",
           "support": "deferred",
           "validation": "integer"
         },
@@ -2482,7 +2482,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0022",
           "rust_variant": "ProgrammersName",
           "sensitive": false,
-          "source_locator": "pdf-page:473;outline:Programmer's name parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbprogn.htm;topic-id:statement-programmers-name-parameter;heading:Programmer's name parameter",
           "support": "available",
           "validation": "text"
         },
@@ -2498,7 +2498,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0023",
           "rust_variant": "Prty",
           "sensitive": false,
-          "source_locator": "pdf-page:474;outline:PRTY parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbprty.htm;topic-id:statement-prty-parameter;heading:PRTY parameter",
           "support": "available",
           "validation": "integer"
         },
@@ -2519,7 +2519,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0024",
           "rust_variant": "Rd",
           "sensitive": false,
-          "source_locator": "pdf-page:475;outline:RD parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbrd.htm;topic-id:js-rd-parameter;heading:RD parameter",
           "support": "deferred",
           "validation": "enum"
         },
@@ -2535,7 +2535,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0025",
           "rust_variant": "Region",
           "sensitive": false,
-          "source_locator": "pdf-page:478;outline:REGION parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbreg.htm;topic-id:js-region-parameter;heading:REGION parameter",
           "support": "deferred",
           "validation": "size"
         },
@@ -2551,7 +2551,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0026",
           "rust_variant": "Regionx",
           "sensitive": false,
-          "source_locator": "pdf-page:480;outline:REGIONX parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xexregjob.htm;topic-id:js-regionx-parameter;heading:REGIONX parameter",
           "support": "deferred",
           "validation": "size-or-tuple"
         },
@@ -2567,7 +2567,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0027",
           "rust_variant": "Restart",
           "sensitive": false,
-          "source_locator": "pdf-page:483;outline:RESTART parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbresta.htm;topic-id:statement-restart-parameter;heading:RESTART parameter",
           "support": "available",
           "validation": "restart"
         },
@@ -2583,7 +2583,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0028",
           "rust_variant": "Seclabel",
           "sensitive": false,
-          "source_locator": "pdf-page:485;outline:SECLABEL parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbsecl.htm;topic-id:statement-seclabel-parameter;heading:SECLABEL parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -2599,7 +2599,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0029",
           "rust_variant": "Schenv",
           "sensitive": false,
-          "source_locator": "pdf-page:486;outline:SCHENV parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbsche.htm;topic-id:statement-schenv-parameter;heading:SCHENV parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -2615,7 +2615,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0030",
           "rust_variant": "Sysaff",
           "sensitive": false,
-          "source_locator": "pdf-page:487;outline:SYSAFF parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbsysaff.htm;topic-id:statement-sysaff-parameter;heading:SYSAFF parameter",
           "support": "deferred",
           "validation": "name-list"
         },
@@ -2631,7 +2631,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0031",
           "rust_variant": "System",
           "sensitive": false,
-          "source_locator": "pdf-page:489;outline:SYSTEM parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbsystem.htm;topic-id:statement-system-parameter;heading:SYSTEM parameter",
           "support": "deferred",
           "validation": "name-list"
         },
@@ -2647,7 +2647,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0032",
           "rust_variant": "Time",
           "sensitive": false,
-          "source_locator": "pdf-page:490;outline:TIME parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbtime.htm;topic-id:js-time-parameter;heading:TIME parameter",
           "support": "deferred",
           "validation": "time"
         },
@@ -2668,7 +2668,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0033",
           "rust_variant": "Typrun",
           "sensitive": false,
-          "source_locator": "pdf-page:493;outline:TYPRUN parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbtypr.htm;topic-id:statement-typrun-parameter;heading:TYPRUN parameter",
           "support": "deferred",
           "validation": "enum"
         },
@@ -2684,7 +2684,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0034",
           "rust_variant": "Ujobcorr",
           "sensitive": false,
-          "source_locator": "pdf-page:495;outline:UJOBCORR parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/ujobcorr.htm;topic-id:statement-ujobcorr-parameter;heading:UJOBCORR parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -2700,7 +2700,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:job-parameters:0035",
           "rust_variant": "User",
           "sensitive": false,
-          "source_locator": "pdf-page:496;outline:USER parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbuser.htm;topic-id:statement-user-parameter;heading:USER parameter",
           "support": "deferred",
           "validation": "name"
         }
@@ -2722,7 +2722,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0001",
           "rust_variant": "Address",
           "sensitive": false,
-          "source_locator": "pdf-page:519;outline:ADDRESS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotaddr.htm;topic-id:statement-address-parameter;heading:ADDRESS parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -2738,7 +2738,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0002",
           "rust_variant": "Afpparms",
           "sensitive": false,
-          "source_locator": "pdf-page:520;outline:AFPPARMS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotafpparms.htm;topic-id:statement-afpparms-parameter;heading:AFPPARMS parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -2754,7 +2754,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0003",
           "rust_variant": "Afpstats",
           "sensitive": false,
-          "source_locator": "pdf-page:521;outline:AFPSTATS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotafpstats.htm;topic-id:statement-afpstats-parameter;heading:AFPSTATS parameter",
           "support": "deferred",
           "validation": "boolean"
         },
@@ -2770,7 +2770,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0004",
           "rust_variant": "Building",
           "sensitive": false,
-          "source_locator": "pdf-page:522;outline:BUILDING parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotbuild.htm;topic-id:statement-building-parameter;heading:BUILDING parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -2786,7 +2786,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0005",
           "rust_variant": "Burst",
           "sensitive": false,
-          "source_locator": "pdf-page:523;outline:BURST parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotburst.htm;topic-id:ojs-burst-parameter;heading:BURST parameter",
           "support": "deferred",
           "validation": "boolean"
         },
@@ -2802,7 +2802,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0006",
           "rust_variant": "Chars",
           "sensitive": false,
-          "source_locator": "pdf-page:524;outline:CHARS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotchars.htm;topic-id:ojs-chars-parameter;heading:CHARS parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -2818,7 +2818,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0007",
           "rust_variant": "Ckptline",
           "sensitive": false,
-          "source_locator": "pdf-page:525;outline:CKPTLINE parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotckptl.htm;topic-id:statement-ckptline-parameter;heading:CKPTLINE parameter",
           "support": "deferred",
           "validation": "integer"
         },
@@ -2834,7 +2834,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0008",
           "rust_variant": "Ckptpage",
           "sensitive": false,
-          "source_locator": "pdf-page:526;outline:CKPTPAGE parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotckptp.htm;topic-id:statement-ckptpage-parameter;heading:CKPTPAGE parameter",
           "support": "deferred",
           "validation": "integer"
         },
@@ -2850,7 +2850,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0009",
           "rust_variant": "Ckptsec",
           "sensitive": false,
-          "source_locator": "pdf-page:527;outline:CKPTSEC parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotckpts.htm;topic-id:statement-ckptsec-parameter;heading:CKPTSEC parameter",
           "support": "deferred",
           "validation": "integer"
         },
@@ -2866,7 +2866,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0010",
           "rust_variant": "Class",
           "sensitive": false,
-          "source_locator": "pdf-page:527;outline:CLASS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotclass.htm;topic-id:ojs-class-parameter;heading:CLASS parameter",
           "support": "available",
           "validation": "class"
         },
@@ -2882,7 +2882,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0011",
           "rust_variant": "Colormap",
           "sensitive": false,
-          "source_locator": "pdf-page:529;outline:COLORMAP parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/otcolor.htm;topic-id:statement-colormap-parameter;heading:COLORMAP parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -2898,7 +2898,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0012",
           "rust_variant": "Compact",
           "sensitive": false,
-          "source_locator": "pdf-page:530;outline:COMPACT parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotcompa.htm;topic-id:statement-compact-parameter;heading:COMPACT parameter",
           "support": "deferred",
           "validation": "boolean"
         },
@@ -2914,7 +2914,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0013",
           "rust_variant": "Comsetup",
           "sensitive": false,
-          "source_locator": "pdf-page:530;outline:COMSETUP parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotcomst.htm;topic-id:statement-comsetup-parameter;heading:COMSETUP parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -2930,7 +2930,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0014",
           "rust_variant": "Control",
           "sensitive": false,
-          "source_locator": "pdf-page:531;outline:CONTROL parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotcontr.htm;topic-id:statement-control-parameter;heading:CONTROL parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -2946,7 +2946,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0015",
           "rust_variant": "Copies",
           "sensitive": false,
-          "source_locator": "pdf-page:532;outline:COPIES parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotcopy.htm;topic-id:ojs-copies-parameter;heading:COPIES parameter",
           "support": "deferred",
           "validation": "integer-or-tuple"
         },
@@ -2962,7 +2962,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0016",
           "rust_variant": "Copycnt",
           "sensitive": false,
-          "source_locator": "pdf-page:534;outline:COPYCNT parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xcopycnt.htm;topic-id:statement-copycnt-parameter;heading:COPYCNT parameter",
           "support": "deferred",
           "validation": "integer"
         },
@@ -2978,7 +2978,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0017",
           "rust_variant": "Datack",
           "sensitive": false,
-          "source_locator": "pdf-page:534;outline:DATACK parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotdatac.htm;topic-id:statement-datack-parameter;heading:DATACK parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -2994,7 +2994,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0018",
           "rust_variant": "Ddname",
           "sensitive": false,
-          "source_locator": "pdf-page:536;outline:DDNAME parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbddname.htm;topic-id:ojs-ddname-parameter;heading:DDNAME parameter",
           "support": "available",
           "validation": "name-list"
         },
@@ -3010,7 +3010,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0019",
           "rust_variant": "Default",
           "sensitive": false,
-          "source_locator": "pdf-page:536;outline:DEFAULT parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotdefau.htm;topic-id:statement-default-parameter;heading:DEFAULT parameter",
           "support": "available",
           "validation": "boolean"
         },
@@ -3026,7 +3026,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0020",
           "rust_variant": "Dept",
           "sensitive": false,
-          "source_locator": "pdf-page:538;outline:DEPT parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotdept.htm;topic-id:statement-dept-parameter;heading:DEPT parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3042,7 +3042,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0021",
           "rust_variant": "Dest",
           "sensitive": false,
-          "source_locator": "pdf-page:539;outline:DEST parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotdest.htm;topic-id:ojs-dest-parameter;heading:DEST parameter",
           "support": "available",
           "validation": "name"
         },
@@ -3058,7 +3058,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0022",
           "rust_variant": "Dpagelbl",
           "sensitive": false,
-          "source_locator": "pdf-page:542;outline:DPAGELBL parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotdpag.htm;topic-id:statement-dpagelbl-parameter;heading:DPAGELBL parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3078,7 +3078,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0023",
           "rust_variant": "Duplex",
           "sensitive": false,
-          "source_locator": "pdf-page:543;outline:DUPLEX parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotdup.htm;topic-id:statement-duplex-parameter;heading:DUPLEX parameter",
           "support": "deferred",
           "validation": "enum"
         },
@@ -3094,7 +3094,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0024",
           "rust_variant": "Fcb",
           "sensitive": false,
-          "source_locator": "pdf-page:544;outline:FCB parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotfcb.htm;topic-id:ojs-fcb-parameter;heading:FCB parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3110,7 +3110,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0025",
           "rust_variant": "Flash",
           "sensitive": false,
-          "source_locator": "pdf-page:546;outline:FLASH parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotflash.htm;topic-id:ojs-flash-parameter;heading:FLASH parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3126,7 +3126,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0026",
           "rust_variant": "Formdef",
           "sensitive": false,
-          "source_locator": "pdf-page:547;outline:FORMDEF parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotformd.htm;topic-id:statement-formdef-parameter;heading:FORMDEF parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3142,7 +3142,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0027",
           "rust_variant": "Formlen",
           "sensitive": false,
-          "source_locator": "pdf-page:548;outline:FORMLEN parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/otforml.htm;topic-id:statement-formlen-parameter;heading:FORMLEN parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3158,7 +3158,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0028",
           "rust_variant": "Forms",
           "sensitive": false,
-          "source_locator": "pdf-page:549;outline:FORMS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotforms.htm;topic-id:statement-forms-parameter;heading:FORMS parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3174,7 +3174,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0029",
           "rust_variant": "Fssdata",
           "sensitive": false,
-          "source_locator": "pdf-page:550;outline:FSSDATA parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotfss.htm;topic-id:statement-fssdata-parameter;heading:FSSDATA parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3190,7 +3190,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0030",
           "rust_variant": "Groupid",
           "sensitive": false,
-          "source_locator": "pdf-page:552;outline:GROUPID parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotgroup.htm;topic-id:statement-groupid-parameter;heading:GROUPID parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3206,7 +3206,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0031",
           "rust_variant": "Index",
           "sensitive": false,
-          "source_locator": "pdf-page:554;outline:INDEX parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotindex.htm;topic-id:statement-index-parameter;heading:INDEX parameter",
           "support": "deferred",
           "validation": "integer"
         },
@@ -3222,7 +3222,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0032",
           "rust_variant": "Intray",
           "sensitive": false,
-          "source_locator": "pdf-page:554;outline:INTRAY parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotintra.htm;topic-id:statement-intray-parameter;heading:INTRAY parameter",
           "support": "deferred",
           "validation": "integer"
         },
@@ -3243,7 +3243,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0033",
           "rust_variant": "Jesds",
           "sensitive": false,
-          "source_locator": "pdf-page:555;outline:JESDS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotjesds.htm;topic-id:statement-jesds-parameter;heading:JESDS parameter",
           "support": "available",
           "validation": "enum"
         },
@@ -3259,7 +3259,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0034",
           "rust_variant": "Lindex",
           "sensitive": false,
-          "source_locator": "pdf-page:557;outline:LINDEX parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotlinde.htm;topic-id:statement-lindex-parameter;heading:LINDEX parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3275,7 +3275,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0035",
           "rust_variant": "Linect",
           "sensitive": false,
-          "source_locator": "pdf-page:557;outline:LINECT parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotlinec.htm;topic-id:statement-linect-parameter;heading:LINECT parameter",
           "support": "deferred",
           "validation": "integer"
         },
@@ -3291,7 +3291,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0036",
           "rust_variant": "Mailbcc",
           "sensitive": false,
-          "source_locator": "pdf-page:558;outline:MAILBCC parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/mailbcc.htm;topic-id:statement-mailbcc-parameter;heading:MAILBCC parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3307,7 +3307,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0037",
           "rust_variant": "Mailcc",
           "sensitive": false,
-          "source_locator": "pdf-page:559;outline:MAILCC parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/mailcc.htm;topic-id:statement-mailcc-parameter;heading:MAILCC parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3323,7 +3323,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0038",
           "rust_variant": "Mailfile",
           "sensitive": false,
-          "source_locator": "pdf-page:560;outline:MAILFILE parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/mailfil.htm;topic-id:statement-mailfile-parameter;heading:MAILFILE parameter",
           "support": "deferred",
           "validation": "name"
         },
@@ -3339,7 +3339,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0039",
           "rust_variant": "Mailfrom",
           "sensitive": false,
-          "source_locator": "pdf-page:561;outline:MAILFROM parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/mailfro.htm;topic-id:statement-mailfrom-parameter;heading:MAILFROM parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3355,7 +3355,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0040",
           "rust_variant": "Mailto",
           "sensitive": false,
-          "source_locator": "pdf-page:561;outline:MAILTO parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/mailto.htm;topic-id:statement-mailto-parameter;heading:MAILTO parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3371,7 +3371,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0041",
           "rust_variant": "Merge",
           "sensitive": false,
-          "source_locator": "pdf-page:562;outline:MERGE parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xjbmerge.htm;topic-id:statement-merge-parameter;heading:MERGE parameter",
           "support": "deferred",
           "validation": "boolean"
         },
@@ -3387,7 +3387,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0042",
           "rust_variant": "Modify",
           "sensitive": false,
-          "source_locator": "pdf-page:563;outline:MODIFY parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotmod.htm;topic-id:ojs-modify-parameter;heading:MODIFY parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3403,7 +3403,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0043",
           "rust_variant": "Name",
           "sensitive": false,
-          "source_locator": "pdf-page:564;outline:NAME parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotname.htm;topic-id:statement-name-parameter;heading:NAME parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3419,7 +3419,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0044",
           "rust_variant": "Notify",
           "sensitive": false,
-          "source_locator": "pdf-page:565;outline:NOTIFY parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotnotif.htm;topic-id:ojs-notify-parameter;heading:NOTIFY parameter",
           "support": "deferred",
           "validation": "name-list"
         },
@@ -3435,7 +3435,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0045",
           "rust_variant": "Offsetxb",
           "sensitive": false,
-          "source_locator": "pdf-page:566;outline:OFFSETXB parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/otofxb.htm;topic-id:statement-offsetxb-parameter;heading:OFFSETXB parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3451,7 +3451,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0046",
           "rust_variant": "Offsetxf",
           "sensitive": false,
-          "source_locator": "pdf-page:566;outline:OFFSETXF parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/otofxf.htm;topic-id:statement-offsetxf-parameter;heading:OFFSETXF parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3467,7 +3467,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0047",
           "rust_variant": "Offsetyb",
           "sensitive": false,
-          "source_locator": "pdf-page:567;outline:OFFSETYB parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/otofyb.htm;topic-id:statement-offsetyb-parameter;heading:OFFSETYB parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3483,7 +3483,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0048",
           "rust_variant": "Offsetyf",
           "sensitive": false,
-          "source_locator": "pdf-page:567;outline:OFFSETYF parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/otofyf.htm;topic-id:statement-offsetyf-parameter;heading:OFFSETYF parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3499,7 +3499,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0049",
           "rust_variant": "Outbin",
           "sensitive": false,
-          "source_locator": "pdf-page:567;outline:OUTBIN parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/otoutb.htm;topic-id:statement-outbin-parameter;heading:OUTBIN parameter",
           "support": "deferred",
           "validation": "integer"
         },
@@ -3521,7 +3521,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0050",
           "rust_variant": "Outdisp",
           "sensitive": false,
-          "source_locator": "pdf-page:568;outline:OUTDISP parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotdisp.htm;topic-id:statement-outdisp-parameter;heading:OUTDISP parameter",
           "support": "available",
           "validation": "enum"
         },
@@ -3537,7 +3537,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0051",
           "rust_variant": "Overlayb",
           "sensitive": false,
-          "source_locator": "pdf-page:570;outline:OVERLAYB parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/otovlb.htm;topic-id:statement-overlayb-parameter;heading:OVERLAYB parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3553,7 +3553,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0052",
           "rust_variant": "Overlayf",
           "sensitive": false,
-          "source_locator": "pdf-page:570;outline:OVERLAYF parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/otovlf.htm;topic-id:statement-overlayf-parameter;heading:OVERLAYF parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3569,7 +3569,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0053",
           "rust_variant": "Ovfl",
           "sensitive": false,
-          "source_locator": "pdf-page:570;outline:OVFL parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xovfl.htm;topic-id:statement-ovfl-parameter;heading:OVFL parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3585,7 +3585,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0054",
           "rust_variant": "Pagedef",
           "sensitive": false,
-          "source_locator": "pdf-page:571;outline:PAGEDEF parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotpaged.htm;topic-id:statement-pagedef-parameter;heading:PAGEDEF parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3601,7 +3601,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0055",
           "rust_variant": "Pimsg",
           "sensitive": false,
-          "source_locator": "pdf-page:572;outline:PIMSG parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotpimsg.htm;topic-id:statement-pimsg-parameter;heading:PIMSG parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3617,7 +3617,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0056",
           "rust_variant": "Portno",
           "sensitive": false,
-          "source_locator": "pdf-page:573;outline:PORTNO parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotport.htm;topic-id:statement-portno-parameter;heading:PORTNO parameter",
           "support": "deferred",
           "validation": "integer"
         },
@@ -3633,7 +3633,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0057",
           "rust_variant": "Prmode",
           "sensitive": false,
-          "source_locator": "pdf-page:574;outline:PRMODE parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotprmod.htm;topic-id:statement-prmode-parameter;heading:PRMODE parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3649,7 +3649,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0058",
           "rust_variant": "Prtattrs",
           "sensitive": false,
-          "source_locator": "pdf-page:575;outline:PRTATTRS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/otprtat.htm;topic-id:statement-prtattrs-parameter;heading:PRTATTRS parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3665,7 +3665,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0059",
           "rust_variant": "Prterror",
           "sensitive": false,
-          "source_locator": "pdf-page:576;outline:PRTERROR parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/otprter.htm;topic-id:statement-prterror-parameter;heading:PRTERROR parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3681,7 +3681,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0060",
           "rust_variant": "Prtoptns",
           "sensitive": false,
-          "source_locator": "pdf-page:577;outline:PRTOPTNS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotoptns.htm;topic-id:statement-prtoptns-parameter;heading:PRTOPTNS parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3697,7 +3697,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0061",
           "rust_variant": "Prtqueue",
           "sensitive": false,
-          "source_locator": "pdf-page:577;outline:PRTQUEUE parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotprtq.htm;topic-id:statement-prtqueue-parameter;heading:PRTQUEUE parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3713,7 +3713,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0062",
           "rust_variant": "Prty",
           "sensitive": false,
-          "source_locator": "pdf-page:578;outline:PRTY parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotprty.htm;topic-id:ojs-prty-parameter;heading:PRTY parameter",
           "support": "available",
           "validation": "integer"
         },
@@ -3729,7 +3729,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0063",
           "rust_variant": "Replyto",
           "sensitive": false,
-          "source_locator": "pdf-page:579;outline:REPLYTO parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/replyto.htm;topic-id:statement-replyto-parameter;heading:REPLYTO parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3745,7 +3745,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0064",
           "rust_variant": "Resfmt",
           "sensitive": false,
-          "source_locator": "pdf-page:579;outline:RESFMT parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotrfmt2.htm;topic-id:statement-resfmt-parameter;heading:RESFMT parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3763,7 +3763,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0065",
           "rust_variant": "RetainsAndRetainf",
           "sensitive": false,
-          "source_locator": "pdf-page:580;outline:RETAINS and RETAINF parameters",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotret.htm;topic-id:statement-retains-retainf-parameters;heading:RETAINS and RETAINF parameters",
           "support": "deferred",
           "validation": "integer"
         },
@@ -3781,7 +3781,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0066",
           "rust_variant": "RetrylAndRetryt",
           "sensitive": false,
-          "source_locator": "pdf-page:581;outline:RETRYL and RETRYT parameters",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xottry.htm;topic-id:statement-retryl-retryt-parameters;heading:RETRYL and RETRYT parameters",
           "support": "deferred",
           "validation": "integer"
         },
@@ -3797,7 +3797,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0067",
           "rust_variant": "Room",
           "sensitive": false,
-          "source_locator": "pdf-page:582;outline:ROOM parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotroom.htm;topic-id:statement-room-parameter;heading:ROOM parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3813,7 +3813,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0068",
           "rust_variant": "Sysarea",
           "sensitive": false,
-          "source_locator": "pdf-page:583;outline:SYSAREA parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotsysr.htm;topic-id:statement-sysarea-parameter;heading:SYSAREA parameter",
           "support": "deferred",
           "validation": "boolean"
         },
@@ -3829,7 +3829,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0069",
           "rust_variant": "Threshld",
           "sensitive": false,
-          "source_locator": "pdf-page:584;outline:THRESHLD parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotthres.htm;topic-id:statement-threshld-parameter;heading:THRESHLD parameter",
           "support": "deferred",
           "validation": "integer"
         },
@@ -3845,7 +3845,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0070",
           "rust_variant": "Title",
           "sensitive": false,
-          "source_locator": "pdf-page:585;outline:TITLE parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xottitle.htm;topic-id:statement-title-parameter;heading:TITLE parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3861,7 +3861,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0071",
           "rust_variant": "Trc",
           "sensitive": false,
-          "source_locator": "pdf-page:585;outline:TRC parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xottrc.htm;topic-id:statement-trc-parameter;heading:TRC parameter",
           "support": "deferred",
           "validation": "boolean"
         },
@@ -3877,7 +3877,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0072",
           "rust_variant": "Ucs",
           "sensitive": false,
-          "source_locator": "pdf-page:586;outline:UCS parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotucs.htm;topic-id:ojs-ucs-parameter;heading:UCS parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3893,7 +3893,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0073",
           "rust_variant": "Userdata",
           "sensitive": false,
-          "source_locator": "pdf-page:588;outline:USERDATA parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/udata.htm;topic-id:statement-userdata-parameter;heading:USERDATA parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3909,7 +3909,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0074",
           "rust_variant": "Userlib",
           "sensitive": false,
-          "source_locator": "pdf-page:591;outline:USERLIB parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/otuslib.htm;topic-id:statement-userlib-parameter;heading:USERLIB parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3925,7 +3925,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0075",
           "rust_variant": "Userpath",
           "sensitive": false,
-          "source_locator": "pdf-page:592;outline:USERPATH parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/ousepth.htm;topic-id:statement-userpath-parameter;heading:USERPATH parameter",
           "support": "deferred",
           "validation": "jcl-value"
         },
@@ -3941,7 +3941,7 @@
           "row_id": "ibm-zos-3.2-jcl-jes2-2026-06:output-parameters:0076",
           "rust_variant": "Writer",
           "sensitive": false,
-          "source_locator": "pdf-page:593;outline:WRITER parameter",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.ieab600/xotwrite.htm;topic-id:statement-writer-parameter;heading:WRITER parameter",
           "support": "deferred",
           "validation": "jcl-value"
         }
@@ -3955,6 +3955,6 @@
   "planner_semantics_sha256": "sha256:d26274c9d06a778228420fef38254da3b6090fa9b516cb35846d614ad2b4ece6",
   "schema_version": "mainframe-env.jcl-generated-catalog@1",
   "source_catalog": "conformance/0.2/catalogs/jcl-jes2.json",
-  "source_catalog_sha256": "sha256:640b6bf949b6feefa6ba2d762286500798d3157794c728c360f4a46fc260fba4",
+  "source_catalog_sha256": "sha256:73bca6535e497397595d09d3bdb4342ae076bf79d63603e17b4cd09e8f36f519",
   "target_version": "0.7.0"
 }

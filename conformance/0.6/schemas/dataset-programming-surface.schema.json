@@ -20,13 +20,13 @@
     "source": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["publication", "url", "sha256", "bytes", "pages", "snapshot_date"],
+      "required": ["publication", "url", "manifest", "sha256", "bytes", "snapshot_date"],
       "properties": {
         "publication": { "const": "SC23-6846-70" },
         "url": { "type": "string", "format": "uri" },
+        "manifest": { "const": "conformance/0.2/manifests/dataset-vsam-ams-topics.json" },
         "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-        "bytes": { "const": 2857720 },
-        "pages": { "const": 610 },
+        "bytes": { "const": 3448164 },
         "snapshot_date": { "const": "2026-06-22" }
       }
     },

@@ -4,10 +4,10 @@
   "baseline_id": "ibm-zos-3.2-dfsms-ams-2026-06",
   "source": {
     "publication": "SC23-6846-70",
-    "url": "https://www.ibm.com/docs/en/SSLTBW_3.2.0/pdf/idai200_v3r2.pdf",
-    "sha256": "sha256:2d0c6bb05bc9ead70575a41bdd786f1ea7ad3f0ed1855ba9a2ec041eaec83c67",
-    "bytes": 2857720,
-    "pages": 610,
+    "url": "https://www.ibm.com/docs/api/v1/toc/SSLTBW_3.2.0?lang=en",
+    "manifest": "conformance/0.2/manifests/dataset-vsam-ams-topics.json",
+    "sha256": "sha256:a1798761a230fbcdf0c772900c28f3656bb04b6a9210bc4b782c2aeeffafbdc1",
+    "bytes": 3448164,
     "snapshot_date": "2026-06-22"
   },
   "state_schema_version": 6,

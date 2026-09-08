@@ -185,10 +185,46 @@ mutation until atomic dependent cleanup is available.
 `conformance/0.6/ams/grammar.json` is the 31-command modal grammar inventory.
 `cargo xtask dataset-contract` validates it against the frozen AMS command order
 and the detailed programming surface, then generates the batch grammar table.
+Its `keywords` are the command name words and nothing more: the file is a
+recognition inventory by design, and parameter fidelity is deliberately not part
+of it. The empty parameter inventory is a boundary, not an oversight.
 The parser owns bounded continuation, parenthesis, command/subcommand, `IF
 MAXCC|LASTCC ... THEN`, and `SET MAXCC|LASTCC` forms. It parses and validates the
 entire control stream before the first effect, so an unknown later statement
 cannot leave earlier catalog mutations behind.
+
+The operand contract lives in two other places, and reading `grammar.json`
+alone would leave a reader believing there is none.
+`conformance/0.6/inventory/dataset-programming-surface.json` is the typed-effect
+inventory: 131 descriptors in ten families carrying 161 operand spellings, each
+bound to an organization, access-mode, DCB, allocation, SMS, volume, catalog,
+lifecycle or provider-capability effect this emulator performs. `ams_operand_allowed`
+in `crates/apps/mainframe-env-batch/src/service.rs` is the per-command IDCAMS
+spelling allowlist — 126 distinct names, 84 of them in the base set shared by
+`ALLOCATE`, `DEFINE CLUSTER`, `DEFINE NONVSAM`, `DEFINE ALTERNATEINDEX` and
+`ALTER`, the rest declared per command — and `unimplemented_ams_operand` rejects
+every top-level term outside it with `UnsupportedCapability` on capability
+`ams-operand`, before any effect runs.
+
+That accepted set is deliberately far narrower than the publication's, and the
+narrowness is the point. `conformance/0.6/generated/ams-html-parameter-projection.json`
+reads 688 parameters and 193 values over the same 31 commands from 89
+documentation topics, 392 of the parameters distinct by spelling, and it carries
+zero coverage credit. An operand is admitted here when it can be carried to a
+typed effect, not when the book names it, because the alternative to an explicit
+rejection is a name quietly accepted and ignored — which for AMS means a caller
+believing an attribute reached a catalog entry that does not have it. The two
+sets are not nested in either direction: the publication introduces some short
+spellings only in description prose rather than as definition-list terms, so
+`CISZ`, `OFILE` and `RLSE` are accepted here while absent from the projection's
+688, and `RECSZ` and `SHR` appear in the topics the same way and are accepted by
+neither.
+
+Growing `grammar.json` to carry the projected parameters was considered and
+rejected. The only consumer available for the field is `ams_operand_allowed`,
+and widening it from the projection would turn a loud `UnsupportedCapability`
+into a silently accepted operand for every name the emulator has no effect for,
+which is worse behaviour than the gap it would close.
 
 Every generated command ID has a dispatch path. Required commands invoke typed
 dataset, catalog, AIX, lifecycle, or bounded snapshot operations; tape library,

@@ -1,0 +1,183 @@
+{
+  "baseline_id": "ibm-mq-9.4-mqi-2026-08-31",
+  "book_href": "SSFKSJ_9.4.0/refdev/q101650_.html",
+  "book_label": "MQI call descriptions",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "coverage_credit": 0,
+  "product": "SSFKSJ_9.4.0",
+  "retained_in_repository": false,
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "snapshot_date": "2026-08-31",
+  "subsystem": "mq",
+  "target_version": "0.2.0",
+  "toc_sha256": "5b23147424db490f5292bd56afe1a0dd2a6ccdde3a08388a79d599998e002bd4",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/SSFKSJ_9.4.0?lang=en",
+  "topic_count": 27,
+  "topic_manifest_digest": "c26cd43339ee07dea20b4efd8d2acc84f0762e44ed1e62afef524b99f5dacae3",
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topics": [
+    {
+      "bytes": 10245,
+      "last_modified": "2026-05-18",
+      "sha256": "24025a9f40dfc613b8243fef16f902a94794a9fbe517730ae1b6c489a338009f",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101650_.html"
+    },
+    {
+      "bytes": 19646,
+      "last_modified": "2026-05-18",
+      "sha256": "9550bf98c66f47f1d61943e0dbb7ab89043d0db1a3918ea3a4314dccf7182c86",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101690_.html"
+    },
+    {
+      "bytes": 16433,
+      "last_modified": "2026-05-18",
+      "sha256": "142301ff6012e8ca253539cba7d2c7fcc0d60801b24caff5a56954c5d47a03d8",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101700_.html"
+    },
+    {
+      "bytes": 15931,
+      "last_modified": "2026-05-18",
+      "sha256": "8a94879a9c9f2e18ddb2171b0dd5ea477ebaf26684a760c9e1e31931f2084156",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101710_.html"
+    },
+    {
+      "bytes": 39286,
+      "last_modified": "2026-05-18",
+      "sha256": "a6ca56ecd421cf8997e66853902cae59812c810d9ce6de5abd2f99a326498b8a",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101720_.html"
+    },
+    {
+      "bytes": 7976,
+      "last_modified": "2026-05-18",
+      "sha256": "eed84527314f1fb8006b1f9ca3ea80fccdba536739fe40a6944a3ced4657c371",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101730_.html"
+    },
+    {
+      "bytes": 37590,
+      "last_modified": "2026-05-18",
+      "sha256": "28003da6981b7913cb0d88f8b250d3debc14682bac929a895e7e1be765853b7b",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101740_.html"
+    },
+    {
+      "bytes": 20389,
+      "last_modified": "2026-05-18",
+      "sha256": "590f32c213d129d6937c253f048ccdb9c5cbd963ca2d3310cf5672dcf68c42f4",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101750_.html"
+    },
+    {
+      "bytes": 36576,
+      "last_modified": "2026-05-18",
+      "sha256": "fa0cdd2c5e19326dfb91e5ad0b921fd47a1a3a918682e13c4ff5e36c2ba40347",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101760_.html"
+    },
+    {
+      "bytes": 25675,
+      "last_modified": "2026-05-18",
+      "sha256": "41e9da41eb766141814ba1b2c3dc9c649450d1ab6cc64d574165f239ea8ed633",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101770_.html"
+    },
+    {
+      "bytes": 15437,
+      "last_modified": "2026-05-18",
+      "sha256": "66cf482573408e227aec23ec2219cd52bf7bf879591f33acb04dc3f33fb386db",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101780_.html"
+    },
+    {
+      "bytes": 26114,
+      "last_modified": "2026-05-18",
+      "sha256": "777347fd5adbf8febb091c0097f941645a889ec2dc3a21c585edbbd5f965d9d3",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101790_.html"
+    },
+    {
+      "bytes": 18660,
+      "last_modified": "2026-05-18",
+      "sha256": "8e33bfec37f7fb467b9f206e8d2f03dc84a18bebf230068582dd84b7d4375e36",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101800_.html"
+    },
+    {
+      "bytes": 10527,
+      "last_modified": "2026-05-18",
+      "sha256": "dc85a4c2b9e2e552615a5e539e3d3066682170f812f2e5f25d8f2346d9f8254e",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101810_.html"
+    },
+    {
+      "bytes": 11499,
+      "last_modified": "2026-05-18",
+      "sha256": "84dee0f8d9659e978f8cadcaaac57dfb7b3697d2b7be949121fb085d9240894d",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101820_.html"
+    },
+    {
+      "bytes": 61579,
+      "last_modified": "2026-05-18",
+      "sha256": "290b8af3acbe4a87f007ab9e3b67d0a797f835066118c9c6150ff0570e430b62",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101830_.html"
+    },
+    {
+      "bytes": 112179,
+      "last_modified": "2026-05-18",
+      "sha256": "60696d9bd5eac33c80fde18d6b0a1bb0849ebc8897c12a490ba7138763393ef9",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101840_.html"
+    },
+    {
+      "bytes": 24037,
+      "last_modified": "2026-05-18",
+      "sha256": "46d73ea328544e00e2f84d07de4e9243c691609f76e2f54c5f6cb6377197be2b",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101850_.html"
+    },
+    {
+      "bytes": 17422,
+      "last_modified": "2026-05-18",
+      "sha256": "79cca3ee757d01445b79275216431b6146bfdd7aa9f9e2a24b9532ed13ba6b30",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101860_.html"
+    },
+    {
+      "bytes": 91834,
+      "last_modified": "2026-05-18",
+      "sha256": "b6f2f3659ca1e91fff52918d17a607bab29ef45cbd473b4a89c1d1c1c2ff8347",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101870_.html"
+    },
+    {
+      "bytes": 59927,
+      "last_modified": "2026-05-18",
+      "sha256": "47f73a96d6926573dd0a09a33a2e48d8389aedef7a2ded58d5d3e7562f393aab",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101880_.html"
+    },
+    {
+      "bytes": 41804,
+      "last_modified": "2026-05-18",
+      "sha256": "6b51813a2e99c74f04c22c599d4ad82d0b0eec31924abb6dc8e03e1ed7438dcb",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101890_.html"
+    },
+    {
+      "bytes": 33020,
+      "last_modified": "2026-05-18",
+      "sha256": "f3d9ef2ad2cc795d374167c6356651d6747c939d2044b316e1d8cc3e06acf54e",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101900_.html"
+    },
+    {
+      "bytes": 17984,
+      "last_modified": "2026-05-18",
+      "sha256": "5c1eddf9f87db568f941fcb283eb1e64c724eae5e64cb56a20f134a481a27a30",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101910_.html"
+    },
+    {
+      "bytes": 19897,
+      "last_modified": "2026-05-18",
+      "sha256": "4f19dab47ed3e325ec894cc74a8d88db265a7c27f8ff2a7c507f94cf4bedd1d9",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101920_.html"
+    },
+    {
+      "bytes": 32085,
+      "last_modified": "2026-05-18",
+      "sha256": "f0cf8e95518f8873b5c8b714323cc22e80fea604cd5987a42ea55c2d93d52314",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101930_.html"
+    },
+    {
+      "bytes": 14076,
+      "last_modified": "2026-05-18",
+      "sha256": "a603f61abc6bdd4ca8f5b76bef36470edc6475363dd2bda640780b46e4565160",
+      "topic_path": "SSFKSJ_9.4.0/refdev/q101940_.html"
+    }
+  ],
+  "total_bytes": 837828
+}

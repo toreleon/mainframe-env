@@ -1,7 +1,7 @@
 {
   "schema_version": "mainframe-env.dataset-surface-audit@1",
   "target_version": "0.6.0",
-  "inventory_sha256": "sha256:87dd08f0848db3db4d496ccdffd03a05581264b08300db77c6abc6a2d11d282c",
+  "inventory_sha256": "sha256:d07f78e956b579efebc7482960c9491c23cc503d50115ad4461789099f1da291",
   "summary": {
     "descriptors": 131,
     "required_pass": 97,

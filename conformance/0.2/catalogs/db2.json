@@ -12,949 +12,949 @@
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0001",
           "label": "ALLOCATE CURSOR",
-          "source_locator": "pdf-page:1169;outline:ALLOCATE CURSOR",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_allocatecursor.html;topic-id:statements-allocate-cursor;heading:ALLOCATE CURSOR",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0002",
           "label": "ALTER DATABASE",
-          "source_locator": "pdf-page:1170;outline:ALTER DATABASE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_alterdatabase.html;topic-id:statements-alter-database;heading:ALTER DATABASE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0003",
           "label": "ALTER FUNCTION (external)",
-          "source_locator": "pdf-page:1172;outline:ALTER FUNCTION (external)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_alterfunctionexternal.html;topic-id:statements-alter-function-external;heading:ALTER FUNCTION (external)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0004",
           "label": "ALTER FUNCTION (compiled SQL scalar)",
-          "source_locator": "pdf-page:1186;outline:ALTER FUNCTION (compiled SQL scalar)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_alterfunctionsqlscalar.html;topic-id:statements-alter-function-compiled-sql-scalar;heading:ALTER FUNCTION (compiled SQL scalar)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0005",
           "label": "ALTER FUNCTION (inlined SQL scalar)",
-          "source_locator": "pdf-page:1214;outline:ALTER FUNCTION (inlined SQL scalar)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_alterfuncinlinesqlscalar.html;topic-id:statements-alter-function-inlined-sql-scalar;heading:ALTER FUNCTION (inlined SQL scalar)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0006",
           "label": "ALTER FUNCTION (SQL table)",
-          "source_locator": "pdf-page:1219;outline:ALTER FUNCTION (SQL table)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_alterfunctionsqltable.html;topic-id:statements-alter-function-sql-table;heading:ALTER FUNCTION (SQL table)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0007",
           "label": "ALTER INDEX",
-          "source_locator": "pdf-page:1224;outline:ALTER INDEX",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_alterindex.html;topic-id:statements-alter-index;heading:ALTER INDEX",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0008",
           "label": "ALTER MASK",
-          "source_locator": "pdf-page:1242;outline:ALTER MASK",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_altermask.html;topic-id:statements-alter-mask;heading:ALTER MASK",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0009",
           "label": "ALTER PERMISSION",
-          "source_locator": "pdf-page:1244;outline:ALTER PERMISSION",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_alterpermission.html;topic-id:statements-alter-permission;heading:ALTER PERMISSION",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0010",
           "label": "ALTER PROCEDURE (external)",
-          "source_locator": "pdf-page:1247;outline:ALTER PROCEDURE (external)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_alterprocedureexternal.html;topic-id:statements-alter-procedure-external;heading:ALTER PROCEDURE (external)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0011",
           "label": "ALTER PROCEDURE (SQL - external) (deprecated)",
-          "source_locator": "pdf-page:1256;outline:ALTER PROCEDURE (SQL - external) (deprecated)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_alterproceduresqlexternal.html;topic-id:statements-alter-procedure-sql-external-deprecated;heading:ALTER PROCEDURE (SQL - external) (deprecated)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0012",
           "label": "ALTER PROCEDURE statement (SQL - native)",
-          "source_locator": "pdf-page:1262;outline:ALTER PROCEDURE statement (SQL - native)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_alterproceduresqlnative.html;topic-id:statements-alter-procedure-statement-sql-native;heading:ALTER PROCEDURE statement (SQL - native)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0013",
           "label": "ALTER SEQUENCE",
-          "source_locator": "pdf-page:1292;outline:ALTER SEQUENCE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_altersequence.html;topic-id:statements-alter-sequence;heading:ALTER SEQUENCE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0014",
           "label": "ALTER STOGROUP",
-          "source_locator": "pdf-page:1297;outline:ALTER STOGROUP",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_alterstogroup.html;topic-id:statements-alter-stogroup;heading:ALTER STOGROUP",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0015",
           "label": "ALTER TABLE",
-          "source_locator": "pdf-page:1300;outline:ALTER TABLE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_altertable.html;topic-id:statements-alter-table;heading:ALTER TABLE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0016",
           "label": "ALTER TABLESPACE",
-          "source_locator": "pdf-page:1392;outline:ALTER TABLESPACE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_altertablespace.html;topic-id:statements-alter-tablespace;heading:ALTER TABLESPACE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0017",
           "label": "ALTER TRIGGER (advanced)",
-          "source_locator": "pdf-page:1414;outline:ALTER TRIGGER (advanced)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_altertriggeradvanced.html;topic-id:statements-alter-trigger-advanced;heading:ALTER TRIGGER (advanced)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0018",
           "label": "ALTER TRIGGER (basic)",
-          "source_locator": "pdf-page:1436;outline:ALTER TRIGGER (basic)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_altertrigger.html;topic-id:statements-alter-trigger-basic;heading:ALTER TRIGGER (basic)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0019",
           "label": "ALTER TRUSTED CONTEXT",
-          "source_locator": "pdf-page:1439;outline:ALTER TRUSTED CONTEXT",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_altertrustedcontext.html;topic-id:statements-alter-trusted-context;heading:ALTER TRUSTED CONTEXT",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0020",
           "label": "ALTER VIEW",
-          "source_locator": "pdf-page:1449;outline:ALTER VIEW",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_alterview.html;topic-id:statements-alter-view;heading:ALTER VIEW",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0021",
           "label": "ASSOCIATE LOCATORS",
-          "source_locator": "pdf-page:1451;outline:ASSOCIATE LOCATORS",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_associatelocators.html;topic-id:statements-associate-locators;heading:ASSOCIATE LOCATORS",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0022",
           "label": "BEGIN DECLARE SECTION",
-          "source_locator": "pdf-page:1454;outline:BEGIN DECLARE SECTION",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_begindeclaresection.html;topic-id:statements-begin-declare-section;heading:BEGIN DECLARE SECTION",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0023",
           "label": "CALL",
-          "source_locator": "pdf-page:1455;outline:CALL",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_call.html;topic-id:statements-call;heading:CALL",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0024",
           "label": "CLOSE",
-          "source_locator": "pdf-page:1467;outline:CLOSE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_close.html;topic-id:statements-close;heading:CLOSE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0025",
           "label": "COMMENT",
-          "source_locator": "pdf-page:1468;outline:COMMENT",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_comment.html;topic-id:statements-comment;heading:COMMENT",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0026",
           "label": "COMMIT",
-          "source_locator": "pdf-page:1478;outline:COMMIT",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_commit.html;topic-id:statements-commit;heading:COMMIT",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0027",
           "label": "CONNECT",
-          "source_locator": "pdf-page:1481;outline:CONNECT",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_connect.html;topic-id:statements-connect;heading:CONNECT",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0028",
           "label": "CREATE ALIAS",
-          "source_locator": "pdf-page:1487;outline:CREATE ALIAS",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createalias.html;topic-id:statements-create-alias;heading:CREATE ALIAS",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0029",
           "label": "CREATE AUXILIARY TABLE",
-          "source_locator": "pdf-page:1490;outline:CREATE AUXILIARY TABLE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createauxiliarytable.html;topic-id:statements-create-auxiliary-table;heading:CREATE AUXILIARY TABLE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0030",
           "label": "CREATE DATABASE",
-          "source_locator": "pdf-page:1493;outline:CREATE DATABASE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createdatabase.html;topic-id:statements-create-database;heading:CREATE DATABASE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0031",
           "label": "CREATE FUNCTION (overview)",
-          "source_locator": "pdf-page:1496;outline:CREATE FUNCTION (overview)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createfunction.html;topic-id:statements-create-function-overview;heading:CREATE FUNCTION (overview)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0032",
           "label": "CREATE FUNCTION (compiled SQL scalar)",
-          "source_locator": "pdf-page:1501;outline:CREATE FUNCTION (compiled SQL scalar)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createfunctionsqlscalar.html;topic-id:statements-create-function-compiled-sql-scalar;heading:CREATE FUNCTION (compiled SQL scalar)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0033",
           "label": "CREATE FUNCTION (external scalar)",
-          "source_locator": "pdf-page:1526;outline:CREATE FUNCTION (external scalar)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createfunctionexternalscalar.html;topic-id:statements-create-function-external-scalar;heading:CREATE FUNCTION (external scalar)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0034",
           "label": "CREATE FUNCTION (external table)",
-          "source_locator": "pdf-page:1546;outline:CREATE FUNCTION (external table)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createfunctionexternaltable.html;topic-id:statements-create-function-external-table;heading:CREATE FUNCTION (external table)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0035",
           "label": "CREATE FUNCTION (inlined SQL scalar)",
-          "source_locator": "pdf-page:1564;outline:CREATE FUNCTION (inlined SQL scalar)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createfuncinlinesqlscalar.html;topic-id:statements-create-function-inlined-sql-scalar;heading:CREATE FUNCTION (inlined SQL scalar)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0036",
           "label": "CREATE FUNCTION (sourced)",
-          "source_locator": "pdf-page:1572;outline:CREATE FUNCTION (sourced)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createfunctionsourced.html;topic-id:statements-create-function-sourced;heading:CREATE FUNCTION (sourced)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0037",
           "label": "CREATE FUNCTION (SQL table)",
-          "source_locator": "pdf-page:1584;outline:CREATE FUNCTION (SQL table)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createfunctionsqltable.html;topic-id:statements-create-function-sql-table;heading:CREATE FUNCTION (SQL table)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0038",
           "label": "CREATE GLOBAL TEMPORARY TABLE",
-          "source_locator": "pdf-page:1592;outline:CREATE GLOBAL TEMPORARY TABLE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createglobaltemptable.html;topic-id:statements-create-global-temporary-table;heading:CREATE GLOBAL TEMPORARY TABLE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0039",
           "label": "CREATE INDEX",
-          "source_locator": "pdf-page:1598;outline:CREATE INDEX",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createindex.html;topic-id:statements-create-index;heading:CREATE INDEX",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0040",
           "label": "CREATE LOB TABLESPACE",
-          "source_locator": "pdf-page:1629;outline:CREATE LOB TABLESPACE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createlobtablespace.html;topic-id:statements-create-lob-tablespace;heading:CREATE LOB TABLESPACE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0041",
           "label": "CREATE MASK",
-          "source_locator": "pdf-page:1639;outline:CREATE MASK",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createmask.html;topic-id:statements-create-mask;heading:CREATE MASK",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0042",
           "label": "CREATE PERMISSION",
-          "source_locator": "pdf-page:1648;outline:CREATE PERMISSION",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createpermission.html;topic-id:statements-create-permission;heading:CREATE PERMISSION",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0043",
           "label": "CREATE PROCEDURE (overview)",
-          "source_locator": "pdf-page:1655;outline:CREATE PROCEDURE (overview)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createprocedure.html;topic-id:statements-create-procedure-overview;heading:CREATE PROCEDURE (overview)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0044",
           "label": "CREATE PROCEDURE (external)",
-          "source_locator": "pdf-page:1657;outline:CREATE PROCEDURE (external)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createprocedureexternal.html;topic-id:statements-create-procedure-external;heading:CREATE PROCEDURE (external)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0045",
           "label": "CREATE PROCEDURE (SQL - external) (deprecated)",
-          "source_locator": "pdf-page:1674;outline:CREATE PROCEDURE (SQL - external) (deprecated)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createproceduresqlexternal.html;topic-id:statements-create-procedure-sql-external-deprecated;heading:CREATE PROCEDURE (SQL - external) (deprecated)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0046",
           "label": "CREATE PROCEDURE (SQL - native)",
-          "source_locator": "pdf-page:1684;outline:CREATE PROCEDURE (SQL - native)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createproceduresqlnative.html;topic-id:statements-create-procedure-sql-native;heading:CREATE PROCEDURE (SQL - native)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0047",
           "label": "CREATE ROLE",
-          "source_locator": "pdf-page:1715;outline:CREATE ROLE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createrole.html;topic-id:statements-create-role;heading:CREATE ROLE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0048",
           "label": "CREATE SEQUENCE",
-          "source_locator": "pdf-page:1716;outline:CREATE SEQUENCE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createsequence.html;topic-id:statements-create-sequence;heading:CREATE SEQUENCE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0049",
           "label": "CREATE STOGROUP",
-          "source_locator": "pdf-page:1723;outline:CREATE STOGROUP",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createstogroup.html;topic-id:statements-create-stogroup;heading:CREATE STOGROUP",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0050",
           "label": "CREATE TABLE",
-          "source_locator": "pdf-page:1727;outline:CREATE TABLE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createtable.html;topic-id:statements-create-table;heading:CREATE TABLE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0051",
           "label": "CREATE TABLESPACE",
-          "source_locator": "pdf-page:1796;outline:CREATE TABLESPACE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createtablespace.html;topic-id:statements-create-tablespace;heading:CREATE TABLESPACE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0052",
           "label": "CREATE TRIGGER (advanced)",
-          "source_locator": "pdf-page:1818;outline:CREATE TRIGGER (advanced)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createtriggeradvanced.html;topic-id:statements-create-trigger-advanced;heading:CREATE TRIGGER (advanced)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0053",
           "label": "CREATE TRIGGER (basic)",
-          "source_locator": "pdf-page:1847;outline:CREATE TRIGGER (basic)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createtrigger.html;topic-id:statements-create-trigger-basic;heading:CREATE TRIGGER (basic)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0054",
           "label": "CREATE TRUSTED CONTEXT",
-          "source_locator": "pdf-page:1865;outline:CREATE TRUSTED CONTEXT",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createtrustedcontext.html;topic-id:statements-create-trusted-context;heading:CREATE TRUSTED CONTEXT",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0055",
           "label": "CREATE TYPE",
-          "source_locator": "pdf-page:1873;outline:CREATE TYPE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createtype.html;topic-id:statements-create-type;heading:CREATE TYPE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0056",
           "label": "CREATE TYPE (array)",
-          "source_locator": "pdf-page:1874;outline:CREATE TYPE (array)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createtypearray.html;topic-id:statements-create-type-array;heading:CREATE TYPE (array)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0057",
           "label": "CREATE TYPE (distinct)",
-          "source_locator": "pdf-page:1879;outline:CREATE TYPE (distinct)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createtypedistinct.html;topic-id:statements-create-type-distinct;heading:CREATE TYPE (distinct)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0058",
           "label": "CREATE VARIABLE",
-          "source_locator": "pdf-page:1886;outline:CREATE VARIABLE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createvariable.html;topic-id:statements-create-variable;heading:CREATE VARIABLE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0059",
           "label": "CREATE VIEW",
-          "source_locator": "pdf-page:1890;outline:CREATE VIEW",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_createview.html;topic-id:statements-create-view;heading:CREATE VIEW",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0060",
           "label": "DECLARE CURSOR",
-          "source_locator": "pdf-page:1897;outline:DECLARE CURSOR",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_declarecursor.html;topic-id:statements-declare-cursor;heading:DECLARE CURSOR",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0061",
           "label": "DECLARE GLOBAL TEMPORARY TABLE",
-          "source_locator": "pdf-page:1908;outline:DECLARE GLOBAL TEMPORARY TABLE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_declareglobaltemptable.html;topic-id:statements-declare-global-temporary-table;heading:DECLARE GLOBAL TEMPORARY TABLE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0062",
           "label": "DECLARE STATEMENT",
-          "source_locator": "pdf-page:1922;outline:DECLARE STATEMENT",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_declarestatement.html;topic-id:statements-declare-statement;heading:DECLARE STATEMENT",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0063",
           "label": "DECLARE TABLE",
-          "source_locator": "pdf-page:1923;outline:DECLARE TABLE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_declaretable.html;topic-id:statements-declare-table;heading:DECLARE TABLE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0064",
           "label": "DECLARE VARIABLE",
-          "source_locator": "pdf-page:1928;outline:DECLARE VARIABLE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_declarevariable.html;topic-id:statements-declare-variable;heading:DECLARE VARIABLE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0065",
           "label": "DELETE",
-          "source_locator": "pdf-page:1931;outline:DELETE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_delete.html;topic-id:statements-delete;heading:DELETE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0066",
           "label": "DESCRIBE",
-          "source_locator": "pdf-page:1947;outline:DESCRIBE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_describe.html;topic-id:statements-describe;heading:DESCRIBE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0067",
           "label": "DESCRIBE CURSOR",
-          "source_locator": "pdf-page:1947;outline:DESCRIBE CURSOR",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_describecursor.html;topic-id:statements-describe-cursor;heading:DESCRIBE CURSOR",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0068",
           "label": "DESCRIBE INPUT",
-          "source_locator": "pdf-page:1949;outline:DESCRIBE INPUT",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_describeinput.html;topic-id:statements-describe-input;heading:DESCRIBE INPUT",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0069",
           "label": "DESCRIBE OUTPUT",
-          "source_locator": "pdf-page:1951;outline:DESCRIBE OUTPUT",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_describeoutput.html;topic-id:statements-describe-output;heading:DESCRIBE OUTPUT",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0070",
           "label": "DESCRIBE PROCEDURE",
-          "source_locator": "pdf-page:1957;outline:DESCRIBE PROCEDURE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_describeprocedure.html;topic-id:statements-describe-procedure;heading:DESCRIBE PROCEDURE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0071",
           "label": "DESCRIBE TABLE",
-          "source_locator": "pdf-page:1960;outline:DESCRIBE TABLE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_describetable.html;topic-id:statements-describe-table;heading:DESCRIBE TABLE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0072",
           "label": "DROP",
-          "source_locator": "pdf-page:1965;outline:DROP",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_drop.html;topic-id:statements-drop;heading:DROP",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0073",
           "label": "END DECLARE SECTION",
-          "source_locator": "pdf-page:1986;outline:END DECLARE SECTION",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_enddeclaresection.html;topic-id:statements-end-declare-section;heading:END DECLARE SECTION",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0074",
           "label": "EXCHANGE",
-          "source_locator": "pdf-page:1987;outline:EXCHANGE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_exchange.html;topic-id:statements-exchange;heading:EXCHANGE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0075",
           "label": "EXECUTE",
-          "source_locator": "pdf-page:1988;outline:EXECUTE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_execute.html;topic-id:statements-execute;heading:EXECUTE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0076",
           "label": "EXECUTE IMMEDIATE",
-          "source_locator": "pdf-page:1993;outline:EXECUTE IMMEDIATE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_executeimmediate.html;topic-id:statements-execute-immediate;heading:EXECUTE IMMEDIATE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0077",
           "label": "EXPLAIN",
-          "source_locator": "pdf-page:1996;outline:EXPLAIN",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_explain.html;topic-id:statements-explain;heading:EXPLAIN",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0078",
           "label": "FETCH",
-          "source_locator": "pdf-page:2003;outline:FETCH",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_fetch.html;topic-id:statements-fetch;heading:FETCH",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0079",
           "label": "FREE LOCATOR",
-          "source_locator": "pdf-page:2028;outline:FREE LOCATOR",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_freelocator.html;topic-id:statements-free-locator;heading:FREE LOCATOR",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0080",
           "label": "GET DIAGNOSTICS",
-          "source_locator": "pdf-page:2028;outline:GET DIAGNOSTICS",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_getdiagnostics.html;topic-id:statements-get-diagnostics;heading:GET DIAGNOSTICS",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0081",
           "label": "GRANT",
-          "source_locator": "pdf-page:2044;outline:GRANT",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_grant.html;topic-id:statements-grant;heading:GRANT",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0082",
           "label": "GRANT (collection privileges)",
-          "source_locator": "pdf-page:2047;outline:GRANT (collection privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_grantcollectionprivileges.html;topic-id:statements-grant-collection-privileges;heading:GRANT (collection privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0083",
           "label": "GRANT (database privileges)",
-          "source_locator": "pdf-page:2048;outline:GRANT (database privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_grantdatabaseprivileges.html;topic-id:statements-grant-database-privileges;heading:GRANT (database privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0084",
           "label": "GRANT (function or procedure privileges)",
-          "source_locator": "pdf-page:2050;outline:GRANT (function or procedure privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_grantfunctionorprocedureprivileges.html;topic-id:statements-grant-function-procedure-privileges;heading:GRANT (function or procedure privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0085",
           "label": "GRANT (package privileges)",
-          "source_locator": "pdf-page:2052;outline:GRANT (package privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_grantpackageprivileges.html;topic-id:statements-grant-package-privileges;heading:GRANT (package privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0086",
           "label": "GRANT (plan privileges)",
-          "source_locator": "pdf-page:2054;outline:GRANT (plan privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_grantplanprivileges.html;topic-id:statements-grant-plan-privileges;heading:GRANT (plan privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0087",
           "label": "GRANT (schema privileges)",
-          "source_locator": "pdf-page:2055;outline:GRANT (schema privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_grantschemaprivileges.html;topic-id:statements-grant-schema-privileges;heading:GRANT (schema privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0088",
           "label": "GRANT (sequence privileges)",
-          "source_locator": "pdf-page:2056;outline:GRANT (sequence privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_grantsequenceprivileges.html;topic-id:statements-grant-sequence-privileges;heading:GRANT (sequence privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0089",
           "label": "GRANT (system privileges)",
-          "source_locator": "pdf-page:2058;outline:GRANT (system privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_grantsystemprivileges.html;topic-id:statements-grant-system-privileges;heading:GRANT (system privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0090",
           "label": "GRANT (table or view privileges)",
-          "source_locator": "pdf-page:2065;outline:GRANT (table or view privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_granttableorviewprivileges.html;topic-id:statements-grant-table-view-privileges;heading:GRANT (table or view privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0091",
           "label": "GRANT (type or JAR file privileges)",
-          "source_locator": "pdf-page:2068;outline:GRANT (type or JAR file privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_granttypeorjarprivileges.html;topic-id:statements-grant-type-jar-file-privileges;heading:GRANT (type or JAR file privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0092",
           "label": "GRANT (variable privileges)",
-          "source_locator": "pdf-page:2069;outline:GRANT (variable privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_grantvariableprivileges.html;topic-id:statements-grant-variable-privileges;heading:GRANT (variable privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0093",
           "label": "GRANT (use privileges)",
-          "source_locator": "pdf-page:2070;outline:GRANT (use privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_grantuseprivileges.html;topic-id:statements-grant-use-privileges;heading:GRANT (use privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0094",
           "label": "HOLD LOCATOR",
-          "source_locator": "pdf-page:2071;outline:HOLD LOCATOR",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_holdlocator.html;topic-id:statements-hold-locator;heading:HOLD LOCATOR",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0095",
           "label": "INCLUDE",
-          "source_locator": "pdf-page:2072;outline:INCLUDE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_include.html;topic-id:statements-include;heading:INCLUDE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0096",
           "label": "INSERT",
-          "source_locator": "pdf-page:2073;outline:INSERT",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_insert.html;topic-id:statements-insert;heading:INSERT",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0097",
           "label": "LABEL",
-          "source_locator": "pdf-page:2092;outline:LABEL",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_label.html;topic-id:statements-label;heading:LABEL",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0098",
           "label": "LOCK TABLE",
-          "source_locator": "pdf-page:2094;outline:LOCK TABLE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_locktable.html;topic-id:statements-lock-table;heading:LOCK TABLE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0099",
           "label": "MERGE",
-          "source_locator": "pdf-page:2096;outline:MERGE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_merge.html;topic-id:statements-merge;heading:MERGE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0100",
           "label": "OPEN",
-          "source_locator": "pdf-page:2115;outline:OPEN",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_open.html;topic-id:statements-open;heading:OPEN",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0101",
           "label": "PREPARE",
-          "source_locator": "pdf-page:2120;outline:PREPARE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_prepare.html;topic-id:statements-prepare;heading:PREPARE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0102",
           "label": "REFRESH TABLE",
-          "source_locator": "pdf-page:2141;outline:REFRESH TABLE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_refreshtable.html;topic-id:statements-refresh-table;heading:REFRESH TABLE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0103",
           "label": "RELEASE (connection)",
-          "source_locator": "pdf-page:2142;outline:RELEASE (connection)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_releaseconnection.html;topic-id:statements-release-connection;heading:RELEASE (connection)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0104",
           "label": "RELEASE SAVEPOINT",
-          "source_locator": "pdf-page:2144;outline:RELEASE SAVEPOINT",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_releasesavepoint.html;topic-id:statements-release-savepoint;heading:RELEASE SAVEPOINT",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0105",
           "label": "RENAME",
-          "source_locator": "pdf-page:2145;outline:RENAME",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_rename.html;topic-id:statements-rename;heading:RENAME",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0106",
           "label": "REVOKE",
-          "source_locator": "pdf-page:2149;outline:REVOKE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_revoke.html;topic-id:statements-revoke;heading:REVOKE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0107",
           "label": "REVOKE (collection privileges)",
-          "source_locator": "pdf-page:2155;outline:REVOKE (collection privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_revokecollectionprivileges.html;topic-id:statements-revoke-collection-privileges;heading:REVOKE (collection privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0108",
           "label": "REVOKE (database privileges)",
-          "source_locator": "pdf-page:2157;outline:REVOKE (database privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_revokedatabaseprivileges.html;topic-id:statements-revoke-database-privileges;heading:REVOKE (database privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0109",
           "label": "REVOKE (function or procedure privileges)",
-          "source_locator": "pdf-page:2160;outline:REVOKE (function or procedure privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_revokefunctionorprocedureprivileges.html;topic-id:statements-revoke-function-procedure-privileges;heading:REVOKE (function or procedure privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0110",
           "label": "REVOKE (package privileges)",
-          "source_locator": "pdf-page:2163;outline:REVOKE (package privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_revokepackageprivileges.html;topic-id:statements-revoke-package-privileges;heading:REVOKE (package privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0111",
           "label": "REVOKE (plan privileges)",
-          "source_locator": "pdf-page:2165;outline:REVOKE (plan privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_revokeplanprivileges.html;topic-id:statements-revoke-plan-privileges;heading:REVOKE (plan privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0112",
           "label": "REVOKE (schema privileges)",
-          "source_locator": "pdf-page:2167;outline:REVOKE (schema privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_revokeschemaprivileges.html;topic-id:statements-revoke-schema-privileges;heading:REVOKE (schema privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0113",
           "label": "REVOKE (sequence privileges)",
-          "source_locator": "pdf-page:2169;outline:REVOKE (sequence privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_revokesequenceprivileges.html;topic-id:statements-revoke-sequence-privileges;heading:REVOKE (sequence privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0114",
           "label": "REVOKE (system privileges)",
-          "source_locator": "pdf-page:2172;outline:REVOKE (system privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_revokesystemprivileges.html;topic-id:statements-revoke-system-privileges;heading:REVOKE (system privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0115",
           "label": "REVOKE (table or view privileges)",
-          "source_locator": "pdf-page:2178;outline:REVOKE (table or view privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_revoketableorviewprivileges.html;topic-id:statements-revoke-table-view-privileges;heading:REVOKE (table or view privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0116",
           "label": "REVOKE (type or JAR file privileges)",
-          "source_locator": "pdf-page:2181;outline:REVOKE (type or JAR file privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_revoketypeorjarprivileges.html;topic-id:statements-revoke-type-jar-file-privileges;heading:REVOKE (type or JAR file privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0117",
           "label": "REVOKE (variable privileges)",
-          "source_locator": "pdf-page:2183;outline:REVOKE (variable privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_revokevariableprivileges.html;topic-id:statements-revoke-variable-privileges;heading:REVOKE (variable privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0118",
           "label": "REVOKE (use privileges)",
-          "source_locator": "pdf-page:2185;outline:REVOKE (use privileges)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_revokeuseprivileges.html;topic-id:statements-revoke-use-privileges;heading:REVOKE (use privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0119",
           "label": "ROLLBACK",
-          "source_locator": "pdf-page:2187;outline:ROLLBACK",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_rollback.html;topic-id:statements-rollback;heading:ROLLBACK",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0120",
           "label": "SAVEPOINT",
-          "source_locator": "pdf-page:2190;outline:SAVEPOINT",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_savepoint.html;topic-id:statements-savepoint;heading:SAVEPOINT",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0121",
           "label": "SELECT",
-          "source_locator": "pdf-page:2191;outline:SELECT",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_select.html;topic-id:statements-select;heading:SELECT",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0122",
           "label": "SELECT INTO",
-          "source_locator": "pdf-page:2197;outline:SELECT INTO",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_selectinto.html;topic-id:statements-select-into;heading:SELECT INTO",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0123",
           "label": "SET CONNECTION",
-          "source_locator": "pdf-page:2203;outline:SET CONNECTION",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setconnection.html;topic-id:statements-set-connection;heading:SET CONNECTION",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0124",
           "label": "SET assignment-statement",
-          "source_locator": "pdf-page:2204;outline:SET assignment-statement",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setassignmentstatement.html;topic-id:statements-set-assignment-statement;heading:SET assignment-statement",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0125",
           "label": "SET CURRENT ACCELERATOR",
-          "source_locator": "pdf-page:2210;outline:SET CURRENT ACCELERATOR",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrentaccelerator.html;topic-id:statements-set-current-accelerator;heading:SET CURRENT ACCELERATOR",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0126",
           "label": "SET CURRENT APPLICATION COMPATIBILITY",
-          "source_locator": "pdf-page:2211;outline:SET CURRENT APPLICATION COMPATIBILITY",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrentapplicationcompatibility.html;topic-id:statements-set-current-application-compatibility;heading:SET CURRENT APPLICATION COMPATIBILITY",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0127",
           "label": "SET CURRENT APPLICATION ENCODING SCHEME",
-          "source_locator": "pdf-page:2213;outline:SET CURRENT APPLICATION ENCODING SCHEME",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrentappencodingscheme.html;topic-id:statements-set-current-application-encoding-scheme;heading:SET CURRENT APPLICATION ENCODING SCHEME",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0128",
           "label": "SET CURRENT DEBUG MODE",
-          "source_locator": "pdf-page:2214;outline:SET CURRENT DEBUG MODE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrentdebugmode.html;topic-id:statements-set-current-debug-mode;heading:SET CURRENT DEBUG MODE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0129",
           "label": "SET CURRENT DECFLOAT ROUNDING MODE",
-          "source_locator": "pdf-page:2215;outline:SET CURRENT DECFLOAT ROUNDING MODE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrentdecfloatroundingmode.html;topic-id:statements-set-current-decfloat-rounding-mode;heading:SET CURRENT DECFLOAT ROUNDING MODE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0130",
           "label": "SET CURRENT DEGREE",
-          "source_locator": "pdf-page:2217;outline:SET CURRENT DEGREE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrentdegree.html;topic-id:statements-set-current-degree;heading:SET CURRENT DEGREE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0131",
           "label": "SET CURRENT EXPLAIN MODE",
-          "source_locator": "pdf-page:2218;outline:SET CURRENT EXPLAIN MODE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrentexplainmode.html;topic-id:statements-set-current-explain-mode;heading:SET CURRENT EXPLAIN MODE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0132",
           "label": "SET CURRENT GET_ACCEL_ARCHIVE",
-          "source_locator": "pdf-page:2219;outline:SET CURRENT GET_ACCEL_ARCHIVE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrentgetaccelarchive.html;topic-id:statements-set-current-get-accel-archive;heading:SET CURRENT GET_ACCEL_ARCHIVE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0133",
           "label": "SET CURRENT LOCAL LC_CTYPE",
-          "source_locator": "pdf-page:2220;outline:SET CURRENT LOCAL LC_CTYPE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrentlocalelcctype.html;topic-id:statements-set-current-local-lc-ctype;heading:SET CURRENT LOCAL LC_CTYPE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0134",
           "label": "SET CURRENT LOCK TIMEOUT",
-          "source_locator": "pdf-page:2221;outline:SET CURRENT LOCK TIMEOUT",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrentlocktimeout.html;topic-id:statements-set-current-lock-timeout;heading:SET CURRENT LOCK TIMEOUT",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0135",
           "label": "SET CURRENT MAINTAINED TABLE TYPES FOR OPTIMIZATION",
-          "source_locator": "pdf-page:2224;outline:SET CURRENT MAINTAINED TABLE TYPES FOR OPTIMIZATION",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_sc_maintainedtabletypes.html;topic-id:statements-set-current-maintained-table-types-optimization;heading:SET CURRENT MAINTAINED TABLE TYPES FOR OPTIMIZATION",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0136",
           "label": "SET CURRENT OPTIMIZATION HINT",
-          "source_locator": "pdf-page:2225;outline:SET CURRENT OPTIMIZATION HINT",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrentoptimizationhint.html;topic-id:statements-set-current-optimization-hint;heading:SET CURRENT OPTIMIZATION HINT",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0137",
           "label": "SET CURRENT PACKAGE PATH",
-          "source_locator": "pdf-page:2226;outline:SET CURRENT PACKAGE PATH",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrentpackagepath.html;topic-id:statements-set-current-package-path;heading:SET CURRENT PACKAGE PATH",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0138",
           "label": "SET CURRENT PACKAGESET",
-          "source_locator": "pdf-page:2229;outline:SET CURRENT PACKAGESET",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrentpackageset.html;topic-id:statements-set-current-packageset;heading:SET CURRENT PACKAGESET",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0139",
           "label": "SET CURRENT PRECISION",
-          "source_locator": "pdf-page:2231;outline:SET CURRENT PRECISION",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrentprecision.html;topic-id:statements-set-current-precision;heading:SET CURRENT PRECISION",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0140",
           "label": "SET CURRENT QUERY ACCELERATION",
-          "source_locator": "pdf-page:2231;outline:SET CURRENT QUERY ACCELERATION",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrentqueryacceleration.html;topic-id:statements-set-current-query-acceleration;heading:SET CURRENT QUERY ACCELERATION",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0141",
           "label": "SET CURRENT QUERY ACCELERATION WAITFORDATA",
-          "source_locator": "pdf-page:2233;outline:SET CURRENT QUERY ACCELERATION WAITFORDATA",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrentqueryaccelerationwfd.html;topic-id:statements-set-current-query-acceleration-waitfordata;heading:SET CURRENT QUERY ACCELERATION WAITFORDATA",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0142",
           "label": "SET CURRENT REFRESH AGE",
-          "source_locator": "pdf-page:2236;outline:SET CURRENT REFRESH AGE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrentrefreshage.html;topic-id:statements-set-current-refresh-age;heading:SET CURRENT REFRESH AGE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0143",
           "label": "SET CURRENT ROUTINE VERSION",
-          "source_locator": "pdf-page:2237;outline:SET CURRENT ROUTINE VERSION",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrentroutineversion.html;topic-id:statements-set-current-routine-version;heading:SET CURRENT ROUTINE VERSION",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0144",
           "label": "SET CURRENT RULES",
-          "source_locator": "pdf-page:2239;outline:SET CURRENT RULES",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrentrules.html;topic-id:statements-set-current-rules;heading:SET CURRENT RULES",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0145",
           "label": "SET CURRENT SQLID",
-          "source_locator": "pdf-page:2239;outline:SET CURRENT SQLID",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrentsqlid.html;topic-id:statements-set-current-sqlid;heading:SET CURRENT SQLID",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0146",
           "label": "SET CURRENT TEMPORAL BUSINESS_TIME",
-          "source_locator": "pdf-page:2241;outline:SET CURRENT TEMPORAL BUSINESS_TIME",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrenttemporalbusinesstime.html;topic-id:statements-set-current-temporal-business-time;heading:SET CURRENT TEMPORAL BUSINESS_TIME",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0147",
           "label": "SET CURRENT TEMPORAL SYSTEM_TIME",
-          "source_locator": "pdf-page:2243;outline:SET CURRENT TEMPORAL SYSTEM_TIME",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setcurrenttemporalsystemtime.html;topic-id:statements-set-current-temporal-system-time;heading:SET CURRENT TEMPORAL SYSTEM_TIME",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0148",
           "label": "SET ENCRYPTION PASSWORD",
-          "source_locator": "pdf-page:2244;outline:SET ENCRYPTION PASSWORD",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setencryptionpassword.html;topic-id:statements-set-encryption-password;heading:SET ENCRYPTION PASSWORD",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0149",
           "label": "SET PATH",
-          "source_locator": "pdf-page:2246;outline:SET PATH",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setpath.html;topic-id:statements-set-path;heading:SET PATH",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0150",
           "label": "SET SCHEMA",
-          "source_locator": "pdf-page:2249;outline:SET SCHEMA",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setschema.html;topic-id:statements-set-schema;heading:SET SCHEMA",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0151",
           "label": "SET SESSION TIME ZONE",
-          "source_locator": "pdf-page:2251;outline:SET SESSION TIME ZONE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_setsessiontimezone.html;topic-id:statements-set-session-time-zone;heading:SET SESSION TIME ZONE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0152",
           "label": "SIGNAL",
-          "source_locator": "pdf-page:2252;outline:SIGNAL",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_signal.html;topic-id:statements-signal;heading:SIGNAL",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0153",
           "label": "TRANSFER OWNERSHIP",
-          "source_locator": "pdf-page:2255;outline:TRANSFER OWNERSHIP",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_transferownership.html;topic-id:statements-transfer-ownership;heading:TRANSFER OWNERSHIP",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0154",
           "label": "TRUNCATE",
-          "source_locator": "pdf-page:2260;outline:TRUNCATE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_truncate.html;topic-id:statements-truncate;heading:TRUNCATE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0155",
           "label": "UPDATE",
-          "source_locator": "pdf-page:2263;outline:UPDATE",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_update.html;topic-id:statements-update;heading:UPDATE",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0156",
           "label": "VALUES",
-          "source_locator": "pdf-page:2284;outline:VALUES",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_values.html;topic-id:statements-values;heading:VALUES",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0157",
           "label": "VALUES INTO",
-          "source_locator": "pdf-page:2285;outline:VALUES INTO",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_valuesinto.html;topic-id:statements-values-into;heading:VALUES INTO",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-statements:0158",
           "label": "WHENEVER",
-          "source_locator": "pdf-page:2289;outline:WHENEVER",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_sql_whenever.html;topic-id:statements-whenever;heading:WHENEVER",
           "mandatory": true
         }
       ]
@@ -967,97 +967,97 @@
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0001",
           "label": "assignment-statement",
-          "source_locator": "pdf-page:2302;outline:assignment-statement",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_assignmentstatement4nativesqlplv11.html;topic-id:pl-assignment-statement;heading:assignment-statement",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0002",
           "label": "CALL statement",
-          "source_locator": "pdf-page:2303;outline:CALL statement",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_callstatement4nativesqlpl.html;topic-id:pl-call-statement;heading:CALL statement",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0003",
           "label": "CASE statement",
-          "source_locator": "pdf-page:2305;outline:CASE statement",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_casestatement4nativesqlpl.html;topic-id:pl-case-statement;heading:CASE statement",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0004",
           "label": "compound-statement",
-          "source_locator": "pdf-page:2307;outline:compound-statement",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_compoundstatement4nativesqlpl.html;topic-id:pl-compound-statement;heading:compound-statement",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0005",
           "label": "FOR statement",
-          "source_locator": "pdf-page:2315;outline:FOR statement",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_forstatement4nativesqlpl.html;topic-id:pl-statement;heading:FOR statement",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0006",
           "label": "GET DIAGNOSTICS statement",
-          "source_locator": "pdf-page:2316;outline:GET DIAGNOSTICS statement",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_getdiagnosticsstatement4nativesqlpl.html;topic-id:pl-get-diagnostics-statement;heading:GET DIAGNOSTICS statement",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0007",
           "label": "GOTO statement",
-          "source_locator": "pdf-page:2317;outline:GOTO statement",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_gotostatement4nativesqlpl.html;topic-id:pl-goto-statement;heading:GOTO statement",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0008",
           "label": "IF statement",
-          "source_locator": "pdf-page:2318;outline:IF statement",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_ifstatement4nativesqlpl.html;topic-id:pl-if-statement;heading:IF statement",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0009",
           "label": "ITERATE statement",
-          "source_locator": "pdf-page:2319;outline:ITERATE statement",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_iteratestatement4nativesqlpl.html;topic-id:pl-iterate-statement;heading:ITERATE statement",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0010",
           "label": "LEAVE statement",
-          "source_locator": "pdf-page:2320;outline:LEAVE statement",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_leavestatement4nativesqlpl.html;topic-id:pl-leave-statement;heading:LEAVE statement",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0011",
           "label": "LOOP statement",
-          "source_locator": "pdf-page:2322;outline:LOOP statement",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_loopstatement4nativesqlpl.html;topic-id:pl-loop-statement;heading:LOOP statement",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0012",
           "label": "REPEAT statement",
-          "source_locator": "pdf-page:2323;outline:REPEAT statement",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_repeatstatement4nativesqlpl.html;topic-id:pl-repeat-statement;heading:REPEAT statement",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0013",
           "label": "RESIGNAL statement",
-          "source_locator": "pdf-page:2324;outline:RESIGNAL statement",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_resignalstatement4nativesqlpl.html;topic-id:pl-resignal-statement;heading:RESIGNAL statement",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0014",
           "label": "RETURN statement",
-          "source_locator": "pdf-page:2326;outline:RETURN statement",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_returnstatement4nativesqlpl.html;topic-id:pl-return-statement;heading:RETURN statement",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0015",
           "label": "SIGNAL statement (SQL PL)",
-          "source_locator": "pdf-page:2328;outline:SIGNAL statement (SQL PL)",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_signalstatement4nativesqlpl.html;topic-id:pl-signal;heading:SIGNAL statement (SQL PL)",
           "mandatory": true
         },
         {
           "id": "ibm-db2-for-zos-13-2026-08-13:sql-pl-statements:0016",
           "label": "WHILE statement",
-          "source_locator": "pdf-page:2331;outline:WHILE statement",
+          "source_locator": "topic:SSEPEK_13.0.0/sqlref/src/tpc/db2z_whilestatement4nativesqlpl.html;topic-id:pl-while-statement;heading:WHILE statement",
           "mandatory": true
         }
       ]

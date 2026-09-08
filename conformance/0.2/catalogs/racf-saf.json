@@ -12,205 +12,205 @@
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0001",
           "label": "ADDGROUP (Add group profile)",
-          "source_locator": "pdf-page:47;outline:ADDGROUP (Add group profile)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/addgroup.htm;topic-id:syntax-addgroup-add-group-profile;heading:ADDGROUP (Add group profile)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0002",
           "label": "ADDSD (Add data set profile)",
-          "source_locator": "pdf-page:55;outline:ADDSD (Add data set profile)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/addsd.htm;topic-id:syntax-addsd-add-data-set-profile;heading:ADDSD (Add data set profile)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0003",
           "label": "ADDUSER (Add user profile)",
-          "source_locator": "pdf-page:70;outline:ADDUSER (Add user profile)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/adduser.htm;topic-id:syntax-adduser-add-user-profile;heading:ADDUSER (Add user profile)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0004",
           "label": "ALTDSD (Alter data set profile)",
-          "source_locator": "pdf-page:112;outline:ALTDSD (Alter data set profile)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/altdsd.htm;topic-id:syntax-altdsd-alter-data-set-profile;heading:ALTDSD (Alter data set profile)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0005",
           "label": "ALTGROUP (Alter group profile)",
-          "source_locator": "pdf-page:127;outline:ALTGROUP (Alter group profile)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/altgrp.htm;topic-id:syntax-altgroup-alter-group-profile;heading:ALTGROUP (Alter group profile)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0006",
           "label": "ALTUSER (Alter user profile)",
-          "source_locator": "pdf-page:137;outline:ALTUSER (Alter user profile)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/altuser.htm;topic-id:syntax-altuser-alter-user-profile;heading:ALTUSER (Alter user profile)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0007",
           "label": "CONNECT (Connect user to group)",
-          "source_locator": "pdf-page:201;outline:CONNECT (Connect user to group)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/connect.htm;topic-id:syntax-connect-connect-user-group;heading:CONNECT (Connect user to group)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0008",
           "label": "DELDSD (Delete data set profile)",
-          "source_locator": "pdf-page:208;outline:DELDSD (Delete data set profile)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/deldsd.htm;topic-id:syntax-deldsd-delete-data-set-profile;heading:DELDSD (Delete data set profile)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0009",
           "label": "DELGROUP (Delete group profile)",
-          "source_locator": "pdf-page:212;outline:DELGROUP (Delete group profile)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/delgrp.htm;topic-id:syntax-delgroup-delete-group-profile;heading:DELGROUP (Delete group profile)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0010",
           "label": "DELUSER (Delete user profile)",
-          "source_locator": "pdf-page:215;outline:DELUSER (Delete user profile)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/deluser.htm;topic-id:syntax-deluser-delete-user-profile;heading:DELUSER (Delete user profile)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0011",
           "label": "DISPLAY (Display signed-on-from list)",
-          "source_locator": "pdf-page:218;outline:DISPLAY (Display signed-on-from list)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/display.htm;topic-id:syntax-display-display-signed-from-list;heading:DISPLAY (Display signed-on-from list)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0012",
           "label": "LISTDSD (List data set profile)",
-          "source_locator": "pdf-page:222;outline:LISTDSD (List data set profile)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/listdsd.htm;topic-id:syntax-listdsd-list-data-set-profile;heading:LISTDSD (List data set profile)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0013",
           "label": "LISTGRP (List group profile)",
-          "source_locator": "pdf-page:234;outline:LISTGRP (List group profile)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/listgrp.htm;topic-id:syntax-listgrp-list-group-profile;heading:LISTGRP (List group profile)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0014",
           "label": "LISTUSER (List user profile)",
-          "source_locator": "pdf-page:243;outline:LISTUSER (List user profile)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/listusr.htm;topic-id:syntax-listuser-list-user-profile;heading:LISTUSER (List user profile)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0015",
           "label": "PASSWORD or PHRASE (Specify user password or password phrase)",
-          "source_locator": "pdf-page:262;outline:PASSWORD or PHRASE (Specify user password or password phrase)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/passwrd.htm;topic-id:syntax-password-phrase-specify-user-password-password-phrase;heading:PASSWORD or PHRASE (Specify user password or password phrase)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0016",
           "label": "PERMIT (Maintain resource access lists)",
-          "source_locator": "pdf-page:267;outline:PERMIT (Maintain resource access lists)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/permit.htm;topic-id:syntax-permit-maintain-resource-access-lists;heading:PERMIT (Maintain resource access lists)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0017",
           "label": "RACDCERT (Manage RACF digital certificates)",
-          "source_locator": "pdf-page:279;outline:RACDCERT (Manage RACF digital certificates)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/radcertg.htm;topic-id:syntax-racdcert-manage-racf-digital-certificates;heading:RACDCERT (Manage RACF digital certificates)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0018",
           "label": "RACLINK (Administer user ID associations)",
-          "source_locator": "pdf-page:399;outline:RACLINK (Administer user ID associations)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/raclnk.htm;topic-id:syntax-raclink-administer-user-id-associations;heading:RACLINK (Administer user ID associations)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0019",
           "label": "RACMAP (Create, delete, list, or query a distributed identity filter)",
-          "source_locator": "pdf-page:405;outline:RACMAP (Create, delete, list, or query a distributed identity filter)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/racmap.htm;topic-id:rcs-racmap-create-delete-list-query-distributed-identity-filter;heading:RACMAP (Create, delete, list, or query a distributed identity filter)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0020",
           "label": "RACPRIV (Set write-down privileges)",
-          "source_locator": "pdf-page:415;outline:RACPRIV (Set write-down privileges)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/racpriv.htm;topic-id:syntax-racpriv-set-write-down-privileges;heading:RACPRIV (Set write-down privileges)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0021",
           "label": "RACPRMCK (Validate parmlib member syntax)",
-          "source_locator": "pdf-page:416;outline:RACPRMCK (Validate parmlib member syntax)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/racprmck.htm;topic-id:syntax-racprmck-validate-parmlib-member;heading:RACPRMCK (Validate parmlib member syntax)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0022",
           "label": "RALTER (Alter general resource profile)",
-          "source_locator": "pdf-page:417;outline:RALTER (Alter general resource profile)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/ralter.htm;topic-id:syntax-ralter-alter-general-resource-profile;heading:RALTER (Alter general resource profile)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0023",
           "label": "RDEFINE (Define general resource profile)",
-          "source_locator": "pdf-page:481;outline:RDEFINE (Define general resource profile)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/rdefine.htm;topic-id:syntax-rdefine-define-general-resource-profile;heading:RDEFINE (Define general resource profile)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0024",
           "label": "RDELETE (Delete general resource profile)",
-          "source_locator": "pdf-page:540;outline:RDELETE (Delete general resource profile)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/rdelete.htm;topic-id:syntax-rdelete-delete-general-resource-profile;heading:RDELETE (Delete general resource profile)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0025",
           "label": "REMOVE (Remove user from group)",
-          "source_locator": "pdf-page:544;outline:REMOVE (Remove user from group)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/remove.htm;topic-id:syntax-remove-remove-user-from-group;heading:REMOVE (Remove user from group)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0026",
           "label": "RESTART (Restart RACF subsystem functions)",
-          "source_locator": "pdf-page:546;outline:RESTART (Restart RACF subsystem functions)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/restart.htm;topic-id:syntax-restart-restart-racf-subsystem-functions;heading:RESTART (Restart RACF subsystem functions)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0027",
           "label": "RLIST (List general resource profile)",
-          "source_locator": "pdf-page:550;outline:RLIST (List general resource profile)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/rlist.htm;topic-id:syntax-rlist-list-general-resource-profile;heading:RLIST (List general resource profile)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0028",
           "label": "RVARY (Change status of RACF database)",
-          "source_locator": "pdf-page:572;outline:RVARY (Change status of RACF database)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/xrvary1.htm;topic-id:syntax-rvary-change-status-racf-database;heading:RVARY (Change status of RACF database)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0029",
           "label": "SEARCH (Search RACF database)",
-          "source_locator": "pdf-page:579;outline:SEARCH (Search RACF database)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/search.htm;topic-id:syntax-search-search-racf-database;heading:SEARCH (Search RACF database)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0030",
           "label": "SET",
-          "source_locator": "pdf-page:591;outline:SET",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/set.htm;topic-id:syntax-set;heading:SET",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0031",
           "label": "SETROPTS (Set RACF options)",
-          "source_locator": "pdf-page:609;outline:SETROPTS (Set RACF options)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/setropts.htm;topic-id:syntax-setropts-set-racf-options;heading:SETROPTS (Set RACF options)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0032",
           "label": "SIGNOFF (Sign off sessions)",
-          "source_locator": "pdf-page:652;outline:SIGNOFF (Sign off sessions)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/signoff.htm;topic-id:syntax-signoff-sign-off-sessions;heading:SIGNOFF (Sign off sessions)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0033",
           "label": "STOP (Stop RACF subsystem)",
-          "source_locator": "pdf-page:655;outline:STOP (Stop RACF subsystem)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/stop.htm;topic-id:syntax-stop-stop-racf-subsystem;heading:STOP (Stop RACF subsystem)",
           "mandatory": true
         },
         {
           "id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0034",
           "label": "TARGET (Manage RRSF nodes)",
-          "source_locator": "pdf-page:656;outline:TARGET (Manage RRSF nodes)",
+          "source_locator": "topic:SSLTBW_3.2.0/com.ibm.zos.v3r2.icha400/target.htm;topic-id:syntax-target-manage-rrsf-nodes;heading:TARGET (Manage RRSF nodes)",
           "mandatory": true
         }
       ]

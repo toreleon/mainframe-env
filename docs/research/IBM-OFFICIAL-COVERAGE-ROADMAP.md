@@ -1,9 +1,14 @@
 # IBM official coverage and de-hardcoding roadmap
 
 Status: research baseline for planning; not a compatibility claim
-Snapshot date: 2026-08-31
+Snapshot date: 2026-09-07
 Repository baseline: `mainframe-env` 0.1.1 working tree based on commit
 `857115b907ce7098c965a51117a079048ea8182e`
+
+The analysis, the row inventories and every denominator below are the
+2026-08-31 snapshot and are unchanged. The date is bumped because on 2026-09-07
+every official source was re-pointed from a PDF to that book's IBM Documentation
+topic set, which changes what "Official sources used for this baseline" names.
 
 ## Executive conclusion
 
@@ -600,12 +605,25 @@ oracle.
 
 ## Official sources used for this baseline
 
-- [Enterprise COBOL for z/OS documentation library](https://www.ibm.com/support/pages/enterprise-cobol-zos-documentation-library), Language Reference SC27-8713-04, 2026-05-31 edition.
-- [CICS TS EXEC CICS function codes](https://www.ibm.com/docs/en/cics-ts/6.x?topic=codes-function-exec-cics-commands), snapshot 2026-08-31.
-- [z/OS 3.2 MVS JCL Reference](https://www.ibm.com/docs/en/SSLTBW_3.2.0/pdf/ieab600_v3r2.pdf).
-- [z/OS 3.2 DFSMS Access Method Services Commands](https://www.ibm.com/docs/en/SSLTBW_3.2.0/pdf/idai200_v3r2.pdf).
-- [z/OS 3.2 RACF Command Language Reference](https://www.ibm.com/docs/en/SSLTBW_3.2.0/pdf/icha400_v3r2.pdf) and [RACROUTE request cross-reference](https://www.ibm.com/docs/en/zos/3.2.0?topic=macros-racroute-router-interface).
-- [z/OSMF 3.2 Programming Guide](https://www.ibm.com/docs/en/SSLTBW_3.2.0/pdf/izua700_v3r2.pdf).
-- [Db2 13 for z/OS SQL Reference](https://www.ibm.com/docs/en/SSEPEK_13.0.0/pdf/db2z_13_sqlrefbook.pdf).
-- [IMS 15.6 EXEC DLI and DL/I call comparison](https://www.ibm.com/docs/en/ims/15.6.0?topic=programs-comparing-exec-dli-commands-dli-calls).
-- [IBM MQ 9.4 MQI call descriptions](https://www.ibm.com/docs/en/ibm-mq/9.4.x?topic=calls-call-descriptions).
+Every source is an IBM Documentation topic set. PDF is retired: no baseline
+pins one and nothing in the repository reads one. Each link below is the book's
+own landing topic; what is actually pinned is the ordered set of topics beneath
+it, named topic by topic with a digest each in
+`conformance/0.2/manifests/`, together with the table-of-contents digest and the
+content URL template that produced them. The row inventories and denominators
+below are unchanged by that: they came from these same books, and locators are
+not part of the identity digest.
+
+- [Enterprise COBOL 6.5 Language Reference](https://www.ibm.com/docs/en/cobol-zos/6.5.0?topic=language-reference), SC27-8713-04, 2026-05-31 edition — 622 topics.
+- [CICS TS EXEC CICS function codes](https://www.ibm.com/docs/en/cics-ts/6.x?topic=codes-function-exec-cics-commands), snapshot 2026-08-31 — 1 topic.
+- [z/OS 3.2 MVS JCL Reference](https://www.ibm.com/docs/en/zos/3.2.0?topic=mvs-zos-jcl-reference), SA23-1385-70 — 1,985 topics.
+- [z/OS 3.2 DFSMS Access Method Services Commands](https://www.ibm.com/docs/en/zos/3.2.0?topic=dfsms-zos-access-method-services-commands), SC23-6846-70 — 516 topics.
+- [z/OS 3.2 Security Server RACF Command Language Reference](https://www.ibm.com/docs/en/zos/3.2.0?topic=racf-zos-security-server-command-language-reference), SA23-2292-70 — 109 topics, plus the [RACROUTE request cross-reference](https://www.ibm.com/docs/en/zos/3.2.0?topic=macros-racroute-router-interface) as a separately pinned supporting topic.
+- [z/OSMF 3.2 Programming Guide](https://www.ibm.com/docs/en/zos/3.2.0?topic=facility-zos-management-programming-guide), SC27-8430-70 — 395 topics.
+- [Db2 13 for z/OS SQL Reference](https://www.ibm.com/docs/en/db2-for-zos/13.0.0?topic=db2-sql) — 832 topics.
+- [IMS 15.6 EXEC DLI and DL/I call comparison](https://www.ibm.com/docs/en/ims/15.6.0?topic=programs-comparing-exec-dli-commands-dli-calls) — 1 topic.
+- [IBM MQ 9.4 MQI call descriptions](https://www.ibm.com/docs/en/ibm-mq/9.4.x?topic=calls-call-descriptions) — 27 topics.
+
+4,488 topics in total. `conformance/tools/fetch_pinned_sources.py` re-reads all
+of them and all nine tables of contents; the probe record at
+[`publication-source-probe.md`](publication-source-probe.md) reports the result.

@@ -8,7 +8,7 @@
   "properties": {
     "schema_version": {"const": "mainframe-env.racroute-catalog@1"},
     "baseline_id": {"const": "ibm-zos-3.2-racf-saf-2026"},
-    "supporting_source_sha256": {"const": "sha256:83e6eed67f5631268e03ad9459c5ac5fde03bd9d78152eb07403b70af3c4cf78"},
+    "supporting_source_sha256": {"const": "sha256:acebd6ebc34ffd70843db61620351ae35df699c8e29bd3da486a409d9854db3a"},
     "requests": {
       "type": "array", "minItems": 14, "maxItems": 14,
       "items": {

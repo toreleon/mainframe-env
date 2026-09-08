@@ -1,0 +1,3588 @@
+{
+  "coverage_credit": 0,
+  "rows": [
+    {
+      "alternatives": [
+        "DAY",
+        "DAY-OF-WEEK",
+        "TIME",
+        "YYYYDDD"
+      ],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "ACCEPT",
+        "FROM"
+      ],
+      "catalog_placeholders": [
+        "environment-name",
+        "identifier-1",
+        "mnemonic-name-1"
+      ],
+      "id": "accept",
+      "keywords_absent_from_source": [],
+      "keywords_missing_from_catalog": [
+        "DATE",
+        "DAY",
+        "DAY-OF-WEEK",
+        "TIME",
+        "YYYYDDD",
+        "YYYYMMDD"
+      ],
+      "optionals": [
+        "FROM",
+        "YYYYMMDD",
+        "environment-name",
+        "mnemonic-name-1"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0001",
+      "source_diagram_count": 2,
+      "source_format_count": 2,
+      "source_format_titles": [
+        "Format 1: data transfer",
+        "Format 2: system information transfer"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "ACCEPT",
+        "DATE",
+        "DAY",
+        "DAY-OF-WEEK",
+        "FROM",
+        "TIME",
+        "YYYYDDD",
+        "YYYYMMDD"
+      ],
+      "source_operands": [
+        "environment-name",
+        "identifier-1",
+        "identifier-2",
+        "mnemonic-name-1"
+      ],
+      "title": "ACCEPT statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [
+        "CORR",
+        "literal-1",
+        "literal-2"
+      ],
+      "catalog_form_count": 3,
+      "catalog_keywords": [
+        "ADD",
+        "CORR",
+        "CORRESPONDING",
+        "END-ADD",
+        "ERROR",
+        "GIVING",
+        "NOT",
+        "ON",
+        "ROUNDED",
+        "SIZE",
+        "TO"
+      ],
+      "catalog_placeholders": [
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "literal-1",
+        "literal-2",
+        "statements"
+      ],
+      "id": "add",
+      "keywords_absent_from_source": [
+        "ERROR",
+        "SIZE"
+      ],
+      "keywords_missing_from_catalog": [
+        "SIZE ERROR"
+      ],
+      "optionals": [
+        "END-ADD",
+        "NOT",
+        "ON",
+        "ROUNDED",
+        "SIZE ERROR",
+        "TO",
+        "imperative-statement-1",
+        "imperative-statement-2"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0002",
+      "source_diagram_count": 3,
+      "source_format_count": 3,
+      "source_format_titles": [
+        "Format 1: ADD statement",
+        "Format 2: ADD statement with GIVING phrase",
+        "Format 3: ADD statement with CORRESPONDING phrase"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "ADD",
+        "CORR",
+        "CORRESPONDING",
+        "END-ADD",
+        "GIVING",
+        "NOT",
+        "ON",
+        "ROUNDED",
+        "SIZE ERROR",
+        "TO"
+      ],
+      "source_operands": [
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "literal-1",
+        "literal-2"
+      ],
+      "title": "ADD statement",
+      "undefined_placeholders": [
+        "statements"
+      ]
+    },
+    {
+      "alternatives": [
+        "data-name-1"
+      ],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "ALLOCATE",
+        "CHARACTERS",
+        "INITIALIZED",
+        "LOC",
+        "RETURNING"
+      ],
+      "catalog_placeholders": [
+        "arithmetic-expression-1",
+        "data-name-1",
+        "data-name-2",
+        "integer-1"
+      ],
+      "id": "allocate",
+      "keywords_absent_from_source": [],
+      "keywords_missing_from_catalog": [],
+      "optionals": [
+        "INITIALIZED",
+        "LOC",
+        "RETURNING",
+        "data-name-2",
+        "integer-1"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0003",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "ALLOCATE",
+        "CHARACTERS",
+        "INITIALIZED",
+        "LOC",
+        "RETURNING"
+      ],
+      "source_operands": [
+        "arithmetic-expression-1",
+        "data-name-1",
+        "data-name-2",
+        "integer-1"
+      ],
+      "title": "ALLOCATE statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "ALTER",
+        "PROCEED",
+        "TO"
+      ],
+      "catalog_placeholders": [
+        "procedure-name-1",
+        "procedure-name-2"
+      ],
+      "id": "alter",
+      "keywords_absent_from_source": [
+        "PROCEED"
+      ],
+      "keywords_missing_from_catalog": [
+        "PROCEED TO"
+      ],
+      "optionals": [
+        "PROCEED TO"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0004",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "ALTER",
+        "PROCEED TO",
+        "TO"
+      ],
+      "source_operands": [
+        "procedure-name-1",
+        "procedure-name-2"
+      ],
+      "title": "ALTER statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [
+        "function-pointer-1",
+        "literal-1",
+        "procedure-pointer-1"
+      ],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "BY",
+        "CALL",
+        "CONTENT",
+        "END-CALL",
+        "EXCEPTION",
+        "NOT",
+        "ON",
+        "OVERFLOW",
+        "REFERENCE",
+        "RETURNING",
+        "USING",
+        "VALUE"
+      ],
+      "catalog_placeholders": [
+        "file-name-1",
+        "function-pointer-1",
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "imperative-statement-3",
+        "literal-1",
+        "literal-2",
+        "literal-3",
+        "procedure-pointer-1"
+      ],
+      "id": "call",
+      "keywords_absent_from_source": [],
+      "keywords_missing_from_catalog": [
+        "ADDRESS OF",
+        "AS FIXED LENGTH",
+        "LENGTH OF",
+        "OMITTED",
+        "fixed-phrase"
+      ],
+      "optionals": [
+        "ADDRESS OF",
+        "BY",
+        "CONTENT",
+        "END-CALL",
+        "EXCEPTION",
+        "LENGTH OF",
+        "NOT",
+        "OMITTED",
+        "ON",
+        "OVERFLOW",
+        "REFERENCE",
+        "RETURNING",
+        "USING",
+        "VALUE",
+        "exception-phrases",
+        "file-name-1",
+        "fixed-phrase",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "imperative-statement-3",
+        "literal-2",
+        "literal-3",
+        "not-exception-phrase"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0005",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "ADDRESS OF",
+        "AS FIXED LENGTH",
+        "BY",
+        "CALL",
+        "CONTENT",
+        "END-CALL",
+        "EXCEPTION",
+        "LENGTH OF",
+        "NOT",
+        "OMITTED",
+        "ON",
+        "OVERFLOW",
+        "REFERENCE",
+        "RETURNING",
+        "USING",
+        "VALUE",
+        "fixed-phrase"
+      ],
+      "source_operands": [
+        "file-name-1",
+        "function-pointer-1",
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "imperative-statement-3",
+        "integer-4",
+        "literal-1",
+        "literal-2",
+        "literal-3",
+        "procedure-pointer-1"
+      ],
+      "title": "CALL statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [
+        "literal-1"
+      ],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "CANCEL"
+      ],
+      "catalog_placeholders": [
+        "identifier-1",
+        "literal-1"
+      ],
+      "id": "cancel",
+      "keywords_absent_from_source": [],
+      "keywords_missing_from_catalog": [],
+      "optionals": [],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0006",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "CANCEL"
+      ],
+      "source_operands": [
+        "identifier-1",
+        "literal-1"
+      ],
+      "title": "CANCEL statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [],
+      "catalog_form_count": 3,
+      "catalog_keywords": [
+        "CLOSE",
+        "FOR",
+        "LOCK",
+        "NO",
+        "REEL",
+        "REMOVAL",
+        "REWIND",
+        "UNIT",
+        "WITH"
+      ],
+      "catalog_placeholders": [
+        "file-name-1"
+      ],
+      "id": "close",
+      "keywords_absent_from_source": [
+        "NO",
+        "REWIND"
+      ],
+      "keywords_missing_from_catalog": [
+        "NO REWIND",
+        "WITH NO REWIND"
+      ],
+      "optionals": [
+        "FOR",
+        "LOCK",
+        "NO REWIND",
+        "REEL",
+        "REMOVAL",
+        "UNIT",
+        "WITH",
+        "WITH NO REWIND"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0007",
+      "source_diagram_count": 3,
+      "source_format_count": 3,
+      "source_format_titles": [
+        "Format 1: CLOSE statement for sequential files",
+        "Format 2: CLOSE statement for indexed and relative files",
+        "Format 3: CLOSE statement for line-sequential files"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "CLOSE",
+        "FOR",
+        "LOCK",
+        "NO REWIND",
+        "REEL",
+        "REMOVAL",
+        "UNIT",
+        "WITH",
+        "WITH NO REWIND"
+      ],
+      "source_operands": [
+        "file-name-1"
+      ],
+      "title": "CLOSE statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [
+        "EQUAL"
+      ],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "COMPUTE",
+        "END-COMPUTE",
+        "EQUAL",
+        "ERROR",
+        "NOT",
+        "ON",
+        "ROUNDED",
+        "SIZE"
+      ],
+      "catalog_placeholders": [
+        "arithmetic-expression",
+        "identifier-1",
+        "statements"
+      ],
+      "id": "compute",
+      "keywords_absent_from_source": [
+        "ERROR",
+        "SIZE"
+      ],
+      "keywords_missing_from_catalog": [
+        "SIZE ERROR"
+      ],
+      "optionals": [
+        "END-COMPUTE",
+        "NOT",
+        "ON",
+        "ROUNDED",
+        "SIZE ERROR",
+        "imperative-statement-1",
+        "imperative-statement-2"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0008",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "COMPUTE",
+        "END-COMPUTE",
+        "EQUAL",
+        "NOT",
+        "ON",
+        "ROUNDED",
+        "SIZE ERROR"
+      ],
+      "source_operands": [
+        "arithmetic-expression",
+        "identifier-1",
+        "imperative-statement-1",
+        "imperative-statement-2"
+      ],
+      "title": "COMPUTE statement",
+      "undefined_placeholders": [
+        "statements"
+      ]
+    },
+    {
+      "alternatives": [],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "CONTINUE"
+      ],
+      "catalog_placeholders": [],
+      "id": "continue",
+      "keywords_absent_from_source": [],
+      "keywords_missing_from_catalog": [],
+      "optionals": [],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0009",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "CONTINUE"
+      ],
+      "source_operands": [],
+      "title": "CONTINUE statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "DELETE",
+        "END-DELETE",
+        "INVALID",
+        "KEY",
+        "NOT",
+        "RECORD"
+      ],
+      "catalog_placeholders": [
+        "file-name-1",
+        "imperative-statement-1",
+        "imperative-statement-2"
+      ],
+      "id": "delete",
+      "keywords_absent_from_source": [
+        "NOT"
+      ],
+      "keywords_missing_from_catalog": [
+        "NOT INVALID"
+      ],
+      "optionals": [
+        "END-DELETE",
+        "INVALID",
+        "KEY",
+        "NOT INVALID",
+        "RECORD",
+        "imperative-statement-1",
+        "imperative-statement-2"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0010",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "DELETE",
+        "END-DELETE",
+        "INVALID",
+        "KEY",
+        "NOT INVALID",
+        "RECORD"
+      ],
+      "source_operands": [
+        "file-name-1",
+        "imperative-statement-1",
+        "imperative-statement-2"
+      ],
+      "title": "DELETE statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [
+        "literal-1"
+      ],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "ADVANCING",
+        "DISPLAY",
+        "NO",
+        "UPON",
+        "WITH"
+      ],
+      "catalog_placeholders": [
+        "environment-name-1",
+        "identifier-1",
+        "literal-1",
+        "mnemonic-name-1"
+      ],
+      "id": "display",
+      "keywords_absent_from_source": [
+        "ADVANCING",
+        "NO"
+      ],
+      "keywords_missing_from_catalog": [
+        "NO ADVANCING"
+      ],
+      "optionals": [
+        "NO ADVANCING",
+        "UPON",
+        "WITH",
+        "environment-name-1",
+        "mnemonic-name-1"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0011",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "DISPLAY",
+        "NO ADVANCING",
+        "UPON",
+        "WITH"
+      ],
+      "source_operands": [
+        "environment-name-1",
+        "identifier-1",
+        "literal-1",
+        "mnemonic-name-1"
+      ],
+      "title": "DISPLAY statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [
+        "literal-1",
+        "literal-2"
+      ],
+      "catalog_form_count": 5,
+      "catalog_keywords": [
+        "BY",
+        "DIVIDE",
+        "END-DIVIDE",
+        "ERROR",
+        "GIVING",
+        "INTO",
+        "NOT",
+        "ON",
+        "REMAINDER",
+        "ROUNDED",
+        "SIZE"
+      ],
+      "catalog_placeholders": [
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "literal-1",
+        "literal-2",
+        "statements"
+      ],
+      "id": "divide",
+      "keywords_absent_from_source": [
+        "ERROR",
+        "SIZE"
+      ],
+      "keywords_missing_from_catalog": [
+        "SIZE ERROR"
+      ],
+      "optionals": [
+        "END-DIVIDE",
+        "NOT",
+        "ON",
+        "ROUNDED",
+        "SIZE ERROR",
+        "imperative-statement-1",
+        "imperative-statement-2"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0012",
+      "source_diagram_count": 5,
+      "source_format_count": 5,
+      "source_format_titles": [
+        "Format 1: DIVIDE statement",
+        "Format 2: DIVIDE statement with INTO and GIVING phrases",
+        "Format 3: DIVIDE statement with BY and GIVING phrases",
+        "Format 4: DIVIDE statement with INTO and REMAINDER phrases",
+        "Format 5: DIVIDE statement with BY and REMAINDER phrases"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "BY",
+        "DIVIDE",
+        "END-DIVIDE",
+        "GIVING",
+        "INTO",
+        "NOT",
+        "ON",
+        "REMAINDER",
+        "ROUNDED",
+        "SIZE ERROR"
+      ],
+      "source_operands": [
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "literal-1",
+        "literal-2"
+      ],
+      "title": "DIVIDE statement",
+      "undefined_placeholders": [
+        "statements"
+      ]
+    },
+    {
+      "alternatives": [],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "BY",
+        "ENTRY",
+        "REFERENCE",
+        "USING",
+        "VALUE"
+      ],
+      "catalog_placeholders": [
+        "identifier-1",
+        "literal-1"
+      ],
+      "id": "entry",
+      "keywords_absent_from_source": [],
+      "keywords_missing_from_catalog": [],
+      "optionals": [
+        "BY",
+        "REFERENCE",
+        "USING",
+        "VALUE",
+        "identifier-1"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0013",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "BY",
+        "ENTRY",
+        "REFERENCE",
+        "USING",
+        "VALUE"
+      ],
+      "source_operands": [
+        "identifier-1",
+        "literal-1"
+      ],
+      "title": "ENTRY statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [
+        "FALSE",
+        "NOT",
+        "THROUGH",
+        "THRU",
+        "TRUE",
+        "arithmetic-expression-1",
+        "arithmetic-expression-2",
+        "arithmetic-expression-3",
+        "arithmetic-expression-4",
+        "condition-1",
+        "condition-2",
+        "expression-1",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "identifier-6",
+        "literal-1",
+        "literal-3",
+        "literal-4",
+        "literal-5",
+        "literal-6"
+      ],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "ALSO",
+        "ANY",
+        "END-EVALUATE",
+        "EVALUATE",
+        "NOT",
+        "OTHER",
+        "THROUGH",
+        "THRU",
+        "WHEN"
+      ],
+      "catalog_placeholders": [
+        "arithmetic-expression-1",
+        "arithmetic-expression-2",
+        "arithmetic-expression-3",
+        "arithmetic-expression-4",
+        "condition-1",
+        "condition-2",
+        "expression-1",
+        "expression-2",
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "identifier-6",
+        "literal-1",
+        "literal-2",
+        "literal-3",
+        "literal-4",
+        "literal-5",
+        "literal-6",
+        "statements"
+      ],
+      "id": "evaluate",
+      "keywords_absent_from_source": [
+        "OTHER"
+      ],
+      "keywords_missing_from_catalog": [
+        "FALSE",
+        "TRUE",
+        "WHEN OTHER"
+      ],
+      "optionals": [
+        "ALSO",
+        "END-EVALUATE",
+        "FALSE",
+        "TRUE",
+        "WHEN OTHER",
+        "expression-2",
+        "identifier-2",
+        "imperative-statement-2",
+        "literal-2",
+        "phrase 2"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0014",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "ALSO",
+        "ANY",
+        "END-EVALUATE",
+        "EVALUATE",
+        "FALSE",
+        "NOT",
+        "THROUGH",
+        "THRU",
+        "TRUE",
+        "WHEN",
+        "WHEN OTHER"
+      ],
+      "source_operands": [
+        "arithmetic-expression-1",
+        "arithmetic-expression-2",
+        "arithmetic-expression-3",
+        "arithmetic-expression-4",
+        "condition-1",
+        "condition-2",
+        "expression-1",
+        "expression-2",
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "identifier-6",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "literal-1",
+        "literal-2",
+        "literal-3",
+        "literal-4",
+        "literal-5",
+        "literal-6"
+      ],
+      "title": "EVALUATE statement",
+      "undefined_placeholders": [
+        "statements"
+      ]
+    },
+    {
+      "alternatives": [
+        "SECTION"
+      ],
+      "catalog_form_count": 5,
+      "catalog_keywords": [
+        "CYCLE",
+        "EXIT",
+        "METHOD",
+        "PARAGRAPH",
+        "PERFORM",
+        "PROGRAM",
+        "SECTION"
+      ],
+      "catalog_placeholders": [],
+      "id": "exit",
+      "keywords_absent_from_source": [
+        "METHOD",
+        "PERFORM",
+        "PROGRAM"
+      ],
+      "keywords_missing_from_catalog": [
+        "EXIT METHOD",
+        "EXIT PERFORM",
+        "EXIT PROGRAM"
+      ],
+      "optionals": [
+        "CYCLE"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0015",
+      "source_diagram_count": 5,
+      "source_format_count": 5,
+      "source_format_titles": [
+        "Format 1",
+        "Format 2",
+        "Format 3",
+        "Format 5",
+        "Format 6"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "CYCLE",
+        "EXIT",
+        "EXIT METHOD",
+        "EXIT PERFORM",
+        "EXIT PROGRAM",
+        "PARAGRAPH",
+        "SECTION"
+      ],
+      "source_operands": [
+        "paragraph-name"
+      ],
+      "title": "EXIT statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "FREE"
+      ],
+      "catalog_placeholders": [
+        "data-name-1"
+      ],
+      "id": "free",
+      "keywords_absent_from_source": [],
+      "keywords_missing_from_catalog": [],
+      "optionals": [],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0016",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "FREE"
+      ],
+      "source_operands": [
+        "data-name-1"
+      ],
+      "title": "FREE statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "GOBACK"
+      ],
+      "catalog_placeholders": [],
+      "id": "goback",
+      "keywords_absent_from_source": [],
+      "keywords_missing_from_catalog": [],
+      "optionals": [],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0017",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "GOBACK"
+      ],
+      "source_operands": [],
+      "title": "GOBACK statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [],
+      "catalog_form_count": 3,
+      "catalog_keywords": [
+        "DEPENDING",
+        "GO",
+        "ON",
+        "TO"
+      ],
+      "catalog_placeholders": [
+        "identifier-1",
+        "procedure-name-1"
+      ],
+      "id": "go-to",
+      "keywords_absent_from_source": [],
+      "keywords_missing_from_catalog": [],
+      "optionals": [
+        "ON",
+        "TO"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0018",
+      "source_diagram_count": 3,
+      "source_format_count": 3,
+      "source_format_titles": [
+        "Format 1: unconditional GO TO statement",
+        "Format 2: conditional GO TO statement",
+        "Format 3: altered GO TO statement"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "DEPENDING",
+        "GO",
+        "ON",
+        "TO"
+      ],
+      "source_operands": [
+        "identifier-1",
+        "paragraph-name",
+        "procedure-name-1"
+      ],
+      "title": "GO TO statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [
+        "NEXT SENTENCE"
+      ],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "ELSE",
+        "END-IF",
+        "IF",
+        "NEXT",
+        "SENTENCE",
+        "THEN"
+      ],
+      "catalog_placeholders": [
+        "condition-1",
+        "statement-1",
+        "statement-2"
+      ],
+      "id": "if",
+      "keywords_absent_from_source": [
+        "NEXT",
+        "SENTENCE"
+      ],
+      "keywords_missing_from_catalog": [
+        "NEXT SENTENCE"
+      ],
+      "optionals": [
+        "ELSE",
+        "END-IF",
+        "NEXT SENTENCE",
+        "THEN",
+        "statement-2"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0019",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "ELSE",
+        "END-IF",
+        "IF",
+        "NEXT SENTENCE",
+        "THEN"
+      ],
+      "source_operands": [
+        "condition-1",
+        "statement-1",
+        "statement-2"
+      ],
+      "title": "IF statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "ALL",
+        "BY",
+        "DATA",
+        "DEFAULT",
+        "FILLER",
+        "INITIALIZE",
+        "REPLACING",
+        "THEN",
+        "TO",
+        "VALUE",
+        "WITH"
+      ],
+      "catalog_placeholders": [
+        "category-name",
+        "identifier-1",
+        "identifier-2",
+        "literal-1"
+      ],
+      "id": "initialize",
+      "keywords_absent_from_source": [],
+      "keywords_missing_from_catalog": [],
+      "optionals": [
+        "ALL",
+        "BY",
+        "DATA",
+        "DEFAULT",
+        "FILLER",
+        "REPLACING",
+        "THEN",
+        "TO",
+        "VALUE",
+        "WITH",
+        "category-name",
+        "identifier-2",
+        "literal-1"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0020",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "ALL",
+        "BY",
+        "DATA",
+        "DEFAULT",
+        "FILLER",
+        "INITIALIZE",
+        "REPLACING",
+        "THEN",
+        "TO",
+        "VALUE",
+        "WITH"
+      ],
+      "source_operands": [
+        "category-name",
+        "identifier-1",
+        "identifier-2",
+        "literal-1"
+      ],
+      "title": "INITIALIZE statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [
+        "AFTER",
+        "ALL",
+        "BY",
+        "FIRST",
+        "LEADING",
+        "identifier-3",
+        "identifier-5",
+        "literal-1",
+        "literal-2",
+        "literal-3",
+        "literal-4",
+        "literal-5",
+        "phrase 1"
+      ],
+      "catalog_form_count": 4,
+      "catalog_keywords": [
+        "AFTER",
+        "ALL",
+        "BEFORE",
+        "BY",
+        "CHARACTERS",
+        "CONVERTING",
+        "FIRST",
+        "FOR",
+        "INITIAL",
+        "INSPECT",
+        "LEADING",
+        "REPLACING",
+        "TALLYING",
+        "TO"
+      ],
+      "catalog_placeholders": [
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "identifier-6",
+        "identifier-7",
+        "literal-1",
+        "literal-2",
+        "literal-3",
+        "literal-4",
+        "literal-5"
+      ],
+      "id": "inspect",
+      "keywords_absent_from_source": [],
+      "keywords_missing_from_catalog": [
+        "CHARACTERS BY"
+      ],
+      "optionals": [
+        "AFTER",
+        "BEFORE",
+        "INITIAL",
+        "identifier-4",
+        "literal-2",
+        "phrase 1"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0021",
+      "source_diagram_count": 4,
+      "source_format_count": 4,
+      "source_format_titles": [
+        "Format 1: INSPECT statement with TALLYING phrase",
+        "Format 2: INSPECT statement with REPLACING phrase",
+        "Format 3: INSPECT statement with TALLYING and REPLACING phrases",
+        "Format 4: INSPECT statement with CONVERTING phrase"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "AFTER",
+        "ALL",
+        "BEFORE",
+        "BY",
+        "CHARACTERS",
+        "CHARACTERS BY",
+        "CONVERTING",
+        "FIRST",
+        "FOR",
+        "INITIAL",
+        "INSPECT",
+        "LEADING",
+        "REPLACING",
+        "TALLYING",
+        "TO"
+      ],
+      "source_operands": [
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "identifier-6",
+        "identifier-7",
+        "literal-1",
+        "literal-2",
+        "literal-3",
+        "literal-4",
+        "literal-5"
+      ],
+      "title": "INSPECT statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [
+        "NEW",
+        "SELF",
+        "SUPER",
+        "class-name-1",
+        "identifier-2"
+      ],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "BY",
+        "END-INVOKE",
+        "EXCEPTION",
+        "INVOKE",
+        "NOT",
+        "ON",
+        "RETURNING",
+        "USING",
+        "VALUE"
+      ],
+      "catalog_placeholders": [
+        "class-name-1",
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "literal-1",
+        "literal-2"
+      ],
+      "id": "invoke",
+      "keywords_absent_from_source": [],
+      "keywords_missing_from_catalog": [
+        "LENGTH OF",
+        "NEW",
+        "SELF",
+        "SUPER"
+      ],
+      "optionals": [
+        "BY",
+        "END-INVOKE",
+        "EXCEPTION",
+        "LENGTH OF",
+        "NOT",
+        "ON",
+        "RETURNING",
+        "USING",
+        "VALUE",
+        "identifier-3",
+        "identifier-4",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "literal-2"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0022",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "BY",
+        "END-INVOKE",
+        "EXCEPTION",
+        "INVOKE",
+        "LENGTH OF",
+        "NEW",
+        "NOT",
+        "ON",
+        "RETURNING",
+        "SELF",
+        "SUPER",
+        "USING",
+        "VALUE"
+      ],
+      "source_operands": [
+        "class-name-1",
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "literal-1",
+        "literal-2"
+      ],
+      "title": "INVOKE statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [
+        "BOOL",
+        "HIGH-VALUE",
+        "HIGH-VALUES",
+        "IN",
+        "LOW-VALUE",
+        "LOW-VALUES",
+        "SPACE",
+        "SPACES",
+        "ZEROES",
+        "ZEROS",
+        "identifier-10",
+        "literal-2",
+        "literal-3"
+      ],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "ALSO",
+        "BYTES",
+        "CHARACTERS",
+        "CODEPAGE",
+        "CONVERTING",
+        "COUNT",
+        "ENCODING",
+        "END-JSON",
+        "EVERY",
+        "EXCEPTION",
+        "FROM",
+        "GENERATE",
+        "IN",
+        "INDICATING",
+        "IS",
+        "JSON",
+        "NAME",
+        "NONNUMERIC",
+        "NOT",
+        "NUMERIC",
+        "ON",
+        "OR",
+        "SUPPRESS",
+        "WHEN"
+      ],
+      "catalog_placeholders": [
+        "converting-phrase",
+        "fig-con-1",
+        "identifier-1",
+        "identifier-11",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "identifier-6",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "indicating-phrase-1",
+        "literal-1",
+        "literal-3"
+      ],
+      "id": "json-generate",
+      "keywords_absent_from_source": [
+        "BYTES",
+        "CODEPAGE",
+        "GENERATE"
+      ],
+      "keywords_missing_from_catalog": [
+        "BOOL",
+        "BOOLEAN",
+        "COUNT BYTES",
+        "FROM CODEPAGE",
+        "HIGH-VALUE",
+        "HIGH-VALUES",
+        "JSON GENERATE",
+        "LOW-VALUE",
+        "LOW-VALUES",
+        "NULL",
+        "OF",
+        "OMITTED",
+        "SPACE",
+        "SPACES",
+        "TO",
+        "USING",
+        "ZERO",
+        "ZEROES",
+        "ZEROS"
+      ],
+      "optionals": [
+        "ALSO",
+        "CHARACTERS",
+        "CONVERTING",
+        "COUNT",
+        "COUNT BYTES",
+        "ENCODING",
+        "END-JSON",
+        "EVERY",
+        "EXCEPTION",
+        "FROM CODEPAGE",
+        "HIGH-VALUE",
+        "HIGH-VALUES",
+        "IN",
+        "INDICATING",
+        "IS",
+        "JSON",
+        "LOW-VALUE",
+        "LOW-VALUES",
+        "NAME",
+        "NONNUMERIC",
+        "NOT",
+        "NUMERIC",
+        "OF",
+        "OMITTED",
+        "ON",
+        "OR",
+        "SPACE",
+        "SPACES",
+        "SUPPRESS",
+        "TO",
+        "USING",
+        "ZERO",
+        "ZEROES",
+        "ZEROS",
+        "converting-phrase",
+        "generic-suppression-phrase",
+        "identifier-11",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "identifier-6",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "indicating-phrase-1",
+        "literal-1",
+        "literal-3",
+        "when-phrase"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0023",
+      "source_diagram_count": 6,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 5,
+      "source_keywords": [
+        "ALSO",
+        "BOOL",
+        "BOOLEAN",
+        "CHARACTERS",
+        "CONVERTING",
+        "COUNT",
+        "COUNT BYTES",
+        "ENCODING",
+        "END-JSON",
+        "EVERY",
+        "EXCEPTION",
+        "FROM",
+        "FROM CODEPAGE",
+        "HIGH-VALUE",
+        "HIGH-VALUES",
+        "IN",
+        "INDICATING",
+        "IS",
+        "JSON",
+        "JSON GENERATE",
+        "LOW-VALUE",
+        "LOW-VALUES",
+        "NAME",
+        "NONNUMERIC",
+        "NOT",
+        "NULL",
+        "NUMERIC",
+        "OF",
+        "OMITTED",
+        "ON",
+        "OR",
+        "SPACE",
+        "SPACES",
+        "SUPPRESS",
+        "TO",
+        "USING",
+        "WHEN",
+        "ZERO",
+        "ZEROES",
+        "ZEROS"
+      ],
+      "source_operands": [
+        "condition-name-1",
+        "condition-name-2",
+        "converting-phrase",
+        "fig-con-1",
+        "generic-suppression-phrase",
+        "identifier-1",
+        "identifier-10",
+        "identifier-11",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "identifier-6",
+        "identifier-7",
+        "identifier-8",
+        "identifier-9",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "indicating-phrase-1",
+        "literal-1",
+        "literal-2",
+        "literal-3",
+        "when-phrase"
+      ],
+      "title": "JSON GENERATE statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [
+        "AND",
+        "BOOL",
+        "condition-name-2",
+        "condition-name-3",
+        "identifier-5",
+        "literal-2",
+        "literal-3"
+      ],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "ALSO",
+        "CODEPAGE",
+        "CONVERTING",
+        "DETAIL",
+        "ENCODING",
+        "END-JSON",
+        "EXCEPTION",
+        "FROM",
+        "IGNORING",
+        "INDICATING",
+        "INTO",
+        "IS",
+        "JSON",
+        "NAME",
+        "NOT",
+        "ON",
+        "PARSE",
+        "SUPPRESS",
+        "WITH"
+      ],
+      "catalog_placeholders": [
+        "converting-phrase-1",
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-6",
+        "ignoring-phrase-1",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "indicating-phrase-1",
+        "literal-1",
+        "literal-4"
+      ],
+      "id": "json-parse",
+      "keywords_absent_from_source": [
+        "CODEPAGE",
+        "PARSE"
+      ],
+      "keywords_missing_from_catalog": [
+        "ALL",
+        "AND",
+        "BOOL",
+        "BOOLEAN",
+        "FROM CODEPAGE",
+        "IN",
+        "JSON PARSE",
+        "NULL",
+        "NULL FOR",
+        "OF",
+        "OMITTED",
+        "USING"
+      ],
+      "optionals": [
+        "ALSO",
+        "CONVERTING",
+        "DETAIL",
+        "ENCODING",
+        "END-JSON",
+        "EXCEPTION",
+        "FROM",
+        "FROM CODEPAGE",
+        "IGNORING",
+        "IN",
+        "INDICATING",
+        "IS",
+        "JSON",
+        "NAME",
+        "NOT",
+        "OF",
+        "OMITTED",
+        "ON",
+        "SUPPRESS",
+        "USING",
+        "WITH",
+        "converting-phrase-1",
+        "identifier-10",
+        "identifier-3",
+        "identifier-4",
+        "identifier-6",
+        "ignoring-phrase-1",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "indicating-phrase-1",
+        "literal-1",
+        "literal-4"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0024",
+      "source_diagram_count": 6,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 5,
+      "source_keywords": [
+        "ALL",
+        "ALSO",
+        "AND",
+        "BOOL",
+        "BOOLEAN",
+        "CONVERTING",
+        "DETAIL",
+        "ENCODING",
+        "END-JSON",
+        "EXCEPTION",
+        "FROM",
+        "FROM CODEPAGE",
+        "IGNORING",
+        "IN",
+        "INDICATING",
+        "INTO",
+        "IS",
+        "JSON",
+        "JSON PARSE",
+        "NAME",
+        "NOT",
+        "NULL",
+        "NULL FOR",
+        "OF",
+        "OMITTED",
+        "ON",
+        "SUPPRESS",
+        "USING",
+        "WITH"
+      ],
+      "source_operands": [
+        "condition-name-1",
+        "condition-name-2",
+        "condition-name-3",
+        "converting-phrase-1",
+        "fig-con-1",
+        "identifier-1",
+        "identifier-10",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "identifier-6",
+        "identifier-7",
+        "identifier-8",
+        "identifier-9",
+        "ignoring-phrase-1",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "indicating-phrase-1",
+        "literal-1",
+        "literal-2",
+        "literal-3",
+        "literal-4",
+        "using-phrase-1"
+      ],
+      "title": "JSON PARSE statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [
+        "DESCENDING",
+        "GIVING",
+        "file-name-4"
+      ],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "ASCENDING",
+        "COLLATING",
+        "DESCENDING",
+        "GIVING",
+        "IS",
+        "KEY",
+        "MERGE",
+        "ON",
+        "OUTPUT",
+        "PROCEDURE",
+        "SEQUENCE",
+        "THROUGH",
+        "THRU",
+        "USING"
+      ],
+      "catalog_placeholders": [
+        "alphabet-name-1",
+        "data-name-1",
+        "file-name-1",
+        "file-name-2",
+        "file-name-3",
+        "file-name-4",
+        "procedure-name-1",
+        "procedure-name-2"
+      ],
+      "id": "merge",
+      "keywords_absent_from_source": [
+        "OUTPUT",
+        "PROCEDURE"
+      ],
+      "keywords_missing_from_catalog": [
+        "OUTPUT PROCEDURE"
+      ],
+      "optionals": [
+        "COLLATING",
+        "IS",
+        "KEY",
+        "ON",
+        "SEQUENCE",
+        "THROUGH",
+        "THRU",
+        "alphabet-name-1",
+        "procedure-name-2"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0025",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "ASCENDING",
+        "COLLATING",
+        "DESCENDING",
+        "GIVING",
+        "IS",
+        "KEY",
+        "MERGE",
+        "ON",
+        "OUTPUT PROCEDURE",
+        "SEQUENCE",
+        "THROUGH",
+        "THRU",
+        "USING"
+      ],
+      "source_operands": [
+        "alphabet-name-1",
+        "data-name-1",
+        "file-name-1",
+        "file-name-2",
+        "file-name-3",
+        "file-name-4",
+        "procedure-name-1",
+        "procedure-name-2"
+      ],
+      "title": "MERGE statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [
+        "CORR",
+        "literal-1"
+      ],
+      "catalog_form_count": 2,
+      "catalog_keywords": [
+        "CORR",
+        "CORRESPONDING",
+        "MOVE",
+        "TO"
+      ],
+      "catalog_placeholders": [
+        "identifier-1",
+        "identifier-2",
+        "literal-1"
+      ],
+      "id": "move",
+      "keywords_absent_from_source": [],
+      "keywords_missing_from_catalog": [],
+      "optionals": [],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0026",
+      "source_diagram_count": 2,
+      "source_format_count": 2,
+      "source_format_titles": [
+        "Format 1: MOVE statement",
+        "Format 2: MOVE statement with CORRESPONDING phrase"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "CORR",
+        "CORRESPONDING",
+        "MOVE",
+        "TO"
+      ],
+      "source_operands": [
+        "identifier-1",
+        "identifier-2",
+        "literal-1"
+      ],
+      "title": "MOVE statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [
+        "literal-1",
+        "literal-2"
+      ],
+      "catalog_form_count": 2,
+      "catalog_keywords": [
+        "BY",
+        "END-MULTIPLY",
+        "ERROR",
+        "GIVING",
+        "MULTIPLY",
+        "NOT",
+        "ON",
+        "ROUNDED",
+        "SIZE"
+      ],
+      "catalog_placeholders": [
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "literal-1",
+        "literal-2",
+        "statements"
+      ],
+      "id": "multiply",
+      "keywords_absent_from_source": [
+        "ERROR",
+        "SIZE"
+      ],
+      "keywords_missing_from_catalog": [
+        "SIZE ERROR"
+      ],
+      "optionals": [
+        "END-MULTIPLY",
+        "NOT",
+        "ON",
+        "ROUNDED",
+        "SIZE ERROR",
+        "imperative-statement-1",
+        "imperative-statement-2"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0027",
+      "source_diagram_count": 2,
+      "source_format_count": 2,
+      "source_format_titles": [
+        "Format 1: MULTIPLY statement",
+        "Format 2: MULTIPLY statement with GIVING phrase"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "BY",
+        "END-MULTIPLY",
+        "GIVING",
+        "MULTIPLY",
+        "NOT",
+        "ON",
+        "ROUNDED",
+        "SIZE ERROR"
+      ],
+      "source_operands": [
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "literal-1",
+        "literal-2"
+      ],
+      "title": "MULTIPLY statement",
+      "undefined_placeholders": [
+        "statements"
+      ]
+    },
+    {
+      "alternatives": [
+        "EXTEND",
+        "I-O",
+        "NO REWIND",
+        "OUTPUT",
+        "WITH",
+        "file-name-2",
+        "file-name-3",
+        "file-name-4"
+      ],
+      "catalog_form_count": 3,
+      "catalog_keywords": [
+        "EXTEND",
+        "I-O",
+        "INPUT",
+        "NO",
+        "OPEN",
+        "OUTPUT",
+        "REVERSED",
+        "REWIND",
+        "WITH"
+      ],
+      "catalog_placeholders": [
+        "file-name-1",
+        "file-name-2",
+        "file-name-3",
+        "file-name-4"
+      ],
+      "id": "open",
+      "keywords_absent_from_source": [
+        "NO",
+        "REWIND"
+      ],
+      "keywords_missing_from_catalog": [
+        "NO REWIND"
+      ],
+      "optionals": [
+        "NO REWIND",
+        "REVERSED",
+        "WITH"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0028",
+      "source_diagram_count": 3,
+      "source_format_count": 3,
+      "source_format_titles": [
+        "Format 1: OPEN statement for sequential files",
+        "Format 2: OPEN statement for indexed and relative files",
+        "Format 3: OPEN statement for line-sequential files"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "EXTEND",
+        "I-O",
+        "INPUT",
+        "NO REWIND",
+        "OPEN",
+        "OUTPUT",
+        "REVERSED",
+        "WITH"
+      ],
+      "source_operands": [
+        "file-name-1",
+        "file-name-2",
+        "file-name-3",
+        "file-name-4"
+      ],
+      "title": "OPEN statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [
+        "END-PERFORM",
+        "EXIT",
+        "TIMES",
+        "identifier-1",
+        "imperative-statement-1",
+        "index-name-1",
+        "index-name-2",
+        "index-name-3",
+        "index-name-4",
+        "integer-1",
+        "literal-1",
+        "literal-2",
+        "literal-3",
+        "literal-4",
+        "phrase 1"
+      ],
+      "catalog_form_count": 4,
+      "catalog_keywords": [
+        "AFTER",
+        "BEFORE",
+        "BY",
+        "END-PERFORM",
+        "EXIT",
+        "FROM",
+        "PERFORM",
+        "TEST",
+        "THROUGH",
+        "THRU",
+        "TIMES",
+        "UNTIL",
+        "VARYING",
+        "WITH"
+      ],
+      "catalog_placeholders": [
+        "condition-1",
+        "condition-2",
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "identifier-6",
+        "identifier-7",
+        "index-name-1",
+        "index-name-2",
+        "index-name-3",
+        "index-name-4",
+        "integer-1",
+        "literal-1",
+        "literal-2",
+        "literal-3",
+        "literal-4",
+        "procedure-name-1",
+        "procedure-name-2",
+        "statements"
+      ],
+      "id": "perform",
+      "keywords_absent_from_source": [],
+      "keywords_missing_from_catalog": [],
+      "optionals": [
+        "AFTER",
+        "BEFORE",
+        "TEST",
+        "THROUGH",
+        "THRU",
+        "WITH",
+        "procedure-name-2"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0029",
+      "source_diagram_count": 4,
+      "source_format_count": 4,
+      "source_format_titles": [
+        "Format 1: Basic PERFORM statement",
+        "Format 2: PERFORM statement with TIMES phrase",
+        "Format 3: PERFORM statement with UNTIL phrase",
+        "Format 4: PERFORM statement with VARYING phrase"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "AFTER",
+        "BEFORE",
+        "BY",
+        "END-PERFORM",
+        "EXIT",
+        "FROM",
+        "PERFORM",
+        "TEST",
+        "THROUGH",
+        "THRU",
+        "TIMES",
+        "UNTIL",
+        "VARYING",
+        "WITH"
+      ],
+      "source_operands": [
+        "condition-1",
+        "condition-2",
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "identifier-6",
+        "identifier-7",
+        "imperative-statement-1",
+        "index-name-1",
+        "index-name-2",
+        "index-name-3",
+        "index-name-4",
+        "integer-1",
+        "literal-1",
+        "literal-2",
+        "literal-3",
+        "literal-4",
+        "procedure-name-1",
+        "procedure-name-2"
+      ],
+      "title": "PERFORM statement",
+      "undefined_placeholders": [
+        "statements"
+      ]
+    },
+    {
+      "alternatives": [],
+      "catalog_form_count": 2,
+      "catalog_keywords": [
+        "AT",
+        "END",
+        "END-READ",
+        "IGNORE",
+        "INTO",
+        "INVALID",
+        "IS",
+        "KEPT",
+        "KEY",
+        "LOCK",
+        "NEXT",
+        "NO",
+        "NOT",
+        "PREVIOUS",
+        "READ",
+        "RECORD",
+        "WAIT",
+        "WITH"
+      ],
+      "catalog_placeholders": [
+        "data-name-1",
+        "file-name-1",
+        "identifier-1",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "imperative-statement-3",
+        "imperative-statement-4"
+      ],
+      "id": "read",
+      "keywords_absent_from_source": [
+        "IGNORE",
+        "KEPT",
+        "LOCK",
+        "NO",
+        "PREVIOUS",
+        "WAIT",
+        "WITH"
+      ],
+      "keywords_missing_from_catalog": [
+        "NOT INVALID"
+      ],
+      "optionals": [
+        "AT",
+        "END",
+        "END-READ",
+        "INTO",
+        "INVALID",
+        "IS",
+        "KEY",
+        "NEXT",
+        "NOT",
+        "NOT INVALID",
+        "RECORD",
+        "data-name-1",
+        "identifier-1",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "imperative-statement-3",
+        "imperative-statement-4"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0030",
+      "source_diagram_count": 2,
+      "source_format_count": 2,
+      "source_format_titles": [
+        "Format 1: READ statement for sequential retrieval",
+        "Format 2: READ statement for random retrieval"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "AT",
+        "END",
+        "END-READ",
+        "INTO",
+        "INVALID",
+        "IS",
+        "KEY",
+        "NEXT",
+        "NOT",
+        "NOT INVALID",
+        "READ",
+        "RECORD"
+      ],
+      "source_operands": [
+        "data-name-1",
+        "file-name-1",
+        "identifier-1",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "imperative-statement-3",
+        "imperative-statement-4"
+      ],
+      "title": "READ statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "FROM",
+        "RELEASE"
+      ],
+      "catalog_placeholders": [
+        "identifier-1",
+        "record-name-1"
+      ],
+      "id": "release",
+      "keywords_absent_from_source": [],
+      "keywords_missing_from_catalog": [],
+      "optionals": [
+        "FROM",
+        "identifier-1"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0031",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format: RELEASE"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "FROM",
+        "RELEASE"
+      ],
+      "source_operands": [
+        "identifier-1",
+        "record-name-1"
+      ],
+      "title": "RELEASE statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "AT",
+        "END",
+        "END-RETURN",
+        "INTO",
+        "NOT",
+        "RECORD",
+        "RETURN"
+      ],
+      "catalog_placeholders": [
+        "file-name-1",
+        "identifier-1",
+        "imperative-statement-1",
+        "imperative-statement-2"
+      ],
+      "id": "return",
+      "keywords_absent_from_source": [],
+      "keywords_missing_from_catalog": [],
+      "optionals": [
+        "AT",
+        "END",
+        "END-RETURN",
+        "INTO",
+        "NOT",
+        "RECORD",
+        "identifier-1",
+        "imperative-statement-1",
+        "imperative-statement-2"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0032",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format: RETURN statement"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "AT",
+        "END",
+        "END-RETURN",
+        "INTO",
+        "NOT",
+        "RECORD",
+        "RETURN"
+      ],
+      "source_operands": [
+        "file-name-1",
+        "identifier-1",
+        "imperative-statement-1",
+        "imperative-statement-2"
+      ],
+      "title": "RETURN statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "END-REWRITE",
+        "FROM",
+        "INVALID",
+        "KEY",
+        "NOT",
+        "REWRITE"
+      ],
+      "catalog_placeholders": [
+        "identifier-1",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "record-name-1"
+      ],
+      "id": "rewrite",
+      "keywords_absent_from_source": [
+        "NOT"
+      ],
+      "keywords_missing_from_catalog": [
+        "NOT INVALID"
+      ],
+      "optionals": [
+        "END-REWRITE",
+        "FROM",
+        "INVALID",
+        "KEY",
+        "NOT INVALID",
+        "identifier-1",
+        "imperative-statement-1",
+        "imperative-statement-2"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0033",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format: REWRITE statement"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "END-REWRITE",
+        "FROM",
+        "INVALID",
+        "KEY",
+        "NOT INVALID",
+        "REWRITE"
+      ],
+      "source_operands": [
+        "identifier-1",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "record-name-1"
+      ],
+      "title": "REWRITE statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [
+        "=",
+        "NEXT SENTENCE",
+        "arithmetic-expression-1",
+        "condition-name-1",
+        "literal-1"
+      ],
+      "catalog_form_count": 2,
+      "catalog_keywords": [
+        "ALL",
+        "AND",
+        "AT",
+        "END",
+        "END-SEARCH",
+        "EQUAL",
+        "IS",
+        "NEXT",
+        "SEARCH",
+        "SENTENCE",
+        "TO",
+        "VARYING",
+        "WHEN"
+      ],
+      "catalog_placeholders": [
+        "arithmetic-expression-1",
+        "arithmetic-expression-2",
+        "condition-1",
+        "condition-name-1",
+        "condition-name-2",
+        "data-name-1",
+        "data-name-2",
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "index-name-1",
+        "literal-1",
+        "literal-2"
+      ],
+      "id": "search",
+      "keywords_absent_from_source": [
+        "ALL",
+        "NEXT",
+        "SENTENCE"
+      ],
+      "keywords_missing_from_catalog": [
+        "=",
+        "NEXT SENTENCE",
+        "SEARCH ALL"
+      ],
+      "optionals": [
+        "=",
+        "AND",
+        "AT",
+        "END",
+        "END-SEARCH",
+        "EQUAL",
+        "IS",
+        "TO",
+        "VARYING",
+        "arithmetic-expression-2",
+        "condition-name-2",
+        "data-name-2",
+        "identifier-2",
+        "identifier-4",
+        "imperative-statement-1",
+        "index-name-1",
+        "literal-2"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0034",
+      "source_diagram_count": 2,
+      "source_format_count": 2,
+      "source_format_titles": [
+        "Format 1: SEARCH statement for serial search",
+        "Format 2: SEARCH statement for binary search"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "=",
+        "AND",
+        "AT",
+        "END",
+        "END-SEARCH",
+        "EQUAL",
+        "IS",
+        "NEXT SENTENCE",
+        "SEARCH",
+        "SEARCH ALL",
+        "TO",
+        "VARYING",
+        "WHEN"
+      ],
+      "source_operands": [
+        "arithmetic-expression-1",
+        "arithmetic-expression-2",
+        "condition-1",
+        "condition-name-1",
+        "condition-name-2",
+        "data-name-1",
+        "data-name-2",
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "index-name-1",
+        "literal-1",
+        "literal-2"
+      ],
+      "title": "SEARCH statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [
+        "ADDRESS OF",
+        "DOWN BY",
+        "ENTRY",
+        "FALSE",
+        "NULL",
+        "NULLS",
+        "OFF",
+        "SELF",
+        "function-pointer-data-item-1",
+        "function-pointer-data-item-2",
+        "identifier-1",
+        "identifier-2",
+        "identifier-5",
+        "identifier-7",
+        "identifier-8",
+        "identifier-9",
+        "integer-1",
+        "integer-2",
+        "literal-1",
+        "pointer-data-item-3"
+      ],
+      "catalog_form_count": 6,
+      "catalog_keywords": [
+        "BY",
+        "DOWN",
+        "ENTRY",
+        "SET",
+        "TO",
+        "UP"
+      ],
+      "catalog_placeholders": [
+        "function-pointer-data-item-1",
+        "function-pointer-data-item-2",
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-6",
+        "identifier-8",
+        "identifier-9",
+        "index-name-1",
+        "index-name-2",
+        "index-name-3",
+        "integer-1",
+        "integer-2",
+        "literal-1",
+        "object-reference-id-1",
+        "object-reference-id-2",
+        "pointer-data-item-3",
+        "procedure-pointer-data-item-1",
+        "procedure-pointer-data-item-2"
+      ],
+      "id": "set",
+      "keywords_absent_from_source": [
+        "BY",
+        "DOWN",
+        "UP"
+      ],
+      "keywords_missing_from_catalog": [
+        "ADDRESS OF",
+        "DOWN BY",
+        "FALSE",
+        "LENGTH OF",
+        "NULL",
+        "NULLS",
+        "OFF",
+        "ON",
+        "SELF",
+        "TRUE",
+        "UP BY"
+      ],
+      "optionals": [],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0035",
+      "source_diagram_count": 8,
+      "source_format_count": 8,
+      "source_format_titles": [
+        "Format 1: SET statement for basic table handling",
+        "Format 2: SET statement for adjusting indexes",
+        "Format 3: SET statement for external switches",
+        "Format 4: SET statement for condition-names",
+        "Format 5: SET statement for USAGE IS POINTER or USAGE IS POINTER-32 data items",
+        "Format 6: SET statement for procedure-pointers and function-pointers",
+        "Format 7: SET statement for object references",
+        "Format 8: SET for length of dynamic-length elementary items"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "ADDRESS OF",
+        "DOWN BY",
+        "ENTRY",
+        "FALSE",
+        "LENGTH OF",
+        "NULL",
+        "NULLS",
+        "OFF",
+        "ON",
+        "SELF",
+        "SET",
+        "TO",
+        "TRUE",
+        "UP BY"
+      ],
+      "source_operands": [
+        "condition-name-1",
+        "function-pointer-data-item-1",
+        "function-pointer-data-item-2",
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "identifier-6",
+        "identifier-7",
+        "identifier-8",
+        "identifier-9",
+        "index-name-1",
+        "index-name-2",
+        "index-name-3",
+        "integer-1",
+        "integer-2",
+        "literal-1",
+        "mnemonic-name-1",
+        "object-reference-id-1",
+        "object-reference-id-2",
+        "pointer-data-item-3",
+        "procedure-pointer-data-item-1",
+        "procedure-pointer-data-item-2"
+      ],
+      "title": "SET statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [
+        "DESCENDING",
+        "INPUT PROCEDURE",
+        "IS",
+        "OUTPUT PROCEDURE",
+        "THROUGH",
+        "THRU",
+        "procedure-name-1",
+        "procedure-name-2",
+        "procedure-name-3",
+        "procedure-name-4"
+      ],
+      "catalog_form_count": 2,
+      "catalog_keywords": [
+        "ASCENDING",
+        "COLLATING",
+        "DESCENDING",
+        "DUPLICATES",
+        "GIVING",
+        "IN",
+        "INPUT",
+        "IS",
+        "KEY",
+        "ON",
+        "ORDER",
+        "OUTPUT",
+        "PROCEDURE",
+        "SEQUENCE",
+        "SORT",
+        "THROUGH",
+        "THRU",
+        "USING",
+        "WITH"
+      ],
+      "catalog_placeholders": [
+        "alphabet-name-1",
+        "data-name-1",
+        "data-name-2",
+        "file-name-1",
+        "file-name-2",
+        "file-name-3",
+        "procedure-name-1",
+        "procedure-name-2",
+        "procedure-name-3",
+        "procedure-name-4"
+      ],
+      "id": "sort",
+      "keywords_absent_from_source": [
+        "INPUT",
+        "OUTPUT",
+        "PROCEDURE"
+      ],
+      "keywords_missing_from_catalog": [
+        "INPUT PROCEDURE",
+        "OUTPUT PROCEDURE"
+      ],
+      "optionals": [
+        "ASCENDING",
+        "COLLATING",
+        "DESCENDING",
+        "DUPLICATES",
+        "IN",
+        "IS",
+        "KEY",
+        "ON",
+        "ORDER",
+        "SEQUENCE",
+        "WITH",
+        "alphabet-name-1",
+        "data-name-1"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0036",
+      "source_diagram_count": 2,
+      "source_format_count": 2,
+      "source_format_titles": [
+        "Format 1: SORT statement",
+        "Format 2: Table SORT statement"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "ASCENDING",
+        "COLLATING",
+        "DESCENDING",
+        "DUPLICATES",
+        "GIVING",
+        "IN",
+        "INPUT PROCEDURE",
+        "IS",
+        "KEY",
+        "ON",
+        "ORDER",
+        "OUTPUT PROCEDURE",
+        "SEQUENCE",
+        "SORT",
+        "THROUGH",
+        "THRU",
+        "USING",
+        "WITH"
+      ],
+      "source_operands": [
+        "alphabet-name-1",
+        "data-name-1",
+        "data-name-2",
+        "file-name-1",
+        "file-name-2",
+        "file-name-3",
+        "procedure-name-1",
+        "procedure-name-2",
+        "procedure-name-3",
+        "procedure-name-4"
+      ],
+      "title": "SORT statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "END-START",
+        "EQUAL",
+        "GREATER",
+        "INVALID",
+        "IS",
+        "KEY",
+        "LESS",
+        "NOT",
+        "OR",
+        "PARTIAL",
+        "START",
+        "THAN",
+        "TO"
+      ],
+      "catalog_placeholders": [
+        "data-name-1",
+        "file-name-1",
+        "imperative-statement-1",
+        "imperative-statement-2"
+      ],
+      "id": "start",
+      "keywords_absent_from_source": [
+        "LESS",
+        "NOT",
+        "OR"
+      ],
+      "keywords_missing_from_catalog": [
+        "=",
+        ">",
+        ">=",
+        "NOT <",
+        "NOT INVALID",
+        "NOT LESS",
+        "OR EQUAL"
+      ],
+      "optionals": [
+        "=",
+        ">",
+        ">=",
+        "END-START",
+        "EQUAL",
+        "GREATER",
+        "INVALID",
+        "IS",
+        "KEY",
+        "NOT <",
+        "NOT INVALID",
+        "NOT LESS",
+        "OR EQUAL",
+        "PARTIAL",
+        "THAN",
+        "TO",
+        "data-name-1",
+        "imperative-statement-1",
+        "imperative-statement-2"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0037",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "=",
+        ">",
+        ">=",
+        "END-START",
+        "EQUAL",
+        "GREATER",
+        "INVALID",
+        "IS",
+        "KEY",
+        "NOT <",
+        "NOT INVALID",
+        "NOT LESS",
+        "OR EQUAL",
+        "PARTIAL",
+        "START",
+        "THAN",
+        "TO"
+      ],
+      "source_operands": [
+        "data-name-1",
+        "file-name-1",
+        "imperative-statement-1",
+        "imperative-statement-2"
+      ],
+      "title": "START statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [
+        "literal"
+      ],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "RETURNING",
+        "RUN",
+        "STOP"
+      ],
+      "catalog_placeholders": [
+        "literal",
+        "value"
+      ],
+      "id": "stop",
+      "keywords_absent_from_source": [
+        "RETURNING"
+      ],
+      "keywords_missing_from_catalog": [],
+      "optionals": [],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0038",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "RUN",
+        "STOP"
+      ],
+      "source_operands": [
+        "literal"
+      ],
+      "title": "STOP statement",
+      "undefined_placeholders": [
+        "value"
+      ]
+    },
+    {
+      "alternatives": [
+        "SIZE",
+        "literal-1",
+        "literal-2"
+      ],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "BY",
+        "DELIMITED",
+        "END-STRING",
+        "INTO",
+        "NOT",
+        "ON",
+        "OVERFLOW",
+        "POINTER",
+        "SIZE",
+        "STRING",
+        "WITH"
+      ],
+      "catalog_placeholders": [
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "literal-1",
+        "literal-2"
+      ],
+      "id": "string",
+      "keywords_absent_from_source": [],
+      "keywords_missing_from_catalog": [],
+      "optionals": [
+        "BY",
+        "END-STRING",
+        "NOT",
+        "ON",
+        "OVERFLOW",
+        "POINTER",
+        "WITH",
+        "identifier-4",
+        "imperative-statement-1",
+        "imperative-statement-2"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0039",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "BY",
+        "DELIMITED",
+        "END-STRING",
+        "INTO",
+        "NOT",
+        "ON",
+        "OVERFLOW",
+        "POINTER",
+        "SIZE",
+        "STRING",
+        "WITH"
+      ],
+      "source_operands": [
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "literal-1",
+        "literal-2"
+      ],
+      "title": "STRING statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [
+        "CORR",
+        "literal-1",
+        "literal-2"
+      ],
+      "catalog_form_count": 3,
+      "catalog_keywords": [
+        "CORR",
+        "CORRESPONDING",
+        "END-SUBTRACT",
+        "ERROR",
+        "FROM",
+        "GIVING",
+        "NOT",
+        "ON",
+        "ROUNDED",
+        "SIZE",
+        "SUBTRACT"
+      ],
+      "catalog_placeholders": [
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "literal-1",
+        "literal-2",
+        "statements"
+      ],
+      "id": "subtract",
+      "keywords_absent_from_source": [
+        "ERROR",
+        "SIZE"
+      ],
+      "keywords_missing_from_catalog": [
+        "SIZE ERROR"
+      ],
+      "optionals": [
+        "END-SUBTRACT",
+        "NOT",
+        "ON",
+        "ROUNDED",
+        "SIZE ERROR",
+        "imperative-statement-1",
+        "imperative-statement-2"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0040",
+      "source_diagram_count": 3,
+      "source_format_count": 3,
+      "source_format_titles": [
+        "Format 1: SUBTRACT statement",
+        "Format 2: SUBTRACT statement with GIVING phrase",
+        "Format 3: SUBTRACT statement with CORRESPONDING phrase"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "CORR",
+        "CORRESPONDING",
+        "END-SUBTRACT",
+        "FROM",
+        "GIVING",
+        "NOT",
+        "ON",
+        "ROUNDED",
+        "SIZE ERROR",
+        "SUBTRACT"
+      ],
+      "source_operands": [
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "literal-1",
+        "literal-2"
+      ],
+      "title": "SUBTRACT statement",
+      "undefined_placeholders": [
+        "statements"
+      ]
+    },
+    {
+      "alternatives": [],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "ALL",
+        "BY",
+        "COUNT",
+        "DELIMITED",
+        "DELIMITER",
+        "END-UNSTRING",
+        "IN",
+        "INTO",
+        "NOT",
+        "ON",
+        "OR",
+        "OVERFLOW",
+        "POINTER",
+        "TALLYING",
+        "UNSTRING",
+        "WITH"
+      ],
+      "catalog_placeholders": [
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "identifier-6",
+        "identifier-7",
+        "identifier-8",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "literal-1",
+        "literal-2"
+      ],
+      "id": "unstring",
+      "keywords_absent_from_source": [],
+      "keywords_missing_from_catalog": [],
+      "optionals": [
+        "ALL",
+        "BY",
+        "COUNT",
+        "DELIMITED",
+        "DELIMITER",
+        "END-UNSTRING",
+        "IN",
+        "NOT",
+        "ON",
+        "OR",
+        "OVERFLOW",
+        "POINTER",
+        "TALLYING",
+        "WITH",
+        "identifier-2",
+        "identifier-3",
+        "identifier-5",
+        "identifier-6",
+        "identifier-7",
+        "identifier-8",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "literal-1",
+        "literal-2"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0041",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "ALL",
+        "BY",
+        "COUNT",
+        "DELIMITED",
+        "DELIMITER",
+        "END-UNSTRING",
+        "IN",
+        "INTO",
+        "NOT",
+        "ON",
+        "OR",
+        "OVERFLOW",
+        "POINTER",
+        "TALLYING",
+        "UNSTRING",
+        "WITH"
+      ],
+      "source_operands": [
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "identifier-6",
+        "identifier-7",
+        "identifier-8",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "literal-1",
+        "literal-2"
+      ],
+      "title": "UNSTRING statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [
+        "invalid_key",
+        "not_invalid_key"
+      ],
+      "catalog_form_count": 3,
+      "catalog_keywords": [
+        "ADVANCING",
+        "AFTER",
+        "AT",
+        "BEFORE",
+        "END-OF-PAGE",
+        "END-WRITE",
+        "EOP",
+        "FROM",
+        "INVALID",
+        "KEY",
+        "LINE",
+        "LINES",
+        "NOT",
+        "WRITE"
+      ],
+      "catalog_placeholders": [
+        "identifier-1",
+        "identifier-2",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "imperative-statement-3",
+        "imperative-statement-4",
+        "integer-1",
+        "mnemonic-name-1",
+        "record-name-1"
+      ],
+      "id": "write",
+      "keywords_absent_from_source": [],
+      "keywords_missing_from_catalog": [
+        "NOT INVALID",
+        "PAGE"
+      ],
+      "optionals": [
+        "ADVANCING",
+        "AFTER",
+        "AT",
+        "BEFORE",
+        "END-OF-PAGE",
+        "END-WRITE",
+        "EOP",
+        "FROM",
+        "INVALID",
+        "KEY",
+        "LINE",
+        "LINES",
+        "NOT",
+        "NOT INVALID",
+        "PAGE",
+        "identifier-1",
+        "identifier-2",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "imperative-statement-3",
+        "imperative-statement-4",
+        "integer-1",
+        "mnemonic-name-1"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0042",
+      "source_diagram_count": 3,
+      "source_format_count": 3,
+      "source_format_titles": [
+        "Format 1: WRITE statement for sequential files",
+        "Format 2: WRITE statement for indexed and relative files",
+        "Format 3: WRITE statement for line-sequential files"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "ADVANCING",
+        "AFTER",
+        "AT",
+        "BEFORE",
+        "END-OF-PAGE",
+        "END-WRITE",
+        "EOP",
+        "FROM",
+        "INVALID",
+        "KEY",
+        "LINE",
+        "LINES",
+        "NOT",
+        "NOT INVALID",
+        "PAGE",
+        "WRITE"
+      ],
+      "source_operands": [
+        "identifier-1",
+        "identifier-2",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "imperative-statement-3",
+        "imperative-statement-4",
+        "integer-1",
+        "mnemonic-name-1",
+        "record-name-1"
+      ],
+      "title": "WRITE statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [
+        "HIGH-VALUE",
+        "HIGH-VALUES",
+        "LOW-VALUE",
+        "LOW-VALUES",
+        "SPACE",
+        "SPACES",
+        "ZEROES",
+        "ZEROS"
+      ],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "ATTRIBUTE",
+        "ATTRIBUTES",
+        "CONTENT",
+        "COUNT",
+        "ELEMENT",
+        "ENCODING",
+        "END-XML",
+        "EXCEPTION",
+        "FROM",
+        "GENERATE",
+        "IN",
+        "IS",
+        "NAME",
+        "NAMESPACE",
+        "NAMESPACE-PREFIX",
+        "NOT",
+        "ON",
+        "SUPPRESS",
+        "TYPE",
+        "WITH",
+        "XML",
+        "XML-DECLARATION"
+      ],
+      "catalog_placeholders": [
+        "codepage",
+        "generic-suppression-phrase",
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "identifier-6",
+        "identifier-7",
+        "identifier-8",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "literal-4",
+        "literal-5",
+        "literal-6",
+        "when-phrase"
+      ],
+      "id": "xml-generate",
+      "keywords_absent_from_source": [
+        "GENERATE",
+        "XML"
+      ],
+      "keywords_missing_from_catalog": [
+        "EVERY",
+        "HIGH-VALUE",
+        "HIGH-VALUES",
+        "LOW-VALUE",
+        "LOW-VALUES",
+        "NONNUMERIC",
+        "NUMERIC",
+        "OF",
+        "OR",
+        "SPACE",
+        "SPACES",
+        "WHEN",
+        "XML GENERATE",
+        "ZERO",
+        "ZEROES",
+        "ZEROS"
+      ],
+      "optionals": [
+        "ATTRIBUTE",
+        "ATTRIBUTES",
+        "CONTENT",
+        "COUNT",
+        "ELEMENT",
+        "ENCODING",
+        "END-XML",
+        "EVERY",
+        "EXCEPTION",
+        "HIGH-VALUE",
+        "HIGH-VALUES",
+        "IN",
+        "IS",
+        "LOW-VALUE",
+        "LOW-VALUES",
+        "NAME",
+        "NAMESPACE",
+        "NAMESPACE-PREFIX",
+        "NONNUMERIC",
+        "NOT",
+        "NUMERIC",
+        "OF",
+        "ON",
+        "OR",
+        "SPACE",
+        "SPACES",
+        "SUPPRESS",
+        "TYPE",
+        "WITH",
+        "XML-DECLARATION",
+        "ZERO",
+        "ZEROES",
+        "ZEROS",
+        "codepage",
+        "generic-suppression-phrase",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "identifier-6",
+        "identifier-7",
+        "identifier-8",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "literal-4",
+        "literal-5",
+        "literal-6",
+        "when-phrase"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0043",
+      "source_diagram_count": 3,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 2,
+      "source_keywords": [
+        "ATTRIBUTE",
+        "ATTRIBUTES",
+        "CONTENT",
+        "COUNT",
+        "ELEMENT",
+        "ENCODING",
+        "END-XML",
+        "EVERY",
+        "EXCEPTION",
+        "FROM",
+        "HIGH-VALUE",
+        "HIGH-VALUES",
+        "IN",
+        "IS",
+        "LOW-VALUE",
+        "LOW-VALUES",
+        "NAME",
+        "NAMESPACE",
+        "NAMESPACE-PREFIX",
+        "NONNUMERIC",
+        "NOT",
+        "NUMERIC",
+        "OF",
+        "ON",
+        "OR",
+        "SPACE",
+        "SPACES",
+        "SUPPRESS",
+        "TYPE",
+        "WHEN",
+        "WITH",
+        "XML GENERATE",
+        "XML-DECLARATION",
+        "ZERO",
+        "ZEROES",
+        "ZEROS"
+      ],
+      "source_operands": [
+        "codepage",
+        "generic-suppression-phrase",
+        "identifier-1",
+        "identifier-2",
+        "identifier-3",
+        "identifier-4",
+        "identifier-5",
+        "identifier-6",
+        "identifier-7",
+        "identifier-8",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "literal-4",
+        "literal-5",
+        "literal-6",
+        "when-phrase"
+      ],
+      "title": "XML GENERATE statement",
+      "undefined_placeholders": []
+    },
+    {
+      "alternatives": [],
+      "catalog_form_count": 1,
+      "catalog_keywords": [
+        "ENCODING",
+        "END-XML",
+        "EXCEPTION",
+        "FILE",
+        "IS",
+        "NATIONAL",
+        "NOT",
+        "ON",
+        "PARSE",
+        "PROCEDURE",
+        "PROCESSING",
+        "RETURNING",
+        "THROUGH",
+        "THRU",
+        "VALIDATING",
+        "WITH",
+        "XML"
+      ],
+      "catalog_placeholders": [
+        "codepage",
+        "identifier-1",
+        "identifier-2",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "procedure-name-1",
+        "procedure-name-2",
+        "xml-schema-name-1"
+      ],
+      "id": "xml-parse",
+      "keywords_absent_from_source": [
+        "NATIONAL",
+        "PARSE",
+        "PROCEDURE",
+        "PROCESSING",
+        "RETURNING",
+        "XML"
+      ],
+      "keywords_missing_from_catalog": [
+        "PROCESSING PROCEDURE",
+        "RETURNING NATIONAL",
+        "XML PARSE"
+      ],
+      "optionals": [
+        "ENCODING",
+        "END-XML",
+        "EXCEPTION",
+        "FILE",
+        "IS",
+        "NOT",
+        "ON",
+        "RETURNING NATIONAL",
+        "THROUGH",
+        "THRU",
+        "VALIDATING",
+        "WITH",
+        "codepage",
+        "identifier-2",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "procedure-name-2",
+        "xml-schema-name-1"
+      ],
+      "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0044",
+      "source_diagram_count": 1,
+      "source_format_count": 1,
+      "source_format_titles": [
+        "Format"
+      ],
+      "source_fragment_count": 0,
+      "source_keywords": [
+        "ENCODING",
+        "END-XML",
+        "EXCEPTION",
+        "FILE",
+        "IS",
+        "NOT",
+        "ON",
+        "PROCESSING PROCEDURE",
+        "RETURNING NATIONAL",
+        "THROUGH",
+        "THRU",
+        "VALIDATING",
+        "WITH",
+        "XML PARSE"
+      ],
+      "source_operands": [
+        "codepage",
+        "identifier-1",
+        "identifier-2",
+        "imperative-statement-1",
+        "imperative-statement-2",
+        "procedure-name-1",
+        "procedure-name-2",
+        "xml-schema-name-1"
+      ],
+      "title": "XML PARSE statement",
+      "undefined_placeholders": []
+    }
+  ],
+  "schema_version": "mainframe-env.cobol-grammar-comparison@1",
+  "source": {
+    "product": "SS6SG3_6.5",
+    "retained_in_repository": false,
+    "topics": 139
+  },
+  "totals": {
+    "catalog_forms": 80,
+    "distinct_catalog_placeholders": 77,
+    "distinct_keywords_missing": 75,
+    "distinct_source_operands": 80,
+    "distinct_undefined_placeholders": 2,
+    "rows": 44,
+    "rows_with_missing_keywords": 29,
+    "rows_with_more_source_formats": 2,
+    "rows_with_undefined_placeholders": 8,
+    "source_diagrams": 95,
+    "source_format_titles": 83,
+    "source_formats": 83,
+    "source_phrase_fragments": 12
+  }
+}
