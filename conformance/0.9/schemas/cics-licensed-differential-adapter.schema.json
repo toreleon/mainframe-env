@@ -1,6 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://mainframe-env.invalid/schemas/cics-licensed-differential-adapter-v1.json",
+  "title": "CICS licensed-differential adapter",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "pilot_id", "capture_contract", "required_scenarios", "origin_policy", "environment_manifest_fields", "handoff", "licensed_campaign_status", "differential_gate"],

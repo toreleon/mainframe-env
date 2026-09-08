@@ -7294,38 +7294,35 @@ fn check_profiles(root: &Path) -> TaskResult {
     Ok(())
 }
 
-fn check_schemas(root: &Path) -> TaskResult {
+fn versioned_schema_files(root: &Path) -> TaskResult<Vec<PathBuf>> {
     let mut files = Vec::new();
-    collect_extension(
-        &root.join("conformance/0.1/schemas"),
-        OsStr::new("json"),
-        &mut files,
-    )?;
-    collect_extension(
-        &root.join("conformance/0.2/schemas"),
-        OsStr::new("json"),
-        &mut files,
-    )?;
-    collect_extension(
-        &root.join("conformance/0.5/schemas"),
-        OsStr::new("json"),
-        &mut files,
-    )?;
-    collect_extension(
-        &root.join("conformance/0.6/schemas"),
-        OsStr::new("json"),
-        &mut files,
-    )?;
-    let jcl_schemas = root.join("conformance/0.7/schemas");
-    if jcl_schemas.is_dir() {
-        collect_extension(&jcl_schemas, OsStr::new("json"), &mut files)?;
+    let conformance = root.join("conformance");
+    for entry in
+        fs::read_dir(&conformance).map_err(|error| format!("{}: {error}", conformance.display()))?
+    {
+        let entry = entry.map_err(|error| error.to_string())?;
+        let path = entry.path();
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else {
+            continue;
+        };
+        let components = name.split('.').collect::<Vec<_>>();
+        let versioned = matches!(components.len(), 2 | 3)
+            && components.iter().all(|component| {
+                !component.is_empty() && component.bytes().all(|byte| byte.is_ascii_digit())
+            });
+        let schemas = path.join("schemas");
+        if versioned && path.is_dir() && schemas.is_dir() {
+            collect_extension(&schemas, OsStr::new("json"), &mut files)?;
+        }
     }
-    let jes_schemas = root.join("conformance/0.8/schemas");
-    if jes_schemas.is_dir() {
-        collect_extension(&jes_schemas, OsStr::new("json"), &mut files)?;
-    }
-    require(!files.is_empty(), "no evidence schemas found")?;
     files.sort();
+    Ok(files)
+}
+
+fn check_schemas(root: &Path) -> TaskResult {
+    let files = versioned_schema_files(root)?;
+    require(!files.is_empty(), "no evidence schemas found")?;
     for file in &files {
         let value = json(file)?;
         let root_object = object(&value, file)?;
@@ -13780,6 +13777,42 @@ mod tests {
         });
         let invalid = json!({"generation":0});
         assert!(validate_schema_instance(&schema, &invalid, Path::new("artifact.json")).is_err());
+    }
+
+    #[test]
+    fn schema_discovery_includes_every_numeric_conformance_version() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = env::temp_dir().join(format!(
+            "mainframe-env-schema-discovery-{}-{nonce}",
+            std::process::id()
+        ));
+        for relative in [
+            "conformance/0.1/schemas/old.json",
+            "conformance/0.9/schemas/new.json",
+            "conformance/0.10.1/schemas/nested/future.json",
+            "conformance/spec/schemas/not-versioned.json",
+        ] {
+            let path = root.join(relative);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, b"{}\n").unwrap();
+        }
+        let discovered = versioned_schema_files(&root)
+            .unwrap()
+            .into_iter()
+            .map(|path| path.strip_prefix(&root).unwrap().to_path_buf())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            discovered,
+            vec![
+                PathBuf::from("conformance/0.1/schemas/old.json"),
+                PathBuf::from("conformance/0.10.1/schemas/nested/future.json"),
+                PathBuf::from("conformance/0.9/schemas/new.json"),
+            ]
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

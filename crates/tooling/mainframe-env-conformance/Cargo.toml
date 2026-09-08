@@ -31,6 +31,7 @@ mainframe-env-mq.workspace = true
 mainframe-env-store.workspace = true
 axum.workspace = true
 base64.workspace = true
+jsonschema.workspace = true
 ring.workspace = true
 serde.workspace = true
 serde_json.workspace = true

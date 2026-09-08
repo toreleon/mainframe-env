@@ -28,6 +28,9 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Made schema discovery cover every versioned conformance directory and made
+  CICS oracle imports validate the 0.9 schema before a closed typed origin is
+  parsed or credited.
 - Sealed the compiler's executable type-state chain and separated semantic
   artifact identity from the exact payload SHA-256 used by runtime references;
   the artifact contract is now `mainframe-env.artifact@2` and old compiler

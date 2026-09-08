@@ -1,6 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://mainframe-env.invalid/schemas/cics-oracle-capture-v1.json",
+  "title": "CICS licensed-oracle capture",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "candidate_digest", "spec_digest", "fixture_digest", "source_review_digest", "environment_manifest_digest", "comparison_policy", "raw_capture_digest", "observations", "origin"],
