@@ -16,6 +16,11 @@ the prior token stops working. Sessions use hashed durable keys, absolute and
 idle expiry, a durable per-user quota, and non-reusable principal-authentication
 epoch revocation across account deletion and recreation.
 
+Dataset catalog responses apply a discrete `DATASET` read decision to every
+candidate name before emitting it. Pagination scans are bounded and `moreRows`
+is based only on an additional authorized name, so a denied dataset cannot be
+inferred from a name, row count, or continuation hint.
+
 Stable JSON errors contain `category`, `message`, and numeric `status`.
 Malformed input is 400, authentication failure 401, authorization failure 403,
 missing resources and unadvertised routes 404, state/idempotency conflicts 409,

@@ -86,7 +86,10 @@ failure.
   values.
 - Providers resolve a secret only inside an authorized operation scope.
 - Diagnostics, logs, events, HTTP responses, spool, and evidence classify and
-  redact secret fields before serialization.
+redact secret fields before serialization.
+- Catalog and discovery operations authorize each returned resource, not only
+  the caller-supplied wildcard. Pagination metadata is derived from visible
+  resources so denied object names remain undisclosed.
 - Compatibility tests compare exact isolated values before publication-time
   redaction when equality is necessary.
 - Long-lived credentials are never copied into compiler artifacts, machine

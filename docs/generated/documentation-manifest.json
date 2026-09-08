@@ -10,7 +10,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:591db24825e72ccd20ca72344fef6a98f880e23d52b1f8cad7b1a0a180051145",
+      "sha256": "sha256:0356db3690dea63dc7b8611ff1f1b31e864486e07b8fd72c1b229af33e21e0bf",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -461,7 +461,7 @@
       "path": "docs/architecture/PLUGIN-AND-SECURITY.md",
       "relative_links": 0,
       "scope": "capability, provider, plugin, secret, and transport boundaries",
-      "sha256": "sha256:afd52d5bd917b39887abb1f38dd2c6b612af976fe3bf602c8ef78b880cd1ebf3",
+      "sha256": "sha256:12654d01c310e049dd9690f0a98c32e7428245f002ef4f38fcb70885c919da6a",
       "status": "Accepted by repository owner",
       "title": "0.1 Security and Capability Architecture",
       "xtask_commands": 0
@@ -693,7 +693,7 @@
       "path": "docs/delivery/ZOSMF-API.md",
       "relative_links": 0,
       "scope": "public z/OSMF-compatible routes, requests, and responses",
-      "sha256": "sha256:dd6c0116a9a92792f8caaefbf9d9427211ea4c06fc865d49f57fff01d14075e6",
+      "sha256": "sha256:487d41609bbda1ea3ff36a289057d1d8dff380f3acac8b03ff3e4033af7fd8b3",
       "status": "Frozen for mainframe-env 0.1.0",
       "title": "z/OSMF 0.1 compatibility API",
       "xtask_commands": 0

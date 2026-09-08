@@ -1859,23 +1859,11 @@ impl ProductServer {
                 attributes,
                 max,
             } => {
-                let result = self.dataset_call(
-                    &principal,
-                    DatasetRequest::List {
-                        pattern,
-                        start: start
-                            .map(|value| {
-                                DatasetName::new(value, 128).map_err(|_| HostProblem::Malformed)
-                            })
-                            .transpose()
-                            .map_err(gateway_problem)?,
-                        max_items: u32::try_from(max)
-                            .map_err(|_| gateway_problem(HostProblem::ResourceExhausted))?,
-                    },
-                )?;
-                let DatasetResult::Listed { names, more } = result else {
-                    return Err(gateway_problem(HostProblem::ProviderFailure));
-                };
+                let start = start
+                    .map(|value| DatasetName::new(value, 128).map_err(|_| HostProblem::Malformed))
+                    .transpose()
+                    .map_err(gateway_problem)?;
+                let (names, more) = self.visible_dataset_names(&principal, pattern, start, max)?;
                 let mut items = Vec::with_capacity(names.len());
                 for name in names {
                     let mut item = json!({"dsname":name.as_str()});
@@ -2929,9 +2917,8 @@ impl ProductServer {
             | DatasetRequest::BeginTvs { .. }
             | DatasetRequest::CompleteTvs { .. }
             | DatasetRequest::ReconcileTvs { .. } => None,
-            DatasetRequest::List { pattern, .. } | DatasetRequest::ListCatalog { pattern, .. } => {
-                Some(pattern.as_str())
-            }
+            DatasetRequest::List { .. } => None,
+            DatasetRequest::ListCatalog { pattern, .. } => Some(pattern.as_str()),
             DatasetRequest::ListVolumes { .. } => Some("VOLUME.**"),
             DatasetRequest::ReadConcatenation { .. } => None,
             DatasetRequest::Rename { from, .. } => Some(from.as_str()),
@@ -3139,6 +3126,19 @@ impl ProductServer {
         resource: &str,
         intent: AccessIntent,
     ) -> Result<(), GatewayProblem> {
+        match self.resource_decision(principal, class, resource, intent)? {
+            SecurityDecision::Allow => Ok(()),
+            _ => Err(gateway_problem(HostProblem::Unauthorized)),
+        }
+    }
+
+    fn resource_decision(
+        &self,
+        principal: &str,
+        class: &str,
+        resource: &str,
+        intent: AccessIntent,
+    ) -> Result<SecurityDecision, GatewayProblem> {
         let invocation = self
             .invocation(
                 principal,
@@ -3168,9 +3168,74 @@ impl ProductServer {
             },
         );
         match result.effect.outcome.map_err(gateway_problem)? {
-            HostResult::Security(SecurityDecision::Allow) => Ok(()),
-            HostResult::Security(_) => Err(gateway_problem(HostProblem::Unauthorized)),
+            HostResult::Security(decision) => Ok(decision),
             _ => Err(gateway_problem(HostProblem::ProviderFailure)),
+        }
+    }
+
+    fn visible_dataset_names(
+        &self,
+        principal: &str,
+        pattern: String,
+        start: Option<DatasetName>,
+        max: usize,
+    ) -> Result<(Vec<DatasetName>, bool), GatewayProblem> {
+        const SCAN_PAGE_ITEMS: u32 = 256;
+        const MAX_SCANNED_NAMES: usize = 262_144;
+        if max == 0 {
+            return Err(gateway_problem(HostProblem::Malformed));
+        }
+        let mut cursor = start;
+        let mut continuation = false;
+        let mut scanned = 0usize;
+        let mut visible = Vec::with_capacity(max.saturating_add(1));
+        loop {
+            let DatasetResult::Listed { names, more } = self.dataset_call(
+                principal,
+                DatasetRequest::List {
+                    pattern: pattern.clone(),
+                    start: cursor.clone(),
+                    max_items: SCAN_PAGE_ITEMS,
+                },
+            )?
+            else {
+                return Err(gateway_problem(HostProblem::ProviderFailure));
+            };
+            let previous = cursor.as_ref().map(|name| name.as_str().to_owned());
+            let mut progressed = false;
+            for name in names {
+                if continuation && previous.as_deref() == Some(name.as_str()) {
+                    continue;
+                }
+                progressed = true;
+                scanned = scanned
+                    .checked_add(1)
+                    .ok_or_else(|| gateway_problem(HostProblem::ResourceExhausted))?;
+                if scanned > MAX_SCANNED_NAMES {
+                    return Err(gateway_problem(HostProblem::ResourceExhausted));
+                }
+                cursor = Some(name.clone());
+                if self.resource_decision(
+                    principal,
+                    "DATASET",
+                    name.as_str(),
+                    AccessIntent::Read,
+                )? == SecurityDecision::Allow
+                {
+                    visible.push(name);
+                    if visible.len() > max {
+                        visible.pop();
+                        return Ok((visible, true));
+                    }
+                }
+            }
+            if !more {
+                return Ok((visible, false));
+            }
+            if !progressed {
+                return Err(gateway_problem(HostProblem::InfrastructureFailure));
+            }
+            continuation = true;
         }
     }
 
@@ -3351,17 +3416,12 @@ impl ProductServer {
             .ok_or_else(|| gateway_problem(HostProblem::Malformed))?;
         match command.as_str() {
             "LISTCAT" => {
-                let result = self.dataset_call(
+                let (names, more) = self.visible_dataset_names(
                     principal,
-                    DatasetRequest::List {
-                        pattern: format!("{}.**", principal.to_ascii_uppercase()),
-                        start: None,
-                        max_items: 1000,
-                    },
+                    format!("{}.**", principal.to_ascii_uppercase()),
+                    None,
+                    1000,
                 )?;
-                let DatasetResult::Listed { names, more } = result else {
-                    return Err(gateway_problem(HostProblem::ProviderFailure));
-                };
                 Ok(GatewayResponse::json(
                     StatusCode::OK,
                     json!({"entries":names.into_iter().map(|name|name.as_str().to_string()).collect::<Vec<_>>(),"more":more}),
@@ -5537,6 +5597,78 @@ mod tests {
             .oneshot(request.body(Body::from(body)).unwrap())
             .await
             .unwrap()
+    }
+
+    #[test]
+    fn dataset_catalog_listing_filters_each_name_without_hidden_pagination_hints() {
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_identity("IBMUSER", b"TESTPASS").unwrap();
+        server.bootstrap_identity("OTHER", b"OTHERPASS1").unwrap();
+        server
+            .racf
+            .define_profile("DATASET", "CATALOG.**", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit("DATASET", "CATALOG.**", "IBMUSER", AccessIntent::Alter)
+            .unwrap();
+        server
+            .racf
+            .define_profile("DATASET", "CATALOG.HIDDEN", "OTHER", None)
+            .unwrap();
+        server
+            .racf
+            .permit("DATASET", "CATALOG.HIDDEN", "OTHER", AccessIntent::Alter)
+            .unwrap();
+        let attributes = json!({"dsorg":"PS","recfm":"V","lrecl":80});
+        server
+            .handle(
+                Authentication::Basic {
+                    user: "OTHER".into(),
+                    secret: b"OTHERPASS1".to_vec(),
+                },
+                GatewayRequest::DatasetCreate {
+                    dataset: "CATALOG.HIDDEN".into(),
+                    attributes: attributes.clone(),
+                },
+            )
+            .unwrap();
+        server
+            .handle(
+                Authentication::Basic {
+                    user: "IBMUSER".into(),
+                    secret: b"TESTPASS".to_vec(),
+                },
+                GatewayRequest::DatasetCreate {
+                    dataset: "CATALOG.PUBLIC".into(),
+                    attributes,
+                },
+            )
+            .unwrap();
+
+        let response = server
+            .handle(
+                Authentication::Basic {
+                    user: "IBMUSER".into(),
+                    secret: b"TESTPASS".to_vec(),
+                },
+                GatewayRequest::DatasetList {
+                    pattern: "CATALOG.**".into(),
+                    start: None,
+                    attributes: false,
+                    max: 1,
+                },
+            )
+            .unwrap();
+        assert_eq!(response.status, StatusCode::OK);
+        assert_eq!(response.headers["X-IBM-Response-Rows"], "1");
+        let mainframe_env_zosmf::GatewayBody::Json(body) = response.body else {
+            panic!("dataset list did not return JSON")
+        };
+        assert_eq!(body["returnedRows"], 1);
+        assert_eq!(body["moreRows"], false);
+        assert_eq!(body["items"][0]["dsname"], "CATALOG.PUBLIC");
+        assert!(!body.to_string().contains("CATALOG.HIDDEN"));
     }
 
     #[tokio::test]
