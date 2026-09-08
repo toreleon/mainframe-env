@@ -2,16 +2,16 @@ use mainframe_env_diagnostics::{
     DiagnosticCode, DiagnosticLimits, ExecutionProblem, FailureCategory, Phase,
 };
 use mainframe_env_execution_api::{
-    ExecutionOutcome, Invocation, LifecycleEvent, LifecycleEventKind, Machine, MachineDrive,
-    MachineResume, Quantum,
+    ExecutionOutcome, Invocation, InvocationLimits, LifecycleEvent, LifecycleEventKind, Machine,
+    MachineDrive, MachineResume, Quantum,
 };
 use mainframe_env_host_api::{
     EffectRequest, EffectResult, HostProblem, ScopedHostService, canonical_request_digest,
     canonical_result_digest,
 };
 use mainframe_env_store_api::{
-    CheckpointRecord, EffectDigestFormat, EffectRecord, EffectState, ExecutionRecord,
-    ExecutionState, OutboxRecord, PlatformStore, StoreError,
+    CheckpointRecord, EffectDigestFormat, EffectIntentMetadata, EffectRecord, EffectState,
+    ExecutionRecord, ExecutionState, OutboxRecord, PlatformStore, StoreError,
 };
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -187,6 +187,14 @@ impl ExecutionCoordinator {
                             ));
                         }
                     };
+                    let mutating = effect.request.is_mutating();
+                    let capability = effect
+                        .request
+                        .required_capability(InvocationLimits::default());
+                    let intent_epoch = journal
+                        .as_ref()
+                        .and_then(|journal| journal.sequence.checked_add(1))
+                        .unwrap_or(effect.sequence);
                     let intent = effect.idempotency_key.as_ref().map(|key| EffectRecord {
                         execution_id: invocation.execution_id.clone(),
                         run_unit_id: invocation.run_unit_id.clone(),
@@ -194,6 +202,15 @@ impl ExecutionCoordinator {
                         key: key.clone(),
                         digest_format: EffectDigestFormat::CanonicalHostV1,
                         request_digest,
+                        intent: EffectIntentMetadata {
+                            owner: invocation.execution_id.clone(),
+                            attempt: invocation.attempt,
+                            capability: Some(capability),
+                            created_tick: control.now_tick,
+                            recovery_after_tick: invocation.deadline_tick.min(effect.deadline_tick),
+                            epoch: intent_epoch,
+                            recovery_lease: None,
+                        },
                         state: EffectState::Intent,
                         result_digest: None,
                     });
@@ -258,10 +275,10 @@ impl ExecutionCoordinator {
                     )
                     .is_err()
                     {
-                        if matches!(&result.outcome, Err(HostProblem::UnknownOutcome)) {
+                        if mutating || matches!(&result.outcome, Err(HostProblem::UnknownOutcome)) {
                             return failed_outcome(problem(
                                 FailureCategory::UnknownOutcome,
-                                "host outcome unknown; result persistence also failed",
+                                "host dispatch completed but result persistence failed; reconcile the intent",
                             ));
                         }
                         return infrastructure_failure("effect result persistence failed");

@@ -63,15 +63,24 @@ Oversized requests fail before provider dispatch. A malformed/oversized successf
 mutation reply is UnknownOutcome after dispatch, not a retryable known rejection.
 An explicit UnknownOutcome remains unknown even if its provider also corrupts
 the sequence or declares an insufficient response budget. A journal encoding
-failure after dispatch must leave a discoverable intent for explicit
-reconciliation.
+or persistence failure after dispatch of a mutating request returns
+`UnknownOutcome` and leaves a discoverable intent for explicit reconciliation,
+including when the provider already returned known success. The intent records
+the typed capability, dispatch owner, execution attempt, durable creation and
+recovery-not-before ticks, and execution-event epoch.
 
-The current implementation does not yet satisfy that last requirement for a
-known-success mutation whose result journal write fails: it can return an
-infrastructure failure while leaving an intent that the reconciliation query
-does not enumerate. This remains release-blocking deviation R-01 in the
-[pre-0.9 review](../reviews/PRE-0.9.0-DEEP-REVIEW.md), not exceptions to this
-contract.
+`stale_intents` applies both the persisted recovery-not-before tick and a
+positive minimum-age boundary in the execution's monotonic logical tick domain,
+and omits active recovery leases.
+`claim_stale_intent` installs an expiring recovery
+owner/attempt/epoch fence with compare-and-swap semantics. Once claimed, a late
+result from the original dispatcher conflicts rather than overwriting recovery.
+The bounded `StaleEffectRecoveryWorker` asks a service resolver to query an
+authoritative provider idempotency ledger and then uses
+`reconcile_stale_intent` to record a proven completion or failure under the
+original digest format. Pending or ambiguous observations are not redispatched;
+an expired recovery lease can be claimed only at a higher recovery attempt and
+epoch.
 
 ## Provider replay and lifecycle outbox encodings
 
@@ -122,18 +131,29 @@ format mismatch is rejected. The older reconciliation API remains available to
 existing callers, which are responsible for supplying a digest in the stored
 format; new callers should use the version-checked API.
 
-New records use schema 2, `digest_format: mainframe-env.effect-canonical@1`, and
-fields `request_canonical_v1` / `result_canonical_v1`. They intentionally omit
-legacy `request` / `result`: old decoders ignored schema numbers but required
-`request`, so a downgrade fails rather than silently treating canonical digests
-as Debug digests. Unsupported or internally mixed schema/format combinations
-fail closed. Recomputing old Debug digests under a new compiler is forbidden;
-there is no bulk rewrite or automatic deduplication-domain migration.
+New records use durable JSON schema 3,
+`digest_format: mainframe-env.effect-canonical@1`, fields
+`request_canonical_v1` / `result_canonical_v1`, and the fenced intent metadata.
+Schema-1 legacy and schema-2 canonical rows remain readable; missing metadata
+is conservatively projected as the retained execution owner, attempt 1, no
+typed capability, creation/recovery ticks 0, and effect sequence as its epoch,
+making a pre-upgrade orphan discoverable after restart. New records
+intentionally omit legacy `request` / `result`: old
+decoders ignored schema numbers but required `request`, so a downgrade fails
+rather than silently treating canonical digests as Debug digests. Unsupported
+or internally mixed schema/format combinations fail closed. Recomputing old
+Debug digests under a new compiler is forbidden; there is no bulk rewrite or
+automatic deduplication-domain migration.
+
+A migrated intent without a typed capability requires an operator-reviewed
+legacy resolver keyed by its retained effect identity. It is never guessed into
+a current provider route.
 
 Drain/reconcile active counter-era runs according to the installed-call replay
 and run-unit lifecycle upgrade rules. Completed cached replies from #55/#47 are
-not re-executed merely because journal encoding changes. This adds neither an
-automatic recovery algorithm nor an exactly-once guarantee.
+not re-executed merely because journal encoding changes. The recovery worker
+establishes no generic exactly-once guarantee: it can finalize an intent only
+from an authoritative service-specific observation.
 
 ## Golden digests
 

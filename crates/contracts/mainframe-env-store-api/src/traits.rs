@@ -129,6 +129,35 @@ pub trait IdempotencyStore: Send + Sync {
     fn record_result(&self, key: &IdempotencyKey, record: EffectRecord) -> Result<(), StoreError>;
     fn effect(&self, key: &IdempotencyKey) -> Result<Option<EffectRecord>, StoreError>;
     fn unknown_effects(&self, max: usize) -> Result<Vec<EffectRecord>, StoreError>;
+    /// Enumerate intents old enough for recovery whose recovery lease is absent or expired.
+    fn stale_intents(
+        &self,
+        now_tick: u64,
+        minimum_age_ticks: u64,
+        max: usize,
+    ) -> Result<Vec<EffectRecord>, StoreError>;
+    /// Claim one stale intent under a monotonically increasing recovery epoch.
+    fn claim_stale_intent(
+        &self,
+        key: &IdempotencyKey,
+        expected_intent_epoch: u64,
+        recovery_owner: &str,
+        now_tick: u64,
+        minimum_age_ticks: u64,
+        lease_ticks: u64,
+    ) -> Result<EffectRecord, StoreError>;
+    /// Resolve a claimed intent without redispatching the original mutation.
+    #[allow(clippy::too_many_arguments)]
+    fn reconcile_stale_intent(
+        &self,
+        key: &IdempotencyKey,
+        recovery_owner: &str,
+        recovery_epoch: u64,
+        now_tick: u64,
+        final_state: crate::EffectState,
+        format: crate::EffectDigestFormat,
+        result_digest: [u8; 32],
+    ) -> Result<EffectRecord, StoreError>;
     fn reconcile_unknown(
         &self,
         key: &IdempotencyKey,

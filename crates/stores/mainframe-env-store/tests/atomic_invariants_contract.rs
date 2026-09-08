@@ -4,8 +4,8 @@ use mainframe_env_execution_api::{
 };
 use mainframe_env_store::{MemoryStore, PostgresStateStore, SqliteStateStore, StoreLimits};
 use mainframe_env_store_api::{
-    ArtifactRecord, CheckpointRecord, EffectDigestFormat, EffectRecord, EffectState,
-    ExecutionRecord, ExecutionState, PlatformStore, StoreError,
+    ArtifactRecord, CheckpointRecord, EffectDigestFormat, EffectIntentMetadata, EffectRecord,
+    EffectRecoveryLease, EffectState, ExecutionRecord, ExecutionState, PlatformStore, StoreError,
 };
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -103,6 +103,21 @@ fn intent_record(execution: &ExecutionRecord, key: &str) -> EffectRecord {
         key: IdempotencyKey::new(key, InvocationLimits::default()).unwrap(),
         digest_format: EffectDigestFormat::CanonicalHostV1,
         request_digest: [1; 32],
+        intent: EffectIntentMetadata {
+            owner: execution.execution_id.clone(),
+            attempt: execution.attempt,
+            capability: Some(
+                mainframe_env_execution_api::CapabilityId::new(
+                    "host.state.write",
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            ),
+            created_tick: 2,
+            recovery_after_tick: 2,
+            epoch: 2,
+            recovery_lease: None,
+        },
         state: EffectState::Intent,
         result_digest: None,
     }
@@ -323,7 +338,7 @@ fn mutate_result(case: &str, record: &mut EffectRecord) -> StoreError {
     match case {
         "execution" => {
             record.execution_id = ExecutionId::new("exec-hostile", limits).unwrap();
-            StoreError::Conflict
+            StoreError::InvalidTransition
         }
         "run-unit" => {
             record.run_unit_id = RunUnitId::new("run-hostile", limits).unwrap();
@@ -339,6 +354,42 @@ fn mutate_result(case: &str, record: &mut EffectRecord) -> StoreError {
         }
         "request-digest" => {
             record.request_digest = [2; 32];
+            StoreError::Conflict
+        }
+        "intent-owner" => {
+            record.intent.owner = ExecutionId::new("different-owner", limits).unwrap();
+            StoreError::InvalidTransition
+        }
+        "intent-attempt" => {
+            record.intent.attempt += 1;
+            StoreError::Conflict
+        }
+        "intent-capability" => {
+            record.intent.capability = Some(
+                mainframe_env_execution_api::CapabilityId::new("host.state.read", limits).unwrap(),
+            );
+            StoreError::Conflict
+        }
+        "intent-tick" => {
+            record.intent.created_tick += 1;
+            record.intent.recovery_after_tick += 1;
+            StoreError::Conflict
+        }
+        "intent-recovery-boundary" => {
+            record.intent.recovery_after_tick += 1;
+            StoreError::Conflict
+        }
+        "intent-epoch" => {
+            record.intent.epoch += 1;
+            StoreError::Conflict
+        }
+        "recovery-lease" => {
+            record.intent.recovery_lease = Some(EffectRecoveryLease {
+                owner: "hostile-worker".into(),
+                attempt: 1,
+                epoch: 1,
+                expires_tick: 100,
+            });
             StoreError::Conflict
         }
         "missing-result-digest" => {
@@ -359,6 +410,13 @@ fn assert_direct_effect_invariants(store: &dyn PlatformStore, prefix: &str) {
         "sequence",
         "format",
         "request-digest",
+        "intent-owner",
+        "intent-attempt",
+        "intent-capability",
+        "intent-tick",
+        "intent-recovery-boundary",
+        "intent-epoch",
+        "recovery-lease",
         "missing-result-digest",
     ] {
         let mut hostile = EffectRecord {
@@ -390,6 +448,13 @@ fn assert_atomic_effect_invariants(store: &dyn PlatformStore, prefix: &str) {
         "sequence",
         "format",
         "request-digest",
+        "intent-owner",
+        "intent-attempt",
+        "intent-capability",
+        "intent-tick",
+        "intent-recovery-boundary",
+        "intent-epoch",
+        "recovery-lease",
         "missing-result-digest",
     ] {
         let execution = execution_record(&format!("{prefix}-journal-effect-{case}"));

@@ -53,6 +53,10 @@ impl SqliteStateStore {
             .map_err(|error| StoreError::Infrastructure(error.to_string()))
     }
 
+    pub(crate) const fn max_rows(&self) -> usize {
+        self.max_rows
+    }
+
     pub fn integrity_check(&self) -> Result<(), StoreError> {
         let result: String =
             self.run(sqlx::query_scalar("PRAGMA integrity_check").fetch_one(&self.pool))?;

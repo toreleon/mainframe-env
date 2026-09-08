@@ -53,6 +53,10 @@ impl PostgresStateStore {
     {
         block_on(&self.runtime, future)?.map_err(infrastructure)
     }
+
+    pub(crate) const fn max_rows(&self) -> usize {
+        self.max_rows
+    }
 }
 
 impl ProviderStateStore for PostgresStateStore {

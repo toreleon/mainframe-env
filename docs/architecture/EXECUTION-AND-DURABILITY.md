@@ -83,7 +83,9 @@ For a mutating effect:
 
 1. Validate request, capability, principal, bounds, transaction, and deadline.
 2. Allocate a monotonic effect sequence in the run unit.
-3. Persist the effect intent and idempotency key.
+3. Persist the effect intent, idempotency key, typed capability, dispatch
+   owner/attempt, durable creation and recovery-not-before ticks, and
+   execution-event epoch.
 4. Invoke the provider.
 5. Persist success, condition, failure, or unknown outcome.
 6. Feed the typed result into the machine.
@@ -91,6 +93,14 @@ For a mutating effect:
 
 Infrastructure retry never assumes that an external mutation did not occur.
 Unknown outcomes remain explicit and require service-specific reconciliation.
+If result persistence fails after a mutating provider was dispatched, the
+caller receives `UnknownOutcome` even when the provider returned a usable
+success. A bounded recovery worker enumerates only sufficiently old intents,
+claims each under an expiring owner/attempt/epoch fence, and asks a
+service-specific resolver to consult the provider's durable idempotency ledger.
+It records the observed result under the original canonical digest domain and
+never redispatches the mutation. A late dispatch owner is fenced once recovery
+has claimed the intent.
 
 CICS syncpoint uses this same rule. A durable commit or rollback intent is
 written before its final decision. Replay returns the recorded final decision;
@@ -101,8 +111,9 @@ rather than worker memory.
 
 Keyed dataset insert, rewrite, and delete commit the base cluster, every
 upgradable alternate-index generation, and the idempotency result as one atomic
-provider-state write. A restart that observes only the preceding intent can
-safely retry; a final result replays without applying the record twice.
+provider-state write. A restart that observes only the preceding intent queries
+that provider ledger through stale-intent reconciliation; a final result
+replays without applying the record twice.
 
 Application seed generations retain verified source-object identities and a
 provider-neutral dataset snapshot. Install, compatible upgrade, and rollback

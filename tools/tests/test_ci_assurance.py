@@ -112,6 +112,7 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(listed, [
             'postgres-move',
             'postgres-effect',
+            'postgres-stale-effect-recovery',
             'postgres-atomic-invariants',
             'postgres-work-leases',
             'postgres-durable',

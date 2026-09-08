@@ -3,7 +3,7 @@ use mainframe_env_execution_api::{
 };
 use mainframe_env_store_api::{
     ArtifactRecord, CheckpointRecord, EffectRecord, EffectState, ExecutionRecord, ExecutionState,
-    OutboxRecord, StoreError,
+    MAX_EFFECT_RECOVERY_OWNER_BYTES, OutboxRecord, StoreError,
 };
 use sha2::{Digest, Sha256};
 
@@ -64,7 +64,19 @@ pub(crate) fn artifact(record: &ArtifactRecord) -> Result<(), StoreError> {
 }
 
 pub(crate) fn effect(record: &EffectRecord) -> Result<(), StoreError> {
-    if record.sequence == 0 {
+    if record.sequence == 0
+        || record.intent.owner != record.execution_id
+        || record.intent.attempt == 0
+        || record.intent.recovery_after_tick < record.intent.created_tick
+        || record.intent.epoch == 0
+        || record.intent.recovery_lease.as_ref().is_some_and(|lease| {
+            lease.owner.is_empty()
+                || lease.owner.len() > MAX_EFFECT_RECOVERY_OWNER_BYTES
+                || lease.attempt == 0
+                || lease.epoch == 0
+                || lease.expires_tick <= record.intent.created_tick
+        })
+    {
         return Err(StoreError::InvalidTransition);
     }
     match record.state {
@@ -81,6 +93,15 @@ pub(crate) fn effect(record: &EffectRecord) -> Result<(), StoreError> {
 pub(crate) fn intent(record: &EffectRecord) -> Result<(), StoreError> {
     effect(record)?;
     if record.state == EffectState::Intent {
+        Ok(())
+    } else {
+        Err(StoreError::InvalidTransition)
+    }
+}
+
+pub(crate) fn new_intent(record: &EffectRecord) -> Result<(), StoreError> {
+    intent(record)?;
+    if record.intent.capability.is_some() {
         Ok(())
     } else {
         Err(StoreError::InvalidTransition)
@@ -108,6 +129,8 @@ pub(crate) fn result(
         || intent.sequence != record.sequence
         || intent.digest_format != record.digest_format
         || intent.request_digest != record.request_digest
+        || intent.intent != record.intent
+        || intent.intent.recovery_lease.is_some()
         || intent.state != EffectState::Intent
         || intent.result_digest.is_some()
     {
@@ -115,6 +138,90 @@ pub(crate) fn result(
     } else {
         Ok(())
     }
+}
+
+pub(crate) fn stale_intent(
+    record: &EffectRecord,
+    now_tick: u64,
+    minimum_age_ticks: u64,
+) -> Result<bool, StoreError> {
+    effect(record)?;
+    if minimum_age_ticks == 0 {
+        return Err(StoreError::InvalidTransition);
+    }
+    if record.state != EffectState::Intent {
+        return Ok(false);
+    }
+    let old_enough = record
+        .intent
+        .created_tick
+        .checked_add(minimum_age_ticks)
+        .is_some_and(|boundary| {
+            boundary <= now_tick && record.intent.recovery_after_tick <= now_tick
+        });
+    let lease_available = record
+        .intent
+        .recovery_lease
+        .as_ref()
+        .is_none_or(|lease| lease.expires_tick <= now_tick);
+    Ok(old_enough && lease_available)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn stale_claim(
+    record: &EffectRecord,
+    expected_intent_epoch: u64,
+    recovery_owner: &str,
+    now_tick: u64,
+    minimum_age_ticks: u64,
+    lease_ticks: u64,
+) -> Result<(), StoreError> {
+    if recovery_owner.is_empty()
+        || recovery_owner.len() > MAX_EFFECT_RECOVERY_OWNER_BYTES
+        || expected_intent_epoch == 0
+        || lease_ticks == 0
+        || now_tick.checked_add(lease_ticks).is_none()
+    {
+        return Err(StoreError::LeaseConflict);
+    }
+    if record.intent.epoch != expected_intent_epoch {
+        return Err(StoreError::Conflict);
+    }
+    if !stale_intent(record, now_tick, minimum_age_ticks)? {
+        return Err(StoreError::LeaseConflict);
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn stale_reconciliation(
+    key: &IdempotencyKey,
+    record: &EffectRecord,
+    recovery_owner: &str,
+    recovery_epoch: u64,
+    now_tick: u64,
+    final_state: EffectState,
+    format: mainframe_env_store_api::EffectDigestFormat,
+) -> Result<(), StoreError> {
+    intent(record)?;
+    if &record.key != key
+        || record.digest_format != format
+        || !matches!(final_state, EffectState::Completed | EffectState::Failed)
+    {
+        return Err(StoreError::InvalidTransition);
+    }
+    let lease = record
+        .intent
+        .recovery_lease
+        .as_ref()
+        .ok_or(StoreError::LeaseConflict)?;
+    if lease.owner != recovery_owner
+        || lease.epoch != recovery_epoch
+        || lease.expires_tick <= now_tick
+    {
+        return Err(StoreError::LeaseConflict);
+    }
+    Ok(())
 }
 
 pub(crate) fn admission(
@@ -165,7 +272,12 @@ pub(crate) fn effect_event(
     record: &EffectRecord,
 ) -> Result<(), StoreError> {
     let sequence = match &event_record.kind {
-        LifecycleEventKind::EffectIntent { sequence } if record.state == EffectState::Intent => {
+        LifecycleEventKind::EffectIntent { sequence }
+            if record.state == EffectState::Intent
+                && record.intent.attempt == event_record.attempt
+                && record.intent.created_tick == event_record.tick
+                && record.intent.epoch == event_record.sequence =>
+        {
             *sequence
         }
         LifecycleEventKind::EffectResult { sequence } if record.state != EffectState::Intent => {
@@ -184,7 +296,10 @@ pub(crate) fn effect_execution(
     execution: &ExecutionRecord,
     record: &EffectRecord,
 ) -> Result<(), StoreError> {
-    if record.execution_id != execution.execution_id || record.run_unit_id != execution.run_unit_id
+    if record.execution_id != execution.execution_id
+        || record.run_unit_id != execution.run_unit_id
+        || record.intent.owner != execution.execution_id
+        || record.intent.attempt != execution.attempt
     {
         Err(StoreError::Conflict)
     } else {

@@ -6,10 +6,10 @@ use mainframe_env_execution_api::{
 };
 use mainframe_env_store_api::{
     ArtifactRecord, ArtifactStore, CheckpointRecord, CheckpointStore, EffectDigestFormat,
-    EffectRecord, EffectState, EventStore, ExecutionRecord, ExecutionState, ExecutionStore,
-    GenerationRecord, GenerationStore, IdempotencyStore, JournalStore, OutboxRecord, OutboxStore,
-    ProviderStateRecord, ProviderStateStore, ProviderStateWrite, SessionRecord, SessionStore,
-    StoreError, WorkRecord, WorkState, WorkStore,
+    EffectRecord, EffectRecoveryLease, EffectState, EventStore, ExecutionRecord, ExecutionState,
+    ExecutionStore, GenerationRecord, GenerationStore, IdempotencyStore, JournalStore,
+    OutboxRecord, OutboxStore, ProviderStateRecord, ProviderStateStore, ProviderStateWrite,
+    SessionRecord, SessionStore, StoreError, WorkRecord, WorkState, WorkStore,
 };
 use serde_json::{Value, json};
 
@@ -72,7 +72,7 @@ macro_rules! durable_implementations {
             fn append_event(&self, event: LifecycleEvent) -> Result<(), StoreError> {
                 validation::event(&event)?;
                 let namespace = format!("durable-event:{}", event.execution_id);
-                let events = self.list_provider_state(&namespace, 65536)?;
+                let events = self.list_provider_state(&namespace, self.max_rows().min(65_536))?;
                 let expected = events.last().map_or(Ok(1), |row| {
                     row.key
                         .parse::<u64>()
@@ -108,16 +108,19 @@ macro_rules! durable_implementations {
                 if max == 0 || max > 65536 {
                     return Err(StoreError::CapacityExceeded);
                 }
-                self.list_provider_state(&format!("durable-event:{id}"), 65536)?
-                    .into_iter()
-                    .filter(|row| {
-                        row.key
-                            .parse::<u64>()
-                            .is_ok_and(|value| value >= start_sequence)
-                    })
-                    .take(max)
-                    .map(|row| decode_event(&row.payload))
-                    .collect()
+                self.list_provider_state(
+                    &format!("durable-event:{id}"),
+                    self.max_rows().min(65_536),
+                )?
+                .into_iter()
+                .filter(|row| {
+                    row.key
+                        .parse::<u64>()
+                        .is_ok_and(|value| value >= start_sequence)
+                })
+                .take(max)
+                .map(|row| decode_event(&row.payload))
+                .collect()
             }
         }
 
@@ -164,7 +167,9 @@ macro_rules! durable_implementations {
                 }
                 for _ in 0..4 {
                     let mut retry_scan = false;
-                    for row in self.list_provider_state("durable-work", 65536)? {
+                    for row in
+                        self.list_provider_state("durable-work", self.max_rows().min(65_536))?
+                    {
                         let mut work = decode_work(&row.payload)?;
                         if work.state == WorkState::Claimed
                             && (work
@@ -544,7 +549,7 @@ macro_rules! durable_implementations {
 
         impl IdempotencyStore for $store {
             fn record_intent(&self, record: EffectRecord) -> Result<(), StoreError> {
-                validation::intent(&record)?;
+                validation::new_intent(&record)?;
                 if let Some(existing) = self.effect(&record.key)? {
                     return if existing == record {
                         Ok(())
@@ -569,11 +574,20 @@ macro_rules! durable_implementations {
                 record: EffectRecord,
             ) -> Result<(), StoreError> {
                 validation::terminal(key, &record)?;
-                let intent = self.effect(key)?.ok_or(StoreError::NotFound)?;
+                let row = self
+                    .get_provider_state("durable-effect", key.as_str())?
+                    .ok_or(StoreError::NotFound)?;
+                let intent = decode_effect(key, &row.payload)?;
                 validation::result(key, &intent, &record)?;
+                let next_version = row.version.checked_add(1).ok_or(StoreError::Conflict)?;
                 self.put_provider_state(
-                    state_record("durable-effect", key.as_str(), 2, encode_effect(&record)?),
-                    Some(1),
+                    state_record(
+                        "durable-effect",
+                        key.as_str(),
+                        next_version,
+                        encode_effect(&record)?,
+                    ),
+                    Some(row.version),
                 )
             }
 
@@ -587,7 +601,8 @@ macro_rules! durable_implementations {
                 if max == 0 || max > 65536 {
                     return Err(StoreError::CapacityExceeded);
                 }
-                let rows = self.list_provider_state("durable-effect", 65536)?;
+                let rows =
+                    self.list_provider_state("durable-effect", self.max_rows().min(65_536))?;
                 let mut records = Vec::new();
                 for row in rows {
                     let key = IdempotencyKey::new(&row.key, InvocationLimits::default())
@@ -603,6 +618,133 @@ macro_rules! durable_implementations {
                 Ok(records)
             }
 
+            fn stale_intents(
+                &self,
+                now_tick: u64,
+                minimum_age_ticks: u64,
+                max: usize,
+            ) -> Result<Vec<EffectRecord>, StoreError> {
+                if max == 0 || max > 65536 {
+                    return Err(StoreError::CapacityExceeded);
+                }
+                if minimum_age_ticks == 0 {
+                    return Err(StoreError::InvalidTransition);
+                }
+                let mut records = Vec::new();
+                for row in
+                    self.list_provider_state("durable-effect", self.max_rows().min(65_536))?
+                {
+                    let key = IdempotencyKey::new(&row.key, InvocationLimits::default())
+                        .map_err(|_| StoreError::IncompatibleVersion)?;
+                    let record = decode_effect(&key, &row.payload)?;
+                    if validation::stale_intent(&record, now_tick, minimum_age_ticks)? {
+                        records.push(record);
+                        if records.len() == max {
+                            break;
+                        }
+                    }
+                }
+                Ok(records)
+            }
+
+            fn claim_stale_intent(
+                &self,
+                key: &IdempotencyKey,
+                expected_intent_epoch: u64,
+                recovery_owner: &str,
+                now_tick: u64,
+                minimum_age_ticks: u64,
+                lease_ticks: u64,
+            ) -> Result<EffectRecord, StoreError> {
+                let row = self
+                    .get_provider_state("durable-effect", key.as_str())?
+                    .ok_or(StoreError::NotFound)?;
+                let mut record = decode_effect(key, &row.payload)?;
+                validation::stale_claim(
+                    &record,
+                    expected_intent_epoch,
+                    recovery_owner,
+                    now_tick,
+                    minimum_age_ticks,
+                    lease_ticks,
+                )?;
+                let (attempt, epoch) =
+                    record
+                        .intent
+                        .recovery_lease
+                        .as_ref()
+                        .map_or(Ok((1, 1)), |lease| {
+                            Ok((
+                                lease
+                                    .attempt
+                                    .checked_add(1)
+                                    .ok_or(StoreError::LeaseConflict)?,
+                                lease
+                                    .epoch
+                                    .checked_add(1)
+                                    .ok_or(StoreError::LeaseConflict)?,
+                            ))
+                        })?;
+                record.intent.recovery_lease = Some(EffectRecoveryLease {
+                    owner: recovery_owner.into(),
+                    attempt,
+                    epoch,
+                    expires_tick: now_tick
+                        .checked_add(lease_ticks)
+                        .ok_or(StoreError::LeaseConflict)?,
+                });
+                let next_version = row.version.checked_add(1).ok_or(StoreError::Conflict)?;
+                self.put_provider_state(
+                    state_record(
+                        "durable-effect",
+                        key.as_str(),
+                        next_version,
+                        encode_effect(&record)?,
+                    ),
+                    Some(row.version),
+                )?;
+                Ok(record)
+            }
+
+            fn reconcile_stale_intent(
+                &self,
+                key: &IdempotencyKey,
+                recovery_owner: &str,
+                recovery_epoch: u64,
+                now_tick: u64,
+                final_state: EffectState,
+                format: EffectDigestFormat,
+                result_digest: [u8; 32],
+            ) -> Result<EffectRecord, StoreError> {
+                let row = self
+                    .get_provider_state("durable-effect", key.as_str())?
+                    .ok_or(StoreError::NotFound)?;
+                let mut record = decode_effect(key, &row.payload)?;
+                validation::stale_reconciliation(
+                    key,
+                    &record,
+                    recovery_owner,
+                    recovery_epoch,
+                    now_tick,
+                    final_state,
+                    format,
+                )?;
+                record.state = final_state;
+                record.result_digest = Some(result_digest);
+                validation::effect(&record)?;
+                let next_version = row.version.checked_add(1).ok_or(StoreError::Conflict)?;
+                self.put_provider_state(
+                    state_record(
+                        "durable-effect",
+                        key.as_str(),
+                        next_version,
+                        encode_effect(&record)?,
+                    ),
+                    Some(row.version),
+                )?;
+                Ok(record)
+            }
+
             fn reconcile_unknown(
                 &self,
                 key: &IdempotencyKey,
@@ -615,18 +757,21 @@ macro_rules! durable_implementations {
                 let row = self
                     .get_provider_state("durable-effect", key.as_str())?
                     .ok_or(StoreError::NotFound)?;
-                if row.version != 2 {
-                    return Err(StoreError::Conflict);
-                }
                 let mut record = decode_effect(key, &row.payload)?;
                 if record.state != EffectState::UnknownOutcome {
                     return Err(StoreError::InvalidTransition);
                 }
                 record.state = final_state;
                 record.result_digest = Some(result_digest);
+                let next_version = row.version.checked_add(1).ok_or(StoreError::Conflict)?;
                 self.put_provider_state(
-                    state_record("durable-effect", key.as_str(), 3, encode_effect(&record)?),
-                    Some(2),
+                    state_record(
+                        "durable-effect",
+                        key.as_str(),
+                        next_version,
+                        encode_effect(&record)?,
+                    ),
+                    Some(row.version),
                 )?;
                 Ok(record)
             }
@@ -662,7 +807,7 @@ macro_rules! durable_implementations {
                     return Err(StoreError::CapacityExceeded);
                 }
                 let records = self
-                    .list_provider_state("durable-outbox", 65536)?
+                    .list_provider_state("durable-outbox", self.max_rows().min(65_536))?
                     .into_iter()
                     .map(|row| decode_outbox(&row.payload, row.version))
                     .collect::<Result<Vec<_>, _>>()?;
@@ -772,7 +917,7 @@ macro_rules! durable_implementations {
                     .checked_add(1)
                     .ok_or(StoreError::Conflict)?;
                 let namespace = format!("durable-event:{}", event.execution_id);
-                let events = self.list_provider_state(&namespace, 65536)?;
+                let events = self.list_provider_state(&namespace, self.max_rows().min(65_536))?;
                 let next_sequence = events.last().map_or(Ok(1), |row| {
                     row.key
                         .parse::<u64>()
@@ -818,17 +963,23 @@ macro_rules! durable_implementations {
                     validation::effect_execution(&execution, &effect)?;
                     let (version, expected) = match effect.state {
                         EffectState::Intent => {
-                            validation::intent(&effect)?;
+                            validation::new_intent(&effect)?;
                             validation::effect_event(&event, &effect)?;
                             (1, None)
                         }
                         EffectState::Completed
                         | EffectState::Failed
                         | EffectState::UnknownOutcome => {
-                            let intent = self.effect(&effect.key)?.ok_or(StoreError::NotFound)?;
+                            let row = self
+                                .get_provider_state("durable-effect", effect.key.as_str())?
+                                .ok_or(StoreError::NotFound)?;
+                            let intent = decode_effect(&effect.key, &row.payload)?;
                             validation::result(&effect.key, &intent, &effect)?;
                             validation::effect_event(&event, &effect)?;
-                            (2, Some(1))
+                            (
+                                row.version.checked_add(1).ok_or(StoreError::Conflict)?,
+                                Some(row.version),
+                            )
                         }
                     };
                     writes.push(ProviderStateWrite {
@@ -1292,7 +1443,29 @@ fn decode_generation(
 }
 
 fn encode_effect(record: &EffectRecord) -> Result<Vec<u8>, StoreError> {
-    let mut value = json!({"execution":record.execution_id.as_str(),"run":record.run_unit_id.as_str(),"sequence":record.sequence,"state":effect_state(record.state)});
+    let recovery = record.intent.recovery_lease.as_ref().map(|lease| {
+        json!({
+            "owner": lease.owner,
+            "attempt": lease.attempt,
+            "epoch": lease.epoch,
+            "expires_tick": lease.expires_tick,
+        })
+    });
+    let mut value = json!({
+        "execution":record.execution_id.as_str(),
+        "run":record.run_unit_id.as_str(),
+        "sequence":record.sequence,
+        "state":effect_state(record.state),
+        "intent":{
+            "owner":record.intent.owner.as_str(),
+            "attempt":record.intent.attempt,
+            "capability":record.intent.capability.as_ref().map(|value| value.as_str()),
+            "created_tick":record.intent.created_tick,
+            "recovery_after_tick":record.intent.recovery_after_tick,
+            "epoch":record.intent.epoch,
+            "recovery":recovery,
+        }
+    });
     match record.digest_format {
         EffectDigestFormat::LegacyDebug => {
             value["schema"] = json!(1);
@@ -1301,7 +1474,7 @@ fn encode_effect(record: &EffectRecord) -> Result<Vec<u8>, StoreError> {
             value["result"] = json!(record.result_digest.map(|value| hex(&value)));
         }
         EffectDigestFormat::CanonicalHostV1 => {
-            value["schema"] = json!(2);
+            value["schema"] = json!(3);
             value["digest_format"] = json!("mainframe-env.effect-canonical@1");
             // Counter-era readers ignore schema numbers. Do not expose the old
             // required field names: their effect decoder must fail on downgrade.
@@ -1314,11 +1487,12 @@ fn encode_effect(record: &EffectRecord) -> Result<Vec<u8>, StoreError> {
 fn decode_effect(key: &IdempotencyKey, bytes: &[u8]) -> Result<EffectRecord, StoreError> {
     let value: Value =
         serde_json::from_slice(bytes).map_err(|_| StoreError::IncompatibleVersion)?;
+    let schema = number(&value, "schema")?;
     let format = value.get("digest_format");
-    let digest_format = match (number(&value, "schema")?, format) {
+    let digest_format = match (schema, format) {
         (1, None) => EffectDigestFormat::LegacyDebug,
         (1, Some(Value::String(v))) if v == "legacy-debug@0" => EffectDigestFormat::LegacyDebug,
-        (2, Some(Value::String(v))) if v == "mainframe-env.effect-canonical@1" => {
+        (2 | 3, Some(Value::String(v))) if v == "mainframe-env.effect-canonical@1" => {
             EffectDigestFormat::CanonicalHostV1
         }
         _ => return Err(StoreError::IncompatibleVersion),
@@ -1340,15 +1514,19 @@ fn decode_effect(key: &IdempotencyKey, bytes: &[u8]) -> Result<EffectRecord, Sto
         }
     };
     let limits = InvocationLimits::default();
+    let execution_id = ExecutionId::new(string(&value, "execution")?, limits)
+        .map_err(|_| StoreError::IncompatibleVersion)?;
+    let sequence = number(&value, "sequence")?;
+    let intent = decode_effect_intent(&value, &execution_id, sequence, schema == 3)?;
     let record = EffectRecord {
-        execution_id: ExecutionId::new(string(&value, "execution")?, limits)
-            .map_err(|_| StoreError::IncompatibleVersion)?,
+        execution_id,
         run_unit_id: RunUnitId::new(string(&value, "run")?, limits)
             .map_err(|_| StoreError::IncompatibleVersion)?,
-        sequence: number(&value, "sequence")?,
+        sequence,
         key: key.clone(),
         digest_format,
         request_digest: digest_back(string(&value, request_field)?)?,
+        intent,
         state: effect_state_back(string(&value, "state")?)?,
         result_digest: match value.get(result_field) {
             Some(Value::String(value)) => Some(digest_back(value)?),
@@ -1358,6 +1536,59 @@ fn decode_effect(key: &IdempotencyKey, bytes: &[u8]) -> Result<EffectRecord, Sto
     };
     validation::effect(&record)?;
     Ok(record)
+}
+
+fn decode_effect_intent(
+    value: &Value,
+    execution_id: &ExecutionId,
+    sequence: u64,
+    required: bool,
+) -> Result<mainframe_env_store_api::EffectIntentMetadata, StoreError> {
+    let Some(metadata) = value.get("intent") else {
+        if required {
+            return Err(StoreError::IncompatibleVersion);
+        }
+        return Ok(mainframe_env_store_api::EffectIntentMetadata {
+            owner: execution_id.clone(),
+            attempt: 1,
+            capability: None,
+            created_tick: 0,
+            recovery_after_tick: 0,
+            epoch: sequence,
+            recovery_lease: None,
+        });
+    };
+    if !metadata.is_object() {
+        return Err(StoreError::IncompatibleVersion);
+    }
+    let recovery_lease = match metadata.get("recovery") {
+        Some(Value::Null) => None,
+        Some(recovery) if recovery.is_object() => Some(EffectRecoveryLease {
+            owner: string(recovery, "owner")?.into(),
+            attempt: u32::try_from(number(recovery, "attempt")?)
+                .map_err(|_| StoreError::IncompatibleVersion)?,
+            epoch: number(recovery, "epoch")?,
+            expires_tick: number(recovery, "expires_tick")?,
+        }),
+        _ => return Err(StoreError::IncompatibleVersion),
+    };
+    let capability = optional_string(metadata, "capability")?
+        .map(|value| {
+            mainframe_env_execution_api::CapabilityId::new(value, InvocationLimits::default())
+                .map_err(|_| StoreError::IncompatibleVersion)
+        })
+        .transpose()?;
+    Ok(mainframe_env_store_api::EffectIntentMetadata {
+        owner: ExecutionId::new(string(metadata, "owner")?, InvocationLimits::default())
+            .map_err(|_| StoreError::IncompatibleVersion)?,
+        attempt: u32::try_from(number(metadata, "attempt")?)
+            .map_err(|_| StoreError::IncompatibleVersion)?,
+        capability,
+        created_tick: number(metadata, "created_tick")?,
+        recovery_after_tick: number(metadata, "recovery_after_tick")?,
+        epoch: number(metadata, "epoch")?,
+        recovery_lease,
+    })
 }
 fn effect_state(value: EffectState) -> &'static str {
     match value {
@@ -1638,6 +1869,18 @@ mod effect_encoding_tests {
             sequence: 1,
             digest_format: EffectDigestFormat::CanonicalHostV1,
             request_digest: [1; 32],
+            intent: mainframe_env_store_api::EffectIntentMetadata {
+                owner: ExecutionId::new("canonical-exec", limits).unwrap(),
+                attempt: 1,
+                capability: Some(
+                    mainframe_env_execution_api::CapabilityId::new("host.state.write", limits)
+                        .unwrap(),
+                ),
+                created_tick: 1,
+                recovery_after_tick: 1,
+                epoch: 1,
+                recovery_lease: None,
+            },
             state: EffectState::UnknownOutcome,
             result_digest: Some([2; 32]),
         }
@@ -1647,6 +1890,21 @@ mod effect_encoding_tests {
         let canonical = record();
         let encoded = encode_effect(&canonical).unwrap();
         assert_eq!(decode_effect(&canonical.key, &encoded).unwrap(), canonical);
+        let mut prior_canonical: Value = serde_json::from_slice(&encoded).unwrap();
+        prior_canonical["schema"] = json!(2);
+        prior_canonical.as_object_mut().unwrap().remove("intent");
+        let prior = decode_effect(
+            &canonical.key,
+            &serde_json::to_vec(&prior_canonical).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(prior.intent.owner, canonical.execution_id);
+        assert_eq!(prior.intent.attempt, 1);
+        assert_eq!(prior.intent.capability, None);
+        assert_eq!(prior.intent.created_tick, 0);
+        assert_eq!(prior.intent.recovery_after_tick, 0);
+        assert_eq!(prior.intent.epoch, canonical.sequence);
+        assert_eq!(prior.intent.recovery_lease, None);
         let mut legacy_value: Value = serde_json::from_slice(&encoded).unwrap();
         legacy_value["schema"] = json!(1);
         legacy_value
@@ -1674,12 +1932,20 @@ mod effect_encoding_tests {
     fn unknown_or_inconsistent_digest_formats_fail_closed() {
         let record = record();
         let value: Value = serde_json::from_slice(&encode_effect(&record).unwrap()).unwrap();
+        let mut missing_intent = value.clone();
+        missing_intent.as_object_mut().unwrap().remove("intent");
+        assert_eq!(
+            decode_effect(&record.key, &serde_json::to_vec(&missing_intent).unwrap()),
+            Err(StoreError::IncompatibleVersion)
+        );
         for (schema, format) in [
             (1, json!("mainframe-env.effect-canonical@1")),
             (2, Value::Null),
             (2, json!("legacy-debug@0")),
-            (2, json!("future@9")),
-            (3, json!("mainframe-env.effect-canonical@1")),
+            (3, Value::Null),
+            (3, json!("legacy-debug@0")),
+            (3, json!("future@9")),
+            (4, json!("mainframe-env.effect-canonical@1")),
         ] {
             let mut bad = value.clone();
             bad["schema"] = json!(schema);

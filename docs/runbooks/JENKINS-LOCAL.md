@@ -107,11 +107,11 @@ does not provide comparison metadata.
 Install the exact PostgreSQL version in `tools/ci-inputs.lock.json` on the node.
 When the changed-path plan selects the store obligation, Jenkins automatically
 creates a disposable cluster under `$WORKSPACE/.postgres`, runs the ignored
-provider-move, canonical-effect, atomic-invariant, work-lease fencing,
-migration/durable, and CardDemo restart contracts, and stops the cluster. The
-database is dropped and recreated before every contract so one suite cannot
-satisfy or contaminate another. Missing or version-drifted PostgreSQL tools
-fail the selected stage instead of turning it into a skip.
+provider-move, canonical-effect, stale-effect recovery, atomic-invariant,
+work-lease fencing, migration/durable, and CardDemo restart contracts, and
+stops the cluster. The database is dropped and recreated before every contract
+so one suite cannot satisfy or contaminate another. Missing or version-drifted
+PostgreSQL tools fail the selected stage instead of turning it into a skip.
 
 Every build-bearing plan also records the `python-tooling-tests` gate.
 `tools/run_tooling_tests.py` discovers tracked `tools/tests` directories at any

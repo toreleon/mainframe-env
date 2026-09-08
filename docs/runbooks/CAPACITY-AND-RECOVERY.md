@@ -10,7 +10,18 @@ After process failure, reopen the store at migration head
 `0001-durable-state`. Running JES work returns to queued state until its attempt
 limit, expired work leases are reclaimable only with a higher durable fencing
 epoch, and queued work at its deadline moves directly to dead letter. Suspended
-CICS sessions stay suspended, and incomplete effect intents remain explicit
-unknown outcomes. Local wakeups are reconstructible by scanning authoritative
-work rows. Dead-letter work requires an operator decision; it is never treated
-as completed.
+CICS sessions stay suspended. Incomplete effects remain explicit intents with
+their typed capability, dispatch owner, attempt, creation tick,
+recovery-not-before tick, and logical event epoch. Run the bounded stale-effect
+recovery worker with the same monotonic logical tick domain and only with a
+service resolver that queries an authoritative provider idempotency ledger. The
+store excludes fresh, pre-boundary, or actively leased intents, fences each
+claim by recovery owner and epoch, and permits an expired claim to be taken only
+at a higher recovery attempt/epoch.
+The resolver may record proven completion or proven failure; an unavailable or
+ambiguous observation stays pending until a later lease. Recovery never
+redispatches the original mutation.
+
+Local wakeups are reconstructible by scanning authoritative work rows.
+Dead-letter work requires an operator decision; it is never treated as
+completed.

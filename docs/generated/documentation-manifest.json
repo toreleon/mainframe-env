@@ -10,7 +10,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:a465535da5dac305166887bdbd2a052b4687ee86c0cff1b57e4733b15c0a72cb",
+      "sha256": "sha256:f35bff87ac9a64a9b157e140d7e09a1032efec999b6ee19ede2a50a7e0405c0f",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -409,7 +409,7 @@
       "path": "docs/architecture/EXECUTION-AND-DURABILITY.md",
       "relative_links": 0,
       "scope": "execution lifecycle, effects, work, checkpoints, and durability",
-      "sha256": "sha256:8f32ff9c31ab506e98b6f35cdd59499c7836c74245b0f12cadef6a920b1bdc47",
+      "sha256": "sha256:28829c8db68801f3578c58b6ec41f768ea57bf557735145fb56d8e50134a38ef",
       "status": "Accepted by repository owner",
       "title": "Execution and Durability Architecture",
       "xtask_commands": 0
@@ -511,9 +511,9 @@
       "normative": true,
       "owner": "execution and host-contract maintainers",
       "path": "docs/contracts/EFFECT-CANONICAL-V1.md",
-      "relative_links": 1,
+      "relative_links": 0,
       "scope": "canonical persisted host request/result digest representation",
-      "sha256": "sha256:dd7246450d101a1e778870909d837110fc33c5793ee70ac04e52c3925120f2f8",
+      "sha256": "sha256:d4612141dff7044f4953a73003ffd10df4eb02433234c2bfd43c48806e1fcfca",
       "status": "Frozen contract; implementation deviations tracked before 0.9.0",
       "title": "Canonical host effect representation, version 1",
       "xtask_commands": 0
@@ -1362,7 +1362,7 @@
       "normative": false,
       "path": "docs/runbooks/CAPACITY-AND-RECOVERY.md",
       "relative_links": 0,
-      "sha256": "sha256:5a41ff944c5910cbca6ddb892d7a8125668913374dd9f77be0c49bde0e39fa14",
+      "sha256": "sha256:1735f322bd3e2588c8717c3652427feafe3e3232c8510fd197eef938260e3e8b",
       "title": "Capacity and recovery",
       "xtask_commands": 0
     },
@@ -1386,7 +1386,7 @@
       "normative": false,
       "path": "docs/runbooks/JENKINS-LOCAL.md",
       "relative_links": 1,
-      "sha256": "sha256:91fb75473066dcaffea602f03a2776fae089688c35f1722a4c3c6efe58d8fe2a",
+      "sha256": "sha256:0603f3dfb89a1801fe9cfd308eccd1f7535df4724e104ddf8ab6d8e0c84d32c6",
       "title": "Local Jenkins CI",
       "xtask_commands": 0
     },

@@ -6,6 +6,8 @@ mod cobol;
 mod config;
 mod environment_secrets;
 mod product;
+#[cfg(test)]
+mod recovery_tests;
 
 pub use cobol::{
     DefaultProgramRouter, ProgramExecutionControl, compatible_system_services,

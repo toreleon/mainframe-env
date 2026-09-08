@@ -1,11 +1,11 @@
 use crate::validation;
 use mainframe_env_execution_api::{ArtifactRef, ExecutionId, IdempotencyKey, LifecycleEvent};
 use mainframe_env_store_api::{
-    ArtifactRecord, ArtifactStore, CheckpointRecord, CheckpointStore, EffectRecord, EffectState,
-    EventStore, ExecutionRecord, ExecutionState, ExecutionStore, GenerationRecord, GenerationStore,
-    IdempotencyStore, JournalStore, OutboxRecord, OutboxStore, ProviderStateMutation,
-    ProviderStateRecord, ProviderStateStore, ProviderStateWrite, SessionRecord, SessionStore,
-    StoreError, WorkRecord, WorkState, WorkStore,
+    ArtifactRecord, ArtifactStore, CheckpointRecord, CheckpointStore, EffectRecord,
+    EffectRecoveryLease, EffectState, EventStore, ExecutionRecord, ExecutionState, ExecutionStore,
+    GenerationRecord, GenerationStore, IdempotencyStore, JournalStore, OutboxRecord, OutboxStore,
+    ProviderStateMutation, ProviderStateRecord, ProviderStateStore, ProviderStateWrite,
+    SessionRecord, SessionStore, StoreError, WorkRecord, WorkState, WorkStore,
 };
 use std::collections::BTreeMap;
 use std::sync::{Mutex, MutexGuard};
@@ -563,7 +563,7 @@ impl GenerationStore for MemoryStore {
 
 impl IdempotencyStore for MemoryStore {
     fn record_intent(&self, record: EffectRecord) -> Result<(), StoreError> {
-        validation::intent(&record)?;
+        validation::new_intent(&record)?;
         let mut state = self.lock()?;
         if let Some(existing) = state.effects.get(&record.key) {
             return if existing == &record {
@@ -604,6 +604,106 @@ impl IdempotencyStore for MemoryStore {
             .take(max)
             .cloned()
             .collect())
+    }
+
+    fn stale_intents(
+        &self,
+        now_tick: u64,
+        minimum_age_ticks: u64,
+        max: usize,
+    ) -> Result<Vec<EffectRecord>, StoreError> {
+        if max == 0 || max > self.limits.max_effects {
+            return Err(StoreError::CapacityExceeded);
+        }
+        if minimum_age_ticks == 0 {
+            return Err(StoreError::InvalidTransition);
+        }
+        self.lock()?
+            .effects
+            .values()
+            .filter_map(|record| {
+                match validation::stale_intent(record, now_tick, minimum_age_ticks) {
+                    Ok(true) => Some(Ok(record.clone())),
+                    Ok(false) => None,
+                    Err(error) => Some(Err(error)),
+                }
+            })
+            .take(max)
+            .collect()
+    }
+
+    fn claim_stale_intent(
+        &self,
+        key: &IdempotencyKey,
+        expected_intent_epoch: u64,
+        recovery_owner: &str,
+        now_tick: u64,
+        minimum_age_ticks: u64,
+        lease_ticks: u64,
+    ) -> Result<EffectRecord, StoreError> {
+        let mut state = self.lock()?;
+        let record = state.effects.get_mut(key).ok_or(StoreError::NotFound)?;
+        validation::stale_claim(
+            record,
+            expected_intent_epoch,
+            recovery_owner,
+            now_tick,
+            minimum_age_ticks,
+            lease_ticks,
+        )?;
+        let (attempt, epoch) =
+            record
+                .intent
+                .recovery_lease
+                .as_ref()
+                .map_or(Ok((1, 1)), |lease| {
+                    Ok((
+                        lease
+                            .attempt
+                            .checked_add(1)
+                            .ok_or(StoreError::LeaseConflict)?,
+                        lease
+                            .epoch
+                            .checked_add(1)
+                            .ok_or(StoreError::LeaseConflict)?,
+                    ))
+                })?;
+        record.intent.recovery_lease = Some(EffectRecoveryLease {
+            owner: recovery_owner.into(),
+            attempt,
+            epoch,
+            expires_tick: now_tick
+                .checked_add(lease_ticks)
+                .ok_or(StoreError::LeaseConflict)?,
+        });
+        Ok(record.clone())
+    }
+
+    fn reconcile_stale_intent(
+        &self,
+        key: &IdempotencyKey,
+        recovery_owner: &str,
+        recovery_epoch: u64,
+        now_tick: u64,
+        final_state: EffectState,
+        format: mainframe_env_store_api::EffectDigestFormat,
+        result_digest: [u8; 32],
+    ) -> Result<EffectRecord, StoreError> {
+        let mut state = self.lock()?;
+        let record = state.effects.get_mut(key).ok_or(StoreError::NotFound)?;
+        validation::stale_reconciliation(
+            key,
+            record,
+            recovery_owner,
+            recovery_epoch,
+            now_tick,
+            final_state,
+            format,
+        )?;
+        record.state = final_state;
+        record.result_digest = Some(result_digest);
+        validation::effect(record)?;
+        Ok(record.clone())
     }
 
     fn reconcile_unknown(
@@ -728,7 +828,7 @@ impl JournalStore for MemoryStore {
             validation::effect_execution(&current, &effect)?;
             match effect.state {
                 EffectState::Intent => {
-                    validation::intent(&effect)?;
+                    validation::new_intent(&effect)?;
                     validation::effect_event(&event, &effect)?;
                     if staged.effects.contains_key(&effect.key) {
                         return Err(StoreError::Conflict);
@@ -1251,12 +1351,27 @@ mod tests {
         let store = MemoryStore::new(StoreLimits::default());
         let ids = ids();
         let intent = EffectRecord {
-            execution_id: ids.execution,
+            execution_id: ids.execution.clone(),
             run_unit_id: ids.run,
             sequence: 1,
             key: ids.idem.clone(),
             digest_format: mainframe_env_store_api::EffectDigestFormat::LegacyDebug,
             request_digest: [1; 32],
+            intent: mainframe_env_store_api::EffectIntentMetadata {
+                owner: ids.execution.clone(),
+                attempt: 1,
+                capability: Some(
+                    mainframe_env_execution_api::CapabilityId::new(
+                        "host.state.write",
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                created_tick: 1,
+                recovery_after_tick: 1,
+                epoch: 1,
+                recovery_lease: None,
+            },
             state: EffectState::Intent,
             result_digest: None,
         };

@@ -6,9 +6,10 @@ mod model;
 mod traits;
 
 pub use model::{
-    ArtifactRecord, CheckpointRecord, EffectDigestFormat, EffectRecord, EffectState,
-    ExecutionRecord, ExecutionState, GenerationRecord, OutboxRecord, ProviderStateMutation,
-    ProviderStateRecord, ProviderStateWrite, SessionRecord, StoreError, WorkRecord, WorkState,
+    ArtifactRecord, CheckpointRecord, EffectDigestFormat, EffectIntentMetadata, EffectRecord,
+    EffectRecoveryLease, EffectState, ExecutionRecord, ExecutionState, GenerationRecord,
+    MAX_EFFECT_RECOVERY_OWNER_BYTES, OutboxRecord, ProviderStateMutation, ProviderStateRecord,
+    ProviderStateWrite, SessionRecord, StoreError, WorkRecord, WorkState,
 };
 pub use traits::{
     ArtifactStore, CheckpointStore, EventStore, ExecutionStore, GenerationStore, IdempotencyStore,

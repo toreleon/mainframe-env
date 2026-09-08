@@ -1,5 +1,6 @@
 use mainframe_env_execution_api::{
-    ArtifactRef, ExecutionId, IdempotencyKey, LifecycleEvent, PrincipalId, RunUnitId, Selector,
+    ArtifactRef, CapabilityId, ExecutionId, IdempotencyKey, LifecycleEvent, PrincipalId, RunUnitId,
+    Selector,
 };
 use std::collections::BTreeMap;
 use std::fmt;
@@ -159,6 +160,29 @@ pub enum EffectState {
     UnknownOutcome,
 }
 
+pub const MAX_EFFECT_RECOVERY_OWNER_BYTES: usize = 128;
+
+/// Durable ownership fence for one stale-intent reconciliation attempt.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EffectRecoveryLease {
+    pub owner: String,
+    pub attempt: u32,
+    pub epoch: u64,
+    pub expires_tick: u64,
+}
+
+/// Metadata that makes an in-flight effect intent attributable and ageable.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EffectIntentMetadata {
+    pub owner: ExecutionId,
+    pub attempt: u32,
+    pub capability: Option<CapabilityId>,
+    pub created_tick: u64,
+    pub recovery_after_tick: u64,
+    pub epoch: u64,
+    pub recovery_lease: Option<EffectRecoveryLease>,
+}
+
 /// Identity of the persisted digest algorithm/domain. Never compare across formats.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EffectDigestFormat {
@@ -176,6 +200,7 @@ pub struct EffectRecord {
     pub key: IdempotencyKey,
     pub digest_format: EffectDigestFormat,
     pub request_digest: [u8; 32],
+    pub intent: EffectIntentMetadata,
     pub state: EffectState,
     pub result_digest: Option<[u8; 32]>,
 }
