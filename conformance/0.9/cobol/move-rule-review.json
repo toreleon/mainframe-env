@@ -1,30 +1,35 @@
 {
   "schema_version": "mainframe-env.cobol-move-rule-review@1",
-  "review_status": "pending-maintainer",
+  "review_status": "accepted",
   "candidate_projection_sha256": "sha256:29163e85029272f4c447b4aa0129908ff2df5bd9c40b60f719ea4fbf8b96f364",
   "topic_manifest_digest": "96b3f6d0d7eb08e90dc8ef465be1cc4549a4e431491d1b32c895cd659dbff067",
   "inventory_disposition": {
     "normative_fragments": 166,
     "candidate_fragments": 8,
-    "proposed_accepted_fragments": 8,
+    "accepted_fragments": 8,
     "outside_scope_fragments": 158,
     "informative_fragments": 0,
     "unsupported_fragments": 0,
     "conflicting_fragments": 0
   },
   "decisions": [
-    {"rule_id": "cobol.move.elementary-scope", "decision": "proposed-accept"},
-    {"rule_id": "cobol.move.conversion-and-editing", "decision": "proposed-accept"},
-    {"rule_id": "cobol.move.decimal-alignment", "decision": "proposed-accept"},
-    {"rule_id": "cobol.move.signed-receiver", "decision": "proposed-accept"},
-    {"rule_id": "cobol.move.numeric-editing", "decision": "proposed-accept"},
-    {"rule_id": "cobol.move.integer-to-edited-valid", "decision": "proposed-accept"},
-    {"rule_id": "cobol.move.edited-alignment", "decision": "proposed-accept"},
-    {"rule_id": "cobol.picture.floating-insertion-capacity", "decision": "proposed-accept"}
+    {"rule_id": "cobol.move.elementary-scope", "decision": "accepted"},
+    {"rule_id": "cobol.move.conversion-and-editing", "decision": "accepted"},
+    {"rule_id": "cobol.move.decimal-alignment", "decision": "accepted"},
+    {"rule_id": "cobol.move.signed-receiver", "decision": "accepted"},
+    {"rule_id": "cobol.move.numeric-editing", "decision": "accepted"},
+    {"rule_id": "cobol.move.integer-to-edited-valid", "decision": "accepted"},
+    {"rule_id": "cobol.move.edited-alignment", "decision": "accepted"},
+    {"rule_id": "cobol.picture.floating-insertion-capacity", "decision": "accepted"}
   ],
+  "review_authority": {
+    "kind": "maintainer",
+    "reviewed_on": "2026-09-08",
+    "result": "8 accepted after required corrections"
+  },
   "review_corrections": {
     "authority": "maintainer review supplied 2026-09-08",
-    "status": "corrections-applied-awaiting-acceptance",
+    "status": "accepted-after-corrections",
     "items": [
       "Changed the final expected byte from digit 9 to space: PIC ----9 moving 99999 produces space followed by 9999.",
       "Added the pinned IBM floating-insertion topic and an explicit capacity/truncation rule.",

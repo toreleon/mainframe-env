@@ -48,8 +48,10 @@ Correct or reject interpretations in the review artifact; never promote an
 extractor count, schema-valid JSON or model self-review. A source, locator,
 fragment digest, release or review mismatch must fail `spec --check`.
 
-The exercised MOVE artifact is still `pending-maintainer`, so it grants no new
-claim. This is expected fail-closed behavior, not a skipped gate.
+The maintainer accepted all eight interpretations after correcting the
+floating-insertion byte, pre-edit overflow guard, six-digit probe, and cutover
+scope. `spec --check` now promotes the reviewed rule digest and refuses stale or
+proposed decisions.
 
 ## 4. Bind obligations without forking the framework
 
@@ -62,7 +64,7 @@ MOVE is a single-language compiler/interpreter path, so it uses one ordinary
 `ConformanceCase` driver and does not create a `ScenarioSpec`, synthetic
 readback participant, failure point, or CICS/UOW primitive.
 
-For MOVE, the proposed new obligation is one exact numeric-move byte result.
+For MOVE, the new obligation is one exact numeric-move byte result.
 The existing `runtime-normal` binding covers an alphanumeric literal moved to
 `PIC X(8)`; the new binding covers signed COMP-5 to floating-minus
 numeric-edited conversion. They do not overlap, so both remain as the sole
@@ -108,13 +110,11 @@ tiers with explicit `not-run` states when skipped.
 
 ## 8. Cut over after acceptance
 
-After maintainer review, add the exact case/credit binding, run the old and
-new paths on the same candidate, investigate any disagreement against the
-reviewed source. Retain the old binding because its alphanumeric scope is
-distinct; add the numeric-edited obligation without creating duplicate credit
-for either behavior. Recompute current claims under the new spec digest. Keep
-useful unit tests and immutable historical evidence. Report the scoped result
-and all exclusions; never describe this MOVE subset as whole-language coverage.
+The accepted mapping adds the exact numeric-edited case/credit binding while
+retaining and rerunning the old alphanumeric path on the same candidate. Their
+scopes are distinct, so neither duplicates the other's credit. Current claims
+are recomputed under the new spec digest while historical evidence and IDs stay
+immutable. The result remains this MOVE subset, not whole-language coverage.
 
 ## Reuse report from the exercised proof
 
@@ -128,5 +128,5 @@ and all exclusions; never describe this MOVE subset as whole-language coverage.
   the CICS pilot is reused.
 - Unsupported/conflicting fragments: zero/zero in the selected MOVE corpus.
 - Reviewer corrections: the one-byte truncation expectation, missing
-  floating-insertion source, and non-overlapping binding decision are applied;
-  promotion remains blocked until the maintainer accepts the corrected set.
+  floating-insertion source, numeric-edited overflow guard, six-digit probe,
+  case-native binding, and non-overlapping cutover were applied and accepted.
