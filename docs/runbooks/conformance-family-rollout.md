@@ -53,9 +53,13 @@ claim. This is expected fail-closed behavior, not a skipped gate.
 ## 4. Bind obligations without forking the framework
 
 Reuse the existing official row, `RowSpec`, mandatory obligations, cases,
-typed registries, shared scenario runner, environment identity, verdict events
+typed registries, shared runner, environment identity, verdict events
 and derived ledger. Add only family-specific compile rules, source shapes and
 observation types required by the reviewed rule.
+
+MOVE is a single-language compiler/interpreter path, so it uses one ordinary
+`ConformanceCase` driver and does not create a `ScenarioSpec`, synthetic
+readback participant, failure point, or CICS/UOW primitive.
 
 For MOVE, the proposed new obligation is one exact numeric-move byte result.
 The existing `runtime-normal` binding covers an alphanumeric literal moved to
@@ -85,10 +89,10 @@ negative sign fails.
 ## 6. Prove product adequacy
 
 Extend the existing disposable source-copy mutation campaign; do not create a
-new receipt family. Run the unchanged normal scenario against a product-source
+new receipt family. Run the unchanged normal case against a product-source
 mutant. The MOVE campaign separately removes the reserved floating insertion
 position and suppresses the floating-minus output; the unchanged exact-byte
-scenario must kill both. Compile errors, empty test selection, timeouts or
+case must kill both. Compile errors, empty test selection, timeouts or
 harness failures receive no kill credit.
 
 ## 7. Select appropriate CI tiers
@@ -101,7 +105,7 @@ tiers with explicit `not-run` states when skipped.
 
 ## 8. Cut over after acceptance
 
-After maintainer review, add the exact scenario/credit binding, run the old and
+After maintainer review, add the exact case/credit binding, run the old and
 new paths on the same candidate, investigate any disagreement against the
 reviewed source. Retain the old binding because its alphanumeric scope is
 distinct; add the numeric-edited obligation without creating duplicate credit
@@ -112,13 +116,13 @@ and all exclusions; never describe this MOVE subset as whole-language coverage.
 ## Reuse report from the exercised proof
 
 - Reused unchanged: topic retrieval/digests, structural fragment engine,
-  review/disposition boundary, `RowSpec`/case registries, scenario observation
-  set equality, verdict/cache/ledger identity, Jenkins selector and source-copy
+  review/disposition boundary, `RowSpec`/case registries, ordinary driver and
+  observation binding, verdict/cache/ledger identity, Jenkins selector and source-copy
   mutation envelope.
 - Family-specific: six-topic source closure, eight compile rules, one
   numeric-edited byte observation, one fixture, and two product mutants.
-- New generic primitives: none beyond the scenario driver and reviewed-rule
-  identity already required by the CICS pilot.
+- New generic primitives: none; the reviewed-rule identity already required by
+  the CICS pilot is reused.
 - Unsupported/conflicting fragments: zero/zero in the selected MOVE corpus.
 - Reviewer corrections: the one-byte truncation expectation, missing
   floating-insertion source, and non-overlapping binding decision are applied;

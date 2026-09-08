@@ -28,7 +28,8 @@
     "items": [
       "Changed the final expected byte from digit 9 to space: PIC ----9 moving 99999 produces space followed by 9999.",
       "Added the pinned IBM floating-insertion topic and an explicit capacity/truncation rule.",
-      "Reclassified the old and new executed bindings as non-overlapping scopes rather than a replacement cutover."
+      "Reclassified the old and new executed bindings as non-overlapping scopes rather than a replacement cutover.",
+      "Uses an ordinary compiler/interpreter ConformanceCase; no synthetic multi-participant ScenarioSpec is introduced for this pure language feature."
     ]
   },
   "old_new_mapping": {

@@ -1,8 +1,6 @@
 use mainframe_env_coverage::{
-    CompiledSpec, ConformanceDriver, ConformanceLimits, ConformanceObservation,
-    ConformanceScenarioDriver, DriverOutput, DriverRef, FixtureRef, ObservationCheck,
-    ObservationRef, RuntimeRegistry, ScenarioId, ScenarioObservationBundle, ScenarioSpec,
-    SpecProblem,
+    CompiledSpec, ConformanceDriver, ConformanceLimits, ConformanceObservation, DriverOutput,
+    DriverRef, FixtureRef, ObservationCheck, ObservationRef, SpecProblem,
 };
 use mainframe_env_execution_api::MachineDrive;
 use serde::{Deserialize, Serialize};
@@ -21,18 +19,14 @@ pub struct CobolMovePilotReport {
 }
 
 pub struct CobolMovePilotRuntime {
-    case_driver: ScenarioOnlyDriver,
-    readback_driver: ScenarioOnlyDriver,
-    scenario_driver: MoveScenarioDriver,
+    driver: MoveDriver,
     observation: MoveBytesObservation,
 }
 
 #[must_use]
 pub const fn cobol_move_pilot_runtime() -> CobolMovePilotRuntime {
     CobolMovePilotRuntime {
-        case_driver: ScenarioOnlyDriver,
-        readback_driver: ScenarioOnlyDriver,
-        scenario_driver: MoveScenarioDriver,
+        driver: MoveDriver,
         observation: MoveBytesObservation,
     }
 }
@@ -44,64 +38,30 @@ impl CobolMovePilotRuntime {
         drivers: &mut Vec<(DriverRef, &'a dyn ConformanceDriver)>,
         observations: &mut Vec<(ObservationRef, &'a dyn ConformanceObservation)>,
         limits: ConformanceLimits,
-    ) -> Result<Vec<(ScenarioId, &'a dyn ConformanceScenarioDriver)>, SpecProblem> {
-        let scenario = ScenarioId::new("cobol.numeric-move.local", limits)?;
-        if spec.scenario(&scenario).is_none() {
-            return Ok(Vec::new());
+    ) -> Result<(), SpecProblem> {
+        let driver = DriverRef::new("cobol.numeric-move.product-path", limits)?;
+        if !spec.registries().drivers().contains(&driver) {
+            return Ok(());
         }
-        drivers.push((
-            DriverRef::new("cobol.numeric-move.product-path", limits)?,
-            &self.case_driver,
-        ));
-        drivers.push((
-            DriverRef::new("cobol.numeric-move.byte-readback", limits)?,
-            &self.readback_driver,
-        ));
+        drivers.push((driver, &self.driver));
         observations.push((
             ObservationRef::new("cobol.numeric-move.exact-bytes", limits)?,
             &self.observation,
         ));
-        Ok(vec![(scenario, &self.scenario_driver)])
+        Ok(())
     }
+}
 
-    pub fn attach_scenarios<'a>(
-        &'a self,
-        spec: &CompiledSpec,
-        runtime: RuntimeRegistry<'a>,
-        limits: ConformanceLimits,
-    ) -> Result<RuntimeRegistry<'a>, SpecProblem> {
-        let scenario = ScenarioId::new("cobol.numeric-move.local", limits)?;
-        if spec.scenario(&scenario).is_none() {
-            return Ok(runtime);
+struct MoveDriver;
+
+impl ConformanceDriver for MoveDriver {
+    fn execute(&self, fixture: &FixtureRef) -> Result<DriverOutput, String> {
+        if fixture.as_str() != "cobol.numeric-move.floating-sign-v1" {
+            return Err(format!("unknown COBOL numeric MOVE fixture {fixture}"));
         }
-        runtime.with_scenario_drivers(spec, vec![(scenario, &self.scenario_driver)], limits)
-    }
-}
-
-struct ScenarioOnlyDriver;
-
-impl ConformanceDriver for ScenarioOnlyDriver {
-    fn execute(&self, _fixture: &FixtureRef) -> Result<DriverOutput, String> {
-        Err("COBOL numeric MOVE binding must execute through its ScenarioSpec".into())
-    }
-}
-
-struct MoveScenarioDriver;
-
-impl ConformanceScenarioDriver for MoveScenarioDriver {
-    fn execute(&self, scenario: &ScenarioSpec) -> Result<ScenarioObservationBundle, String> {
         let report = run_cobol_move_pilot()?;
         let bytes = serde_json::to_vec(&report).map_err(|error| error.to_string())?;
-        let observations = scenario
-            .credits()
-            .iter()
-            .map(|key| {
-                DriverOutput::new(bytes.clone(), ConformanceLimits::default())
-                    .map(|output| (key.clone(), output))
-                    .map_err(|problem| problem.to_string())
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        ScenarioObservationBundle::new(observations, ConformanceLimits::default())
+        DriverOutput::new(bytes, ConformanceLimits::default())
             .map_err(|problem| problem.to_string())
     }
 }

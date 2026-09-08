@@ -1197,8 +1197,8 @@ fn check_cobol_move_pilot_inputs(root: &Path, spec: &CompiledSpec) -> TaskResult
         "COBOL MOVE candidate decisions or exact-byte fixture are incomplete",
     )?;
     let promoted = spec
-        .scenarios()
-        .any(|scenario| scenario.scenario_id().as_str() == "cobol.numeric-move.local");
+        .cases()
+        .any(|case| case.test_id().as_str() == "cobol.numeric-move.bytes.executed");
     match review["review_status"].as_str() {
         Some("pending-maintainer") => require(
             !promoted,
@@ -1209,7 +1209,7 @@ fn check_cobol_move_pilot_inputs(root: &Path, spec: &CompiledSpec) -> TaskResult
                 && decisions
                     .iter()
                     .all(|decision| decision["decision"] == "accepted"),
-            "accepted COBOL MOVE review is not promoted through the shared scenario runner",
+            "accepted COBOL MOVE review is not promoted through the shared runner",
         ),
         _ => Err("COBOL MOVE pilot review status is unknown".into()),
     }
@@ -4396,22 +4396,8 @@ fn augment_cobol_move_pilot_spec(root: &Path, spec: &mut Value) -> TaskResult {
         "COBOL MOVE accepted rule set is incomplete",
     )?;
     let review_digest = format!("sha256:{}", file_digest(&review_path)?);
-    for (registry, values) in [
-        (
-            "drivers",
-            vec![
-                "cobol.numeric-move.product-path",
-                "cobol.numeric-move.byte-readback",
-            ],
-        ),
-        (
-            "scenario_steps",
-            vec!["cobol.numeric-move.compile", "cobol.numeric-move.execute"],
-        ),
-    ] {
-        registry_values_mut(spec, registry)?
-            .extend(values.into_iter().map(|value| Value::String(value.into())));
-    }
+    registry_values_mut(spec, "drivers")?
+        .push(Value::String("cobol.numeric-move.product-path".into()));
     registry_values_mut(spec, "observations")?
         .push(Value::String("cobol.numeric-move.exact-bytes".into()));
     registry_values_mut(spec, "fixtures")?.push(json!({
@@ -4470,18 +4456,7 @@ fn augment_cobol_move_pilot_spec(root: &Path, spec: &mut Value) -> TaskResult {
         "recovery": null,
         "oracle": "cobol.enterprise-6.5.licensed",
         "reviewed_rules": rules,
-        "scenario": "cobol.numeric-move.local",
-    }));
-    document_values_mut(spec, "scenarios")?.push(json!({
-        "scenario_id": "cobol.numeric-move.local",
-        "drivers": ["cobol.numeric-move.product-path", "cobol.numeric-move.byte-readback"],
-        "ordered_steps": ["cobol.numeric-move.compile", "cobol.numeric-move.execute"],
-        "failure_points": [],
-        "credits": [{
-            "row_id": row_id,
-            "obligation_id": "numeric-move-bytes",
-            "gate": "executed",
-        }],
+        "scenario": null,
     }));
     Ok(())
 }
@@ -5233,14 +5208,12 @@ fn combined_conformance_runtime<'a>(
         jcl.observations(limits)
             .map_err(|problem| problem.to_string())?,
     );
-    let mut scenario_drivers = cics
+    let scenario_drivers = cics
         .bind(spec, &mut drivers, &mut observations, limits)
         .map_err(|problem| problem.to_string())?;
-    scenario_drivers.extend(
-        cobol_move
-            .bind(spec, &mut drivers, &mut observations, limits)
-            .map_err(|problem| problem.to_string())?,
-    );
+    cobol_move
+        .bind(spec, &mut drivers, &mut observations, limits)
+        .map_err(|problem| problem.to_string())?;
     let runtime = mainframe_env_conformance::racf_runtime_with(
         spec,
         drivers,
