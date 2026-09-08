@@ -109,31 +109,33 @@ Inject:
 - async-context store and composed execution-route regression checks;
 - schema/fixture check when relevant.
 
-### Hosted CI budget policy
+### Local Jenkins budget policy
 
-Hosted CI implements the risk tiers without repeating release-grade work on
-every event:
+The repository Jenkinsfile implements the risk tiers without repeating
+release-grade work on every event:
 
-- feature-branch pushes do not start a run; the pull-request merge ref is the
-  pre-merge authority;
-- superseded runs for the same pull request are cancelled;
+- jobs run only for branches and changes configured in local Jenkins; the
+  checked-out SHA is the execution authority;
+- concurrent runs of the same job are serialized to bound local disk use;
 - documentation-only changes do not start the Rust workflow;
 - pull requests run formatting, specification and COBOL exit checks, workspace
   tests, Clippy, and the contract MSRV gate;
 - the integrated `main` commit runs the complete workspace and documentation
-  gates; the MSRV result is not repeated for a standard GitHub merge commit;
-- manual dispatch adds complete conformance, evidence, and runtime-architecture
-  checks for a minor exit or an explicit integrated audit; and
+  gates; the MSRV result is not repeated for a standard merge commit;
+- a manual `full` run adds complete conformance, certification, evidence, and
+  runtime-architecture checks for a minor exit or an explicit integrated
+  audit; and
 - release generation, artifact upload, and reproduction run only on a
   `mainframe-env-v*` tag, after the complete manual-tier checks, and use a clean
   build rather than the normal debug cache.
 
-The non-release job caches `target/debug` by runner, Rust version, lockfile, and
-workspace manifests. Pull requests are restore-only: they may consume the
-trusted default-branch cache but never publish one. A successful `main` or
-manual full run saves a new cache only on a miss. Later pull requests rebuild
-only changed crate outputs. The cache is an optimization only; every command
-remains able to rebuild from an empty cache.
+Cargo registry downloads are shared in the capped Cargo home. Build outputs are
+kept in the per-build workspace and removed after archiving receipts, so every
+run can rebuild from an empty target directory. The Jenkins home, workspace,
+Cargo home/target, temporary files, logs, and artifacts live on a filesystem
+whose total capacity is at most 10 GiB. Selected backend parity uses a
+disposable PostgreSQL 18 cluster whose data, socket and log also stay in that
+workspace.
 
 ### Milestone gate
 

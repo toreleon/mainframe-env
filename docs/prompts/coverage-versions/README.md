@@ -138,7 +138,7 @@ shell-in-spec, general formal languages, or generated tests for internal details
   Digest materialization is generated, not typed by hand. The repository-owned
   sealer derives content hashes, projections, and commit trailers and provides a
   deterministic, non-mutating `--check` mode for CI. Keep it a build-hygiene
-  tool: GitHub CI status remains the authority for executed tests, and committed
+  tool: local Jenkins status remains the authority for executed tests, and committed
   evidence must not duplicate free-form command results, test counts, or a
   tamper-resistant remote attestation system.
 
