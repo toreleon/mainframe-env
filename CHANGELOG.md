@@ -43,6 +43,9 @@ All notable changes to mainframe-env are documented here.
 - Classified mutating-effect journal failures after dispatch as unknown outcomes
   and added fenced, bounded stale-intent recovery across memory, SQLite, and
   PostgreSQL without redispatching the original mutation.
+- Enforced PostgreSQL row/object quotas with transactional reservations, moved
+  the PostgreSQL product profile to a shared immutable artifact store, and made
+  local artifact publication no-replace and directory-durable.
 - Filtered dataset catalog listings through a discrete SAF decision per name
   and derived pagination hints only from resources visible to the principal.
 - Fenced every work-lease transition by a monotonic epoch and observed clock,

@@ -4,8 +4,10 @@ use mainframe_env_server::{
     ConfigOverrides, EnvironmentSecretResolver, HmacSha256PackageTrust, ProductServer,
     ServerConfig, StoreProfile, default_program_router,
 };
-use mainframe_env_store::{MemoryStore, PostgresStateStore, SqliteStateStore};
-use mainframe_env_store_api::PlatformStore;
+use mainframe_env_store::{
+    MemoryStore, PostgresArtifactStore, PostgresStateStore, SqliteStateStore,
+};
+use mainframe_env_store_api::{ArtifactStore, PlatformStore};
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -41,22 +43,32 @@ async fn run(cli: Cli) -> Result<(), String> {
     let config =
         ServerConfig::from_sources(Some(&config_path), &environment, ConfigOverrides::default())
             .map_err(|problem| problem.to_string())?;
-    let store: Arc<dyn PlatformStore> = match config.store_profile {
-        StoreProfile::Memory => Arc::new(MemoryStore::new(Default::default())),
-        StoreProfile::Sqlite => Arc::new(
-            SqliteStateStore::open(&config.sqlite_url, 64 * 1024 * 1024, 262_144)
-                .map_err(|problem| problem.to_string())?,
-        ),
-        StoreProfile::Postgres => {
-            let url = environment
-                .get("MAINFRAME_ENV_POSTGRES_URL")
-                .ok_or("MAINFRAME_ENV_POSTGRES_URL did not resolve postgres_url_reference")?;
-            Arc::new(
-                PostgresStateStore::open(url, 64 * 1024 * 1024, 262_144)
-                    .map_err(|problem| problem.to_string())?,
-            )
-        }
-    };
+    let (store, shared_artifacts): (Arc<dyn PlatformStore>, Option<Arc<dyn ArtifactStore>>) =
+        match config.store_profile {
+            StoreProfile::Memory => (Arc::new(MemoryStore::new(Default::default())), None),
+            StoreProfile::Sqlite => (
+                Arc::new(
+                    SqliteStateStore::open(&config.sqlite_url, 64 * 1024 * 1024, 262_144)
+                        .map_err(|problem| problem.to_string())?,
+                ),
+                None,
+            ),
+            StoreProfile::Postgres => {
+                let url = environment
+                    .get("MAINFRAME_ENV_POSTGRES_URL")
+                    .ok_or("MAINFRAME_ENV_POSTGRES_URL did not resolve postgres_url_reference")?;
+                (
+                    Arc::new(
+                        PostgresStateStore::open(url, 64 * 1024 * 1024, 262_144)
+                            .map_err(|problem| problem.to_string())?,
+                    ),
+                    Some(Arc::new(
+                        PostgresArtifactStore::open(url, 64 * 1024 * 1024, 262_144)
+                            .map_err(|problem| problem.to_string())?,
+                    )),
+                )
+            }
+        };
     let package_trust = Arc::new(
         HmacSha256PackageTrust::from_environment(
             &environment,
@@ -64,13 +76,25 @@ async fn run(cli: Cli) -> Result<(), String> {
         )
         .map_err(|problem| problem.to_string())?,
     );
-    let server = ProductServer::open_with_package_trust(
-        config.clone(),
-        store,
-        Arc::new(MemorySecretResolver::default()),
-        default_program_router(),
-        package_trust,
-    )
+    let secrets = Arc::new(MemorySecretResolver::default());
+    let program = default_program_router();
+    let server = match shared_artifacts {
+        Some(artifacts) => ProductServer::open_with_package_trust_and_artifact_store(
+            config.clone(),
+            store,
+            secrets,
+            program,
+            package_trust,
+            artifacts,
+        ),
+        None => ProductServer::open_with_package_trust(
+            config.clone(),
+            store,
+            secrets,
+            program,
+            package_trust,
+        ),
+    }
     .map_err(|problem| problem.to_string())?;
     let address: SocketAddr = config
         .listen

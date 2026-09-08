@@ -4,6 +4,7 @@ listen = "0.0.0.0:10443"
 store_profile = "postgres"
 sqlite_url = "sqlite://mainframe-env.db?mode=rwc"
 postgres_url_reference = "secret://mainframe-env/postgres-url"
+artifact_profile = "shared"
 artifact_root = "mainframe-env-artifacts"
 max_body_bytes = 4194304
 max_concurrency = 256

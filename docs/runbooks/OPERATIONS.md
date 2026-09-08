@@ -44,6 +44,7 @@ Unknown TOML fields and unsupported schema versions fail closed.
 | `MAINFRAME_ENV_SQLITE_URL` | Override the SQLite URL | Potentially |
 | `MAINFRAME_ENV_POSTGRES_URL_REF` | Override the validated reference marker | No |
 | `MAINFRAME_ENV_POSTGRES_URL` | Actual URL consumed by the current binary | **Yes** |
+| `MAINFRAME_ENV_ARTIFACT_STORE` | `local` for memory/SQLite or `shared` for PostgreSQL | No |
 | `MAINFRAME_ENV_ARTIFACT_ROOT` | Override the local artifact directory | No |
 | `MAINFRAME_ENV_TLS` | Enable or disable TLS | No |
 | `MAINFRAME_ENV_TLS_KEY_PATH` | Actual private-key path consumed by the current binary | Sensitive path |
@@ -84,6 +85,7 @@ the actual process values:
 
 ```bash
 MAINFRAME_ENV_STORE=postgres \
+MAINFRAME_ENV_ARTIFACT_STORE=shared \
 MAINFRAME_ENV_POSTGRES_URL='postgres://USER:PASSWORD@HOST/DATABASE' \
 MAINFRAME_ENV_TLS=true \
 MAINFRAME_ENV_TLS_KEY_PATH='/absolute/path/to/server.key' \

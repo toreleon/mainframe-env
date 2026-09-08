@@ -27,12 +27,10 @@ use mainframe_env_source::{
     LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLibrary,
     SourceLimits, materialize_host_abi_libraries,
 };
-use mainframe_env_store::LocalArtifactStore;
 use mainframe_env_store_api::{
     ArtifactStore, PlatformStore, ProviderStateRecord, ProviderStateWrite,
 };
 use std::collections::BTreeMap;
-use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
@@ -81,7 +79,7 @@ impl DefaultProgramRouter {
         &self,
         host: Arc<ScopedHostService>,
         store: Arc<dyn PlatformStore>,
-        artifact_root: &Path,
+        artifacts: Arc<dyn ArtifactStore>,
     ) -> Result<(), HostProblem> {
         self.cobol
             .host
@@ -93,10 +91,7 @@ impl DefaultProgramRouter {
             .map_err(|_| HostProblem::IdempotencyConflict)?;
         self.cobol
             .artifacts
-            .set(
-                LocalArtifactStore::open(artifact_root, 64 * 1024 * 1024)
-                    .map_err(|_| HostProblem::InfrastructureFailure)?,
-            )
+            .set(artifacts)
             .map_err(|_| HostProblem::IdempotencyConflict)
     }
 }
@@ -252,7 +247,7 @@ fn persist_batch_file_cursors(
 struct CobolProgram {
     host: OnceLock<Arc<ScopedHostService>>,
     store: OnceLock<Arc<dyn PlatformStore>>,
-    artifacts: OnceLock<LocalArtifactStore>,
+    artifacts: OnceLock<Arc<dyn ArtifactStore>>,
     sequence: AtomicU64,
     control: OnceLock<Arc<dyn ProgramExecutionControl>>,
     clock_start: Instant,

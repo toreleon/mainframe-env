@@ -4,7 +4,7 @@ use super::*;
 use mainframe_env_batch::DdPlan;
 use mainframe_env_execution_api::{CapabilityId, PrincipalId, ResourceLimits, ServiceClass};
 use mainframe_env_host_api::{HostLimits, ProgramName, RegistrySnapshot};
-use mainframe_env_store::{MemoryStore, SqliteStateStore, StoreLimits};
+use mainframe_env_store::{LocalArtifactStore, MemoryStore, SqliteStateStore, StoreLimits};
 use mainframe_env_store_api::{ArtifactRecord, EffectState};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -215,8 +215,9 @@ impl Fixture {
             ),
             HostLimits::default(),
         ));
+        let artifacts = Arc::new(LocalArtifactStore::open(&root.0, 64 * 1024 * 1024).unwrap());
         router
-            .bind_runtime(host.clone(), store.clone(), &root.0)
+            .bind_runtime(host.clone(), store.clone(), artifacts)
             .unwrap();
         Self {
             store,

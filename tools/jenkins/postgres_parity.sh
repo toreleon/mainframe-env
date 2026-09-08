@@ -33,7 +33,7 @@ postgres_share() {
   printf '%s\n' "$share"
 }
 
-gates=(postgres-move postgres-effect postgres-stale-effect-recovery postgres-atomic-invariants postgres-work-leases postgres-durable postgres-carddemo-restart)
+gates=(postgres-move postgres-effect postgres-stale-effect-recovery postgres-atomic-invariants postgres-work-leases postgres-storage-profile postgres-durable postgres-carddemo-restart)
 
 [[ "$action" == run || "$action" == smoke || "$action" == check || "$action" == cleanup \
   || "$action" == list ]] || { echo "usage: $0 [run|smoke|check|cleanup|list]" >&2; exit 2; }
@@ -133,6 +133,10 @@ for gate in "${gates[@]}"; do
     postgres-work-leases)
       command=(cargo test --locked -p mainframe-env-store --test work_lease_contract \
         postgres_work_deadlines_and_fencing_contract -- --ignored --exact)
+      ;;
+    postgres-storage-profile)
+      command=(cargo test --locked -p mainframe-env-store --test postgres_storage_contract \
+        postgres_quota_and_shared_artifact_contract -- --ignored --exact)
       ;;
     postgres-durable)
       command=(cargo test --locked -p mainframe-env-store --lib \

@@ -55,7 +55,7 @@ use mainframe_env_racf::{
     MemorySecretResolver, RacfManifest, RacfProfileDefinition, RacfService, RacfUserDefinition,
 };
 use mainframe_env_server::{
-    BatchProgramDefinition, HmacSha256PackageTrust, OnlineApplicationDefinition,
+    ArtifactProfile, BatchProgramDefinition, HmacSha256PackageTrust, OnlineApplicationDefinition,
     OnlineProgramDefinition, ProductServer, ServerConfig, StoreProfile, TlsConfig,
     compatible_system_services, default_program_router,
 };
@@ -64,7 +64,9 @@ use mainframe_env_source::{
     SourceEncoding, SourceFile, SourceFormat, SourceLibrary, SourceLimits,
     materialize_host_abi_libraries,
 };
-use mainframe_env_store::{MemoryStore, PostgresStateStore, SqliteStateStore};
+use mainframe_env_store::{
+    MemoryStore, PostgresArtifactStore, PostgresStateStore, SqliteStateStore,
+};
 use ring::hmac;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -6836,11 +6838,16 @@ async fn exercise_full_certification() -> Result<FullCertificationExercise, Corp
         PostgresStateStore::open(&postgres_url, 64 * 1024 * 1024, 262_144)
             .map_err(|error| CorpusProblem::new("carddemo.full.postgres", error.to_string()))?,
     );
+    let postgres_artifacts = Arc::new(
+        PostgresArtifactStore::open(&postgres_url, 64 * 1024 * 1024, 262_144)
+            .map_err(|error| CorpusProblem::new("carddemo.full.postgres", error.to_string()))?,
+    );
     let postgres_root =
         env::temp_dir().join(format!("mainframe-env-carddemo-full-postgres-{nonce}"));
     let postgres_config = ServerConfig {
         store_profile: StoreProfile::Postgres,
         postgres_url_reference: Some("secret://carddemo-full-postgres".into()),
+        artifact_profile: ArtifactProfile::Shared,
         artifact_root: postgres_root.clone(),
         tls: TlsConfig {
             enabled: false,
@@ -6849,13 +6856,20 @@ async fn exercise_full_certification() -> Result<FullCertificationExercise, Corp
         },
         ..ServerConfig::default()
     };
-    let postgres = ProductServer::open(
+    let postgres = ProductServer::open_with_artifact_store(
         postgres_config.clone(),
         postgres_store.clone(),
         Arc::new(MemorySecretResolver::default()),
         default_program_router(),
+        postgres_artifacts.clone(),
     )
     .map_err(terminal_problem)?;
+    if postgres_root.exists() {
+        return Err(CorpusProblem::new(
+            "carddemo.full.postgres_local_artifact_fallback",
+            "PostgreSQL profile created a node-local artifact directory",
+        ));
+    }
     let dataset = format!("IBMUSER.CD{:06}", nonce % 1_000_000);
     let mut postgres_sequence = u64::try_from((nonce / 1_000_000) % 1_000_000_000)
         .map_err(|_| CorpusProblem::new("carddemo.full.postgres", "sequence overflow"))?;
@@ -6876,11 +6890,12 @@ async fn exercise_full_certification() -> Result<FullCertificationExercise, Corp
         ));
     }
     drop(postgres);
-    let postgres_restarted = ProductServer::open(
+    let postgres_restarted = ProductServer::open_with_artifact_store(
         postgres_config,
         postgres_store,
         Arc::new(MemorySecretResolver::default()),
         default_program_router(),
+        postgres_artifacts,
     )
     .map_err(terminal_problem)?;
     if utility_records(&postgres_restarted, &dataset, None)? != [b"POSTGRES-RESTART".to_vec()] {

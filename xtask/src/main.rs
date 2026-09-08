@@ -6977,6 +6977,21 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         status.success(),
         "provider row persistence architecture guard failed",
     )?;
+    let storage_profile = root.join("tools/check_storage_profile.py");
+    require(
+        storage_profile.is_file(),
+        "durable storage profile architecture guard is missing",
+    )?;
+    let status = Command::new("python3")
+        .arg("-B")
+        .arg(&storage_profile)
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("durable storage profile guard: {error}"))?;
+    require(
+        status.success(),
+        "durable storage profile architecture guard failed",
+    )?;
     Ok(())
 }
 

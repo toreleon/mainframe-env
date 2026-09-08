@@ -25,3 +25,10 @@ redispatches the original mutation.
 Local wakeups are reconstructible by scanning authoritative work rows.
 Dead-letter work requires an operator decision; it is never treated as
 completed.
+
+PostgreSQL records the configured state-row and artifact-object bounds in
+transaction-locked `store_quota` rows. Every count-changing transaction reserves
+or releases quota with its data mutation. All nodes must use identical limits;
+startup rejects limit drift, over-capacity legacy rows, or a quota/count
+mismatch. Drain old binaries before the first quota-aware startup because they
+do not maintain these reservations.

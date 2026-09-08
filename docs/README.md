@@ -52,6 +52,7 @@ explicitly names that authority as superseded.
 - [Db2 application catalog](architecture/DB2-APPLICATION-CATALOG.md)
 - [Host ABI source libraries](architecture/HOST-ABI-SOURCE-LIBRARIES.md)
 - [Program and route registries](architecture/PROGRAM-AND-ROUTE-REGISTRIES.md)
+- [Durable storage profile](contracts/DURABLE-STORAGE-PROFILE.md)
 - [Canonical effect encoding](contracts/EFFECT-CANONICAL-V1.md)
 - [Provider object-row persistence](contracts/PROVIDER-ROW-PERSISTENCE-V1.md)
 - [Target release build type](contracts/RELEASE-BUILD-V1.md)

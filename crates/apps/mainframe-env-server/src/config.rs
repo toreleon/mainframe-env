@@ -11,6 +11,14 @@ pub enum StoreProfile {
     Postgres,
 }
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ArtifactProfile {
+    #[default]
+    Local,
+    Shared,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TlsConfig {
@@ -28,6 +36,8 @@ pub struct ServerConfig {
     pub store_profile: StoreProfile,
     pub sqlite_url: String,
     pub postgres_url_reference: Option<String>,
+    #[serde(default)]
+    pub artifact_profile: ArtifactProfile,
     pub artifact_root: PathBuf,
     pub max_body_bytes: usize,
     pub max_concurrency: usize,
@@ -45,6 +55,7 @@ impl Default for ServerConfig {
             store_profile: StoreProfile::Sqlite,
             sqlite_url: "sqlite://mainframe-env.db?mode=rwc".into(),
             postgres_url_reference: None,
+            artifact_profile: ArtifactProfile::Local,
             artifact_root: PathBuf::from("mainframe-env-artifacts"),
             max_body_bytes: 4 * 1024 * 1024,
             max_concurrency: 256,
@@ -65,6 +76,7 @@ pub struct ConfigOverrides {
     pub store_profile: Option<StoreProfile>,
     pub sqlite_url: Option<String>,
     pub postgres_url_reference: Option<String>,
+    pub artifact_profile: Option<ArtifactProfile>,
     pub artifact_root: Option<PathBuf>,
     pub tls_enabled: Option<bool>,
 }
@@ -94,6 +106,9 @@ impl ServerConfig {
         if let Some(value) = environment.get("MAINFRAME_ENV_POSTGRES_URL_REF") {
             config.postgres_url_reference = Some(value.clone());
         }
+        if let Some(value) = environment.get("MAINFRAME_ENV_ARTIFACT_STORE") {
+            config.artifact_profile = parse_artifact_store(value)?;
+        }
         if let Some(value) = environment.get("MAINFRAME_ENV_ARTIFACT_ROOT") {
             config.artifact_root = value.into();
         }
@@ -111,6 +126,9 @@ impl ServerConfig {
         }
         if let Some(value) = cli.postgres_url_reference {
             config.postgres_url_reference = Some(value);
+        }
+        if let Some(value) = cli.artifact_profile {
+            config.artifact_profile = value;
         }
         if let Some(value) = cli.artifact_root {
             config.artifact_root = value;
@@ -130,13 +148,18 @@ impl ServerConfig {
             || self.max_concurrency == 0
             || self.timeout_millis == 0
             || self.shutdown_millis == 0
-            || self.artifact_root.as_os_str().is_empty()
+            || (self.artifact_profile == ArtifactProfile::Local
+                && self.artifact_root.as_os_str().is_empty())
             || (self.store_profile == StoreProfile::Sqlite && self.sqlite_url.is_empty())
             || (self.store_profile == StoreProfile::Postgres
                 && self
                     .postgres_url_reference
                     .as_deref()
                     .is_none_or(str::is_empty))
+            || (self.store_profile == StoreProfile::Postgres
+                && self.artifact_profile != ArtifactProfile::Shared)
+            || (self.store_profile != StoreProfile::Postgres
+                && self.artifact_profile != ArtifactProfile::Local)
             || (self.tls.enabled
                 && (self.tls.certificate_path.is_none()
                     || self
@@ -149,6 +172,14 @@ impl ServerConfig {
         } else {
             Ok(())
         }
+    }
+}
+
+fn parse_artifact_store(value: &str) -> Result<ArtifactProfile, HostProblem> {
+    match value.to_ascii_lowercase().as_str() {
+        "local" => Ok(ArtifactProfile::Local),
+        "shared" => Ok(ArtifactProfile::Shared),
+        _ => Err(HostProblem::Malformed),
     }
 }
 
@@ -212,6 +243,25 @@ enabled=false
         config.tls.enabled = false;
         assert!(config.validate().is_ok());
         config.schema_version = 2;
+        assert_eq!(config.validate(), Err(HostProblem::Malformed));
+    }
+
+    #[test]
+    fn postgres_requires_the_shared_artifact_profile() {
+        let mut config = ServerConfig {
+            store_profile: StoreProfile::Postgres,
+            postgres_url_reference: Some("secret://postgres".into()),
+            tls: TlsConfig {
+                enabled: false,
+                certificate_path: None,
+                private_key_reference: None,
+            },
+            ..ServerConfig::default()
+        };
+        assert_eq!(config.validate(), Err(HostProblem::Malformed));
+        config.artifact_profile = ArtifactProfile::Shared;
+        assert!(config.validate().is_ok());
+        config.store_profile = StoreProfile::Memory;
         assert_eq!(config.validate(), Err(HostProblem::Malformed));
     }
 }

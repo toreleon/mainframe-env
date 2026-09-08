@@ -18,6 +18,13 @@ Never restore over an active authority.
 
 ## Artifacts
 
-Copy the immutable `objects/<prefix>/<sha256>` tree with metadata preserved.
-On restore, read every retained object through `LocalArtifactStore`; digest or
-media-envelope mismatch is an integrity failure, never a cache miss.
+For a local profile, copy the immutable `objects/<prefix>/<sha256>` tree with
+metadata preserved. On restore, read every retained object through
+`LocalArtifactStore`; digest or media-envelope mismatch is an integrity
+failure, never a cache miss.
+
+The PostgreSQL profile stores immutable objects in `artifact_object`; include
+that table and both `store_quota` rows in the same physical or custom-format
+database backup. On restore, `PostgresStateStore` and
+`PostgresArtifactStore` reconcile recorded quota usage against actual rows and
+fail closed before serving a missing, partial, or corrupt object.

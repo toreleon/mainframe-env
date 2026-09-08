@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 178,
+    "markdown_documents": 179,
     "navigation_groups": 5,
-    "normative_documents": 34,
+    "normative_documents": 35,
     "xtask_commands": 156
   },
   "documents": [
@@ -10,7 +10,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:f35bff87ac9a64a9b157e140d7e09a1032efec999b6ee19ede2a50a7e0405c0f",
+      "sha256": "sha256:ee5897abea9bcda2b468a18c297510e59843495ab5c3559a4f056f1eb951f2aa",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -106,7 +106,7 @@
       "normative": false,
       "path": "crates/apps/mainframe-env-server/README.md",
       "relative_links": 0,
-      "sha256": "sha256:d53afb231804842c973a02c206610f453c3104f18ccd1cc740526f18cee44902",
+      "sha256": "sha256:f0f2dc5aa90d9261dca973301bf24f76112c5bb507a4cb7b7411a7895d9af0ce",
       "title": "mainframe-env-server",
       "xtask_commands": 0
     },
@@ -274,7 +274,7 @@
       "normative": false,
       "path": "crates/stores/mainframe-env-store/README.md",
       "relative_links": 0,
-      "sha256": "sha256:a1df4ed53377ff40a4494ffcaa67b7a1f5a103dd3b25d6c307be93f86271008a",
+      "sha256": "sha256:195e45131a1adedd33f5385383d7f07de70e6c003f32178e356d8228a53570ee",
       "title": "mainframe-env-store",
       "xtask_commands": 0
     },
@@ -301,8 +301,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 69,
-      "sha256": "sha256:36e8c0414812060dd1c06545724391318d84508b6240bdffdacce02cbe61cc71",
+      "relative_links": 70,
+      "sha256": "sha256:ffaa86f45f18d444776990c951e639810e0d5438e22dc3c8baf3a4ee36e714e3",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -505,6 +505,18 @@
       "sha256": "sha256:b4898990f86ea395a34e74b133c3980817a1f2cb619d074a4e17cdfe0201e43f",
       "title": "CardDemo reached compatibility copybooks",
       "xtask_commands": 2
+    },
+    {
+      "applies_from": "mainframe-env 0.8.3 hardening",
+      "normative": true,
+      "owner": "store adapters and core-server composition",
+      "path": "docs/contracts/DURABLE-STORAGE-PROFILE.md",
+      "relative_links": 0,
+      "scope": "PostgreSQL quotas, shared immutable artifacts, and local publication durability",
+      "sha256": "sha256:3349ded5cb83df3e7ca8d20efd4b052aff9fa0360b899934dbf7d18f8ba3ab65",
+      "status": "Implemented",
+      "title": "Durable storage profile",
+      "xtask_commands": 0
     },
     {
       "applies_from": "mainframe-env 0.8.2 hardening",
@@ -1354,7 +1366,7 @@
       "normative": false,
       "path": "docs/runbooks/BACKUP-RESTORE.md",
       "relative_links": 0,
-      "sha256": "sha256:637022dc0b6714d9e8f5a6630df50169d788c962ea908593d52ae31449503603",
+      "sha256": "sha256:7ad9b2555627a0ed777acf8388768c03a0747f39d7744f6d8de0fadf2839282c",
       "title": "Backup and restore",
       "xtask_commands": 0
     },
@@ -1362,7 +1374,7 @@
       "normative": false,
       "path": "docs/runbooks/CAPACITY-AND-RECOVERY.md",
       "relative_links": 0,
-      "sha256": "sha256:1735f322bd3e2588c8717c3652427feafe3e3232c8510fd197eef938260e3e8b",
+      "sha256": "sha256:614c13070713ce9f6185b3bd9f47ef9830e75b350d09d4b418217b76e73e38bd",
       "title": "Capacity and recovery",
       "xtask_commands": 0
     },
@@ -1394,7 +1406,7 @@
       "normative": false,
       "path": "docs/runbooks/OPERATIONS.md",
       "relative_links": 3,
-      "sha256": "sha256:209a169e79aaf8f84ac2906e37f700a81adb3e9cdbc6273f7721f97631ab25c9",
+      "sha256": "sha256:9b074c2e9aeee0fbcc22c47875d3b6dc569912a3d10792afd41037c295b448b3",
       "title": "Core-server operations",
       "xtask_commands": 0
     },
@@ -1635,6 +1647,10 @@
           "path": "docs/architecture/PROGRAM-AND-ROUTE-REGISTRIES.md"
         },
         {
+          "label": "Durable storage profile",
+          "path": "docs/contracts/DURABLE-STORAGE-PROFILE.md"
+        },
+        {
           "label": "Canonical effect encoding",
           "path": "docs/contracts/EFFECT-CANONICAL-V1.md"
         },
@@ -1855,7 +1871,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:30442a6f79704be9a9df85f0e86d813303937298b6af7c8f4ff9389495d0c155",
+  "registry_sha256": "sha256:30b31ecb1278643e5d74a18fd19f6e74d7674db58f255aca7a9ce733855babe9",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

@@ -1,5 +1,5 @@
 use crate::cobol::bind_compatible_runtime_services;
-use crate::{DefaultProgramRouter, ServerConfig, default_program_router};
+use crate::{ArtifactProfile, DefaultProgramRouter, ServerConfig, default_program_router};
 use axum::http::StatusCode;
 use base64::Engine;
 use mainframe_env_application::{
@@ -222,7 +222,7 @@ pub struct ProductServer {
     ims: Arc<ImsService>,
     mq: Arc<MqService>,
     batch: Arc<BatchService>,
-    artifacts: Arc<LocalArtifactStore>,
+    artifacts: Arc<ProductArtifactStore>,
     host: Arc<ScopedHostService>,
     program: Arc<DefaultProgramRouter>,
     applications: ApplicationInstaller,
@@ -239,6 +239,47 @@ pub struct ProductServer {
     failures: AtomicU64,
     active: AtomicUsize,
     outbox_delivered: AtomicU64,
+}
+
+enum ProductArtifactStore {
+    Local(LocalArtifactStore),
+    Shared(Arc<dyn ArtifactStore>),
+}
+
+impl ProductArtifactStore {
+    fn is_ready(&self) -> bool {
+        match self {
+            Self::Local(store) => store.is_ready(),
+            Self::Shared(store) => ArtifactRef::new(
+                "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+                InvocationLimits::default(),
+            )
+            .is_ok_and(|probe| store.get_artifact(&probe).is_ok()),
+        }
+    }
+}
+
+impl ArtifactStore for ProductArtifactStore {
+    fn put_artifact(&self, record: ArtifactRecord) -> Result<(), StoreError> {
+        match self {
+            Self::Local(store) => store.put_artifact(record),
+            Self::Shared(store) => store.put_artifact(record),
+        }
+    }
+
+    fn get_artifact(&self, id: &ArtifactRef) -> Result<Option<ArtifactRecord>, StoreError> {
+        match self {
+            Self::Local(store) => store.get_artifact(id),
+            Self::Shared(store) => store.get_artifact(id),
+        }
+    }
+
+    fn delete_artifact(&self, id: &ArtifactRef) -> Result<(), StoreError> {
+        match self {
+            Self::Local(store) => store.delete_artifact(id),
+            Self::Shared(store) => store.delete_artifact(id),
+        }
+    }
 }
 
 const APPLICATION_V2_STATE_NAMESPACE: &str = "application-package-v2";
@@ -383,22 +424,72 @@ impl ProductServer {
         program: Arc<DefaultProgramRouter>,
         package_trust: Arc<dyn PackageSignatureVerifier>,
     ) -> Result<Arc<Self>, HostProblem> {
-        config.validate()?;
-        let artifacts = Arc::new(
+        if config.artifact_profile != ArtifactProfile::Local {
+            return Err(HostProblem::Malformed);
+        }
+        let artifacts = Arc::new(ProductArtifactStore::Local(
             LocalArtifactStore::open(&config.artifact_root, 64 * 1024 * 1024)
                 .map_err(store_error)?,
-        );
+        ));
+        Self::open_configured(config, store, secrets, program, package_trust, artifacts)
+    }
+
+    pub fn open_with_package_trust_and_artifact_store(
+        config: ServerConfig,
+        store: Arc<dyn PlatformStore>,
+        secrets: Arc<MemorySecretResolver>,
+        program: Arc<DefaultProgramRouter>,
+        package_trust: Arc<dyn PackageSignatureVerifier>,
+        artifacts: Arc<dyn ArtifactStore>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        if config.artifact_profile != ArtifactProfile::Shared {
+            return Err(HostProblem::Malformed);
+        }
+        Self::open_configured(
+            config,
+            store,
+            secrets,
+            program,
+            package_trust,
+            Arc::new(ProductArtifactStore::Shared(artifacts)),
+        )
+    }
+
+    pub fn open_with_artifact_store(
+        config: ServerConfig,
+        store: Arc<dyn PlatformStore>,
+        secrets: Arc<MemorySecretResolver>,
+        program: Arc<DefaultProgramRouter>,
+        artifacts: Arc<dyn ArtifactStore>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_with_package_trust_and_artifact_store(
+            config,
+            store,
+            secrets,
+            program,
+            Arc::new(RejectPackageTrust),
+            artifacts,
+        )
+    }
+
+    fn open_configured(
+        config: ServerConfig,
+        store: Arc<dyn PlatformStore>,
+        secrets: Arc<MemorySecretResolver>,
+        program: Arc<DefaultProgramRouter>,
+        package_trust: Arc<dyn PackageSignatureVerifier>,
+        artifacts: Arc<ProductArtifactStore>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        config.validate()?;
         let provider_store: Arc<dyn ProviderStateStore> = store.clone();
         let racf = RacfService::open(provider_store.clone(), secrets.clone(), Default::default())?;
         let dataset = DatasetService::open(provider_store.clone(), Default::default())?;
         let db2 = Db2Service::open(provider_store.clone(), Default::default())?;
         let ims = ImsService::open(provider_store.clone(), Default::default())?;
         let mq = MqService::open(provider_store.clone(), Default::default())?;
-        let spool = SpoolService::open(
-            provider_store.clone(),
-            artifacts.clone(),
-            Default::default(),
-        )?;
+        let spool_artifacts: Arc<dyn ArtifactStore> = artifacts.clone();
+        let spool =
+            SpoolService::open(provider_store.clone(), spool_artifacts, Default::default())?;
         let mut enterprise_providers = db2_providers(db2.clone(), InvocationLimits::default());
         enterprise_providers.extend(ims_providers(ims.clone(), InvocationLimits::default()));
         enterprise_providers.extend(mq_providers(mq.clone(), InvocationLimits::default()));
@@ -425,7 +516,8 @@ impl ProductServer {
             true,
             Some(cics_provider(cics.clone(), InvocationLimits::default())),
         )?;
-        program.bind_runtime(host.clone(), store.clone(), &config.artifact_root)?;
+        let program_artifacts: Arc<dyn ArtifactStore> = artifacts.clone();
+        program.bind_runtime(host.clone(), store.clone(), program_artifacts)?;
         let checkpoint_store: Arc<dyn CheckpointStore> = store.clone();
         let batch = BatchService::open_with_checkpoint_store(
             host.clone(),

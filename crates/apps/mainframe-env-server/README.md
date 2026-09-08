@@ -20,3 +20,9 @@ state machine with explicit partial states; no generation is reported selected
 until every applicable section is durable. Production package trust stores only
 `SecretRef` values and resolves zeroizing HMAC verification material per use;
 signing remains test/tooling-only.
+
+Artifact placement is explicit. Memory and SQLite profiles require
+`artifact_profile = "local"`; the PostgreSQL profile requires
+`artifact_profile = "shared"` and stores content-addressed objects in the same
+PostgreSQL authority through `PostgresArtifactStore`. PostgreSQL startup fails
+closed rather than falling back to a node-local artifact directory.
