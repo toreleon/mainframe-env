@@ -11,7 +11,7 @@ route already exists. Record exact sender/receiver shapes, compiler options,
 environment, positive/negative/boundary values and exclusions. For the exercised
 proof this is the existing MOVE statement row, a signed `S9(9) COMP-5` sender,
 a `PIC ----9` numeric-edited receiver, default compiler options, and values 100,
--911, 0 and 99999. MOVE CORRESPONDING, group moves, decimal fractions,
+-911, 0 and the five-digit truncation probe 99999. MOVE CORRESPONDING, group moves, decimal fractions,
 overflow, national/UTF-8, other editing pictures and licensed differential work
 remain outside this subset.
 
@@ -19,9 +19,9 @@ remain outside this subset.
 
 Reuse the documentation content endpoint and topic-manifest digest contract.
 Follow only links required to interpret the selected behavior, within explicit
-topic/byte/depth limits. The MOVE proof uses five already-pinned Enterprise
+topic/byte/depth limits. The MOVE proof uses six already-pinned Enterprise
 COBOL 6.5 topics: MOVE, elementary moves, elementary move rules, valid/invalid
-elementary moves, and alignment rules. The manifest contains 57,772 bytes by
+elementary moves, alignment rules, and floating insertion editing. The manifest contains 69,858 bytes by
 digest; no publication body is retained in the repository.
 
 Generate the review projection from external snapshots:
@@ -34,11 +34,11 @@ python3 conformance/0.9/tools/extract_cobol_move_rules.py \
   --output conformance/0.9/generated/cobol-move-semantic-candidates.json
 ```
 
-The exercised projection inventories 154 fragments: seven candidates and 147
+The exercised projection inventories 166 fragments: eight candidates and 158
 explicit outside-scope dispositions, with zero unsupported fragments and zero
 conflicts. It preserves the structural table row that authorizes numeric
-integer to numeric-edited MOVE, rather than treating table text as unstructured
-prose.
+integer to numeric-edited MOVE and the bounded floating-insertion list that
+requires an extra insertion position to avoid truncation.
 
 ## 3. Require independent review
 
@@ -58,9 +58,11 @@ and derived ledger. Add only family-specific compile rules, source shapes and
 observation types required by the reviewed rule.
 
 For MOVE, the proposed new obligation is one exact numeric-move byte result.
-The old broad `runtime-normal` binding and new scoped binding overlap; the
-review artifact therefore defines a cutover rather than allowing two current
-claim authorities. Historical verdicts remain bound to their original spec.
+The existing `runtime-normal` binding covers an alphanumeric literal moved to
+`PIC X(8)`; the new binding covers signed COMP-5 to floating-minus
+numeric-edited conversion. They do not overlap, so both remain as the sole
+claim authority for their respective scope. Historical verdicts and IDs remain
+bound to their original spec.
 
 ## 5. Execute the real product route
 
@@ -75,16 +77,19 @@ cargo test -p mainframe-env-conformance \
 ```
 
 The command was exercised locally. The positive, negative-sign, zero/padding
-and upper-bound values produce exact independent bytes. A comparator
-perturbation that removes the negative sign fails.
+and truncation-boundary values produce exact independent bytes. `99999` moved
+to `PIC ----9` yields space plus `9999`, matching the pinned IBM capacity rule
+and an external GnuCOBOL control. A comparator perturbation that removes the
+negative sign fails.
 
 ## 6. Prove product adequacy
 
 Extend the existing disposable source-copy mutation campaign; do not create a
 new receipt family. Run the unchanged normal scenario against a product-source
-mutant. The MOVE campaign changes the interpreter's floating-minus output and
-requires the unchanged exact-byte scenario to fail. Compile errors, empty test
-selection, timeouts or harness failures receive no kill credit.
+mutant. The MOVE campaign separately removes the reserved floating insertion
+position and suppresses the floating-minus output; the unchanged exact-byte
+scenario must kill both. Compile errors, empty test selection, timeouts or
+harness failures receive no kill credit.
 
 ## 7. Select appropriate CI tiers
 
@@ -98,10 +103,11 @@ tiers with explicit `not-run` states when skipped.
 
 After maintainer review, add the exact scenario/credit binding, run the old and
 new paths on the same candidate, investigate any disagreement against the
-reviewed source, remove only the overlapping current coverage authority, and
-recompute current claims under the new spec digest. Keep useful unit tests and
-immutable historical evidence. Report the scoped result and all exclusions;
-never describe this MOVE subset as whole-language coverage.
+reviewed source. Retain the old binding because its alphanumeric scope is
+distinct; add the numeric-edited obligation without creating duplicate credit
+for either behavior. Recompute current claims under the new spec digest. Keep
+useful unit tests and immutable historical evidence. Report the scoped result
+and all exclusions; never describe this MOVE subset as whole-language coverage.
 
 ## Reuse report from the exercised proof
 
@@ -109,10 +115,11 @@ never describe this MOVE subset as whole-language coverage.
   review/disposition boundary, `RowSpec`/case registries, scenario observation
   set equality, verdict/cache/ledger identity, Jenkins selector and source-copy
   mutation envelope.
-- Family-specific: five-topic source closure, seven compile rules, one
-  numeric-edited byte observation, one fixture, and one product mutant.
+- Family-specific: six-topic source closure, eight compile rules, one
+  numeric-edited byte observation, one fixture, and two product mutants.
 - New generic primitives: none beyond the scenario driver and reviewed-rule
   identity already required by the CICS pilot.
 - Unsupported/conflicting fragments: zero/zero in the selected MOVE corpus.
-- Reviewer corrections: pending; promotion and old/new cutover are blocked until
-  a maintainer records acceptance or changes.
+- Reviewer corrections: the one-byte truncation expectation, missing
+  floating-insertion source, and non-overlapping binding decision are applied;
+  promotion remains blocked until the maintainer accepts the corrected set.

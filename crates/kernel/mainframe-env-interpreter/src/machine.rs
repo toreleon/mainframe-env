@@ -11430,29 +11430,40 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
     if layout.blank_when_zero && value.coefficient == 0 {
         return Ok(vec![b' '; layout.length]);
     }
+    let picture = expanded_picture(&layout.picture, layout.length.saturating_add(layout.digits))?;
+    let floating_sign = picture
+        .windows(2)
+        .find(|pair| pair[0] == pair[1] && matches!(pair[0], b'+' | b'-'))
+        .map(|pair| pair[0]);
     let mut digits = value.coefficient.unsigned_abs().to_string();
-    if digits.len() < layout.digits {
+    if floating_sign.is_some() {
+        let numeric_capacity = layout
+            .digits
+            .checked_sub(1)
+            .ok_or(MachineProblem::UnsupportedForm)?;
+        if digits.len() > numeric_capacity {
+            digits = digits[digits.len() - numeric_capacity..].to_string();
+        }
+        if digits.len() < numeric_capacity {
+            digits = format!("{}{}", "0".repeat(numeric_capacity - digits.len()), digits);
+        }
+        // The first floating symbol is the insertion position; the remaining
+        // symbols are numeric positions. A leading placeholder lets the
+        // existing picture walk consume that reserved insertion position.
+        digits.insert(0, '0');
+    } else if digits.len() < layout.digits {
         digits = format!("{}{}", "0".repeat(layout.digits - digits.len()), digits);
     }
     let mut digit_index = 0usize;
     let mut output = Vec::with_capacity(layout.length);
     let mut suppressing = true;
-    let picture = expanded_picture(&layout.picture, layout.length.saturating_add(layout.digits))?;
     let first_nonzero = digits.bytes().position(|digit| digit != b'0');
-    let has_floating_plus = picture.windows(2).any(|pair| pair == b"++");
+    let has_floating_plus = floating_sign == Some(b'+');
     let floating_sign_slot = if value.coefficient < 0 || has_floating_plus {
         first_nonzero.and_then(|position| position.checked_sub(1))
     } else {
         None
     };
-    if (value.coefficient < 0 || has_floating_plus)
-        && first_nonzero == Some(0)
-        && picture
-            .first()
-            .is_some_and(|symbol| matches!(symbol, b'+' | b'-'))
-    {
-        return Err(MachineProblem::SizeError);
-    }
     for (picture_index, byte) in picture.iter().copied().enumerate() {
         match byte {
             b'9' => {
@@ -11490,7 +11501,13 @@ fn encode_edited(layout: &LayoutMetadata, value: Decimal) -> Result<Vec<u8>, Mac
             {
                 let digit = *digits.as_bytes().get(digit_index).unwrap_or(&b'0');
                 if floating_sign_slot == Some(digit_index) {
-                    output.push(if value.coefficient < 0 { b'-' } else { b'+' });
+                    output.push(if value.coefficient < 0 {
+                        b'-'
+                    } else if byte == b'+' {
+                        b'+'
+                    } else {
+                        b' '
+                    });
                     suppressing = false;
                 } else if suppressing && digit == b'0' && digit_index + 1 < layout.digits {
                     output.push(b' ');
@@ -13412,6 +13429,57 @@ mod tests {
                 }
             ),
             Ok(b"000000123.45 ".to_vec())
+        );
+    }
+
+    #[test]
+    fn floating_minus_reserves_one_insertion_position_before_numeric_digits() {
+        let layout = LayoutMetadata {
+            name: "EDITED".into(),
+            simple_name: "EDITED".into(),
+            category: LayoutCategory::NumericEdited,
+            picture: "----9".into(),
+            digits: 5,
+            scale: 0,
+            signed: true,
+            sign_separate: false,
+            justified_right: false,
+            blank_when_zero: false,
+            linkage: false,
+            offset: 0,
+            length: 5,
+            element_length: 5,
+            occurs: 1,
+            occurs_min: 1,
+            unbounded: false,
+            depending_on: None,
+            indexes: Vec::new(),
+            keys: Vec::new(),
+            dynamic: false,
+            dynamic_limit: 0,
+            parent: None,
+            condition_values: Vec::new(),
+            object_class: None,
+        };
+        assert_eq!(
+            encode_edited(
+                &layout,
+                Decimal {
+                    coefficient: -911,
+                    scale: 0,
+                }
+            ),
+            Ok(b" -911".to_vec())
+        );
+        assert_eq!(
+            encode_edited(
+                &layout,
+                Decimal {
+                    coefficient: 99_999,
+                    scale: 0,
+                }
+            ),
+            Ok(b" 9999".to_vec())
         );
     }
 

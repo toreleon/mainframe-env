@@ -1104,8 +1104,8 @@ fn check_cobol_move_pilot_inputs(root: &Path, spec: &CompiledSpec) -> TaskResult
     let manifest = json(&manifest_path)?;
     let topics = array(&manifest, "topics", &manifest_path)?;
     require(
-        topics.len() == 5
-            && manifest["topic_count"].as_u64() == Some(5)
+        topics.len() == 6
+            && manifest["topic_count"].as_u64() == Some(6)
             && topics
                 .iter()
                 .map(|topic| topic["bytes"].as_u64().unwrap_or(0))
@@ -1180,9 +1180,20 @@ fn check_cobol_move_pilot_inputs(root: &Path, spec: &CompiledSpec) -> TaskResult
     require(
         candidate_rules == reviewed
             && fixture["row_id"] == "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0026"
+            && fixture["expected_output_hex"] == "20203130300a202d3931310a20202020300a20393939390a"
+            && fixture["expectation_authority"]["kind"] == "maintainer-reviewed-golden"
+            && fixture["expectation_authority"]["independent_control"]["observed_output_hex"]
+                == fixture["expected_output_hex"]
+            && fixture["expectation_authority"]["independent_control"]["coverage_credit"] == 0
+            && fixture["expectation_authority"]["independent_control"]["licensed_credit"] == 0
             && fixture["comparison_policy"]["normalizable_fields"]
                 .as_array()
-                .is_some_and(Vec::is_empty),
+                .is_some_and(Vec::is_empty)
+            && review["old_new_mapping"]["old_scope"] == "alphanumeric literal MOVED to PIC X(8)"
+            && review["old_new_mapping"]["new_scope"]
+                == "signed S9(9) COMP-5 to PIC ----9 numeric-edited conversion, sign insertion, zero suppression, and truncation boundary"
+            && review["old_new_mapping"]["cutover_rule"]
+                == "Retain both bindings because their behavioral scopes do not overlap; each remains the sole current claim authority for its own fixture and observation.",
         "COBOL MOVE candidate decisions or exact-byte fixture are incomplete",
     )?;
     let promoted = spec
@@ -4381,7 +4392,7 @@ fn augment_cobol_move_pilot_spec(root: &Path, spec: &mut Value) -> TaskResult {
         .map(|decision| text(decision, "rule_id", &review_path).map(str::to_string))
         .collect::<TaskResult<BTreeSet<_>>>()?;
     require(
-        rules.len() == 7,
+        rules.len() == 8,
         "COBOL MOVE accepted rule set is incomplete",
     )?;
     let review_digest = format!("sha256:{}", file_digest(&review_path)?);
@@ -4413,6 +4424,20 @@ fn augment_cobol_move_pilot_spec(root: &Path, spec: &mut Value) -> TaskResult {
             .map(|rule| json!({"id": rule, "digest": review_digest})),
     );
     let row_id = "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0026";
+    require(
+        document_values_mut(spec, "obligations")?
+            .iter()
+            .any(|obligation| {
+                obligation["row_id"] == row_id && obligation["obligation_id"] == "runtime-normal"
+            })
+            && document_values_mut(spec, "cases")?.iter().any(|case| {
+                case["row_id"] == row_id
+                    && case["obligation_id"] == "runtime-normal"
+                    && case["test_id"] == "cobol.statement-runtime.move"
+                    && case["input"] == "cobol.statement-runtime.move"
+            }),
+        "COBOL MOVE non-overlapping alphanumeric binding is missing before numeric cutover",
+    )?;
     let rows = document_values_mut(spec, "rows")?;
     let row = rows
         .iter_mut()
@@ -4421,21 +4446,12 @@ fn augment_cobol_move_pilot_spec(root: &Path, spec: &mut Value) -> TaskResult {
     row["obligations"]
         .as_array_mut()
         .ok_or("COBOL MOVE obligations are missing")?
-        .retain(|obligation| obligation != "runtime-normal");
-    row["obligations"]
-        .as_array_mut()
-        .unwrap()
         .push(Value::String("numeric-move-bytes".into()));
     row["postconditions"]
         .as_array_mut()
         .ok_or("COBOL MOVE postconditions are missing")?
         .push(Value::String("cobol.numeric-move.exact-bytes".into()));
     row["reviewed_rules"] = Value::Array(rules.iter().cloned().map(Value::String).collect());
-    document_values_mut(spec, "obligations")?.retain(|obligation| {
-        !(obligation["row_id"] == row_id && obligation["obligation_id"] == "runtime-normal")
-    });
-    document_values_mut(spec, "cases")?
-        .retain(|case| !(case["row_id"] == row_id && case["obligation_id"] == "runtime-normal"));
     document_values_mut(spec, "obligations")?.push(json!({
         "row_id": row_id,
         "obligation_id": "numeric-move-bytes",

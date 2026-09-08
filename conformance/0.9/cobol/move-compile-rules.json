@@ -1,9 +1,10 @@
 {
   "schema_version": "mainframe-env.cobol-move-compile-rules@1",
-  "extractor_version": "cobol-move-dita-fragments@1",
+  "extractor_version": "cobol-move-dita-fragments@2",
   "release": "Enterprise COBOL for z/OS 6.5",
   "sources": [
     {"topic_path": "SS6SG3_6.5/lr/ref/rldadar.html", "sections": ["__lead__"]},
+    {"topic_path": "SS6SG3_6.5/lr/ref/rlddeief.html", "sections": ["__lead__"], "include_tags": ["ul"]},
     {"topic_path": "SS6SG3_6.5/lr/ref/rlpsmove.html", "sections": ["__lead__"]},
     {"topic_path": "SS6SG3_6.5/lr/ref/rlpsmovea.html", "sections": ["__lead__"]},
     {"topic_path": "SS6SG3_6.5/lr/rlpsmovea1.html", "sections": ["__lead__"]},
@@ -65,6 +66,14 @@
       "all": ["aligned on the decimal point", "editing causes replacement of leading zeros"],
       "interpretation": "Numeric-edited receivers align on the decimal point and may replace leading zeros as directed by editing.",
       "applicability": "PIC ----9 receiver"
+    },
+    {
+      "id": "cobol.picture.floating-insertion-capacity",
+      "topic_path": "SS6SG3_6.5/lr/ref/rlddeief.html",
+      "sections": ["__lead__"],
+      "all": ["number of character positions in the sending item", "one character position for the floating insertion symbol"],
+      "interpretation": "A floating-insertion receiver needs all sending numeric positions plus one insertion position to avoid truncation; PIC ----9 has four numeric positions and one floating-sign position, so moving 99999 truncates the high-order digit and produces space followed by 9999.",
+      "applicability": "integer sender to PIC ----9 floating-minus numeric-edited receiver"
     }
   ]
 }

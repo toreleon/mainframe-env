@@ -96,8 +96,8 @@ def ancestor(node: Node, tags: set[str]) -> Node | None:
     return None
 
 
-def fragment_node(node: Node) -> bool:
-    return node.tag in BLOCKS or (
+def fragment_node(node: Node, extra_blocks: frozenset[str] = frozenset()) -> bool:
+    return node.tag in BLOCKS | extra_blocks or (
         node.tag == "div" and "p" in node.attrs.get("class", "").split()
     )
 
@@ -160,13 +160,17 @@ def semantic_cues(text: str, node: Node) -> dict[str, object]:
     }
 
 
-def selected_fragments(root: Node, section_ids: set[str]) -> list[tuple[str, Node, str]]:
+def selected_fragments(
+    root: Node,
+    section_ids: set[str],
+    extra_blocks: frozenset[str] = frozenset(),
+) -> list[tuple[str, Node, str]]:
     current_section = "__lead__"
     result: list[tuple[str, Node, str]] = []
     for node in walk(root):
         if node.tag == "h2":
             current_section = node.attrs.get("id", "__idless_h2__")
-        if current_section not in section_ids or not fragment_node(node):
+        if current_section not in section_ids or not fragment_node(node, extra_blocks):
             continue
         if node.tag == "p" or (
             node.tag == "div" and "p" in node.attrs.get("class", "").split()
@@ -204,7 +208,10 @@ def compile_topic(topic: dict[str, object], body: bytes, config: dict[str, objec
     topic_path = str(topic["topic_path"])
     source = next(item for item in config["sources"] if item["topic_path"] == topic_path)
     wanted_sections = set(source["sections"])
-    fragments = selected_fragments(parser.root, wanted_sections)
+    extra_blocks = frozenset(source.get("include_tags", []))
+    if not extra_blocks <= {"ol", "ul"}:
+        raise ValueError(f"unsupported opt-in fragment tag: {sorted(extra_blocks)}")
+    fragments = selected_fragments(parser.root, wanted_sections, extra_blocks)
     records: list[dict[str, object]] = []
     available_sections = {"__lead__"} | {
         node.attrs["id"]

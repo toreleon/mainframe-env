@@ -102,12 +102,20 @@ COBOL_MOVE_EXPECTED_TESTS = {
 }
 COBOL_MOVE_MUTATIONS = (
     Mutation(
+        'cobol-ignore-floating-capacity',
+        'Treat every floating-sign position as a numeric digit and lose the reviewed truncation boundary',
+        'if floating_sign.is_some() {\n        let numeric_capacity = layout',
+        'if false {\n        let numeric_capacity = layout',
+    ),
+    Mutation(
         'cobol-drop-floating-minus',
         'Suppress the negative sign produced by the product numeric-edited MOVE path',
         "if floating_sign_slot == Some(digit_index) {\n"
-        "                    output.push(if value.coefficient < 0 { b'-' } else { b'+' });",
+        "                    output.push(if value.coefficient < 0 {\n"
+        "                        b'-'",
         "if floating_sign_slot == Some(digit_index) {\n"
-        "                    output.push(if value.coefficient < 0 { b' ' } else { b'+' });",
+        "                    output.push(if value.coefficient < 0 {\n"
+        "                        b' '",
     ),
 )
 

@@ -1,13 +1,13 @@
 {
   "schema_version": "mainframe-env.cobol-move-rule-review@1",
   "review_status": "pending-maintainer",
-  "candidate_projection_sha256": "sha256:3260d2158a58e1d9a7b1c2d5a2ebe5cdad0583640a295bd3a7f245181e0c388a",
-  "topic_manifest_digest": "2eabe41382c2718e80fbdebe0b759c199443710a8710ad32872b9cc9f0bc74e9",
+  "candidate_projection_sha256": "sha256:29163e85029272f4c447b4aa0129908ff2df5bd9c40b60f719ea4fbf8b96f364",
+  "topic_manifest_digest": "96b3f6d0d7eb08e90dc8ef465be1cc4549a4e431491d1b32c895cd659dbff067",
   "inventory_disposition": {
-    "normative_fragments": 154,
-    "candidate_fragments": 7,
-    "proposed_accepted_fragments": 7,
-    "outside_scope_fragments": 147,
+    "normative_fragments": 166,
+    "candidate_fragments": 8,
+    "proposed_accepted_fragments": 8,
+    "outside_scope_fragments": 158,
     "informative_fragments": 0,
     "unsupported_fragments": 0,
     "conflicting_fragments": 0
@@ -19,12 +19,24 @@
     {"rule_id": "cobol.move.signed-receiver", "decision": "proposed-accept"},
     {"rule_id": "cobol.move.numeric-editing", "decision": "proposed-accept"},
     {"rule_id": "cobol.move.integer-to-edited-valid", "decision": "proposed-accept"},
-    {"rule_id": "cobol.move.edited-alignment", "decision": "proposed-accept"}
+    {"rule_id": "cobol.move.edited-alignment", "decision": "proposed-accept"},
+    {"rule_id": "cobol.picture.floating-insertion-capacity", "decision": "proposed-accept"}
   ],
+  "review_corrections": {
+    "authority": "maintainer review supplied 2026-09-08",
+    "status": "corrections-applied-awaiting-acceptance",
+    "items": [
+      "Changed the final expected byte from digit 9 to space: PIC ----9 moving 99999 produces space followed by 9999.",
+      "Added the pinned IBM floating-insertion topic and an explicit capacity/truncation rule.",
+      "Reclassified the old and new executed bindings as non-overlapping scopes rather than a replacement cutover."
+    ]
+  },
   "old_new_mapping": {
     "old_current_binding": "cobol.statement-runtime.move / runtime-normal / executed",
-    "proposed_replacement": "cobol.numeric-move.bytes / numeric-move-bytes / executed",
-    "cutover_rule": "After maintainer review, replace the overlapping runtime-normal claim for this scoped MOVE behavior; do not retain two current coverage authorities.",
+    "old_scope": "alphanumeric literal MOVED to PIC X(8)",
+    "new_binding": "cobol.numeric-move.bytes / numeric-move-bytes / executed",
+    "new_scope": "signed S9(9) COMP-5 to PIC ----9 numeric-edited conversion, sign insertion, zero suppression, and truncation boundary",
+    "cutover_rule": "Retain both bindings because their behavioral scopes do not overlap; each remains the sole current claim authority for its own fixture and observation.",
     "historical_evidence": "unchanged and bound to its original spec digest"
   }
 }

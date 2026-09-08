@@ -30,6 +30,31 @@
     },
     {
       "applicability": [
+        "integer sender to PIC ----9 floating-minus numeric-edited receiver"
+      ],
+      "classification": "candidate",
+      "cues": {
+        "condition_stack": [],
+        "negated": false,
+        "only_when": false,
+        "references": [],
+        "unless": false
+      },
+      "fragment_sha256": "020c312a7c67759ed271ac25a90c22c4205ab83c381d5c325875c5e3277f490c",
+      "interpretations": [
+        "A floating-insertion receiver needs all sending numeric positions plus one insertion position to avoid truncation; PIC ----9 has four numeric positions and one floating-sign position, so moving 99999 truncates the high-order digit and produces space followed by 9999."
+      ],
+      "locator": "topic:SS6SG3_6.5/lr/ref/rlddeief.html;section:__lead__;path:div[1]/article[1]/div[2]/div[1]/ul[1];fragment-sha256:020c312a7c67759ed271ac25a90c22c4205ab83c381d5c325875c5e3277f490c",
+      "rule_ids": [
+        "cobol.picture.floating-insertion-capacity"
+      ],
+      "section": "__lead__",
+      "tag": "ul",
+      "topic_path": "SS6SG3_6.5/lr/ref/rlddeief.html",
+      "topic_sha256": "419d1cf396c6e1be313a877edf3b0d4ae976aaea6eaff12d608933c6113379d2"
+    },
+    {
+      "applicability": [
         "elementary items only; MOVE CORRESPONDING and group moves excluded"
       ],
       "classification": "candidate",
@@ -181,9 +206,9 @@
       "topic_sha256": "c62fe5d91391bcf0fe2c6a4d2e5f5763feffc80adfc55ca859c66db8eed7ec05"
     }
   ],
-  "compile_rules_sha256": "4ac5884e218768fc0da3db63faa1b8aac98927eaf6be065e7e215db4929cc86d",
+  "compile_rules_sha256": "6c578a27be7209074901b55b34e2e2a39bb73e21e121dce84470f0bd0a5e985f",
   "coverage_credit": 0,
-  "extractor_version": "cobol-move-dita-fragments@1",
+  "extractor_version": "cobol-move-dita-fragments@2",
   "inventory": [
     {
       "classification": "outside-scope",
@@ -431,6 +456,141 @@
       "tag": "li",
       "topic_path": "SS6SG3_6.5/lr/ref/rldadar.html",
       "topic_sha256": "243d5bc417ac02bcfd1ea5d28fef59af30506a0be3c770246023dc7679c5aa96"
+    },
+    {
+      "classification": "outside-scope",
+      "fragment_sha256": "5fd6a62ad8e9ad5b55bd3f091b627f59f92eea7bbbcd08c20db065ee79778c6a",
+      "locator": "topic:SS6SG3_6.5/lr/ref/rlddeief.html;section:__lead__;path:div[1]/article[1]/div[2]/p[1];fragment-sha256:5fd6a62ad8e9ad5b55bd3f091b627f59f92eea7bbbcd08c20db065ee79778c6a",
+      "rule_ids": [],
+      "section": "__lead__",
+      "tag": "p",
+      "topic_path": "SS6SG3_6.5/lr/ref/rlddeief.html",
+      "topic_sha256": "419d1cf396c6e1be313a877edf3b0d4ae976aaea6eaff12d608933c6113379d2"
+    },
+    {
+      "classification": "outside-scope",
+      "fragment_sha256": "65a1c8409e423eb34562f1bd91db2914276093652257154e41d908442d4a4a62",
+      "locator": "topic:SS6SG3_6.5/lr/ref/rlddeief.html;section:__lead__;path:div[1]/article[1]/div[2]/div[1]/p[1];fragment-sha256:65a1c8409e423eb34562f1bd91db2914276093652257154e41d908442d4a4a62",
+      "rule_ids": [],
+      "section": "__lead__",
+      "tag": "p",
+      "topic_path": "SS6SG3_6.5/lr/ref/rlddeief.html",
+      "topic_sha256": "419d1cf396c6e1be313a877edf3b0d4ae976aaea6eaff12d608933c6113379d2"
+    },
+    {
+      "classification": "outside-scope",
+      "fragment_sha256": "048eb8a7d92cf1657768ef81582162ccabd692215cd2ec8b045f3e655b7efeb0",
+      "locator": "topic:SS6SG3_6.5/lr/ref/rlddeief.html;section:__lead__;path:div[1]/article[1]/div[2]/div[1]/p[2];fragment-sha256:048eb8a7d92cf1657768ef81582162ccabd692215cd2ec8b045f3e655b7efeb0",
+      "rule_ids": [],
+      "section": "__lead__",
+      "tag": "p",
+      "topic_path": "SS6SG3_6.5/lr/ref/rlddeief.html",
+      "topic_sha256": "419d1cf396c6e1be313a877edf3b0d4ae976aaea6eaff12d608933c6113379d2"
+    },
+    {
+      "classification": "outside-scope",
+      "fragment_sha256": "feb458ec5e65355c170f2356c865451460555228a9504a75468a47573a402626",
+      "locator": "topic:SS6SG3_6.5/lr/ref/rlddeief.html;section:__lead__;path:div[1]/article[1]/div[2]/div[1]/p[3];fragment-sha256:feb458ec5e65355c170f2356c865451460555228a9504a75468a47573a402626",
+      "rule_ids": [],
+      "section": "__lead__",
+      "tag": "p",
+      "topic_path": "SS6SG3_6.5/lr/ref/rlddeief.html",
+      "topic_sha256": "419d1cf396c6e1be313a877edf3b0d4ae976aaea6eaff12d608933c6113379d2"
+    },
+    {
+      "classification": "outside-scope",
+      "fragment_sha256": "1c40b496fff4b9da0c01c795ee000f3918a5fa25cafe950f51646993845b39dc",
+      "locator": "topic:SS6SG3_6.5/lr/ref/rlddeief.html;section:__lead__;path:div[1]/article[1]/div[2]/div[1]/p[4];fragment-sha256:1c40b496fff4b9da0c01c795ee000f3918a5fa25cafe950f51646993845b39dc",
+      "rule_ids": [],
+      "section": "__lead__",
+      "tag": "p",
+      "topic_path": "SS6SG3_6.5/lr/ref/rlddeief.html",
+      "topic_sha256": "419d1cf396c6e1be313a877edf3b0d4ae976aaea6eaff12d608933c6113379d2"
+    },
+    {
+      "classification": "outside-scope",
+      "fragment_sha256": "78d384a1acf05efd8a30c8e07b5a5513bed6dff940e50827931f640beea71cb5",
+      "locator": "topic:SS6SG3_6.5/lr/ref/rlddeief.html;section:__lead__;path:div[1]/article[1]/div[2]/div[1]/p[5];fragment-sha256:78d384a1acf05efd8a30c8e07b5a5513bed6dff940e50827931f640beea71cb5",
+      "rule_ids": [],
+      "section": "__lead__",
+      "tag": "p",
+      "topic_path": "SS6SG3_6.5/lr/ref/rlddeief.html",
+      "topic_sha256": "419d1cf396c6e1be313a877edf3b0d4ae976aaea6eaff12d608933c6113379d2"
+    },
+    {
+      "classification": "outside-scope",
+      "fragment_sha256": "aea5e47fb45ff69367e1ab49a3ff6d899ae44005954955fbba8e53ebf3cd507a",
+      "locator": "topic:SS6SG3_6.5/lr/ref/rlddeief.html;section:__lead__;path:div[1]/article[1]/div[2]/div[1]/p[6];fragment-sha256:aea5e47fb45ff69367e1ab49a3ff6d899ae44005954955fbba8e53ebf3cd507a",
+      "rule_ids": [],
+      "section": "__lead__",
+      "tag": "p",
+      "topic_path": "SS6SG3_6.5/lr/ref/rlddeief.html",
+      "topic_sha256": "419d1cf396c6e1be313a877edf3b0d4ae976aaea6eaff12d608933c6113379d2"
+    },
+    {
+      "classification": "outside-scope",
+      "fragment_sha256": "bf2d46901de98302cf6c40d6e63f19288edf3e75790d72a424c5dff26489e57c",
+      "locator": "topic:SS6SG3_6.5/lr/ref/rlddeief.html;section:__lead__;path:div[1]/article[1]/div[2]/div[1]/p[7];fragment-sha256:bf2d46901de98302cf6c40d6e63f19288edf3e75790d72a424c5dff26489e57c",
+      "rule_ids": [],
+      "section": "__lead__",
+      "tag": "p",
+      "topic_path": "SS6SG3_6.5/lr/ref/rlddeief.html",
+      "topic_sha256": "419d1cf396c6e1be313a877edf3b0d4ae976aaea6eaff12d608933c6113379d2"
+    },
+    {
+      "applicability": [
+        "integer sender to PIC ----9 floating-minus numeric-edited receiver"
+      ],
+      "classification": "candidate",
+      "cues": {
+        "condition_stack": [],
+        "negated": false,
+        "only_when": false,
+        "references": [],
+        "unless": false
+      },
+      "fragment_sha256": "020c312a7c67759ed271ac25a90c22c4205ab83c381d5c325875c5e3277f490c",
+      "interpretations": [
+        "A floating-insertion receiver needs all sending numeric positions plus one insertion position to avoid truncation; PIC ----9 has four numeric positions and one floating-sign position, so moving 99999 truncates the high-order digit and produces space followed by 9999."
+      ],
+      "locator": "topic:SS6SG3_6.5/lr/ref/rlddeief.html;section:__lead__;path:div[1]/article[1]/div[2]/div[1]/ul[1];fragment-sha256:020c312a7c67759ed271ac25a90c22c4205ab83c381d5c325875c5e3277f490c",
+      "rule_ids": [
+        "cobol.picture.floating-insertion-capacity"
+      ],
+      "section": "__lead__",
+      "tag": "ul",
+      "topic_path": "SS6SG3_6.5/lr/ref/rlddeief.html",
+      "topic_sha256": "419d1cf396c6e1be313a877edf3b0d4ae976aaea6eaff12d608933c6113379d2"
+    },
+    {
+      "classification": "outside-scope",
+      "fragment_sha256": "a21bf1fff3847ecdd6494a6745067f083f846d7cf2d124baec1b08ea80abcd8b",
+      "locator": "topic:SS6SG3_6.5/lr/ref/rlddeief.html;section:__lead__;path:div[1]/article[1]/div[2]/div[1]/ul[1]/li[1];fragment-sha256:a21bf1fff3847ecdd6494a6745067f083f846d7cf2d124baec1b08ea80abcd8b",
+      "rule_ids": [],
+      "section": "__lead__",
+      "tag": "li",
+      "topic_path": "SS6SG3_6.5/lr/ref/rlddeief.html",
+      "topic_sha256": "419d1cf396c6e1be313a877edf3b0d4ae976aaea6eaff12d608933c6113379d2"
+    },
+    {
+      "classification": "outside-scope",
+      "fragment_sha256": "60fad87488d8429dd3162ded45a29db2e6d89f86d3aaed659820de85d1e42553",
+      "locator": "topic:SS6SG3_6.5/lr/ref/rlddeief.html;section:__lead__;path:div[1]/article[1]/div[2]/div[1]/ul[1]/li[2];fragment-sha256:60fad87488d8429dd3162ded45a29db2e6d89f86d3aaed659820de85d1e42553",
+      "rule_ids": [],
+      "section": "__lead__",
+      "tag": "li",
+      "topic_path": "SS6SG3_6.5/lr/ref/rlddeief.html",
+      "topic_sha256": "419d1cf396c6e1be313a877edf3b0d4ae976aaea6eaff12d608933c6113379d2"
+    },
+    {
+      "classification": "outside-scope",
+      "fragment_sha256": "181c606bf5b05fda30eb5328f60189274a4c2c524015c023f858ac29fc796a9a",
+      "locator": "topic:SS6SG3_6.5/lr/ref/rlddeief.html;section:__lead__;path:div[1]/article[1]/div[2]/div[1]/ul[1]/li[3];fragment-sha256:181c606bf5b05fda30eb5328f60189274a4c2c524015c023f858ac29fc796a9a",
+      "rule_ids": [],
+      "section": "__lead__",
+      "tag": "li",
+      "topic_path": "SS6SG3_6.5/lr/ref/rlddeief.html",
+      "topic_sha256": "419d1cf396c6e1be313a877edf3b0d4ae976aaea6eaff12d608933c6113379d2"
     },
     {
       "classification": "outside-scope",
@@ -1839,14 +1999,14 @@
   "release": "Enterprise COBOL for z/OS 6.5",
   "retained_publication_bytes": false,
   "schema_version": "mainframe-env.cobol-move-semantic-candidates@1",
-  "topic_manifest_digest": "2eabe41382c2718e80fbdebe0b759c199443710a8710ad32872b9cc9f0bc74e9",
+  "topic_manifest_digest": "96b3f6d0d7eb08e90dc8ef465be1cc4549a4e431491d1b32c895cd659dbff067",
   "totals": {
-    "candidates": 7,
+    "candidates": 8,
     "conflicting": 0,
     "informative": 0,
-    "normative_fragments": 154,
-    "outside_scope": 147,
-    "topics": 5,
+    "normative_fragments": 166,
+    "outside_scope": 158,
+    "topics": 6,
     "unsupported": 0
   }
 }

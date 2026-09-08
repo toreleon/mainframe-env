@@ -16,6 +16,9 @@ spec.loader.exec_module(module)
 HTML = b"""<article><h1>MOVE</h1><p>Conversion and editing apply.</p>
 <table id="valid"><tr><th>Sender</th><th>Numeric-edited</th></tr>
 <tr><td>Numeric integer sending item</td><td>Yes</td></tr></table></article>"""
+FLOATING_HTML = b"""<article><h1>PICTURE</h1><p>To avoid truncation:</p>
+<ul><li>number of character positions in the sending item</li>
+<li>one character position for the floating insertion symbol</li></ul></article>"""
 
 
 class CobolMoveRuleTests(unittest.TestCase):
@@ -87,6 +90,45 @@ class CobolMoveRuleTests(unittest.TestCase):
             (root / "move.html").write_bytes(HTML)
             with self.assertRaisesRegex(ValueError, "digest mismatch"):
                 module.compile_corpus(manifest, config, root)
+
+    def test_bounded_list_fragment_is_opted_in_for_cross_item_rule(self) -> None:
+        manifest = {
+            "baseline_id": "synthetic",
+            "product": "synthetic",
+            "topic_manifest_digest": "0" * 64,
+            "topics": [{
+                "topic_path": "synthetic/picture.html",
+                "bytes": len(FLOATING_HTML),
+                "sha256": hashlib.sha256(FLOATING_HTML).hexdigest(),
+            }],
+        }
+        config = {
+            "extractor_version": "test@1",
+            "release": "synthetic",
+            "sources": [{
+                "topic_path": "synthetic/picture.html",
+                "sections": ["__lead__"],
+                "include_tags": ["ul"],
+            }],
+            "compile_rules": [{
+                "id": "floating-capacity",
+                "topic_path": "synthetic/picture.html",
+                "sections": ["__lead__"],
+                "all": ["number of character positions", "one character position"],
+                "interpretation": "one insertion position is reserved",
+                "applicability": "synthetic",
+            }],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "picture.html").write_bytes(FLOATING_HTML)
+            result = module.compile_corpus(manifest, config, root)
+            config["sources"][0]["include_tags"] = ["table"]
+            with self.assertRaisesRegex(ValueError, "unsupported opt-in"):
+                module.compile_corpus(manifest, config, root)
+        self.assertEqual(result["totals"]["candidates"], 1)
+        self.assertEqual(result["candidates"][0]["tag"], "ul")
+        self.assertNotIn("number of character positions", str(result))
 
 
 if __name__ == "__main__":

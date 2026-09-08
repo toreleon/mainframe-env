@@ -116,10 +116,25 @@ impl ConformanceObservation for MoveBytesObservation {
         let expected = fixture["expected_output_hex"]
             .as_str()
             .ok_or_else(|| "COBOL MOVE expected bytes are missing".to_string())?;
+        let expected_policy = fixture["comparison_policy"]["version"]
+            .as_str()
+            .ok_or_else(|| "COBOL MOVE comparison policy is missing".to_string())?;
+        let expected_identity = serde_json::json!({
+            "schema_version": "mainframe-env.cobol-move-pilot-observation@1",
+            "fixture_digest": digest(FIXTURE.as_bytes()),
+            "comparison_policy": expected_policy,
+            "differential_credit": 0,
+        });
+        let actual_identity = serde_json::json!({
+            "schema_version": report.schema_version,
+            "fixture_digest": report.fixture_digest,
+            "comparison_policy": report.comparison_policy,
+            "differential_credit": report.differential_credit,
+        });
         ObservationCheck::new(
-            report.output_hex == expected,
-            expected,
-            report.output_hex,
+            report.output_hex == expected && expected_identity == actual_identity,
+            format!("identity={expected_identity}; output={expected}"),
+            format!("identity={actual_identity}; output={}", report.output_hex),
             ConformanceLimits::default(),
         )
         .map_err(|problem| problem.to_string())
@@ -188,6 +203,16 @@ mod tests {
         value["output_hex"] = Value::String(report.output_hex.replacen("202d", "2020", 1));
         bytes = serde_json::to_vec(&value).unwrap();
         let output = DriverOutput::new(bytes, ConformanceLimits::default()).unwrap();
+        assert!(!MoveBytesObservation.evaluate(&output).unwrap().matched);
+
+        let mut stale = report;
+        stale.fixture_digest =
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
+        let output = DriverOutput::new(
+            serde_json::to_vec(&stale).unwrap(),
+            ConformanceLimits::default(),
+        )
+        .unwrap();
         assert!(!MoveBytesObservation.evaluate(&output).unwrap().matched);
     }
 }
