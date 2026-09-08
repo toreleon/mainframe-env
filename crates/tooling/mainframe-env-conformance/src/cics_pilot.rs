@@ -96,9 +96,12 @@ const INVALID_REWRITE_SOURCE: &str = r#"IDENTIFICATION DIVISION.
 PROGRAM-ID. CICSINV.
 DATA DIVISION.
 WORKING-STORAGE SECTION.
+01 REC-X PIC X(4).
 01 RESP-X PIC 9(3) VALUE 0.
 01 RESP2-X PIC 9(3) VALUE 0.
 PROCEDURE DIVISION.
+EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD('AA') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
+DISPLAY 'INVPLAIN:' RESP-X ':' RESP2-X ':' REC-X.
 EXEC CICS REWRITE FILE('ACCTDAT') FROM('AA22') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
 DISPLAY 'INVALID:' RESP-X ':' RESP2-X.
 STOP RUN.
@@ -501,6 +504,10 @@ fn run_profile(
         (
             "plain_read".into(),
             parse_command(&commit_output, "PLAIN", true)?,
+        ),
+        (
+            "invalid_plain_read".into(),
+            parse_command(&invalid_output, "INVPLAIN", true)?,
         ),
         (
             "rewrite_without_update".into(),
@@ -1225,7 +1232,10 @@ fn compare_obligation(
         "plain-read" => (vec![("plain_read", "plain_read")], vec![], vec![]),
         "read-update" => (vec![("read_update", "read_update")], vec![], vec![]),
         "requires-read-update" => (
-            vec![("rewrite_without_update", "rewrite_without_update")],
+            vec![
+                ("invalid_plain_read", "invalid_plain_read"),
+                ("rewrite_without_update", "rewrite_without_update"),
+            ],
             vec![],
             vec![],
         ),
