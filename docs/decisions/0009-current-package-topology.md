@@ -36,6 +36,12 @@ The current workspace consists of these twenty-six packages:
 | Tooling | `mainframe-env-conformance`, `xtask` | 2 |
 | **Total** |  | **26** |
 
+The isolated, non-publishing `fuzz/` Cargo workspace is a cargo-fuzz harness,
+not a product or tooling package in the main workspace. It has its own lockfile
+so nightly/libFuzzer dependencies cannot enter the shipping dependency graph,
+and no production package may depend on it. Its presence does not change the
+twenty-six-package machine inventory.
+
 The machine authority is the twenty-four-package base in
 [`conformance/0.1/inventory/packages.json`](../../conformance/0.1/inventory/packages.json),
 plus the versioned additions in

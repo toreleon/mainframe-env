@@ -22,7 +22,11 @@ SHARED = {
 PROSE = {'README.md', 'CHANGELOG.md', 'LICENSE', 'LICENSE.md', 'CONTRIBUTING.md', 'AGENTS.md'}
 PRIMARY = ['fmt', 'spec', 'cobol', 'python-tooling-tests', 'tests', 'clippy']
 POLICY = ['supply-chain', 'cargo-deny', 'license-notices']
-FULL = ['targets', 'documentation', 'docs', 'conformance', 'certification', 'evidence-seal', 'runtime-architecture']
+FULL = [
+    'targets', 'documentation', 'docs', 'conformance', 'certification',
+    'evidence-seal', 'runtime-architecture', 'fuzz-smoke', 'fuzz-periodic',
+    'model-check', 'coverage-baseline',
+]
 SHA = re.compile(r'[0-9a-f]{40}\Z')
 EVENTS = frozenset({'local', 'push', 'pull_request', 'schedule', 'manual', 'tag'})
 

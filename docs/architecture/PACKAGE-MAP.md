@@ -87,6 +87,11 @@ conformance and xtask tooling packages. Later versioned additions introduced
 `mainframe-env-coverage` (0.2) and `mainframe-env-spool` (0.8), so the current
 workspace contains 26 packages.
 
+The non-publishing `fuzz/` Cargo workspace is an isolated test driver rather
+than a main-workspace package. Its nightly/libFuzzer dependencies, lockfile,
+corpora, and generated artifacts do not enter a product package or release
+closure; ADR-0008 records that boundary.
+
 `conformance/0.1/inventory/packages.json` plus the versioned
 `package-additions.json` files are the current machine authority. ADR-0005 is a
 historical decision whose original count must not be used as current workspace

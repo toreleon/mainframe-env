@@ -6797,6 +6797,7 @@ fn check_versions(root: &Path) -> TaskResult {
     let mut manifests = Vec::new();
     collect_named(root, OsStr::new("Cargo.toml"), &mut manifests)?;
     let mut workspace_packages = BTreeSet::new();
+    let mut isolated_workspace_packages = Vec::new();
     for manifest in manifests {
         let parsed: toml::Value = read(&manifest)?
             .parse()
@@ -6807,7 +6808,6 @@ fn check_versions(root: &Path) -> TaskResult {
         let package_name = parsed["package"]["name"]
             .as_str()
             .ok_or_else(|| format!("{} package.name is missing", manifest.display()))?;
-        workspace_packages.insert(package_name.to_string());
         let crate_version = &parsed["package"]["version"];
         let inherits = crate_version
             .get("workspace")
@@ -6818,6 +6818,18 @@ fn check_versions(root: &Path) -> TaskResult {
             inherits || exact,
             &format!("{} does not use the product version", manifest.display()),
         )?;
+        if parsed.get("workspace").is_some() {
+            require(
+                exact,
+                &format!(
+                    "{} isolated workspace must use the exact product version",
+                    manifest.display()
+                ),
+            )?;
+            isolated_workspace_packages.push((package_name.to_string(), manifest));
+        } else {
+            workspace_packages.insert(package_name.to_string());
+        }
     }
 
     let lock_path = root.join("Cargo.lock");
@@ -6835,6 +6847,33 @@ fn check_versions(root: &Path) -> TaskResult {
         require(
             matches.len() == 1 && matches[0]["version"].as_str() == Some(version.as_str()),
             &format!("Cargo.lock workspace package {package_name} differs from VERSION"),
+        )?;
+    }
+    for (package_name, manifest) in isolated_workspace_packages {
+        let nested_lock_path = manifest
+            .parent()
+            .ok_or_else(|| format!("{} has no parent directory", manifest.display()))?
+            .join("Cargo.lock");
+        let nested_lock: toml::Value = read(&nested_lock_path)?
+            .parse()
+            .map_err(|error| format!("{}: {error}", nested_lock_path.display()))?;
+        let matches = nested_lock["package"]
+            .as_array()
+            .ok_or_else(|| {
+                format!(
+                    "{} package inventory is missing",
+                    nested_lock_path.display()
+                )
+            })?
+            .iter()
+            .filter(|package| package["name"].as_str() == Some(package_name.as_str()))
+            .collect::<Vec<_>>();
+        require(
+            matches.len() == 1 && matches[0]["version"].as_str() == Some(version.as_str()),
+            &format!(
+                "{} isolated workspace package {package_name} differs from VERSION",
+                nested_lock_path.display()
+            ),
         )?;
     }
 

@@ -96,7 +96,13 @@ pipeline {
                         tools/dataset_mutations.py
                         tools/jenkins/disk_guard.py
                         tools/jenkins/postgres_parity.sh
+                        tools/assurance-gates.json
+                        tools/assurance_gates.py
+                        tools/run_coverage_baseline.sh
+                        tools/run_fuzz_assurance.sh
+                        tools/run_model_assurance.sh
                         tools/run_tooling_tests.py
+                        fuzz/Cargo.toml
                         tools/package_offline_cargo_bundle.sh
                       )
                       for required_path in "${required_paths[@]}"; do
@@ -148,6 +154,10 @@ pipeline {
                       exit 1
                     }
                     cargo deny --version
+                    grep -Eq '^llvm-tools(-|$)' <<<"$components" || {
+                      echo "llvm-tools-preview is missing from installed toolchain $required" >&2
+                      exit 1
+                    }
                 '''
             }
         }
@@ -350,6 +360,10 @@ pipeline {
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate certification -- cargo xtask certification
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate evidence-seal -- cargo xtask evidence seal --check
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate runtime-architecture -- cargo xtask runtime-architecture --check
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate model-check --expect-tests -- tools/run_model_assurance.sh
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate fuzz-smoke -- tools/run_fuzz_assurance.sh smoke
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate fuzz-periodic -- tools/run_fuzz_assurance.sh periodic
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate coverage-baseline -- tools/run_coverage_baseline.sh
                 '''
             }
         }
@@ -470,7 +484,7 @@ pipeline {
                     --gates "${gates[@]}"
                 fi
             ''')
-            archiveArtifacts artifacts: 'target/ci-assurance/**/*,target/ci-backend/**/*,target/jenkins-artifacts/**/*,.postgres/postgres.log,release/*/targets/**/*',
+            archiveArtifacts artifacts: 'target/ci-assurance/**/*,target/ci-backend/**/*,target/coverage/**/*,target/fuzz-artifacts-*/*,target/jenkins-artifacts/**/*,.postgres/postgres.log,release/*/targets/**/*',
                              allowEmptyArchive: true, fingerprint: false
             script {
                 if (env.CARGO_TARGET_DIR) {

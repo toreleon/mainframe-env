@@ -11,12 +11,26 @@
       "version": "1.95.0",
       "rustc_commit": "59807616e1fa2540724bfbac14d7976d7e4a3860",
       "cargo_commit": "f2d3ce0bd7f24a49f8f72d9000448f8838c4e850"
+    },
+    "fuzz": {
+      "toolchain": "nightly-2026-09-01",
+      "version": "1.100.0-nightly",
+      "rustc_commit": "0dfb098f3aeecbe38c2566ca090193280e7349e7",
+      "cargo_commit": "e8cb624d5701824f46a2ec5873cfd59ee3d2f66c"
     }
   },
   "tools": {
     "cargo-deny": {
       "version": "0.20.2",
       "install": "cargo +1.98.0 install cargo-deny --version 0.20.2 --locked"
+    },
+    "cargo-fuzz": {
+      "version": "0.13.2",
+      "install": "cargo +1.98.0 install cargo-fuzz --version 0.13.2 --locked"
+    },
+    "cargo-llvm-cov": {
+      "version": "0.9.1",
+      "install": "cargo +1.98.0 install cargo-llvm-cov --version 0.9.1 --locked"
     },
     "docker": {
       "version": "29.4.3"
@@ -54,6 +68,7 @@
       "LICENSES/ICU.txt",
       "NOTICE",
       "rust-toolchain.toml",
+      "tools/assurance-gates.json",
       "tools/ci-inputs.lock.json",
       "tools/jenkins/controller-plugins.lock.json",
       "tools/jenkins/select-python.sh",

@@ -7,3 +7,6 @@ license.workspace = true
 
 [dependencies]
 mainframe-env-execution-api.workspace = true
+
+[dev-dependencies]
+loom.workspace = true

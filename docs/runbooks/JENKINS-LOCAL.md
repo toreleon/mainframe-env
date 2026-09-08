@@ -13,12 +13,17 @@ than 10 GiB. On macOS, create and mount the repository's default APFS sparse
 bundle, then start Jenkins in the foreground:
 
 ```bash
-rustup toolchain install 1.98.0 --component clippy,rustfmt
+rustup toolchain install 1.98.0 --component clippy,llvm-tools-preview,rustfmt
 rustup toolchain install 1.95.0
+rustup toolchain install nightly-2026-09-01 --profile minimal --component rust-src
 cargo +1.98.0 install cargo-deny --version 0.20.2 --locked
 tools/jenkins/bootstrap-macos.sh
 "$(tools/jenkins/select-python.sh)" -B tools/supply_chain.py install-jenkins \
   --home /Volumes/MainframeEnvJenkins/jenkins-home
+CARGO_HOME=/Volumes/MainframeEnvJenkins/cargo-home \
+  cargo +1.98.0 install cargo-fuzz --version 0.13.2 --locked
+CARGO_HOME=/Volumes/MainframeEnvJenkins/cargo-home \
+  cargo +1.98.0 install cargo-llvm-cov --version 0.9.1 --locked
 tools/jenkins/run-local.sh
 ```
 
@@ -61,8 +66,12 @@ PostgreSQL port.
 The controller may read already-installed rustup toolchains from the host, but
 sets `RUSTUP_AUTO_INSTALL=0` so a job cannot grow `~/.rustup`. Before any build,
 the pipeline fails closed unless the exact locked compiler and Cargo commits
-for 1.98.0 and 1.95.0, `rustfmt`, and `clippy` are already installed. The MSRV
-gate checks the full workspace with every target and feature enabled.
+for 1.98.0 and 1.95.0, `rustfmt`, `clippy`, and `llvm-tools-preview` are already
+installed. The MSRV gate checks the full workspace with every target and
+feature enabled. Full assurance also requires the pinned fuzz nightly plus
+`rust-src`, cargo-fuzz 0.13.2, and cargo-llvm-cov 0.9.1. Install them before
+starting Jenkins with the commands above; the Cargo helper binaries live in the
+capped Cargo home while rustup toolchains remain host prerequisites.
 The startup scripts also select an already-installed Python that can load its
 standard `hashlib`, `math`, and `ssl` extensions. Set `MAINFRAME_ENV_PYTHON` to
 an absolute interpreter path to override the default `~/.local/bin/python3`,
@@ -132,6 +141,13 @@ Use **Build with Parameters** in Jenkins:
   evidence-seal, runtime, mutation, MSRV, and PostgreSQL parity gates;
 - `release`: full assurance for a post-migration tag, native release receipt
   reproduction, and a verified offline Cargo vendor archive.
+
+The full tier receipts bounded and periodic cargo-fuzz runs for the COBOL
+parser and IR decoders, the registered Loom durable-state model, and an LLVM
+line/function coverage summary for the IR, compiler, and store packages.
+Coverage JSON and any fuzz crash artifacts are archived with the command
+receipts. Kani and TLC are not installed or credited; their current boundaries
+and prerequisites are recorded in the verification strategy.
 
 With a Jenkins API token and the Jenkins CLI jar, the equivalent commands are:
 

@@ -10,7 +10,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:ef565dffc2a8b44642a55bd8270ab0373656d635e0d66123ed88c0261222e9ad",
+      "sha256": "sha256:a465535da5dac305166887bdbd2a052b4687ee86c0cff1b57e4733b15c0a72cb",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -457,7 +457,7 @@
       "path": "docs/architecture/PACKAGE-MAP.md",
       "relative_links": 1,
       "scope": "current package ownership, dependency layers, and split boundaries",
-      "sha256": "sha256:e050b10cf56222b337817b78b37bd7cdcd59f8ee22a58ce5ea99f5c4c1c7f500",
+      "sha256": "sha256:efe1c54bcb867c3e6c597002a3118a98ef4c022128046976178c6fed4ed485ab",
       "status": "Accepted; current topology governed by ADR-0009",
       "title": "0.1 Package Map",
       "xtask_commands": 0
@@ -645,7 +645,7 @@
       "path": "docs/decisions/0009-current-package-topology.md",
       "relative_links": 4,
       "scope": "current workspace package boundaries and topology changes",
-      "sha256": "sha256:6e81778f845752e2f82e9237b65c985315c23c13cb99c99a8d025f05c4d6a09e",
+      "sha256": "sha256:7db76b320ee10ab5cb2e8ff5b532d6fdde68d3c227af0f81051e4d8e453866ab",
       "status": "Accepted by repository owner",
       "title": "ADR-0009: Govern the current 26-package topology",
       "xtask_commands": 2
@@ -713,7 +713,7 @@
       "path": "docs/delivery/VERIFICATION-STRATEGY.md",
       "relative_links": 0,
       "scope": "verification layers, assurance tiers, and required evidence",
-      "sha256": "sha256:9184d94ace40b68b3a4f52942a9e81dd70d8310baef07d0571d885b132d254c8",
+      "sha256": "sha256:59fefdf6a8576b36582a61096265f302d3b956b5bc6eb9ad4ae629d1a4c0345b",
       "status": "Accepted by repository owner",
       "title": "0.1 Verification Strategy",
       "xtask_commands": 0
@@ -1378,7 +1378,7 @@
       "normative": false,
       "path": "docs/runbooks/CI-SUPPLY-CHAIN.md",
       "relative_links": 0,
-      "sha256": "sha256:c6c2eae1ae970d22d8dbbb33b253dbc46e5e5748b93a0d2f7d8e62a0d2774da4",
+      "sha256": "sha256:d15cb34ec00438be996db4dd7b7108193e2db72895c8fc7315557398bb7e70c0",
       "title": "CI supply-chain inputs",
       "xtask_commands": 1
     },
@@ -1386,7 +1386,7 @@
       "normative": false,
       "path": "docs/runbooks/JENKINS-LOCAL.md",
       "relative_links": 1,
-      "sha256": "sha256:cbee934562d87229a5be16f06de2a47cf40430de48f4bb8cc920d8ece99338e2",
+      "sha256": "sha256:91fb75473066dcaffea602f03a2776fae089688c35f1722a4c3c6efe58d8fe2a",
       "title": "Local Jenkins CI",
       "xtask_commands": 0
     },

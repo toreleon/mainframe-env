@@ -6,6 +6,9 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added persistent bounded COBOL-parser and IR-decoder fuzzing, Loom schedule
+  models with a negative concurrency mutant, and instrumented critical-package
+  coverage reporting as receipt-backed full CI gates.
 - Added a generated documentation manifest and bounded documentation gate via
   `cargo xtask docs --check` for navigation, normative metadata, links, anchors,
   command examples, and public version truth.

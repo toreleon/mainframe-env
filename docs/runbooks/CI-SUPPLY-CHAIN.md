@@ -80,11 +80,15 @@ and verification before the old key is retired.
 The host must already provide the exact versions in `tools/ci-inputs.lock.json`.
 The lock currently requires Rust/Cargo 1.98.0, Rust/Cargo 1.95.0 for MSRV,
 Python 3.12.13, Git 2.50.1, Docker 29.4.3, Java 21.0.12.1, cargo-deny 0.20.2,
-PostgreSQL 18.6, and GitHub CLI 2.92.0. Install cargo-deny only from its immutable Cargo package
-coordinate:
+cargo-fuzz 0.13.2, cargo-llvm-cov 0.9.1, PostgreSQL 18.6, and GitHub CLI
+2.92.0. The fuzz compiler is additionally pinned as nightly-2026-09-01 by its
+rustc and Cargo commits. Install Cargo tools only from their immutable locked
+package coordinates:
 
 ```bash
 cargo +1.98.0 install cargo-deny --version 0.20.2 --locked
+cargo +1.98.0 install cargo-fuzz --version 0.13.2 --locked
+cargo +1.98.0 install cargo-llvm-cov --version 0.9.1 --locked
 ```
 
 Package-manager commands are workstation provisioning, not CI steps. A

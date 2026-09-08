@@ -68,32 +68,60 @@ Use Proptest for:
 - machine transition invariants; and
 - idempotency/effect sequence behavior.
 
-### Fuzzing — planned, not yet implemented
+### Fuzzing
 
-The target state is for persistent fuzz targets to cover:
+The repository has persistent cargo-fuzz/libFuzzer targets for the bounded
+COBOL frontend and IR binary/text decoders. `fuzz-smoke` executes both targets
+against copied seed corpora with a small generated-input budget; the larger
+`fuzz-periodic` run is part of every full tier, including the weekly scheduled
+run. Corpora and crash artifacts are kept separate so CI cannot rewrite a
+committed seed while earning a clean-candidate receipt. Every discovered crash
+must become a minimized regression fixture.
 
-- COBOL and JCL lexers/parsers/preprocessors;
-- IR text/binary decoders;
+The remaining target state is to extend persistent fuzzing to:
+
+- JCL lexers/parsers/preprocessors;
 - z/OSMF JSON/path/query/multipart inputs;
 - dataset names, records, catalogs, and encoded data;
 - RACF/security request parsing and profile matching; and
 - checkpoint/configuration readers.
 
-Every discovered crash must become a minimized regression fixture. As of the
-pre-0.9 review, the repository has property tests but no persistent fuzz target
-or CI fuzz-smoke gate; this section is a requirement, not current evidence.
+The tracked assurance registry requires both current targets, nonempty corpora,
+positive input/run bounds, the pinned nightly, and the exact cargo-fuzz version.
+Removing a target or corpus therefore fails before fuzz execution rather than
+producing an empty green gate.
 
-### Model and concurrency checking — planned, not yet implemented
+### Model and concurrency checking
 
-- Kani checks bounded pure validators, arithmetic, and selected state-machine
-  transitions where tractable.
-- Loom checks custom concurrency primitives and publication/permit behavior,
-  with its limitations documented.
-- TLA+/TLC models durable work claim, lease, attempt, effect intent/result,
-  cancellation, and recovery before multi-process durable promotion.
+The `model-check` gate uses Loom to enumerate schedules for version-fenced
+execution transitions and effect intent finalization. A deliberately unfenced
+lost-update mutant is required to fail under Loom, proving that the gate is
+exploring schedules rather than merely running an ordinary happy-path test.
+These bounded models use the production `ExecutionState::can_transition_to`
+and effect-state types; they do not claim to model PostgreSQL or the complete
+multi-process work queue.
 
-No Kani harness, Loom dependency, or TLA+/TLC model is currently present. Do
-not cite this target-state section as a completed assurance layer.
+Kani remains a candidate for pure validators after an approved pinned verifier
+distribution can be installed on the capped Jenkins node. TLA+/TLC work-lease
+modeling remains blocked on R-18: the reviewed production lease transition is
+known to admit expired work, so formalizing it now would preserve the defect as
+the specification. TLC also needs a pinned, checksum-verified JVM artifact
+before it can enter this repository's offline assurance boundary. Neither tool
+is current evidence, and the implemented Loom scope must not be described as a
+substitute for those future proofs.
+
+### Source coverage visibility
+
+The full tier uses pinned `cargo-llvm-cov` and the pinned toolchain's
+`llvm-tools-preview` component to instrument the IR, COBOL compiler, store
+contract, and store implementation packages. It archives the machine-readable
+summary and records exact line/function totals. The validator requires nonzero
+covered code and the presence of every declared package, so an empty or
+mis-scoped report blocks the gate. Conservative absolute covered-line and
+function floors derived from the first measured baseline prevent the gate from
+becoming vacuous while leaving room for refactoring. No arbitrary percentage is
+treated as semantic evidence; the baseline is visibility and regression input,
+not release coverage credit.
 
 ### Failure and chaos testing
 
@@ -160,8 +188,9 @@ update procedure are in `docs/runbooks/CI-SUPPLY-CHAIN.md`.
 - profile build and test;
 - differential and property suites;
 - public API/schema compatibility check;
-- fuzz smoke corpus once the planned harness exists; until then the missing
-  gate remains an explicit release-readiness gap.
+- bounded parser/decoder fuzz smoke and nonempty corpus validation;
+- Loom schedule exploration for the registered durable-state models; and
+- instrumented coverage visibility for the registered critical packages.
 
 ### Release gate
 

@@ -97,16 +97,33 @@ def validate_ci_lock(root: Path) -> dict:
     )
     require(lock["schema_version"] == "mainframe-env.ci-input-lock@1", "bad CI lock schema")
     require(re.fullmatch(r"20[0-9]{2}-[0-9]{2}-[0-9]{2}", lock["reviewed_on"] or ""), "bad CI lock review date")
-    exact_keys(lock["rust"], {"workspace", "msrv"}, "Rust lock")
+    exact_keys(lock["rust"], {"workspace", "msrv", "fuzz"}, "Rust lock")
     for name, toolchain in lock["rust"].items():
         require(isinstance(toolchain, dict), f"Rust {name} lock is not an object")
-        exact_keys(toolchain, {"version", "rustc_commit", "cargo_commit"}, f"Rust {name} lock")
-        require(re.fullmatch(r"[1-9][0-9]*\.[0-9]+\.[0-9]+", toolchain["version"] or ""), f"bad Rust {name} version")
+        expected_rust_keys = {"version", "rustc_commit", "cargo_commit"}
+        if name == "fuzz":
+            expected_rust_keys.add("toolchain")
+        exact_keys(toolchain, expected_rust_keys, f"Rust {name} lock")
+        if name == "fuzz":
+            require(
+                re.fullmatch(r"nightly-20[0-9]{2}-[0-9]{2}-[0-9]{2}", toolchain["toolchain"] or "")
+                is not None,
+                "bad Rust fuzz toolchain",
+            )
+            require(
+                re.fullmatch(r"[1-9][0-9]*\.[0-9]+\.[0-9]+-nightly", toolchain["version"] or "")
+                is not None,
+                "bad Rust fuzz version",
+            )
+        else:
+            require(re.fullmatch(r"[1-9][0-9]*\.[0-9]+\.[0-9]+", toolchain["version"] or ""), f"bad Rust {name} version")
         require(re.fullmatch(r"[0-9a-f]{40}", toolchain["rustc_commit"] or ""), f"bad Rust {name} commit")
         require(re.fullmatch(r"[0-9a-f]{40}", toolchain["cargo_commit"] or ""), f"bad Cargo {name} commit")
 
     expected_tools = {
         "cargo-deny",
+        "cargo-fuzz",
+        "cargo-llvm-cov",
         "docker",
         "git",
         "github-cli",
@@ -124,6 +141,13 @@ def validate_ci_lock(root: Path) -> dict:
         == "cargo +1.98.0 install cargo-deny --version 0.20.2 --locked",
         "cargo-deny installation is not exact and locked",
     )
+    for name in ("cargo-fuzz", "cargo-llvm-cov"):
+        exact_keys(lock["tools"][name], {"version", "install"}, f"{name} lock")
+        require(
+            lock["tools"][name]["install"]
+            == f"cargo +1.98.0 install {name} --version {lock['tools'][name]['version']} --locked",
+            f"{name} installation is not exact and locked",
+        )
 
     remote = lock["tracked_remote_inputs"]
     exact_keys(remote, {"github_actions", "container_images", "package_install_commands"}, "remote input lock")
@@ -247,11 +271,23 @@ def check_repository(root: Path = ROOT) -> tuple[dict, dict]:
     toolchain = (root / "rust-toolchain.toml").read_text(encoding="utf-8")
     workspace = (root / "Cargo.toml").read_text(encoding="utf-8")
     channel = re.search(r'^channel\s*=\s*"([^"]+)"\s*$', toolchain, re.MULTILINE)
+    components = re.search(r'^components\s*=\s*\[([^]]+)\]\s*$', toolchain, re.MULTILINE)
     rust_version = re.search(r'^rust-version\s*=\s*"([^"]+)"\s*$', workspace, re.MULTILINE)
     require(channel is not None and channel.group(1) == ci_lock["rust"]["workspace"]["version"], "workspace Rust pin drifted")
+    require(
+        components is not None
+        and all(name in components.group(1) for name in ('"clippy"', '"llvm-tools-preview"', '"rustfmt"')),
+        "workspace Rust component lock is incomplete",
+    )
     declared_msrv = rust_version.group(1) if rust_version is not None else ""
     normalized_msrv = declared_msrv + ".0" if declared_msrv.count(".") == 1 else declared_msrv
     require(normalized_msrv == ci_lock["rust"]["msrv"]["version"], "workspace MSRV pin drifted")
+    assurance = load_json(root / "tools/assurance-gates.json")
+    require(
+        assurance.get("fuzz", {}).get("toolchain")
+        == ci_lock["rust"]["fuzz"]["toolchain"],
+        "fuzz toolchain lock drifted",
+    )
 
     jenkins = (root / "Jenkinsfile").read_text(encoding="utf-8")
     msrv = re.search(r"stage\('MSRV'\)(.*?)(?=\n\s*stage\('|\Z)", jenkins, re.DOTALL)
@@ -286,8 +322,9 @@ def field(output: str, name: str) -> str:
 
 def verify_rust(name: str, locked: dict) -> None:
     version = locked["version"]
-    rustc = command_output(["rustup", "run", version, "rustc", "-Vv"])
-    cargo = command_output(["rustup", "run", version, "cargo", "-Vv"])
+    toolchain = locked.get("toolchain", version)
+    rustc = command_output(["rustup", "run", toolchain, "rustc", "-Vv"])
+    cargo = command_output(["rustup", "run", toolchain, "cargo", "-Vv"])
     require(field(rustc, "release") == version, f"Rust {name} release drifted")
     require(field(rustc, "commit-hash") == locked["rustc_commit"], f"Rust {name} compiler commit drifted")
     require(field(cargo, "release") == version, f"Rust {name} Cargo release drifted")
@@ -330,8 +367,13 @@ def verify_runtime(ci_lock: dict, scope: str) -> None:
         verify_active_rust(ci_lock["rust"]["workspace"])
     if scope in {"ci", "all"}:
         verify_rust("MSRV", ci_lock["rust"]["msrv"])
+        verify_rust("fuzz", ci_lock["rust"]["fuzz"])
         deny = command_output(["cargo", "deny", "--version"])
         require(deny == f"cargo-deny {tools['cargo-deny']['version']}", f"cargo-deny must be exactly {tools['cargo-deny']['version']}")
+        fuzz = command_output(["cargo", "fuzz", "--version"])
+        require(fuzz == f"cargo-fuzz {tools['cargo-fuzz']['version']}", f"cargo-fuzz must be exactly {tools['cargo-fuzz']['version']}")
+        coverage = command_output(["cargo", "llvm-cov", "--version"])
+        require(coverage == f"cargo-llvm-cov {tools['cargo-llvm-cov']['version']}", f"cargo-llvm-cov must be exactly {tools['cargo-llvm-cov']['version']}")
     if scope in {"controller", "all"}:
         java = command_output([java_executable(), "-version"])
         match = re.search(r'version "([0-9.]+)', java)

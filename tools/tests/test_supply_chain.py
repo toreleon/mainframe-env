@@ -28,6 +28,9 @@ class SupplyChainTests(unittest.TestCase):
     def test_repository_lock_closes_tracked_inputs_and_full_msrv(self):
         ci_lock, jenkins_lock = supply_chain.check_repository(ROOT)
         self.assertEqual(ci_lock["rust"]["msrv"]["version"], "1.95.0")
+        self.assertEqual(ci_lock["rust"]["fuzz"]["toolchain"], "nightly-2026-09-01")
+        self.assertEqual(ci_lock["tools"]["cargo-fuzz"]["version"], "0.13.2")
+        self.assertEqual(ci_lock["tools"]["cargo-llvm-cov"]["version"], "0.9.1")
         self.assertEqual(len(jenkins_lock["plugins"]), 63)
         self.assertEqual(
             ci_lock["tracked_remote_inputs"],
