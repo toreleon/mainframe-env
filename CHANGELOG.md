@@ -26,6 +26,9 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Made the macOS release build retain its required `LC_UUID` and required the
+  exact target CLI and server binaries to pass launch, help, version, and
+  readiness probes before release receipts can be written.
 - Corrected RACF flat/nested syntax value handling and added generated-path
   regressions.
 - Corrected Jenkins checkout/temp storage, tool selection, parameter handling,

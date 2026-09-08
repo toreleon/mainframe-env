@@ -1,3 +1,4 @@
+use clap::Parser;
 use mainframe_env_racf::MemorySecretResolver;
 use mainframe_env_server::{
     ConfigOverrides, EnvironmentSecretResolver, HmacSha256PackageTrust, ProductServer,
@@ -11,19 +12,27 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
+#[derive(Debug, Parser)]
+#[command(
+    name = "mainframe-env-server",
+    version,
+    about = "mainframe-env z/OS-compatible service"
+)]
+struct Cli {
+    #[arg(value_name = "CONFIG", default_value = "config/mainframe-env.toml")]
+    config: PathBuf,
+}
+
 #[tokio::main]
 async fn main() {
-    if let Err(problem) = run().await {
+    if let Err(problem) = run(Cli::parse()).await {
         eprintln!("mainframe-env-server: {problem}");
         std::process::exit(1);
     }
 }
 
-async fn run() -> Result<(), String> {
-    let config_path = std::env::args()
-        .nth(1)
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("config/mainframe-env.toml"));
+async fn run(cli: Cli) -> Result<(), String> {
+    let config_path = cli.config;
     let environment = std::env::vars()
         .filter(|(name, _)| {
             name.starts_with("MAINFRAME_ENV_") && !name.starts_with("MAINFRAME_ENV_SECRET_")
@@ -123,5 +132,22 @@ async fn wait_for_shutdown() {
     #[cfg(not(unix))]
     {
         let _ = tokio::signal::ctrl_c().await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn command_line_accepts_the_legacy_positional_config_path() {
+        let cli = Cli::try_parse_from(["mainframe-env-server", "custom.toml"]).unwrap();
+        assert_eq!(cli.config, PathBuf::from("custom.toml"));
+    }
+
+    #[test]
+    fn command_line_has_a_bounded_default_config_path() {
+        let cli = Cli::try_parse_from(["mainframe-env-server"]).unwrap();
+        assert_eq!(cli.config, PathBuf::from("config/mainframe-env.toml"));
     }
 }

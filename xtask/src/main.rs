@@ -11618,24 +11618,12 @@ fn check_evidence_fast(root: &Path) -> TaskResult {
 
 fn check_runtime_architecture(root: &Path) -> TaskResult {
     check_architecture(root)?;
-    let status = Command::new("cargo")
-        .args([
-            "build",
-            "--release",
-            "-p",
-            "mainframe-env-server",
-            "--all-features",
-            "--locked",
-        ])
-        .current_dir(root)
-        .status()
-        .map_err(|error| format!("release server build: {error}"))?;
-    require(status.success(), "release server build failed")?;
-    release_server_sqlite_smoke(root)
+    let target = host_target(root)?;
+    build_release_target(root, &target)?;
+    smoke_release_target(root, &target)
 }
 
-fn release_server_sqlite_smoke(root: &Path) -> TaskResult {
-    let binary = cargo_target_directory(root).join("release/mainframe-env-server");
+fn release_server_sqlite_smoke(root: &Path, binary: &Path) -> TaskResult {
     require(binary.is_file(), "release server binary is missing")?;
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -11653,7 +11641,7 @@ fn release_server_sqlite_smoke(root: &Path) -> TaskResult {
         .map_err(|error| error.to_string())?
         .port();
     drop(listener);
-    let mut child = Command::new(&binary)
+    let mut child = Command::new(binary)
         .arg(root.join("config/mainframe-env.toml"))
         .current_dir(&directory)
         .env("MAINFRAME_ENV_STORE", "sqlite")
@@ -12189,69 +12177,70 @@ fn host_target(root: &Path) -> TaskResult<String> {
 
 fn build_release_target(root: &Path, target: &str) -> TaskResult {
     validate_release_target(target)?;
-    let mut rustflags = vec![format!(
-        "--remap-path-prefix={}=/workspace/mainframe-env",
-        root.display()
-    )];
-    let user_home = env::var_os("HOME").map(PathBuf::from);
-    for (path, replacement) in [
-        (
-            env::var_os("CARGO_HOME")
-                .map(PathBuf::from)
-                .or_else(|| user_home.as_ref().map(|home| home.join(".cargo"))),
-            "/cargo",
-        ),
-        (
-            env::var_os("RUSTUP_HOME")
-                .map(PathBuf::from)
-                .or_else(|| user_home.as_ref().map(|home| home.join(".rustup"))),
-            "/rustup",
-        ),
-    ] {
-        if let Some(path) = path {
-            rustflags.push(format!(
-                "--remap-path-prefix={}={replacement}",
-                path.display()
-            ));
-        }
-    }
-    if target.contains("apple-darwin") {
-        rustflags.push("-C link-arg=-Wl,-no_uuid".into());
-    } else if target.contains("linux-gnu") {
-        rustflags.push("-C link-arg=-Wl,--build-id=sha1".into());
-    }
-    let mut command = Command::new("cargo");
-    command
-        .args([
-            "build",
-            "--release",
-            "-p",
-            "mainframe-env-server",
-            "-p",
-            "mainframe-env-cli",
-            "--all-features",
-            "--locked",
-            "--target",
-            target,
-        ])
-        .env("CARGO_INCREMENTAL", "0")
-        .env("SOURCE_DATE_EPOCH", "0")
-        .env("ZERO_AR_DATE", "1")
-        .env("LC_ALL", "C")
-        .env("TZ", "UTC")
-        .env("RUSTFLAGS", rustflags.join(" "))
+    let status = Command::new(root.join("tools/build_release_binaries.sh"))
+        .args(["--target", target])
         .current_dir(root)
-        .env_remove("CARGO_ENCODED_RUSTFLAGS");
-    if target.contains("apple-darwin") {
-        command.env("MACOSX_DEPLOYMENT_TARGET", "15.0");
-    }
-    let status = command
         .status()
-        .map_err(|error| format!("cargo release build for {target}: {error}"))?;
+        .map_err(|error| format!("canonical release build for {target}: {error}"))?;
     require(
         status.success(),
         &format!("release build failed for {target}"),
     )
+}
+
+fn release_binary(root: &Path, target: &str, name: &str) -> PathBuf {
+    cargo_target_directory(root).join(format!("{target}/release/{name}"))
+}
+
+fn probe_release_binary(binary: &Path, argument: &str, expected: &str) -> TaskResult {
+    let output = Command::new(binary)
+        .arg(argument)
+        .output()
+        .map_err(|error| format!("run {} {argument}: {error}", binary.display()))?;
+    require(
+        output.status.success(),
+        &format!(
+            "{} {argument} exited {}: {}",
+            binary.display(),
+            output.status,
+            String::from_utf8_lossy(&output.stderr)
+        ),
+    )?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    require(
+        stdout.contains(expected),
+        &format!("{} {argument} output is invalid", binary.display()),
+    )
+}
+
+fn smoke_release_target(root: &Path, target: &str) -> TaskResult {
+    let host = host_target(root)?;
+    require(
+        host == target,
+        &format!(
+            "release target {target} cannot be certified on host {host}; exact binaries must execute"
+        ),
+    )?;
+    let version = product_version(root)?;
+    let cli = release_binary(root, target, "mainframe-env");
+    let server = release_binary(root, target, "mainframe-env-server");
+    for binary in [&cli, &server] {
+        require(
+            binary.is_file(),
+            &format!("{} is missing", binary.display()),
+        )?;
+        probe_release_binary(binary, "--version", &version)?;
+        probe_release_binary(binary, "--help", "Usage:")?;
+    }
+    release_server_sqlite_smoke(root, &server)
+}
+
+fn release_linker_determinism(target: &str) -> &'static str {
+    if target.contains("apple-darwin") {
+        "ld64-content-derived-lc-uuid"
+    } else {
+        "-Wl,--build-id=sha1"
+    }
 }
 
 fn cargo_target_directory(root: &Path) -> PathBuf {
@@ -12272,6 +12261,7 @@ fn generate_release_artifacts(root: &Path, target: &str) -> TaskResult {
         return validate_retained_accepted_release(root, target);
     }
     build_release_target(root, target)?;
+    smoke_release_target(root, target)?;
     let documents = release_documents(root, target)?;
     validate_release_documents(root, &documents, target)?;
     for (relative, bytes) in documents {
@@ -12290,6 +12280,7 @@ fn check_release_artifacts(root: &Path, target: &str) -> TaskResult {
     }
     let retained = retained_release_documents(root, target)?;
     build_release_target(root, target)?;
+    smoke_release_target(root, target)?;
     let documents = release_documents(root, target)?;
     validate_release_documents(root, &documents, target)?;
     compare_release_documents(&retained, &documents)?;
@@ -12921,7 +12912,7 @@ fn release_documents(root: &Path, target: &str) -> TaskResult<BTreeMap<PathBuf, 
         "source_digest":source_digest,
         "path_remapping":{"repository":"/workspace/mainframe-env","cargo_home":"/cargo","rustup_home":"/rustup"},
         "deterministic_environment":deterministic_environment,
-        "linker_determinism":if target.contains("apple-darwin") {"-Wl,-no_uuid"} else {"-Wl,--build-id=sha1"}
+        "linker_determinism":release_linker_determinism(target)
     });
     let build_inputs_bytes = pretty_json(&build_inputs)?;
     let build_inputs_digest = format!("{:x}", Sha256::digest(&build_inputs_bytes));
@@ -13681,6 +13672,36 @@ mod tests {
             .unwrap(),
             "x86_64-unknown-linux-gnu"
         );
+    }
+
+    #[test]
+    fn macos_release_build_retains_the_required_load_command() {
+        assert_eq!(
+            release_linker_determinism("aarch64-apple-darwin"),
+            "ld64-content-derived-lc-uuid"
+        );
+        assert!(!release_linker_determinism("aarch64-apple-darwin").contains("no_uuid"));
+        let build = fs::read_to_string(
+            repository_root()
+                .unwrap()
+                .join("tools/build_release_binaries.sh"),
+        )
+        .unwrap();
+        assert!(!build.contains("-Wl,-no_uuid"));
+        assert!(build.contains("cargo build --release --locked --all-features"));
+    }
+
+    #[test]
+    fn release_smoke_refuses_to_certify_a_foreign_target() {
+        let root = repository_root().unwrap();
+        let host = host_target(&root).unwrap();
+        let foreign = if host == "aarch64-apple-darwin" {
+            "x86_64-unknown-linux-gnu"
+        } else {
+            "aarch64-apple-darwin"
+        };
+        let problem = smoke_release_target(&root, foreign).unwrap_err();
+        assert!(problem.contains("exact binaries must execute"));
     }
 
     #[test]
