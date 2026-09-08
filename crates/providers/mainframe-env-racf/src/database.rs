@@ -3,8 +3,9 @@ use crate::model::{
     CredentialVerifier, DecisionOutcome, DecisionReason, GroupAuthority, GroupConnection,
     GroupProfile, MigrationState, PrincipalKind, PrincipalProfile, PrincipalState, ProfileTemplate,
     RecoveryRecord, RecoveryState, ResourceProfile, SafStatus, SecurityAuditRecord,
-    SecurityDatabaseLimits, SecurityDatabaseSnapshot, SecurityMigration, SecuritySchemaProblem,
-    TransactionState, connection_key, profile_key,
+    SecurityDatabaseLimits, SecurityDatabaseSnapshot, SecurityMigration,
+    SecurityRequestDigestFormat, SecuritySchemaProblem, TransactionState, connection_key,
+    profile_key,
 };
 use mainframe_env_host_api::HostProblem;
 use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
@@ -20,6 +21,8 @@ const LEGACY_USER_NAMESPACE: &str = "racf-user";
 const LEGACY_GROUP_NAMESPACE: &str = "racf-group";
 const LEGACY_PROFILE_NAMESPACE: &str = "racf-profile";
 const LEGACY_AUDIT_NAMESPACE: &str = "racf-audit";
+const LEGACY_REPLAY_SCRUB_DOMAIN: &[u8] = b"mainframe-env.racf-legacy-replay-scrub@1\0";
+const LEGACY_AUDIT_SCRUB_DOMAIN: &[u8] = b"mainframe-env.racf-legacy-audit-scrub@1\0";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SecurityDatabaseSummary {
@@ -71,7 +74,51 @@ impl SecurityDatabase {
         });
         database.initialize()?;
         database.read()?;
+        database.scrub_legacy_replay_digests()?;
         Ok(database)
+    }
+
+    fn scrub_legacy_replay_digests(&self) -> Result<usize, HostProblem> {
+        self.mutate_retry(|snapshot| {
+            let mut scrubbed = 0usize;
+            for transaction in snapshot.transactions.values_mut().filter(|transaction| {
+                transaction.request_digest_format == SecurityRequestDigestFormat::LegacyUnversioned
+            }) {
+                transaction.request_digest = scrubbed_transaction_digest(transaction);
+                transaction.request_digest_format = SecurityRequestDigestFormat::LegacyScrubbedV0;
+                scrubbed = scrubbed
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?;
+            }
+            let racroute_actions = crate::command::racroute_descriptors()
+                .iter()
+                .map(|descriptor| descriptor.keyword())
+                .collect::<std::collections::BTreeSet<_>>();
+            for audit in &mut snapshot.audits {
+                let generated_command = audit.fields.contains_key("COMMAND_FAMILY")
+                    && audit.fields.contains_key("OFFICIAL_ROW");
+                let generated_racroute = audit.fields.contains_key("ACEE")
+                    && racroute_actions.contains(audit.action.as_str());
+                if (generated_command || generated_racroute)
+                    && !audit.fields.contains_key("REQUEST_DIGEST_FORMAT")
+                {
+                    audit.resource_digest = Some(scrubbed_audit_digest(audit));
+                    audit.fields.insert(
+                        "REQUEST_DIGEST_FORMAT".into(),
+                        AuditFieldValue::Text(
+                            SecurityRequestDigestFormat::LegacyScrubbedV0
+                                .as_str()
+                                .into(),
+                        ),
+                    );
+                    scrubbed = scrubbed
+                        .checked_add(1)
+                        .ok_or(HostProblem::ResourceExhausted)?;
+                }
+            }
+            Ok((scrubbed, scrubbed != 0))
+        })
+        .map(|(scrubbed, _)| scrubbed)
     }
 
     pub fn summary(&self) -> Result<SecurityDatabaseSummary, HostProblem> {
@@ -906,6 +953,43 @@ fn recovery_id(transaction_id: &str) -> String {
     format!("RECOVERY{:X}", Sha256::digest(transaction_id.as_bytes()))
 }
 
+fn scrubbed_transaction_digest(transaction: &crate::SecurityTransaction) -> String {
+    let mut digest = Sha256::new();
+    digest.update(LEGACY_REPLAY_SCRUB_DOMAIN);
+    for value in [
+        transaction.id.as_bytes(),
+        transaction.idempotency_key.as_bytes(),
+        transaction.actor.as_bytes(),
+        transaction.operation.as_bytes(),
+    ] {
+        digest_part(&mut digest, value);
+    }
+    digest.update(transaction.base_generation.to_be_bytes());
+    match transaction.final_generation {
+        Some(generation) => {
+            digest.update([1]);
+            digest.update(generation.to_be_bytes());
+        }
+        None => digest.update([0]),
+    }
+    format!("sha256:{:x}", digest.finalize())
+}
+
+fn scrubbed_audit_digest(audit: &SecurityAuditRecord) -> String {
+    let mut digest = Sha256::new();
+    digest.update(LEGACY_AUDIT_SCRUB_DOMAIN);
+    for value in [
+        audit.id.as_bytes(),
+        audit.correlation.as_bytes(),
+        audit.actor.as_bytes(),
+        audit.action.as_bytes(),
+    ] {
+        digest_part(&mut digest, value);
+    }
+    digest.update(audit.tick.to_be_bytes());
+    format!("sha256:{:x}", digest.finalize())
+}
+
 fn digest_part(digest: &mut Sha256, value: &[u8]) {
     digest.update(u64::try_from(value.len()).unwrap_or(u64::MAX).to_be_bytes());
     digest.update(value);
@@ -1336,6 +1420,8 @@ mod tests {
                             idempotency_key: id.into(),
                             actor: "SYSTEM".into(),
                             operation: "RECOVERY".into(),
+                            request_digest_format:
+                                crate::SecurityRequestDigestFormat::RacfCommandCanonicalV1,
                             request_digest: format!("sha256:{}", "a".repeat(64)),
                             state,
                             base_generation,

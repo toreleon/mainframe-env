@@ -466,12 +466,37 @@ impl RacfService {
         crate::command_processor::execute(self, context, input)
     }
 
+    /// Bind a scrubbed pre-canonical command receipt to a reviewed command.
+    pub fn reconcile_legacy_command(
+        &self,
+        context: &crate::command_processor::CommandContext,
+        expected_scrubbed_digest: &str,
+        input: &str,
+    ) -> Result<(), HostProblem> {
+        crate::command_processor::reconcile_legacy_replay(
+            self,
+            context,
+            expected_scrubbed_digest,
+            input,
+        )
+    }
+
     pub fn racroute(
         &self,
         context: &crate::saf::SafRequestContext,
         request: crate::saf::RacrouteRequest,
     ) -> Result<crate::saf::RacrouteOutcome, HostProblem> {
         crate::saf::execute(self, context, request)
+    }
+
+    /// Bind a scrubbed pre-canonical RACROUTE receipt to a reviewed request.
+    pub fn reconcile_legacy_racroute(
+        &self,
+        context: &crate::saf::SafRequestContext,
+        expected_scrubbed_digest: &str,
+        request: &crate::saf::RacrouteRequest,
+    ) -> Result<(), HostProblem> {
+        crate::saf::reconcile_legacy_replay(self, context, expected_scrubbed_digest, request)
     }
 
     pub fn add_group(&self, name: &str) -> Result<(), HostProblem> {

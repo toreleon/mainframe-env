@@ -17,6 +17,9 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+const LIFECYCLE_OUTBOX_TOPIC: &str = "execution.lifecycle.v1";
+const LIFECYCLE_OUTBOX_DOMAIN: &[u8] = b"mainframe-env.execution-lifecycle@1\0";
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CoordinatorLimits {
     pub quantum: Quantum,
@@ -556,12 +559,45 @@ fn notification(event: &LifecycleEvent) -> OutboxRecord {
         notification_id: format!("{}:{:020}", event.execution_id, event.sequence),
         execution_id: event.execution_id.clone(),
         sequence: event.sequence,
-        topic: "execution.lifecycle".into(),
-        payload: format!("{:?}", event.kind).into_bytes(),
+        topic: LIFECYCLE_OUTBOX_TOPIC.into(),
+        payload: lifecycle_payload(&event.kind),
         attempt: 0,
         delivered: false,
         version: 1,
     }
+}
+
+fn lifecycle_payload(kind: &LifecycleEventKind) -> Vec<u8> {
+    let mut payload = Vec::with_capacity(LIFECYCLE_OUTBOX_DOMAIN.len() + 9);
+    payload.extend_from_slice(LIFECYCLE_OUTBOX_DOMAIN);
+    match kind {
+        LifecycleEventKind::Admitted => payload.push(1),
+        LifecycleEventKind::Queued => payload.push(2),
+        LifecycleEventKind::Claimed => payload.push(3),
+        LifecycleEventKind::Started => payload.push(4),
+        LifecycleEventKind::Completing => payload.push(5),
+        LifecycleEventKind::EffectIntent { sequence } => {
+            payload.push(6);
+            payload.extend_from_slice(&sequence.to_be_bytes());
+        }
+        LifecycleEventKind::EffectResult { sequence } => {
+            payload.push(7);
+            payload.extend_from_slice(&sequence.to_be_bytes());
+        }
+        LifecycleEventKind::Suspended => payload.push(8),
+        LifecycleEventKind::Resumed => payload.push(9),
+        LifecycleEventKind::CancellationRequested => payload.push(10),
+        LifecycleEventKind::Cancelled => payload.push(11),
+        LifecycleEventKind::TimedOut => payload.push(12),
+        LifecycleEventKind::Completed { return_code } => {
+            payload.push(13);
+            payload.extend_from_slice(&return_code.to_be_bytes());
+        }
+        LifecycleEventKind::Condition => payload.push(14),
+        LifecycleEventKind::Abend => payload.push(15),
+        LifecycleEventKind::Failed => payload.push(16),
+    }
+    payload
 }
 
 fn record_step(
@@ -724,6 +760,61 @@ mod tests {
             limits,
         )
         .unwrap()
+    }
+
+    fn hex(value: &[u8]) -> String {
+        value.iter().map(|byte| format!("{byte:02x}")).collect()
+    }
+
+    #[test]
+    fn lifecycle_outbox_payloads_are_versioned_unique_and_golden() {
+        let effect = lifecycle_payload(&LifecycleEventKind::EffectIntent {
+            sequence: 0x0102_0304_0506_0708,
+        });
+        let completed = lifecycle_payload(&LifecycleEventKind::Completed { return_code: -12 });
+        assert_eq!(
+            hex(&effect),
+            "6d61696e6672616d652d656e762e657865637574696f6e2d6c6966656379636c65403100060102030405060708"
+        );
+        assert_eq!(
+            hex(&completed),
+            "6d61696e6672616d652d656e762e657865637574696f6e2d6c6966656379636c654031000dfffffff4"
+        );
+
+        let invocation = invocation();
+        let record = notification(&LifecycleEvent {
+            execution_id: invocation.execution_id.clone(),
+            run_unit_id: invocation.run_unit_id.clone(),
+            sequence: 1,
+            attempt: 1,
+            tick: 0,
+            kind: LifecycleEventKind::Completed { return_code: -12 },
+        });
+        assert_eq!(record.topic, "execution.lifecycle.v1");
+        assert_eq!(record.payload, completed);
+
+        let payloads = [
+            LifecycleEventKind::Admitted,
+            LifecycleEventKind::Queued,
+            LifecycleEventKind::Claimed,
+            LifecycleEventKind::Started,
+            LifecycleEventKind::Completing,
+            LifecycleEventKind::EffectIntent { sequence: 1 },
+            LifecycleEventKind::EffectResult { sequence: 1 },
+            LifecycleEventKind::Suspended,
+            LifecycleEventKind::Resumed,
+            LifecycleEventKind::CancellationRequested,
+            LifecycleEventKind::Cancelled,
+            LifecycleEventKind::TimedOut,
+            LifecycleEventKind::Completed { return_code: 0 },
+            LifecycleEventKind::Condition,
+            LifecycleEventKind::Abend,
+            LifecycleEventKind::Failed,
+        ]
+        .into_iter()
+        .map(|kind| lifecycle_payload(&kind))
+        .collect::<BTreeSet<_>>();
+        assert_eq!(payloads.len(), 16);
     }
 
     #[test]

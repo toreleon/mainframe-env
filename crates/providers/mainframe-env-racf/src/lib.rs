@@ -35,10 +35,10 @@ pub use model::{
     RacfDatabaseStatus, RacfSubsystemState, RaclistCache, RecoveryRecord, RecoveryState,
     ResourceProfile, RrsfNode, RrsfNodeState, SECURITY_DATABASE_SCHEMA, SECURITY_PROFILE_SCHEMA,
     SECURITY_TRANSACTION_SCHEMA, SafDecision, SafStatus, SecurityAuditRecord,
-    SecurityDatabaseLimits, SecurityMigration, SecurityPolicyOptions, SecuritySchemaProblem,
-    SecurityToken, SecurityTransaction, SegmentFieldKind, SegmentFieldSchema, SegmentTemplate,
-    SegmentValue, SignonSession, SignonSessionState, TokenKind, TokenState, TransactionState,
-    UserAssociation,
+    SecurityDatabaseLimits, SecurityMigration, SecurityPolicyOptions, SecurityRequestDigestFormat,
+    SecuritySchemaProblem, SecurityToken, SecurityTransaction, SegmentFieldKind,
+    SegmentFieldSchema, SegmentTemplate, SegmentValue, SignonSession, SignonSessionState,
+    TokenKind, TokenState, TransactionState, UserAssociation,
 };
 pub use saf::{
     AccessEnvironment, AceeSummary, ExtractedSecurityRecord, RacrouteOutcome, RacrouteRequest,

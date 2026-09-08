@@ -837,6 +837,16 @@ pub(crate) fn diagnostic(code: CommandDiagnosticCode, offset: usize) -> CommandD
     }
 }
 
+pub(crate) fn diagnostic_with_host_problem(
+    code: CommandDiagnosticCode,
+    offset: usize,
+    problem: HostProblem,
+) -> CommandDiagnostic {
+    let mut diagnostic = diagnostic(code, offset);
+    diagnostic.host_problem = Some(problem);
+    diagnostic
+}
+
 fn unsupported_operand_diagnostic(
     descriptor: CommandDescriptor,
     operand: &str,

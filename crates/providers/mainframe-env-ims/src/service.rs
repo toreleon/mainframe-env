@@ -1,7 +1,9 @@
-use mainframe_env_execution_api::{CapabilityId, Invocation, InvocationLimits, ServiceClass};
+use mainframe_env_execution_api::{
+    CapabilityId, IdempotencyKey, Invocation, InvocationLimits, ServiceClass,
+};
 use mainframe_env_host_api::{
     CapabilityDescriptor, EffectRequest, EffectResult, HostProblem, HostProvider, HostRequest,
-    HostResult, ImsOperation, ImsRequest, ImsResult, ImsSegment,
+    HostResult, ImsOperation, ImsRequest, ImsResult, ImsSegment, canonical_ims_request_digest,
 };
 use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
 use serde::{Deserialize, Serialize};
@@ -132,8 +134,19 @@ struct Session {
     last: Option<SegmentLocation>,
 }
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+enum ReplayDigestFormat {
+    #[default]
+    #[serde(rename = "legacy-debug@0")]
+    LegacyDebugV0,
+    #[serde(rename = "mainframe-env.provider-replay-canonical@1")]
+    CanonicalHostV1,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct RecordedResult {
+    #[serde(default)]
+    request_digest_format: ReplayDigestFormat,
     request_sha256: [u8; 32],
     status: String,
     segments: Vec<(String, Option<Vec<u8>>, Vec<u8>)>,
@@ -144,6 +157,7 @@ struct RecordedResult {
 impl RecordedResult {
     fn from_result(request_sha256: [u8; 32], result: &ImsResult) -> Self {
         Self {
+            request_digest_format: ReplayDigestFormat::CanonicalHostV1,
             request_sha256,
             status: result.status.clone(),
             segments: result
@@ -260,7 +274,7 @@ impl ImsService {
         request: &ImsRequest,
     ) -> Result<ImsResult, HostProblem> {
         let mut durable = self.lock()?;
-        let request_sha256 = request_digest(request);
+        let request_sha256 = request_digest(request)?;
         let replay_key = request
             .mutation
             .as_ref()
@@ -268,10 +282,14 @@ impl ImsService {
         if let Some(key) = replay_key
             && let Some(recorded) = durable.state.replay.get(key)
         {
-            return if recorded.request_sha256 == request_sha256 {
-                Ok(recorded.result())
-            } else {
-                Err(HostProblem::IdempotencyConflict)
+            return match recorded.request_digest_format {
+                ReplayDigestFormat::LegacyDebugV0 => Err(HostProblem::UnknownOutcome),
+                ReplayDigestFormat::CanonicalHostV1
+                    if recorded.request_sha256 == request_sha256 =>
+                {
+                    Ok(recorded.result())
+                }
+                ReplayDigestFormat::CanonicalHostV1 => Err(HostProblem::IdempotencyConflict),
             };
         }
         let mut next = durable.state.clone();
@@ -302,6 +320,58 @@ impl ImsService {
             self.persist(&mut durable, next)?;
         }
         Ok(result)
+    }
+
+    /// Bind a retained pre-canonical replay receipt to a reviewed typed request.
+    ///
+    /// Legacy receipts are never replayed or redispatched implicitly. The caller
+    /// must attest the exact retained digest before this metadata-only migration.
+    pub fn reconcile_legacy_replay(
+        &self,
+        key: &IdempotencyKey,
+        expected_legacy_digest: [u8; 32],
+        request: &ImsRequest,
+    ) -> Result<(), HostProblem> {
+        if !request.operation.is_mutating()
+            || request
+                .mutation
+                .as_ref()
+                .map(|mutation| &mutation.idempotency_key)
+                != Some(key)
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        let canonical = request_digest(request)?;
+        let mut durable = self.lock()?;
+        let retained = durable
+            .state
+            .replay
+            .get(key.as_str())
+            .ok_or(HostProblem::NotFound)?;
+        match retained.request_digest_format {
+            ReplayDigestFormat::CanonicalHostV1 => {
+                return if retained.request_sha256 == canonical {
+                    Ok(())
+                } else {
+                    Err(HostProblem::IdempotencyConflict)
+                };
+            }
+            ReplayDigestFormat::LegacyDebugV0
+                if retained.request_sha256 != expected_legacy_digest =>
+            {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            ReplayDigestFormat::LegacyDebugV0 => {}
+        }
+        let mut next = durable.state.clone();
+        let retained = next
+            .replay
+            .get_mut(key.as_str())
+            .ok_or(HostProblem::NotFound)?;
+        retained.request_digest_format = ReplayDigestFormat::CanonicalHostV1;
+        retained.request_sha256 = canonical;
+        validate_state(&next, self.limits)?;
+        self.persist(&mut durable, next)
     }
 
     pub fn hierarchy(&self, database: &str) -> Result<Vec<ImsLoadRoot>, HostProblem> {
@@ -1100,8 +1170,8 @@ fn validate_state(state: &State, limits: ImsLimits) -> Result<(), HostProblem> {
     }
 }
 
-fn request_digest(request: &ImsRequest) -> [u8; 32] {
-    Sha256::digest(format!("{request:?}").as_bytes()).into()
+fn request_digest(request: &ImsRequest) -> Result<[u8; 32], HostProblem> {
+    canonical_ims_request_digest(request)
 }
 
 fn normalize(value: &str) -> String {
@@ -1265,6 +1335,32 @@ mod tests {
         }
     }
 
+    fn retain_as_legacy_replay(
+        store: &dyn ProviderStateStore,
+        key: &IdempotencyKey,
+        digest: [u8; 32],
+    ) {
+        let row = store
+            .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+            .unwrap()
+            .unwrap();
+        let mut state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        let replay = state["replay"][key.as_str()].as_object_mut().unwrap();
+        replay.remove("request_digest_format");
+        replay.insert("request_sha256".into(), serde_json::json!(digest));
+        let version = row.version;
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    version: version + 1,
+                    payload: serde_json::to_vec(&state).unwrap(),
+                    ..row
+                },
+                Some(version),
+            )
+            .unwrap();
+    }
+
     fn qualifier(segment: &str, field: &str, value: &[u8]) -> ImsQualifier {
         ImsQualifier {
             segment: segment.into(),
@@ -1392,5 +1488,52 @@ mod tests {
         let result = reopened.execute(&invocation, &unload).unwrap();
         assert_eq!(result.segments.len(), 2);
         assert_eq!(reopened.hierarchy("AUTHDB").unwrap()[0].children, [child]);
+    }
+
+    #[test]
+    fn legacy_replay_requires_attested_canonical_migration_without_redispatch() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = ImsService::open(store.clone(), ImsLimits::default()).unwrap();
+        service.install(definition()).unwrap();
+        let invocation = invocation("legacy-replay");
+        service
+            .execute(
+                &invocation,
+                &request(ImsOperation::Schedule, 90, &[], &[], Vec::new()),
+            )
+            .unwrap();
+        let insert = request(
+            ImsOperation::Insert,
+            91,
+            &["ROOT"],
+            b"000091ONCE",
+            Vec::new(),
+        );
+        let key = insert.mutation.as_ref().unwrap().idempotency_key.clone();
+        let original = service.execute(&invocation, &insert).unwrap();
+        assert_eq!(service.hierarchy("AUTHDB").unwrap().len(), 1);
+        drop(service);
+
+        retain_as_legacy_replay(store.as_ref(), &key, [0x22; 32]);
+        let reopened = ImsService::open(store.clone(), ImsLimits::default()).unwrap();
+        assert_eq!(
+            reopened.execute(&invocation, &insert),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(reopened.hierarchy("AUTHDB").unwrap().len(), 1);
+        assert_eq!(
+            reopened.reconcile_legacy_replay(&key, [0x33; 32], &insert),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        reopened
+            .reconcile_legacy_replay(&key, [0x22; 32], &insert)
+            .unwrap();
+        assert_eq!(reopened.execute(&invocation, &insert), Ok(original.clone()));
+        assert_eq!(reopened.hierarchy("AUTHDB").unwrap().len(), 1);
+        drop(reopened);
+
+        let restarted = ImsService::open(store, ImsLimits::default()).unwrap();
+        assert_eq!(restarted.execute(&invocation, &insert), Ok(original));
+        assert_eq!(restarted.hierarchy("AUTHDB").unwrap().len(), 1);
     }
 }

@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub const SECURITY_DATABASE_SCHEMA: &str = "mainframe-env.racf-database@2";
 pub const SECURITY_PROFILE_SCHEMA: &str = "mainframe-env.racf-profile@2";
-pub const SECURITY_TRANSACTION_SCHEMA: &str = "mainframe-env.racf-transaction@1";
+pub const SECURITY_TRANSACTION_SCHEMA: &str = "mainframe-env.racf-transaction@2";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SecurityDatabaseLimits {
@@ -714,6 +714,31 @@ pub enum TransactionState {
     UnknownOutcome,
 }
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub enum SecurityRequestDigestFormat {
+    #[default]
+    #[serde(rename = "legacy-unversioned@0")]
+    LegacyUnversioned,
+    #[serde(rename = "mainframe-env.legacy-replay-redacted@0")]
+    LegacyScrubbedV0,
+    #[serde(rename = "mainframe-env.racf-command@1")]
+    RacfCommandCanonicalV1,
+    #[serde(rename = "mainframe-env.racroute-request@1")]
+    RacrouteCanonicalV1,
+}
+
+impl SecurityRequestDigestFormat {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::LegacyUnversioned => "legacy-unversioned@0",
+            Self::LegacyScrubbedV0 => "mainframe-env.legacy-replay-redacted@0",
+            Self::RacfCommandCanonicalV1 => "mainframe-env.racf-command@1",
+            Self::RacrouteCanonicalV1 => "mainframe-env.racroute-request@1",
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SecurityTransaction {
@@ -721,6 +746,8 @@ pub struct SecurityTransaction {
     pub idempotency_key: String,
     pub actor: String,
     pub operation: String,
+    #[serde(default)]
+    pub request_digest_format: SecurityRequestDigestFormat,
     pub request_digest: String,
     pub state: TransactionState,
     pub base_generation: u64,
@@ -1360,6 +1387,14 @@ impl SecurityDatabaseSnapshot {
                 return Err(SecuritySchemaProblem::Malformed);
             }
             digest_sha256(&transaction.request_digest)?;
+            let racroute = transaction.operation.starts_with("RACROUTE-");
+            if matches!(
+                (racroute, transaction.request_digest_format),
+                (true, SecurityRequestDigestFormat::RacfCommandCanonicalV1)
+                    | (false, SecurityRequestDigestFormat::RacrouteCanonicalV1)
+            ) {
+                return Err(SecuritySchemaProblem::Malformed);
+            }
             if let Some(result) = &transaction.terminal_result {
                 bounded(result, 65_536)?;
                 if crate::audit::sensitive_value(result) {

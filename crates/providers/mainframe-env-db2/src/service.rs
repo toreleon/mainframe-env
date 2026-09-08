@@ -2,14 +2,16 @@ use crate::catalog::{
     Db2CatalogGeneration, Db2ColumnDefinition, Db2ResultEncoding, Db2TableDefinition,
     input_for_column, normalize_identifier, value_for_column,
 };
-use mainframe_env_execution_api::{CapabilityId, Invocation, InvocationLimits, ServiceClass};
+use mainframe_env_execution_api::{
+    CapabilityId, IdempotencyKey, Invocation, InvocationLimits, ServiceClass,
+};
 use mainframe_env_host_api::{
     CapabilityDescriptor, Db2HostVariable, Db2Operation, Db2Request, Db2Result, Db2Row,
     EffectRequest, EffectResult, HostProblem, HostProvider, HostRequest, HostResult,
+    canonical_db2_request_digest,
 };
 use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -75,8 +77,19 @@ struct Cursor {
     index: usize,
 }
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+enum ReplayDigestFormat {
+    #[default]
+    #[serde(rename = "legacy-debug@0")]
+    LegacyDebugV0,
+    #[serde(rename = "mainframe-env.provider-replay-canonical@1")]
+    CanonicalHostV1,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct RecordedResult {
+    #[serde(default)]
+    request_digest_format: ReplayDigestFormat,
     request_sha256: [u8; 32],
     sqlcode: i32,
     sqlstate: String,
@@ -88,6 +101,7 @@ struct RecordedResult {
 impl From<&Db2Result> for RecordedResult {
     fn from(result: &Db2Result) -> Self {
         Self {
+            request_digest_format: ReplayDigestFormat::CanonicalHostV1,
             request_sha256: [0; 32],
             sqlcode: result.sqlcode,
             sqlstate: result.sqlstate.clone(),
@@ -317,7 +331,7 @@ impl Db2Service {
         request: &Db2Request,
     ) -> Result<Db2Result, HostProblem> {
         let mut durable = self.lock()?;
-        let request_sha256 = request_digest(request);
+        let request_sha256 = request_digest(request)?;
         let replay_key = request
             .mutation
             .as_ref()
@@ -325,10 +339,14 @@ impl Db2Service {
         if let Some(key) = replay_key
             && let Some(recorded) = durable.state.replay.get(key)
         {
-            return if recorded.request_sha256 == request_sha256 {
-                Ok(recorded.result())
-            } else {
-                Err(HostProblem::IdempotencyConflict)
+            return match recorded.request_digest_format {
+                ReplayDigestFormat::LegacyDebugV0 => Err(HostProblem::UnknownOutcome),
+                ReplayDigestFormat::CanonicalHostV1
+                    if recorded.request_sha256 == request_sha256 =>
+                {
+                    Ok(recorded.result())
+                }
+                ReplayDigestFormat::CanonicalHostV1 => Err(HostProblem::IdempotencyConflict),
             };
         }
         let mut next = durable.state.clone();
@@ -347,6 +365,58 @@ impl Db2Service {
             self.persist(&mut durable, next)?;
         }
         Ok(result)
+    }
+
+    /// Bind a retained pre-canonical replay receipt to a reviewed typed request.
+    ///
+    /// Legacy receipts are never replayed or redispatched implicitly. The caller
+    /// must attest the exact retained digest before this metadata-only migration.
+    pub fn reconcile_legacy_replay(
+        &self,
+        key: &IdempotencyKey,
+        expected_legacy_digest: [u8; 32],
+        request: &Db2Request,
+    ) -> Result<(), HostProblem> {
+        if !request.operation.is_mutating()
+            || request
+                .mutation
+                .as_ref()
+                .map(|mutation| &mutation.idempotency_key)
+                != Some(key)
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        let canonical = request_digest(request)?;
+        let mut durable = self.lock()?;
+        let retained = durable
+            .state
+            .replay
+            .get(key.as_str())
+            .ok_or(HostProblem::NotFound)?;
+        match retained.request_digest_format {
+            ReplayDigestFormat::CanonicalHostV1 => {
+                return if retained.request_sha256 == canonical {
+                    Ok(())
+                } else {
+                    Err(HostProblem::IdempotencyConflict)
+                };
+            }
+            ReplayDigestFormat::LegacyDebugV0
+                if retained.request_sha256 != expected_legacy_digest =>
+            {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            ReplayDigestFormat::LegacyDebugV0 => {}
+        }
+        let mut next = durable.state.clone();
+        let retained = next
+            .replay
+            .get_mut(key.as_str())
+            .ok_or(HostProblem::NotFound)?;
+        retained.request_digest_format = ReplayDigestFormat::CanonicalHostV1;
+        retained.request_sha256 = canonical;
+        validate_state(&next, self.limits)?;
+        self.persist(&mut durable, next)
     }
 
     pub fn table_rows(&self, table: &str) -> Result<Vec<Vec<Vec<u8>>>, HostProblem> {
@@ -2172,8 +2242,8 @@ fn sql_condition(sqlcode: i32, sqlstate: &str, message: &str) -> Db2Result {
     }
 }
 
-fn request_digest(request: &Db2Request) -> [u8; 32] {
-    Sha256::digest(format!("{request:?}").as_bytes()).into()
+fn request_digest(request: &Db2Request) -> Result<[u8; 32], HostProblem> {
+    canonical_db2_request_digest(request)
 }
 
 fn validate_state(state: &State, limits: Db2Limits) -> Result<(), HostProblem> {
@@ -2376,6 +2446,32 @@ mod tests {
             max_rows: 64,
             mutation,
         }
+    }
+
+    fn retain_as_legacy_replay(
+        store: &dyn ProviderStateStore,
+        key: &IdempotencyKey,
+        digest: [u8; 32],
+    ) {
+        let row = store
+            .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+            .unwrap()
+            .unwrap();
+        let mut state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        let replay = state["replay"][key.as_str()].as_object_mut().unwrap();
+        replay.remove("request_digest_format");
+        replay.insert("request_sha256".into(), serde_json::json!(digest));
+        let version = row.version;
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    version: version + 1,
+                    payload: serde_json::to_vec(&state).unwrap(),
+                    ..row
+                },
+                Some(version),
+            )
+            .unwrap();
     }
 
     fn variable(value: &str) -> Db2HostVariable {
@@ -3482,5 +3578,54 @@ mod tests {
                 .sqlcode,
             -532
         );
+    }
+
+    #[test]
+    fn legacy_replay_requires_attested_canonical_migration_without_redispatch() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = Db2Service::open(store.clone(), Db2Limits::default()).unwrap();
+        service.install_catalog(installed_catalog(71)).unwrap();
+        let invocation = invocation("legacy-replay");
+        let insert = request(
+            Db2Operation::Insert,
+            901,
+            "INSERT INTO APP.CODE",
+            BTreeMap::from([
+                ("CODE".into(), variable("71")),
+                ("DESCRIPTION".into(), varchar_variable("ONCE")),
+            ]),
+        );
+        let key = insert.mutation.as_ref().unwrap().idempotency_key.clone();
+        let original = service.execute(&invocation, &insert).unwrap();
+        service
+            .execute(
+                &invocation,
+                &request(Db2Operation::Commit, 902, "COMMIT", BTreeMap::new()),
+            )
+            .unwrap();
+        assert_eq!(service.table_rows("APP.CODE").unwrap().len(), 2);
+        drop(service);
+
+        retain_as_legacy_replay(store.as_ref(), &key, [0x33; 32]);
+        let reopened = Db2Service::open(store.clone(), Db2Limits::default()).unwrap();
+        assert_eq!(
+            reopened.execute(&invocation, &insert),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(reopened.table_rows("APP.CODE").unwrap().len(), 2);
+        assert_eq!(
+            reopened.reconcile_legacy_replay(&key, [0x44; 32], &insert),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        reopened
+            .reconcile_legacy_replay(&key, [0x33; 32], &insert)
+            .unwrap();
+        assert_eq!(reopened.execute(&invocation, &insert), Ok(original.clone()));
+        assert_eq!(reopened.table_rows("APP.CODE").unwrap().len(), 2);
+        drop(reopened);
+
+        let restarted = Db2Service::open(store, Db2Limits::default()).unwrap();
+        assert_eq!(restarted.execute(&invocation, &insert), Ok(original));
+        assert_eq!(restarted.table_rows("APP.CODE").unwrap().len(), 2);
     }
 }

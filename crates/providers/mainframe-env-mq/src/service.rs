@@ -1,7 +1,7 @@
-use mainframe_env_execution_api::{CapabilityId, Invocation, InvocationLimits};
+use mainframe_env_execution_api::{CapabilityId, IdempotencyKey, Invocation, InvocationLimits};
 use mainframe_env_host_api::{
     CapabilityDescriptor, EffectRequest, EffectResult, HostProblem, HostProvider, HostRequest,
-    HostResult, MqOperation, MqRequest, MqResult,
+    HostResult, MqOperation, MqRequest, MqResult, canonical_mq_request_digest,
 };
 use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
 use serde::{Deserialize, Serialize};
@@ -71,8 +71,19 @@ struct PendingUnit {
     gets: Vec<(String, Message)>,
 }
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+enum ReplayDigestFormat {
+    #[default]
+    #[serde(rename = "legacy-debug@0")]
+    LegacyDebugV0,
+    #[serde(rename = "mainframe-env.provider-replay-canonical@1")]
+    CanonicalHostV1,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct RecordedResult {
+    #[serde(default)]
+    request_digest_format: ReplayDigestFormat,
     request_sha256: [u8; 32],
     completion_code: i32,
     reason_code: i32,
@@ -86,6 +97,7 @@ struct RecordedResult {
 impl RecordedResult {
     fn from_result(request_sha256: [u8; 32], result: &MqResult) -> Self {
         Self {
+            request_digest_format: ReplayDigestFormat::CanonicalHostV1,
             request_sha256,
             completion_code: result.completion_code,
             reason_code: result.reason_code,
@@ -202,17 +214,21 @@ impl MqService {
         request: &MqRequest,
     ) -> Result<MqResult, HostProblem> {
         let mut durable = self.lock()?;
-        let request_sha256 = request_digest(request);
+        let request_sha256 = request_digest(request)?;
         let replay_key = request
             .mutation
             .as_ref()
             .map(|mutation| mutation.idempotency_key.as_str())
             .ok_or(HostProblem::MissingIdempotency)?;
         if let Some(recorded) = durable.state.replay.get(replay_key) {
-            return if recorded.request_sha256 == request_sha256 {
-                Ok(recorded.result())
-            } else {
-                Err(HostProblem::IdempotencyConflict)
+            return match recorded.request_digest_format {
+                ReplayDigestFormat::LegacyDebugV0 => Err(HostProblem::UnknownOutcome),
+                ReplayDigestFormat::CanonicalHostV1
+                    if recorded.request_sha256 == request_sha256 =>
+                {
+                    Ok(recorded.result())
+                }
+                ReplayDigestFormat::CanonicalHostV1 => Err(HostProblem::IdempotencyConflict),
             };
         }
         let mut next = durable.state.clone();
@@ -240,6 +256,57 @@ impl MqService {
 
     pub fn inject_unknown_outcome_once(&self) {
         self.unknown_after_persist.store(true, Ordering::SeqCst);
+    }
+
+    /// Bind a retained pre-canonical replay receipt to a reviewed typed request.
+    ///
+    /// Legacy receipts are never replayed or redispatched implicitly. The caller
+    /// must attest the exact retained digest before this metadata-only migration.
+    pub fn reconcile_legacy_replay(
+        &self,
+        key: &IdempotencyKey,
+        expected_legacy_digest: [u8; 32],
+        request: &MqRequest,
+    ) -> Result<(), HostProblem> {
+        if request
+            .mutation
+            .as_ref()
+            .map(|mutation| &mutation.idempotency_key)
+            != Some(key)
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        let canonical = request_digest(request)?;
+        let mut durable = self.lock()?;
+        let retained = durable
+            .state
+            .replay
+            .get(key.as_str())
+            .ok_or(HostProblem::NotFound)?;
+        match retained.request_digest_format {
+            ReplayDigestFormat::CanonicalHostV1 => {
+                return if retained.request_sha256 == canonical {
+                    Ok(())
+                } else {
+                    Err(HostProblem::IdempotencyConflict)
+                };
+            }
+            ReplayDigestFormat::LegacyDebugV0
+                if retained.request_sha256 != expected_legacy_digest =>
+            {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            ReplayDigestFormat::LegacyDebugV0 => {}
+        }
+        let mut next = durable.state.clone();
+        let retained = next
+            .replay
+            .get_mut(key.as_str())
+            .ok_or(HostProblem::NotFound)?;
+        retained.request_digest_format = ReplayDigestFormat::CanonicalHostV1;
+        retained.request_sha256 = canonical;
+        validate_state(&next, self.limits)?;
+        self.persist(&mut durable, next)
     }
 
     pub fn queue_depth(&self, queue: &str) -> Result<usize, HostProblem> {
@@ -375,11 +442,14 @@ fn put(
     if queue_depth >= limits.max_messages_per_queue {
         return Err(HostProblem::ResourceExhausted);
     }
-    let message_id = request
+    let message_id = match request
         .message_id
         .clone()
         .filter(|value| value.iter().any(|byte| *byte != 0))
-        .unwrap_or_else(|| Sha256::digest(format!("{run}:{request:?}").as_bytes())[..24].to_vec());
+    {
+        Some(message_id) => message_id,
+        None => canonical_message_id(run, request)?,
+    };
     let correlation_id = request
         .correlation_id
         .clone()
@@ -414,6 +484,16 @@ fn put(
         trigger_program,
         ..success()
     })
+}
+
+fn canonical_message_id(run: &str, request: &MqRequest) -> Result<Vec<u8>, HostProblem> {
+    let request_digest = canonical_mq_request_digest(request)?;
+    let mut digest = Sha256::new();
+    digest.update(b"mainframe-env.mq-message-id@1\0");
+    digest.update(u64::try_from(run.len()).unwrap_or(u64::MAX).to_be_bytes());
+    digest.update(run.as_bytes());
+    digest.update(request_digest);
+    Ok(digest.finalize()[..24].to_vec())
 }
 
 fn get(state: &mut State, run: &str, request: &MqRequest) -> Result<MqResult, HostProblem> {
@@ -580,8 +660,8 @@ fn validate_state(state: &State, limits: MqLimits) -> Result<(), HostProblem> {
     }
 }
 
-fn request_digest(request: &MqRequest) -> [u8; 32] {
-    Sha256::digest(format!("{request:?}").as_bytes()).into()
+fn request_digest(request: &MqRequest) -> Result<[u8; 32], HostProblem> {
+    canonical_mq_request_digest(request)
 }
 
 fn normalize(value: &str) -> String {
@@ -708,6 +788,50 @@ mod tests {
         }
     }
 
+    fn retain_as_legacy_replay(
+        store: &dyn ProviderStateStore,
+        key: &IdempotencyKey,
+        digest: [u8; 32],
+    ) {
+        let row = store
+            .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+            .unwrap()
+            .unwrap();
+        let mut state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        let replay = state["replay"][key.as_str()].as_object_mut().unwrap();
+        replay.remove("request_digest_format");
+        replay.insert("request_sha256".into(), serde_json::json!(digest));
+        let version = row.version;
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    version: version + 1,
+                    payload: serde_json::to_vec(&state).unwrap(),
+                    ..row
+                },
+                Some(version),
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn generated_message_id_has_a_canonical_golden_identity() {
+        let mut put = request(MqOperation::PutOne, 77);
+        put.queue = Some("GOLDEN.Q".into());
+        put.message = vec![0, 10, 255];
+        let message_id = canonical_message_id("RUN-GOLDEN", &put).unwrap();
+        let encoded = message_id
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        assert_eq!(encoded, "c2f60b319528714c9aee52203dc22c9b6b3b7464e7fca383");
+        put.message.push(1);
+        assert_ne!(
+            canonical_message_id("RUN-GOLDEN", &put).unwrap(),
+            message_id
+        );
+    }
+
     #[test]
     fn correlation_syncpoint_timeout_unknown_outcome_and_restart_are_durable() {
         let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
@@ -785,5 +909,47 @@ mod tests {
         drop(service);
         let reopened = MqService::open(store, MqLimits::default()).unwrap();
         assert_eq!(reopened.queue_messages("REPLY.Q").unwrap(), [b"REPLY"]);
+    }
+
+    #[test]
+    fn legacy_replay_requires_attested_canonical_migration_without_redispatch() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = MqService::open(store.clone(), MqLimits::default()).unwrap();
+        service
+            .install(vec![MqQueueDefinition {
+                name: "LEGACY.Q".into(),
+                trigger_program: None,
+            }])
+            .unwrap();
+        let invocation = invocation("legacy-replay");
+        let mut put = request(MqOperation::PutOne, 99);
+        put.queue = Some("LEGACY.Q".into());
+        put.message = b"ONCE".to_vec();
+        let key = put.mutation.as_ref().unwrap().idempotency_key.clone();
+        let original = service.execute(&invocation, &put).unwrap();
+        assert_eq!(service.queue_depth("LEGACY.Q"), Ok(1));
+        drop(service);
+
+        retain_as_legacy_replay(store.as_ref(), &key, [0x11; 32]);
+        let reopened = MqService::open(store.clone(), MqLimits::default()).unwrap();
+        assert_eq!(
+            reopened.execute(&invocation, &put),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(reopened.queue_depth("LEGACY.Q"), Ok(1));
+        assert_eq!(
+            reopened.reconcile_legacy_replay(&key, [0x22; 32], &put),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        reopened
+            .reconcile_legacy_replay(&key, [0x11; 32], &put)
+            .unwrap();
+        assert_eq!(reopened.execute(&invocation, &put), Ok(original.clone()));
+        assert_eq!(reopened.queue_depth("LEGACY.Q"), Ok(1));
+        drop(reopened);
+
+        let restarted = MqService::open(store, MqLimits::default()).unwrap();
+        assert_eq!(restarted.execute(&invocation, &put), Ok(original));
+        assert_eq!(restarted.queue_depth("LEGACY.Q"), Ok(1));
     }
 }

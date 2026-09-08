@@ -7,6 +7,7 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
 pub const EFFECT_CANONICAL_SCHEMA: &str = "mainframe-env.effect-canonical@1";
+pub const PROVIDER_REPLAY_DIGEST_FORMAT: &str = "mainframe-env.provider-replay-canonical@1";
 pub const REQUEST_DIGEST_DOMAIN: &[u8] = b"mainframe-env.effect-request@1\0";
 pub const RESULT_DIGEST_DOMAIN: &[u8] = b"mainframe-env.effect-result@1\0";
 /// A hard ceiling for the canonical journal representation, not the provider's payload budget.
@@ -246,6 +247,18 @@ fn digest<T: Canonical + ?Sized>(value: &T, domain: &[u8]) -> Result<[u8; 32], H
 /// SHA-256 over the versioned request domain and explicit typed bytes.
 pub fn canonical_request_digest(value: &HostRequest) -> Result<[u8; 32], HostProblem> {
     digest(value, REQUEST_DIGEST_DOMAIN)
+}
+/// Canonical Db2 replay identity in the same domain used by the host journal.
+pub fn canonical_db2_request_digest(value: &Db2Request) -> Result<[u8; 32], HostProblem> {
+    canonical_request_digest(&HostRequest::Db2(value.clone()))
+}
+/// Canonical IMS replay identity in the same domain used by the host journal.
+pub fn canonical_ims_request_digest(value: &ImsRequest) -> Result<[u8; 32], HostProblem> {
+    canonical_request_digest(&HostRequest::Ims(value.clone()))
+}
+/// Canonical MQ replay identity in the same domain used by the host journal.
+pub fn canonical_mq_request_digest(value: &MqRequest) -> Result<[u8; 32], HostProblem> {
+    canonical_request_digest(&HostRequest::Mq(value.clone()))
 }
 /// SHA-256 over the versioned outcome domain, including Ok/Err and error fields.
 pub fn canonical_result_digest(

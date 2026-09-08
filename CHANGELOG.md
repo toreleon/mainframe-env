@@ -39,6 +39,9 @@ All notable changes to mainframe-env are documented here.
   artifact identity from the exact payload SHA-256 used by runtime references;
   the artifact contract is now `mainframe-env.artifact@2` and old compiler
   outputs must be rebuilt before execution.
+- Replaced diagnostic provider replay identities and lifecycle outbox payloads
+  with versioned canonical encodings, including fail-closed legacy
+  reconciliation and credential-redacted RACF command digests.
 - Unified execution-journal, effect, checkpoint, and artifact invariants across
   memory, SQLite, and PostgreSQL stores, with hostile-record rollback contracts.
 - Made the macOS release build retain its required `LC_UUID` and required the

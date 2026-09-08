@@ -68,11 +68,45 @@ reconciliation.
 The current implementation does not yet satisfy that last requirement for a
 known-success mutation whose result journal write fails: it can return an
 infrastructure failure while leaving an intent that the reconciliation query
-does not enumerate. Provider-local Db2, IMS, MQ, and RACF replay digests also
-still contain diagnostic `Debug` encodings outside this canonical codec. These
-are release-blocking deviations R-01 and R-07 in the
+does not enumerate. This remains release-blocking deviation R-01 in the
 [pre-0.9 review](../reviews/PRE-0.9.0-DEEP-REVIEW.md), not exceptions to this
 contract.
+
+## Provider replay and lifecycle outbox encodings
+
+Db2, IMS, and MQ replay receipts use the corresponding typed `HostRequest`
+encoding above and record digest format
+`mainframe-env.provider-replay-canonical@1`. A receipt without the format field
+is legacy Debug format and fails as `UnknownOutcome`; it is never redispatched.
+Provider-specific reconciliation requires the exact retained legacy digest and
+the matching typed request/idempotency key before replacing only its replay
+metadata.
+
+RACROUTE uses domain `mainframe-env.racroute-request@1` followed by a zero byte,
+explicit request/enum tags, framed strings and ordered fields. RACF command
+replay uses domain `mainframe-env.racf-command@1` followed by a zero byte and
+encodes the canonical command keyword, positionals, operand names, counts and
+values. Credential values in `PASSWORD` and `PHRASE` operands of `ADDUSER`,
+`ALTUSER`, and `PASSWORD` are replaced by typed redaction markers before
+hashing; their operand kind and value count remain part of the identity. Thus a
+credential retry must use the same idempotency key, while an intentional new
+credential operation must use a new key.
+
+On RACF database open, unversioned replay digests and generated command or
+RACROUTE audit digests are overwritten with metadata-only hashes marked
+`mainframe-env.legacy-replay-redacted@0`. This removes old raw-command and
+Debug-derived hash oracles. Scrubbed receipts fail closed until an explicit
+reconciliation binds the retained actor, operation and idempotency key to a
+reviewed command or RACROUTE request and the caller attests the exact scrubbed
+digest.
+
+Lifecycle notifications use topic `execution.lifecycle.v1`. Their payload
+begins with `mainframe-env.execution-lifecycle@1` and a zero byte, followed by
+an explicit one-byte event tag. Effect sequence numbers are big-endian u64 and
+completion return codes are big-endian i32. The encoder exhaustively matches
+all lifecycle variants, so adding a variant requires an explicit wire choice.
+Already-persisted `execution.lifecycle` rows retain their legacy topic and
+payload for legacy draining; they are never relabeled as version 1 bytes.
 
 ## Persisted identity and upgrades
 
@@ -111,3 +145,12 @@ Err(HostProblem::UnknownOutcome): 83 preimage bytes,
 Tests also cover map insertion order, absent versus empty, embedded 00/ff/newline,
 length framing, exact provider budgets, and a value whose Debug implementation
 panics while its canonical implementation succeeds.
+
+Provider replay golden digests are:
+
+- Db2: `73deaa15e0e23619ee059776d818b7aa0b39805f4dc350f46cb013d3242cb4ad`.
+- IMS: `0be6adcc52e9699a9c1ae6976b0eba69e3b53d1de56b296a6c8a4e7a8621d872`.
+- MQ: `15290c92f51c0823f3a65fbe5f4ff0a96efad4561394b0b8ba7f1225b85a313b`.
+- RACROUTE: `f12a7fce354c0f3c1a42b54376597d9230b956d729186932208c9f519824f503`.
+- Credential-redacted RACF command:
+  `5b150c202f1af2c3d1f63a24875153e7055dcc894d28daa90de9f3eb5356035e`.
