@@ -34,7 +34,10 @@ impl ExecutionState {
                     S::Running,
                     S::Suspended | S::Completing | S::Failed | S::Cancelled | S::TimedOut
                 )
-                | (S::Suspended, S::Queued | S::Cancelled | S::TimedOut)
+                | (
+                    S::Suspended,
+                    S::Queued | S::Completed | S::Cancelled | S::TimedOut
+                )
                 | (S::Completing, S::Completed | S::Failed)
         )
     }

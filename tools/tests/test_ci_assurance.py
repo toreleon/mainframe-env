@@ -113,6 +113,7 @@ class SelectionTests(unittest.TestCase):
             'postgres-move',
             'postgres-effect',
             'postgres-stale-effect-recovery',
+            'postgres-online-resume',
             'postgres-atomic-invariants',
             'postgres-work-leases',
             'postgres-storage-profile',

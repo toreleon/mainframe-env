@@ -148,14 +148,23 @@ pub enum LifecycleEventKind {
     Claimed,
     Started,
     Completing,
-    EffectIntent { sequence: u64 },
-    EffectResult { sequence: u64 },
+    EffectIntent {
+        sequence: u64,
+    },
+    EffectResult {
+        sequence: u64,
+    },
     Suspended,
+    /// The interpreter checkpoint was durably handed to a product-owned
+    /// continuation, so this execution no longer owns resumable work.
+    HandoffCompleted,
     Resumed,
     CancellationRequested,
     Cancelled,
     TimedOut,
-    Completed { return_code: i32 },
+    Completed {
+        return_code: i32,
+    },
     Condition,
     Abend,
     Failed,

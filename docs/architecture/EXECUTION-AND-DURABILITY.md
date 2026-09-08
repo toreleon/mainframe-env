@@ -109,6 +109,39 @@ the CICS authority reconciles it. Pseudo-conversational COMMAREA continuations
 and transient-data queue records use provider-state compare-and-swap identities
 rather than worker memory.
 
+Installed online CICS programs use the durable execution coordinator, not the
+host-only driver. The product persists one bounded exchange record containing
+the exact execution, run-unit, principal, artifact, grant, transaction,
+COMMAREA, and idempotency identities before driving the machine. A process
+restart reconstructs volatile CICS run state from that record and resumes the
+same non-terminal execution. Previously completed effects may be replayed only
+through the original provider idempotency identity and only when the returned
+canonical digest matches the journaled result. `Intent` and `UnknownOutcome`
+records stop before provider dispatch. When the CICS replay ledger proves an
+outer result, reconciliation changes the effect to `Completed` before machine
+execution resumes.
+
+CICS also retains the exact bounded outer response for every mutating file,
+transient-queue, program-link, and syncpoint request. The replay key is checked
+against the canonical request digest. New replay envelopes also retain the
+owning execution and conservative effect deadline; legacy envelopes remain
+replayable but are not retention-eligible. A crash after the provider mutation
+but before the caller observes the response therefore cannot apply that
+mutation twice. An unresolved result remains an explicit HTTP 409
+`unknown_outcome`; it is never translated to a normal CICS condition or the
+generic `conflict` code.
+
+When a terminal RECEIVE suspends a machine, the product first commits its own
+session continuation and then atomically moves the interpreter execution from
+`Suspended` to terminal `Completed` with `HandoffCompleted`. Only after that
+handoff does it delete the redundant interpreter checkpoint and finish the
+volatile COBOL/CICS run. A restart in the cleanup gap recognizes the handoff
+event, preserves the product continuation, completes the remaining cleanup,
+and admits the next terminal task under a new execution identity. Other stale
+terminal exchanges discard both continuations and retain their conservative
+`Cancelled`, `TimedOut`, or provider-failure outcome; terminal journal rows are
+never passed back to resumable execution.
+
 Keyed dataset insert, rewrite, and delete commit the base cluster, every
 upgradable alternate-index generation, and the idempotency result as one atomic
 provider-state write. A restart that observes only the preceding intent queries

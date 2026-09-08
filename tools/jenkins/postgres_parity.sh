@@ -33,7 +33,7 @@ postgres_share() {
   printf '%s\n' "$share"
 }
 
-gates=(postgres-move postgres-effect postgres-stale-effect-recovery postgres-atomic-invariants postgres-work-leases postgres-storage-profile postgres-durable postgres-carddemo-restart)
+gates=(postgres-move postgres-effect postgres-stale-effect-recovery postgres-online-resume postgres-atomic-invariants postgres-work-leases postgres-storage-profile postgres-durable postgres-carddemo-restart)
 
 [[ "$action" == run || "$action" == smoke || "$action" == check || "$action" == cleanup \
   || "$action" == list ]] || { echo "usage: $0 [run|smoke|check|cleanup|list]" >&2; exit 2; }
@@ -124,6 +124,11 @@ for gate in "${gates[@]}"; do
     postgres-stale-effect-recovery)
       command=(cargo test --locked -p mainframe-env-server --lib \
         recovery_tests::postgres_stale_effect_recovery_known_success_is_not_redispatched \
+        -- --ignored --exact)
+      ;;
+    postgres-online-resume)
+      command=(cargo test --locked -p mainframe-env-server \
+        --test durable_execution_recovery postgres_durable_resume_blocks_until_reconciled \
         -- --ignored --exact)
       ;;
     postgres-atomic-invariants)

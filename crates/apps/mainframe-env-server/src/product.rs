@@ -20,7 +20,8 @@ use mainframe_env_batch::{
     BatchControllerSelector, BatchLimits, BatchService, JclBundle,
 };
 use mainframe_env_cics::{
-    BmsMapDefinition, CicsService, CicsTerminalSnapshot, CicsTraceEntry, cics_provider,
+    BmsMapDefinition, CicsService, CicsTerminalExecution, CicsTerminalSnapshot, CicsTraceEntry,
+    cics_provider,
 };
 use mainframe_env_dataset::{DatasetService, dataset_providers};
 use mainframe_env_db2::{
@@ -30,8 +31,8 @@ use mainframe_env_db2::{
 use mainframe_env_encoding::CodePage;
 use mainframe_env_execution_api::{
     ArtifactRef, BoundedPayload, Cancellation, CancellationId, CapabilityId, ExecutionId,
-    ExecutionOutcome, IdempotencyKey, Invocation, InvocationLimits, Machine, Principal,
-    PrincipalId, RequestId, ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
+    ExecutionOutcome, IdempotencyKey, Invocation, InvocationLimits, LifecycleEventKind, Machine,
+    Principal, PrincipalId, RequestId, ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
 };
 use mainframe_env_host_api::{
     AccessIntent, CapabilityDescriptor, CicsOperation, ClockRequest, DatasetAttributes,
@@ -50,8 +51,9 @@ use mainframe_env_racf::{
 use mainframe_env_spool::{SpoolService, spool_providers};
 use mainframe_env_store::{LocalArtifactStore, MemoryStore};
 use mainframe_env_store_api::{
-    ArtifactRecord, ArtifactStore, CheckpointStore, PlatformStore, ProviderStateMutation,
-    ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError, WorkRecord, WorkState,
+    ArtifactRecord, ArtifactStore, CheckpointStore, EffectDigestFormat, EffectState,
+    ExecutionState, PlatformStore, ProviderStateMutation, ProviderStateRecord, ProviderStateStore,
+    ProviderStateWrite, StoreError, WorkRecord, WorkState,
 };
 use mainframe_env_zosmf::{
     Authentication, GatewayCallContext, GatewayProblem, GatewayRequest, GatewayResponse,
@@ -168,6 +170,42 @@ pub struct OnlineInstallReceipt {
 struct OnlineMachineContinuation {
     program: String,
     checkpoint: BoundedPayload,
+    version: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TerminalExchangeRecovery {
+    Completed,
+    HandoffCompleted,
+    Cancelled,
+    TimedOut,
+    Failed,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct OnlineExchangeState {
+    schema_version: String,
+    program: String,
+    request_id: String,
+    execution_id: String,
+    run_unit_id: String,
+    selector: String,
+    artifact: String,
+    principal: String,
+    grants: BTreeSet<String>,
+    provider_generations: BTreeMap<String, String>,
+    priority: u8,
+    deadline_tick: u64,
+    trace_id: String,
+    idempotency_key: String,
+    attempt: u32,
+    audit_correlation: String,
+    transaction: String,
+    commarea: Vec<u8>,
+    aid: u8,
+    blocking_effect: Option<String>,
+    #[serde(skip)]
     version: u64,
 }
 
@@ -315,6 +353,8 @@ const AUTH_SESSION_INDEX_KEY: &str = "global";
 const LEGACY_AUTH_SESSION_NAMESPACE: &str = "auth-session";
 const AUTH_SESSION_CONTRACT: &str = "mainframe-env.auth-session@3";
 const AUTH_SESSION_INDEX_CONTRACT: &str = "mainframe-env.auth-session-index@2";
+const ONLINE_EXCHANGE_NAMESPACE: &str = "online-exchange-v1";
+const ONLINE_EXCHANGE_CONTRACT: &str = "mainframe-env.online-exchange@1";
 const MAX_AUTH_SESSIONS: usize = 65_536;
 const MAX_AUTH_SESSIONS_PER_USER: usize = 8;
 const AUTH_SESSION_ABSOLUTE_TTL_MILLIS: u64 = 8 * 60 * 60 * 1000;
@@ -1627,6 +1667,237 @@ impl ProductServer {
         Ok(selected)
     }
 
+    fn online_exchange(
+        &self,
+        session: &SessionId,
+    ) -> Result<Option<OnlineExchangeState>, HostProblem> {
+        self.store
+            .get_provider_state(ONLINE_EXCHANGE_NAMESPACE, session.as_str())
+            .map_err(store_error)?
+            .map(|record| decode_online_exchange(&record))
+            .transpose()
+    }
+
+    fn begin_online_exchange(
+        &self,
+        session: &SessionId,
+        program: &str,
+        context: &CicsTerminalExecution,
+    ) -> Result<OnlineExchangeState, HostProblem> {
+        let state = OnlineExchangeState {
+            schema_version: ONLINE_EXCHANGE_CONTRACT.into(),
+            program: normalize_online_name(program, 128)?,
+            request_id: context.invocation.request_id.as_str().into(),
+            execution_id: context.invocation.execution_id.as_str().into(),
+            run_unit_id: context.invocation.run_unit_id.as_str().into(),
+            selector: context.invocation.selector.as_str().into(),
+            artifact: context.invocation.artifact.as_str().into(),
+            principal: context.invocation.principal.id().as_str().into(),
+            grants: context
+                .invocation
+                .principal
+                .grants()
+                .iter()
+                .map(|capability| capability.as_str().to_string())
+                .collect(),
+            provider_generations: context
+                .invocation
+                .provider_generations
+                .iter()
+                .map(|(capability, generation)| {
+                    (capability.as_str().to_string(), generation.clone())
+                })
+                .collect(),
+            priority: context.invocation.priority,
+            deadline_tick: context.invocation.deadline_tick,
+            trace_id: context.invocation.trace_id.as_str().into(),
+            idempotency_key: context.invocation.idempotency_key.as_str().into(),
+            attempt: context.invocation.attempt,
+            audit_correlation: context.invocation.audit_correlation.clone(),
+            transaction: normalize_online_name(&context.transaction, 16)?,
+            commarea: context.commarea.clone(),
+            aid: context.aid,
+            blocking_effect: None,
+            version: 1,
+        };
+        validate_online_exchange(&state)?;
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: ONLINE_EXCHANGE_NAMESPACE.into(),
+                    key: session.as_str().into(),
+                    version: state.version,
+                    payload: encode_online_exchange(&state)?,
+                },
+                None,
+            )
+            .map_err(store_error)?;
+        Ok(state)
+    }
+
+    fn persist_online_exchange(
+        &self,
+        session: &SessionId,
+        state: &mut OnlineExchangeState,
+    ) -> Result<(), HostProblem> {
+        let previous = state.version;
+        state.version = previous
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        if let Err(error) = self.store.put_provider_state(
+            ProviderStateRecord {
+                namespace: ONLINE_EXCHANGE_NAMESPACE.into(),
+                key: session.as_str().into(),
+                version: state.version,
+                payload: encode_online_exchange(state)?,
+            },
+            Some(previous),
+        ) {
+            state.version = previous;
+            return Err(store_error(error));
+        }
+        Ok(())
+    }
+
+    fn clear_online_exchange(
+        &self,
+        session: &SessionId,
+        state: &OnlineExchangeState,
+    ) -> Result<(), HostProblem> {
+        self.store
+            .delete_provider_state(ONLINE_EXCHANGE_NAMESPACE, session.as_str(), state.version)
+            .map_err(store_error)
+    }
+
+    fn online_exchange_invocation(
+        &self,
+        state: &OnlineExchangeState,
+    ) -> Result<Invocation, HostProblem> {
+        validate_online_exchange(state)?;
+        let limits = InvocationLimits::default();
+        let grants = state
+            .grants
+            .iter()
+            .map(|capability| {
+                CapabilityId::new(capability, limits)
+                    .map_err(|_| HostProblem::InfrastructureFailure)
+            })
+            .collect::<Result<BTreeSet<_>, _>>()?;
+        let generations = state
+            .provider_generations
+            .iter()
+            .map(|(capability, generation)| {
+                Ok((
+                    CapabilityId::new(capability, limits)
+                        .map_err(|_| HostProblem::InfrastructureFailure)?,
+                    generation.clone(),
+                ))
+            })
+            .collect::<Result<BTreeMap<_, _>, HostProblem>>()?;
+        let deadline_tick = current_gateway_call_context()
+            .map_or(state.deadline_tick, |context| context.deadline_tick());
+        let mut invocation = Invocation::new(
+            RequestId::new(&state.request_id, limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            ExecutionId::new(&state.execution_id, limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            RunUnitId::new(&state.run_unit_id, limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            None,
+            Selector::new(&state.selector, limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            ArtifactRef::new(&state.artifact, limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            Principal::new(
+                PrincipalId::new(&state.principal, limits)
+                    .map_err(|_| HostProblem::InfrastructureFailure)?,
+                grants,
+                limits,
+            )
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+            ServiceClass::Interactive,
+            state.priority,
+            deadline_tick,
+            TraceId::new(&state.trace_id, limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            IdempotencyKey::new(&state.idempotency_key, limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            state.attempt,
+            ResourceLimits::default(),
+            BTreeMap::new(),
+            limits,
+        )
+        .and_then(|invocation| invocation.with_provider_generations(generations, limits))
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+        invocation
+            .audit_correlation
+            .clone_from(&state.audit_correlation);
+        if let Some(context) = current_gateway_call_context() {
+            invocation = invocation.with_cancellation_probe(context.cancellation_probe());
+        }
+        Ok(invocation)
+    }
+
+    fn online_exchange_blocked(&self, state: &OnlineExchangeState) -> Result<bool, HostProblem> {
+        let Some(key) = state.blocking_effect.as_deref() else {
+            return Ok(false);
+        };
+        let key = IdempotencyKey::new(key, InvocationLimits::default())
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let effect = self
+            .store
+            .effect(&key)
+            .map_err(store_error)?
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        Ok(matches!(
+            effect.state,
+            EffectState::Intent | EffectState::UnknownOutcome
+        ))
+    }
+
+    fn reconcile_online_exchange(
+        &self,
+        session: &SessionId,
+        state: &mut OnlineExchangeState,
+    ) -> Result<bool, HostProblem> {
+        let Some(key) = state.blocking_effect.as_deref() else {
+            return Ok(true);
+        };
+        let key = IdempotencyKey::new(key, InvocationLimits::default())
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let effect = self
+            .store
+            .effect(&key)
+            .map_err(store_error)?
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        if effect.execution_id.as_str() != state.execution_id
+            || effect.run_unit_id.as_str() != state.run_unit_id
+            || effect.digest_format != EffectDigestFormat::CanonicalHostV1
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        match effect.state {
+            EffectState::Completed => {}
+            EffectState::UnknownOutcome => {
+                let result_digest = self
+                    .cics
+                    .reconciled_effect_result_digest(&key, effect.request_digest)?;
+                self.store
+                    .reconcile_unknown_versioned(
+                        &key,
+                        EffectState::Completed,
+                        EffectDigestFormat::CanonicalHostV1,
+                        result_digest,
+                    )
+                    .map_err(store_error)?;
+            }
+            EffectState::Intent | EffectState::Failed => return Ok(false),
+        }
+        state.blocking_effect = None;
+        self.persist_online_exchange(session, state)?;
+        Ok(true)
+    }
+
     fn online_machine_continuation(
         &self,
         session: &SessionId,
@@ -1693,6 +1964,131 @@ impl ProductServer {
             .complete_terminal_run(session, principal, now_tick)
     }
 
+    fn discard_online_machine_run_if_present(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        now_tick: u64,
+    ) -> Result<(), HostProblem> {
+        let trace = self
+            .cics
+            .discard_terminal_run_if_present(session, principal, now_tick)?;
+        self.online_traces
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .entry(session.as_str().into())
+            .or_default()
+            .extend(trace);
+        Ok(())
+    }
+
+    fn clear_execution_checkpoint(&self, execution_id: &ExecutionId) -> Result<(), HostProblem> {
+        match self.store.delete_checkpoint(execution_id) {
+            Ok(()) | Err(StoreError::NotFound) => Ok(()),
+            Err(problem) => Err(store_error(problem)),
+        }
+    }
+
+    /// Recover the gap between execution terminalization and product/CICS
+    /// cleanup. A handoff completion retains the product-owned continuation;
+    /// every other terminal outcome discards it before a fresh task may start.
+    fn recover_terminal_online_exchange(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        exchange: &OnlineExchangeState,
+        now_tick: u64,
+    ) -> Result<Option<TerminalExchangeRecovery>, HostProblem> {
+        let invocation = self.online_exchange_invocation(exchange)?;
+        let Some(execution) = self
+            .store
+            .get_execution(&invocation.execution_id)
+            .map_err(store_error)?
+        else {
+            // The exchange is persisted before coordinator admission. A crash
+            // in that narrow gap is safe to resume under the same identity.
+            return Ok(None);
+        };
+        if !execution.state.terminal() {
+            return Ok(None);
+        }
+        let last = self
+            .store
+            .events(&invocation.execution_id, execution.version, 1)
+            .map_err(store_error)?
+            .into_iter()
+            .next()
+            .filter(|event| event.sequence == execution.version)
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let preserve_handoff = matches!(last.kind, LifecycleEventKind::HandoffCompleted);
+        let recovered = match execution.state {
+            ExecutionState::Completed if preserve_handoff => {
+                TerminalExchangeRecovery::HandoffCompleted
+            }
+            ExecutionState::Completed => TerminalExchangeRecovery::Completed,
+            ExecutionState::Cancelled => TerminalExchangeRecovery::Cancelled,
+            ExecutionState::TimedOut => TerminalExchangeRecovery::TimedOut,
+            ExecutionState::Failed | ExecutionState::DeadLetter => TerminalExchangeRecovery::Failed,
+            ExecutionState::Admitted
+            | ExecutionState::Queued
+            | ExecutionState::Running
+            | ExecutionState::Suspended
+            | ExecutionState::Completing => return Err(HostProblem::InfrastructureFailure),
+        };
+        let saved = self.online_machine_continuation(session)?;
+        let missing_handoff = preserve_handoff && saved.is_none();
+
+        // Evaluate every cleanup before propagating the first failure. This
+        // prevents a recoverable stale row from repeatedly blocking a session.
+        let program_result = self.program.finish_run_unit(&invocation);
+        let continuation_result = if preserve_handoff {
+            Ok(())
+        } else {
+            self.clear_online_machine_continuation(
+                session,
+                saved.as_ref().map(|continuation| continuation.version),
+            )
+        };
+        let checkpoint_result = self.clear_execution_checkpoint(&invocation.execution_id);
+        let cics_result = self.discard_online_machine_run_if_present(session, principal, now_tick);
+        let exchange_result = self.clear_online_exchange(session, exchange);
+        for result in [
+            program_result,
+            continuation_result,
+            checkpoint_result,
+            cics_result,
+            exchange_result,
+        ] {
+            result?;
+        }
+        if missing_handoff {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        Ok(Some(recovered))
+    }
+
+    fn finish_known_online_failure(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        invocation: &Invocation,
+        now_tick: u64,
+        saved_version: Option<u64>,
+        exchange: &OnlineExchangeState,
+    ) -> Result<(), HostProblem> {
+        let results = [
+            self.program.finish_run_unit(invocation),
+            self.clear_online_machine_continuation(session, saved_version),
+            self.clear_execution_checkpoint(&invocation.execution_id),
+            self.finish_online_machine_run(session, principal, now_tick),
+            self.clear_online_exchange(session, exchange),
+        ];
+        for result in results {
+            result?;
+        }
+        Ok(())
+    }
+
     fn run_online_exchange(
         &self,
         session: &SessionId,
@@ -1700,7 +2096,63 @@ impl ProductServer {
         program: &str,
         now_tick: u64,
     ) -> Result<(), HostProblem> {
-        let context = self.cics.terminal_execution(session, principal, now_tick)?;
+        let mut exchange = self.online_exchange(session)?;
+        if let Some(state) = exchange.as_ref() {
+            if state.principal != principal.as_str()
+                || state.program != normalize_online_name(program, 128)?
+            {
+                return Err(HostProblem::Unauthorized);
+            }
+            if let Some(recovered) =
+                self.recover_terminal_online_exchange(session, principal, state, now_tick)?
+            {
+                return match recovered {
+                    TerminalExchangeRecovery::Completed
+                    | TerminalExchangeRecovery::HandoffCompleted => Ok(()),
+                    TerminalExchangeRecovery::Cancelled => Err(HostProblem::Cancelled),
+                    TerminalExchangeRecovery::TimedOut => Err(HostProblem::TimedOut),
+                    TerminalExchangeRecovery::Failed => Err(HostProblem::ProviderFailure),
+                };
+            }
+        }
+        let blocked = exchange
+            .as_ref()
+            .map(|state| self.online_exchange_blocked(state))
+            .transpose()?
+            .unwrap_or(false);
+        if blocked
+            && !self.reconcile_online_exchange(
+                session,
+                exchange
+                    .as_mut()
+                    .ok_or(HostProblem::InfrastructureFailure)?,
+            )?
+        {
+            return Err(HostProblem::UnknownOutcome);
+        }
+        let context = match exchange.as_ref() {
+            Some(state) => {
+                let invocation = self.online_exchange_invocation(state)?;
+                self.cics.restore_terminal_run(
+                    invocation.clone(),
+                    session,
+                    &state.transaction,
+                    state.commarea.clone(),
+                    now_tick,
+                )?;
+                CicsTerminalExecution {
+                    invocation,
+                    transaction: state.transaction.clone(),
+                    commarea: state.commarea.clone(),
+                    aid: state.aid,
+                }
+            }
+            None => {
+                let context = self.cics.terminal_execution(session, principal, now_tick)?;
+                exchange = Some(self.begin_online_exchange(session, program, &context)?);
+                context
+            }
+        };
         let mut invocation = context.invocation;
         invocation.bindings.insert(
             "cics.commarea".into(),
@@ -1773,7 +2225,7 @@ impl ProductServer {
                     .restore_checkpoint(&checkpoint)
                     .map_err(|_| HostProblem::InfrastructureFailure)?;
             }
-            let coordinator = ExecutionCoordinator::with_host_audit_store(
+            let coordinator = ExecutionCoordinator::durable(
                 self.host.clone(),
                 self.store.clone(),
                 CoordinatorLimits {
@@ -1781,13 +2233,19 @@ impl ProductServer {
                     ..CoordinatorLimits::default()
                 },
             );
-            match coordinator.execute_with_control(&mut machine, &invocation, || {
+            match coordinator.execute_resumable_with_control(&mut machine, &invocation, || {
                 self.program.observe_execution_control(&invocation)
             }) {
                 ExecutionOutcome::Completed(_) => {
                     self.program.finish_run_unit(&invocation)?;
                     self.clear_online_machine_continuation(session, saved_version)?;
                     self.finish_online_machine_run(session, principal, now_tick)?;
+                    self.clear_online_exchange(
+                        session,
+                        exchange
+                            .as_ref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                    )?;
                     return Ok(());
                 }
                 ExecutionOutcome::Suspended(_) => {
@@ -1798,7 +2256,21 @@ impl ProductServer {
                         &checkpoint,
                         saved_version,
                     )?;
+                    let control = self
+                        .program
+                        .observe_execution_control(&invocation)
+                        .map_err(|_| HostProblem::InfrastructureFailure)?;
+                    coordinator
+                        .complete_suspended_handoff(&invocation, control.now_tick)
+                        .map_err(store_error)?;
+                    self.program.finish_run_unit(&invocation)?;
                     self.finish_online_machine_run(session, principal, now_tick)?;
+                    self.clear_online_exchange(
+                        session,
+                        exchange
+                            .as_ref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                    )?;
                     return Ok(());
                 }
                 ExecutionOutcome::Transfer(transfer) if transfer.replace_frame => {
@@ -1828,6 +2300,16 @@ impl ProductServer {
                     );
                 }
                 ExecutionOutcome::Condition(condition) => {
+                    self.finish_known_online_failure(
+                        session,
+                        principal,
+                        &invocation,
+                        now_tick,
+                        saved_version,
+                        exchange
+                            .as_ref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                    )?;
                     return Err(HostProblem::Condition {
                         name: condition.name,
                         response: condition.response,
@@ -1835,15 +2317,59 @@ impl ProductServer {
                     });
                 }
                 ExecutionOutcome::Abend(abend) => {
+                    self.finish_known_online_failure(
+                        session,
+                        principal,
+                        &invocation,
+                        now_tick,
+                        saved_version,
+                        exchange
+                            .as_ref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                    )?;
                     return Err(HostProblem::Condition {
                         name: abend.code,
                         response: -1,
                         response2: 0,
                     });
                 }
-                ExecutionOutcome::TimedOut => return Err(HostProblem::TimedOut),
-                ExecutionOutcome::Cancelled => return Err(HostProblem::Cancelled),
+                ExecutionOutcome::TimedOut => {
+                    self.finish_known_online_failure(
+                        session,
+                        principal,
+                        &invocation,
+                        now_tick,
+                        saved_version,
+                        exchange
+                            .as_ref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                    )?;
+                    return Err(HostProblem::TimedOut);
+                }
+                ExecutionOutcome::Cancelled => {
+                    self.finish_known_online_failure(
+                        session,
+                        principal,
+                        &invocation,
+                        now_tick,
+                        saved_version,
+                        exchange
+                            .as_ref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                    )?;
+                    return Err(HostProblem::Cancelled);
+                }
                 ExecutionOutcome::ResourceExhausted(problem) => {
+                    self.finish_known_online_failure(
+                        session,
+                        principal,
+                        &invocation,
+                        now_tick,
+                        saved_version,
+                        exchange
+                            .as_ref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                    )?;
                     return Err(HostProblem::Condition {
                         name: format!(
                             "{} at {}",
@@ -1855,6 +2381,43 @@ impl ProductServer {
                     });
                 }
                 ExecutionOutcome::ProviderFailure(problem) => {
+                    if problem.has_unknown_outcome() {
+                        let key = IdempotencyKey::new(
+                            format!(
+                                "{}:{}",
+                                invocation.idempotency_key,
+                                machine.effect_sequence()
+                            ),
+                            InvocationLimits::default(),
+                        )
+                        .map_err(|_| HostProblem::InfrastructureFailure)?;
+                        if self
+                            .store
+                            .effect(&key)
+                            .map_err(store_error)?
+                            .is_some_and(|effect| {
+                                matches!(
+                                    effect.state,
+                                    EffectState::Intent | EffectState::UnknownOutcome
+                                )
+                            })
+                            && let Some(state) = exchange.as_mut()
+                        {
+                            state.blocking_effect = Some(key.as_str().into());
+                            let _ = self.persist_online_exchange(session, state);
+                        }
+                        return Err(HostProblem::UnknownOutcome);
+                    }
+                    self.finish_known_online_failure(
+                        session,
+                        principal,
+                        &invocation,
+                        now_tick,
+                        saved_version,
+                        exchange
+                            .as_ref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                    )?;
                     return Err(HostProblem::Condition {
                         name: problem.public_message,
                         response: -4,
@@ -1865,6 +2428,16 @@ impl ProductServer {
                     return Err(HostProblem::InfrastructureFailure);
                 }
                 ExecutionOutcome::Rejected(problem) => {
+                    self.finish_known_online_failure(
+                        session,
+                        principal,
+                        &invocation,
+                        now_tick,
+                        saved_version,
+                        exchange
+                            .as_ref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                    )?;
                     return Err(HostProblem::Condition {
                         name: format!(
                             "{} at {}",
@@ -1876,6 +2449,16 @@ impl ProductServer {
                     });
                 }
                 ExecutionOutcome::Invoke(_) | ExecutionOutcome::Transfer(_) => {
+                    self.finish_known_online_failure(
+                        session,
+                        principal,
+                        &invocation,
+                        now_tick,
+                        saved_version,
+                        exchange
+                            .as_ref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                    )?;
                     return Err(HostProblem::Unsupported);
                 }
             }
@@ -3062,19 +3645,62 @@ impl ProductServer {
             } => {
                 let session = terminal_session_id(&session)?;
                 let principal_id = terminal_principal(&principal)?;
-                let snapshot = self
-                    .cics
-                    .terminal_snapshot(&session, &principal_id, current_tick()?)
-                    .map_err(gateway_problem)?;
-                let invocation = self.cics_invocation(&principal, &snapshot.transaction, None)?;
-                let resumed = self
-                    .cics
-                    .resume_terminal(invocation, &session, &csrf_token, current_tick()?)
-                    .map_err(gateway_problem)?;
-                let online = self.online_transaction(&resumed.transaction)?;
-                if let Some((program, _)) = online {
-                    self.run_online_exchange(&session, &principal_id, &program, current_tick()?)
+                let snapshot = self.online_exchange(&session).map_err(gateway_problem)?;
+                let mut start_fresh_task = snapshot.is_none();
+                if let Some(exchange) = snapshot {
+                    let tick = current_tick()?;
+                    self.cics
+                        .validate_terminal_resume(&session, &principal_id, &csrf_token, tick)
                         .map_err(gateway_problem)?;
+                    match self
+                        .recover_terminal_online_exchange(&session, &principal_id, &exchange, tick)
+                        .map_err(gateway_problem)?
+                    {
+                        Some(TerminalExchangeRecovery::HandoffCompleted) => {
+                            start_fresh_task = true;
+                        }
+                        Some(TerminalExchangeRecovery::Completed) => {}
+                        Some(TerminalExchangeRecovery::Cancelled) => {
+                            return Err(gateway_problem(HostProblem::Cancelled));
+                        }
+                        Some(TerminalExchangeRecovery::TimedOut) => {
+                            return Err(gateway_problem(HostProblem::TimedOut));
+                        }
+                        Some(TerminalExchangeRecovery::Failed) => {
+                            return Err(gateway_problem(HostProblem::ProviderFailure));
+                        }
+                        None => {
+                            self.run_online_exchange(
+                                &session,
+                                &principal_id,
+                                &exchange.program,
+                                tick,
+                            )
+                            .map_err(gateway_problem)?;
+                        }
+                    }
+                }
+                if start_fresh_task {
+                    let snapshot = self
+                        .cics
+                        .terminal_snapshot(&session, &principal_id, current_tick()?)
+                        .map_err(gateway_problem)?;
+                    let invocation =
+                        self.cics_invocation(&principal, &snapshot.transaction, None)?;
+                    let resumed = self
+                        .cics
+                        .resume_terminal(invocation, &session, &csrf_token, current_tick()?)
+                        .map_err(gateway_problem)?;
+                    let online = self.online_transaction(&resumed.transaction)?;
+                    if let Some((program, _)) = online {
+                        self.run_online_exchange(
+                            &session,
+                            &principal_id,
+                            &program,
+                            current_tick()?,
+                        )
+                        .map_err(gateway_problem)?;
+                    }
                 }
                 let snapshot = self
                     .cics
@@ -4905,6 +5531,66 @@ fn decode_online_machine_continuation(
     })
 }
 
+fn encode_online_exchange(state: &OnlineExchangeState) -> Result<Vec<u8>, HostProblem> {
+    validate_online_exchange(state)?;
+    serde_json::to_vec(state).map_err(|_| HostProblem::InfrastructureFailure)
+}
+
+fn decode_online_exchange(
+    record: &ProviderStateRecord,
+) -> Result<OnlineExchangeState, HostProblem> {
+    let mut state: OnlineExchangeState =
+        serde_json::from_slice(&record.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
+    state.version = record.version;
+    validate_online_exchange(&state)?;
+    Ok(state)
+}
+
+fn validate_online_exchange(state: &OnlineExchangeState) -> Result<(), HostProblem> {
+    let limits = InvocationLimits::default();
+    if state.schema_version != ONLINE_EXCHANGE_CONTRACT
+        || state.version == 0
+        || normalize_online_name(&state.program, 128)? != state.program
+        || normalize_online_name(&state.transaction, 16)? != state.transaction
+        || state.deadline_tick == 0
+        || state.attempt == 0
+        || state.grants.is_empty()
+        || state.grants.len() > limits.max_capabilities
+        || state.provider_generations.len() > limits.max_capabilities
+        || state.commarea.len() > limits.max_payload_bytes
+        || state.audit_correlation.is_empty()
+        || state.audit_correlation.len() > limits.max_identity_bytes
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    RequestId::new(&state.request_id, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
+    ExecutionId::new(&state.execution_id, limits)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    RunUnitId::new(&state.run_unit_id, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
+    Selector::new(&state.selector, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
+    ArtifactRef::new(&state.artifact, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
+    PrincipalId::new(&state.principal, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
+    TraceId::new(&state.trace_id, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
+    IdempotencyKey::new(&state.idempotency_key, limits)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    for grant in &state.grants {
+        CapabilityId::new(grant, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
+    }
+    for (capability, generation) in &state.provider_generations {
+        if !state.grants.contains(capability)
+            || generation.is_empty()
+            || generation.len() > limits.max_identity_bytes
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        CapabilityId::new(capability, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
+    }
+    if let Some(key) = &state.blocking_effect {
+        IdempotencyKey::new(key, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
+    }
+    Ok(())
+}
+
 fn digest_online_field(digest: &mut Sha256, bytes: &[u8]) {
     digest.update((bytes.len() as u64).to_be_bytes());
     digest.update(bytes);
@@ -5233,9 +5919,8 @@ fn gateway_problem(problem: HostProblem) -> GatewayProblem {
         HostProblem::Cancelled => (StatusCode::CONFLICT, "cancelled"),
         HostProblem::TimedOut => (StatusCode::REQUEST_TIMEOUT, "timed_out"),
         HostProblem::ResourceExhausted => (StatusCode::TOO_MANY_REQUESTS, "resource_exhausted"),
-        HostProblem::IdempotencyConflict | HostProblem::UnknownOutcome => {
-            (StatusCode::CONFLICT, "conflict")
-        }
+        HostProblem::IdempotencyConflict => (StatusCode::CONFLICT, "conflict"),
+        HostProblem::UnknownOutcome => (StatusCode::CONFLICT, "unknown_outcome"),
         HostProblem::Condition { .. } => (StatusCode::CONFLICT, "condition"),
         HostProblem::ProviderFailure | HostProblem::InfrastructureFailure => {
             (StatusCode::SERVICE_UNAVAILABLE, "infrastructure_failure")
@@ -7062,6 +7747,609 @@ mod tests {
                 .unwrap(),
             b"HELLO"
         );
+        let run_unit = body["terminal"]["run_unit"].as_str().unwrap();
+        let execution_id = ExecutionId::new(
+            format!("execution-{}", run_unit.strip_prefix("run-").unwrap()),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            server
+                .store
+                .get_execution(&execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Completed,
+            "online execution did not reach a durable terminal state"
+        );
+        assert!(
+            server
+                .store
+                .events(&execution_id, 1, 32)
+                .unwrap()
+                .iter()
+                .any(|event| matches!(
+                    event.kind,
+                    mainframe_env_execution_api::LifecycleEventKind::EffectIntent { .. }
+                )),
+            "online host effects bypassed the durable journal"
+        );
+    }
+
+    #[test]
+    fn online_pseudo_conversations_handoff_without_leaking_suspended_executions() {
+        fn assert_handoff(server: &ProductServer, execution_id: &ExecutionId) {
+            let execution = server.store.get_execution(execution_id).unwrap().unwrap();
+            assert_eq!(execution.state, ExecutionState::Completed);
+            assert!(server.store.get_checkpoint(execution_id).unwrap().is_none());
+            assert!(matches!(
+                server
+                    .store
+                    .events(execution_id, execution.version, 1)
+                    .unwrap()
+                    .as_slice(),
+                [event] if matches!(event.kind, LifecycleEventKind::HandoffCompleted)
+            ));
+        }
+
+        let limits = SourceLimits::default();
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. PSEUDO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MSG PIC X(5) VALUE 'HELLO'.\nPROCEDURE DIVISION.\nEXEC CICS SEND MAP('PSEUDO') MAPSET('PSEUDO') END-EXEC.\nEXEC CICS RECEIVE MAP('PSEUDO') MAPSET('PSEUDO') END-EXEC.\nEXEC CICS SEND TEXT FROM(MSG) END-EXEC.\nEXEC CICS RETURN TRANSID('PS00') END-EXEC.\n";
+        let path = LogicalPath::new("PSEUDO.cbl", limits.max_path_bytes).unwrap();
+        let bundle = SourceBundle::new(
+            &path,
+            vec![
+                SourceFile::input(
+                    "PSEUDO.cbl",
+                    source.to_vec(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("pseudo-conversation fixture did not publish");
+        };
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "PSEUDO".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                }],
+                transactions: BTreeMap::from([("PS00".into(), "PSEUDO".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "PSEUDO".into(),
+                    map: "PSEUDO".into(),
+                    rows: 24,
+                    columns: 80,
+                    fields: vec![mainframe_env_cics::BmsFieldDefinition {
+                        name: "INPUT".into(),
+                        row: 1,
+                        column: 1,
+                        length: 8,
+                        initial: Vec::new(),
+                        color: None,
+                        highlight: None,
+                        protected: false,
+                        secret: false,
+                        fset: false,
+                        justify_right: false,
+                        fill_zero: false,
+                        output_offset: None,
+                        attribute_offset: None,
+                    }],
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("r03-pseudo-session", 64).unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let launch = server
+            .cics_invocation("IBMUSER", "PS00", Some(artifact_ref.clone()))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                launch,
+                &session,
+                "PS00",
+                24,
+                80,
+                "r03-pseudo-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let first_context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        let first_exchange = server
+            .begin_online_exchange(&session, "PSEUDO", &first_context)
+            .unwrap();
+        assert_eq!(
+            server.run_online_exchange(&session, &principal, "PSEUDO", 2),
+            Ok(())
+        );
+        assert_handoff(&server, &first_context.invocation.execution_id);
+        assert!(
+            server
+                .online_machine_continuation(&session)
+                .unwrap()
+                .is_some()
+        );
+        assert!(server.online_exchange(&session).unwrap().is_none());
+
+        // Recreate the exact crash gap after the handoff event but before CICS
+        // and exchange cleanup. Recovery must retain the product checkpoint.
+        server
+            .store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: ONLINE_EXCHANGE_NAMESPACE.into(),
+                    key: session.as_str().into(),
+                    version: first_exchange.version,
+                    payload: encode_online_exchange(&first_exchange).unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        server
+            .cics
+            .restore_terminal_run(
+                first_context.invocation.clone(),
+                &session,
+                &first_context.transaction,
+                first_context.commarea.clone(),
+                3,
+            )
+            .unwrap();
+        assert_eq!(
+            server
+                .recover_terminal_online_exchange(&session, &principal, &first_exchange, 3)
+                .unwrap(),
+            Some(TerminalExchangeRecovery::HandoffCompleted)
+        );
+        assert!(
+            server
+                .online_machine_continuation(&session)
+                .unwrap()
+                .is_some()
+        );
+        assert!(server.online_exchange(&session).unwrap().is_none());
+        assert!(matches!(
+            server.cics.terminal_execution(&session, &principal, 3),
+            Err(HostProblem::NotFound)
+        ));
+
+        server
+            .cics
+            .submit_terminal_input(
+                &session,
+                &principal,
+                "r03-pseudo-csrf",
+                0x7d,
+                &BTreeMap::from([("INPUT".into(), b"ONE".to_vec())]),
+                4,
+            )
+            .unwrap();
+        let resumed = server
+            .cics_invocation("IBMUSER", "PS00", Some(artifact_ref.clone()))
+            .unwrap();
+        server
+            .cics
+            .resume_terminal(resumed, &session, "r03-pseudo-csrf", 5)
+            .unwrap();
+        let completed_context = server
+            .cics
+            .terminal_execution(&session, &principal, 5)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "PSEUDO", 5)
+            .unwrap();
+        assert_eq!(
+            server
+                .store
+                .get_execution(&completed_context.invocation.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Completed
+        );
+        assert!(
+            server
+                .online_machine_continuation(&session)
+                .unwrap()
+                .is_none()
+        );
+
+        // The RETURN TRANSID starts another task. With no input it suspends
+        // again, but the old execution is terminalized through a second handoff.
+        let next = server
+            .cics_invocation("IBMUSER", "PS00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .resume_terminal(next, &session, "r03-pseudo-csrf", 6)
+            .unwrap();
+        let second_context = server
+            .cics
+            .terminal_execution(&session, &principal, 6)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "PSEUDO", 6)
+            .unwrap();
+        assert_handoff(&server, &second_context.invocation.execution_id);
+        assert!(
+            server
+                .online_machine_continuation(&session)
+                .unwrap()
+                .is_some()
+        );
+        assert!(server.online_exchange(&session).unwrap().is_none());
+    }
+
+    #[cfg(feature = "fault-injection")]
+    #[test]
+    fn online_unknown_reconciles_and_known_failure_does_not_strand_session() {
+        let limits = SourceLimits::default();
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. RECOVER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(4) VALUE 'AA11'.\nPROCEDURE DIVISION.\nEXEC CICS WRITE FILE('RECFILE') FROM(DATA-X) END-EXEC.\nSTOP RUN.\n";
+        let path = LogicalPath::new("RECOVER.cbl", limits.max_path_bytes).unwrap();
+        let bundle = SourceBundle::new(
+            &path,
+            vec![
+                SourceFile::input(
+                    "RECOVER.cbl",
+                    source.to_vec(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("recovery fixture did not publish");
+        };
+        let known_source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. KNOWNFAIL.\nPROCEDURE DIVISION.\nCALL 'MISSING-PROGRAM'.\nSTOP RUN.\n";
+        let known_path = LogicalPath::new("KNOWNFAIL.cbl", limits.max_path_bytes).unwrap();
+        let known_bundle = SourceBundle::new(
+            &known_path,
+            vec![
+                SourceFile::input(
+                    "KNOWNFAIL.cbl",
+                    known_source.to_vec(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let CompilerResult::Published {
+            artifact: known_artifact,
+            ..
+        } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: known_bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("known-failure fixture did not publish");
+        };
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-online-restart-{}-{:?}-{}",
+            std::process::id(),
+            std::thread::current().id(),
+            session_tick().unwrap()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let mut server_config = config();
+        server_config.store_profile = crate::StoreProfile::Sqlite;
+        server_config.sqlite_url = url.clone();
+        server_config.artifact_root = root.join("artifacts");
+        let first_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let first_platform: Arc<dyn PlatformStore> = first_store.clone();
+        let server = ProductServer::open(
+            server_config.clone(),
+            first_platform,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+        )
+        .unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .handle(
+                Authentication::Basic {
+                    user: "IBMUSER".into(),
+                    secret: b"TESTPASS".to_vec(),
+                },
+                GatewayRequest::DatasetCreate {
+                    dataset: "IBMUSER.RECOVERY".into(),
+                    attributes: json!({"dsorg":"PS","recfm":"V","lrecl":80}),
+                },
+            )
+            .unwrap();
+        server
+            .cics
+            .register_file_aliases(&BTreeMap::from([(
+                "RECFILE".into(),
+                DatasetName::new("IBMUSER.RECOVERY", 128).unwrap(),
+            )]))
+            .unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let known_artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(known_artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![
+                    OnlineProgramDefinition {
+                        name: "RECOVER".into(),
+                        artifact: artifact_ref.clone(),
+                        payload: artifact.payload().to_vec(),
+                    },
+                    OnlineProgramDefinition {
+                        name: "KNOWNFAIL".into(),
+                        artifact: known_artifact_ref.clone(),
+                        payload: known_artifact.payload().to_vec(),
+                    },
+                ],
+                transactions: BTreeMap::from([
+                    ("RCVY".into(), "RECOVER".into()),
+                    ("KFLR".into(), "KNOWNFAIL".into()),
+                ]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "RECOVER".into(),
+                    map: "RECOVER".into(),
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("r03-unknown-session", 64).unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "RCVY", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(invocation, &session, "RCVY", 24, 80, "r03-csrf", 1, 10_000)
+            .unwrap();
+        server
+            .cics
+            .inject_file_fault_once(
+                CicsOperation::Write,
+                "RECFILE",
+                mainframe_env_cics::CicsFileFaultPoint::AfterMutation,
+            )
+            .unwrap();
+        let problem = server
+            .run_online_exchange(&session, &principal, "RECOVER", 2)
+            .unwrap_err();
+        assert_eq!(problem, HostProblem::UnknownOutcome);
+        assert_eq!(gateway_problem(problem).code, "unknown_outcome");
+        let exchange = server.online_exchange(&session).unwrap().unwrap();
+        assert!(server.online_exchange_blocked(&exchange).unwrap());
+        let key = IdempotencyKey::new(
+            exchange.blocking_effect.as_deref().unwrap(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            server.store.effect(&key).unwrap().unwrap().state,
+            EffectState::UnknownOutcome
+        );
+        assert_eq!(
+            server
+                .store
+                .get_execution(
+                    &ExecutionId::new(&exchange.execution_id, InvocationLimits::default()).unwrap(),
+                )
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Running
+        );
+        drop(server);
+        drop(first_store);
+
+        let second_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let second_platform: Arc<dyn PlatformStore> = second_store.clone();
+        let server = ProductServer::open(
+            server_config,
+            second_platform,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+        )
+        .unwrap();
+        assert_eq!(
+            server.run_online_exchange(&session, &principal, "RECOVER", 3),
+            Ok(()),
+            "authoritatively reconciled session did not resume"
+        );
+        assert!(server.online_exchange(&session).unwrap().is_none());
+        assert_eq!(
+            server.store.effect(&key).unwrap().unwrap().state,
+            EffectState::Completed
+        );
+        assert_eq!(
+            server
+                .store
+                .get_execution(
+                    &ExecutionId::new(&exchange.execution_id, InvocationLimits::default()).unwrap(),
+                )
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Completed
+        );
+        let outer_audits = server
+            .store
+            .audit_records(
+                &ExecutionId::new(&exchange.execution_id, InvocationLimits::default()).unwrap(),
+                1,
+                32,
+            )
+            .unwrap()
+            .into_iter()
+            .filter(|record| record.capability.as_str() == "host.cics.execute")
+            .map(|record| record.decision)
+            .collect::<Vec<_>>();
+        assert!(outer_audits.contains(&mainframe_env_execution_api::AuditDecision::UnknownOutcome));
+        assert!(outer_audits.contains(&mainframe_env_execution_api::AuditDecision::Success));
+        let records = server
+            .dataset
+            .invoke(DatasetRequest::Read {
+                dataset: DatasetName::new("IBMUSER.RECOVERY", 128).unwrap(),
+                member: None,
+                key: None,
+                max_records: 8,
+                control: Default::default(),
+            })
+            .unwrap();
+        let DatasetResult::Records { records, .. } = records else {
+            panic!("recovery dataset did not return records")
+        };
+        assert_eq!(
+            records.len(),
+            1,
+            "reconciliation redispatched the committed write"
+        );
+
+        let known_session = SessionId::new("r03-known-session", 64).unwrap();
+        let known_invocation = server
+            .cics_invocation("IBMUSER", "KFLR", Some(known_artifact_ref.clone()))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                known_invocation,
+                &known_session,
+                "KFLR",
+                24,
+                80,
+                "r03-known-csrf",
+                4,
+                10_000,
+            )
+            .unwrap();
+        let known_context = server
+            .cics
+            .terminal_execution(&known_session, &principal, 5)
+            .unwrap();
+        let known_exchange = server
+            .begin_online_exchange(&known_session, "KNOWNFAIL", &known_context)
+            .unwrap();
+        let known_result = server.run_online_exchange(&known_session, &principal, "KNOWNFAIL", 5);
+        assert!(
+            matches!(
+                known_result,
+                Err(HostProblem::Condition { response: -4, .. })
+            ),
+            "known provider failure lost its CICS condition projection: {known_result:?}"
+        );
+        assert!(server.online_exchange(&known_session).unwrap().is_none());
+
+        // A crash after the Failed journal transition but before cleanup must
+        // not convert the known failure into success or feed a terminal row
+        // back through resumable execution.
+        server
+            .store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: ONLINE_EXCHANGE_NAMESPACE.into(),
+                    key: known_session.as_str().into(),
+                    version: known_exchange.version,
+                    payload: encode_online_exchange(&known_exchange).unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        server
+            .cics
+            .restore_terminal_run(
+                known_context.invocation.clone(),
+                &known_session,
+                &known_context.transaction,
+                known_context.commarea.clone(),
+                6,
+            )
+            .unwrap();
+        assert_eq!(
+            server
+                .recover_terminal_online_exchange(&known_session, &principal, &known_exchange, 6,)
+                .unwrap(),
+            Some(TerminalExchangeRecovery::Failed)
+        );
+        assert!(server.online_exchange(&known_session).unwrap().is_none());
+        let retry_invocation = server
+            .cics_invocation("IBMUSER", "KFLR", Some(known_artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .resume_terminal(retry_invocation, &known_session, "r03-known-csrf", 7)
+            .unwrap();
+        assert!(
+            matches!(
+                server.run_online_exchange(&known_session, &principal, "KNOWNFAIL", 8),
+                Err(HostProblem::Condition { response: -4, .. })
+            ),
+            "known terminal failure left a stale online exchange"
+        );
+        assert!(server.online_exchange(&known_session).unwrap().is_none());
+        drop((server, second_store));
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[tokio::test]

@@ -146,23 +146,93 @@ impl ExecutionCoordinator {
         &self,
         machine: &mut M,
         invocation: &Invocation,
-        mut observe: F,
+        observe: F,
     ) -> ExecutionOutcome
     where
         M: Machine<Effect = EffectRequest, EffectResult = EffectResult>,
         F: FnMut() -> Result<ExecutionControl, ExecutionControlError>,
     {
+        self.execute_inner(machine, invocation, observe, false)
+    }
+
+    /// Resume a durably journaled execution after a process boundary.
+    ///
+    /// Only a matching non-terminal execution can be resumed. A previously
+    /// completed effect is dispatched solely through its original idempotency
+    /// identity and its replayed result must match the committed canonical
+    /// digest. An unresolved intent or unknown result is never redispatched.
+    pub fn execute_resumable_with_control<M, F>(
+        &self,
+        machine: &mut M,
+        invocation: &Invocation,
+        observe: F,
+    ) -> ExecutionOutcome
+    where
+        M: Machine<Effect = EffectRequest, EffectResult = EffectResult>,
+        F: FnMut() -> Result<ExecutionControl, ExecutionControlError>,
+    {
+        self.execute_inner(machine, invocation, observe, true)
+    }
+
+    /// Close a suspended execution after its checkpoint has been durably
+    /// transferred to a product-owned continuation.
+    ///
+    /// The state transition and its lifecycle event are committed atomically.
+    /// The now-redundant interpreter checkpoint is then removed; a caller may
+    /// safely retry that cleanup when recovering the terminal execution.
+    pub fn complete_suspended_handoff(
+        &self,
+        invocation: &Invocation,
+        tick: u64,
+    ) -> Result<(), StoreError> {
+        let store = self.store.as_ref().ok_or_else(|| {
+            StoreError::Infrastructure("handoff completion requires an execution store".into())
+        })?;
+        let (mut journal, state) = JournalCursor::open(Arc::clone(store), invocation, tick, true)?;
+        if state != Some(ExecutionState::Suspended) {
+            return Err(StoreError::InvalidTransition);
+        }
+        journal.record(
+            Some(ExecutionState::Completed),
+            LifecycleEventKind::HandoffCompleted,
+            None,
+            None,
+            None,
+        )?;
+        match store.delete_checkpoint(&invocation.execution_id) {
+            Ok(()) | Err(StoreError::NotFound) => Ok(()),
+            Err(problem) => Err(problem),
+        }
+    }
+
+    fn execute_inner<M, F>(
+        &self,
+        machine: &mut M,
+        invocation: &Invocation,
+        mut observe: F,
+        resumable: bool,
+    ) -> ExecutionOutcome
+    where
+        M: Machine<Effect = EffectRequest, EffectResult = EffectResult>,
+        F: FnMut() -> Result<ExecutionControl, ExecutionControlError>,
+    {
+        if resumable && self.store.is_none() {
+            return infrastructure_failure("durable resume requires an execution store");
+        }
         let mut control = match observe() {
             Ok(control) => control,
             Err(_) => return infrastructure_failure("execution controls unavailable at admission"),
         };
-        let mut journal = match self
+        let (mut journal, resumed_from) = match self
             .store
             .as_ref()
-            .map(|store| JournalCursor::admit(Arc::clone(store), invocation, control.now_tick))
+            .map(|store| {
+                JournalCursor::open(Arc::clone(store), invocation, control.now_tick, resumable)
+            })
             .transpose()
         {
-            Ok(journal) => journal,
+            Ok(Some((journal, resumed_from))) => (Some(journal), resumed_from),
+            Ok(None) => (None, None),
             Err(_) => return infrastructure_failure("execution admission persistence failed"),
         };
         if let Err(outcome) = check_control(
@@ -174,11 +244,36 @@ impl ExecutionCoordinator {
         ) {
             return outcome;
         }
-        for (state, event) in [
-            (ExecutionState::Queued, LifecycleEventKind::Queued),
-            (ExecutionState::Running, LifecycleEventKind::Started),
-        ] {
-            if record_step(&mut journal, Some(state), event, None, None).is_err() {
+        let dispatch = match resumed_from {
+            None => vec![
+                (Some(ExecutionState::Queued), LifecycleEventKind::Queued),
+                (Some(ExecutionState::Running), LifecycleEventKind::Started),
+            ],
+            Some(ExecutionState::Admitted) => vec![
+                (Some(ExecutionState::Queued), LifecycleEventKind::Resumed),
+                (Some(ExecutionState::Running), LifecycleEventKind::Started),
+            ],
+            Some(ExecutionState::Queued) => {
+                vec![(Some(ExecutionState::Running), LifecycleEventKind::Resumed)]
+            }
+            Some(ExecutionState::Running) => {
+                vec![(None, LifecycleEventKind::Resumed)]
+            }
+            Some(ExecutionState::Suspended) => vec![
+                (Some(ExecutionState::Queued), LifecycleEventKind::Resumed),
+                (Some(ExecutionState::Running), LifecycleEventKind::Started),
+            ],
+            Some(
+                ExecutionState::Completing
+                | ExecutionState::Completed
+                | ExecutionState::Failed
+                | ExecutionState::Cancelled
+                | ExecutionState::TimedOut
+                | ExecutionState::DeadLetter,
+            ) => return infrastructure_failure("terminal execution cannot be resumed"),
+        };
+        for (state, event) in dispatch {
+            if record_step(&mut journal, state, event, None, None).is_err() {
                 return infrastructure_failure("execution dispatch persistence failed");
             }
         }
@@ -230,6 +325,90 @@ impl ExecutionCoordinator {
                     let capability = effect
                         .request
                         .required_capability(InvocationLimits::default());
+                    if resumable && let Some(key) = effect.idempotency_key.as_ref() {
+                        let Some(replay_journal) = journal.as_ref() else {
+                            return infrastructure_failure("durable resume journal is unavailable");
+                        };
+                        let existing = match replay_journal.store.effect(key) {
+                            Ok(existing) => existing,
+                            Err(_) => {
+                                return infrastructure_failure(
+                                    "prior effect lookup failed during durable resume",
+                                );
+                            }
+                        };
+                        if let Some(existing) = existing {
+                            if existing.execution_id != invocation.execution_id
+                                || existing.run_unit_id != invocation.run_unit_id
+                                || existing.sequence != effect.sequence
+                                || existing.digest_format != EffectDigestFormat::CanonicalHostV1
+                                || existing.request_digest != request_digest
+                            {
+                                return failed_outcome(problem(
+                                    FailureCategory::UnknownOutcome,
+                                    "durable effect replay identity does not match",
+                                ));
+                            }
+                            if existing.state != EffectState::Completed {
+                                return failed_outcome(problem(
+                                    FailureCategory::UnknownOutcome,
+                                    "durable effect requires reconciliation before resume",
+                                ));
+                            }
+                            control = match observe_checked(
+                                &mut observe,
+                                control,
+                                invocation,
+                                invocation.deadline_tick.min(effect.deadline_tick),
+                                &mut journal,
+                            ) {
+                                Ok(control) => control,
+                                Err(outcome) => return outcome,
+                            };
+                            let effect_sequence = effect.sequence;
+                            let audited = host.invoke(
+                                invocation,
+                                control.now_tick,
+                                control.cancellation_requested,
+                                effect,
+                            );
+                            let (result, audit) = audited.into_transaction_parts();
+                            let replay_digest = match canonical_result_digest(&result.outcome) {
+                                Ok(digest) => digest,
+                                Err(_) => {
+                                    return failed_outcome(problem(
+                                        FailureCategory::UnknownOutcome,
+                                        "replayed host result cannot be encoded",
+                                    ));
+                                }
+                            };
+                            if existing.result_digest != Some(replay_digest) {
+                                return failed_outcome(problem(
+                                    FailureCategory::UnknownOutcome,
+                                    "replayed host result differs from the reconciled result",
+                                ));
+                            }
+                            if record_audited_step(
+                                &mut journal,
+                                self.audit_sink.as_deref(),
+                                None,
+                                LifecycleEventKind::EffectResult {
+                                    sequence: effect_sequence,
+                                },
+                                None,
+                                None,
+                                audit,
+                            )
+                            .is_err()
+                            {
+                                return infrastructure_failure(
+                                    "replayed host audit persistence failed",
+                                );
+                            }
+                            resume = MachineResume::HostResult(result);
+                            continue;
+                        }
+                    }
                     let intent_epoch = journal
                         .as_ref()
                         .and_then(|journal| journal.sequence.checked_add(1))
@@ -328,13 +507,15 @@ impl ExecutionCoordinator {
                     if matches!(&result.outcome, Err(HostProblem::UnknownOutcome)) {
                         // Never poll again or resume an ordinary exception handler
                         // before preserving this already-observed uncertainty.
-                        let _ = record_step(
-                            &mut journal,
-                            Some(ExecutionState::Failed),
-                            LifecycleEventKind::Failed,
-                            None,
-                            None,
-                        );
+                        if !resumable {
+                            let _ = record_step(
+                                &mut journal,
+                                Some(ExecutionState::Failed),
+                                LifecycleEventKind::Failed,
+                                None,
+                                None,
+                            );
+                        }
                         return failed_outcome(problem(
                             FailureCategory::UnknownOutcome,
                             "host outcome unknown",
@@ -538,11 +719,46 @@ struct JournalCursor {
 }
 
 impl JournalCursor {
-    fn admit(
+    fn open(
         store: Arc<dyn PlatformStore>,
         invocation: &Invocation,
         tick: u64,
-    ) -> Result<Self, StoreError> {
+        resumable: bool,
+    ) -> Result<(Self, Option<ExecutionState>), StoreError> {
+        if let Some(execution) = store.get_execution(&invocation.execution_id)? {
+            if !resumable
+                || execution.run_unit_id != invocation.run_unit_id
+                || execution.principal != *invocation.principal.id()
+                || execution.attempt != invocation.attempt
+                || (execution.state != ExecutionState::Suspended
+                    && (execution.selector != invocation.selector
+                        || execution.artifact != invocation.artifact))
+            {
+                return Err(StoreError::Conflict);
+            }
+            let events = store.events(&invocation.execution_id, 1, 65_536)?;
+            let last = events.last().ok_or(StoreError::IncompatibleVersion)?;
+            if last.execution_id != invocation.execution_id
+                || last.run_unit_id != invocation.run_unit_id
+                || last.attempt != invocation.attempt
+                || last.sequence != execution.version
+            {
+                return Err(StoreError::IncompatibleVersion);
+            }
+            let state = execution.state;
+            return Ok((
+                Self {
+                    store,
+                    execution_id: invocation.execution_id.clone(),
+                    run_unit_id: invocation.run_unit_id.clone(),
+                    attempt: invocation.attempt,
+                    tick,
+                    version: execution.version,
+                    sequence: last.sequence,
+                },
+                Some(state),
+            ));
+        }
         let event = LifecycleEvent {
             execution_id: invocation.execution_id.clone(),
             run_unit_id: invocation.run_unit_id.clone(),
@@ -568,15 +784,18 @@ impl JournalCursor {
             event,
             notification,
         )?;
-        Ok(Self {
-            store,
-            execution_id: invocation.execution_id.clone(),
-            run_unit_id: invocation.run_unit_id.clone(),
-            attempt: invocation.attempt,
-            tick,
-            version: 1,
-            sequence: 1,
-        })
+        Ok((
+            Self {
+                store,
+                execution_id: invocation.execution_id.clone(),
+                run_unit_id: invocation.run_unit_id.clone(),
+                attempt: invocation.attempt,
+                tick,
+                version: 1,
+                sequence: 1,
+            },
+            None,
+        ))
     }
 
     fn record(
@@ -646,6 +865,7 @@ fn lifecycle_payload(kind: &LifecycleEventKind) -> Vec<u8> {
             payload.extend_from_slice(&sequence.to_be_bytes());
         }
         LifecycleEventKind::Suspended => payload.push(8),
+        LifecycleEventKind::HandoffCompleted => payload.push(17),
         LifecycleEventKind::Resumed => payload.push(9),
         LifecycleEventKind::CancellationRequested => payload.push(10),
         LifecycleEventKind::Cancelled => payload.push(11),
@@ -889,6 +1109,7 @@ mod tests {
             LifecycleEventKind::EffectIntent { sequence: 1 },
             LifecycleEventKind::EffectResult { sequence: 1 },
             LifecycleEventKind::Suspended,
+            LifecycleEventKind::HandoffCompleted,
             LifecycleEventKind::Resumed,
             LifecycleEventKind::CancellationRequested,
             LifecycleEventKind::Cancelled,
@@ -901,7 +1122,7 @@ mod tests {
         .into_iter()
         .map(|kind| lifecycle_payload(&kind))
         .collect::<BTreeSet<_>>();
-        assert_eq!(payloads.len(), 16);
+        assert_eq!(payloads.len(), 17);
     }
 
     #[test]

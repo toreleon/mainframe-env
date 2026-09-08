@@ -1337,6 +1337,7 @@ fn event_kind_back(value: &str) -> Result<LifecycleEventKind, StoreError> {
         "started" => LifecycleEventKind::Started,
         "completing" => LifecycleEventKind::Completing,
         "suspended" => LifecycleEventKind::Suspended,
+        "handoffcompleted" | "handoff-completed" => LifecycleEventKind::HandoffCompleted,
         "resumed" => LifecycleEventKind::Resumed,
         "cancellationrequested" | "cancellation-requested" => {
             LifecycleEventKind::CancellationRequested

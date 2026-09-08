@@ -10,7 +10,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:a0ab615b0d0e21da74f713c37aa30cfbc8c4b09fee2a64b731a5054fc90c0707",
+      "sha256": "sha256:d2e29d6f17bf3b91fc148b2f07d6b077ae9ea639dc8549c45063c5a040f3ff7f",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -409,7 +409,7 @@
       "path": "docs/architecture/EXECUTION-AND-DURABILITY.md",
       "relative_links": 0,
       "scope": "execution lifecycle, effects, work, checkpoints, and durability",
-      "sha256": "sha256:e5719993ce2f9ec97af12031cc3f796e4e48d22d7846de43e797369f0395ebef",
+      "sha256": "sha256:3fcdd4cf696cc63c24b8b1ee258caf0eeb907ae7bae41d2e6f3bfe1508be3185",
       "status": "Accepted by repository owner",
       "title": "Execution and Durability Architecture",
       "xtask_commands": 0
@@ -1374,7 +1374,7 @@
       "normative": false,
       "path": "docs/runbooks/CAPACITY-AND-RECOVERY.md",
       "relative_links": 0,
-      "sha256": "sha256:36c7d2db9528127e2a2a2567f38c724680d4324379b3e90911c03a31d4af518a",
+      "sha256": "sha256:a39b54b02d8b0762896627be487816be893672eb2b52b599547adb6edeea3deb",
       "title": "Capacity and recovery",
       "xtask_commands": 0
     },

@@ -32,6 +32,27 @@ The resolver may record proven completion or proven failure; an unavailable or
 ambiguous observation stays pending until a later lease. Recovery never
 redispatches the original mutation.
 
+An online CICS exchange with an unresolved effect retains an
+`online-exchange-v1` record keyed by terminal session. A resume request first
+checks the referenced durable effect. If it remains `Intent` or
+`UnknownOutcome` and no matching CICS replay-ledger result exists, return
+`unknown_outcome` and do not dispatch the operation. If the ledger's canonical
+request digest matches, reconcile the stored result, rebuild the abandoned
+CICS run with the original execution and run-unit identity, and resume. Never
+delete or edit the exchange, effect, or `cics-effect-replay-v1` rows by hand.
+Replay envelope `MECER002` records expose the owner execution and effect
+deadline needed by retention; `MECER001` rows lack that proof and must remain
+retention-ineligible.
+
+If an exchange points at a terminal execution, first finish the abandoned
+COBOL/CICS run, remove its interpreter checkpoint, and delete the exchange.
+Preserve `online-machine-continuation` only when the final lifecycle event is
+`HandoffCompleted`; that record is the durable owner of the next
+pseudo-conversation task. Ordinary completion returns success. Cancellation
+and timeout retain their exact categories, while failed/dead-letter executions
+return a conservative provider failure when no exact condition payload was
+persisted. Never retry a terminal execution identity.
+
 Local wakeups are reconstructible by scanning authoritative work rows.
 Dead-letter work requires an operator decision; it is never treated as
 completed.

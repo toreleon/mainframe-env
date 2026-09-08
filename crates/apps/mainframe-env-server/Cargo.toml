@@ -5,6 +5,9 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
+[features]
+fault-injection = ["mainframe-env-cics/fault-injection"]
+
 [dependencies]
 mainframe-env-application.workspace = true
 mainframe-env-batch.workspace = true

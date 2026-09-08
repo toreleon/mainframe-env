@@ -47,6 +47,14 @@ All notable changes to mainframe-env are documented here.
 - Derived batch host grants from the validated JCL plan and installed program
   registry, and required typed table/PSB/database/queue SAF authorization
   inside Db2, IMS, and MQ providers before any mutation.
+- Routed installed online CICS programs through the durable, resume-aware
+  execution journal. Per-session exchange identity now survives restart,
+  unresolved effects return the explicit `unknown_outcome` gateway code, and
+  file, transient-queue, program-link, and syncpoint replay is provider-ledger
+  fenced before a recovered machine can continue. Pseudo-conversation
+  checkpoints now close their old execution with an explicit durable handoff,
+  and restart cleanup preserves only that handed-off continuation while
+  retaining known terminal failure categories.
 - Moved synchronous z/OSMF backend calls to a bounded four-worker lane and
   propagated finite HTTP deadlines plus live cancellation into invocations.
 - Classified mutating-effect journal failures after dispatch as unknown outcomes
