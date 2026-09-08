@@ -5,6 +5,7 @@
 mod cobol;
 mod config;
 mod environment_secrets;
+mod jes_worker;
 mod product;
 #[cfg(test)]
 mod recovery_tests;

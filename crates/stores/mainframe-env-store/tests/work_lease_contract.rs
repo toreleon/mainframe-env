@@ -19,6 +19,7 @@ fn work(label: &str, deadline_tick: u64) -> WorkRecord {
         required_generation: "lease-contract@1".into(),
         artifact: ArtifactRef::new(format!("sha256:{}", "a".repeat(64)), limits).unwrap(),
         state: WorkState::Queued,
+        priority: 0,
         attempt: 0,
         max_attempts: 4,
         available_tick: 1,
@@ -39,7 +40,7 @@ fn assert_deadlines_and_fencing(first: &dyn PlatformStore, second: &dyn Platform
     let expired = work("queued-deadline", 5);
     let expired_id = expired.work_id.clone();
     first.enqueue(expired).unwrap();
-    assert!(first.claim("worker-a", 5, 10).unwrap().is_none());
+    assert!(first.claim("worker-a", None, 5, 10).unwrap().is_none());
     assert_eq!(
         first.get_work(&expired_id).unwrap().unwrap().state,
         WorkState::DeadLetter
@@ -48,9 +49,9 @@ fn assert_deadlines_and_fencing(first: &dyn PlatformStore, second: &dyn Platform
     let reclaimable = work("stale-owner", 100);
     let reclaimable_id = reclaimable.work_id.clone();
     first.enqueue(reclaimable).unwrap();
-    let stale = first.claim("same-worker", 10, 5).unwrap().unwrap();
+    let stale = first.claim("same-worker", None, 10, 5).unwrap().unwrap();
     assert_eq!(stale.lease_expiry_tick, Some(15));
-    let current = second.claim("same-worker", 15, 10).unwrap().unwrap();
+    let current = second.claim("same-worker", None, 15, 10).unwrap().unwrap();
     assert_eq!((stale.lease_epoch, current.lease_epoch), (1, 2));
     assert_ne!(stale.lease_id, current.lease_id);
     let stale_id = stale.lease_id.as_deref().unwrap();
@@ -91,7 +92,7 @@ fn assert_deadlines_and_fencing(first: &dyn PlatformStore, second: &dyn Platform
     let bounded = work("deadline-clamp", 22);
     let bounded_id = bounded.work_id.clone();
     first.enqueue(bounded).unwrap();
-    let claimed = first.claim("worker-b", 20, 100).unwrap().unwrap();
+    let claimed = first.claim("worker-b", None, 20, 100).unwrap().unwrap();
     assert_eq!(claimed.lease_expiry_tick, Some(22));
     assert_eq!(
         first.complete(
@@ -102,10 +103,69 @@ fn assert_deadlines_and_fencing(first: &dyn PlatformStore, second: &dyn Platform
         ),
         Err(StoreError::LeaseConflict)
     );
-    assert!(second.claim("worker-c", 22, 5).unwrap().is_none());
+    assert!(second.claim("worker-c", None, 22, 5).unwrap().is_none());
     assert_eq!(
         first.get_work(&bounded_id).unwrap().unwrap().state,
         WorkState::DeadLetter
+    );
+}
+
+fn assert_generation_scoped_claim(store: &dyn PlatformStore) {
+    let mut other = work("a-other-lane", 100);
+    other.required_generation = "other-worker@1".into();
+    let other_id = other.work_id.clone();
+    let mut jes = work("b-jes-lane", 100);
+    jes.required_generation = "mainframe-env-batch@1".into();
+    let jes_id = jes.work_id.clone();
+    store.enqueue(other).unwrap();
+    store.enqueue(jes).unwrap();
+
+    let claimed = store
+        .claim("jes-worker", Some("mainframe-env-batch@1"), 1, 10)
+        .unwrap()
+        .unwrap();
+    assert_eq!(claimed.work_id, jes_id);
+    assert_eq!(
+        store.get_work(&other_id).unwrap().unwrap().state,
+        WorkState::Queued
+    );
+}
+
+fn assert_oldest_available_claim(store: &dyn PlatformStore) {
+    let mut lexically_first = work("a-newer", 100);
+    lexically_first.available_tick = 20;
+    let mut oldest = work("z-older", 100);
+    oldest.available_tick = 10;
+    let oldest_id = oldest.work_id.clone();
+    store.enqueue(lexically_first).unwrap();
+    store.enqueue(oldest).unwrap();
+    assert_eq!(
+        store
+            .claim("worker", None, 20, 10)
+            .unwrap()
+            .unwrap()
+            .work_id,
+        oldest_id
+    );
+}
+
+fn assert_priority_precedes_fifo_age(store: &dyn PlatformStore) {
+    let mut older = work("older-low-priority", 100);
+    older.available_tick = 10;
+    older.priority = 1;
+    let mut priority = work("newer-high-priority", 100);
+    priority.available_tick = 20;
+    priority.priority = 2;
+    let priority_id = priority.work_id.clone();
+    store.enqueue(older).unwrap();
+    store.enqueue(priority).unwrap();
+    assert_eq!(
+        store
+            .claim("worker", None, 20, 10)
+            .unwrap()
+            .unwrap()
+            .work_id,
+        priority_id
     );
 }
 
@@ -113,6 +173,24 @@ fn assert_deadlines_and_fencing(first: &dyn PlatformStore, second: &dyn Platform
 fn memory_work_deadlines_and_fencing_contract() {
     let store = MemoryStore::new(StoreLimits::default());
     assert_deadlines_and_fencing(&store, &store);
+}
+
+#[test]
+fn memory_claim_is_generation_scoped() {
+    let store = MemoryStore::new(StoreLimits::default());
+    assert_generation_scoped_claim(&store);
+}
+
+#[test]
+fn memory_claim_is_oldest_available_first() {
+    let store = MemoryStore::new(StoreLimits::default());
+    assert_oldest_available_claim(&store);
+}
+
+#[test]
+fn memory_claim_preserves_jes_priority() {
+    let store = MemoryStore::new(StoreLimits::default());
+    assert_priority_precedes_fifo_age(&store);
 }
 
 #[test]
@@ -129,6 +207,24 @@ fn sqlite_work_deadlines_and_fencing_contract() {
     assert_deadlines_and_fencing(&first, &second);
     drop((first, second));
     std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn sqlite_claim_is_generation_scoped() {
+    let store = SqliteStateStore::open("sqlite::memory:", 64 * 1024 * 1024, 262_144).unwrap();
+    assert_generation_scoped_claim(&store);
+}
+
+#[test]
+fn sqlite_claim_is_oldest_available_first() {
+    let store = SqliteStateStore::open("sqlite::memory:", 64 * 1024 * 1024, 262_144).unwrap();
+    assert_oldest_available_claim(&store);
+}
+
+#[test]
+fn sqlite_claim_preserves_jes_priority() {
+    let store = SqliteStateStore::open("sqlite::memory:", 64 * 1024 * 1024, 262_144).unwrap();
+    assert_priority_precedes_fifo_age(&store);
 }
 
 #[test]
@@ -177,8 +273,9 @@ fn legacy_claimed_work_migrates_to_an_explicit_fencing_epoch() {
         .unwrap()
         .unwrap();
     let migrated: serde_json::Value = serde_json::from_slice(&migrated.payload).unwrap();
-    assert_eq!(migrated["schema"], 2);
+    assert_eq!(migrated["schema"], 3);
     assert_eq!(migrated["lease_epoch"], 1);
+    assert_eq!(migrated["priority"], 0);
 }
 
 #[test]

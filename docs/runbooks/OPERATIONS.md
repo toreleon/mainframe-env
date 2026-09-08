@@ -110,21 +110,26 @@ at least:
 - retention/capacity headroom for events, outbox records, sessions, and replay
   journals.
 
-Until those checks exist, external orchestration must not use `ready=true` as a
-production traffic gate.
+The current readiness bit now requires the JES worker pool to be started and
+not stopping. Until the remaining checks exist, external orchestration must not
+use `ready=true` as a production traffic gate.
 
 ## Shutdown
 
-Send `SIGTERM` or `SIGINT`. Admission stops and the product waits up to
-`shutdown_millis` for its tracked active request set. The current non-TLS Axum
-path does not independently enforce a hard transport shutdown deadline, so
-operators should verify process exit and investigate blocked synchronous
+Send `SIGTERM` or `SIGINT`. Admission and new JES claims stop, idle workers are
+woken, and the product waits up to `shutdown_millis` for its tracked active
+request set and bounded worker pool. A worker that cannot finish before the
+deadline is detached without a lease completion; its durable item becomes
+reclaimable at lease expiry with a higher fencing epoch. The current non-TLS
+Axum path does not independently enforce a hard transport shutdown deadline,
+so operators should verify process exit and investigate blocked synchronous
 backend work rather than immediately issuing `SIGKILL`.
 
 ## Observability
 
-The library tracks request, failure, active-request, authentication-session,
-console-message, and outbox counters. They are currently visible only to an
+The library tracks request, failure, active-request, JES worker/active-work,
+authentication-session, console-message, and outbox counters. They are
+currently visible only to an
 embedding application or test through `ProductServer::metrics()`. The
 standalone binary does not install a metrics exporter or a tracing subscriber.
 

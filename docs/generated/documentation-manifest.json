@@ -10,7 +10,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:ee5897abea9bcda2b468a18c297510e59843495ab5c3559a4f056f1eb951f2aa",
+      "sha256": "sha256:f2e778d1e07797286e4df410f84c7bec024afb8c8d441e34e857951b48b5f959",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -409,7 +409,7 @@
       "path": "docs/architecture/EXECUTION-AND-DURABILITY.md",
       "relative_links": 0,
       "scope": "execution lifecycle, effects, work, checkpoints, and durability",
-      "sha256": "sha256:28829c8db68801f3578c58b6ec41f768ea57bf557735145fb56d8e50134a38ef",
+      "sha256": "sha256:e5719993ce2f9ec97af12031cc3f796e4e48d22d7846de43e797369f0395ebef",
       "status": "Accepted by repository owner",
       "title": "Execution and Durability Architecture",
       "xtask_commands": 0
@@ -433,7 +433,7 @@
       "path": "docs/architecture/JES-EXECUTION.md",
       "relative_links": 0,
       "scope": "JES execution, scheduling, spool, and utility behavior",
-      "sha256": "sha256:b8566079f9acc8cd6d0b712cb4a978e7b49eaced91c6e7f7766762cb18b88752",
+      "sha256": "sha256:92effd74484228c2db0a0154bcc8be2af527108817788af727a7f7ba7038d003",
       "status": "Normative from mainframe-env 0.8.0",
       "title": "JES execution, scheduling, spool, and utilities",
       "xtask_commands": 1
@@ -1374,7 +1374,7 @@
       "normative": false,
       "path": "docs/runbooks/CAPACITY-AND-RECOVERY.md",
       "relative_links": 0,
-      "sha256": "sha256:614c13070713ce9f6185b3bd9f47ef9830e75b350d09d4b418217b76e73e38bd",
+      "sha256": "sha256:36c7d2db9528127e2a2a2567f38c724680d4324379b3e90911c03a31d4af518a",
       "title": "Capacity and recovery",
       "xtask_commands": 0
     },
@@ -1406,7 +1406,7 @@
       "normative": false,
       "path": "docs/runbooks/OPERATIONS.md",
       "relative_links": 3,
-      "sha256": "sha256:9b074c2e9aeee0fbcc22c47875d3b6dc569912a3d10792afd41037c295b448b3",
+      "sha256": "sha256:4eb9f6b2ae9c1dac7bf48634719de84e9cf3bd6deaefa0dd05aa8ef6f32c477c",
       "title": "Core-server operations",
       "xtask_commands": 0
     },

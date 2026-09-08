@@ -584,6 +584,7 @@ fn queued_control_work(inv: &Invocation, id: &str) -> mainframe_env_store_api::W
         required_generation: "test-control@1".into(),
         artifact: inv.artifact.clone(),
         state: mainframe_env_store_api::WorkState::Queued,
+        priority: 0,
         attempt: 0,
         max_attempts: 3,
         available_tick: 0,

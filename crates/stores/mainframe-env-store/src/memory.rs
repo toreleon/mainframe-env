@@ -276,14 +276,26 @@ impl WorkStore for MemoryStore {
     fn claim(
         &self,
         worker: &str,
+        required_generation: Option<&str>,
         now_tick: u64,
         lease_ticks: u64,
     ) -> Result<Option<WorkRecord>, StoreError> {
-        if worker.is_empty() || lease_ticks == 0 {
+        if worker.is_empty()
+            || lease_ticks == 0
+            || required_generation.is_some_and(|generation| {
+                generation.is_empty()
+                    || generation.len() > 128
+                    || generation.chars().any(char::is_control)
+            })
+        {
             return Err(StoreError::LeaseConflict);
         }
         let mut state = self.lock()?;
         for work in state.work.values_mut() {
+            if required_generation.is_some_and(|generation| work.required_generation != generation)
+            {
+                continue;
+            }
             if work.state == WorkState::Claimed
                 && (work
                     .lease_expiry_tick
@@ -303,11 +315,24 @@ impl WorkStore for MemoryStore {
                 clear_lease(work);
             }
         }
-        let Some(work) = state.work.values_mut().find(|work| {
-            work.state == WorkState::Queued
-                && work.available_tick <= now_tick
-                && work.deadline_tick > now_tick
-        }) else {
+        let candidate = state
+            .work
+            .values()
+            .filter(|work| {
+                required_generation.is_none_or(|generation| work.required_generation == generation)
+                    && work.state == WorkState::Queued
+                    && work.available_tick <= now_tick
+                    && work.deadline_tick > now_tick
+            })
+            .min_by(|left, right| {
+                right
+                    .priority
+                    .cmp(&left.priority)
+                    .then_with(|| left.available_tick.cmp(&right.available_tick))
+                    .then_with(|| left.work_id.cmp(&right.work_id))
+            })
+            .map(|work| work.work_id.clone());
+        let Some(work) = candidate.and_then(|work_id| state.work.get_mut(&work_id)) else {
             return Ok(None);
         };
         work.attempt = work.attempt.checked_add(1).ok_or(StoreError::Conflict)?;
@@ -1123,6 +1148,7 @@ mod tests {
                 required_generation: "test@1".into(),
                 artifact: ids.artifact,
                 state: WorkState::Queued,
+                priority: 0,
                 attempt: 0,
                 max_attempts: 3,
                 available_tick: 1,
@@ -1138,8 +1164,8 @@ mod tests {
                 payload: vec![1],
             })
             .unwrap();
-        let first = store.claim("worker", 1, 1).unwrap().unwrap();
-        let second = store.claim("worker", 2, 1).unwrap().unwrap();
+        let first = store.claim("worker", None, 1, 1).unwrap().unwrap();
+        let second = store.claim("worker", None, 2, 1).unwrap().unwrap();
         assert_eq!((first.attempt, second.attempt), (1, 2));
         assert_eq!((first.lease_epoch, second.lease_epoch), (1, 2));
         assert_eq!(
@@ -1173,6 +1199,7 @@ mod tests {
                 required_generation: "test@1".into(),
                 artifact: ids.artifact,
                 state: WorkState::Queued,
+                priority: 0,
                 attempt: 0,
                 max_attempts: 1,
                 available_tick: 1,
@@ -1188,13 +1215,13 @@ mod tests {
                 payload: vec![1],
             })
             .unwrap();
-        let claimed = store.claim("worker", 1, 2).unwrap().unwrap();
+        let claimed = store.claim("worker", None, 1, 2).unwrap().unwrap();
         let lease = claimed.lease_id.as_deref().unwrap();
         let heartbeat = store
             .heartbeat("bounded-work", lease, claimed.lease_epoch, 2, 10)
             .unwrap();
         assert_eq!(heartbeat.heartbeat_tick, Some(2));
-        assert!(store.claim("other", 3, 1).unwrap().is_none());
+        assert!(store.claim("other", None, 3, 1).unwrap().is_none());
         assert_eq!(
             store
                 .release("bounded-work", lease, claimed.lease_epoch, 3, 4)

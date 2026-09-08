@@ -6,6 +6,16 @@ JES jobs/active work/spool/events, SQL rows/payloads, and immutable artifacts.
 At 100% of any bound, admission fails before mutation. No queue or retry loop
 grows automatically.
 
+The core server owns exactly two JES workers. Their generation-scoped claim
+prevents them from consuming another durable work lane. Higher JES priority is
+selected first; oldest available admission tick plus work ID provides a
+deterministic FIFO tie-break within a priority. Each
+worker heartbeats a 30-second lease every 5 seconds through the persisted
+logical clock, and admitted work has a 24-hour deadline. After an ungraceful
+process exit, wait until that lease expires;
+the next server advances the same durable clock and reclaims with a higher
+epoch. Never edit a lease ID, epoch, heartbeat, or clock record by hand.
+
 After process failure, reopen the store at migration head
 `0001-durable-state`. Running JES work returns to queued state until its attempt
 limit, expired work leases are reclaimable only with a higher durable fencing

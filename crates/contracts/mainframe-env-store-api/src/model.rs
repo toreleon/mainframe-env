@@ -79,6 +79,7 @@ pub struct WorkRecord {
     pub required_generation: String,
     pub artifact: ArtifactRef,
     pub state: WorkState,
+    pub priority: u8,
     pub attempt: u32,
     pub max_attempts: u32,
     pub available_tick: u64,

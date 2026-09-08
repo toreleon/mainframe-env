@@ -1128,6 +1128,47 @@ impl BatchService {
         initiator: &str,
         cancelled: bool,
     ) -> Result<Option<JobSnapshot>, HostProblem> {
+        self.run_on_member(invocation, member, initiator, cancelled, None)
+    }
+
+    pub fn run_claimed(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+        initiator: &str,
+        cancelled: bool,
+    ) -> Result<Option<JobSnapshot>, HostProblem> {
+        let topology = self.topology()?;
+        let members = topology
+            .members
+            .values()
+            .filter(|member| member.enabled && member.node == topology.local_node)
+            .map(|member| member.name.clone())
+            .collect::<Vec<_>>();
+        if members.is_empty() {
+            return Err(HostProblem::UnsupportedCapability {
+                capability: "jes.mas.member".into(),
+                detail: "no enabled local MAS member".into(),
+            });
+        }
+        for member in members {
+            if let Some(job) =
+                self.run_on_member(invocation, &member, initiator, cancelled, Some(id))?
+            {
+                return Ok(Some(job));
+            }
+        }
+        Ok(None)
+    }
+
+    fn run_on_member(
+        &self,
+        invocation: &Invocation,
+        member: &str,
+        initiator: &str,
+        cancelled: bool,
+        requested_id: Option<&str>,
+    ) -> Result<Option<JobSnapshot>, HostProblem> {
         if self.limits.max_active == 0 {
             return Err(HostProblem::ResourceExhausted);
         }
@@ -1173,6 +1214,7 @@ impl BatchService {
                 .jobs
                 .values()
                 .filter(|job| job.owner == invocation.principal.id().as_str())
+                .filter(|job| requested_id.is_none_or(|id| job.id == id))
                 .filter(|job| {
                     job.route.execution_node == member_definition.node
                         && job
@@ -1258,6 +1300,12 @@ impl BatchService {
         };
         let mut state = self.lock()?;
         let current = state.jobs.get(&id).cloned().ok_or(HostProblem::NotFound)?;
+        if current.state == JobState::Cancelled {
+            return Ok(Some(snapshot(&current)));
+        }
+        if current.state != JobState::Running {
+            return Err(HostProblem::UnknownOutcome);
+        }
         ensure_job_event_capacity(
             &job,
             self.limits.max_events,

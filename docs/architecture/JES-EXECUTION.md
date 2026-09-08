@@ -47,6 +47,29 @@ job number. A warm start returns a selected or running job to the execution
 queue unless its bounded attempt limit is exhausted. A durable output-phase
 job completes without re-executing program or dataset effects.
 
+z/OSMF submission parses, authorizes, and durably admits the job and one typed
+work record, then returns the accepted job identity while it is still active.
+It never claims or executes work on the request thread. A fixed two-worker pool
+claims only `mainframe-env-batch@1` records by priority and durable admission
+order and must process whichever valid JES item it receives; workers do not
+reject another principal's item or search for the submitting request's item.
+Each work payload
+binds the job ID, normalized owner, and bounded capability set. The worker
+reconstructs a least-authority invocation for that owner and verifies it
+against the durable job before dispatch, preserving multi-user isolation. The
+invocation also binds the durable work ID so installed COBOL execution observes
+cancellation changes made after dispatch.
+
+All workers share a persisted Unix-millisecond logical clock. A wall-clock
+advance moves it forward; an equal or regressed wall reading advances the
+stored logical value by one. Claims, periodic heartbeats, deferrals,
+cancellation, completion, and dead-letter transitions supply that clock plus
+the lease ID and monotonic fencing epoch. A crashed worker leaves its lease for
+expiry; a later process can reclaim it only at a higher epoch. Pool tasks run
+blocking batch execution outside HTTP/runtime worker slots, retain a lease with
+heartbeats, and stop claiming before graceful shutdown waits for in-flight
+items. Queued durable items remain available to the next process.
+
 Each step records `pending`, `allocating`, `running`, `disposing`, and one exact
 terminal state. Bypassed-restart and skipped-condition states are explicit.
 Completed steps retain their return codes across retry. An abended step retains

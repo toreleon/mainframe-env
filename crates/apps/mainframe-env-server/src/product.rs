@@ -1,4 +1,10 @@
 use crate::cobol::bind_compatible_runtime_services;
+#[cfg(test)]
+use crate::jes_worker::ManualJesClock;
+use crate::jes_worker::{
+    DurableJesClock, JES_HEARTBEAT_MILLIS, JES_IDLE_MILLIS, JES_LEASE_TICKS,
+    JES_WORK_DEADLINE_TICKS, JES_WORK_GENERATION, JES_WORKER_COUNT, JesClock, JesWorkPayload,
+};
 use crate::{ArtifactProfile, DefaultProgramRouter, ServerConfig, default_program_router};
 use axum::http::StatusCode;
 use base64::Engine;
@@ -11,7 +17,7 @@ use mainframe_env_application::{
 use mainframe_env_batch::{
     BATCH_CONTROLLER_REGISTRY_CONTRACT, BatchControllerDefinition, BatchControllerGeneration,
     BatchControllerInstallReceipt, BatchControllerPlan, BatchControllerProgram,
-    BatchControllerSelector, BatchService, JclBundle,
+    BatchControllerSelector, BatchLimits, BatchService, JclBundle,
 };
 use mainframe_env_cics::{
     BmsMapDefinition, CicsService, CicsTerminalSnapshot, CicsTraceEntry, cics_provider,
@@ -23,9 +29,9 @@ use mainframe_env_db2::{
 };
 use mainframe_env_encoding::CodePage;
 use mainframe_env_execution_api::{
-    ArtifactRef, BoundedPayload, CapabilityId, ExecutionId, ExecutionOutcome, IdempotencyKey,
-    Invocation, InvocationLimits, Machine, Principal, PrincipalId, RequestId, ResourceLimits,
-    RunUnitId, Selector, ServiceClass, TraceId,
+    ArtifactRef, BoundedPayload, Cancellation, CancellationId, CapabilityId, ExecutionId,
+    ExecutionOutcome, IdempotencyKey, Invocation, InvocationLimits, Machine, Principal,
+    PrincipalId, RequestId, ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
 };
 use mainframe_env_host_api::{
     AccessIntent, CapabilityDescriptor, CicsOperation, ClockRequest, DatasetAttributes,
@@ -60,7 +66,7 @@ use sha2::{Digest, Sha256};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Weak};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio_rustls::TlsAcceptor;
 use zeroize::Zeroizing;
@@ -72,6 +78,8 @@ pub struct ProductMetrics {
     pub active: usize,
     pub sessions: usize,
     pub console_messages: usize,
+    pub jes_workers: usize,
+    pub jes_active: usize,
     pub outbox_pending: usize,
     pub outbox_delivered: u64,
 }
@@ -211,6 +219,13 @@ struct SequenceState {
     version: Option<u64>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum JesWorkOutcome {
+    Completed,
+    Cancelled,
+    Deferred,
+}
+
 pub struct ProductServer {
     config: ServerConfig,
     store: Arc<dyn PlatformStore>,
@@ -234,6 +249,13 @@ pub struct ProductServer {
     sessions: Mutex<BTreeMap<String, AuthSession>>,
     console: Mutex<Vec<ConsoleMessage>>,
     sequence: Mutex<SequenceState>,
+    jes_clock: Arc<dyn JesClock>,
+    jes_workers_started: AtomicBool,
+    jes_workers_stopping: AtomicBool,
+    jes_worker_notify: tokio::sync::Notify,
+    jes_worker_handles: Mutex<Vec<tokio::task::JoinHandle<()>>>,
+    jes_worker_active: AtomicUsize,
+    outbox_delivery: Mutex<()>,
     accepting: AtomicBool,
     requests: AtomicU64,
     failures: AtomicU64,
@@ -296,6 +318,22 @@ const MAX_AUTH_SESSIONS: usize = 65_536;
 const MAX_AUTH_SESSIONS_PER_USER: usize = 8;
 const AUTH_SESSION_ABSOLUTE_TTL_MILLIS: u64 = 8 * 60 * 60 * 1000;
 const AUTH_SESSION_IDLE_TTL_MILLIS: u64 = 30 * 60 * 1000;
+static NEXT_JES_WORKER_POOL: AtomicU64 = AtomicU64::new(1);
+const JES_ALLOWED_WORK_CAPABILITIES: [&str; 13] = [
+    "host.cics.execute",
+    "host.clock",
+    "host.dataset.read",
+    "host.dataset.write",
+    "host.db2.read",
+    "host.db2.write",
+    "host.ims.read",
+    "host.ims.write",
+    "host.program.invoke",
+    "host.security.authorize",
+    "host.spool.read",
+    "host.spool.write",
+    "host.terminal",
+];
 
 thread_local! {
     static GATEWAY_CALL_CONTEXT: RefCell<Option<GatewayCallContext>> = const { RefCell::new(None) };
@@ -431,7 +469,15 @@ impl ProductServer {
             LocalArtifactStore::open(&config.artifact_root, 64 * 1024 * 1024)
                 .map_err(store_error)?,
         ));
-        Self::open_configured(config, store, secrets, program, package_trust, artifacts)
+        Self::open_configured(
+            config,
+            store,
+            secrets,
+            program,
+            package_trust,
+            artifacts,
+            None,
+        )
     }
 
     pub fn open_with_package_trust_and_artifact_store(
@@ -452,6 +498,7 @@ impl ProductServer {
             program,
             package_trust,
             Arc::new(ProductArtifactStore::Shared(artifacts)),
+            None,
         )
     }
 
@@ -479,6 +526,7 @@ impl ProductServer {
         program: Arc<DefaultProgramRouter>,
         package_trust: Arc<dyn PackageSignatureVerifier>,
         artifacts: Arc<ProductArtifactStore>,
+        jes_clock: Option<Arc<dyn JesClock>>,
     ) -> Result<Arc<Self>, HostProblem> {
         config.validate()?;
         let provider_store: Arc<dyn ProviderStateStore> = store.clone();
@@ -524,7 +572,10 @@ impl ProductServer {
             provider_store,
             checkpoint_store,
             Default::default(),
-            Default::default(),
+            BatchLimits {
+                max_active: JES_WORKER_COUNT,
+                ..BatchLimits::default()
+            },
         )?;
         let (application_store_version, applications_v2) = match store
             .get_provider_state(APPLICATION_V2_STATE_NAMESPACE, APPLICATION_V2_STATE_KEY)
@@ -670,6 +721,10 @@ impl ProductServer {
                 version: None,
             },
         };
+        let jes_clock: Arc<dyn JesClock> = match jes_clock {
+            Some(clock) => clock,
+            None => Arc::new(DurableJesClock::new(store.clone()).map_err(store_error)?),
+        };
         let product = Arc::new(Self {
             config,
             store,
@@ -697,6 +752,13 @@ impl ProductServer {
             sessions: Mutex::new(sessions),
             console: Mutex::new(console),
             sequence: Mutex::new(sequence),
+            jes_clock,
+            jes_workers_started: AtomicBool::new(false),
+            jes_workers_stopping: AtomicBool::new(false),
+            jes_worker_notify: tokio::sync::Notify::new(),
+            jes_worker_handles: Mutex::new(Vec::new()),
+            jes_worker_active: AtomicUsize::new(0),
+            outbox_delivery: Mutex::new(()),
             accepting: AtomicBool::new(true),
             requests: AtomicU64::new(0),
             failures: AtomicU64::new(0),
@@ -713,6 +775,30 @@ impl ProductServer {
         let secrets = Arc::new(MemorySecretResolver::default());
         let program = default_program_router();
         Self::open(config, store, secrets, program)
+    }
+
+    #[cfg(test)]
+    fn open_with_clock(
+        config: ServerConfig,
+        store: Arc<dyn PlatformStore>,
+        clock: Arc<dyn JesClock>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        if config.artifact_profile != ArtifactProfile::Local {
+            return Err(HostProblem::Malformed);
+        }
+        let artifacts = Arc::new(ProductArtifactStore::Local(
+            LocalArtifactStore::open(&config.artifact_root, 64 * 1024 * 1024)
+                .map_err(store_error)?,
+        ));
+        Self::open_configured(
+            config,
+            store,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+            Arc::new(RejectPackageTrust),
+            artifacts,
+            Some(clock),
+        )
     }
 
     pub fn memory_with_package_trust(
@@ -1791,7 +1877,10 @@ impl ProductServer {
             ("FACILITY", "CONSOLE.**".into(), AccessIntent::Alter),
             ("TCICSTRN", "CICS.**".into(), AccessIntent::Execute),
         ] {
-            self.racf.define_profile(class, &pattern, user, None)?;
+            match self.racf.define_profile(class, &pattern, user, None) {
+                Ok(()) | Err(HostProblem::IdempotencyConflict) => {}
+                Err(problem) => return Err(problem),
+            }
             self.racf.permit(class, &pattern, user, access)?;
         }
         Ok(())
@@ -1808,7 +1897,345 @@ impl ProductServer {
         self.racf.add_user(principal.as_str(), &reference)
     }
 
+    pub fn start_background_workers(self: &Arc<Self>) -> Result<(), HostProblem> {
+        if self.jes_workers_stopping.load(Ordering::SeqCst) {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        if self
+            .jes_workers_started
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
+            return Ok(());
+        }
+        let runtime = tokio::runtime::Handle::try_current().map_err(|_| {
+            self.jes_workers_started.store(false, Ordering::SeqCst);
+            HostProblem::InfrastructureFailure
+        })?;
+        let pool = NEXT_JES_WORKER_POOL.fetch_add(1, Ordering::Relaxed);
+        let mut handles = self
+            .jes_worker_handles
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        handles.reserve(JES_WORKER_COUNT);
+        for ordinal in 0..JES_WORKER_COUNT {
+            let server = Arc::downgrade(self);
+            let worker = format!("jes-worker-{pool}-{ordinal}");
+            handles.push(runtime.spawn(Self::jes_worker_loop(server, worker)));
+        }
+        Ok(())
+    }
+
+    async fn jes_worker_loop(server: Weak<Self>, worker: String) {
+        loop {
+            let Some(product) = server.upgrade() else {
+                return;
+            };
+            if product.jes_workers_stopping.load(Ordering::SeqCst) {
+                return;
+            }
+            let claim_product = product.clone();
+            let claim_worker = worker.clone();
+            let claimed =
+                tokio::task::spawn_blocking(move || claim_product.claim_jes_work(&claim_worker))
+                    .await;
+            let claimed = match claimed {
+                Ok(Ok(value)) => value,
+                Ok(Err(_)) | Err(_) => {
+                    tokio::time::sleep(Duration::from_millis(JES_IDLE_MILLIS)).await;
+                    continue;
+                }
+            };
+            let Some(work) = claimed else {
+                tokio::select! {
+                    () = product.jes_worker_notify.notified() => {},
+                    () = tokio::time::sleep(Duration::from_millis(JES_IDLE_MILLIS)) => {},
+                }
+                continue;
+            };
+
+            product.jes_worker_active.fetch_add(1, Ordering::SeqCst);
+            let execute_product = product.clone();
+            let execute_work = work.clone();
+            let mut execution = tokio::task::spawn_blocking(move || {
+                execute_product.process_claimed_jes_work(&execute_work)
+            });
+            let mut lease_current = true;
+            let joined = loop {
+                tokio::select! {
+                    result = &mut execution => break result,
+                    () = tokio::time::sleep(Duration::from_millis(JES_HEARTBEAT_MILLIS)) => {
+                        let heartbeat_product = product.clone();
+                        let heartbeat_work = work.clone();
+                        match tokio::task::spawn_blocking(move || {
+                            heartbeat_product.heartbeat_jes_work(&heartbeat_work)
+                        }).await {
+                            Ok(Ok(())) => {}
+                            Ok(Err(_)) | Err(_) => {
+                                lease_current = false;
+                                break execution.await;
+                            }
+                        }
+                    }
+                }
+            };
+            product.jes_worker_active.fetch_sub(1, Ordering::SeqCst);
+            if lease_current && let Ok(outcome) = joined {
+                let finish_product = product.clone();
+                let finish_work = work.clone();
+                let _ = tokio::task::spawn_blocking(move || {
+                    finish_product.finish_claimed_jes_work(&finish_work, outcome)
+                })
+                .await;
+            }
+        }
+    }
+
+    fn claim_jes_work(&self, worker: &str) -> Result<Option<WorkRecord>, HostProblem> {
+        let now_tick = self.jes_tick()?;
+        self.store
+            .claim(worker, Some(JES_WORK_GENERATION), now_tick, JES_LEASE_TICKS)
+            .map_err(store_error)
+    }
+
+    fn heartbeat_jes_work(&self, work: &WorkRecord) -> Result<(), HostProblem> {
+        let lease = work
+            .lease_id
+            .as_deref()
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let now_tick = self.jes_tick()?;
+        self.store
+            .heartbeat(
+                &work.work_id,
+                lease,
+                work.lease_epoch,
+                now_tick,
+                JES_LEASE_TICKS,
+            )
+            .map(|_| ())
+            .map_err(store_error)
+    }
+
+    fn process_claimed_jes_work(&self, work: &WorkRecord) -> Result<JesWorkOutcome, HostProblem> {
+        if work.state != WorkState::Claimed
+            || work.required_generation != JES_WORK_GENERATION
+            || work.required_selector.as_str() != "zosmf:job-submit"
+            || work.artifact.as_str() != "artifact:none"
+            || work.max_attempts != 3
+            || work.lease_epoch == 0
+            || work.lease_id.is_none()
+            || work.work_id.strip_prefix("jes:").is_none()
+        {
+            return Err(HostProblem::Malformed);
+        }
+        let payload = JesWorkPayload::decode(&work.payload).map_err(store_error)?;
+        if work.work_id != format!("jes:{}", payload.job_id)
+            || payload
+                .capabilities
+                .iter()
+                .any(|capability| !JES_ALLOWED_WORK_CAPABILITIES.contains(&capability.as_str()))
+        {
+            return Err(HostProblem::Malformed);
+        }
+        loop {
+            let job = self.batch.get(&payload.job_id)?;
+            if job.owner != payload.owner {
+                return Err(HostProblem::Unauthorized);
+            }
+            if job.priority != work.priority {
+                return Err(HostProblem::Malformed);
+            }
+            match job.state {
+                mainframe_env_batch::JobState::Completed
+                | mainframe_env_batch::JobState::Failed => return Ok(JesWorkOutcome::Completed),
+                mainframe_env_batch::JobState::Cancelled => {
+                    return Ok(JesWorkOutcome::Cancelled);
+                }
+                mainframe_env_batch::JobState::Held => return Ok(JesWorkOutcome::Deferred),
+                mainframe_env_batch::JobState::Submitted
+                | mainframe_env_batch::JobState::Output => {
+                    return Err(HostProblem::InfrastructureFailure);
+                }
+                mainframe_env_batch::JobState::Queued
+                | mainframe_env_batch::JobState::Selected
+                | mainframe_env_batch::JobState::Running => {}
+            }
+            let current = self
+                .store
+                .get_work(&work.work_id)
+                .map_err(store_error)?
+                .ok_or(HostProblem::NotFound)?;
+            if current.lease_id != work.lease_id || current.lease_epoch != work.lease_epoch {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            let invocation =
+                self.jes_work_invocation(work, &payload, current.cancellation_requested)?;
+            if current.cancellation_requested {
+                match self.batch.cancel(&invocation, &payload.job_id) {
+                    Ok(_) => return Ok(JesWorkOutcome::Cancelled),
+                    Err(HostProblem::Condition { .. })
+                        if self.batch.get(&payload.job_id)?.state
+                            == mainframe_env_batch::JobState::Cancelled =>
+                    {
+                        return Ok(JesWorkOutcome::Cancelled);
+                    }
+                    Err(problem) => return Err(problem),
+                }
+            }
+            match self
+                .batch
+                .run_claimed(&invocation, &payload.job_id, "INIT0001", false)?
+            {
+                Some(job) if job.state == mainframe_env_batch::JobState::Cancelled => {
+                    return Ok(JesWorkOutcome::Cancelled);
+                }
+                Some(_) => return Ok(JesWorkOutcome::Completed),
+                None if self.jes_workers_stopping.load(Ordering::SeqCst) => {
+                    return Ok(JesWorkOutcome::Deferred);
+                }
+                None => std::thread::sleep(Duration::from_millis(JES_IDLE_MILLIS)),
+            }
+        }
+    }
+
+    fn finish_claimed_jes_work(
+        &self,
+        work: &WorkRecord,
+        outcome: Result<JesWorkOutcome, HostProblem>,
+    ) -> Result<(), HostProblem> {
+        let lease = work
+            .lease_id
+            .as_deref()
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let now_tick = self.jes_tick()?;
+        self.recover_local_wakeups()?;
+        match outcome {
+            Ok(JesWorkOutcome::Completed) => self
+                .store
+                .complete(&work.work_id, lease, work.lease_epoch, now_tick)
+                .map_err(store_error),
+            Ok(JesWorkOutcome::Cancelled) => {
+                self.store
+                    .request_cancellation(&work.work_id)
+                    .map_err(store_error)?;
+                self.store
+                    .release(&work.work_id, lease, work.lease_epoch, now_tick, now_tick)
+                    .map(|_| ())
+                    .map_err(store_error)
+            }
+            Ok(JesWorkOutcome::Deferred) => self
+                .store
+                .release(
+                    &work.work_id,
+                    lease,
+                    work.lease_epoch,
+                    now_tick,
+                    now_tick
+                        .checked_add(JES_IDLE_MILLIS)
+                        .ok_or(HostProblem::ResourceExhausted)?,
+                )
+                .map(|_| ())
+                .map_err(store_error),
+            Err(_) => self
+                .store
+                .dead_letter(&work.work_id, lease, work.lease_epoch, now_tick)
+                .map(|_| ())
+                .map_err(store_error),
+        }
+    }
+
+    fn jes_work_invocation(
+        &self,
+        work: &WorkRecord,
+        payload: &JesWorkPayload,
+        cancelled: bool,
+    ) -> Result<Invocation, HostProblem> {
+        let limits = InvocationLimits::default();
+        let grants = payload
+            .capabilities
+            .iter()
+            .map(|capability| {
+                CapabilityId::new(capability, limits)
+                    .map_err(|_| HostProblem::InfrastructureFailure)
+            })
+            .collect::<Result<BTreeSet<_>, _>>()?;
+        let generations = grants
+            .iter()
+            .cloned()
+            .map(|capability| (capability, "1".to_string()))
+            .collect();
+        let bindings = BTreeMap::from([(
+            "jes.work-id".into(),
+            BoundedPayload::new(
+                "mainframe-env.jes-work@1",
+                work.work_id.as_bytes().to_vec(),
+                limits,
+            )
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+        )]);
+        let identity = format!("{}-{}", payload.job_id, work.lease_epoch);
+        let mut invocation = Invocation::new(
+            RequestId::new(format!("jes-request-{identity}"), limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            work.execution_id.clone(),
+            RunUnitId::new(format!("jes-run-{identity}"), limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            None,
+            work.required_selector.clone(),
+            work.artifact.clone(),
+            Principal::new(
+                PrincipalId::new(&payload.owner, limits).map_err(|_| HostProblem::Unauthorized)?,
+                grants,
+                limits,
+            )
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+            ServiceClass::Batch,
+            0,
+            work.deadline_tick,
+            TraceId::new(format!("jes-trace-{identity}"), limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            IdempotencyKey::new(format!("jes-work-{}", payload.job_id), limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            work.attempt,
+            ResourceLimits::default(),
+            bindings,
+            limits,
+        )
+        .map_err(|_| HostProblem::InfrastructureFailure)?
+        .with_provider_generations(generations, limits)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+        if cancelled {
+            invocation = invocation.with_cancellation(
+                Cancellation::new(
+                    CancellationId::new(format!("jes-cancel-{identity}"), limits)
+                        .map_err(|_| HostProblem::InfrastructureFailure)?,
+                    "durable JES work cancellation",
+                    self.jes_tick()?,
+                    limits,
+                )
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            );
+        }
+        Ok(invocation)
+    }
+
+    fn jes_tick(&self) -> Result<u64, HostProblem> {
+        self.jes_clock.now_tick().map_err(store_error)
+    }
+
+    #[cfg(test)]
+    fn run_jes_worker_once(&self, worker: &str) -> Result<Option<String>, HostProblem> {
+        let Some(work) = self.claim_jes_work(worker)? else {
+            return Ok(None);
+        };
+        let work_id = work.work_id.clone();
+        let outcome = self.process_claimed_jes_work(&work);
+        self.finish_claimed_jes_work(&work, outcome)?;
+        Ok(Some(work_id))
+    }
+
     pub fn router(self: &Arc<Self>) -> axum::Router {
+        let _ = self.start_background_workers();
         mainframe_env_zosmf::router(
             self.clone(),
             ZosmfLimits {
@@ -1824,6 +2251,8 @@ impl ProductServer {
     #[must_use]
     pub fn ready(&self) -> bool {
         self.accepting.load(Ordering::SeqCst)
+            && self.jes_workers_started.load(Ordering::SeqCst)
+            && !self.jes_workers_stopping.load(Ordering::SeqCst)
             && self.store.get_provider_state("jes-meta", "next-id").is_ok()
             && self.host.capability_ready("host.cics.execute")
             && self.host.capability_ready("host.db2.read")
@@ -1843,6 +2272,11 @@ impl ProductServer {
             active: self.active.load(Ordering::Relaxed),
             sessions: self.sessions.lock().map_or(0, |sessions| sessions.len()),
             console_messages: self.console.lock().map_or(0, |messages| messages.len()),
+            jes_workers: usize::from(
+                self.jes_workers_started.load(Ordering::Relaxed)
+                    && !self.jes_workers_stopping.load(Ordering::Relaxed),
+            ) * JES_WORKER_COUNT,
+            jes_active: self.jes_worker_active.load(Ordering::Relaxed),
             outbox_pending: self
                 .store
                 .pending_notifications(4096)
@@ -1853,6 +2287,8 @@ impl ProductServer {
 
     pub async fn graceful_shutdown(&self) -> bool {
         self.accepting.store(false, Ordering::SeqCst);
+        self.jes_workers_stopping.store(true, Ordering::SeqCst);
+        self.jes_worker_notify.notify_waiters();
         let deadline =
             tokio::time::Instant::now() + Duration::from_millis(self.config.shutdown_millis);
         while self.active.load(Ordering::SeqCst) != 0 {
@@ -1860,6 +2296,24 @@ impl ProductServer {
                 return false;
             }
             tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        let handles = match self.jes_worker_handles.lock() {
+            Ok(mut handles) => std::mem::take(&mut *handles),
+            Err(_) => return false,
+        };
+        for mut handle in handles {
+            let Some(remaining) = deadline.checked_duration_since(tokio::time::Instant::now())
+            else {
+                handle.abort();
+                return false;
+            };
+            if tokio::time::timeout(remaining, &mut handle).await.is_err() {
+                handle.abort();
+                return false;
+            }
+        }
+        if self.jes_worker_active.load(Ordering::SeqCst) != 0 {
+            return false;
         }
         true
     }
@@ -1913,6 +2367,10 @@ impl ProductServer {
     }
 
     fn recover_local_wakeups(&self) -> Result<(), HostProblem> {
+        let _delivery = self
+            .outbox_delivery
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
         for notification in self
             .store
             .pending_notifications(4096)
@@ -2253,6 +2711,10 @@ impl ProductServer {
                         &capabilities,
                     )
                     .map_err(gateway_problem)?;
+                let now_tick = self.jes_tick().map_err(gateway_problem)?;
+                let deadline_tick = now_tick
+                    .checked_add(JES_WORK_DEADLINE_TICKS)
+                    .ok_or_else(|| gateway_problem(HostProblem::ResourceExhausted))?;
                 let snapshot = self
                     .batch
                     .submit(
@@ -2263,78 +2725,40 @@ impl ProductServer {
                     )
                     .map_err(gateway_problem)?;
                 let work_id = format!("jes:{}", snapshot.id);
-                self.store
-                    .enqueue(WorkRecord {
-                        work_id: work_id.clone(),
-                        execution_id: invocation.execution_id.clone(),
-                        required_selector: invocation.selector.clone(),
-                        required_generation: "mainframe-env-batch@1".into(),
-                        artifact: invocation.artifact.clone(),
-                        state: WorkState::Queued,
-                        attempt: 0,
-                        max_attempts: 3,
-                        available_tick: 1,
-                        deadline_tick: invocation.deadline_tick,
-                        cancellation_requested: false,
-                        worker_id: None,
-                        lease_id: None,
-                        lease_epoch: 0,
-                        lease_expiry_tick: None,
-                        heartbeat_tick: None,
-                        checkpoint_id: None,
-                        effect_sequence: 0,
-                        payload: snapshot.id.as_bytes().to_vec(),
-                    })
-                    .map_err(store_error)
-                    .map_err(gateway_problem)?;
-                let claimed = self
-                    .store
-                    .claim("jes-worker-0", 1, 10)
-                    .map_err(store_error)
-                    .map_err(gateway_problem)?
-                    .ok_or_else(|| gateway_problem(HostProblem::InfrastructureFailure))?;
-                if claimed.work_id != work_id {
-                    let lease = claimed
-                        .lease_id
-                        .as_deref()
-                        .ok_or_else(|| gateway_problem(HostProblem::InfrastructureFailure))?;
-                    let _ = self
-                        .store
-                        .release(&claimed.work_id, lease, claimed.lease_epoch, 1, 2);
-                    return Err(gateway_problem(HostProblem::InfrastructureFailure));
+                let payload =
+                    JesWorkPayload::new(&snapshot.id, &principal, capabilities.iter().copied())
+                        .and_then(|payload| payload.encode())
+                        .map_err(store_error)
+                        .map_err(gateway_problem)?;
+                if let Err(error) = self.store.enqueue(WorkRecord {
+                    work_id: work_id.clone(),
+                    execution_id: invocation.execution_id.clone(),
+                    required_selector: invocation.selector.clone(),
+                    required_generation: JES_WORK_GENERATION.into(),
+                    artifact: invocation.artifact.clone(),
+                    state: WorkState::Queued,
+                    priority: snapshot.priority,
+                    attempt: 0,
+                    max_attempts: 3,
+                    available_tick: now_tick,
+                    deadline_tick,
+                    cancellation_requested: false,
+                    worker_id: None,
+                    lease_id: None,
+                    lease_epoch: 0,
+                    lease_expiry_tick: None,
+                    heartbeat_tick: None,
+                    checkpoint_id: None,
+                    effect_sequence: 0,
+                    payload,
+                }) {
+                    let _ = self.batch.cancel(&invocation, &snapshot.id);
+                    return Err(gateway_problem(store_error(error)));
                 }
-                let lease = claimed
-                    .lease_id
-                    .clone()
-                    .ok_or_else(|| gateway_problem(HostProblem::InfrastructureFailure))?;
-                self.store
-                    .heartbeat(&work_id, &lease, claimed.lease_epoch, 2, 10)
-                    .map_err(store_error)
-                    .map_err(gateway_problem)?;
-                match self.batch.run_next(&invocation, false) {
-                    Ok(result) => {
-                        self.store
-                            .complete(&work_id, &lease, claimed.lease_epoch, 2)
-                            .map_err(store_error)
-                            .map_err(gateway_problem)?;
-                        if result.is_none() {
-                            return Err(gateway_problem(HostProblem::InfrastructureFailure));
-                        }
-                    }
-                    Err(problem) => {
-                        let _ = self
-                            .store
-                            .dead_letter(&work_id, &lease, claimed.lease_epoch, 2);
-                        return Err(gateway_problem(problem));
-                    }
-                }
-                self.batch
-                    .drain_queued(&invocation)
-                    .map_err(gateway_problem)?;
-                let completed = self.batch.get(&snapshot.id).map_err(gateway_problem)?;
+                self.jes_worker_notify.notify_one();
                 Ok(GatewayResponse::json(
                     StatusCode::CREATED,
-                    job_json(completed),
+                    job_json(snapshot),
                 ))
             }
             GatewayRequest::JobStatus { jobname, jobid } => {
@@ -4837,6 +5261,7 @@ mod tests {
         LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
     };
     use mainframe_env_store::SqliteStateStore;
+    use mainframe_env_store_api::WorkStore;
     use tower::ServiceExt;
 
     #[test]
@@ -5228,6 +5653,311 @@ mod tests {
             )),
             ..ServerConfig::default()
         }
+    }
+
+    fn worker_test_server(
+        tick: u64,
+    ) -> (Arc<ProductServer>, Arc<MemoryStore>, Arc<ManualJesClock>) {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let clock = Arc::new(ManualJesClock::new(tick));
+        let platform: Arc<dyn PlatformStore> = store.clone();
+        let server = ProductServer::open_with_clock(config(), platform, clock.clone()).unwrap();
+        (server, store, clock)
+    }
+
+    fn submit_direct(server: &ProductServer, user: &str, secret: &[u8], name: &str) -> Value {
+        let response = server
+            .handle(
+                Authentication::Basic {
+                    user: user.into(),
+                    secret: secret.to_vec(),
+                },
+                GatewayRequest::JobSubmit {
+                    jcl: format!("//{name} JOB CLASS=A\n//STEP1 EXEC PGM=IEFBR14\n").into_bytes(),
+                },
+            )
+            .unwrap();
+        assert_eq!(response.status, StatusCode::CREATED);
+        let mainframe_env_zosmf::GatewayBody::Json(job) = response.body else {
+            panic!("job submission did not return JSON")
+        };
+        assert_eq!(job["status"], "ACTIVE");
+        job
+    }
+
+    async fn wait_for_terminal_job(
+        server: &ProductServer,
+        id: &str,
+    ) -> mainframe_env_batch::JobSnapshot {
+        for _ in 0..2_000 {
+            let job = server.batch.get(id).unwrap();
+            let work_terminal = server
+                .store
+                .get_work(&format!("jes:{id}"))
+                .unwrap()
+                .is_some_and(|work| {
+                    matches!(
+                        work.state,
+                        WorkState::Completed | WorkState::Cancelled | WorkState::DeadLetter
+                    )
+                });
+            if job.state.terminal() && work_terminal {
+                return job;
+            }
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        panic!("job {id} did not reach a terminal state")
+    }
+
+    #[test]
+    fn jes_worker_is_fifo_fair_and_preserves_multi_user_identity() {
+        let (server, store, _) = worker_test_server(100);
+        server.bootstrap_user("ALICE", b"ALICEPASS").unwrap();
+        server.bootstrap_user("BOB", b"BOBPASSWORD").unwrap();
+        let first = submit_direct(&server, "ALICE", b"ALICEPASS", "ALICEA");
+        let second = submit_direct(&server, "BOB", b"BOBPASSWORD", "BOBJOB");
+        let third = submit_direct(&server, "ALICE", b"ALICEPASS", "ALICEB");
+        let ids = [&first, &second, &third].map(|job| job["jobid"].as_str().unwrap().to_string());
+
+        for (ordinal, expected) in ids.iter().enumerate() {
+            assert_eq!(
+                server
+                    .run_jes_worker_once(&format!("fair-worker-{ordinal}"))
+                    .unwrap(),
+                Some(format!("jes:{expected}"))
+            );
+        }
+        assert!(
+            server
+                .run_jes_worker_once("fair-worker-done")
+                .unwrap()
+                .is_none()
+        );
+        for (id, owner) in ids.iter().zip(["ALICE", "BOB", "ALICE"]) {
+            assert_eq!(server.batch.get(id).unwrap().owner, owner);
+            assert_eq!(
+                store.get_work(&format!("jes:{id}")).unwrap().unwrap().state,
+                WorkState::Completed
+            );
+        }
+    }
+
+    #[test]
+    fn expired_crashed_jes_lease_is_reclaimed_and_stale_epoch_is_fenced() {
+        let (server, store, clock) = worker_test_server(200);
+        server.bootstrap_user("ALICE", b"ALICEPASS").unwrap();
+        let job = submit_direct(&server, "ALICE", b"ALICEPASS", "RECOVER");
+        let id = job["jobid"].as_str().unwrap();
+        let work_id = format!("jes:{id}");
+        let crashed = store
+            .claim("crashed-worker", Some(JES_WORK_GENERATION), 200, 10)
+            .unwrap()
+            .unwrap();
+        assert_eq!(crashed.lease_epoch, 1);
+        clock.advance(10);
+
+        assert_eq!(
+            server.run_jes_worker_once("recovery-worker").unwrap(),
+            Some(work_id.clone())
+        );
+        let recovered = store.get_work(&work_id).unwrap().unwrap();
+        assert_eq!(
+            (recovered.state, recovered.attempt, recovered.lease_epoch),
+            (WorkState::Completed, 2, 2)
+        );
+        assert_eq!(
+            server.batch.get(id).unwrap().state,
+            mainframe_env_batch::JobState::Completed
+        );
+        assert_eq!(
+            store.complete(
+                &work_id,
+                crashed.lease_id.as_deref().unwrap(),
+                crashed.lease_epoch,
+                210,
+            ),
+            Err(StoreError::LeaseConflict)
+        );
+    }
+
+    #[test]
+    fn sqlite_restart_reclaims_crashed_jes_work_with_a_new_epoch() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-jes-worker-restart-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let mut server_config = config();
+        server_config.store_profile = crate::StoreProfile::Sqlite;
+        server_config.sqlite_url = url.clone();
+        server_config.artifact_root = directory.join("artifacts");
+
+        let first_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let first_platform: Arc<dyn PlatformStore> = first_store.clone();
+        let first = ProductServer::open_with_clock(
+            server_config.clone(),
+            first_platform,
+            Arc::new(ManualJesClock::new(500)),
+        )
+        .unwrap();
+        first.bootstrap_user("ALICE", b"ALICEPASS").unwrap();
+        let job = submit_direct(&first, "ALICE", b"ALICEPASS", "RESTART");
+        let id = job["jobid"].as_str().unwrap().to_string();
+        let work_id = format!("jes:{id}");
+        let stale = first_store
+            .claim("crashed-process", Some(JES_WORK_GENERATION), 500, 10)
+            .unwrap()
+            .unwrap();
+        drop((first, first_store));
+
+        let second_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let second_platform: Arc<dyn PlatformStore> = second_store.clone();
+        let second = ProductServer::open_with_clock(
+            server_config,
+            second_platform,
+            Arc::new(ManualJesClock::new(510)),
+        )
+        .unwrap();
+        assert_eq!(
+            second.run_jes_worker_once("restarted-process").unwrap(),
+            Some(work_id.clone())
+        );
+        let work = second_store.get_work(&work_id).unwrap().unwrap();
+        assert_eq!((work.state, work.lease_epoch), (WorkState::Completed, 2));
+        assert_eq!(
+            second.batch.get(&id).unwrap().state,
+            mainframe_env_batch::JobState::Completed
+        );
+        assert_eq!(
+            second_store.complete(
+                &work_id,
+                stale.lease_id.as_deref().unwrap(),
+                stale.lease_epoch,
+                510,
+            ),
+            Err(StoreError::LeaseConflict)
+        );
+        drop((second, second_store));
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn cancellation_of_claimed_jes_work_wins_before_worker_completion() {
+        let (server, store, _) = worker_test_server(300);
+        server.bootstrap_user("ALICE", b"ALICEPASS").unwrap();
+        let job = submit_direct(&server, "ALICE", b"ALICEPASS", "CANCEL");
+        let id = job["jobid"].as_str().unwrap();
+        let work_id = format!("jes:{id}");
+        let claimed = store
+            .claim("cancel-worker", Some(JES_WORK_GENERATION), 300, 20)
+            .unwrap()
+            .unwrap();
+        let payload = JesWorkPayload::decode(&claimed.payload).unwrap();
+        let invocation = server
+            .jes_work_invocation(&claimed, &payload, false)
+            .unwrap();
+        assert_eq!(
+            invocation.bindings["jes.work-id"].bytes(),
+            work_id.as_bytes()
+        );
+        let response = server
+            .handle(
+                Authentication::Basic {
+                    user: "ALICE".into(),
+                    secret: b"ALICEPASS".to_vec(),
+                },
+                GatewayRequest::JobCancel {
+                    jobname: "CANCEL".into(),
+                    jobid: id.into(),
+                },
+            )
+            .unwrap();
+        assert_eq!(response.status, StatusCode::NO_CONTENT);
+        let outcome = server.process_claimed_jes_work(&claimed);
+        assert_eq!(outcome, Ok(JesWorkOutcome::Cancelled));
+        server.finish_claimed_jes_work(&claimed, outcome).unwrap();
+        assert_eq!(
+            store.get_work(&work_id).unwrap().unwrap().state,
+            WorkState::Cancelled
+        );
+        assert_eq!(
+            server.batch.get(id).unwrap().state,
+            mainframe_env_batch::JobState::Cancelled
+        );
+    }
+
+    #[test]
+    fn jes_worker_rejects_cross_user_payload_substitution() {
+        let (server, store, _) = worker_test_server(350);
+        server.bootstrap_user("ALICE", b"ALICEPASS").unwrap();
+        server.bootstrap_user("BOB", b"BOBPASSWORD").unwrap();
+        let job = submit_direct(&server, "ALICE", b"ALICEPASS", "ISOLATE");
+        let id = job["jobid"].as_str().unwrap();
+        let claimed = store
+            .claim("isolation-worker", Some(JES_WORK_GENERATION), 350, 20)
+            .unwrap()
+            .unwrap();
+        let mut forged = claimed.clone();
+        let mut payload = JesWorkPayload::decode(&forged.payload).unwrap();
+        payload.owner = "BOB".into();
+        forged.payload = payload.encode().unwrap();
+        assert_eq!(
+            server.process_claimed_jes_work(&forged),
+            Err(HostProblem::Unauthorized)
+        );
+        assert_eq!(
+            server.batch.get(id).unwrap().state,
+            mainframe_env_batch::JobState::Queued
+        );
+    }
+
+    #[tokio::test]
+    async fn bounded_worker_pool_starts_once_and_joins_on_shutdown() {
+        let (server, _, _) = worker_test_server(400);
+        server.start_background_workers().unwrap();
+        server.start_background_workers().unwrap();
+        assert_eq!(
+            server.jes_worker_handles.lock().unwrap().len(),
+            JES_WORKER_COUNT
+        );
+        assert_eq!(server.metrics().jes_workers, JES_WORKER_COUNT);
+        assert!(server.ready());
+        assert!(server.graceful_shutdown().await);
+        assert!(server.jes_worker_handles.lock().unwrap().is_empty());
+        assert_eq!(server.jes_worker_active.load(Ordering::SeqCst), 0);
+        assert_eq!(server.metrics().jes_workers, 0);
+        assert!(!server.ready());
+    }
+
+    #[tokio::test]
+    async fn background_workers_process_multiple_users_without_request_coupling() {
+        let (server, store, _) = worker_test_server(700);
+        server.bootstrap_user("ALICE", b"ALICEPASS").unwrap();
+        server.bootstrap_user("BOB", b"BOBPASSWORD").unwrap();
+        server.start_background_workers().unwrap();
+        let alice = submit_direct(&server, "ALICE", b"ALICEPASS", "ALICEBG");
+        let bob = submit_direct(&server, "BOB", b"BOBPASSWORD", "BOBBG");
+        let alice_id = alice["jobid"].as_str().unwrap();
+        let bob_id = bob["jobid"].as_str().unwrap();
+        let (alice_job, bob_job) = tokio::join!(
+            wait_for_terminal_job(&server, alice_id),
+            wait_for_terminal_job(&server, bob_id)
+        );
+        assert_eq!(
+            (alice_job.owner.as_str(), bob_job.owner.as_str()),
+            ("ALICE", "BOB")
+        );
+        for id in [alice_id, bob_id] {
+            assert_eq!(
+                store.get_work(&format!("jes:{id}")).unwrap().unwrap().state,
+                WorkState::Completed
+            );
+        }
+        assert!(server.graceful_shutdown().await);
     }
 
     const TEST_PACKAGE_KEY: &[u8] = b"test-production-package-trust-key";
@@ -5944,8 +6674,13 @@ mod tests {
         let job: Value =
             serde_json::from_slice(&to_bytes(response.into_body(), 65536).await.unwrap()).unwrap();
         assert_eq!(job["jobname"], "TESTJOB");
-        assert_eq!(job["status"], "OUTPUT");
-        let id = job["jobid"].as_str().unwrap();
+        assert_eq!(job["status"], "ACTIVE");
+        assert_eq!(job["retcode"], Value::Null);
+        assert_eq!(server.metrics().active, 0);
+        let id = job["jobid"].as_str().unwrap().to_string();
+        let completed = wait_for_terminal_job(&server, &id).await;
+        assert_eq!(completed.state, mainframe_env_batch::JobState::Completed);
+        assert_eq!(completed.return_code, Some(0));
         let files = call(
             &app,
             Method::GET,
@@ -6054,7 +6789,9 @@ mod tests {
         assert_eq!(response.status(), StatusCode::CREATED);
         let job: Value =
             serde_json::from_slice(&to_bytes(response.into_body(), 65536).await.unwrap()).unwrap();
-        assert_eq!(job["retcode"], "CC 0000");
+        assert_eq!(job["status"], "ACTIVE");
+        let completed = wait_for_terminal_job(&server, job["jobid"].as_str().unwrap()).await;
+        assert_eq!(completed.return_code, Some(0));
         assert!(server.metrics().outbox_delivered >= 5);
     }
 
@@ -6275,8 +7012,9 @@ mod tests {
         assert_eq!(response.status(), StatusCode::CREATED);
         let job: Value =
             serde_json::from_slice(&to_bytes(response.into_body(), 65_536).await.unwrap()).unwrap();
-        assert_eq!(job["retcode"], "CC 0000");
-        assert_eq!(job["status"], "OUTPUT");
+        assert_eq!(job["status"], "ACTIVE");
+        let completed = wait_for_terminal_job(&server, job["jobid"].as_str().unwrap()).await;
+        assert_eq!(completed.return_code, Some(0));
 
         let abend_source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. ABENDER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 ABCODE PIC S9(9) COMP VALUE 999.\n01 TIMING PIC S9(9) COMP VALUE 0.\nPROCEDURE DIVISION.\nCALL 'CEE3ABD' USING ABCODE TIMING.\nSTOP RUN.\n";
         let path = LogicalPath::new("ABENDER.cbl", limits.max_path_bytes).unwrap();
@@ -6330,8 +7068,9 @@ mod tests {
         .await;
         let job: Value =
             serde_json::from_slice(&to_bytes(response.into_body(), 65_536).await.unwrap()).unwrap();
-        assert_eq!(job["retcode"], "ABEND U0999");
-        assert_eq!(job["status"], "OUTPUT");
+        assert_eq!(job["status"], "ACTIVE");
+        let completed = wait_for_terminal_job(&server, job["jobid"].as_str().unwrap()).await;
+        assert_eq!(completed.abend_code.as_deref(), Some("U0999"));
     }
 
     #[test]

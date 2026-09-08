@@ -159,18 +159,32 @@ macro_rules! durable_implementations {
             fn claim(
                 &self,
                 worker: &str,
+                required_generation: Option<&str>,
                 now_tick: u64,
                 lease_ticks: u64,
             ) -> Result<Option<WorkRecord>, StoreError> {
-                if worker.is_empty() || lease_ticks == 0 {
+                if worker.is_empty()
+                    || lease_ticks == 0
+                    || required_generation.is_some_and(|generation| {
+                        generation.is_empty()
+                            || generation.len() > 128
+                            || generation.chars().any(char::is_control)
+                    })
+                {
                     return Err(StoreError::LeaseConflict);
                 }
                 for _ in 0..4 {
                     let mut retry_scan = false;
+                    let mut candidate = None::<(u8, u64, String, ProviderStateRecord, WorkRecord)>;
                     for row in
                         self.list_provider_state("durable-work", self.max_rows().min(65_536))?
                     {
                         let mut work = decode_work(&row.payload)?;
+                        if required_generation
+                            .is_some_and(|generation| work.required_generation != generation)
+                        {
+                            continue;
+                        }
                         if work.state == WorkState::Claimed
                             && (work
                                 .lease_expiry_tick
@@ -235,42 +249,57 @@ macro_rules! durable_implementations {
                             && work.available_tick <= now_tick
                             && work.deadline_tick > now_tick
                         {
-                            work.attempt =
-                                work.attempt.checked_add(1).ok_or(StoreError::Conflict)?;
-                            work.lease_epoch = work
-                                .lease_epoch
-                                .checked_add(1)
-                                .ok_or(StoreError::Conflict)?;
-                            work.state = WorkState::Claimed;
-                            work.worker_id = Some(worker.into());
-                            work.lease_id = Some(format!("{worker}:{}", work.lease_epoch));
-                            work.lease_expiry_tick = Some(
-                                now_tick
-                                    .checked_add(lease_ticks)
-                                    .ok_or(StoreError::Conflict)?
-                                    .min(work.deadline_tick),
-                            );
-                            work.heartbeat_tick = Some(now_tick);
-                            match self.put_provider_state(
-                                state_record(
-                                    "durable-work",
-                                    &work.work_id,
-                                    row.version + 1,
-                                    encode_work(&work)?,
-                                ),
-                                Some(row.version),
-                            ) {
-                                Ok(()) => return Ok(Some(work)),
-                                Err(StoreError::Conflict) => {
-                                    retry_scan = true;
-                                    break;
-                                }
-                                Err(error) => return Err(error),
+                            let better =
+                                candidate.as_ref().is_none_or(|(priority, tick, id, _, _)| {
+                                    work.priority > *priority
+                                        || (work.priority == *priority
+                                            && (work.available_tick, work.work_id.as_str())
+                                                < (*tick, id.as_str()))
+                                });
+                            if better {
+                                candidate = Some((
+                                    work.priority,
+                                    work.available_tick,
+                                    work.work_id.clone(),
+                                    row,
+                                    work,
+                                ));
                             }
                         }
                     }
-                    if !retry_scan {
+                    if retry_scan {
+                        continue;
+                    }
+                    let Some((_, _, _, row, mut work)) = candidate else {
                         return Ok(None);
+                    };
+                    work.attempt = work.attempt.checked_add(1).ok_or(StoreError::Conflict)?;
+                    work.lease_epoch = work
+                        .lease_epoch
+                        .checked_add(1)
+                        .ok_or(StoreError::Conflict)?;
+                    work.state = WorkState::Claimed;
+                    work.worker_id = Some(worker.into());
+                    work.lease_id = Some(format!("{worker}:{}", work.lease_epoch));
+                    work.lease_expiry_tick = Some(
+                        now_tick
+                            .checked_add(lease_ticks)
+                            .ok_or(StoreError::Conflict)?
+                            .min(work.deadline_tick),
+                    );
+                    work.heartbeat_tick = Some(now_tick);
+                    match self.put_provider_state(
+                        state_record(
+                            "durable-work",
+                            &work.work_id,
+                            row.version + 1,
+                            encode_work(&work)?,
+                        ),
+                        Some(row.version),
+                    ) {
+                        Ok(()) => return Ok(Some(work)),
+                        Err(StoreError::Conflict) => continue,
+                        Err(error) => return Err(error),
                     }
                 }
                 Ok(None)
@@ -1221,9 +1250,10 @@ fn event_kind_back(value: &str) -> Result<LifecycleEventKind, StoreError> {
 
 fn encode_work(work: &WorkRecord) -> Result<Vec<u8>, StoreError> {
     encode(
-        json!({"schema":2,"id":work.work_id,"execution":work.execution_id.as_str(),
+        json!({"schema":3,"id":work.work_id,"execution":work.execution_id.as_str(),
         "selector":work.required_selector.as_str(),"generation":work.required_generation,
-        "artifact":work.artifact.as_str(),"state":work_state(work.state),"attempt":work.attempt,
+        "artifact":work.artifact.as_str(),"state":work_state(work.state),"priority":work.priority,
+        "attempt":work.attempt,
         "max_attempts":work.max_attempts,"available":work.available_tick,"deadline":work.deadline_tick,
         "cancel":work.cancellation_requested,"worker":work.worker_id,"lease":work.lease_id,
         "lease_epoch":work.lease_epoch,
@@ -1234,7 +1264,7 @@ fn encode_work(work: &WorkRecord) -> Result<Vec<u8>, StoreError> {
 fn decode_work(bytes: &[u8]) -> Result<WorkRecord, StoreError> {
     let value = decode(bytes)?;
     let schema = number(&value, "schema")?;
-    if !matches!(schema, 1 | 2) {
+    if !matches!(schema, 1..=3) {
         return Err(StoreError::IncompatibleVersion);
     }
     let limits = InvocationLimits::default();
@@ -1250,6 +1280,12 @@ fn decode_work(bytes: &[u8]) -> Result<WorkRecord, StoreError> {
         artifact: ArtifactRef::new(string(&value, "artifact")?, limits)
             .map_err(|_| StoreError::IncompatibleVersion)?,
         state: work_state_back(string(&value, "state")?)?,
+        priority: if schema >= 3 {
+            u8::try_from(number(&value, "priority")?)
+                .map_err(|_| StoreError::IncompatibleVersion)?
+        } else {
+            0
+        },
         attempt,
         max_attempts: u32::try_from(number(&value, "max_attempts")?)
             .map_err(|_| StoreError::IncompatibleVersion)?,
@@ -1716,6 +1752,7 @@ mod tests {
                     required_generation: "mainframe-env-reference@1".into(),
                     artifact: ArtifactRef::new("artifact", limits).unwrap(),
                     state: WorkState::Queued,
+                    priority: 0,
                     attempt: 0,
                     max_attempts: 3,
                     available_tick: 0,
@@ -1783,7 +1820,7 @@ mod tests {
                 store.get_execution(&execution).unwrap().unwrap().state,
                 ExecutionState::Admitted
             );
-            let claimed = store.claim("worker", 1, 10).unwrap().unwrap();
+            let claimed = store.claim("worker", None, 1, 10).unwrap().unwrap();
             assert_eq!(claimed.attempt, 1);
             assert_eq!(
                 store

@@ -188,7 +188,7 @@ Work claims use row state containing:
 
 ```text
 work ID and execution ID
-required selector and generation
+required selector and generation, plus scheduling priority
 lease ID, worker ID, and monotonic fencing epoch
 lease expiry and heartbeat
 monotonic attempt
@@ -206,6 +206,11 @@ never returned to a worker. Every heartbeat, release, completion, and explicit
 dead-letter transition supplies the observed clock and fencing epoch; the
 store's compare-and-swap transaction rejects expired, superseded, or
 clock-regressed owners. Lease expiry is clamped to the work deadline.
+
+Durable work schema 3 adds the explicit scheduling priority used by the JES
+worker pool. Schema 1/2 rows remain readable with priority zero and are
+rewritten as schema 3 on their next lease mutation; their existing
+attempt-derived or explicit fencing epoch remains authoritative.
 
 State transition, current projection, effect record, and outbox notification
 are committed in one transaction where they share an authority boundary.

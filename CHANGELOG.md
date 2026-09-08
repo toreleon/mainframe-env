@@ -46,6 +46,10 @@ All notable changes to mainframe-env are documented here.
 - Enforced PostgreSQL row/object quotas with transactional reservations, moved
   the PostgreSQL product profile to a shared immutable artifact store, and made
   local artifact publication no-replace and directory-durable.
+- Moved JES execution out of HTTP submission into a bounded two-worker pool
+  backed by a durable monotonic logical clock, generation-scoped FIFO claims,
+  preserved JES priority, owner-bound execution contexts, periodic heartbeats,
+  fenced lease recovery, and graceful worker shutdown.
 - Filtered dataset catalog listings through a discrete SAF decision per name
   and derived pagination hints only from resources visible to the principal.
 - Fenced every work-lease transition by a monotonic epoch and observed clock,

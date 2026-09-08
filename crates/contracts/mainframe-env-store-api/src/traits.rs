@@ -30,9 +30,13 @@ pub trait WorkStore: Send + Sync {
     /// Observe durable cancellation without claiming, leasing, or mutating work.
     fn get_work(&self, work_id: &str) -> Result<Option<WorkRecord>, StoreError>;
     fn enqueue(&self, work: WorkRecord) -> Result<(), StoreError>;
+    /// Claim the highest-priority, oldest available work, optionally restricted
+    /// to one required generation. `None` is the compatibility form for a
+    /// caller that owns the entire durable work namespace.
     fn claim(
         &self,
         worker: &str,
+        required_generation: Option<&str>,
         now_tick: u64,
         lease_ticks: u64,
     ) -> Result<Option<WorkRecord>, StoreError>;

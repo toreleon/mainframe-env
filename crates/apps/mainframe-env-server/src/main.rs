@@ -100,6 +100,9 @@ async fn run(cli: Cli) -> Result<(), String> {
         .listen
         .parse()
         .map_err(|_| "listen is not a socket address")?;
+    server
+        .start_background_workers()
+        .map_err(|problem| problem.to_string())?;
     let router = server.router();
     if config.tls.enabled {
         let certificate = config
