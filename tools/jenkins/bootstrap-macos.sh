@@ -3,6 +3,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+python_bin="$("$repo_root/tools/jenkins/select-python.sh")"
 image="${MAINFRAME_ENV_JENKINS_IMAGE:-$HOME/Library/Application Support/mainframe-env/jenkins-10gb.sparsebundle}"
 volume="${MAINFRAME_ENV_JENKINS_VOLUME:-/Volumes/MainframeEnvJenkins}"
 
@@ -33,7 +34,7 @@ if ! mount | grep -Fq " on $volume ("; then
 fi
 
 mkdir -p "$volume/jenkins-home" "$volume/cargo-home" "$volume/tmp/controller"
-python3 -B "$repo_root/tools/jenkins/disk_guard.py" verify \
+"$python_bin" -B "$repo_root/tools/jenkins/disk_guard.py" verify \
   --root "$volume" \
   --require "JENKINS_HOME=$volume/jenkins-home" \
   --require "CARGO_HOME=$volume/cargo-home" \

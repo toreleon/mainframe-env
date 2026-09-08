@@ -58,6 +58,10 @@ sets `RUSTUP_AUTO_INSTALL=0` so a job cannot grow `~/.rustup`. Before any build,
 the pipeline fails closed unless the pinned toolchain, Rust 1.95.0, `rustfmt`,
 and `clippy` are already installed. Install them before starting Jenkins with
 the commands above; those host prerequisites are not Jenkins-managed caches.
+The startup scripts also select an already-installed Python that can load its
+standard `hashlib`, `math`, and `ssl` extensions. Set `MAINFRAME_ENV_PYTHON` to
+an absolute interpreter path to override the default `~/.local/bin/python3`,
+then `/usr/bin/python3`, probe order. The selector never installs packages.
 
 ## One-time Jenkins setup
 
@@ -71,6 +75,11 @@ Git, use this repository URL, set the branch to
 Keep the checkout non-shallow because conformance verifies tags and historical
 phase commits. The checked-out repository must contain the Jenkins migration;
 a job cannot load an uncommitted `Jenkinsfile` from Git.
+
+For a controller that must remain completely local, use a `file://` URL for the
+existing checkout. `run-local.sh` enables Git plugin local checkouts explicitly;
+the controller listens only on `127.0.0.1`, and Jenkins still clones into its
+capped workspace before running any gate.
 
 The Jenkinsfile polls the configured SCM every five minutes and schedules a
 weekly full run. `auto` uses `CHANGE_ID`,

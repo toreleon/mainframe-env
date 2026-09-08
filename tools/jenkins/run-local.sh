@@ -3,6 +3,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+python_bin="$("$repo_root/tools/jenkins/select-python.sh")"
 volume="${MAINFRAME_ENV_JENKINS_VOLUME:-/Volumes/MainframeEnvJenkins}"
 port="${JENKINS_PORT:-8080}"
 
@@ -30,12 +31,14 @@ export JENKINS_HOME="$volume/jenkins-home"
 export CARGO_HOME="$volume/cargo-home"
 export TMPDIR="$volume/tmp/controller"
 export RUSTUP_AUTO_INSTALL=0
-export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }-Djava.io.tmpdir=$TMPDIR"
+export MAINFRAME_ENV_PYTHON="$python_bin"
+export PATH="$(dirname "$python_bin"):$PATH"
+export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }-Djava.io.tmpdir=$TMPDIR -Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true"
 init_dir="$JENKINS_HOME/init.groovy.d"
 mkdir -p "$JENKINS_HOME" "$CARGO_HOME" "$TMPDIR" "$init_dir"
 install -m 0644 "$repo_root/tools/jenkins/init-capped-controller.groovy" \
   "$init_dir/10-mainframe-env-capped-controller.groovy"
-python3 -B "$repo_root/tools/jenkins/disk_guard.py" verify \
+"$MAINFRAME_ENV_PYTHON" -B "$repo_root/tools/jenkins/disk_guard.py" verify \
   --root "$volume" \
   --require "JENKINS_HOME=$JENKINS_HOME" \
   --require "CARGO_HOME=$CARGO_HOME" \

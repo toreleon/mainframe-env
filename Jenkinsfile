@@ -101,8 +101,16 @@ pipeline {
 
         stage('Installed toolchain preflight') {
             steps {
+                script {
+                    env.MAINFRAME_ENV_PYTHON = sh(
+                        script: 'tools/jenkins/select-python.sh',
+                        returnStdout: true
+                    ).trim()
+                }
                 sh '''#!/bin/bash
                     set -euo pipefail
+                    "$MAINFRAME_ENV_PYTHON" -c \
+                      'import hashlib, math, ssl; hashlib.sha256(b"jenkins").digest()'
                     required="$(awk -F'"' '/^[[:space:]]*channel[[:space:]]*=/{print $2; exit}' rust-toolchain.toml)"
                     [[ -n "$required" ]] || {
                       echo 'rust-toolchain.toml does not declare a channel' >&2
@@ -130,10 +138,10 @@ pipeline {
             steps {
                 sh '''#!/bin/bash
                     set -euo pipefail
-                    python3 -B tools/jenkins/disk_guard.py prune \
+                    "$MAINFRAME_ENV_PYTHON" -B tools/jenkins/disk_guard.py prune \
                       --root "$MAINFRAME_ENV_JENKINS_VOLUME" \
                       --cargo-home "$CARGO_HOME"
-                    python3 -B tools/jenkins/disk_guard.py verify \
+                    "$MAINFRAME_ENV_PYTHON" -B tools/jenkins/disk_guard.py verify \
                       --root "$MAINFRAME_ENV_JENKINS_VOLUME" \
                       --require "JENKINS_HOME=$JENKINS_HOME" \
                       --require "WORKSPACE=$WORKSPACE" \
@@ -199,11 +207,11 @@ pipeline {
             steps {
                 sh '''#!/bin/bash
                     set -euo pipefail
-                    python3 -B -m unittest discover -s tools/tests -p 'test_ci_assurance.py'
-                    python3 -B -m unittest discover -s tools/tests -p 'test_jenkins_disk_guard.py'
+                    "$MAINFRAME_ENV_PYTHON" -B -m unittest discover -s tools/tests -p 'test_ci_assurance.py'
+                    "$MAINFRAME_ENV_PYTHON" -B -m unittest discover -s tools/tests -p 'test_jenkins_disk_guard.py'
                     merge_args=()
                     [[ "$MAINFRAME_ENV_MERGE_COMMIT" == true ]] && merge_args+=(--merge-commit)
-                    python3 -B tools/ci_assurance.py plan \
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py plan \
                       --event "$MAINFRAME_ENV_CI_EVENT" \
                       --ref "$MAINFRAME_ENV_CI_REF" \
                       --base "$MAINFRAME_ENV_CI_BASE" \
@@ -233,11 +241,11 @@ pipeline {
                 sh '''#!/bin/bash
                     set -euo pipefail
                     out="$CARGO_TARGET_DIR/ci-assurance"
-                    python3 -B tools/ci_assurance.py record --output "$out" --gate fmt -- cargo fmt --all -- --check
-                    python3 -B tools/ci_assurance.py record --output "$out" --gate spec -- cargo xtask spec --check
-                    python3 -B tools/ci_assurance.py record --output "$out" --gate cobol -- cargo xtask cobol-exit --check
-                    python3 -B tools/ci_assurance.py record --output "$out" --gate tests --expect-tests -- cargo test --workspace --all-features --locked --no-fail-fast
-                    python3 -B tools/ci_assurance.py record --output "$out" --gate clippy -- cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate fmt -- cargo fmt --all -- --check
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate spec -- cargo xtask spec --check
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate cobol -- cargo xtask cobol-exit --check
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate tests --expect-tests -- cargo test --workspace --all-features --locked --no-fail-fast
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate clippy -- cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
                 '''
             }
         }
@@ -254,10 +262,10 @@ pipeline {
                     set -euo pipefail
                     out="$CARGO_TARGET_DIR/ci-assurance"
                     if [[ "$CI_TARGETS" == true ]]; then
-                      python3 -B tools/ci_assurance.py record --output "$out" --gate targets -- cargo check --workspace --all-targets --all-features --locked
+                      "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate targets -- cargo check --workspace --all-targets --all-features --locked
                     fi
                     if [[ "$CI_DOCUMENTATION" == true ]]; then
-                      python3 -B tools/ci_assurance.py record --output "$out" --gate documentation -- env RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --locked
+                      "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate documentation -- env RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --locked
                     fi
                 '''
             }
@@ -276,13 +284,13 @@ pipeline {
                     set -euo pipefail
                     out="$CARGO_TARGET_DIR/ci-assurance"
                     if [[ "$CI_ARCHITECTURE" == true && "$CI_FULL" != true ]]; then
-                      python3 -B tools/ci_assurance.py record --output "$out" --gate architecture-fast -- cargo xtask architecture-fast --check
+                      "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate architecture-fast -- cargo xtask architecture-fast --check
                     fi
                     if [[ "$CI_EVIDENCE" == true && "$CI_FULL" != true ]]; then
-                      python3 -B tools/ci_assurance.py record --output "$out" --gate evidence-fast -- cargo xtask evidence-fast --check
+                      "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate evidence-fast -- cargo xtask evidence-fast --check
                     fi
                     if [[ "$CI_MUTATION" == true ]]; then
-                      python3 -B tools/ci_assurance.py record --output "$out" --gate mutation -- python3 -B tools/dataset_mutations.py --output "$out/dataset-mutations" --timeout 300
+                      "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate mutation -- "$MAINFRAME_ENV_PYTHON" -B tools/dataset_mutations.py --output "$out/dataset-mutations" --timeout 300
                     fi
                 '''
             }
@@ -294,10 +302,10 @@ pipeline {
                 sh '''#!/bin/bash
                     set -euo pipefail
                     out="$CARGO_TARGET_DIR/ci-assurance"
-                    python3 -B tools/ci_assurance.py record --output "$out" --gate conformance -- cargo xtask conformance --check
-                    python3 -B tools/ci_assurance.py record --output "$out" --gate certification -- cargo xtask certification
-                    python3 -B tools/ci_assurance.py record --output "$out" --gate evidence-seal -- cargo xtask evidence seal --check
-                    python3 -B tools/ci_assurance.py record --output "$out" --gate runtime-architecture -- cargo xtask runtime-architecture --check
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate conformance -- cargo xtask conformance --check
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate certification -- cargo xtask certification
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate evidence-seal -- cargo xtask evidence seal --check
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate runtime-architecture -- cargo xtask runtime-architecture --check
                 '''
             }
         }
@@ -393,7 +401,7 @@ pipeline {
                 sh '''#!/bin/bash
                     set -euo pipefail
                     out="$CARGO_TARGET_DIR/ci-assurance"
-                    python3 -B tools/ci_assurance.py summary --plan "$out/plan.json" \
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py summary --plan "$out/plan.json" \
                       --directory "$out" --output "$out/summary.json"
                 '''
             }
@@ -407,14 +415,14 @@ pipeline {
                 set -u
                 main="$CARGO_TARGET_DIR/ci-assurance"
                 if [[ -f "$main/plan.json" ]]; then
-                  python3 -B tools/ci_assurance.py summary --plan "$main/plan.json" \
+                  "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py summary --plan "$main/plan.json" \
                     --directory "$main" --output "$main/summary.json"
                 fi
                 backend="$CARGO_TARGET_DIR/ci-backend"
                 if [[ -f "$backend/plan.json" ]]; then
                   gates=(postgres-move)
                   [[ -f "$backend/postgres-effect.json" ]] && gates+=(postgres-effect)
-                  python3 -B tools/ci_assurance.py summary --plan "$backend/plan.json" \
+                  "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py summary --plan "$backend/plan.json" \
                     --directory "$backend" --output "$backend/summary.json" \
                     --gates "${gates[@]}"
                 fi
@@ -427,7 +435,7 @@ pipeline {
                 }
             }
             sh(returnStatus: true, script: '''#!/bin/bash
-                python3 -B tools/jenkins/disk_guard.py prune \
+                "$MAINFRAME_ENV_PYTHON" -B tools/jenkins/disk_guard.py prune \
                   --root "$MAINFRAME_ENV_JENKINS_VOLUME" \
                   --cargo-home "$CARGO_HOME"
             ''')

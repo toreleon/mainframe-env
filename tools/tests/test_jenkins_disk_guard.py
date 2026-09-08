@@ -1,15 +1,34 @@
 import importlib.util
+import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
 
 TOOL = Path(__file__).resolve().parents[1] / 'jenkins' / 'disk_guard.py'
+SELECT_PYTHON = TOOL.with_name('select-python.sh')
 spec = importlib.util.spec_from_file_location('jenkins_disk_guard', TOOL)
 guard = importlib.util.module_from_spec(spec); spec.loader.exec_module(guard)
 
 
 class DiskGuardTests(unittest.TestCase):
+    def test_python_selector_honors_only_a_healthy_explicit_interpreter(self):
+        environment = os.environ.copy()
+        environment['MAINFRAME_ENV_PYTHON'] = sys.executable
+        selected = subprocess.run(
+            [SELECT_PYTHON], env=environment, text=True, capture_output=True, check=False
+        )
+        self.assertEqual(selected.returncode, 0)
+        self.assertEqual(Path(selected.stdout.strip()).resolve(), Path(sys.executable).resolve())
+
+        environment['MAINFRAME_ENV_PYTHON'] = '/definitely/missing/python3'
+        rejected = subprocess.run(
+            [SELECT_PYTHON], env=environment, text=True, capture_output=True, check=False
+        )
+        self.assertNotEqual(rejected.returncode, 0)
+
     def test_verify_accepts_only_paths_on_and_below_capped_root(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()

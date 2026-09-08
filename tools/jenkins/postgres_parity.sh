@@ -3,12 +3,13 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+python_bin="${MAINFRAME_ENV_PYTHON:-$("$root/tools/jenkins/select-python.sh")}"
 action="${1:-run}"
 
 postgres_bin() {
   local candidate=""
   if command -v postgres >/dev/null 2>&1; then
-    candidate="$(dirname "$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$(command -v postgres)")")"
+    candidate="$(dirname "$("$python_bin" -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$(command -v postgres)")")"
   elif command -v brew >/dev/null 2>&1; then
     candidate="$(cd "$(brew --prefix postgresql@18 2>/dev/null)/bin" && pwd -P)"
   fi
@@ -98,17 +99,17 @@ out="${CARGO_TARGET_DIR:?CARGO_TARGET_DIR must be set}/ci-backend"
 mkdir -p "$out"
 cp "$CARGO_TARGET_DIR/ci-assurance/plan.json" "$out/plan.json"
 
-python3 -B "$root/tools/ci_assurance.py" record --output "$out" \
+"$python_bin" -B "$root/tools/ci_assurance.py" record --output "$out" \
   --gate postgres-move --expect-tests -- \
   cargo test --locked -p mainframe-env-store --test provider_move_contract \
   postgres_move_contract -- --ignored --exact
 gates=(postgres-move)
 if [[ -f "$root/crates/stores/mainframe-env-store/tests/effect_encoding_contract.rs" ]]; then
-  python3 -B "$root/tools/ci_assurance.py" record --output "$out" \
+  "$python_bin" -B "$root/tools/ci_assurance.py" record --output "$out" \
     --gate postgres-effect --expect-tests -- \
     cargo test --locked -p mainframe-env-store --test effect_encoding_contract \
     postgres_effect_domains_cannot_be_mixed -- --ignored --exact
   gates+=(postgres-effect)
 fi
-python3 -B "$root/tools/ci_assurance.py" summary --plan "$out/plan.json" \
+"$python_bin" -B "$root/tools/ci_assurance.py" summary --plan "$out/plan.json" \
   --directory "$out" --output "$out/summary.json" --gates "${gates[@]}"
