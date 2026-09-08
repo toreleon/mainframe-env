@@ -219,18 +219,21 @@ pipeline {
                       ${merge_flag:+$merge_flag}
                 '''
                 script {
-                    def plan = new groovy.json.JsonSlurperClassic().parseText(
-                        readFile("${env.CARGO_TARGET_DIR}/ci-assurance/plan.json")
-                    )
-                    env.CI_BUILD_REQUIRED = plan.build.toString()
-                    env.CI_MSRV_REQUIRED = plan.msrv.toString()
-                    env.CI_STORE_REQUIRED = plan.store.toString()
-                    env.CI_ARCHITECTURE = plan.architecture.toString()
-                    env.CI_EVIDENCE = plan.evidence.toString()
-                    env.CI_MUTATION = plan.mutation.toString()
-                    env.CI_FULL = plan.full.toString()
-                    env.CI_TARGETS = plan.primary_gates.contains('targets').toString()
-                    env.CI_DOCUMENTATION = plan.primary_gates.contains('documentation').toString()
+                    def selector = { field ->
+                        sh(
+                            script: "\"${env.MAINFRAME_ENV_PYTHON}\" -B tools/jenkins/plan_field.py --plan \"${env.CARGO_TARGET_DIR}/ci-assurance/plan.json\" --field ${field}",
+                            returnStdout: true
+                        ).trim()
+                    }
+                    env.CI_BUILD_REQUIRED = selector('build')
+                    env.CI_MSRV_REQUIRED = selector('msrv')
+                    env.CI_STORE_REQUIRED = selector('store')
+                    env.CI_ARCHITECTURE = selector('architecture')
+                    env.CI_EVIDENCE = selector('evidence')
+                    env.CI_MUTATION = selector('mutation')
+                    env.CI_FULL = selector('full')
+                    env.CI_TARGETS = selector('targets')
+                    env.CI_DOCUMENTATION = selector('documentation')
                 }
             }
         }

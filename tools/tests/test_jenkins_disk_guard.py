@@ -9,11 +9,29 @@ from unittest.mock import patch
 
 TOOL = Path(__file__).resolve().parents[1] / 'jenkins' / 'disk_guard.py'
 SELECT_PYTHON = TOOL.with_name('select-python.sh')
+PLAN_FIELD = TOOL.with_name('plan_field.py')
 spec = importlib.util.spec_from_file_location('jenkins_disk_guard', TOOL)
 guard = importlib.util.module_from_spec(spec); spec.loader.exec_module(guard)
 
 
 class DiskGuardTests(unittest.TestCase):
+    def test_plan_field_reads_only_typed_boolean_selectors(self):
+        plan = {
+            'build': True,
+            'msrv': False,
+            'primary_gates': ['fmt', 'targets'],
+        }
+        field_spec = importlib.util.spec_from_file_location('jenkins_plan_field', PLAN_FIELD)
+        field = importlib.util.module_from_spec(field_spec); field_spec.loader.exec_module(field)
+        self.assertTrue(field.selected(plan, 'build'))
+        self.assertFalse(field.selected(plan, 'msrv'))
+        self.assertTrue(field.selected(plan, 'targets'))
+        self.assertFalse(field.selected(plan, 'documentation'))
+        with self.assertRaises(ValueError):
+            field.selected({'build': 'true'}, 'build')
+        with self.assertRaises(ValueError):
+            field.selected({'primary_gates': ['targets', 'targets']}, 'targets')
+
     def test_python_selector_honors_only_a_healthy_explicit_interpreter(self):
         environment = os.environ.copy()
         environment['MAINFRAME_ENV_PYTHON'] = sys.executable
