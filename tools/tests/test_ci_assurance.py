@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import patch
 
 TOOL = Path(__file__).resolve().parents[1] / 'ci_assurance.py'
+ROOT = TOOL.parent.parent
 spec = importlib.util.spec_from_file_location('ci_assurance', TOOL)
 ci = importlib.util.module_from_spec(spec); spec.loader.exec_module(ci)
 
@@ -64,6 +65,26 @@ class SelectionTests(unittest.TestCase):
             self.assertTrue(p['full']);self.assertTrue(p['msrv']);self.assertTrue(p['store'])
             self.assertTrue(set(ci.FULL)<=set(p['primary_gates']))
             self.assertIn('certification',p['primary_gates'])
+            self.assertIn('cargo-deny',p['primary_gates'])
+
+    @patch.object(ci,'identity',return_value={'candidate':'a'*40,'tree':'b'*40})
+    def test_dependency_policy_blocks_even_a_prose_only_pull_request(self,_):
+        with patch.object(ci.subprocess,'check_output',return_value=b'README.md\0'):
+            plan=ci.make_plan(Path('.'),{},'pull_request','refs/pull/1/merge','c'*40)
+        self.assertFalse(plan['build'])
+        self.assertEqual(plan['primary_gates'],['cargo-deny','license-notices'])
+
+    def test_jenkins_and_offline_release_bundle_enforce_license_distribution(self):
+        jenkins=(ROOT/'Jenkinsfile').read_text()
+        self.assertIn('--gate cargo-deny -- cargo deny check',jenkins)
+        self.assertIn('--gate license-notices -- cargo xtask license-notices --check',jenkins)
+        self.assertIn("command -v cargo-deny",jenkins)
+        bundle=(ROOT/'tools/package_offline_cargo_bundle.sh').read_text()
+        for required in ['LICENSE','NOTICE','LICENSES/ICU.txt']:
+            self.assertIn(f'"$root/{required}"',bundle)
+        policy=(ROOT/'deny.toml').read_text()
+        self.assertIn('crate = "decnumber-sys@=0.1.6"',policy)
+        self.assertIn('allow = ["ICU"]',policy)
 
     def test_jenkins_pull_request_context_uses_explicit_comparison_sha(self):
         context=ci.jenkins_context(Path('.'),{

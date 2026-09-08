@@ -122,9 +122,11 @@ release-grade work on every event:
 - jobs run only for branches and changes configured in local Jenkins; the
   checked-out SHA is the execution authority;
 - concurrent runs of the same job are serialized to bound local disk use;
-- documentation-only changes do not start the Rust workflow;
-- pull requests run formatting, specification and COBOL exit checks, workspace
-  tests, Clippy, and the contract MSRV gate;
+- documentation-only changes skip the ordinary Rust suite but still run the
+  locked dependency-policy and full-notice checks;
+- pull requests run `cargo deny check`, target-production license-notice
+  validation, formatting, specification and COBOL exit checks, workspace tests,
+  Clippy, and the contract MSRV gate;
 - the integrated `main` commit runs the complete workspace and documentation
   gates; the MSRV result is not repeated for a standard merge commit;
 - a manual `full` run adds complete conformance, certification, evidence, and
@@ -158,7 +160,8 @@ workspace.
 - overload/backpressure and cancellation evidence;
 - database backup/restore and restart recovery;
 - release-binary SQLite startup, readiness, and shutdown smoke;
-- security/advisory/license checks;
+- blocking `cargo deny check` plus deterministic full target-production license
+  notices;
 - compatibility and cutover rehearsal; and
 - reproducible artifacts and documentation.
 

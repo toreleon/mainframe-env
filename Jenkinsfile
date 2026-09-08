@@ -132,6 +132,11 @@ pipeline {
                       echo "clippy is missing from installed toolchain $required" >&2
                       exit 1
                     }
+                    command -v cargo-deny >/dev/null || {
+                      echo 'cargo-deny is required on the Jenkins node' >&2
+                      exit 1
+                    }
+                    cargo deny --version
                 '''
             }
         }
@@ -237,6 +242,19 @@ pipeline {
                     env.CI_TARGETS = selector('targets')
                     env.CI_DOCUMENTATION = selector('documentation')
                 }
+            }
+        }
+
+        stage('Dependency and license policy') {
+            steps {
+                sh '''#!/bin/bash
+                    set -euo pipefail
+                    out="$CARGO_TARGET_DIR/ci-assurance"
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record \
+                      --output "$out" --gate cargo-deny -- cargo deny check
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record \
+                      --output "$out" --gate license-notices -- cargo xtask license-notices --check
+                '''
             }
         }
 

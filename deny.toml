@@ -17,6 +17,11 @@ allow = [
   "Unicode-3.0",
   "Zlib",
 ]
+exceptions = [
+  # ADR-0008 approves only this locked component and retained ICU text.
+  { allow = ["ICU"], crate = "decnumber-sys@=0.1.6" },
+]
+unused-license-exception = "deny"
 
 [sources]
 unknown-registry = "deny"

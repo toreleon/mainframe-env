@@ -42,6 +42,10 @@ grep -q '^directory = "vendor"$' "$sdk/.cargo/config.toml" \
   || { echo "could not make the vendor path relocatable" >&2; exit 1; }
 cp "$root/Cargo.lock" "$sdk/Cargo.lock"
 cp "$root/Cargo.toml" "$sdk/Cargo.toml"
+cp "$root/LICENSE" "$sdk/LICENSE"
+cp "$root/NOTICE" "$sdk/NOTICE"
+mkdir -p "$sdk/LICENSES"
+cp "$root/LICENSES/ICU.txt" "$sdk/LICENSES/ICU.txt"
 
 cat > "$sdk/README.md" <<'EOF'
 # mainframe-env offline Cargo dependency bundle
@@ -52,6 +56,10 @@ contains the exact crates selected by `Cargo.lock`; build and test with
 `cargo test --workspace --all-features --locked --offline`.
 
 The Rust compiler and source checkout are not included.
+
+The mainframe-env Apache-2.0 license, project NOTICE, and the complete retained
+ICU text for the locked decNumber dependency are included at the archive root.
+Each vendored crate retains its own complete license and notice files.
 EOF
 
 echo "==> verifying a clean checkout with networking disabled in Cargo"

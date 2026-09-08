@@ -79,6 +79,8 @@ Common local checks are:
 
 ```bash
 cargo fmt --all -- --check
+cargo deny check
+cargo xtask license-notices --check
 cargo xtask spec --check
 cargo xtask architecture-fast --check
 cargo test --workspace --all-features --locked --no-fail-fast
@@ -134,3 +136,12 @@ mainframe-env owned contracts and implementation
 
 No production deployment, remote publication, or licensed-equivalence claim is
 implied by repository publication or by passing local tests.
+
+## License
+
+mainframe-env is licensed under the [Apache License 2.0](LICENSE). Required
+project and third-party attributions are in [NOTICE](NOTICE); the exact ICU text
+approved for the locked decNumber dependency is retained in
+[LICENSES/ICU.txt](LICENSES/ICU.txt). Release tooling generates full,
+target-specific `LICENSES.md` notices for every production dependency before it
+writes release receipts.

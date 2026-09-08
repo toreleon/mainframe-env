@@ -1,0 +1,12 @@
+mainframe-env
+Copyright 2026 mainframe-env contributors
+
+This product includes decNumber-derived software through the locked
+decnumber-sys 0.1.6 crate. That component is distributed under the ICU License
+and retains the copyright notices for Materialize, Inc., International Business
+Machines Corporation, and others. The complete retained text is in
+LICENSES/ICU.txt and in each target release's generated LICENSES.md.
+
+Complete license and attribution texts for every third-party package in a
+target binary's production dependency closure are generated into LICENSES.md
+before release receipts are written.

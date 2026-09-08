@@ -44,6 +44,9 @@ All notable changes to mainframe-env are documented here.
   reconciliation and credential-redacted RACF command digests.
 - Unified execution-journal, effect, checkpoint, and artifact invariants across
   memory, SQLite, and PostgreSQL stores, with hostile-record rollback contracts.
+- Added the complete Apache-2.0 project license and ICU attribution, generated
+  deterministic full notices from each target production dependency closure,
+  and made dependency-license policy a blocking CI and release gate.
 - Made the macOS release build retain its required `LC_UUID` and required the
   exact target CLI and server binaries to pass launch, help, version, and
   readiness probes before release receipts can be written.

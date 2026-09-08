@@ -58,6 +58,7 @@ explicitly names that authority as superseded.
 - [ADR-0005: Package consolidation](decisions/0005-package-consolidation.md)
 - [ADR-0006: CardDemo 0.1.1 profile](decisions/0006-carddemo-0.1.1-profile.md)
 - [ADR-0007: CardDemo 0.1.1 release](decisions/0007-carddemo-0.1.1-release.md)
+- [ADR-0008: ICU license compliance](decisions/0008-icu-license-compliance.md)
 - [Decision index and template](decisions/README.md)
 
 ADR-0005 records a historical 0.1 decision. The current workspace has later

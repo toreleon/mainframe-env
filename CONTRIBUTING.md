@@ -38,6 +38,8 @@ environment. A skipped external test receives no evidence credit.
 
 ```bash
 cargo fmt --all -- --check
+cargo deny check
+cargo xtask license-notices --check
 cargo xtask spec --check
 cargo xtask architecture-fast --check
 cargo test --workspace --all-features --locked --no-fail-fast
@@ -46,9 +48,9 @@ RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --lock
 git diff --check
 ```
 
-Run `cargo deny check` for dependency changes. It is currently a known
-pre-0.9 blocker until the ICU license decision and complete notice packaging
-are resolved; do not waive the failure silently.
+`cargo deny check` is mandatory for every change. License additions require an
+explicit repository decision and complete distributable notice text; do not
+silently waive a rejected dependency.
 
 ## Public and durable changes
 

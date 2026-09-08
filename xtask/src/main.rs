@@ -6,6 +6,7 @@ mod evidence_seal;
 mod jcl_catalog;
 mod jcl_conformance;
 mod racf_catalog;
+mod release_licenses;
 mod topic_manifests;
 mod work_package_seal;
 
@@ -231,6 +232,7 @@ enum XtaskCommand {
     CarddemoOperatorSubmit(CheckArgs),
     CarddemoOperatorReset(CheckArgs),
     CarddemoFull(CheckArgs),
+    LicenseNotices(CheckArgs),
     Digest(CheckArgs),
     Release(ReleaseArgs),
 }
@@ -586,6 +588,9 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
         ),
         XtaskCommand::CarddemoFull(args) => {
             checked!("carddemo-full", args, check_carddemo_full(root))
+        }
+        XtaskCommand::LicenseNotices(args) => {
+            checked!("license-notices", args, check_release_license_notices(root))
         }
         XtaskCommand::Digest(args) => checked!("digest", args, print_digest(root)),
         XtaskCommand::WorkPackageSeal(args) => (
@@ -12302,6 +12307,20 @@ fn validate_release_target(target: &str) -> TaskResult {
     )
 }
 
+fn check_release_license_notices(root: &Path) -> TaskResult {
+    for target in RETAINED_RELEASE_TARGETS {
+        let report = release_licenses::generate(root, target)?;
+        println!(
+            "license-notices target={target} production-packages={} third-party-packages={} unique-legal-texts={} bytes={}",
+            report.production_packages,
+            report.third_party_packages,
+            report.unique_legal_texts,
+            report.bytes.len()
+        );
+    }
+    Ok(())
+}
+
 fn host_target(root: &Path) -> TaskResult<String> {
     let verbose = command_text(root, "rustc", &["-vV"])?;
     let target = verbose
@@ -12748,6 +12767,47 @@ fn validate_release_documents(
         .as_str()
         .ok_or("product.channel is missing")?;
     let source_digest = release_source_digest(root)?;
+    let expected_notices = release_licenses::generate(root, target)?;
+    let actual_notices = documents
+        .iter()
+        .find_map(|(path, bytes)| {
+            (path.file_name() == Some(OsStr::new("LICENSES.md"))).then_some(bytes)
+        })
+        .ok_or("target release receipt omits LICENSES.md")?;
+    require(
+        actual_notices == &expected_notices.bytes,
+        "target release license notices are stale or incomplete",
+    )?;
+    let manifest_bytes = documents
+        .iter()
+        .find_map(|(path, bytes)| {
+            (path.file_name() == Some(OsStr::new("manifest.json"))).then_some(bytes)
+        })
+        .ok_or("target release receipt omits manifest.json")?;
+    let manifest: Value = serde_json::from_slice(manifest_bytes)
+        .map_err(|error| format!("release manifest: {error}"))?;
+    let production_packages = u64::try_from(expected_notices.production_packages)
+        .map_err(|_| "release production package count is out of range")?;
+    let third_party_packages = u64::try_from(expected_notices.third_party_packages)
+        .map_err(|_| "release third-party package count is out of range")?;
+    let unique_legal_texts = u64::try_from(expected_notices.unique_legal_texts)
+        .map_err(|_| "release legal text count is out of range")?;
+    require(
+        manifest["license_notices"]["project_license"]["path"] == Value::String("LICENSE".into())
+            && manifest["license_notices"]["project_license"]["sha256"]
+                == Value::String(file_digest(&root.join("LICENSE"))?)
+            && manifest["license_notices"]["project_notice"]["path"]
+                == Value::String("NOTICE".into())
+            && manifest["license_notices"]["project_notice"]["sha256"]
+                == Value::String(file_digest(&root.join("NOTICE"))?)
+            && manifest["license_notices"]["production_packages"].as_u64()
+                == Some(production_packages)
+            && manifest["license_notices"]["third_party_packages"].as_u64()
+                == Some(third_party_packages)
+            && manifest["license_notices"]["unique_legal_texts"].as_u64()
+                == Some(unique_legal_texts),
+        "release manifest license metadata differs from the production closure",
+    )?;
     validate_release_documents_for_identity(documents, target, &version, channel, &source_digest)
 }
 
@@ -12780,6 +12840,13 @@ fn validate_release_documents_for_identity(
         .map_err(|error| format!("release licenses: {error}"))?;
     let build_inputs: Value = serde_json::from_slice(document("build-inputs.json")?)
         .map_err(|error| format!("release build inputs: {error}"))?;
+    validate_license_document_binding(
+        &manifest,
+        &provenance,
+        checksums,
+        document("LICENSES.md")?,
+        version,
+    )?;
     validate_release_identity(
         &manifest,
         &sbom,
@@ -12851,6 +12918,69 @@ fn validate_release_documents_for_identity(
     Ok(())
 }
 
+fn full_license_notices_required(version: &str) -> TaskResult<bool> {
+    Ok(stable_zero_version(version)? >= (8, 3))
+}
+
+fn validate_license_document_binding(
+    manifest: &Value,
+    provenance: &Value,
+    checksums: &str,
+    licenses: &[u8],
+    version: &str,
+) -> TaskResult {
+    if !full_license_notices_required(version)? {
+        return Ok(());
+    }
+    let licenses_text = std::str::from_utf8(licenses)
+        .map_err(|error| format!("release licenses are not UTF-8: {error}"))?;
+    let licenses_digest = format!("{:x}", Sha256::digest(licenses));
+    for field in ["project_license", "project_notice"] {
+        let digest = manifest["license_notices"][field]["sha256"]
+            .as_str()
+            .ok_or_else(|| format!("release license notices omit {field} digest"))?;
+        validate_sha256_hex(digest, &format!("release {field} digest"))?;
+    }
+    require(
+        licenses_text.starts_with("# mainframe-env license and third-party notices\n")
+            && licenses_text.contains(&format!("Schema: `{}`", release_licenses::NOTICE_SCHEMA))
+            && licenses_text.contains("`decnumber-sys 0.1.6` — expression: `ICU`")
+            && licenses_text.contains(
+                "Copyright (c) 1995-2005 International Business Machines Corporation and others",
+            )
+            && manifest["license_notices"]["schema_version"]
+                == Value::String(release_licenses::NOTICE_SCHEMA.into())
+            && manifest["license_notices"]["path"] == Value::String("LICENSES.md".into())
+            && manifest["license_notices"]["sha256"] == Value::String(licenses_digest.clone())
+            && manifest["license_notices"]["production_packages"]
+                .as_u64()
+                .is_some_and(|count| count > 0)
+            && manifest["license_notices"]["third_party_packages"]
+                .as_u64()
+                .is_some_and(|count| count > 0)
+            && manifest["license_notices"]["unique_legal_texts"]
+                .as_u64()
+                .is_some_and(|count| count > 1)
+            && manifest["license_notices"]["project_license"]["path"]
+                == Value::String("LICENSE".into())
+            && manifest["license_notices"]["project_notice"]["path"]
+                == Value::String("NOTICE".into())
+            && checksums
+                .lines()
+                .any(|line| line == format!("{licenses_digest}  LICENSES.md"))
+            && provenance["predicate"]["buildDefinition"]["resolvedDependencies"]
+                .as_array()
+                .is_some_and(|dependencies| {
+                    dependencies.iter().any(|dependency| {
+                        dependency["uri"].as_str() == Some("LICENSES.md")
+                            && dependency["digest"]["sha256"].as_str()
+                                == Some(licenses_digest.as_str())
+                    })
+                }),
+        "release license notices are incomplete or are not bound to the receipt",
+    )
+}
+
 #[allow(clippy::too_many_arguments)]
 fn validate_release_identity(
     manifest: &Value,
@@ -12863,6 +12993,11 @@ fn validate_release_identity(
     channel: &str,
     source_digest: &str,
 ) -> TaskResult {
+    let valid_license_header = if full_license_notices_required(version)? {
+        licenses.starts_with("# mainframe-env license and third-party notices\n")
+    } else {
+        licenses.starts_with("# License expressions\n")
+    };
     require(
         manifest["schema_version"] == Value::String("mainframe-env.release-manifest@1".into())
             && manifest["version"] == Value::String(version.into())
@@ -12887,7 +13022,7 @@ fn validate_release_identity(
             && build_inputs["source_digest"] == Value::String(source_digest.into())
             && build_inputs["deterministic_environment"]["SOURCE_DATE_EPOCH"]
                 == Value::String("0".into())
-            && licenses.starts_with("# License expressions\n"),
+            && valid_license_header,
         "target release receipt metadata is inconsistent",
     )?;
     require(
@@ -13055,6 +13190,10 @@ fn release_documents(root: &Path, target: &str) -> TaskResult<BTreeMap<PathBuf, 
     });
     let build_inputs_bytes = pretty_json(&build_inputs)?;
     let build_inputs_digest = format!("{:x}", Sha256::digest(&build_inputs_bytes));
+    let license_report = release_licenses::generate(root, target)?;
+    let licenses_digest = format!("{:x}", Sha256::digest(&license_report.bytes));
+    let project_license_digest = file_digest(&root.join("LICENSE"))?;
+    let project_notice_digest = file_digest(&root.join("NOTICE"))?;
     let manifest = json!({
         "schema_version":"mainframe-env.release-manifest@1",
         "product":"mainframe-env",
@@ -13066,6 +13205,16 @@ fn release_documents(root: &Path, target: &str) -> TaskResult<BTreeMap<PathBuf, 
         "profile":"release/core-server",
         "contracts":"conformance/0.2/inventory/versions.json",
         "migration_head":"0001-durable-state",
+        "license_notices":{
+            "schema_version":release_licenses::NOTICE_SCHEMA,
+            "path":"LICENSES.md",
+            "sha256":licenses_digest,
+            "project_license":{"path":"LICENSE","sha256":project_license_digest},
+            "project_notice":{"path":"NOTICE","sha256":project_notice_digest},
+            "production_packages":license_report.production_packages,
+            "third_party_packages":license_report.third_party_packages,
+            "unique_legal_texts":license_report.unique_legal_texts
+        },
         "artifacts":[
             {"path":"bin/mainframe-env-server","sha256":server_digest},
             {"path":"bin/mainframe-env","sha256":cli_digest},
@@ -13091,28 +13240,15 @@ fn release_documents(root: &Path, target: &str) -> TaskResult<BTreeMap<PathBuf, 
                 "resolvedDependencies":[
                     {"uri":"Cargo.lock","digest":{"sha256":lock_digest}},
                     {"uri":"build-inputs.json","digest":{"sha256":build_inputs_digest}},
+                    {"uri":"LICENSES.md","digest":{"sha256":licenses_digest}},
                     {"uri":"source-tree","digest":{"sha256":source_digest.trim_start_matches("sha256:")}}
                 ]
             },
             "runDetails":{"builder":{"id":format!("mainframe-env-cargo/{target}")},"metadata":{"invocationId":format!("mainframe-env-v{version}-{target}-local")}}
         }
     });
-    let mut licenses = packages
-        .iter()
-        .filter_map(|package| package.get("license").and_then(Value::as_str))
-        .map(str::to_string)
-        .collect::<BTreeSet<_>>();
-    licenses.insert("Apache-2.0 (mainframe-env)".into());
-    let notices = format!(
-        "# License expressions\n\nGenerated from locked Cargo metadata. Full dependency texts remain in their source packages.\n\n{}\n",
-        licenses
-            .into_iter()
-            .map(|license| format!("- {license}"))
-            .collect::<Vec<_>>()
-            .join("\n")
-    );
     let checksums = format!(
-        "{server_digest}  bin/mainframe-env-server\n{cli_digest}  bin/mainframe-env\n{config_digest}  config/mainframe-env.toml\n{sqlite_migration}  migrations/sqlite/0001-durable-state.sql\n{postgres_migration}  migrations/postgres/0001-durable-state.sql\n{build_inputs_digest}  build-inputs.json\n"
+        "{server_digest}  bin/mainframe-env-server\n{cli_digest}  bin/mainframe-env\n{config_digest}  config/mainframe-env.toml\n{sqlite_migration}  migrations/sqlite/0001-durable-state.sql\n{postgres_migration}  migrations/postgres/0001-durable-state.sql\n{build_inputs_digest}  build-inputs.json\n{licenses_digest}  LICENSES.md\n"
     );
     Ok(BTreeMap::from([
         (directory.join("manifest.json"), pretty_json(&manifest)?),
@@ -13122,7 +13258,7 @@ fn release_documents(root: &Path, target: &str) -> TaskResult<BTreeMap<PathBuf, 
             pretty_json(&provenance)?,
         ),
         (directory.join("checksums.sha256"), checksums.into_bytes()),
-        (directory.join("LICENSES.md"), notices.into_bytes()),
+        (directory.join("LICENSES.md"), license_report.bytes),
         (directory.join("build-inputs.json"), build_inputs_bytes),
     ]))
 }
@@ -13958,6 +14094,57 @@ mod tests {
         let problem = require_release_candidate(&root).unwrap_err();
         assert!(problem.contains("release-candidate promotion"));
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn full_license_notices_are_digest_bound_from_0_8_3_forward() {
+        let licenses = format!(
+            "# mainframe-env license and third-party notices\n\nSchema: `{}`\n\n- `decnumber-sys 0.1.6` — expression: `ICU`\n\nCopyright (c) 1995-2005 International Business Machines Corporation and others\n",
+            release_licenses::NOTICE_SCHEMA
+        );
+        let digest = format!("{:x}", Sha256::digest(licenses.as_bytes()));
+        let manifest = json!({"license_notices":{
+            "schema_version":release_licenses::NOTICE_SCHEMA,
+            "path":"LICENSES.md",
+            "sha256":digest,
+            "production_packages":2,
+            "third_party_packages":1,
+            "unique_legal_texts":2,
+            "project_license":{"path":"LICENSE","sha256":"a".repeat(64)},
+            "project_notice":{"path":"NOTICE","sha256":"b".repeat(64)}
+        }});
+        let provenance = json!({"predicate":{"buildDefinition":{"resolvedDependencies":[{
+            "uri":"LICENSES.md","digest":{"sha256":digest}
+        }]}}});
+        let checksums = format!("{digest}  LICENSES.md\n");
+        validate_license_document_binding(
+            &manifest,
+            &provenance,
+            &checksums,
+            licenses.as_bytes(),
+            "0.8.3",
+        )
+        .unwrap();
+        assert!(
+            validate_license_document_binding(
+                &manifest,
+                &provenance,
+                &checksums,
+                b"# mainframe-env license and third-party notices\nchanged\n",
+                "0.8.3",
+            )
+            .is_err()
+        );
+        assert!(
+            validate_license_document_binding(
+                &json!({}),
+                &json!({}),
+                "",
+                b"# License expressions\n",
+                "0.8.2",
+            )
+            .is_ok()
+        );
     }
 
     #[test]

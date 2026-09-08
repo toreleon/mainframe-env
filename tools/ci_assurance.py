@@ -19,6 +19,7 @@ SHARED = {
 }
 PROSE = {'README.md', 'CHANGELOG.md', 'LICENSE', 'LICENSE.md', 'CONTRIBUTING.md', 'AGENTS.md'}
 PRIMARY = ['fmt', 'spec', 'cobol', 'tests', 'clippy']
+POLICY = ['cargo-deny', 'license-notices']
 FULL = ['targets', 'documentation', 'conformance', 'certification', 'evidence-seal', 'runtime-architecture']
 SHA = re.compile(r'[0-9a-f]{40}\Z')
 EVENTS = frozenset({'local', 'push', 'pull_request', 'schedule', 'manual', 'tag'})
@@ -88,7 +89,12 @@ def make_plan(root: Path, event: dict, event_name: str, ref: str, base: str | No
     build = bool(selected)
     merge_push = event_name == 'push' and event.get('merge_commit', False)
     msrv = build and (full or not merge_push)
-    gates = list(PRIMARY) if build else []
+    # Dependency and license policy is intentionally unconditional: prose-only
+    # pull requests, scheduled/full runs, and release tags all remain blocked by
+    # a red locked dependency policy.
+    gates = list(POLICY)
+    if build:
+        gates.extend(PRIMARY)
     if 'architecture' in selected and not full: gates.append('architecture-fast')
     if 'evidence' in selected and not full: gates.append('evidence-fast')
     if 'mutation' in selected: gates.append('mutation')

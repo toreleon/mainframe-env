@@ -11,6 +11,7 @@ ADRs capture decisions that constrain implementation and public contracts.
 | [0005](0005-package-consolidation.md) | twenty-package physical map and split triggers | Accepted |
 | [0006](0006-carddemo-0.1.1-profile.md) | additive 0.1.1 CardDemo-full profile and new split triggers | Accepted |
 | [0007](0007-carddemo-0.1.1-release.md) | release CardDemo-full 0.1.1 and canonicalize CARDDEMO naming | Accepted |
+| [0008](0008-icu-license-compliance.md) | retain the locked decNumber dependency under ICU and ship complete notices | Accepted |
 
 An accepted ADR is immutable. A material change creates a superseding ADR and
 links to the previous decision.
