@@ -1189,6 +1189,75 @@ mod tests {
     }
 
     #[test]
+    fn every_reachable_unsupported_syntax_path_fails_in_both_inner_forms() {
+        let mut exercised = 0usize;
+        for descriptor in command_descriptors() {
+            let mut prefix = descriptor.keyword().to_string();
+            for index in 0..descriptor.min_positionals {
+                prefix.push_str(&format!(" X{index}"));
+            }
+            for syntax in descriptor
+                .syntax_tokens()
+                .iter()
+                .filter(|syntax| syntax.behavior() == SyntaxTokenBehavior::UnsupportedCapability)
+            {
+                if syntax.command_level() {
+                    let input = format!("{prefix} {}", syntax.token());
+                    let problem = validate_command(&input, Default::default()).unwrap_err();
+                    assert_eq!(problem.code, CommandDiagnosticCode::UnsupportedCapability);
+                    exercised += 1;
+                }
+                for path in syntax
+                    .within_paths()
+                    .iter()
+                    .filter(|path| descriptor.operands().contains(&path[0]))
+                {
+                    let blocked_by_parent =
+                        path.iter().enumerate().skip(1).any(|(index, parent)| {
+                            descriptor.syntax_tokens().iter().any(|candidate| {
+                                candidate.token() == *parent
+                                    && candidate.behavior()
+                                        == SyntaxTokenBehavior::UnsupportedCapability
+                                    && candidate.within_paths().contains(&&path[..index])
+                            })
+                        });
+                    if blocked_by_parent {
+                        continue;
+                    }
+                    let mut parenthesized = format!("{}(X)", syntax.token());
+                    for parent in path.iter().rev() {
+                        parenthesized = format!("{parent}({parenthesized})");
+                    }
+                    let flat = if path.len() == 1 {
+                        format!("{}({} X)", path[0], syntax.token())
+                    } else {
+                        format!("{}({} {} X)", path[0], path[1], syntax.token())
+                    };
+                    for fragment in [parenthesized, flat] {
+                        let input = format!("{prefix} {fragment}");
+                        let problem = validate_command(&input, Default::default()).unwrap_err();
+                        assert_eq!(
+                            problem.code,
+                            CommandDiagnosticCode::UnsupportedCapability,
+                            "{input} did not reach the scoped capability boundary"
+                        );
+                        assert!(
+                            matches!(
+                                problem.host_problem(),
+                                Some(HostProblem::UnsupportedCapability { detail, .. })
+                                    if detail.contains(syntax.token())
+                            ),
+                            "{input} failed at a different capability boundary: {problem:?}"
+                        );
+                        exercised += 1;
+                    }
+                }
+            }
+        }
+        assert_eq!(exercised, 123);
+    }
+
+    #[test]
     fn parser_handles_nested_segment_values_and_doubled_quotes() {
         let parsed = parse_command(
             "ADDUSER USER1 NAME('O''BRIEN') OMVS(UID(1001) HOME('/u/user1'))",
