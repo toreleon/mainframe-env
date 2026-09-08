@@ -45,7 +45,7 @@ pub struct SyntaxTokenDescriptor {
     token: &'static str,
     behavior: SyntaxTokenBehavior,
     command_level: bool,
-    within_operands: &'static [&'static str],
+    within_paths: &'static [&'static [&'static str]],
 }
 
 impl SyntaxTokenDescriptor {
@@ -65,8 +65,8 @@ impl SyntaxTokenDescriptor {
     }
 
     #[must_use]
-    pub const fn within_operands(self) -> &'static [&'static str] {
-        self.within_operands
+    pub const fn within_paths(self) -> &'static [&'static [&'static str]] {
+        self.within_paths
     }
 }
 
@@ -525,6 +525,8 @@ pub(crate) fn parse_command(
             {
                 index += 1;
                 let mut depth = 1usize;
+                let mut context = vec![Some(name.clone())];
+                let mut pending_parent = None;
                 while index < tokens.len() && depth > 0 {
                     let value = &tokens[index];
                     match value.kind {
@@ -536,24 +538,40 @@ pub(crate) fn parse_command(
                                     value.offset,
                                 ));
                             }
+                            context.push(pending_parent.take());
                         }
-                        TokenKind::RightParenthesis => depth -= 1,
+                        TokenKind::RightParenthesis => {
+                            depth -= 1;
+                            context.pop();
+                            pending_parent = None;
+                        }
                         TokenKind::Word | TokenKind::Quoted if depth > 0 => {
                             if value.kind == TokenKind::Word {
                                 let nested = value.upper();
+                                let path = context
+                                    .iter()
+                                    .filter_map(Option::as_deref)
+                                    .collect::<Vec<_>>();
                                 if descriptor.syntax_tokens.iter().any(|syntax| {
                                     syntax.token == nested
                                         && syntax.behavior
                                             == SyntaxTokenBehavior::UnsupportedCapability
-                                        && syntax.within_operands.contains(&name.as_str())
+                                        && syntax
+                                            .within_paths
+                                            .iter()
+                                            .any(|expected| *expected == path)
                                 }) {
+                                    let path = path.join("/");
                                     return Err(unsupported_operand_diagnostic(
                                         descriptor,
                                         &nested,
                                         value.offset,
-                                        Some(&name),
+                                        Some(&path),
                                     ));
                                 }
+                                pending_parent = Some(nested);
+                            } else {
+                                pending_parent = None;
                             }
                             if values.len() >= limits.max_values_per_operand {
                                 return Err(diagnostic(
@@ -563,7 +581,7 @@ pub(crate) fn parse_command(
                             }
                             values.push(Zeroizing::new(value.text.to_string()));
                         }
-                        TokenKind::Comma => {}
+                        TokenKind::Comma => pending_parent = None,
                         _ => {}
                     }
                     index += 1;
@@ -1005,6 +1023,8 @@ mod tests {
         for input in [
             "PERMIT APP PROGRAM",
             "PERMIT APP ID(PROGRAM)",
+            "PERMIT APP WHEN(TERMINAL(PROGRAM))",
+            "PERMIT APP WHEN(CONSOLE(SYSID))",
             "PERMIT APP JES",
             "DELDSD RACF",
             "PERMIT APP 'VOLUME'",
@@ -1062,7 +1082,7 @@ mod tests {
         assert!(syntax.iter().all(|descriptor| {
             descriptor.behavior() != SyntaxTokenBehavior::UnsupportedCapability
                 || descriptor.command_level()
-                || !descriptor.within_operands().is_empty()
+                || !descriptor.within_paths().is_empty()
         }));
         let setropts = command_descriptors()
             .iter()
@@ -1072,7 +1092,7 @@ mod tests {
         assert!(setropts.syntax_tokens().iter().any(|syntax| {
             syntax.token() == "PROGRAM"
                 && syntax.behavior() == SyntaxTokenBehavior::UnsupportedCapability
-                && syntax.within_operands() == ["WHEN", "NOWHEN"]
+                && syntax.within_paths() == [&["WHEN"][..], &["NOWHEN"][..]]
         }));
         let display = command_descriptors()
             .iter()

@@ -1159,19 +1159,24 @@
           "name": "NO",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "CSDATA"
-          ],
-          "note": "The pinned syntax places NO within CSDATA; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places NO at the exact CSDATA parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "CSDATA"
+            ]
+          ]
         },
         {
           "name": "CKDS",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "DFP"
-          ],
-          "note": "The pinned syntax places CKDS within DFP; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places CKDS at the exact DFP/DATAKEY parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "DFP",
+              "DATAKEY"
+            ]
+          ]
         }
       ]
     },
@@ -1219,95 +1224,129 @@
           "name": "OPERATOR-CLASS",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "CICS",
-            "OPERPARM"
-          ],
-          "note": "The pinned syntax places OPERATOR-CLASS within CICS, OPERPARM; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places OPERATOR-CLASS at the exact CICS/OPCLASS or OPERPARM parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "CICS",
+              "OPCLASS"
+            ],
+            [
+              "OPERPARM"
+            ]
+          ]
         },
         {
           "name": "OPERATOR-ID",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "CICS",
-            "OPERPARM"
-          ],
-          "note": "The pinned syntax places OPERATOR-ID within CICS, OPERPARM; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places OPERATOR-ID at the exact CICS/OPIDENT or OPERPARM parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "CICS",
+              "OPIDENT"
+            ],
+            [
+              "OPERPARM"
+            ]
+          ]
         },
         {
           "name": "OPERATOR-PRIORITY",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "CICS",
-            "OPERPARM"
-          ],
-          "note": "The pinned syntax places OPERATOR-PRIORITY within CICS, OPERPARM; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places OPERATOR-PRIORITY at the exact CICS/OPPRTY or OPERPARM parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "CICS",
+              "OPPRTY"
+            ],
+            [
+              "OPERPARM"
+            ]
+          ]
         },
         {
           "name": "TIMEOUT-VALUE",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "CICS",
-            "OPERPARM"
-          ],
-          "note": "The pinned syntax places TIMEOUT-VALUE within CICS, OPERPARM; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places TIMEOUT-VALUE at the exact CICS/TIMEOUT or OPERPARM parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "CICS",
+              "TIMEOUT"
+            ],
+            [
+              "OPERPARM"
+            ]
+          ]
         },
         {
           "name": "FORCE",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "CICS"
-          ],
-          "note": "The pinned syntax places FORCE within CICS; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places FORCE at the exact CICS/XRFSOFF parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "CICS",
+              "XRFSOFF"
+            ]
+          ]
         },
         {
           "name": "NOFORCE",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "CICS"
-          ],
-          "note": "The pinned syntax places NOFORCE within CICS; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places NOFORCE at the exact CICS/XRFSOFF parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "CICS",
+              "XRFSOFF"
+            ]
+          ]
         },
         {
           "name": "WAADDR1",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "WORKATTR"
-          ],
-          "note": "The pinned syntax places WAADDR1 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places WAADDR1 at the exact WORKATTR parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "WORKATTR"
+            ]
+          ]
         },
         {
           "name": "WAADDR2",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "WORKATTR"
-          ],
-          "note": "The pinned syntax places WAADDR2 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places WAADDR2 at the exact WORKATTR parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "WORKATTR"
+            ]
+          ]
         },
         {
           "name": "WAADDR3",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "WORKATTR"
-          ],
-          "note": "The pinned syntax places WAADDR3 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places WAADDR3 at the exact WORKATTR parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "WORKATTR"
+            ]
+          ]
         },
         {
           "name": "WAADDR4",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "WORKATTR"
-          ],
-          "note": "The pinned syntax places WAADDR4 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places WAADDR4 at the exact WORKATTR parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "WORKATTR"
+            ]
+          ]
         }
       ]
     },
@@ -1353,19 +1392,24 @@
           "name": "NO",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "CSDATA"
-          ],
-          "note": "The pinned syntax places NO within CSDATA; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places NO at the exact CSDATA parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "CSDATA"
+            ]
+          ]
         },
         {
           "name": "CKDS",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "DFP"
-          ],
-          "note": "The pinned syntax places CKDS within DFP; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places CKDS at the exact DFP/DATAKEY parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "DFP",
+              "DATAKEY"
+            ]
+          ]
         }
       ]
     },
@@ -1399,10 +1443,12 @@
           "name": "NO",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "CSDATA"
-          ],
-          "note": "The pinned syntax places NO within CSDATA; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places NO at the exact CSDATA parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "CSDATA"
+            ]
+          ]
         }
       ]
     },
@@ -1485,91 +1531,113 @@
           "name": "FORCE",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "CICS"
-          ],
-          "note": "The pinned syntax places FORCE within CICS; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places FORCE at the exact CICS/XRFSOFF parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "CICS",
+              "XRFSOFF"
+            ]
+          ]
         },
         {
           "name": "NOFORCE",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "CICS"
-          ],
-          "note": "The pinned syntax places NOFORCE within CICS; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places NOFORCE at the exact CICS/XRFSOFF parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "CICS",
+              "XRFSOFF"
+            ]
+          ]
         },
         {
           "name": "WAADDR1",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "WORKATTR"
-          ],
-          "note": "The pinned syntax places WAADDR1 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places WAADDR1 at the exact WORKATTR parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "WORKATTR"
+            ]
+          ]
         },
         {
           "name": "NOWAADDR1",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "WORKATTR"
-          ],
-          "note": "The pinned syntax places NOWAADDR1 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places NOWAADDR1 at the exact WORKATTR parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "WORKATTR"
+            ]
+          ]
         },
         {
           "name": "WAADDR2",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "WORKATTR"
-          ],
-          "note": "The pinned syntax places WAADDR2 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places WAADDR2 at the exact WORKATTR parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "WORKATTR"
+            ]
+          ]
         },
         {
           "name": "NOWAADDR2",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "WORKATTR"
-          ],
-          "note": "The pinned syntax places NOWAADDR2 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places NOWAADDR2 at the exact WORKATTR parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "WORKATTR"
+            ]
+          ]
         },
         {
           "name": "WAADDR3",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "WORKATTR"
-          ],
-          "note": "The pinned syntax places WAADDR3 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places WAADDR3 at the exact WORKATTR parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "WORKATTR"
+            ]
+          ]
         },
         {
           "name": "NOWAADDR3",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "WORKATTR"
-          ],
-          "note": "The pinned syntax places NOWAADDR3 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places NOWAADDR3 at the exact WORKATTR parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "WORKATTR"
+            ]
+          ]
         },
         {
           "name": "WAADDR4",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "WORKATTR"
-          ],
-          "note": "The pinned syntax places WAADDR4 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places WAADDR4 at the exact WORKATTR parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "WORKATTR"
+            ]
+          ]
         },
         {
           "name": "NOWAADDR4",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "WORKATTR"
-          ],
-          "note": "The pinned syntax places NOWAADDR4 within WORKATTR; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places NOWAADDR4 at the exact WORKATTR parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "WORKATTR"
+            ]
+          ]
         }
       ]
     },
@@ -1620,8 +1688,8 @@
           "name": "RACF",
           "runtime_behavior": "analysis-only",
           "command_level": false,
-          "within_operands": [],
-          "note": "RACF is emitted by syntax text but is not an executable keyword in an unambiguous command or operand context; arbitrary occurrences remain data."
+          "note": "RACF is emitted by syntax text but is not an executable keyword in an unambiguous command or operand path; arbitrary occurrences remain data.",
+          "within_paths": []
         }
       ]
     },
@@ -1818,98 +1886,118 @@
           "name": "ALL",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "RESET"
-          ],
-          "note": "The pinned syntax places ALL within RESET; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places ALL at the exact RESET parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "RESET"
+            ]
+          ]
         },
         {
           "name": "STANDARD",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "RESET"
-          ],
-          "note": "The pinned syntax places STANDARD within RESET; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places STANDARD at the exact RESET parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "RESET"
+            ]
+          ]
         },
         {
           "name": "APPCPORT",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "WHEN"
-          ],
-          "note": "The pinned syntax places APPCPORT within WHEN; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places APPCPORT at the exact WHEN parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "WHEN"
+            ]
+          ]
         },
         {
           "name": "CONSOLE",
           "runtime_behavior": "implemented",
           "command_level": false,
-          "within_operands": [
-            "WHEN"
-          ],
-          "note": "CONSOLE is consumed within WHEN by the current command processor; the scoped occurrence is not an unsupported capability."
+          "note": "CONSOLE is consumed at the exact WHEN parent path by the current command processor; deeper occurrences remain data.",
+          "within_paths": [
+            [
+              "WHEN"
+            ]
+          ]
         },
         {
           "name": "CRITERIA",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "WHEN"
-          ],
-          "note": "The pinned syntax places CRITERIA within WHEN; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places CRITERIA at the exact WHEN parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "WHEN"
+            ]
+          ]
         },
         {
           "name": "JESINPUT",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "WHEN"
-          ],
-          "note": "The pinned syntax places JESINPUT within WHEN; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places JESINPUT at the exact WHEN parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "WHEN"
+            ]
+          ]
         },
         {
           "name": "JES",
           "runtime_behavior": "analysis-only",
           "command_level": false,
-          "within_operands": [],
-          "note": "JES is emitted by syntax text but is not an executable keyword in an unambiguous command or operand context; arbitrary occurrences remain data."
+          "note": "JES is emitted by syntax text but is not an executable keyword in an unambiguous command or operand path; arbitrary occurrences remain data.",
+          "within_paths": []
         },
         {
           "name": "PROGRAM",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "WHEN"
-          ],
-          "note": "The pinned syntax places PROGRAM within WHEN; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places PROGRAM at the exact WHEN parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "WHEN"
+            ]
+          ]
         },
         {
           "name": "SERVAUTH",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "WHEN"
-          ],
-          "note": "The pinned syntax places SERVAUTH within WHEN; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places SERVAUTH at the exact WHEN parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "WHEN"
+            ]
+          ]
         },
         {
           "name": "SYSID",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "WHEN"
-          ],
-          "note": "The pinned syntax places SYSID within WHEN; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places SYSID at the exact WHEN parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "WHEN"
+            ]
+          ]
         },
         {
           "name": "TERMINAL",
           "runtime_behavior": "implemented",
           "command_level": false,
-          "within_operands": [
-            "WHEN"
-          ],
-          "note": "TERMINAL is consumed within WHEN by the current command processor; the scoped occurrence is not an unsupported capability."
+          "note": "TERMINAL is consumed at the exact WHEN parent path by the current command processor; deeper occurrences remain data.",
+          "within_paths": [
+            [
+              "WHEN"
+            ]
+          ]
         }
       ]
     },
@@ -2002,153 +2090,238 @@
           "name": "SERIALNUMBER",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "ALTER",
-            "DELETE",
-            "LIST"
-          ],
-          "note": "The pinned syntax places SERIALNUMBER within ALTER, DELETE, LIST; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places SERIALNUMBER at the exact ALTER or DELETE or LIST parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "ALTER"
+            ],
+            [
+              "DELETE"
+            ],
+            [
+              "LIST"
+            ]
+          ]
         },
         {
           "name": "ISSUERSDN",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "ALTER",
-            "DELETE",
-            "LIST"
-          ],
-          "note": "The pinned syntax places ISSUERSDN within ALTER, DELETE, LIST; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places ISSUERSDN at the exact ALTER/SERIALNUMBER or DELETE/SERIALNUMBER or LIST/SERIALNUMBER parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "ALTER",
+              "SERIALNUMBER"
+            ],
+            [
+              "DELETE",
+              "SERIALNUMBER"
+            ],
+            [
+              "LIST",
+              "SERIALNUMBER"
+            ]
+          ]
         },
         {
           "name": "PERSONAL",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "BIND",
-            "CONNECT"
-          ],
-          "note": "The pinned syntax places PERSONAL within BIND, CONNECT; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places PERSONAL at the exact BIND/USAGE or CONNECT/USAGE parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "BIND",
+              "USAGE"
+            ],
+            [
+              "CONNECT",
+              "USAGE"
+            ]
+          ]
         },
         {
           "name": "CERTDER",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "EXPORT"
-          ],
-          "note": "The pinned syntax places CERTDER within EXPORT; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places CERTDER at the exact EXPORT/FORMAT parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "EXPORT",
+              "FORMAT"
+            ]
+          ]
         },
         {
           "name": "CERTB64",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "EXPORT"
-          ],
-          "note": "The pinned syntax places CERTB64 within EXPORT; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places CERTB64 at the exact EXPORT/FORMAT parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "EXPORT",
+              "FORMAT"
+            ]
+          ]
         },
         {
           "name": "PKCS7DER",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "EXPORT"
-          ],
-          "note": "The pinned syntax places PKCS7DER within EXPORT; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places PKCS7DER at the exact EXPORT/FORMAT parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "EXPORT",
+              "FORMAT"
+            ]
+          ]
         },
         {
           "name": "PKCS7B64",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "EXPORT"
-          ],
-          "note": "The pinned syntax places PKCS7B64 within EXPORT; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places PKCS7B64 at the exact EXPORT/FORMAT parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "EXPORT",
+              "FORMAT"
+            ]
+          ]
         },
         {
           "name": "PKCS12DER",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "EXPORT"
-          ],
-          "note": "The pinned syntax places PKCS12DER within EXPORT; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places PKCS12DER at the exact EXPORT/FORMAT parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "EXPORT",
+              "FORMAT"
+            ]
+          ]
         },
         {
           "name": "PKCS12B64",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "EXPORT"
-          ],
-          "note": "The pinned syntax places PKCS12B64 within EXPORT; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places PKCS12B64 at the exact EXPORT/FORMAT parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "EXPORT",
+              "FORMAT"
+            ]
+          ]
         },
         {
           "name": "AES",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "EXPORT"
-          ],
-          "note": "The pinned syntax places AES within EXPORT; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places AES at the exact EXPORT/PBE parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "EXPORT",
+              "PBE"
+            ]
+          ]
         },
         {
           "name": "CN",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "GENCERT"
-          ],
-          "note": "The pinned syntax places CN within GENCERT; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places CN at the exact GENCERT/SUBJECTSDN parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "GENCERT",
+              "SUBJECTSDN"
+            ]
+          ]
         },
         {
           "name": "OU",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "GENCERT"
-          ],
-          "note": "The pinned syntax places OU within GENCERT; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places OU at the exact GENCERT/SUBJECTSDN parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "GENCERT",
+              "SUBJECTSDN"
+            ]
+          ]
         },
         {
           "name": "SP",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "GENCERT"
-          ],
-          "note": "The pinned syntax places SP within GENCERT; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places SP at the exact GENCERT/SUBJECTSDN parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "GENCERT",
+              "SUBJECTSDN"
+            ]
+          ]
         },
         {
           "name": "DATE",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "GENCERT",
-            "REKEY"
-          ],
-          "note": "The pinned syntax places DATE within GENCERT, REKEY; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places DATE at the exact GENCERT/NOTBEFORE or GENCERT/NOTAFTER or REKEY/NOTBEFORE or REKEY/NOTAFTER parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "GENCERT",
+              "NOTBEFORE"
+            ],
+            [
+              "GENCERT",
+              "NOTAFTER"
+            ],
+            [
+              "REKEY",
+              "NOTBEFORE"
+            ],
+            [
+              "REKEY",
+              "NOTAFTER"
+            ]
+          ]
         },
         {
           "name": "TIME",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "GENCERT",
-            "REKEY"
-          ],
-          "note": "The pinned syntax places TIME within GENCERT, REKEY; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places TIME at the exact GENCERT/NOTBEFORE or GENCERT/NOTAFTER or REKEY/NOTBEFORE or REKEY/NOTAFTER parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "GENCERT",
+              "NOTBEFORE"
+            ],
+            [
+              "GENCERT",
+              "NOTAFTER"
+            ],
+            [
+              "REKEY",
+              "NOTBEFORE"
+            ],
+            [
+              "REKEY",
+              "NOTAFTER"
+            ]
+          ]
         },
         {
           "name": "RSAPSS",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "GENCERT",
-            "REKEY"
-          ],
-          "note": "The pinned syntax places RSAPSS within GENCERT, REKEY; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places RSAPSS at the exact GENCERT/SIGATTR or REKEY/SIGATTR parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "GENCERT",
+              "SIGATTR"
+            ],
+            [
+              "REKEY",
+              "SIGATTR"
+            ]
+          ]
         }
       ]
     },
@@ -2178,19 +2351,25 @@
           "name": "NOPWSYNC",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "DEFINE"
-          ],
-          "note": "The pinned syntax places NOPWSYNC within DEFINE; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places NOPWSYNC at the exact DEFINE/PEER parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "DEFINE",
+              "PEER"
+            ]
+          ]
         },
         {
           "name": "PWSYNC",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "DEFINE"
-          ],
-          "note": "The pinned syntax places PWSYNC within DEFINE; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places PWSYNC at the exact DEFINE/PEER parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "DEFINE",
+              "PEER"
+            ]
+          ]
         }
       ]
     },
@@ -2219,10 +2398,17 @@
           "name": "NAME",
           "runtime_behavior": "implemented",
           "command_level": false,
-          "within_operands": [
-            "MAP"
-          ],
-          "note": "NAME is consumed within MAP by the current command processor; the scoped occurrence is not an unsupported capability."
+          "note": "NAME is consumed at the exact MAP/USERDIDFILTER or MAP/REGISTRY parent path by the current command processor; deeper occurrences remain data.",
+          "within_paths": [
+            [
+              "MAP",
+              "USERDIDFILTER"
+            ],
+            [
+              "MAP",
+              "REGISTRY"
+            ]
+          ]
         }
       ]
     },
@@ -2312,53 +2498,68 @@
           "name": "UPPER",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "CDTINFO"
-          ],
-          "note": "The pinned syntax places UPPER within CDTINFO; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places UPPER at the exact CDTINFO/CASE parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "CDTINFO",
+              "CASE"
+            ]
+          ]
         },
         {
           "name": "ASIS",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "CDTINFO"
-          ],
-          "note": "The pinned syntax places ASIS within CDTINFO; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places ASIS at the exact CDTINFO/CASE parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "CDTINFO",
+              "CASE"
+            ]
+          ]
         },
         {
           "name": "NORMAL",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "CDTINFO"
-          ],
-          "note": "The pinned syntax places NORMAL within CDTINFO; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places NORMAL at the exact CDTINFO/MACPROCESSING parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "CDTINFO",
+              "MACPROCESSING"
+            ]
+          ]
         },
         {
           "name": "REVERSE",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "CDTINFO"
-          ],
-          "note": "The pinned syntax places REVERSE within CDTINFO; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places REVERSE at the exact CDTINFO/MACPROCESSING parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "CDTINFO",
+              "MACPROCESSING"
+            ]
+          ]
         },
         {
           "name": "EQUAL",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "CDTINFO"
-          ],
-          "note": "The pinned syntax places EQUAL within CDTINFO; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places EQUAL at the exact CDTINFO/MACPROCESSING parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "CDTINFO",
+              "MACPROCESSING"
+            ]
+          ]
         },
         {
           "name": "REXX",
           "runtime_behavior": "analysis-only",
           "command_level": false,
-          "within_operands": [],
-          "note": "REXX is emitted by syntax text but is not an executable keyword in an unambiguous command or operand context; arbitrary occurrences remain data."
+          "note": "REXX is emitted by syntax text but is not an executable keyword in an unambiguous command or operand path; arbitrary occurrences remain data.",
+          "within_paths": []
         }
       ]
     },
@@ -2422,35 +2623,44 @@
           "name": "NORMAL",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "CDTINFO"
-          ],
-          "note": "The pinned syntax places NORMAL within CDTINFO; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places NORMAL at the exact CDTINFO/MACPROCESSING parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "CDTINFO",
+              "MACPROCESSING"
+            ]
+          ]
         },
         {
           "name": "REVERSE",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "CDTINFO"
-          ],
-          "note": "The pinned syntax places REVERSE within CDTINFO; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places REVERSE at the exact CDTINFO/MACPROCESSING parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "CDTINFO",
+              "MACPROCESSING"
+            ]
+          ]
         },
         {
           "name": "EQUAL",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "CDTINFO"
-          ],
-          "note": "The pinned syntax places EQUAL within CDTINFO; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places EQUAL at the exact CDTINFO/MACPROCESSING parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "CDTINFO",
+              "MACPROCESSING"
+            ]
+          ]
         },
         {
           "name": "REXX",
           "runtime_behavior": "analysis-only",
           "command_level": false,
-          "within_operands": [],
-          "note": "REXX is emitted by syntax text but is not an executable keyword in an unambiguous command or operand context; arbitrary occurrences remain data."
+          "note": "REXX is emitted by syntax text but is not an executable keyword in an unambiguous command or operand path; arbitrary occurrences remain data.",
+          "within_paths": []
         }
       ]
     },
@@ -2527,8 +2737,8 @@
           "name": "OUTPUT",
           "runtime_behavior": "unsupported-capability",
           "command_level": true,
-          "within_operands": [],
-          "note": "The pinned syntax presents OUTPUT as a command-level selector; this exact occurrence returns UnsupportedCapability before effects."
+          "note": "The pinned syntax presents OUTPUT as a command-level selector; this exact occurrence returns UnsupportedCapability before effects.",
+          "within_paths": []
         }
       ]
     },
@@ -2600,10 +2810,12 @@
           "name": "NOTAPE",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "INACTIVE"
-          ],
-          "note": "The pinned syntax places NOTAPE within INACTIVE; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places NOTAPE at the exact INACTIVE parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "INACTIVE"
+            ]
+          ]
         }
       ]
     },
@@ -2647,10 +2859,12 @@
           "name": "DATASET",
           "runtime_behavior": "implemented",
           "command_level": false,
-          "within_operands": [
-            "CLASS"
-          ],
-          "note": "DATASET is consumed within CLASS by the current command processor; the scoped occurrence is not an unsupported capability."
+          "note": "DATASET is consumed at the exact CLASS parent path by the current command processor; deeper occurrences remain data.",
+          "within_paths": [
+            [
+              "CLASS"
+            ]
+          ]
         }
       ]
     },
@@ -2770,47 +2984,59 @@
           "name": "RULE",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "PASSWORD"
-          ],
-          "note": "The pinned syntax places RULE within PASSWORD; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places RULE at the exact PASSWORD parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "PASSWORD"
+            ]
+          ]
         },
         {
           "name": "NORULE",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "PASSWORD"
-          ],
-          "note": "The pinned syntax places NORULE within PASSWORD; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places NORULE at the exact PASSWORD parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "PASSWORD"
+            ]
+          ]
         },
         {
           "name": "NONE",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "TERMINAL"
-          ],
-          "note": "The pinned syntax places NONE within TERMINAL; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places NONE at the exact TERMINAL parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "TERMINAL"
+            ]
+          ]
         },
         {
           "name": "READ",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "TERMINAL"
-          ],
-          "note": "The pinned syntax places READ within TERMINAL; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places READ at the exact TERMINAL parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "TERMINAL"
+            ]
+          ]
         },
         {
           "name": "PROGRAM",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "WHEN",
-            "NOWHEN"
-          ],
-          "note": "The pinned syntax places PROGRAM within WHEN, NOWHEN; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places PROGRAM at the exact WHEN or NOWHEN parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "WHEN"
+            ],
+            [
+              "NOWHEN"
+            ]
+          ]
         }
       ]
     },
@@ -2890,19 +3116,23 @@
           "name": "INMSG",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "PURGE"
-          ],
-          "note": "The pinned syntax places INMSG within PURGE; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places INMSG at the exact PURGE parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "PURGE"
+            ]
+          ]
         },
         {
           "name": "OUTMSG",
           "runtime_behavior": "unsupported-capability",
           "command_level": false,
-          "within_operands": [
-            "PURGE"
-          ],
-          "note": "The pinned syntax places OUTMSG within PURGE; only that nested operand context returns UnsupportedCapability before effects."
+          "note": "The pinned syntax places OUTMSG at the exact PURGE parent path; only that occurrence returns UnsupportedCapability before effects.",
+          "within_paths": [
+            [
+              "PURGE"
+            ]
+          ]
         }
       ]
     }

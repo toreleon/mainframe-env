@@ -27,7 +27,7 @@ struct SyntaxTokenProjection {
     name: String,
     runtime_behavior: String,
     command_level: bool,
-    within_operands: Vec<String>,
+    within_paths: Vec<Vec<String>>,
 }
 
 pub(super) fn generate(root: &Path) -> TaskResult {
@@ -700,13 +700,14 @@ fn render(root: &Path) -> TaskResult<Vec<u8>> {
                 out.push_str(", behavior: SyntaxTokenBehavior::");
                 out.push_str(rust_syntax_behavior(&token.runtime_behavior)?);
                 out.push_str(&format!(
-                    ", command_level: {}, within_operands: &[",
+                    ", command_level: {}, within_paths: &[",
                     token.command_level
                 ));
-                separated_strings(
-                    &mut out,
-                    token.within_operands.iter().map(String::as_str).collect(),
-                );
+                for path in &token.within_paths {
+                    out.push_str("&[");
+                    separated_strings(&mut out, path.iter().map(String::as_str).collect());
+                    out.push_str("], ");
+                }
                 out.push_str("] }, ");
             }
         }
@@ -1034,11 +1035,32 @@ fn check_operand_dispositions(
             )?;
             let runtime_behavior = text(context, "runtime_behavior", &dispositions_path)?;
             let command_level = boolean(context, "command_level", &dispositions_path)?;
-            let within_operands = string_array(context, "within_operands", &dispositions_path)?
-                .into_iter()
-                .map(str::to_string)
-                .collect::<Vec<_>>();
-            for parent in &within_operands {
+            let within_paths = array(context, "within_paths", &dispositions_path)?
+                .iter()
+                .map(|path| {
+                    path.as_array()
+                        .ok_or_else(|| {
+                            format!(
+                                "{} syntax context path is not an array",
+                                dispositions_path.display()
+                            )
+                        })?
+                        .iter()
+                        .map(|part| {
+                            part.as_str().map(str::to_string).ok_or_else(|| {
+                                format!(
+                                    "{} syntax context path contains a non-string",
+                                    dispositions_path.display()
+                                )
+                            })
+                        })
+                        .collect::<TaskResult<Vec<_>>>()
+                })
+                .collect::<TaskResult<Vec<_>>>()?;
+            for path in &within_paths {
+                let parent = path.first().ok_or_else(|| {
+                    format!("RACF syntax context {keyword} {name} has an empty path")
+                })?;
                 require(
                     operands.contains(parent)
                         || source_only.contains(&(row_id.to_string(), parent.clone())),
@@ -1060,7 +1082,7 @@ fn check_operand_dispositions(
                         ),
                     )?;
                     require(
-                        command_level || !within_operands.is_empty(),
+                        command_level || !within_paths.is_empty(),
                         &format!(
                             "RACF unsupported syntax token {keyword} {name} has no executable context"
                         ),
@@ -1074,7 +1096,7 @@ fn check_operand_dispositions(
                         ),
                     )?;
                     require(
-                        !command_level && within_operands.is_empty(),
+                        !command_level && within_paths.is_empty(),
                         &format!(
                             "RACF analysis-only syntax token {keyword} {name} claims an executable context"
                         ),
@@ -1089,7 +1111,7 @@ fn check_operand_dispositions(
                     name: name.to_string(),
                     runtime_behavior: runtime_behavior.to_string(),
                     command_level,
-                    within_operands,
+                    within_paths,
                 });
         }
     }
