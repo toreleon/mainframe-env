@@ -1,8 +1,10 @@
 [product]
 name = "mainframe-env"
-version = "0.8.2"
+version = "0.8.3"
+released_version = "0.8.2"
 release_line = "0.8"
-channel = "stable"
+channel = "development"
+state = "development"
 publish = false
 
 [rust]

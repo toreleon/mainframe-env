@@ -6594,6 +6594,112 @@ fn release_target_directory(version: &str, target: &str) -> TaskResult<PathBuf> 
     Ok(PathBuf::from(format!("release/{version}/targets/{target}")))
 }
 
+fn validate_unreleased_identity(
+    root: &Path,
+    current: &str,
+    released: &str,
+    allow_exact_current_tag: bool,
+) -> TaskResult {
+    let current_parts = stable_zero_version(current)?;
+    let released_parts = stable_zero_version(released)?;
+    require(
+        current_parts > released_parts,
+        "development version must be newer than the released version",
+    )?;
+    let released_tag = format!("refs/tags/mainframe-env-v{released}^{{commit}}");
+    let released_commit = command_text(root, "git", &["rev-parse", "--verify", &released_tag])?;
+    let head = command_text(root, "git", &["rev-parse", "HEAD"])?;
+    require(
+        head != released_commit,
+        "development identity cannot point at the released tag",
+    )?;
+    let ancestry = Command::new("git")
+        .args(["merge-base", "--is-ancestor", &released_commit, &head])
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("released-version ancestry: {error}"))?;
+    require(
+        ancestry.success(),
+        "development candidate does not descend from the released version",
+    )?;
+    let current_tag = format!("refs/tags/mainframe-env-v{current}");
+    let tagged = Command::new("git")
+        .args(["rev-parse", "--verify", "--quiet", &current_tag])
+        .current_dir(root)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map_err(|error| format!("development-version tag probe: {error}"))?;
+    if !tagged.success() {
+        return Ok(());
+    }
+    require(
+        allow_exact_current_tag
+            && command_text(
+                root,
+                "git",
+                &[
+                    "rev-parse",
+                    "--verify",
+                    &format!("{current_tag}^{{commit}}"),
+                ],
+            )? == head,
+        "unreleased version has a tag that does not identify the exact candidate",
+    )
+}
+
+fn validate_public_version_truth(
+    root: &Path,
+    current: &str,
+    released: &str,
+    state_label: &str,
+) -> TaskResult {
+    let readme = read(&root.join("README.md"))?;
+    require(
+        readme.contains(&format!("| Latest published release | [{released}]"))
+            && readme.contains(&format!(
+                "| Current workspace version | `{current}` ({state_label}) |"
+            )),
+        "README release/development identity is stale",
+    )?;
+    let coverage = read(&root.join("docs/delivery/coverage-versions/README.md"))?;
+    require(
+        coverage.contains(&format!("current workspace is `{current}` {state_label}"))
+            && coverage.contains(&format!("through {released} released")),
+        "coverage index release/current identity is stale",
+    )?;
+    let project = read(&root.join("docs/delivery/coverage-versions/GITHUB-PROJECT.md"))?;
+    require(
+        project.contains(&format!("| {current} | `{current}`"))
+            && project.contains(&format!("| {released} | `{released}`")),
+        "project mapping omits the release or current version",
+    )?;
+    let changelog = read(&root.join("CHANGELOG.md"))?;
+    let unreleased = changelog
+        .split_once("## [Unreleased]")
+        .map(|(_, tail)| tail.split("\n## [").next().unwrap_or(tail))
+        .ok_or("CHANGELOG omits Unreleased")?;
+    require(
+        unreleased.lines().any(|line| line.starts_with("- ")),
+        "CHANGELOG Unreleased has no entries",
+    )?;
+    require(
+        unreleased.contains(current) && unreleased.contains(released),
+        "CHANGELOG Unreleased does not distinguish current and released versions",
+    )
+}
+
+fn require_release_candidate(root: &Path) -> TaskResult {
+    let release: toml::Value = read(&root.join("release.toml"))?
+        .parse()
+        .map_err(|error| format!("release.toml: {error}"))?;
+    require(
+        release["product"]["state"].as_str() == Some("release-candidate")
+            && release["product"]["channel"].as_str() == Some("stable"),
+        "release artifacts require an explicit stable release-candidate promotion",
+    )
+}
+
 fn check_versions(root: &Path) -> TaskResult {
     let version = product_version(root)?;
     let expected_release_line = release_line_for_version(&version)?;
@@ -6610,12 +6716,18 @@ fn check_versions(root: &Path) -> TaskResult {
     let release_version = release["product"]["version"]
         .as_str()
         .ok_or("product.version is missing")?;
+    let released_version = release["product"]["released_version"]
+        .as_str()
+        .ok_or("product.released_version is missing")?;
     let release_line = release["product"]["release_line"]
         .as_str()
         .ok_or("product.release_line is missing")?;
     let channel = release["product"]["channel"]
         .as_str()
         .ok_or("product.channel is missing")?;
+    let state = release["product"]["state"]
+        .as_str()
+        .ok_or("product.state is missing")?;
     let publish = release["product"]["publish"]
         .as_bool()
         .ok_or("product.publish is missing")?;
@@ -6638,13 +6750,36 @@ fn check_versions(root: &Path) -> TaskResult {
         release_line == expected_release_line,
         "release.toml release line is not derived from VERSION",
     )?;
-    require(channel == "stable", "product channel must be stable")?;
+    let state_label = match state {
+        "development" => {
+            require(
+                channel == "development",
+                "development channel is inconsistent",
+            )?;
+            "development"
+        }
+        "release-candidate" => {
+            require(
+                channel == "stable",
+                "release-candidate channel must be stable",
+            )?;
+            "release candidate"
+        }
+        _ => return Err("product state must be development or release-candidate".into()),
+    };
     require(
         !publish,
         "checked-in release configuration must not publish",
     )?;
     require(msrv == "1.95", "workspace MSRV must be 1.95")?;
     require(pinned == "1.98.0", "pinned Rust toolchain must be 1.98.0")?;
+    validate_unreleased_identity(
+        root,
+        &version,
+        released_version,
+        state == "release-candidate",
+    )?;
+    validate_public_version_truth(root, &version, released_version, state_label)?;
 
     let mut manifests = Vec::new();
     collect_named(root, OsStr::new("Cargo.toml"), &mut manifests)?;
@@ -6703,6 +6838,11 @@ fn check_versions(root: &Path) -> TaskResult {
     require(
         text(&inventory, "channel", &inventory_path)? == channel,
         "machine version inventory channel differs from release.toml",
+    )?;
+    require(
+        text(&inventory, "released_product", &inventory_path)? == released_version
+            && text(&inventory, "release_state", &inventory_path)? == state,
+        "machine version inventory release/development state differs from release.toml",
     )?;
 
     let notes = read(&root.join(format!("docs/releases/{release_line}.md")))?;
@@ -12260,6 +12400,7 @@ fn generate_release_artifacts(root: &Path, target: &str) -> TaskResult {
     if retained_accepted_release(root)?.is_some() {
         return validate_retained_accepted_release(root, target);
     }
+    require_release_candidate(root)?;
     build_release_target(root, target)?;
     smoke_release_target(root, target)?;
     let documents = release_documents(root, target)?;
@@ -12278,6 +12419,7 @@ fn check_release_artifacts(root: &Path, target: &str) -> TaskResult {
     if retained_accepted_release(root)?.is_some() {
         return validate_retained_accepted_release(root, target);
     }
+    require_release_candidate(root)?;
     let retained = retained_release_documents(root, target)?;
     build_release_target(root, target)?;
     smoke_release_target(root, target)?;
@@ -13702,6 +13844,87 @@ mod tests {
         };
         let problem = smoke_release_target(&root, foreign).unwrap_err();
         assert!(problem.contains("exact binaries must execute"));
+    }
+
+    fn write_public_version_fixtures(root: &Path, current: &str, released: &str) {
+        fs::create_dir_all(root.join("docs/delivery/coverage-versions")).unwrap();
+        fs::write(
+            root.join("README.md"),
+            format!(
+                "| Latest published release | [{released}](release) |\n| Current workspace version | `{current}` (development) |\n"
+            ),
+        )
+        .unwrap();
+        fs::write(
+            root.join("docs/delivery/coverage-versions/README.md"),
+            format!(
+                "Status: through {released} released\nThe current workspace is `{current}` development.\n"
+            ),
+        )
+        .unwrap();
+        fs::write(
+            root.join("docs/delivery/coverage-versions/GITHUB-PROJECT.md"),
+            format!("| {released} | `{released}` | released |\n| {current} | `{current}` | development |\n"),
+        )
+        .unwrap();
+        fs::write(
+            root.join("CHANGELOG.md"),
+            format!(
+                "# Changelog\n\n## [Unreleased]\n\n- Develop {current} after {released}.\n\n## [{released}]\n"
+            ),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn development_identity_requires_tag_ancestry_distance_and_public_truth() {
+        let root = temporary_git_repository("development-version");
+        fs::write(root.join("source.txt"), b"released\n").unwrap();
+        commit_all(&root, "released");
+        assert!(
+            Command::new("git")
+                .args(["tag", "mainframe-env-v0.8.2"])
+                .current_dir(&root)
+                .status()
+                .unwrap()
+                .success()
+        );
+        write_public_version_fixtures(&root, "0.8.3", "0.8.2");
+        commit_all(&root, "development");
+        validate_unreleased_identity(&root, "0.8.3", "0.8.2", false).unwrap();
+        validate_public_version_truth(&root, "0.8.3", "0.8.2", "development").unwrap();
+
+        fs::write(
+            root.join("README.md"),
+            "| Latest published release | [0.8.2](release) |\n| Current workspace version | `0.8.2` |\n",
+        )
+        .unwrap();
+        assert!(validate_public_version_truth(&root, "0.8.3", "0.8.2", "development").is_err());
+        write_public_version_fixtures(&root, "0.8.3", "0.8.2");
+        assert!(
+            Command::new("git")
+                .args(["tag", "mainframe-env-v0.8.3"])
+                .current_dir(&root)
+                .status()
+                .unwrap()
+                .success()
+        );
+        assert!(validate_unreleased_identity(&root, "0.8.3", "0.8.2", false).is_err());
+        validate_unreleased_identity(&root, "0.8.3", "0.8.2", true).unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn development_configuration_cannot_emit_release_artifacts() {
+        let root = temporary_git_repository("development-release-guard");
+        fs::write(
+            root.join("release.toml"),
+            "[product]\nstate = \"development\"\nchannel = \"development\"\n",
+        )
+        .unwrap();
+        let problem = require_release_candidate(&root).unwrap_err();
+        assert!(problem.contains("release-candidate promotion"));
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

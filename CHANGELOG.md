@@ -16,6 +16,8 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Assigned post-0.8.2 work the distinct `0.8.3` development identity and made
+  released versus development state explicit in every version authority.
 - Replaced the live GitHub Actions assurance path with the capped local Jenkins
   workflow; hosted metadata remains historical rather than current evidence.
 - Moved official catalog extraction to pinned IBM topic markup and strengthened
@@ -36,8 +38,7 @@ All notable changes to mainframe-env are documented here.
 
 ### Known issues
 
-- These changes are not part of the published 0.8.2 tag even though the
-  workspace version still reads `0.8.2`. The
+- These `0.8.3` development changes are not part of the published 0.8.2 tag. The
   [pre-0.9 deep review](docs/reviews/PRE-0.9.0-DEEP-REVIEW.md) records the
   release-truth, durability, security, CI, and documentation blockers that must
   be resolved before 0.9.0 implementation and publication.

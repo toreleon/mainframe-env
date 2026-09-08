@@ -14,8 +14,8 @@ presented as licensed IBM equivalence.
 | Item | Status |
 |---|---|
 | Latest published release | [0.8.2](https://github.com/toreleon/mainframe-env/releases/tag/mainframe-env-v0.8.2), source bundle only |
-| Current workspace version | `0.8.2` |
-| Development baseline | `main` contains unreleased hardening and a bounded CICS conformance pilot after the 0.8.2 tag |
+| Current workspace version | `0.8.3` (development) |
+| Development baseline | `0.8.3` contains unreleased pre-0.9 hardening after the published 0.8.2 tag |
 | Next planned minor | [0.9.0 — complete CICS application API](docs/delivery/coverage-versions/0.9.0.md) |
 | Production readiness | Not claimed |
 | Licensed differential status | Required campaigns remain pending where the release notes say so |

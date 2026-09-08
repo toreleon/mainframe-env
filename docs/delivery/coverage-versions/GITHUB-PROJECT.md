@@ -23,6 +23,7 @@ hashes, or test counts into Project fields.
 | 0.8.0 | `0.8.0` | [#14](https://github.com/toreleon/mainframe-env/issues/14) | [#30](https://github.com/toreleon/mainframe-env/pull/30) | Published; closed |
 | 0.8.1 | `0.8.1` | [#42](https://github.com/toreleon/mainframe-env/issues/42) | [#43](https://github.com/toreleon/mainframe-env/pull/43) | Published; closed |
 | 0.8.2 | `0.8.2` | — | [#70](https://github.com/toreleon/mainframe-env/pull/70) | Published source bundle; closed |
+| 0.8.3 | `0.8.3` | — | — | Pre-0.9 hardening; in development |
 | 0.9.0 | `0.9.0` | [#15](https://github.com/toreleon/mainframe-env/issues/15) | — | Planned; open |
 | 0.10.0 | `0.10.0` | [#16](https://github.com/toreleon/mainframe-env/issues/16) | — | Planned; open |
 | 0.11.0 | `0.11.0` | [#17](https://github.com/toreleon/mainframe-env/issues/17) | — | Planned; open |
