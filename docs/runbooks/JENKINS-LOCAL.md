@@ -113,12 +113,17 @@ stops the cluster. The database is dropped and recreated before every contract
 so one suite cannot satisfy or contaminate another. Missing or version-drifted
 PostgreSQL tools fail the selected stage instead of turning it into a skip.
 
-Every build-bearing plan also records the `python-tooling-tests` gate.
+Every build-bearing plan also records the `python-tooling-tests` and
+`api-docs` gates.
 `tools/run_tooling_tests.py` discovers tracked `tools/tests` directories at any
 repository depth, runs every Python and shell test file, and syntax-checks all
 shipped shell tooling. Adding a new versioned conformance tool test therefore
-does not require another Jenkinsfile edit. Markdown-only plans remain bounded
-to the documentation-system gate.
+does not require another Jenkinsfile edit. `tools/check_public_api_docs.py`
+enables Rust's `missing_docs` lint for every contract crate and rejects any
+increase over the reviewed per-crate baseline in `tools/public-api-docs.json`;
+an improvement must lower that baseline in the same change, so documentation
+debt cannot silently return.
+Markdown-only plans remain bounded to the documentation-system gate.
 
 For optional GitHub Release publication, create a Secret Text credential named
 `mainframe-env-github-token`. Publication occurs only when both `release` mode

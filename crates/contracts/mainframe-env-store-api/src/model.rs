@@ -6,20 +6,32 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Durable state of one execution attempt.
 pub enum ExecutionState {
+    /// Identity and admission records exist.
     Admitted,
+    /// Execution is waiting for an eligible worker.
     Queued,
+    /// A worker is actively driving the machine.
     Running,
+    /// A restorable checkpoint is durable.
     Suspended,
+    /// The terminal machine result is being committed.
     Completing,
+    /// The execution completed normally.
     Completed,
+    /// The execution failed outside a modeled condition or ABEND.
     Failed,
+    /// Cancellation won before terminal completion.
     Cancelled,
+    /// The declared deadline elapsed before terminal completion.
     TimedOut,
+    /// Retry policy was exhausted or the work was unrecoverable.
     DeadLetter,
 }
 
 impl ExecutionState {
+    /// Return whether `next` is a legal direct durable transition.
     #[must_use]
     pub fn can_transition_to(self, next: Self) -> bool {
         use ExecutionState as S;
@@ -42,6 +54,7 @@ impl ExecutionState {
         )
     }
 
+    /// Return whether no later execution transition is permitted.
     #[must_use]
     pub const fn terminal(self) -> bool {
         matches!(
@@ -52,27 +65,44 @@ impl ExecutionState {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Optimistically versioned durable execution metadata.
 pub struct ExecutionRecord {
+    /// Stable execution identity.
     pub execution_id: ExecutionId,
+    /// Current run-unit identity.
     pub run_unit_id: RunUnitId,
+    /// Program or runtime selector required by this execution.
     pub selector: Selector,
+    /// Immutable executable artifact identity.
     pub artifact: ArtifactRef,
+    /// Principal on whose behalf the execution runs.
     pub principal: PrincipalId,
+    /// Current lifecycle state.
     pub state: ExecutionState,
+    /// Positive execution or delivery attempt.
     pub attempt: u32,
+    /// Positive compare-and-swap version.
     pub version: u64,
+    /// Current worker lease owner, when leased.
     pub owner_lease: Option<String>,
+    /// Logical tick after which the owner lease is invalid.
     pub lease_expiry_tick: Option<u64>,
     /// Logical tick copied from the durable terminal lifecycle transition.
     pub terminal_tick: Option<u64>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Durable queue-item state.
 pub enum WorkState {
+    /// Eligible for a future claim.
     Queued,
+    /// Held under a fenced, expiring worker lease.
     Claimed,
+    /// Completed exactly once.
     Completed,
+    /// Cancelled before completion.
     Cancelled,
+    /// Terminally removed from retry processing.
     DeadLetter,
 }
 
@@ -92,6 +122,7 @@ pub struct WorkRecord {
     pub required_generation: String,
     pub artifact: ArtifactRef,
     pub state: WorkState,
+    /// Scheduling priority; larger values are claimed before smaller values.
     pub priority: u8,
     pub attempt: u32,
     pub max_attempts: u32,
@@ -230,30 +261,42 @@ pub enum EffectState {
     UnknownOutcome,
 }
 
+/// Maximum UTF-8 byte length of a stale-effect recovery owner identity.
 pub const MAX_EFFECT_RECOVERY_OWNER_BYTES: usize = 128;
 
 /// Durable ownership fence for one stale-intent reconciliation attempt.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EffectRecoveryLease {
+    /// Bounded identity of the recovery worker holding the lease.
     pub owner: String,
+    /// One-based number of times recovery has claimed this effect.
     pub attempt: u32,
+    /// Monotonic fencing epoch for the recovery lease.
     pub epoch: u64,
+    /// Logical clock tick at which another worker may reclaim the effect.
     pub expires_tick: u64,
 }
 
 /// Metadata that makes an in-flight effect intent attributable and ageable.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EffectIntentMetadata {
+    /// Durable execution that dispatched the effect.
     pub owner: ExecutionId,
+    /// Positive execution attempt that dispatched the effect.
     pub attempt: u32,
+    /// Capability selected for the original host dispatch, when retained.
     pub capability: Option<CapabilityId>,
     /// Resource identity needed to reconstruct an audit after an in-doubt restart.
     pub audit_resource: Option<AuditResourceDigest>,
     /// Invocation identity used to make recovered audit records unique and correlatable.
     pub audit_invocation_key: Option<IdempotencyKey>,
+    /// Logical clock tick at which the intent became durable.
     pub created_tick: u64,
+    /// Earliest logical clock tick at which recovery may claim the intent.
     pub recovery_after_tick: u64,
+    /// Monotonic intent epoch used to fence concurrent recovery.
     pub epoch: u64,
+    /// Current recovery ownership fence, if a live worker claimed the intent.
     pub recovery_lease: Option<EffectRecoveryLease>,
 }
 
@@ -274,6 +317,7 @@ pub struct EffectRecord {
     pub key: IdempotencyKey,
     pub digest_format: EffectDigestFormat,
     pub request_digest: [u8; 32],
+    /// Attribution, age, audit, and recovery-fencing metadata for the intent.
     pub intent: EffectIntentMetadata,
     pub state: EffectState,
     pub result_digest: Option<[u8; 32]>,
@@ -962,17 +1006,29 @@ pub enum ProviderStateMutation {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Store-independent failure returned at the durable boundary.
 pub enum StoreError {
+    /// The requested record does not exist.
     NotFound,
+    /// A record with the same unique identity already exists.
     AlreadyExists,
+    /// An optimistic version, identity, or immutable value conflicts.
     Conflict,
+    /// The requested lifecycle transition is not legal.
     InvalidTransition,
+    /// An ordered record has a duplicate, zero, or discontinuous sequence.
     InvalidSequence,
+    /// A configured row or byte quota would be exceeded.
     CapacityExceeded,
+    /// A payload exceeds the configured per-record bound.
     PayloadTooLarge,
+    /// A worker lease identity, epoch, or expiry fence does not match.
     LeaseConflict,
+    /// A persisted schema cannot be migrated by this implementation.
     IncompatibleVersion,
+    /// In-process synchronization was poisoned.
     Poisoned,
+    /// The durable backend failed without a more specific safe category.
     Infrastructure(String),
 }
 

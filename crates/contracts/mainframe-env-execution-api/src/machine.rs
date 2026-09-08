@@ -142,45 +142,74 @@ pub trait Machine {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// A durable execution lifecycle transition.
 pub enum LifecycleEventKind {
+    /// The execution identity was accepted into durable state.
     Admitted,
+    /// The execution is eligible for a worker.
     Queued,
+    /// A worker acquired the execution.
     Claimed,
+    /// Machine execution began or resumed on a worker.
     Started,
+    /// The machine produced its terminal value and is committing it.
     Completing,
+    /// A host-effect intent was durably recorded before dispatch.
     EffectIntent {
+        /// Monotonic effect sequence within the execution.
         sequence: u64,
     },
+    /// A host-effect result was durably recorded after dispatch.
     EffectResult {
+        /// Monotonic effect sequence within the execution.
         sequence: u64,
     },
+    /// A restorable checkpoint was committed.
     Suspended,
     /// The interpreter checkpoint was durably handed to a product-owned
     /// continuation, so this execution no longer owns resumable work.
     HandoffCompleted,
+    /// Execution continued from a committed checkpoint.
     Resumed,
+    /// Durable cancellation was requested.
     CancellationRequested,
+    /// Execution stopped because cancellation won the control race.
     Cancelled,
+    /// Execution stopped at its declared deadline.
     TimedOut,
+    /// Execution reached an ordinary terminal completion.
     Completed {
+        /// Application return code committed with the terminal transition.
         return_code: i32,
     },
+    /// Execution ended with a modeled application condition.
     Condition,
+    /// Execution ended with a modeled abnormal termination.
     Abend,
+    /// Execution ended with a non-condition failure.
     Failed,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// One ordered, attempt-scoped lifecycle observation.
 pub struct LifecycleEvent {
+    /// Stable identity shared by every event for the execution.
     pub execution_id: ExecutionId,
+    /// Runtime instance that emitted the event.
     pub run_unit_id: RunUnitId,
+    /// Positive ordering sequence within the execution.
     pub sequence: u64,
+    /// Positive delivery or execution attempt.
     pub attempt: u32,
+    /// Caller-owned logical time used for deterministic ordering.
     pub tick: u64,
+    /// Typed transition represented by this event.
     pub kind: LifecycleEventKind,
 }
 
 impl LifecycleEvent {
+    /// Return whether the event meets the contract's non-zero ordering rules.
+    #[must_use]
     pub fn validate(&self) -> bool {
         self.sequence > 0 && self.attempt > 0
     }

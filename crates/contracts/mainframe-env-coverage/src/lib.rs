@@ -9,21 +9,32 @@ pub use conformance::*;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
+/// Stable identifier for one official-capability coverage row.
 pub const COVERAGE_ROW_CONTRACT: &str = "mainframe-env.coverage-row@1";
+/// Stable identifier for evidence attached to a coverage gate.
 pub const COVERAGE_EVIDENCE_CONTRACT: &str = "mainframe-env.coverage-evidence@1";
+/// Stable identifier for the immutable coverage ledger.
 pub const COVERAGE_LEDGER_CONTRACT: &str = "mainframe-env.coverage-ledger@1";
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+/// One independently evidenced capability gate.
 pub enum CoverageGate {
+    /// The frontend recognizes the capability syntax or protocol identity.
     Recognized,
+    /// Invalid inputs are rejected and valid inputs reach typed validation.
     Validated,
+    /// A valid request reaches its owned semantic implementation.
     Executed,
+    /// Success and failure outcomes are observably distinct and exact.
     Conditioned,
+    /// State and identity survive the required restart boundary.
     Recovered,
+    /// An approved independent oracle agrees with the candidate behavior.
     Differential,
 }
 
 impl CoverageGate {
+    /// Every gate in canonical evaluation order.
     pub const ALL: [Self; 6] = [
         Self::Recognized,
         Self::Validated,
@@ -34,6 +45,7 @@ impl CoverageGate {
     ];
 
     #[must_use]
+    /// Stable lowercase identifier used in manifests and receipts.
     pub const fn slug(self) -> &'static str {
         match self {
             Self::Recognized => "recognized",

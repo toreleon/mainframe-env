@@ -15,5 +15,7 @@ pub use service::{
 };
 pub use stage::{LegalizedMir, LoweredMir, VerifiedHir};
 
+/// Stable identifier for the compiler request and stage contract.
 pub const COMPILER_CONTRACT: &str = "mainframe-env.compiler@1";
+/// Stable identifier for the semantic/content artifact contract.
 pub const ARTIFACT_CONTRACT: &str = "mainframe-env.artifact@2";

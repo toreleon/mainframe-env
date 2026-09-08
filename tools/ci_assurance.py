@@ -20,7 +20,7 @@ SHARED = {
     'clippy.toml', 'deny.toml', 'release.toml', 'VERSION', 'Jenkinsfile',
 }
 PROSE = {'README.md', 'CHANGELOG.md', 'LICENSE', 'LICENSE.md', 'CONTRIBUTING.md', 'AGENTS.md'}
-PRIMARY = ['fmt', 'spec', 'cobol', 'python-tooling-tests', 'tests', 'clippy']
+PRIMARY = ['fmt', 'spec', 'cobol', 'python-tooling-tests', 'api-docs', 'tests', 'clippy']
 POLICY = ['supply-chain', 'cargo-deny', 'license-notices']
 FULL = [
     'targets', 'documentation', 'docs', 'conformance', 'certification',

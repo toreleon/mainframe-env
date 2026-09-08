@@ -70,6 +70,7 @@ class SelectionTests(unittest.TestCase):
             self.assertIn('cargo-deny',p['primary_gates'])
             self.assertIn('msrv',p['primary_gates'])
             self.assertIn('python-tooling-tests',p['primary_gates'])
+            self.assertIn('api-docs',p['primary_gates'])
 
     @patch.object(ci,'identity',return_value={'candidate':'a'*40,'tree':'b'*40})
     def test_dependency_policy_blocks_even_a_prose_only_pull_request(self,_):
@@ -106,6 +107,7 @@ class SelectionTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         pipeline = (root / 'Jenkinsfile').read_text()
         self.assertIn('--gate python-tooling-tests --expect-tests -- "$MAINFRAME_ENV_PYTHON" -B tools/run_tooling_tests.py', pipeline)
+        self.assertIn('--gate api-docs -- "$MAINFRAME_ENV_PYTHON" -B tools/check_public_api_docs.py', pipeline)
         listed = subprocess.check_output(
             [root / 'tools/jenkins/postgres_parity.sh', 'list'], text=True
         ).splitlines()

@@ -12,7 +12,9 @@ use mainframe_env_execution_api::{
 
 /// Mandatory persistence boundary for typed security-relevant host decisions.
 pub trait AuditSink: Send + Sync {
+    /// Persist one security-relevant authorization decision.
     fn record_audit(&self, record: AuditRecord) -> Result<(), StoreError>;
+    /// Read a bounded ordered range of audit records for one execution.
     fn audit_records(
         &self,
         execution_id: &ExecutionId,
@@ -21,9 +23,16 @@ pub trait AuditSink: Send + Sync {
     ) -> Result<Vec<AuditRecord>, StoreError>;
 }
 
+/// Optimistic lifecycle persistence for one execution identity.
 pub trait ExecutionStore: Send + Sync {
+    /// Insert a previously unseen admitted execution.
     fn create_execution(&self, record: ExecutionRecord) -> Result<(), StoreError>;
+    /// Read the current execution record without changing it.
     fn get_execution(&self, id: &ExecutionId) -> Result<Option<ExecutionRecord>, StoreError>;
+    /// Apply a legal state transition when `expected_version` still matches.
+    ///
+    /// A terminal transition records the supplied nonzero `now_tick` as the
+    /// execution's durable retention age.
     fn transition_execution(
         &self,
         id: &ExecutionId,
@@ -33,8 +42,11 @@ pub trait ExecutionStore: Send + Sync {
     ) -> Result<ExecutionRecord, StoreError>;
 }
 
+/// Ordered durable lifecycle-event storage.
 pub trait EventStore: Send + Sync {
+    /// Append a valid event without replacing an existing sequence.
     fn append_event(&self, event: LifecycleEvent) -> Result<(), StoreError>;
+    /// Read at most `max` events at or after `start_sequence`.
     fn events(
         &self,
         id: &ExecutionId,
@@ -43,9 +55,11 @@ pub trait EventStore: Send + Sync {
     ) -> Result<Vec<LifecycleEvent>, StoreError>;
 }
 
+/// Durable queue storage with expiring, fenced worker leases.
 pub trait WorkStore: Send + Sync {
     /// Observe durable cancellation without claiming, leasing, or mutating work.
     fn get_work(&self, work_id: &str) -> Result<Option<WorkRecord>, StoreError>;
+    /// Enqueue a previously unseen work identity.
     fn enqueue(&self, work: WorkRecord) -> Result<(), StoreError>;
     /// Claim the highest-priority, oldest available work, optionally restricted
     /// to one required generation. `None` is the compatibility form for a
@@ -57,6 +71,7 @@ pub trait WorkStore: Send + Sync {
         now_tick: u64,
         lease_ticks: u64,
     ) -> Result<Option<WorkRecord>, StoreError>;
+    /// Extend a live lease held by the exact lease identity and epoch.
     fn heartbeat(
         &self,
         work_id: &str,
@@ -65,6 +80,7 @@ pub trait WorkStore: Send + Sync {
         now_tick: u64,
         lease_ticks: u64,
     ) -> Result<WorkRecord, StoreError>;
+    /// Return leased work to the queue at a bounded future tick.
     fn release(
         &self,
         work_id: &str,
@@ -73,7 +89,9 @@ pub trait WorkStore: Send + Sync {
         now_tick: u64,
         available_tick: u64,
     ) -> Result<WorkRecord, StoreError>;
+    /// Mark queued or claimed work for cancellation.
     fn request_cancellation(&self, work_id: &str) -> Result<WorkRecord, StoreError>;
+    /// Move exhausted or invalid work to its terminal dead-letter state.
     fn dead_letter(
         &self,
         work_id: &str,
@@ -81,6 +99,7 @@ pub trait WorkStore: Send + Sync {
         lease_epoch: u64,
         now_tick: u64,
     ) -> Result<WorkRecord, StoreError>;
+    /// Complete work only while the supplied lease fence remains live.
     fn complete(
         &self,
         work_id: &str,
@@ -90,9 +109,14 @@ pub trait WorkStore: Send + Sync {
     ) -> Result<(), StoreError>;
 }
 
+/// Durable delivery outbox storage.
 pub trait OutboxStore: Send + Sync {
+    /// Append a unique notification.
     fn append_notification(&self, record: OutboxRecord) -> Result<(), StoreError>;
+    /// Return at most `max` undelivered notifications in stable order.
     fn pending_notifications(&self, max: usize) -> Result<Vec<OutboxRecord>, StoreError>;
+    /// Mark one notification delivered under optimistic version control and
+    /// persist the supplied nonzero `delivered_tick` as its retention age.
     fn mark_notification_delivered(
         &self,
         notification_id: &str,
@@ -215,13 +239,17 @@ pub trait RetentionStore: Send + Sync {
     ) -> Result<Vec<RetentionLegacyRow>, StoreError>;
 }
 
+/// Atomic execution, event, effect, checkpoint, and outbox transactions.
 pub trait JournalStore: Send + Sync {
+    /// Atomically admit an execution with its first event and notification.
     fn admit_execution(
         &self,
         execution: ExecutionRecord,
         event: LifecycleEvent,
         notification: OutboxRecord,
     ) -> Result<(), StoreError>;
+    /// Atomically commit one execution step and all associated durable records,
+    /// including terminal lifecycle ages carried by the event and records.
     #[allow(clippy::too_many_arguments)]
     fn commit_execution_step(
         &self,
@@ -236,21 +264,29 @@ pub trait JournalStore: Send + Sync {
     ) -> Result<ExecutionRecord, StoreError>;
 }
 
+/// Restorable execution-checkpoint storage.
 pub trait CheckpointStore: Send + Sync {
+    /// Insert or replace a validated checkpoint for its execution.
     fn put_checkpoint(&self, record: CheckpointRecord) -> Result<(), StoreError>;
+    /// Read the current checkpoint for an execution.
     fn get_checkpoint(&self, id: &ExecutionId) -> Result<Option<CheckpointRecord>, StoreError>;
+    /// Delete the current checkpoint, if present.
     fn delete_checkpoint(&self, id: &ExecutionId) -> Result<(), StoreError>;
 }
 
+/// Durable authenticated-session storage.
 pub trait SessionStore: Send + Sync {
+    /// Create or compare-and-swap a session record.
     fn put_session(
         &self,
         record: SessionRecord,
         expected_version: Option<u64>,
     ) -> Result<(), StoreError>;
+    /// Read a session by its opaque storage identity.
     fn get_session(&self, id: &str) -> Result<Option<SessionRecord>, StoreError>;
 }
 
+/// Immutable content-addressed artifact storage.
 pub trait ArtifactStore: Send + Sync {
     /// Prove readable and writable access and report every enforced capacity dimension.
     ///
@@ -259,20 +295,31 @@ pub trait ArtifactStore: Send + Sync {
     fn health(&self) -> Result<ArtifactStoreHealth, StoreError> {
         Err(StoreError::IncompatibleVersion)
     }
+    /// Publish an artifact or accept an identical prior publication.
     fn put_artifact(&self, record: ArtifactRecord) -> Result<(), StoreError>;
+    /// Read and validate an artifact by content identity.
     fn get_artifact(&self, id: &ArtifactRef) -> Result<Option<ArtifactRecord>, StoreError>;
+    /// Remove an artifact under an operator-controlled lifecycle.
     fn delete_artifact(&self, id: &ArtifactRef) -> Result<(), StoreError>;
 }
 
+/// Active provider-generation metadata storage.
 pub trait GenerationStore: Send + Sync {
+    /// Publish a provider generation under optimistic version control.
     fn publish_generation(&self, record: GenerationRecord) -> Result<(), StoreError>;
+    /// Read the currently published generation for a provider.
     fn generation(&self, provider: &str) -> Result<Option<GenerationRecord>, StoreError>;
 }
 
+/// Durable idempotency intents and terminal effect receipts.
 pub trait IdempotencyStore: Send + Sync {
+    /// Record a unique pre-dispatch effect intent.
     fn record_intent(&self, record: EffectRecord) -> Result<(), StoreError>;
+    /// Replace an exact intent with its validated post-dispatch result.
     fn record_result(&self, key: &IdempotencyKey, record: EffectRecord) -> Result<(), StoreError>;
+    /// Read the current effect record for an idempotency key.
     fn effect(&self, key: &IdempotencyKey) -> Result<Option<EffectRecord>, StoreError>;
+    /// Enumerate a bounded set of explicitly uncertain effects.
     fn unknown_effects(&self, max: usize) -> Result<Vec<EffectRecord>, StoreError>;
     /// Enumerate all intent or unknown-outcome effects that still require recovery.
     fn unresolved_effects(&self, _max: usize) -> Result<Vec<EffectRecord>, StoreError> {
@@ -307,6 +354,7 @@ pub trait IdempotencyStore: Send + Sync {
         format: crate::EffectDigestFormat,
         result_digest: [u8; 32],
     ) -> Result<EffectRecord, StoreError>;
+    /// Resolve one uncertain effect using its retained digest domain.
     fn reconcile_unknown(
         &self,
         key: &IdempotencyKey,
@@ -330,6 +378,7 @@ pub trait IdempotencyStore: Send + Sync {
     }
 }
 
+/// Versioned per-object provider state and atomic mutation batches.
 pub trait ProviderStateStore: AuditSink + Send + Sync {
     /// Return a positive durable tick no lower than `observed_floor` or any
     /// previously observed floor.
@@ -341,11 +390,13 @@ pub trait ProviderStateStore: AuditSink + Send + Sync {
     fn advance_logical_clock(&self, _observed_floor: u64) -> Result<u64, StoreError> {
         Err(StoreError::InvalidTransition)
     }
+    /// Read one provider-owned object.
     fn get_provider_state(
         &self,
         namespace: &str,
         key: &str,
     ) -> Result<Option<ProviderStateRecord>, StoreError>;
+    /// List a bounded, stable prefix of one provider namespace.
     fn list_provider_state(
         &self,
         namespace: &str,
@@ -359,25 +410,30 @@ pub trait ProviderStateStore: AuditSink + Send + Sync {
     ) -> Result<Vec<ProviderStateRecord>, StoreError> {
         Err(StoreError::InvalidTransition)
     }
+    /// Create or compare-and-swap one provider-owned object.
     fn put_provider_state(
         &self,
         record: ProviderStateRecord,
         expected_version: Option<u64>,
     ) -> Result<(), StoreError>;
+    /// Delete one provider-owned object at an exact version.
     fn delete_provider_state(
         &self,
         namespace: &str,
         key: &str,
         expected_version: u64,
     ) -> Result<(), StoreError>;
+    /// Atomically move an object between keys in the same namespace.
     fn move_provider_state(
         &self,
         record: ProviderStateRecord,
         old_key: &str,
         expected_version: u64,
     ) -> Result<(), StoreError>;
+    /// Atomically apply a bounded batch of object writes.
     fn put_provider_states_atomic(&self, writes: Vec<ProviderStateWrite>)
     -> Result<(), StoreError>;
+    /// Atomically apply mixed puts, deletes, and moves.
     fn mutate_provider_states_atomic(
         &self,
         mutations: Vec<ProviderStateMutation>,
@@ -449,6 +505,7 @@ pub trait ProviderStateStore: AuditSink + Send + Sync {
     }
 }
 
+/// Complete storage authority required by the product coordinator.
 pub trait PlatformStore:
     ExecutionStore
     + EventStore

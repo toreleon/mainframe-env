@@ -13,6 +13,7 @@ pub const EFFECT_CANONICAL_SCHEMA: &str = "mainframe-env.effect-canonical@1";
 pub const PROVIDER_REPLAY_DIGEST_FORMAT: &str = "mainframe-env.provider-replay-canonical@1";
 pub const REQUEST_DIGEST_DOMAIN: &[u8] = b"mainframe-env.effect-request@1\0";
 pub const RESULT_DIGEST_DOMAIN: &[u8] = b"mainframe-env.effect-result@1\0";
+/// Independent domain separator for credential-safe host-resource audit digests.
 pub const AUDIT_RESOURCE_DIGEST_DOMAIN: &[u8] = b"mainframe-env.audit-resource@1\0";
 const OVERSIZED_AUDIT_RESOURCE_DIGEST_DOMAIN: &[u8] = b"mainframe-env.audit-resource-oversized@1\0";
 /// A hard ceiling for the canonical journal representation, not the provider's payload budget.

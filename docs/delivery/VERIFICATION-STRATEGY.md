@@ -157,8 +157,8 @@ release-grade work on every event:
   immutable supply-chain, locked dependency-policy, and full-notice checks;
 - pull requests run the supply-chain gate, `cargo deny check`, target-production license-notice
   validation, formatting, specification and COBOL exit checks, workspace tests,
-  Clippy, and a Rust 1.95.0 check over the full workspace, all targets, and all
-  features;
+  Clippy, the contract-crate `missing_docs` ratchet, and a Rust 1.95.0 check over
+  the full workspace, all targets, and all features;
 - the integrated `main` commit runs the complete workspace and documentation
   gates; the MSRV result is not repeated for a standard merge commit;
 - a manual `full` run adds complete conformance, certification, evidence, and

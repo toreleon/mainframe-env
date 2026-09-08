@@ -57,7 +57,9 @@ pub use runtime_service::{
     RUNTIME_SERVICE_REGISTRY_CONTRACT, RuntimeServiceDescriptor, RuntimeServiceRegistry,
 };
 
+/// Stable identifier for the typed host-effect contract.
 pub const HOST_CONTRACT: &str = "mainframe-env.host@1";
+/// Stable identifier for the CICS request and response contract.
 pub const CICS_CONTRACT: &str = "mainframe-env.cics@1";
 
 pub use semantic::{

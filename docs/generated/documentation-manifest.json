@@ -10,7 +10,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:39b89d0558022eae3b520d4b02655aa0c8bbdcff178bd1dcb6c67fa11acd45e5",
+      "sha256": "sha256:f9b6326476205c0156874d0709beb015005b87662bdc5fbc9cc0c603fdb2fea5",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -737,7 +737,7 @@
       "path": "docs/delivery/VERIFICATION-STRATEGY.md",
       "relative_links": 0,
       "scope": "verification layers, assurance tiers, and required evidence",
-      "sha256": "sha256:59fefdf6a8576b36582a61096265f302d3b956b5bc6eb9ad4ae629d1a4c0345b",
+      "sha256": "sha256:0b3dfb9d38d80d5cc391905d880a6a543decc4be6612a8f03c99a03f2854fb88",
       "status": "Accepted by repository owner",
       "title": "0.1 Verification Strategy",
       "xtask_commands": 0
@@ -1410,7 +1410,7 @@
       "normative": false,
       "path": "docs/runbooks/JENKINS-LOCAL.md",
       "relative_links": 1,
-      "sha256": "sha256:0603f3dfb89a1801fe9cfd308eccd1f7535df4724e104ddf8ab6d8e0c84d32c6",
+      "sha256": "sha256:5dbe8255a2c20eb928c5878be84d178ceaa525743a644bf136deefcac20094e8",
       "title": "Local Jenkins CI",
       "xtask_commands": 0
     },

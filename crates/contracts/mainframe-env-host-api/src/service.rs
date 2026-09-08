@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 #[must_use = "host effects must not be consumed without their typed audit record"]
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// A host effect paired with the mandatory durable security audit decision.
 pub struct AuditedEffectResult {
     effect: EffectResult,
     audit: AuditRecord,
