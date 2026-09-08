@@ -99,7 +99,11 @@ struct EvidenceArgs {
 struct ConformanceArgs {
     #[arg(long)]
     subsystem: Option<String>,
-    #[arg(long)]
+    #[arg(
+        long,
+        value_name = "GATE",
+        help = "One coverage gate, or local for all non-differential gates"
+    )]
     gate: Option<String>,
     #[arg(long)]
     shard: Option<u16>,
@@ -3695,20 +3699,20 @@ fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> T
         "selected subsystem product driver registry is not installed",
     )?;
     let limits = ConformanceLimits::default();
-    let gate = args.gate.as_deref().map(parse_coverage_gate).transpose()?;
+    let (gate, local_gate) = parse_focused_gate(args.gate.as_deref())?;
     let spec = compile_shared_spec(root)?;
     let selection = if let Some(replay) = args.replay.as_deref() {
         RunnerSelection::replay(replay, limits).map_err(|problem| problem.to_string())?
     } else {
-        RunnerSelection::focused(
+        make_focused_selection(
             args.subsystem
                 .as_deref()
                 .ok_or("focused conformance requires --subsystem")?,
             gate,
+            local_gate,
             args.shard,
             limits,
-        )
-        .map_err(|problem| problem.to_string())?
+        )?
     };
     let dataset_handlers = dataset_conformance_runtime();
     let jcl_handlers = jcl_conformance::runtime();
@@ -3928,7 +3932,7 @@ fn check_focused_dataset_or_jcl_conformance_interface(
     root: &Path,
     args: &ConformanceArgs,
 ) -> TaskResult {
-    let gate = args.gate.as_deref().map(parse_coverage_gate).transpose()?;
+    let (gate, local_gate) = parse_focused_gate(args.gate.as_deref())?;
     let spec = compile_shared_spec(root)?;
     let selected = spec
         .cases()
@@ -3943,7 +3947,7 @@ fn check_focused_dataset_or_jcl_conformance_interface(
                 .subsystem
                 .as_deref()
                 .is_some_and(|subsystem| subsystem == row.subsystem());
-            let gate_matches = gate.is_none_or(|gate| gate == case.key().gate);
+            let gate_matches = focused_gate_matches(case.key().gate, gate, local_gate);
             let shard_matches = args.shard.is_none_or(|bucket| {
                 spec.expected_shards().iter().any(|(shard, bindings)| {
                     shard.bucket == bucket && bindings.contains(case.key())
@@ -3969,17 +3973,18 @@ fn check_focused_dataset_or_jcl_conformance_interface(
     if is_dataset {
         let selection = if let Some(replay) = args.replay.as_deref() {
             RunnerSelection::replay(replay, ConformanceLimits::default())
+                .map_err(|problem| problem.to_string())
         } else {
-            RunnerSelection::focused(
+            make_focused_selection(
                 args.subsystem
                     .as_deref()
                     .ok_or("dataset conformance subsystem is missing")?,
                 gate,
+                local_gate,
                 args.shard,
                 ConformanceLimits::default(),
             )
-        }
-        .map_err(|problem| problem.to_string())?;
+        }?;
         let context = RunnerContext::new(
             repository_digest(root)?,
             "local-focused",
@@ -4036,15 +4041,16 @@ fn check_focused_dataset_or_jcl_conformance_interface(
         "selected subsystem product driver registry is not installed",
     )?;
     if racf_selected {
-        return run_focused_racf(root, args, gate, &spec, selected);
+        return run_focused_racf(root, args, gate, local_gate, &spec, selected);
     }
-    run_focused_jcl(root, args, gate, &spec, selected)
+    run_focused_jcl(root, args, gate, local_gate, &spec, selected)
 }
 
 fn run_focused_racf(
     root: &Path,
     args: &ConformanceArgs,
     gate: Option<CoverageGate>,
+    local_gate: bool,
     spec: &CompiledSpec,
     selected: usize,
 ) -> TaskResult {
@@ -4052,8 +4058,7 @@ fn run_focused_racf(
     let selection = if let Some(replay) = args.replay.as_deref() {
         RunnerSelection::replay(replay, limits).map_err(|problem| problem.to_string())?
     } else {
-        RunnerSelection::focused("racf-saf", gate, args.shard, limits)
-            .map_err(|problem| problem.to_string())?
+        make_focused_selection("racf-saf", gate, local_gate, args.shard, limits)?
     };
     let context = RunnerContext::new(repository_digest(root)?, "local-deterministic", limits)
         .map_err(|problem| problem.to_string())?;
@@ -4100,6 +4105,7 @@ fn run_focused_jcl(
     root: &Path,
     args: &ConformanceArgs,
     gate: Option<CoverageGate>,
+    local_gate: bool,
     spec: &CompiledSpec,
     selected: usize,
 ) -> TaskResult {
@@ -4107,13 +4113,13 @@ fn run_focused_jcl(
     let selection = if let Some(replay) = args.replay.as_deref() {
         RunnerSelection::replay(replay, limits).map_err(|problem| problem.to_string())?
     } else {
-        RunnerSelection::focused(
+        make_focused_selection(
             args.subsystem.as_deref().unwrap_or("jcl-jes2"),
             gate,
+            local_gate,
             args.shard,
             limits,
-        )
-        .map_err(|problem| problem.to_string())?
+        )?
     };
     let context = RunnerContext::new(repository_digest(root)?, "local-deterministic", limits)
         .map_err(|problem| problem.to_string())?;
@@ -4319,6 +4325,41 @@ fn parse_coverage_gate(value: &str) -> TaskResult<CoverageGate> {
         .into_iter()
         .find(|gate| gate.slug() == value)
         .ok_or_else(|| format!("unknown coverage gate {value}"))
+}
+
+fn parse_focused_gate(value: Option<&str>) -> TaskResult<(Option<CoverageGate>, bool)> {
+    match value {
+        Some("local") => Ok((None, true)),
+        Some(value) => Ok((Some(parse_coverage_gate(value)?), false)),
+        None => Ok((None, false)),
+    }
+}
+
+fn focused_gate_matches(
+    candidate: CoverageGate,
+    selected: Option<CoverageGate>,
+    local: bool,
+) -> bool {
+    if local {
+        candidate != CoverageGate::Differential
+    } else {
+        selected.is_none_or(|gate| gate == candidate)
+    }
+}
+
+fn make_focused_selection(
+    subsystem: &str,
+    gate: Option<CoverageGate>,
+    local: bool,
+    shard: Option<u16>,
+    limits: ConformanceLimits,
+) -> TaskResult<RunnerSelection> {
+    let selection = if local {
+        RunnerSelection::local(subsystem, shard, limits)
+    } else {
+        RunnerSelection::focused(subsystem, gate, shard, limits)
+    };
+    selection.map_err(|problem| problem.to_string())
 }
 
 fn generate_evidence_seal(root: &Path) -> TaskResult {
@@ -6243,6 +6284,14 @@ fn check_schemas(root: &Path) -> TaskResult {
         &json(&jes_package_additions_schema)?,
         &json(&jes_package_additions)?,
         &jes_package_additions,
+    )?;
+    let distribution_release = root.join("release/0.8.2/source-distribution.json");
+    let distribution_release_schema =
+        root.join("conformance/0.8/schemas/source-distribution-release.schema.json");
+    validate_schema_instance(
+        &json(&distribution_release_schema)?,
+        &json(&distribution_release)?,
+        &distribution_release,
     )?;
     for (artifact, schema) in [
         (
@@ -10691,13 +10740,15 @@ fn check_certification(root: &Path) -> TaskResult {
         .iter()
         .map(|row| text(row, "name", &packages_path).map(str::to_string))
         .collect::<TaskResult<BTreeSet<_>>>()?;
-    let additions_path = root.join("conformance/0.2/inventory/package-additions.json");
-    if additions_path.is_file() {
+    for additions_path in [
+        root.join("conformance/0.2/inventory/package-additions.json"),
+        root.join("conformance/0.8/inventory/package-additions.json"),
+    ] {
         let additions = json(&additions_path)?;
         for package in array(&additions, "packages", &additions_path)? {
             require(
                 package_names.insert(text(package, "name", &additions_path)?.to_string()),
-                "0.2 package addition duplicates a historical package",
+                "package addition duplicates an earlier inventory package",
             )?;
         }
     }
@@ -10877,7 +10928,9 @@ fn check_certification(root: &Path) -> TaskResult {
         workspace_tests.success(),
         "certification workspace tests failed",
     )?;
-    check_release_artifacts(root, &host_target(root)?)?;
+    if !validate_source_distribution_release(root)? {
+        check_release_artifacts(root, &host_target(root)?)?;
+    }
     Ok(())
 }
 
@@ -11235,6 +11288,131 @@ fn check_release_artifacts(root: &Path, target: &str) -> TaskResult {
     compare_release_documents(&retained, &documents)?;
     validate_checked_in_release_targets(root)?;
     Ok(())
+}
+
+fn validate_source_distribution_release(root: &Path) -> TaskResult<bool> {
+    let version = product_version(root)?;
+    let record_path = root.join(format!("release/{version}/source-distribution.json"));
+    if !record_path.is_file() {
+        return Ok(false);
+    }
+    let schema_path = root.join("conformance/0.8/schemas/source-distribution-release.schema.json");
+    let record = json(&record_path)?;
+    validate_schema_instance(&json(&schema_path)?, &record, &record_path)?;
+    require(
+        text(&record, "version", &record_path)? == version
+            && record["runtime_and_contract_changes"] == Value::Bool(true)
+            && record["published_assets"]["native_binaries"] == Value::Bool(false)
+            && record["published_assets"]["native_binary_receipts"] == Value::Bool(false),
+        "source-distribution release identity is inconsistent",
+    )?;
+    let tag = text(&record, "tag", &record_path)?;
+    let tag_commit = text(&record, "tag_commit", &record_path)?;
+    let peeled_tag = format!("{tag}^{{}}");
+    require(
+        command_text(root, "git", &["rev-parse", &peeled_tag])? == tag_commit,
+        "source-distribution release tag moved",
+    )?;
+    let ancestry = Command::new("git")
+        .args(["merge-base", "--is-ancestor", tag_commit, "HEAD"])
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("source-distribution release ancestry: {error}"))?;
+    require(
+        ancestry.success(),
+        "current candidate does not descend from the source-distribution release tag",
+    )?;
+    require(
+        !root.join(format!("release/{version}/targets")).exists(),
+        "source-distribution release unexpectedly carries target-binary receipts",
+    )?;
+    for digest in [
+        text(
+            &record["published_assets"]["archive"],
+            "sha256",
+            &record_path,
+        )?,
+        text(
+            &record["published_assets"]["checksum"],
+            "sha256",
+            &record_path,
+        )?,
+    ] {
+        validate_sha256_identity(digest, "distribution release asset digest")?;
+    }
+
+    let cargo_lock_digest = text(
+        &record["source_identity"],
+        "cargo_lock_sha256",
+        &record_path,
+    )?;
+    require(
+        cargo_lock_digest
+            == format!(
+                "sha256:{}",
+                git_file_digest(root, tag_commit, "Cargo.lock")?
+            ),
+        "source-distribution Cargo.lock identity drifted",
+    )?;
+    let workflow_commit = text(&record["verification"], "workflow_commit", &record_path)?;
+    let workflow_digest = text(&record["verification"], "workflow_sha256", &record_path)?;
+    let workflow_ancestry = Command::new("git")
+        .args(["merge-base", "--is-ancestor", tag_commit, workflow_commit])
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("source-distribution workflow ancestry: {error}"))?;
+    require(
+        workflow_ancestry.success()
+            && workflow_digest
+                == format!(
+                    "sha256:{}",
+                    git_file_digest(
+                        root,
+                        workflow_commit,
+                        ".github/workflows/offline-release-bundle.yml",
+                    )?
+                ),
+        "source-distribution workflow identity or ancestry drifted",
+    )?;
+
+    let retained_version = text(&record["prior_binary_receipts"], "version", &record_path)?;
+    let retained =
+        retained_release_documents_for_version(root, retained_version, "aarch64-apple-darwin")?;
+    let inputs = retained
+        .iter()
+        .find_map(|(path, bytes)| {
+            (path.file_name() == Some(OsStr::new("build-inputs.json"))).then_some(bytes)
+        })
+        .ok_or("retained runtime receipts omit build-inputs.json")?;
+    let inputs: Value = serde_json::from_slice(inputs)
+        .map_err(|error| format!("retained release build inputs: {error}"))?;
+    let source_digest = text(&inputs, "source_digest", &record_path)?;
+    validate_checked_in_release_targets_for_identity(
+        root,
+        retained_version,
+        "stable",
+        source_digest,
+    )?;
+    let retained_tag = format!("mainframe-env-v{retained_version}");
+    for retained_target in RETAINED_RELEASE_TARGETS {
+        for (relative, current) in
+            retained_release_documents_for_version(root, retained_version, retained_target)?
+        {
+            let tagged = git_file_bytes(root, &retained_tag, &relative.to_string_lossy())?;
+            require(
+                current == tagged,
+                &format!(
+                    "historical {retained_version} binary receipt drifted: {}",
+                    relative.display()
+                ),
+            )?;
+        }
+    }
+    println!(
+        "source-distribution release version={version} tag={tag} bundle={} native-binary-receipts=absent current-runtime-artifact-credit=0 prior-binary-receipts={retained_version}:historical-only",
+        text(&record["published_assets"]["archive"], "name", &record_path)?
+    );
+    Ok(true)
 }
 
 fn retained_accepted_release(root: &Path) -> TaskResult<Option<String>> {
@@ -11960,6 +12138,11 @@ fn collect_named(root: &Path, name: &OsStr, files: &mut Vec<PathBuf>) -> TaskRes
     for entry in fs::read_dir(root).map_err(|error| format!("{}: {error}", root.display()))? {
         let path = entry.map_err(|error| error.to_string())?.path();
         if path.is_dir() {
+            // A nested Git worktree has a `.git` file rather than a `.git`
+            // directory. It is a separate checkout, not part of this candidate.
+            if linked_worktree_root(&path) {
+                continue;
+            }
             collect_named(&path, name, files)?;
         } else if path.file_name() == Some(name) {
             files.push(path);
@@ -11972,6 +12155,9 @@ fn collect_extension(root: &Path, extension: &OsStr, files: &mut Vec<PathBuf>) -
     for entry in fs::read_dir(root).map_err(|error| format!("{}: {error}", root.display()))? {
         let path = entry.map_err(|error| error.to_string())?.path();
         if path.is_dir() {
+            if linked_worktree_root(&path) {
+                continue;
+            }
             collect_extension(&path, extension, files)?;
         } else if path.extension() == Some(extension) {
             files.push(path);
@@ -11980,8 +12166,9 @@ fn collect_extension(root: &Path, extension: &OsStr, files: &mut Vec<PathBuf>) -
     Ok(())
 }
 
-/// Every file in the tree, minus the two directories at the workspace root that
-/// are not the tree: Cargo's build directory and git's object store.
+/// Every file in the tree, minus Cargo's root build directory, git's root
+/// object store, and any linked worktree nested below this checkout. A linked
+/// worktree is a separate candidate even when a tool stores it below this path.
 ///
 /// The skip used to read `file_name() == "target" || file_name() == ".git"`, and
 /// it was evaluated at every level of the recursion, so it said "the build
@@ -12025,6 +12212,10 @@ fn ignored_build_output(path: &Path) -> bool {
     path.file_name().is_some_and(|name| name == "__pycache__")
 }
 
+fn linked_worktree_root(path: &Path) -> bool {
+    path.join(".git").is_file()
+}
+
 fn collect_files_below(
     directory: &Path,
     not_the_tree: &[PathBuf; 2],
@@ -12035,7 +12226,10 @@ fn collect_files_below(
     {
         let path = entry.map_err(|error| error.to_string())?.path();
         if path.is_dir() {
-            if not_the_tree.contains(&path) || ignored_build_output(&path) {
+            if not_the_tree.contains(&path)
+                || ignored_build_output(&path)
+                || linked_worktree_root(&path)
+            {
                 continue;
             }
             collect_files_below(&path, not_the_tree, files)?;
@@ -12226,6 +12420,54 @@ mod tests {
         }
 
         check_publication_bytes(&root).expect("nothing is left planted");
+        fs::remove_dir_all(&root).expect("clean up");
+    }
+
+    #[test]
+    fn repository_inventories_do_not_enter_nested_git_worktrees() {
+        let root = std::env::temp_dir().join(format!(
+            "xtask-collect-named-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("member/src")).expect("member directory");
+        fs::create_dir_all(root.join(".claude/worktrees/probe/src"))
+            .expect("nested worktree directory");
+        fs::write(root.join(".git"), b"gitdir: candidate\n").expect("candidate worktree marker");
+        fs::write(root.join("Cargo.toml"), b"[workspace]\n").expect("root manifest");
+        fs::write(
+            root.join("member/Cargo.toml"),
+            b"[package]\nname = \"member\"\nversion = \"0.1.0\"\n",
+        )
+        .expect("member manifest");
+        fs::write(
+            root.join(".claude/worktrees/probe/.git"),
+            b"gitdir: elsewhere\n",
+        )
+        .expect("worktree marker");
+        fs::write(
+            root.join(".claude/worktrees/probe/Cargo.toml"),
+            b"[workspace]\n",
+        )
+        .expect("nested root manifest");
+        fs::write(
+            root.join(".claude/worktrees/probe/src/leak.rs"),
+            served_topic(),
+        )
+        .expect("nested build output");
+
+        let mut manifests = Vec::new();
+        collect_named(&root, OsStr::new("Cargo.toml"), &mut manifests).expect("manifest inventory");
+        manifests.sort();
+        assert_eq!(
+            manifests,
+            vec![root.join("Cargo.toml"), root.join("member/Cargo.toml")]
+        );
+        let mut rust_files = Vec::new();
+        collect_extension(&root, OsStr::new("rs"), &mut rust_files).expect("Rust source inventory");
+        assert!(rust_files.is_empty());
+        check_publication_bytes(&root).expect("linked worktree bytes are another candidate");
         fs::remove_dir_all(&root).expect("clean up");
     }
 

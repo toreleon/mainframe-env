@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# Package and verify the locked Cargo sources for an existing release tag.
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+out="$root/dist"
+tag=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --tag) tag="${2:?--tag needs a tag}"; shift 2 ;;
+    --out) out="${2:?--out needs a directory}"; shift 2 ;;
+    -h|--help) sed -n '2,14p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+
+[[ "$tag" =~ ^mainframe-env-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] \
+  || { echo "--tag must be a mainframe-env-vX.Y.Z release tag" >&2; exit 2; }
+version="${tag#mainframe-env-v}"
+actual_version="$(tr -d '[:space:]' < "$root/VERSION")"
+[[ "$actual_version" == "$version" ]] \
+  || { echo "VERSION mismatch: tag=$version repository=$actual_version" >&2; exit 1; }
+
+head="$(git -C "$root" rev-parse HEAD)"
+tag_commit="$(git -C "$root" rev-parse --verify "refs/tags/$tag^{commit}")"
+[[ "$head" == "$tag_commit" ]] \
+  || { echo "release bundle requires HEAD at $tag ($tag_commit), got $head" >&2; exit 1; }
+
+target_root="${CARGO_TARGET_DIR:-$root/target}"
+mkdir -p "$target_root" "$out"
+stage="$(mktemp -d "$target_root/offline-release.XXXXXX")"
+trap 'rm -rf "$stage"' EXIT
+sdk="$stage/offline-sdk"
+mkdir -p "$sdk/.cargo"
+
+echo "==> vendoring locked Cargo sources for $tag"
+cargo vendor --locked "$sdk/vendor" > "$sdk/.cargo/config.toml"
+sed -i.bak 's|^directory = .*|directory = "vendor"|' "$sdk/.cargo/config.toml"
+rm -f "$sdk/.cargo/config.toml.bak"
+grep -q '^directory = "vendor"$' "$sdk/.cargo/config.toml" \
+  || { echo "could not make the vendor path relocatable" >&2; exit 1; }
+cp "$root/Cargo.lock" "$sdk/Cargo.lock"
+cp "$root/Cargo.toml" "$sdk/Cargo.toml"
+
+cat > "$sdk/README.md" <<'EOF'
+# mainframe-env offline Cargo dependency bundle
+
+Extract this archive into the root of the matching tagged source checkout. It
+contains the exact crates selected by `Cargo.lock`; build and test with
+`cargo build --workspace --all-features --locked --offline` and
+`cargo test --workspace --all-features --locked --offline`.
+
+The Rust compiler and source checkout are not included.
+EOF
+
+echo "==> verifying a clean checkout with networking disabled in Cargo"
+verify="$stage/verify"
+git clone --quiet --no-local "$root" "$verify"
+git -C "$verify" checkout --quiet --detach "$head"
+rm -rf "$verify/.cargo" "$verify/vendor"
+cp -R "$sdk/.cargo" "$verify/.cargo"
+cp -R "$sdk/vendor" "$verify/vendor"
+CARGO_NET_OFFLINE=true CARGO_TARGET_DIR="$stage/verify-target" \
+  cargo build --manifest-path "$verify/Cargo.toml" \
+    --workspace --all-features --locked --offline
+
+archive="$out/mainframe-env-${version}-cargo-vendor.tar.gz"
+echo "==> packaging $archive"
+if tar --version 2>/dev/null | grep -qi 'gnu tar'; then
+  tar_flags=(--format=ustar --numeric-owner --owner=0 --group=0 --mtime=@0 --sort=name)
+else
+  tar_flags=(--format=ustar --numeric-owner --uid 0 --gid 0 --uname '' --gname '')
+fi
+tar "${tar_flags[@]}" -C "$sdk" -cf - . | gzip -9 -n > "$archive"
+if command -v sha256sum >/dev/null 2>&1; then
+  sha256sum "$archive" | sed 's|  .*/|  |' > "$archive.sha256"
+else
+  shasum -a 256 "$archive" | sed 's|  .*/|  |' > "$archive.sha256"
+fi
+printf 'bundle: %s\n' "$archive"

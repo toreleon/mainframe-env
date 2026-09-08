@@ -215,7 +215,7 @@ def locators(root: Path) -> Iterator[Figure]:
     recompute without asking IBM anything.
     """
     kinds: dict[str, int] = {}
-    rows = located = chapters = cited = 0
+    rows = located = publication_located = embedded_located = chapters = cited = 0
     headings: dict[tuple[str, str], int] = {}
     numbered: dict[str, int] = {}
     for baseline in BASELINES:
@@ -229,6 +229,10 @@ def locators(root: Path) -> Iterator[Figure]:
                 here[kind] = here.get(kind, 0) + 1
                 kinds[kind] = kinds.get(kind, 0) + 1
                 rows += 1
+                if kind in ("topic", "html-table", "html-link"):
+                    publication_located += 1
+                if kind in ("html-table", "html-link"):
+                    embedded_located += 1
                 if kind != "topic":
                     continue
                 parts = dict(
@@ -260,6 +264,16 @@ def locators(root: Path) -> Iterator[Figure]:
     every = f"{CATALOGS}/*.json (index.json excluded) units[].rows[]"
     yield Figure("catalog.rows_total", rows, every)
     yield Figure("catalog.topic_located_total", located, f"{every}, `topic:` prefix")
+    yield Figure(
+        "catalog.publication_located_total",
+        publication_located,
+        f"{every}, `topic:`, `html-table:` or `html-link:` prefix",
+    )
+    yield Figure(
+        "catalog.embedded_located_total",
+        embedded_located,
+        f"{every}, `html-table:` or `html-link:` prefix",
+    )
     yield Figure("catalog.not_topic_located_total", rows - located, f"{every}, other prefixes")
     for kind in ("html-table", "html-link", "roadmap-normalization"):
         yield Figure(
@@ -490,6 +504,21 @@ def racf(root: Path) -> Iterator[Figure]:
         "applied_names",
         "remaining_catalog_only_names",
         "remaining_catalog_only_families",
+        "reviewed_catalog_only_names",
+        "implemented_catalog_only_names",
+        "opaque_catalog_only_names",
+        "unsupported_catalog_only_names",
+        "source_only_names",
+        "source_only_families",
+        "implemented_source_only_names",
+        "unsupported_source_only_names",
+        "catalog_gap_source_only_names",
+        "syntax_only_names",
+        "syntax_only_families",
+        "implemented_syntax_only_names",
+        "unsupported_syntax_only_names",
+        "context_only_syntax_only_names",
+        "catalog_gap_syntax_only_names",
     ):
         yield Figure(f"racf.{name}", book[name], f"{dispositions} {name}")
     unapplied = [entry for entry in book["dispositions"] if not entry.get("applied")]

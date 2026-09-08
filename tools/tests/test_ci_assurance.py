@@ -12,12 +12,13 @@ spec = importlib.util.spec_from_file_location('ci_assurance', TOOL)
 ci = importlib.util.module_from_spec(spec); spec.loader.exec_module(ci)
 
 class SelectionTests(unittest.TestCase):
-    def test_runtime_compiler_store_and_workflow_paths_select_their_obligations(self):
+    def test_runtime_compiler_store_and_pipeline_paths_select_their_obligations(self):
         for path, required in {
             'crates/kernel/mainframe-env-interpreter/src/machine.rs': {'runtime','architecture'},
             'crates/kernel/mainframe-env-compiler/src/hir.rs': {'compiler','architecture'},
             'crates/stores/mainframe-env-store/src/durable.rs': {'store','runtime'},
-            '.github/workflows/ci.yml': ci.ALL,
+            'Jenkinsfile': ci.ALL,
+            'tools/jenkins/disk_guard.py': ci.ALL,
             'conformance/0.8/evidence/receipt.json': ci.ALL,
             'docs/contracts/effect-canonical-v1.md': ci.ALL,
             'docs/architecture/RUNTIME.md': ci.ALL,
@@ -41,10 +42,49 @@ class SelectionTests(unittest.TestCase):
             with self.assertRaises(ValueError): ci.obligations([path])
     @patch.object(ci,'identity',return_value={'candidate':'a'*40,'tree':'b'*40})
     def test_full_tiers_select_every_obligation(self,_):
-        for event,ref in [('schedule','refs/heads/main'),('workflow_dispatch','refs/heads/main'),('push','refs/tags/mainframe-env-v0.8.2')]:
+        for event,ref in [('schedule','refs/heads/main'),('manual','refs/heads/main'),('tag','refs/tags/mainframe-env-v0.8.2')]:
             p=ci.make_plan(Path('.'),{},event,ref)
             self.assertTrue(p['full']);self.assertTrue(p['msrv']);self.assertTrue(p['store'])
             self.assertTrue(set(ci.FULL)<=set(p['primary_gates']))
+            self.assertIn('certification',p['primary_gates'])
+
+    def test_jenkins_pull_request_context_uses_explicit_comparison_sha(self):
+        context=ci.jenkins_context(Path('.'),{
+            'JENKINS_URL':'http://127.0.0.1:8080/',
+            'CHANGE_ID':'93',
+            'BRANCH_NAME':'PR-93',
+            'MAINFRAME_ENV_CI_BASE':'a'*40,
+        })
+        self.assertEqual(context,{
+            'event':'pull_request',
+            'ref':'refs/pull/93/merge',
+            'base':'a'*40,
+            'provider':'jenkins',
+        })
+
+    def test_jenkins_tag_and_timer_select_full_contexts(self):
+        tag=ci.jenkins_context(Path('.'),{
+            'JENKINS_HOME':'/capped/jenkins-home',
+            'BRANCH_NAME':'mainframe-env-v0.8.2',
+        })
+        self.assertEqual((tag['event'],tag['ref'],tag['provider']),
+                         ('tag','refs/tags/mainframe-env-v0.8.2','jenkins'))
+        timer=ci.jenkins_context(Path('.'),{
+            'JENKINS_URL':'http://127.0.0.1:8080/',
+            'BUILD_CAUSE':'TIMERTRIGGER',
+            'BRANCH_NAME':'main',
+        })
+        self.assertEqual(timer['event'],'schedule')
+
+    def test_jenkins_context_rejects_non_sha_comparison_base(self):
+        with self.assertRaises(ValueError):
+            ci.jenkins_context(Path('.'),{'JENKINS_HOME':'/capped'},requested_base='main~1')
+
+    @patch.object(ci,'identity',return_value={'candidate':'a'*40,'tree':'b'*40})
+    def test_merge_push_skips_msrv_but_manual_full_does_not(self,_):
+        push=ci.make_plan(Path('.'),{'merge_commit':True},'push','refs/heads/main')
+        full=ci.make_plan(Path('.'),{'merge_commit':True},'manual','refs/heads/main')
+        self.assertFalse(push['msrv']);self.assertTrue(full['msrv'])
     @patch.object(ci,'identity',return_value={'candidate':'a'*40,'tree':'b'*40})
     def test_missing_diff_fails_closed_to_all_not_prose(self,_):
         p=ci.make_plan(Path('.'),{},'pull_request','refs/pull/1/merge')
@@ -62,6 +102,11 @@ class SelectionTests(unittest.TestCase):
     def test_empty_gate_list_is_not_full_assurance(self):
         p={'candidate':'a'*40,'tree':'b'*40,'full':True}
         self.assertFalse(ci.summarize(p,Path('.'),[])['selected_commands_passed'])
+    def test_empty_gate_list_passes_an_explicit_no_build_plan(self):
+        p={'candidate':'a'*40,'tree':'b'*40,'full':False,'build':False}
+        report=ci.summarize(p,Path('.'),[])
+        self.assertTrue(report['selected_commands_passed'])
+        self.assertEqual(report['checks'],{})
     def test_real_git_diff_includes_deletions(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)
@@ -78,5 +123,18 @@ class SelectionTests(unittest.TestCase):
             code=ci.record(Path('.'),Path(d),'empty-test',[sys.executable,'-c','print("running 0 tests\\ntest result: ok. 0 passed; 0 failed;")'],True)
             self.assertNotEqual(code,0)
             self.assertEqual(json.loads((Path(d)/'empty-test.json').read_text())['status'],'failed')
+
+    @patch.object(ci,'identity',return_value={'candidate':'a'*40,'tree':'b'*40})
+    @patch.object(ci.subprocess,'check_output',side_effect=lambda *args, **kw: '' if kw.get('text') else b'')
+    def test_record_captures_jenkins_runner_identity(self,_,__):
+        with tempfile.TemporaryDirectory() as d, patch.dict(ci.os.environ,{
+            'JENKINS_URL':'http://127.0.0.1:8080/', 'NODE_NAME':'built-in',
+            'JOB_NAME':'mainframe-env', 'BUILD_NUMBER':'7',
+            'BUILD_URL':'http://127.0.0.1:8080/job/mainframe-env/7/'
+        },clear=True):
+            code=ci.record(Path('.'),Path(d),'runner',[sys.executable,'-c','pass'])
+            runner=json.loads((Path(d)/'runner.json').read_text())['runner']
+            self.assertEqual(code,0);self.assertEqual(runner['ci'],'jenkins')
+            self.assertEqual((runner['job_name'],runner['build_number']),('mainframe-env','7'))
 
 if __name__=='__main__':unittest.main()

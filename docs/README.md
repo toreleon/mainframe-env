@@ -28,6 +28,7 @@ rewrite. When prose conflicts, the order below defines precedence.
 - [Versioning and release gates](delivery/VERSIONING-AND-RELEASES.md)
 - [GitHub Project synchronization](delivery/coverage-versions/GITHUB-PROJECT.md)
 - [CardDemo reached compatibility copybooks](compatibility/CARDDEMO-COPYBOOKS.md)
+- [Local Jenkins CI runbook](runbooks/JENKINS-LOCAL.md)
 
 ## Document status vocabulary
 

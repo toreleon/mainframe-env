@@ -2043,6 +2043,10 @@ pub enum RunnerSelection {
         gate: Option<CoverageGate>,
         shard: Option<u16>,
     },
+    Local {
+        subsystem: String,
+        shard: Option<u16>,
+    },
     Replay(TestId),
 }
 
@@ -2069,6 +2073,16 @@ impl RunnerSelection {
         Ok(Self::Replay(TestId::new(test_id, limits)?))
     }
 
+    pub fn local(
+        subsystem: impl Into<String>,
+        shard: Option<u16>,
+        limits: ConformanceLimits,
+    ) -> Result<Self, SpecProblem> {
+        let subsystem = subsystem.into();
+        validate_token(&subsystem, limits)?;
+        Ok(Self::Local { subsystem, shard })
+    }
+
     fn includes(&self, spec: &CompiledSpec, key: &BindingKey, case: &ConformanceCase) -> bool {
         match self {
             Self::Focused {
@@ -2085,6 +2099,20 @@ impl RunnerSelection {
                     .find_map(|(shard_key, bindings)| bindings.contains(key).then_some(shard_key));
                 row.subsystem == *subsystem
                     && gate.is_none_or(|selected| selected == key.gate)
+                    && shard.is_none_or(|selected| {
+                        key_shard.is_some_and(|value| value.bucket == selected)
+                    })
+            }
+            Self::Local { subsystem, shard } => {
+                let Some(row) = spec.catalog_rows.get(&key.row_id) else {
+                    return false;
+                };
+                let key_shard = spec
+                    .expected_shards
+                    .iter()
+                    .find_map(|(shard_key, bindings)| bindings.contains(key).then_some(shard_key));
+                row.subsystem == *subsystem
+                    && key.gate != CoverageGate::Differential
                     && shard.is_none_or(|selected| {
                         key_shard.is_some_and(|value| value.bucket == selected)
                     })
@@ -2825,6 +2853,34 @@ mod conformance_tests {
         assert_eq!(ledger["schema_version"], json!(CONFORMANCE_LEDGER_CONTRACT));
         assert_eq!(report.ledger.counts[&CoverageGate::Recognized].pass, 1);
         assert_eq!(report.ledger.counts[&CoverageGate::Validated].pass, 1);
+    }
+
+    #[test]
+    fn local_selection_runs_local_gates_and_excludes_differential() {
+        let spec = compile(&document()).unwrap();
+        let runner = ConformanceRunner::new(&spec, runtime(&spec, &ECHO), limits());
+        let local = RunnerSelection::local("mock", None, limits()).unwrap();
+        let report = runner.run(&local, &context()).unwrap();
+        assert_eq!(
+            report
+                .batches
+                .iter()
+                .flat_map(|batch| &batch.events)
+                .count(),
+            2
+        );
+
+        let differential = differential_spec();
+        let runner = ConformanceRunner::new(
+            &differential,
+            runtime(&differential, &ECHO_WITH_ORACLE),
+            limits(),
+        );
+        assert!(matches!(
+            runner.run(&local, &context()),
+            Err(SpecProblem::RuntimeFailure(message))
+                if message == "selection has no executable bindings"
+        ));
     }
 
     #[test]

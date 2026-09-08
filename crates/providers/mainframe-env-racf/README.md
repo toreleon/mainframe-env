@@ -27,6 +27,22 @@ idempotency, concurrent-CAS, and audit routes. Policy/operations and advanced
 identity families remain assigned to their later named work packages rather
 than receiving generic-success handlers.
 
+The same generator reads the reviewed publication-difference contract in
+`conformance/0.5/racf/operand-dispositions.json`. Each command descriptor carries
+separate inventories for deliberately unimplemented top-level operands and for
+syntax-only tokens with their command/parent-operand contexts. The former return
+diagnostic `MERSEC1015E` at command level; the latter return it only in the
+recorded nested or command context. Both attach
+`HostProblem::UnsupportedCapability` for capability `racf-command-operand`
+before authorization, audit, or mutation. Positional values, unrelated operand
+values, analysis-only syntax text, and unknown names outside the reviewed
+projection retain their ordinary parser behavior.
+
+The retained catalog-only review is also executable: each of its 62 names has a
+named review and a concrete behavior classification. Names classified as
+deliberately unimplemented join the top-level unsupported inventory; implemented
+and opaque BASE-profile compatibility spellings keep their reviewed behavior.
+
 SEC-503 adds generated supplied-class metadata plus validated installation-
 defined classes, SETROPTS/class activation and generic controls, owned RACLIST
 snapshots with explicit refresh semantics, PROGRAM control, RACPRIV, SET,

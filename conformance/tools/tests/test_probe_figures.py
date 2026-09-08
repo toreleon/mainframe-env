@@ -193,6 +193,75 @@ class IndependentFigureTests(unittest.TestCase):
             self.figures["catalog.rows_total"].value,
         )
 
+    def test_publication_locators_and_deliberate_normalizations_account_for_all_rows(self):
+        self.assertEqual(636, self.figures["catalog.embedded_located_total"].value)
+        self.assertEqual(1501, self.figures["catalog.publication_located_total"].value)
+        self.assertEqual(
+            self.figures["catalog.publication_located_total"].value
+            + self.figures["catalog.roadmap_normalization_total"].value,
+            self.figures["catalog.rows_total"].value,
+        )
+
+    def test_racf_retained_catalog_classifications_recompute_from_named_entries(self):
+        source = REPOSITORY / "conformance/0.5/racf/operand-dispositions.json"
+        book = json.loads(source.read_text(encoding="utf-8"))
+        retained = [entry for entry in book["dispositions"] if not entry["applied"]]
+        counts = {
+            classification: sum(
+                entry["emulator_classification"] == classification for entry in retained
+            )
+            for classification in (
+                "implemented",
+                "opaque-profile-field",
+                "deliberately-unimplemented",
+            )
+        }
+        expected = {
+            "implemented": (43, "implemented"),
+            "opaque-profile-field": (9, "opaque"),
+            "deliberately-unimplemented": (10, "unsupported"),
+        }
+        for classification, (count, figure) in expected.items():
+            self.assertEqual(count, counts[classification])
+            self.assertEqual(
+                count,
+                self.figures[f"racf.{figure}_catalog_only_names"].value,
+            )
+
+    def test_racf_publication_classifications_recompute_from_each_named_entry(self):
+        source = REPOSITORY / "conformance/0.5/racf/operand-dispositions.json"
+        book = json.loads(source.read_text(encoding="utf-8"))
+        populations = (
+            (
+                "source_only",
+                ("implemented", "deliberately_unimplemented", "catalog_gaps"),
+                ("implemented", "unsupported", "catalog_gap"),
+                (0, 429, 0),
+            ),
+            (
+                "syntax_only",
+                (
+                    "implemented",
+                    "deliberately_unimplemented",
+                    "context_only",
+                    "catalog_gaps",
+                ),
+                ("implemented", "unsupported", "context_only", "catalog_gap"),
+                (4, 68, 4, 0),
+            ),
+        )
+        for population, fields, figures, expected in populations:
+            counts = tuple(
+                sum(len(row[population][field]) for row in book["publication_dispositions"])
+                for field in fields
+            )
+            self.assertEqual(expected, counts)
+            for classification, count in zip(figures, counts, strict=True):
+                self.assertEqual(
+                    count,
+                    self.figures[f"racf.{classification}_{population}_names"].value,
+                )
+
     def test_the_ledger_numerators_are_still_zero(self):
         # Not an arithmetic identity but the claim the whole record rests on,
         # so it is asserted rather than merely reported.

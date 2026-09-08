@@ -1,5 +1,9 @@
 # #54 — selected PR gates and explicit full campaigns
 
+Current executor: the repository `Jenkinsfile` on the capped local Jenkins
+volume. The original implementation and recorded measurements used GitHub
+Actions; committed GitHub receipts remain historical evidence only.
+
 ## Acceptance boundaries
 
 The inexpensive selector runs for all main-target PRs and main pushes, including
@@ -41,11 +45,12 @@ against normal, mixed, unknown, renamed and deleted paths.
 
 ## Full and bounded additional tiers
 
-Manual dispatch, the weekly schedule and release tags select the full tier.
-Workspace target checks/documentation, full conformance, the evidence seal and
-runtime architecture run on one exact checked-out commit. Tag release packaging
-and release checks remain unchanged. Scheduling only takes effect after this
-workflow reaches the default branch; an unexecuted schedule grants no credit.
+Manual `full` runs, the weekly Jenkins schedule and release tags select the full
+tier. Workspace target checks/documentation, full conformance, certification,
+the evidence seal and runtime architecture run on one exact checked-out commit.
+Tag release packaging and release checks remain unchanged. Scheduling only takes
+effect after the Jenkinsfile reaches the configured job branch; an unexecuted
+schedule grants no credit.
 
 Backend parity runs on relevant store/shared/normative changes and all full tiers,
 using a disposable PostgreSQL 18 service. It explicitly selects #51's ignored
@@ -61,20 +66,20 @@ benchmark or credits unavailable external systems.
 
 ## Security, cost and evidence
 
-Jobs use contents:read and no PR secrets. Checkouts do not persist credentials.
-Every subsequent job checks out the exact SHA emitted by selection, not a moving
-branch. PRs only restore caches; cache saves are restricted to main push jobs.
-Manual runs on arbitrary refs cannot populate the trusted main cache. Tag jobs
-do not restore the debug cache. Existing per-PR cancellation and non-cancellation
-of release tags are retained. Prose avoids Rust, PostgreSQL and mutation runners;
-relevant code keeps the existing build instead of scheduling duplicate builds.
+The local Jenkins job uses no PR secrets. The optional GitHub publication
+credential is injected only into its explicitly selected stage; PostgreSQL
+parity uses a disposable local cluster. Every gate runs against the checked-out
+SHA emitted by selection. Cargo downloads are
+shared on the capped volume, while build targets stay in the build workspace and
+are deleted after each run. Prose avoids Rust, PostgreSQL and mutation work;
+relevant code keeps one local build rather than scheduling duplicate builds.
 
 `tools/ci_assurance.py record` writes command, candidate/tree, Rust/Cargo versions,
 runner details, observed test count, exit status, wall seconds and log SHA-256.
 Receipts from another commit, missing commands and empty selected test runs cannot
-pass. Unselected full gates are listed separately. The aggregate assurance-status
-job requires every selected foundation, MSRV and backend job to succeed. A job
-receipt is not a release acceptance decision for epic #46.
+pass. Unselected full gates are listed separately. The Jenkins build result
+requires every selected foundation, MSRV and enabled backend stage to succeed.
+A job receipt is not a release acceptance decision for epic #46.
 
 The experiment below measures actual warm command overhead on one runner and
 compares architecture-fast with the broader architecture gate. The old PR tier

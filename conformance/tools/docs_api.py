@@ -72,6 +72,11 @@ TAG = re.compile(r"<[^>]+>")
 CELL = re.compile(r"<t[dh]\b[^>]*>(.*?)</t[dh]>", re.S)
 ROW = re.compile(r"<tr\b[^>]*>(.*?)</tr>", re.S)
 DATA_CELL = re.compile(r"<td\b", re.I)
+TABLE_OPEN = re.compile(
+    r"<table\b[^>]*\bid\s*=\s*(?:\"([^\"]+)\"|'([^']+)')", re.I
+)
+ANCHOR = re.compile(r"<a\b(?P<attrs>[^>]*)>(?P<body>.*?)</a>", re.I | re.S)
+HREF = re.compile(r"\bhref\s*=\s*(?:\"([^\"]*)\"|'([^']*)')", re.I | re.S)
 CHAPTER = re.compile(r"^Chapter [0-9]+\. ")
 ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -309,11 +314,27 @@ def last_modified_of(body: str) -> str | None:
 
 def _table(body: str, table_id: str) -> str | None:
     """The markup of the named table, or None when the topic has no such table."""
-    opening = re.search(rf"<table\b[^>]*\bid=\"{re.escape(table_id)}\"", body)
+    opening = re.search(
+        rf"<table\b[^>]*\bid\s*=\s*(?:\"{re.escape(table_id)}\"|'{re.escape(table_id)}')",
+        body,
+        re.I,
+    )
     if not opening:
         return None
-    end = body.find("</table>", opening.start())
-    return None if end < 0 else body[opening.start() : end]
+    end = re.search(r"</table\s*>", body[opening.start() :], re.I)
+    return None if end is None else body[opening.start() : opening.start() + end.end()]
+
+
+def table_ids(body: str) -> list[str]:
+    """Table ids in document order.
+
+    The embedded-row catalogs cite tables rather than topics.  Two of the old
+    locators carry a reviewed semantic name instead of the literal DITA id, so
+    their verifier first needs an inventory of the tables the served topic
+    actually contains.  Only ids can be cited: an anonymous table cannot be a
+    stable locator.
+    """
+    return [match.group(1) or match.group(2) for match in TABLE_OPEN.finditer(body)]
 
 
 def table_cells(body: str, table_id: str) -> list[str] | None:
@@ -341,6 +362,46 @@ def table_rows(body: str, table_id: str) -> list[list[str]] | None:
         for markup in ROW.findall(segment)
         if DATA_CELL.search(markup)
     ]
+
+
+def table_header_rows(body: str, table_id: str) -> list[list[str]] | None:
+    """Header-only rows of a named table, in order.
+
+    RACROUTE publishes its fourteen request types as the fourteen columns of a
+    cross-reference matrix.  They are catalog rows even though the DITA table
+    spells them in one ``tr`` of ``th`` cells, so dropping headers (as
+    :func:`table_rows` deliberately does for ordinal row locators) would make
+    those fourteen identities impossible to audit.
+    """
+    segment = _table(body, table_id)
+    if segment is None:
+        return None
+    return [
+        [strip_markup(cell) for cell in CELL.findall(markup)]
+        for markup in ROW.findall(segment)
+        if not DATA_CELL.search(markup) and CELL.search(markup)
+    ]
+
+
+def html_links(body: str) -> list[tuple[str, str]]:
+    """The visible text and href of every linked anchor, in document order.
+
+    Link text may contain inline markup and hrefs may use either HTML quote
+    style.  Returning both fields is what lets the MQ verifier prove a
+    ``(reviewed label, target filename)`` pair unique instead of merely proving
+    that both strings occur somewhere in the same topic.
+    """
+    found: list[tuple[str, str]] = []
+    for anchor in ANCHOR.finditer(body):
+        href = HREF.search(anchor.group("attrs"))
+        if href is not None:
+            found.append(
+                (
+                    strip_markup(anchor.group("body")),
+                    html_module.unescape(href.group(1) or href.group(2) or ""),
+                )
+            )
+    return found
 
 
 def heading_in_cells(heading: str, cells: Iterable[str]) -> bool:

@@ -1,3 +1,4 @@
+use mainframe_env_host_api::HostProblem;
 use std::collections::BTreeSet;
 use std::fmt;
 use zeroize::Zeroizing;
@@ -28,6 +29,64 @@ pub struct CommandDescriptor {
     min_positionals: u64,
     max_positionals: u64,
     operands: &'static [&'static str],
+    unsupported_operands: &'static [&'static str],
+    syntax_tokens: &'static [SyntaxTokenDescriptor],
+    flat_value_roles: &'static [FlatValueRoleDescriptor],
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FlatValueRoleDescriptor {
+    role: &'static str,
+    within_path: &'static [&'static str],
+}
+
+impl FlatValueRoleDescriptor {
+    #[must_use]
+    pub const fn role(self) -> &'static str {
+        self.role
+    }
+
+    #[must_use]
+    pub const fn within_path(self) -> &'static [&'static str] {
+        self.within_path
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SyntaxTokenBehavior {
+    Implemented,
+    UnsupportedCapability,
+    AnalysisOnly,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SyntaxTokenDescriptor {
+    token: &'static str,
+    behavior: SyntaxTokenBehavior,
+    command_level: bool,
+    within_paths: &'static [&'static [&'static str]],
+}
+
+impl SyntaxTokenDescriptor {
+    #[must_use]
+    pub const fn token(self) -> &'static str {
+        self.token
+    }
+
+    #[must_use]
+    pub const fn behavior(self) -> SyntaxTokenBehavior {
+        self.behavior
+    }
+
+    #[must_use]
+    pub const fn command_level(self) -> bool {
+        self.command_level
+    }
+
+    #[must_use]
+    pub const fn within_paths(self) -> &'static [&'static [&'static str]] {
+        self.within_paths
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -53,7 +112,10 @@ pub struct RacrouteDescriptor {
 }
 
 mod generated {
-    use super::{CommandDescriptor, CommandDomain, RacrouteDescriptor, SuppliedClassDescriptor};
+    use super::{
+        CommandDescriptor, CommandDomain, FlatValueRoleDescriptor, RacrouteDescriptor,
+        SuppliedClassDescriptor, SyntaxTokenBehavior, SyntaxTokenDescriptor,
+    };
     include!("generated/racf_command_catalog.rs");
 }
 
@@ -112,6 +174,21 @@ impl CommandDescriptor {
     #[must_use]
     pub const fn operands(self) -> &'static [&'static str] {
         self.operands
+    }
+
+    #[must_use]
+    pub const fn unsupported_operands(self) -> &'static [&'static str] {
+        self.unsupported_operands
+    }
+
+    #[must_use]
+    pub const fn syntax_tokens(self) -> &'static [SyntaxTokenDescriptor] {
+        self.syntax_tokens
+    }
+
+    #[must_use]
+    pub const fn flat_value_roles(self) -> &'static [FlatValueRoleDescriptor] {
+        self.flat_value_roles
     }
 }
 
@@ -203,6 +280,7 @@ pub enum CommandDiagnosticCode {
     UnknownOperand,
     DuplicateOperand,
     OperandValueLimit,
+    UnsupportedCapability,
     UnsupportedFamily,
     InvalidValue,
     Unauthorized,
@@ -230,6 +308,7 @@ impl CommandDiagnosticCode {
             Self::UnknownOperand => "MERSEC1012E",
             Self::DuplicateOperand => "MERSEC1013E",
             Self::OperandValueLimit => "MERSEC1014E",
+            Self::UnsupportedCapability => "MERSEC1015E",
             Self::UnsupportedFamily => "MERSEC2001E",
             Self::InvalidValue => "MERSEC2002E",
             Self::Unauthorized => "MERSEC2003E",
@@ -246,6 +325,15 @@ pub struct CommandDiagnostic {
     pub code: CommandDiagnosticCode,
     pub offset: usize,
     pub message: &'static str,
+    host_problem: Option<HostProblem>,
+}
+
+impl CommandDiagnostic {
+    /// The structured host failure attached to an executable capability boundary.
+    #[must_use]
+    pub const fn host_problem(&self) -> Option<&HostProblem> {
+        self.host_problem.as_ref()
+    }
 }
 
 impl fmt::Display for CommandDiagnostic {
@@ -260,7 +348,13 @@ impl fmt::Display for CommandDiagnostic {
     }
 }
 
-impl std::error::Error for CommandDiagnostic {}
+impl std::error::Error for CommandDiagnostic {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.host_problem
+            .as_ref()
+            .map(|problem| problem as &(dyn std::error::Error + 'static))
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ValidatedCommand {
@@ -402,6 +496,32 @@ pub(crate) fn parse_command(
         let required_positionals = usize::try_from(descriptor.min_positionals)
             .map_err(|_| diagnostic(CommandDiagnosticCode::PositionalCount, token.offset))?;
         let candidate = (token.kind == TokenKind::Word).then(|| token.upper());
+        if positionals.len() >= required_positionals
+            && let Some(name) = candidate.as_deref()
+            && descriptor.unsupported_operands.contains(&name)
+        {
+            return Err(unsupported_operand_diagnostic(
+                descriptor,
+                name,
+                token.offset,
+                None,
+            ));
+        }
+        if positionals.len() >= required_positionals
+            && let Some(name) = candidate.as_deref()
+            && descriptor.syntax_tokens.iter().any(|syntax| {
+                syntax.token == name
+                    && syntax.behavior == SyntaxTokenBehavior::UnsupportedCapability
+                    && syntax.command_level
+            })
+        {
+            return Err(unsupported_operand_diagnostic(
+                descriptor,
+                name,
+                token.offset,
+                None,
+            ));
+        }
         let allowed_operand = candidate.as_deref().is_some_and(|name| {
             descriptor.operands.contains(&name)
                 || descriptor.command_direction && matches!(name, "AT" | "ONLYAT")
@@ -429,6 +549,9 @@ pub(crate) fn parse_command(
             {
                 index += 1;
                 let mut depth = 1usize;
+                let mut context = vec![Some(name.clone())];
+                let mut pending_parent = None;
+                let mut flat_parent = None;
                 while index < tokens.len() && depth > 0 {
                     let value = &tokens[index];
                     match value.kind {
@@ -440,9 +563,71 @@ pub(crate) fn parse_command(
                                     value.offset,
                                 ));
                             }
+                            context.push(pending_parent.take());
+                            flat_parent = None;
                         }
-                        TokenKind::RightParenthesis => depth -= 1,
+                        TokenKind::RightParenthesis => {
+                            depth -= 1;
+                            context.pop();
+                            pending_parent = None;
+                            flat_parent = None;
+                        }
                         TokenKind::Word | TokenKind::Quoted if depth > 0 => {
+                            if value.kind == TokenKind::Word {
+                                let nested = value.upper();
+                                let base_path = context
+                                    .iter()
+                                    .filter_map(Option::as_deref)
+                                    .collect::<Vec<_>>();
+                                let inherited_flat = flat_parent.take();
+                                let mut path = base_path.clone();
+                                let opens_parenthesis = tokens
+                                    .get(index + 1)
+                                    .is_some_and(|next| next.kind == TokenKind::LeftParenthesis);
+                                if !opens_parenthesis {
+                                    path.extend(inherited_flat.as_deref());
+                                }
+                                if descriptor.syntax_tokens.iter().any(|syntax| {
+                                    syntax.token == nested
+                                        && syntax.behavior
+                                            == SyntaxTokenBehavior::UnsupportedCapability
+                                        && syntax
+                                            .within_paths
+                                            .iter()
+                                            .any(|expected| *expected == path)
+                                }) {
+                                    let path = path.join("/");
+                                    return Err(unsupported_operand_diagnostic(
+                                        descriptor,
+                                        &nested,
+                                        value.offset,
+                                        Some(&path),
+                                    ));
+                                }
+                                let mut nested_path = base_path.clone();
+                                nested_path.push(&nested);
+                                let contextual_role =
+                                    descriptor.syntax_tokens.iter().any(|syntax| {
+                                        syntax
+                                            .within_paths
+                                            .iter()
+                                            .any(|expected| expected.starts_with(&nested_path))
+                                    });
+                                let declared_flat_role =
+                                    descriptor.flat_value_roles.iter().any(|role| {
+                                        role.role == nested && role.within_path == base_path
+                                    });
+                                // Inner grammars use both KEY(VALUE) and flat KEY VALUE. Only a
+                                // generated structural prefix or an explicitly declared runtime
+                                // role consumes the next flat word. Data cannot invent a role that
+                                // hides a following sibling keyword.
+                                flat_parent =
+                                    (contextual_role || declared_flat_role).then(|| nested.clone());
+                                pending_parent = Some(nested);
+                            } else {
+                                pending_parent = None;
+                                flat_parent = None;
+                            }
                             if values.len() >= limits.max_values_per_operand {
                                 return Err(diagnostic(
                                     CommandDiagnosticCode::OperandValueLimit,
@@ -451,7 +636,10 @@ pub(crate) fn parse_command(
                             }
                             values.push(Zeroizing::new(value.text.to_string()));
                         }
-                        TokenKind::Comma => {}
+                        TokenKind::Comma => {
+                            pending_parent = None;
+                            flat_parent = None;
+                        }
                         _ => {}
                     }
                     index += 1;
@@ -630,6 +818,9 @@ pub(crate) fn diagnostic(code: CommandDiagnosticCode, offset: usize) -> CommandD
         CommandDiagnosticCode::UnknownOperand => "operand is not supported by this command",
         CommandDiagnosticCode::DuplicateOperand => "operand occurs more than once",
         CommandDiagnosticCode::OperandValueLimit => "operand values exceed their limit",
+        CommandDiagnosticCode::UnsupportedCapability => {
+            "recognized RACF operand is deliberately unimplemented"
+        }
         CommandDiagnosticCode::UnsupportedFamily => "command execution belongs to a later package",
         CommandDiagnosticCode::InvalidValue => "command operand value is invalid",
         CommandDiagnosticCode::Unauthorized => "command authority check denied",
@@ -642,6 +833,38 @@ pub(crate) fn diagnostic(code: CommandDiagnosticCode, offset: usize) -> CommandD
         code,
         offset,
         message,
+        host_problem: None,
+    }
+}
+
+fn unsupported_operand_diagnostic(
+    descriptor: CommandDescriptor,
+    operand: &str,
+    offset: usize,
+    within: Option<&str>,
+) -> CommandDiagnostic {
+    let detail = within.map_or_else(
+        || {
+            format!(
+                "{} operand {operand} is not implemented by the RACF command processor",
+                descriptor.keyword
+            )
+        },
+        |parent| {
+            format!(
+                "{} syntax token {operand} within {parent} is not implemented by the RACF command processor",
+                descriptor.keyword
+            )
+        },
+    );
+    CommandDiagnostic {
+        code: CommandDiagnosticCode::UnsupportedCapability,
+        offset,
+        message: "recognized RACF operand is deliberately unimplemented",
+        host_problem: Some(HostProblem::UnsupportedCapability {
+            capability: "racf-command-operand".into(),
+            detail,
+        }),
     }
 }
 
@@ -819,6 +1042,219 @@ mod tests {
             validate_command("ADDUSER", limits).unwrap_err().code,
             CommandDiagnosticCode::InputLimit
         );
+    }
+
+    #[test]
+    fn reviewed_unimplemented_operands_raise_structured_unsupported_capability() {
+        for input in [
+            "ADDGROUP OPER AT(NODE1)",
+            "ADDGROUP OPER NOTERMUACC",
+            "ADDUSER USER1 REVOKE",
+            "DISPLAY MAPPING",
+            "RACDCERT TRUST",
+        ] {
+            let problem = validate_command(input, Default::default())
+                .expect_err("reviewed unimplemented operand unexpectedly validated");
+            assert_eq!(problem.code, CommandDiagnosticCode::UnsupportedCapability);
+            assert!(matches!(
+                problem.host_problem(),
+                Some(HostProblem::UnsupportedCapability { capability, detail })
+                    if capability == "racf-command-operand"
+                        && detail.contains(input.split_whitespace().next().unwrap())
+            ));
+        }
+    }
+
+    #[test]
+    fn nested_tokens_and_reviewed_implemented_syntax_names_keep_their_scope() {
+        validate_command(
+            "PERMIT APP.RESOURCE CLASS(FACILITY) ID(USER1) ACCESS(READ) WHEN(TERMINAL TERM1)",
+            Default::default(),
+        )
+        .unwrap();
+        validate_command("SEARCH CLASS(DATASET)", Default::default()).unwrap();
+        validate_command("SETROPTS PROGRAM", Default::default()).unwrap();
+    }
+
+    #[test]
+    fn syntax_only_words_do_not_collide_with_positionals_or_unrelated_values() {
+        for input in [
+            "PERMIT APP PROGRAM",
+            "PERMIT APP ID(PROGRAM)",
+            "PERMIT APP WHEN(TERMINAL(PROGRAM))",
+            "PERMIT APP WHEN(CONSOLE(SYSID))",
+            "PERMIT APP WHEN(TERMINAL PROGRAM)",
+            "PERMIT APP WHEN(CONSOLE SYSID)",
+            "PERMIT APP WHEN(APPLICATION PROGRAM)",
+            "PERMIT APP WHEN(SYSTEM SYSID)",
+            "PERMIT APP JES",
+            "DELDSD RACF",
+            "PERMIT APP 'VOLUME'",
+        ] {
+            validate_command(input, Default::default())
+                .unwrap_or_else(|problem| panic!("{input} failed with {problem}"));
+        }
+    }
+
+    #[test]
+    fn unsupported_syntax_tokens_fail_only_in_their_generated_context() {
+        for input in [
+            "ADDUSER USER1 OPERPARM(OPERATOR-CLASS(X))",
+            "ADDSD HLQ.DATA DFP(DATAKEY CKDS)",
+            "PERMIT APP WHEN(PROGRAM(X))",
+            "PERMIT APP WHEN(TERMINAL TERM1 PROGRAM X)",
+            "PERMIT APP WHEN(X PROGRAM)",
+            "RACDCERT EXPORT(CERT1 FORMAT CERTDER)",
+            "RESTART OUTPUT",
+        ] {
+            let problem = validate_command(input, Default::default())
+                .expect_err("scoped unsupported syntax unexpectedly validated");
+            assert_eq!(problem.code, CommandDiagnosticCode::UnsupportedCapability);
+            assert!(matches!(
+                problem.host_problem(),
+                Some(HostProblem::UnsupportedCapability { capability, .. })
+                    if capability == "racf-command-operand"
+            ));
+        }
+    }
+
+    #[test]
+    fn generated_unsupported_inventory_is_complete_and_command_scoped() {
+        assert_eq!(
+            command_descriptors()
+                .iter()
+                .map(|descriptor| descriptor.unsupported_operands().len())
+                .sum::<usize>(),
+            439
+        );
+        let syntax = command_descriptors()
+            .iter()
+            .flat_map(|descriptor| descriptor.syntax_tokens())
+            .collect::<Vec<_>>();
+        assert_eq!(syntax.len(), 76);
+        for (behavior, expected) in [
+            (SyntaxTokenBehavior::Implemented, 4),
+            (SyntaxTokenBehavior::UnsupportedCapability, 68),
+            (SyntaxTokenBehavior::AnalysisOnly, 4),
+        ] {
+            assert_eq!(
+                syntax
+                    .iter()
+                    .filter(|descriptor| descriptor.behavior() == behavior)
+                    .count(),
+                expected
+            );
+        }
+        assert!(syntax.iter().all(|descriptor| {
+            descriptor.behavior() != SyntaxTokenBehavior::UnsupportedCapability
+                || descriptor.command_level()
+                || !descriptor.within_paths().is_empty()
+        }));
+        let flat_roles = command_descriptors()
+            .iter()
+            .flat_map(|descriptor| descriptor.flat_value_roles())
+            .collect::<Vec<_>>();
+        assert_eq!(flat_roles.len(), 6);
+        assert!(flat_roles.iter().all(|role| role.within_path() == ["WHEN"]));
+        assert_eq!(
+            flat_roles
+                .iter()
+                .map(|role| role.role())
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                "APPL",
+                "APPLICATION",
+                "CONSOLE",
+                "SYSTEM",
+                "TERMINAL",
+                "TIME"
+            ])
+        );
+        let setropts = command_descriptors()
+            .iter()
+            .find(|descriptor| descriptor.keyword() == "SETROPTS")
+            .unwrap();
+        assert!(!setropts.unsupported_operands().contains(&"PROGRAM"));
+        assert!(setropts.syntax_tokens().iter().any(|syntax| {
+            syntax.token() == "PROGRAM"
+                && syntax.behavior() == SyntaxTokenBehavior::UnsupportedCapability
+                && syntax.within_paths() == [&["WHEN"][..], &["NOWHEN"][..]]
+        }));
+        let display = command_descriptors()
+            .iter()
+            .find(|descriptor| descriptor.keyword() == "DISPLAY")
+            .unwrap();
+        assert!(display.unsupported_operands().contains(&"MAPPING"));
+        assert!(!display.unsupported_operands().contains(&"ALL"));
+    }
+
+    #[test]
+    fn every_reachable_unsupported_syntax_path_fails_in_both_inner_forms() {
+        let mut exercised = 0usize;
+        for descriptor in command_descriptors() {
+            let mut prefix = descriptor.keyword().to_string();
+            for index in 0..descriptor.min_positionals {
+                prefix.push_str(&format!(" X{index}"));
+            }
+            for syntax in descriptor
+                .syntax_tokens()
+                .iter()
+                .filter(|syntax| syntax.behavior() == SyntaxTokenBehavior::UnsupportedCapability)
+            {
+                if syntax.command_level() {
+                    let input = format!("{prefix} {}", syntax.token());
+                    let problem = validate_command(&input, Default::default()).unwrap_err();
+                    assert_eq!(problem.code, CommandDiagnosticCode::UnsupportedCapability);
+                    exercised += 1;
+                }
+                for path in syntax
+                    .within_paths()
+                    .iter()
+                    .filter(|path| descriptor.operands().contains(&path[0]))
+                {
+                    let blocked_by_parent =
+                        path.iter().enumerate().skip(1).any(|(index, parent)| {
+                            descriptor.syntax_tokens().iter().any(|candidate| {
+                                candidate.token() == *parent
+                                    && candidate.behavior()
+                                        == SyntaxTokenBehavior::UnsupportedCapability
+                                    && candidate.within_paths().contains(&&path[..index])
+                            })
+                        });
+                    if blocked_by_parent {
+                        continue;
+                    }
+                    let mut parenthesized = format!("{}(X)", syntax.token());
+                    for parent in path.iter().rev() {
+                        parenthesized = format!("{parent}({parenthesized})");
+                    }
+                    let flat = if path.len() == 1 {
+                        format!("{}({} X)", path[0], syntax.token())
+                    } else {
+                        format!("{}({} {} X)", path[0], path[1], syntax.token())
+                    };
+                    for fragment in [parenthesized, flat] {
+                        let input = format!("{prefix} {fragment}");
+                        let problem = validate_command(&input, Default::default()).unwrap_err();
+                        assert_eq!(
+                            problem.code,
+                            CommandDiagnosticCode::UnsupportedCapability,
+                            "{input} did not reach the scoped capability boundary"
+                        );
+                        assert!(
+                            matches!(
+                                problem.host_problem(),
+                                Some(HostProblem::UnsupportedCapability { detail, .. })
+                                    if detail.contains(syntax.token())
+                            ),
+                            "{input} failed at a different capability boundary: {problem:?}"
+                        );
+                        exercised += 1;
+                    }
+                }
+            }
+        }
+        assert_eq!(exercised, 123);
     }
 
     #[test]

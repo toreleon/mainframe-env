@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check every `topic:PATH;topic-id:ID;heading:TITLE` row locator against IBM.
+"""Check every publication-backed catalog row locator against IBM.
 
 The 0.2 catalogs record where each row came from. A locator now names a
 documentation topic outright, which makes the row inventory directly checkable
@@ -7,9 +7,9 @@ against the publication: the topic either serves that heading under that path or
 it does not.
 
 This audits row *identity*, not row *content* — a weaker claim than a syntax
-projection, but a uniform one. It applies to every topic-located baseline,
-including the two with no syntax reader of their own (Db2, z/OSMF), and it is
-the check that catches an inventory drifting off its publication.
+projection, but a uniform one. It applies to topic, table and link locators,
+including the two baselines with no syntax reader of their own (Db2, z/OSMF),
+and it is the check that catches an inventory drifting off its publication.
 
 Three things are compared, and all three have to agree for a row to read
 `exact`:
@@ -36,9 +36,22 @@ Citing a row only discriminates if the comparison does. See `cell_names_heading`
 for the rule and `table_verdict` for what happens when it cannot tell two rows
 apart.
 
-Rows located some other way (`html-table:`, `html-link:`,
-`roadmap-normalization:`) are reported as skipped with a reason rather than
-silently ignored, and so is a row whose topic could not be retrieved. An
+The three older embedded locator forms are resolved according to the identity
+their source actually publishes:
+
+  html-table:  CICS matches the command, EIBFN and family cells; IMS matches the
+               cited body-row ordinal plus its call and command cells; RACROUTE
+               matches one request-type header cell in its cross-reference
+               matrix.  Exact means that complete identity resolves once.
+  html-link:   MQ matches the reviewed call name and target filename as one
+               pair.  Byte-identical duplicate anchors collapse to one semantic
+               link, which preserves the catalog's documented deduplication.
+  roadmap-normalization:
+               the five VSAM organization rows are a deliberate normalized
+               taxonomy rather than claims that IBM publishes five rows in one
+               topic.  They remain visible as a documented ``skipped`` result.
+
+A source body that cannot be retrieved is also reported as skipped. An
 unreachable endpoint is NEVER reported as missing: not knowing is not a finding.
 
 The emitted report is a review input. It grants no coverage credit, it is
@@ -52,7 +65,8 @@ import json
 import re
 import sys
 import tempfile
-from pathlib import Path
+import urllib.parse
+from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -69,6 +83,30 @@ DEFAULT_CACHE = Path(tempfile.gettempdir()) / "cobolgrammar" / "topic-cache"
 #: follows — so a prose cell that merely opens with a slash is not mistaken for
 #: a coded one.
 STATEMENT_MARKER = re.compile(r"^(?://\*|//|/\*)(?=\s|$)")
+
+# Two catalogs predate literal table ids in source locators.  These aliases are
+# resolved to the DITA ids in the pinned bodies and then checked like every
+# literal table citation.  Keeping the mapping here makes publication drift a
+# visible ``html-table-absent`` finding instead of silently choosing whichever
+# table happens to be first.
+TABLE_ALIASES = {
+    ("ims", "comparison"): "ims_comparingexecdlicmdsanddlicalls__p5tcmp1",
+    ("racf-saf", "keyword-and-parameter-cross-reference"): "rrkpcr__pkcx",
+}
+
+FOOTNOTE_SUFFIX = re.compile(r"\s+\d+$")
+
+ROADMAP_NORMALIZATION = "vsam-primary-organizations"
+ROADMAP_NORMALIZATION_REASON = (
+    "The five VSAM organization rows are the deliberate normalized taxonomy "
+    "frozen by conformance/roadmap/ibm-official-coverage-roadmap.json; they do "
+    "not claim that one IBM topic publishes a five-row inventory."
+)
+
+
+def locator_kind(locator: str) -> str:
+    """The leading component, which decides how the row is resolved."""
+    return locator.partition(":")[0]
 
 
 def components(locator: str) -> dict[str, str]:
@@ -263,6 +301,357 @@ def heading_verdict(
     return False, "none", {"served_heading": served}
 
 
+def catalog_ordinal(row: dict[str, Any]) -> int | None:
+    """The frozen 1-based ordinal carried by an official row id."""
+    suffix = str(row.get("id", "")).rsplit(":", 1)[-1]
+    return int(suffix) if suffix.isdigit() and int(suffix) > 0 else None
+
+
+def locator_body_path(
+    row: dict[str, Any], catalog: dict[str, Any], baseline: dict[str, Any]
+) -> str | None:
+    """The pinned topic body a row locator has to be checked inside.
+
+    Topic locators name their body outright.  CICS, IMS and MQ are inventories
+    extracted from the baseline's ``book_href`` topic.  RACROUTE is explicitly
+    a supporting source in the receipt; requiring exactly one such topic avoids
+    silently selecting an arbitrary RACF command-language topic.
+    """
+    parts = components(row["source_locator"])
+    kind = locator_kind(row["source_locator"])
+    if kind == "topic":
+        return parts.get("topic")
+    if kind == "roadmap-normalization":
+        return None
+
+    subsystem = catalog["subsystem"]
+    if (subsystem, kind) in {
+        ("cics", "html-table"),
+        ("ims", "html-table"),
+        ("mq", "html-link"),
+    }:
+        return baseline["source"]["book_href"]
+    if (subsystem, kind) == ("racf-saf", "html-table"):
+        paths = [
+            source.get("topic_path")
+            for source in baseline.get("supporting_sources", [])
+            if source.get("topic_path")
+        ]
+        if len(paths) != 1:
+            raise ValueError(
+                f"{baseline['id']} must name exactly one supporting topic for its html-table rows"
+            )
+        return paths[0]
+    raise ValueError(f"no body-source convention for {subsystem} {kind} locator")
+
+
+def unavailable_result(
+    row: dict[str, Any], source_path: str, body: bytes | Exception | None
+) -> dict[str, Any] | None:
+    """A result for a body that did not answer, or None for a served body."""
+    result = {"id": row["id"], "topic_path": source_path}
+    if isinstance(body, docs_api.NotFound):
+        return {
+            **result,
+            "verdict": "missing",
+            "reason": "source-topic-not-found",
+            "locator": row["source_locator"],
+        }
+    if body is None or isinstance(body, Exception):
+        return {
+            **result,
+            "verdict": "skipped",
+            "reason": "endpoint-unreachable",
+            "detail": getattr(body, "reason", "not-retrieved"),
+        }
+    return None
+
+
+def table_id(subsystem: str, cited: str) -> str:
+    """A literal DITA table id for a literal or legacy semantic citation."""
+    return TABLE_ALIASES.get((subsystem, cited), cited)
+
+
+def _retitled(
+    row: dict[str, Any], body: str, matched_on: str, detail: dict[str, Any]
+) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "verdict": "retitled",
+        "heading": row["label"],
+        "matched_on": matched_on,
+        **detail,
+        "last_modified": docs_api.last_modified_of(body),
+    }
+
+
+def check_cics_table(
+    row: dict[str, Any], parts: dict[str, str], body: str
+) -> dict[str, Any]:
+    """Resolve one CICS row by its complete three-cell identity."""
+    cited = parts.get("html-table", "")
+    actual = table_id("cics", cited)
+    rows = docs_api.table_rows(body, actual)
+    detail: dict[str, Any] = {"table": cited, "resolved_table_id": actual}
+    if rows is None:
+        return _retitled(row, body, "html-table-absent", detail)
+    if "eibfn" not in parts or "family" not in parts:
+        return _retitled(row, body, "html-table-locator-incomplete", detail)
+
+    wanted = tuple(
+        docs_api.normalize(value)
+        for value in (row["label"], parts["eibfn"], parts["family"])
+    )
+    matches = [
+        ordinal
+        for ordinal, cells in enumerate(rows, 1)
+        if len(cells) == 3
+        and tuple(docs_api.normalize(value) for value in cells) == wanted
+    ]
+    if len(matches) == 1:
+        return {
+            "id": row["id"],
+            "verdict": "exact",
+            "matched_on": "html-table-row",
+            **detail,
+            "row": matches[0],
+        }
+    if len(matches) > 1:
+        return _retitled(
+            row,
+            body,
+            "html-table-row-ambiguous",
+            {**detail, "heading_found_in_rows": matches},
+        )
+
+    locator_rows = [
+        ordinal
+        for ordinal, cells in enumerate(rows, 1)
+        if len(cells) == 3
+        and docs_api.normalize(cells[1]) == wanted[1]
+        and docs_api.normalize(cells[2]) == wanted[2]
+    ]
+    heading_rows = [
+        ordinal
+        for ordinal, cells in enumerate(rows, 1)
+        if len(cells) == 3 and docs_api.normalize(cells[0]) == wanted[0]
+    ]
+    if locator_rows:
+        detail["locator_rows"] = locator_rows
+        detail["row_cells"] = [rows[ordinal - 1] for ordinal in locator_rows]
+    if heading_rows:
+        detail["heading_found_in_rows"] = heading_rows
+    return _retitled(row, body, "html-table-row", detail)
+
+
+def _without_footnote(value: str) -> str:
+    return FOOTNOTE_SUFFIX.sub("", docs_api.normalize(value))
+
+
+def check_ims_table(
+    row: dict[str, Any], parts: dict[str, str], body: str
+) -> dict[str, Any]:
+    """Resolve one IMS comparison row by ordinal, call and command."""
+    cited = parts.get("html-table", "")
+    actual = table_id("ims", cited)
+    rows = docs_api.table_rows(body, actual)
+    detail: dict[str, Any] = {"table": cited, "resolved_table_id": actual}
+    if rows is None:
+        return _retitled(row, body, "html-table-absent", detail)
+    ordinal = parts.get("row", "")
+    if not ordinal.isdigit() or int(ordinal) < 1:
+        return _retitled(row, body, "html-table-row-malformed", {**detail, "row": ordinal})
+    wanted = int(ordinal)
+    detail["row"] = wanted
+    if wanted > len(rows):
+        return _retitled(
+            row,
+            body,
+            "html-table-row-absent",
+            {**detail, "table_body_rows": len(rows)},
+        )
+    if "command" not in parts:
+        return _retitled(row, body, "html-table-locator-incomplete", detail)
+
+    expected_ordinal = catalog_ordinal(row)
+    call = _without_footnote(rows[wanted - 1][0]) if rows[wanted - 1] else ""
+    command = _without_footnote(rows[wanted - 1][1]) if len(rows[wanted - 1]) > 1 else ""
+    label_matches = call == docs_api.normalize(row["label"])
+    command_matches = command == docs_api.normalize(parts["command"])
+    ordinal_matches = expected_ordinal == wanted
+    if label_matches and command_matches and ordinal_matches:
+        return {
+            "id": row["id"],
+            "verdict": "exact",
+            "matched_on": "html-table-row",
+            **detail,
+        }
+
+    detail.update(
+        {
+            "catalog_row": expected_ordinal,
+            "row_cells": rows[wanted - 1],
+            "served_call": call,
+            "served_command": command,
+        }
+    )
+    return _retitled(row, body, "html-table-row", detail)
+
+
+def _compact(value: str) -> str:
+    return "".join(docs_api.normalize(value).split())
+
+
+def check_racroute_table(
+    row: dict[str, Any], parts: dict[str, str], body: str
+) -> dict[str, Any]:
+    """Resolve one RACROUTE request type to one matrix header cell."""
+    cited = parts.get("html-table", "")
+    actual = table_id("racf-saf", cited)
+    headers = docs_api.table_header_rows(body, actual)
+    detail: dict[str, Any] = {"table": cited, "resolved_table_id": actual}
+    if headers is None:
+        return _retitled(row, body, "html-table-absent", detail)
+    wanted = _compact(row["label"])
+    matches = [
+        (row_number, column_number)
+        for row_number, cells in enumerate(headers, 1)
+        for column_number, cell in enumerate(cells, 1)
+        if _compact(cell) == wanted
+    ]
+    ordinal = catalog_ordinal(row)
+    expected = (1, ordinal + 1) if ordinal is not None else None
+    if matches == [expected]:
+        return {
+            "id": row["id"],
+            "verdict": "exact",
+            "matched_on": "html-table-header-cell",
+            **detail,
+            "header_row": expected[0],
+            "column": expected[1],
+        }
+    if len(matches) > 1:
+        how = "html-table-header-cell-ambiguous"
+    else:
+        how = "html-table-header-cell"
+    return _retitled(
+        row,
+        body,
+        how,
+        {**detail, "catalog_column": expected[1] if expected else None, "matching_cells": matches},
+    )
+
+
+def check_html_table(
+    row: dict[str, Any], subsystem: str, body: str
+) -> dict[str, Any]:
+    """Dispatch one reachable html-table locator to its published shape."""
+    parts = components(row["source_locator"])
+    if subsystem == "cics":
+        return check_cics_table(row, parts, body)
+    if subsystem == "ims":
+        return check_ims_table(row, parts, body)
+    if subsystem == "racf-saf":
+        return check_racroute_table(row, parts, body)
+    return _retitled(
+        row,
+        body,
+        "html-table-convention-unknown",
+        {"table": parts.get("html-table")},
+    )
+
+
+def link_name(text: str) -> str:
+    """The MQ call name before the prose description in a link."""
+    return docs_api.normalize(text).split(" - ", 1)[0]
+
+
+def link_filename(href: str) -> str:
+    """The filename component an ``html-link:`` locator records."""
+    return PurePosixPath(urllib.parse.urlparse(href).path).name
+
+
+def check_html_link(row: dict[str, Any], body: str) -> dict[str, Any]:
+    """Resolve an MQ link by the unique semantic (name, target) pair."""
+    parts = components(row["source_locator"])
+    target = parts.get("html-link", "")
+    anchors = docs_api.html_links(body)
+    raw = [(link_name(text), link_filename(href)) for text, href in anchors]
+    identities = sorted(set(raw))
+    wanted = (docs_api.normalize(row["label"]), target)
+    matching_anchors = [anchor for anchor, identity in zip(anchors, raw) if identity == wanted]
+    distinct_anchors = sorted(set(matching_anchors))
+    if identities.count(wanted) == 1 and len(distinct_anchors) == 1:
+        result: dict[str, Any] = {
+            "id": row["id"],
+            "verdict": "exact",
+            "matched_on": "html-link",
+            "target": target,
+        }
+        if len(matching_anchors) > 1:
+            result["duplicate_anchor_occurrences"] = len(matching_anchors)
+        return result
+
+    if len(distinct_anchors) > 1:
+        return _retitled(
+            row,
+            body,
+            "html-link-ambiguous",
+            {
+                "target": target,
+                "matching_anchors": [
+                    {"text": text, "href": href} for text, href in distinct_anchors
+                ],
+            },
+        )
+
+    same_name = sorted({filename for name, filename in identities if name == wanted[0]})
+    same_target = sorted({name for name, filename in identities if filename == target})
+    detail: dict[str, Any] = {"target": target}
+    if same_name:
+        detail["heading_found_at_targets"] = same_name
+    if same_target:
+        detail["target_names"] = same_target
+    if len(same_name) == 1 and same_name[0] != target:
+        return {
+            "id": row["id"],
+            "verdict": "moved",
+            "reason": "link-target",
+            "found_target": same_name[0],
+            "heading": row["label"],
+        }
+    if same_target:
+        return _retitled(row, body, "html-link", detail)
+    return {
+        "id": row["id"],
+        "verdict": "missing",
+        "heading": row["label"],
+        **detail,
+    }
+
+
+def check_roadmap_normalization(row: dict[str, Any]) -> dict[str, Any]:
+    """The deliberate non-publication disposition of the five VSAM rows."""
+    parts = components(row["source_locator"])
+    convention = parts.get("roadmap-normalization")
+    if convention != ROADMAP_NORMALIZATION:
+        return {
+            "id": row["id"],
+            "verdict": "skipped",
+            "reason": "unknown-roadmap-normalization",
+            "locator": row["source_locator"],
+        }
+    return {
+        "id": row["id"],
+        "verdict": "skipped",
+        "reason": "documented-roadmap-normalization",
+        "locator": row["source_locator"],
+        "disposition": "deliberate",
+        "documentation": "conformance/0.2/catalogs/README.md",
+        "detail": ROADMAP_NORMALIZATION_REASON,
+    }
+
+
 def check(
     row: dict[str, Any],
     nodes: dict[str, list[dict[str, Any]]],
@@ -324,6 +713,52 @@ def check(
     return entry
 
 
+def audit_row(
+    row: dict[str, Any],
+    catalog: dict[str, Any],
+    baseline: dict[str, Any],
+    nodes: dict[str, list[dict[str, Any]]],
+    labels: dict[str, list[str]],
+    tails: dict[str, list[str]],
+    bodies: dict[str, bytes | Exception],
+) -> dict[str, Any]:
+    """Resolve any committed locator form through the same verdict vocabulary."""
+    kind = locator_kind(row["source_locator"])
+    if kind == "roadmap-normalization":
+        return check_roadmap_normalization(row)
+
+    source_path = locator_body_path(row, catalog, baseline)
+    if source_path is None:
+        return {
+            "id": row["id"],
+            "verdict": "skipped",
+            "reason": "locator-has-no-source-body",
+            "locator": row["source_locator"],
+        }
+    body = bodies.get(source_path)
+    if kind == "topic":
+        return check(row, nodes, labels, tails, body)
+
+    unavailable = unavailable_result(row, source_path, body)
+    if unavailable is not None:
+        return unavailable
+    assert isinstance(body, bytes)
+    text = body.decode("utf-8", "replace")
+    if kind == "html-table":
+        result = check_html_table(row, catalog["subsystem"], text)
+    elif kind == "html-link":
+        result = check_html_link(row, text)
+    else:
+        return {
+            "id": row["id"],
+            "verdict": "skipped",
+            "reason": "unsupported-locator",
+            "locator": row["source_locator"],
+        }
+    result.setdefault("topic_path", source_path)
+    return result
+
+
 def outside_repository(path: Path) -> Path:
     """Refuse to write a report into the tree.
 
@@ -370,25 +805,33 @@ def main(argv: Iterable[str] | None = None) -> int:
     )
     cache = None if args.no_cache else outside_repository(args.cache)
 
-    toc_state: dict[str, Any] = {"url": source["url"], "pinned_sha256": source["toc_sha256"]}
-    try:
-        raw = docs_api.toc_bytes(source["url"], cache)
-        nodes = docs_api.toc_index(json.loads(raw.decode("utf-8")))
-        toc_state["sha256"] = "sha256:" + docs_api.digest(raw)
-        toc_state["matches_pin"] = toc_state["sha256"] == source["toc_sha256"]
-    except docs_api.Unreachable as error:
-        print(f"table of contents unreachable: {error.reason}")
-        return 2
+    rows = [row for unit in catalog["units"] for row in unit["rows"]]
+    needs_toc = any(locator_kind(row["source_locator"]) == "topic" for row in rows)
+    toc_state: dict[str, Any] = {
+        "url": source["url"],
+        "pinned_sha256": source["toc_sha256"],
+        "required": needs_toc,
+    }
+    nodes: dict[str, list[dict[str, Any]]] = {}
+    if needs_toc:
+        try:
+            raw = docs_api.toc_bytes(source["url"], cache)
+            nodes = docs_api.toc_index(json.loads(raw.decode("utf-8")))
+            toc_state["sha256"] = "sha256:" + docs_api.digest(raw)
+            toc_state["matches_pin"] = toc_state["sha256"] == source["toc_sha256"]
+        except docs_api.Unreachable as error:
+            print(f"table of contents unreachable: {error.reason}")
+            return 2
 
     labels, tails = label_index(nodes), tail_index(nodes)
     template = source["content_url_template"]
-
-    locators = {
-        row["id"]: components(row["source_locator"])
-        for unit in catalog["units"]
-        for row in unit["rows"]
-    }
-    wanted = sorted({parts["topic"] for parts in locators.values() if "topic" in parts})
+    wanted = sorted(
+        {
+            path
+            for row in rows
+            if (path := locator_body_path(row, catalog, baseline)) is not None
+        }
+    )
     bodies = dict(docs_api.topics(wanted, template, cache, args.workers))
 
     units: list[dict[str, Any]] = []
@@ -396,7 +839,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     matched_on: dict[str, int] = {}
     for unit in catalog["units"]:
         results = [
-            check(row, nodes, labels, tails, bodies.get(locators[row["id"]].get("topic", "")))
+            audit_row(row, catalog, baseline, nodes, labels, tails, bodies)
             for row in unit["rows"]
         ]
         counts: dict[str, int] = {}
@@ -416,6 +859,7 @@ def main(argv: Iterable[str] | None = None) -> int:
                 "unresolved": [
                     r for r in results if r["verdict"] in ("missing", "moved", "retitled")
                 ],
+                "skipped": [r for r in results if r["verdict"] == "skipped"],
             }
         )
         print(

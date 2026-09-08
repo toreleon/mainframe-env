@@ -6,14 +6,34 @@ All notable changes to mainframe-env are documented here.
 
 ## [0.8.2] - 2026-09-06
 
-### Changed
+### Fixed
 
-- Added a release-time offline Cargo vendor bundle so the exact locked dependency graph can be used in network-restricted build environments.
-- Added SHA-256 checksums for the offline vendor bundle and verified the vendored workspace builds with `--locked --offline` before publication.
+- Retained installed COBOL program state within a run unit, observed live
+  cancellation and deadlines, preserved unknown outcomes, and made installed
+  child replay durable and stable without redispatching completed calls.
+- Required verified HIR before executable lowering.
+- Rejected incomplete, non-progressing, or changing DCOLLECT catalog traversals
+  instead of publishing partial output.
+- Applied one provider-state Move validation contract across memory, SQLite,
+  and PostgreSQL.
+
+### Evidence and distribution
+
+- Separated observation perturbations from behavioral mutants in dataset
+  certification schema `@2` and added an opt-in memory-store scaling benchmark.
+- Published a locked offline Cargo vendor bundle and SHA-256 checksum after an
+  offline workspace build. No 0.8.2 native binaries or binary receipts were
+  published.
 
 ### Compatibility
 
-- No supported runtime or contract surface changes from 0.8.1; this patch is release-tooling and distribution focused.
+- This patch changes runtime and contract behavior. Custom `WorkStore`
+  implementations must add `get_work`; legacy MIR must be recompiled; and
+  protocol-1 or counter-era in-flight installed calls require draining or
+  explicit reconciliation before protocol 2.
+- DCOLLECT can now fail where 0.8.1 returned partial output. Provider Move maps
+  missing memory sources to `Conflict` and oversized SQL payloads to
+  `PayloadTooLarge`. Dataset certification consumers must accept schema `@2`.
 
 ## [0.8.1] - 2026-09-05
 
