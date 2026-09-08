@@ -239,6 +239,7 @@ pipeline {
                     env.CI_EVIDENCE = selector('evidence')
                     env.CI_MUTATION = selector('mutation')
                     env.CI_FULL = selector('full')
+                    env.CI_DOCS = selector('docs')
                     env.CI_TARGETS = selector('targets')
                     env.CI_DOCUMENTATION = selector('documentation')
                 }
@@ -278,12 +279,16 @@ pipeline {
                 anyOf {
                     expression { env.CI_TARGETS == 'true' }
                     expression { env.CI_DOCUMENTATION == 'true' }
+                    expression { env.CI_DOCS == 'true' }
                 }
             }
             steps {
                 sh '''#!/bin/bash
                     set -euo pipefail
                     out="$CARGO_TARGET_DIR/ci-assurance"
+                    if [[ "$CI_DOCS" == true ]]; then
+                      "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate docs -- cargo xtask docs --check
+                    fi
                     if [[ "$CI_TARGETS" == true ]]; then
                       "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate targets -- cargo check --workspace --all-targets --all-features --locked
                     fi

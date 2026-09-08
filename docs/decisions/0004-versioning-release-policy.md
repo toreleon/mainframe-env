@@ -1,6 +1,9 @@
 # ADR-0004: v0.1 Versioning and Release Policy
 
 Status: **Accepted by repository owner**
+Owner: **repository owner**
+Scope: **product, contract, schema, artifact, and release versioning**
+Applies from: **mainframe-env 0.1.0**
 Decision scope: **mainframe-env product, crates, contracts, schemas, artifacts,
 stores, releases, and phase commits**
 

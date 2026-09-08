@@ -1,6 +1,9 @@
 # Conformance IR and executable coverage
 
 Status: **Normative from 0.3.0**
+Owner: **conformance maintainers**
+Scope: **conformance catalog, binding, execution, and evidence authority**
+Applies from: **mainframe-env 0.3.0**
 
 ## Purpose
 

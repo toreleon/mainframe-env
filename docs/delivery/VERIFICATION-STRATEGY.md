@@ -1,6 +1,9 @@
 # 0.1 Verification Strategy
 
 Status: **Accepted by repository owner**
+Owner: **verification maintainers**
+Scope: **verification layers, assurance tiers, and required evidence**
+Applies from: **mainframe-env 0.1.0**
 
 ## Objective
 

@@ -1,6 +1,9 @@
 # 0.1 Security and Capability Architecture
 
 Status: **Accepted by repository owner**
+Owner: **security and architecture maintainers**
+Scope: **capability, provider, plugin, secret, and transport boundaries**
+Applies from: **mainframe-env 0.1.0**
 
 ## 0.1 boundary
 

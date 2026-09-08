@@ -1,6 +1,9 @@
 # 0.1 Compatibility and Cutover Contract
 
 Status: **Accepted by repository owner**
+Owner: **repository owner**
+Scope: **compatibility authority, migration, cutover, and rollback**
+Applies from: **mainframe-env 0.1.0**
 
 ## Compatibility boundary
 

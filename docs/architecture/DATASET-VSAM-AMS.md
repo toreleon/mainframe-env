@@ -1,6 +1,9 @@
 # Dataset, VSAM, catalog, and AMS authority
 
 Status: **Normative from 0.6.0**
+Owner: **dataset provider maintainers**
+Scope: **dataset, VSAM, catalog, and AMS authority**
+Applies from: **mainframe-env 0.6.0**
 
 ## Authority boundary
 

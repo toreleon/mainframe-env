@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 DIRECT_FIELDS = frozenset({
-    'build', 'msrv', 'store', 'architecture', 'evidence', 'mutation', 'full',
+    'build', 'msrv', 'store', 'architecture', 'evidence', 'mutation', 'docs', 'full',
 })
 GATE_FIELDS = frozenset({'targets', 'documentation'})
 

@@ -1,6 +1,9 @@
 # Versioning, Phase Commits, and Release Gates
 
 Status: **Accepted by repository owner**
+Owner: **release maintainers**
+Scope: **version authorities, release gates, artifacts, and publication**
+Applies from: **mainframe-env 0.1.0**
 Initial release line: **mainframe-env 0.1**
 
 ## 1. Version inventory

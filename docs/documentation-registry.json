@@ -1,0 +1,121 @@
+{
+  "schema_version": "mainframe-env.documentation-registry@1",
+  "manifest_path": "docs/generated/documentation-manifest.json",
+  "portal_path": "docs/README.md",
+  "package_topology": {
+    "authority": "docs/decisions/0009-current-package-topology.md",
+    "package_map": "docs/architecture/PACKAGE-MAP.md",
+    "package_count": 26
+  },
+  "normative_documents": [
+    "docs/CHARTER.md",
+    "docs/architecture/APPLICATION-PACKAGES.md",
+    "docs/architecture/BATCH-CONTROLLER-REGISTRY.md",
+    "docs/architecture/COBOL-RUNTIME-SEMANTICS.md",
+    "docs/architecture/COMPILER-AND-IR.md",
+    "docs/architecture/CONFORMANCE-IR.md",
+    "docs/architecture/COVERAGE-AUTHORITY.md",
+    "docs/architecture/DATASET-VSAM-AMS.md",
+    "docs/architecture/DB2-APPLICATION-CATALOG.md",
+    "docs/architecture/EXECUTION-AND-DURABILITY.md",
+    "docs/architecture/HOST-ABI-SOURCE-LIBRARIES.md",
+    "docs/architecture/JES-EXECUTION.md",
+    "docs/architecture/OVERVIEW.md",
+    "docs/architecture/PACKAGE-MAP.md",
+    "docs/architecture/PLUGIN-AND-SECURITY.md",
+    "docs/architecture/PROGRAM-AND-ROUTE-REGISTRIES.md",
+    "docs/contracts/EFFECT-CANONICAL-V1.md",
+    "docs/decisions/0001-technology-stack.md",
+    "docs/decisions/0002-deterministic-core.md",
+    "docs/decisions/0003-contract-serialization.md",
+    "docs/decisions/0004-versioning-release-policy.md",
+    "docs/decisions/0005-package-consolidation.md",
+    "docs/decisions/0006-carddemo-0.1.1-profile.md",
+    "docs/decisions/0007-carddemo-0.1.1-release.md",
+    "docs/decisions/0008-icu-license-compliance.md",
+    "docs/decisions/0009-current-package-topology.md",
+    "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
+    "docs/delivery/IMPLEMENTATION-ROADMAP.md",
+    "docs/delivery/VERIFICATION-STRATEGY.md",
+    "docs/delivery/VERSIONING-AND-RELEASES.md",
+    "docs/delivery/ZOSMF-API.md"
+  ],
+  "navigation": [
+    {
+      "heading": "Architecture and contracts",
+      "entries": [
+        {"label": "Project charter", "path": "docs/CHARTER.md"},
+        {"label": "Architecture overview", "path": "docs/architecture/OVERVIEW.md"},
+        {"label": "Package map", "path": "docs/architecture/PACKAGE-MAP.md"},
+        {"label": "Compiler and IR", "path": "docs/architecture/COMPILER-AND-IR.md"},
+        {"label": "COBOL runtime semantics", "path": "docs/architecture/COBOL-RUNTIME-SEMANTICS.md"},
+        {"label": "Execution and durability", "path": "docs/architecture/EXECUTION-AND-DURABILITY.md"},
+        {"label": "Security and capabilities", "path": "docs/architecture/PLUGIN-AND-SECURITY.md"},
+        {"label": "Conformance IR", "path": "docs/architecture/CONFORMANCE-IR.md"},
+        {"label": "Coverage authority", "path": "docs/architecture/COVERAGE-AUTHORITY.md"},
+        {"label": "Dataset, VSAM, and AMS", "path": "docs/architecture/DATASET-VSAM-AMS.md"},
+        {"label": "JES execution", "path": "docs/architecture/JES-EXECUTION.md"},
+        {"label": "Application packages", "path": "docs/architecture/APPLICATION-PACKAGES.md"},
+        {"label": "Batch controller registry", "path": "docs/architecture/BATCH-CONTROLLER-REGISTRY.md"},
+        {"label": "Db2 application catalog", "path": "docs/architecture/DB2-APPLICATION-CATALOG.md"},
+        {"label": "Host ABI source libraries", "path": "docs/architecture/HOST-ABI-SOURCE-LIBRARIES.md"},
+        {"label": "Program and route registries", "path": "docs/architecture/PROGRAM-AND-ROUTE-REGISTRIES.md"},
+        {"label": "Canonical effect encoding", "path": "docs/contracts/EFFECT-CANONICAL-V1.md"}
+      ]
+    },
+    {
+      "heading": "Architecture decisions",
+      "entries": [
+        {"label": "ADR-0001: Technology stack", "path": "docs/decisions/0001-technology-stack.md"},
+        {"label": "ADR-0002: Deterministic core", "path": "docs/decisions/0002-deterministic-core.md"},
+        {"label": "ADR-0003: Contract serialization", "path": "docs/decisions/0003-contract-serialization.md"},
+        {"label": "ADR-0004: Versioning and release policy", "path": "docs/decisions/0004-versioning-release-policy.md"},
+        {"label": "ADR-0005: Historical package consolidation", "path": "docs/decisions/0005-package-consolidation.md"},
+        {"label": "ADR-0006: CardDemo 0.1.1 profile", "path": "docs/decisions/0006-carddemo-0.1.1-profile.md"},
+        {"label": "ADR-0007: CardDemo 0.1.1 release", "path": "docs/decisions/0007-carddemo-0.1.1-release.md"},
+        {"label": "ADR-0008: ICU license compliance", "path": "docs/decisions/0008-icu-license-compliance.md"},
+        {"label": "ADR-0009: Current package topology", "path": "docs/decisions/0009-current-package-topology.md"},
+        {"label": "Decision index and template", "path": "docs/decisions/README.md"}
+      ],
+      "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."
+    },
+    {
+      "heading": "Delivery and development",
+      "entries": [
+        {"label": "Implementation roadmap", "path": "docs/delivery/IMPLEMENTATION-ROADMAP.md"},
+        {"label": "Implementation status", "path": "docs/delivery/IMPLEMENTATION-STATUS.md"},
+        {"label": "Verification strategy", "path": "docs/delivery/VERIFICATION-STRATEGY.md"},
+        {"label": "Compatibility and cutover", "path": "docs/delivery/COMPATIBILITY-AND-CUTOVER.md"},
+        {"label": "Versioning and releases", "path": "docs/delivery/VERSIONING-AND-RELEASES.md"},
+        {"label": "z/OSMF compatibility API", "path": "docs/delivery/ZOSMF-API.md"},
+        {"label": "IBM coverage release plans", "path": "docs/delivery/coverage-versions/README.md"},
+        {"label": "Parallel implementation plan", "path": "docs/delivery/coverage-versions/PARALLEL-IMPLEMENTATION.md"},
+        {"label": "Implementation prompt index", "path": "docs/prompts/coverage-versions/README.md"}
+      ],
+      "note": "Version-specific status files and review reports describe candidates at a point in time. They are not automatically current product documentation."
+    },
+    {
+      "heading": "Operations",
+      "entries": [
+        {"label": "Core-server operations", "path": "docs/runbooks/OPERATIONS.md"},
+        {"label": "Backup and restore", "path": "docs/runbooks/BACKUP-RESTORE.md"},
+        {"label": "Capacity and recovery", "path": "docs/runbooks/CAPACITY-AND-RECOVERY.md"},
+        {"label": "Local Jenkins", "path": "docs/runbooks/JENKINS-LOCAL.md"},
+        {"label": "CardDemo operator guide", "path": "docs/runbooks/CARDDEMO-OPERATOR.md"},
+        {"label": "CICS licensed pilot", "path": "docs/runbooks/cics-licensed-pilot.md"},
+        {"label": "Conformance family rollout", "path": "docs/runbooks/conformance-family-rollout.md"}
+      ]
+    },
+    {
+      "heading": "Releases, reviews, and research",
+      "entries": [
+        {"label": "0.8 release notes", "path": "docs/releases/0.8.md"},
+        {"label": "Pre-0.9 deep review", "path": "docs/reviews/PRE-0.9.0-DEEP-REVIEW.md"},
+        {"label": "Review index", "path": "docs/reviews/README.md"},
+        {"label": "IBM official coverage roadmap", "path": "docs/research/IBM-OFFICIAL-COVERAGE-ROADMAP.md"},
+        {"label": "Publication source probe", "path": "docs/research/publication-source-probe.md"},
+        {"label": "CICS behavioral pilot", "path": "docs/research/cics-behavioral-conformance-pilot.md"}
+      ]
+    }
+  ]
+}

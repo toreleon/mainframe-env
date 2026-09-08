@@ -81,6 +81,7 @@ Common local checks are:
 cargo fmt --all -- --check
 cargo deny check
 cargo xtask license-notices --check
+cargo xtask docs --check
 cargo xtask spec --check
 cargo xtask architecture-fast --check
 cargo test --workspace --all-features --locked --no-fail-fast

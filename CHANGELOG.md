@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added a generated documentation manifest and bounded documentation gate via
+  `cargo xtask docs --check` for navigation, normative metadata, links, anchors,
+  command examples, and public version truth.
+- Added ADR-0008 as the current authority for the 26-package workspace
+  topology, superseding ADR-0005's historical count.
 - Added a docs-driven CICS file/unit-of-work conformance pilot with reviewed
   rules, exact per-obligation observations, memory/SQLite execution, restart
   faults, and a fail-closed licensed-capture adapter.

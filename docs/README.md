@@ -33,8 +33,10 @@ authoritative for the exact identities and counts they own. Prose must not
 silently override them. A later ADR overrides an earlier authority only when it
 explicitly names that authority as superseded.
 
+<!-- BEGIN GENERATED DOCUMENTATION NAVIGATION -->
 ## Architecture and contracts
 
+- [Project charter](CHARTER.md)
 - [Architecture overview](architecture/OVERVIEW.md)
 - [Package map](architecture/PACKAGE-MAP.md)
 - [Compiler and IR](architecture/COMPILER-AND-IR.md)
@@ -46,6 +48,9 @@ explicitly names that authority as superseded.
 - [Dataset, VSAM, and AMS](architecture/DATASET-VSAM-AMS.md)
 - [JES execution](architecture/JES-EXECUTION.md)
 - [Application packages](architecture/APPLICATION-PACKAGES.md)
+- [Batch controller registry](architecture/BATCH-CONTROLLER-REGISTRY.md)
+- [Db2 application catalog](architecture/DB2-APPLICATION-CATALOG.md)
+- [Host ABI source libraries](architecture/HOST-ABI-SOURCE-LIBRARIES.md)
 - [Program and route registries](architecture/PROGRAM-AND-ROUTE-REGISTRIES.md)
 - [Canonical effect encoding](contracts/EFFECT-CANONICAL-V1.md)
 
@@ -55,15 +60,14 @@ explicitly names that authority as superseded.
 - [ADR-0002: Deterministic core](decisions/0002-deterministic-core.md)
 - [ADR-0003: Contract serialization](decisions/0003-contract-serialization.md)
 - [ADR-0004: Versioning and release policy](decisions/0004-versioning-release-policy.md)
-- [ADR-0005: Package consolidation](decisions/0005-package-consolidation.md)
+- [ADR-0005: Historical package consolidation](decisions/0005-package-consolidation.md)
 - [ADR-0006: CardDemo 0.1.1 profile](decisions/0006-carddemo-0.1.1-profile.md)
 - [ADR-0007: CardDemo 0.1.1 release](decisions/0007-carddemo-0.1.1-release.md)
 - [ADR-0008: ICU license compliance](decisions/0008-icu-license-compliance.md)
+- [ADR-0009: Current package topology](decisions/0009-current-package-topology.md)
 - [Decision index and template](decisions/README.md)
 
-ADR-0005 records a historical 0.1 decision. The current workspace has later
-package additions; the pre-0.9 review tracks the missing composed/current
-architecture decision.
+ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.
 
 ## Delivery and development
 
@@ -72,13 +76,12 @@ architecture decision.
 - [Verification strategy](delivery/VERIFICATION-STRATEGY.md)
 - [Compatibility and cutover](delivery/COMPATIBILITY-AND-CUTOVER.md)
 - [Versioning and releases](delivery/VERSIONING-AND-RELEASES.md)
+- [z/OSMF compatibility API](delivery/ZOSMF-API.md)
 - [IBM coverage release plans](delivery/coverage-versions/README.md)
 - [Parallel implementation plan](delivery/coverage-versions/PARALLEL-IMPLEMENTATION.md)
 - [Implementation prompt index](prompts/coverage-versions/README.md)
-- [z/OSMF compatibility API](delivery/ZOSMF-API.md)
 
-Version-specific status files and review reports describe candidates at a point
-in time. They are not automatically current product documentation.
+Version-specific status files and review reports describe candidates at a point in time. They are not automatically current product documentation.
 
 ## Operations
 
@@ -92,12 +95,26 @@ in time. They are not automatically current product documentation.
 
 ## Releases, reviews, and research
 
-- Release notes: [`releases/`](releases/)
-- Deep reviews: [`reviews/`](reviews/)
-- IBM official coverage roadmap: [research record](research/IBM-OFFICIAL-COVERAGE-ROADMAP.md)
-- Publication source probe: [current research record](research/publication-source-probe.md)
-- CICS behavioral pilot: [accepted bounded pilot](research/cics-behavioral-conformance-pilot.md)
-- Historical hardening records: [`delivery/hardening/`](delivery/hardening/)
+- [0.8 release notes](releases/0.8.md)
+- [Pre-0.9 deep review](reviews/PRE-0.9.0-DEEP-REVIEW.md)
+- [Review index](reviews/README.md)
+- [IBM official coverage roadmap](research/IBM-OFFICIAL-COVERAGE-ROADMAP.md)
+- [Publication source probe](research/publication-source-probe.md)
+- [CICS behavioral pilot](research/cics-behavioral-conformance-pilot.md)
+<!-- END GENERATED DOCUMENTATION NAVIGATION -->
+
+## Documentation governance
+
+[`documentation-registry.json`](documentation-registry.json) identifies every
+normative document, supplies the generated navigation above, and declares the
+checked manifest location. Each normative document must state its status,
+owner, scope, and first applicable mainframe-env version near its title.
+
+Run `cargo xtask docs` after an intentional documentation change, then run
+`cargo xtask docs --check`. The check verifies the generated
+[`documentation-manifest.json`](generated/documentation-manifest.json), relative
+links and anchors, documented xtask subcommands and options, normative metadata,
+navigation, and the released/development version authorities.
 
 ## Document status vocabulary
 

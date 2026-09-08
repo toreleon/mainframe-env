@@ -1,6 +1,9 @@
 # ADR-0003: Contract, Serialization, and Identity Policy
 
 Status: **Accepted by repository owner**
+Owner: **repository owner**
+Scope: **owned contracts, serialization, durable identity, and evolution**
+Applies from: **mainframe-env 0.1.0**
 Decision scope: **Public DTOs, durable state, artifacts, evidence, and hashes**
 
 ## Context

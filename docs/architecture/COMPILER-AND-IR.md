@@ -1,6 +1,9 @@
 # Compiler and IR Architecture
 
 Status: **Accepted by repository owner**
+Owner: **compiler and IR maintainers**
+Scope: **compiler stages, IR contracts, and publication pipeline**
+Applies from: **mainframe-env 0.1.0**
 
 ## Goals
 

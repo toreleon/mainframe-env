@@ -1,6 +1,9 @@
 # ADR-0007: Release mainframe-env 0.1.1 after CardDemo certification
 
 Status: **Accepted by repository owner**
+Owner: **repository owner**
+Scope: **CardDemo-full 0.1.1 release promotion and naming authority**
+Applies from: **mainframe-env 0.1.1**
 Date: **2026-08-31**
 Supersedes: the release-order hold in ADR-0006
 

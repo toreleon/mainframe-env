@@ -1,6 +1,9 @@
 # JES execution, scheduling, spool, and utilities
 
 Status: **Normative from mainframe-env 0.8.0**
+Owner: **JES, batch, and spool maintainers**
+Scope: **JES execution, scheduling, spool, and utility behavior**
+Applies from: **mainframe-env 0.8.0**
 
 ## Authority boundary
 

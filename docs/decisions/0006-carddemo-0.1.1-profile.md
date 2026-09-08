@@ -1,6 +1,9 @@
 # ADR-0006: Add an additive CardDemo-full profile for 0.1.1
 
 Status: **Accepted by repository owner**
+Owner: **repository owner**
+Scope: **additive CardDemo-full product profile and package boundaries**
+Applies from: **mainframe-env 0.1.1**
 Target product: **mainframe-env 0.1.1**
 Supersedes: the 0.1 exclusions only for the optional `carddemo-full` profile
 

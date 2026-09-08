@@ -1,5 +1,10 @@
 # z/OSMF 0.1 compatibility API
 
+Status: **Frozen for mainframe-env 0.1.0**
+Owner: **z/OSMF gateway maintainers**
+Scope: **public z/OSMF-compatible routes, requests, and responses**
+Applies from: **mainframe-env 0.1.0**
+
 The authoritative route list is
 `conformance/0.1/inventory/zosmf-routes.json`. Exactly 23 routes cover product
 information, authentication, datasets/members/AMS, jobs/spool, and the bounded

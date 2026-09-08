@@ -1,6 +1,9 @@
 # Execution and Durability Architecture
 
 Status: **Accepted by repository owner**
+Owner: **execution and store maintainers**
+Scope: **execution lifecycle, effects, work, checkpoints, and durability**
+Applies from: **mainframe-env 0.1.0**
 
 ## Design outcome
 

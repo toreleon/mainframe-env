@@ -12,7 +12,9 @@ import subprocess
 import sys
 import time
 
-ALL = frozenset({'architecture', 'evidence', 'runtime', 'compiler', 'store', 'mutation'})
+DOCS = 'docs'
+ALL = frozenset({'architecture', 'evidence', 'runtime', 'compiler', 'store', 'mutation', DOCS})
+BUILD_OBLIGATIONS = ALL - {DOCS}
 SHARED = {
     'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'rustfmt.toml',
     'clippy.toml', 'deny.toml', 'release.toml', 'VERSION', 'Jenkinsfile',
@@ -20,7 +22,7 @@ SHARED = {
 PROSE = {'README.md', 'CHANGELOG.md', 'LICENSE', 'LICENSE.md', 'CONTRIBUTING.md', 'AGENTS.md'}
 PRIMARY = ['fmt', 'spec', 'cobol', 'tests', 'clippy']
 POLICY = ['cargo-deny', 'license-notices']
-FULL = ['targets', 'documentation', 'conformance', 'certification', 'evidence-seal', 'runtime-architecture']
+FULL = ['targets', 'documentation', 'docs', 'conformance', 'certification', 'evidence-seal', 'runtime-architecture']
 SHA = re.compile(r'[0-9a-f]{40}\Z')
 EVENTS = frozenset({'local', 'push', 'pull_request', 'schedule', 'manual', 'tag'})
 
@@ -31,7 +33,11 @@ def obligations(paths: list[str]) -> list[str]:
         p = PurePosixPath(path)
         if not path or p.is_absolute() or '..' in p.parts or '\x00' in path or '\\' in path:
             raise ValueError('unsafe changed path')
-        if path in SHARED or path.startswith(('.cargo/', '.github/', 'xtask/', 'tools/', 'crates/contracts/', 'crates/foundation/')):
+        if path in PROSE or path.endswith('.md') or path in {
+                'docs/documentation-registry.json',
+                'docs/generated/documentation-manifest.json'}:
+            selected.add(DOCS)
+        elif path in SHARED or path.startswith(('.cargo/', '.github/', 'xtask/', 'tools/', 'crates/contracts/', 'crates/foundation/')):
             selected.update(ALL)
         elif path.startswith(('docs/contracts/', 'docs/architecture/', 'docs/decisions/', 'docs/compatibility/', 'docs/generated/', 'conformance/spec/')):
             selected.update(ALL)
@@ -47,8 +53,6 @@ def obligations(paths: list[str]) -> list[str]:
             selected.update({'architecture', 'evidence', 'compiler'})
         elif path.startswith(('crates/', 'config/')):
             selected.update({'architecture', 'evidence', 'runtime'})
-        elif path in PROSE or (path.endswith('.md') and path.startswith(('docs/research/', 'docs/prompts/', 'docs/runbooks/', 'docs/delivery/'))):
-            pass
         else:
             selected.update(ALL)  # New/unclassified paths never silently select no gate.
     return sorted(selected)
@@ -86,7 +90,8 @@ def make_plan(root: Path, event: dict, event_name: str, ref: str, base: str | No
             selected = sorted(ALL); reason = 'missing-base-select-all'
     else:
         selected = sorted(ALL)
-    build = bool(selected)
+    build = bool(set(selected) & BUILD_OBLIGATIONS)
+    docs = DOCS in selected
     merge_push = event_name == 'push' and event.get('merge_commit', False)
     msrv = build and (full or not merge_push)
     # Dependency and license policy is intentionally unconditional: prose-only
@@ -98,11 +103,13 @@ def make_plan(root: Path, event: dict, event_name: str, ref: str, base: str | No
     if 'architecture' in selected and not full: gates.append('architecture-fast')
     if 'evidence' in selected and not full: gates.append('evidence-fast')
     if 'mutation' in selected: gates.append('mutation')
+    if docs: gates.append('docs')
     if build and event_name != 'pull_request': gates.extend(['targets', 'documentation'])
     if full: gates.extend(gate for gate in FULL if gate not in gates)
     return {'schema_version': 'mainframe-env.ci-plan@1', **identity(root), 'provider': provider,
             'event': event_name, 'ref': ref, 'base': base, 'full': full,
             'build': build, 'msrv': msrv, 'store': 'store' in selected, 'mutation': 'mutation' in selected,
+            'docs': docs,
             'architecture': 'architecture' in selected, 'evidence': 'evidence' in selected,
             'obligations': selected, 'paths': paths, 'selection_reason': reason, 'primary_gates': gates,
             'licensed_credit': 0}

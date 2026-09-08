@@ -1,6 +1,9 @@
 # COBOL runtime semantic contracts
 
 Status: **Frozen for mainframe-env 0.4.0 implementation**
+Owner: **compiler and interpreter maintainers**
+Scope: **COBOL runtime semantic contracts**
+Applies from: **mainframe-env 0.4.0**
 
 The accepted typed COBOL HIR lowers once into the existing Core-MIR operation
 catalog. The deterministic reference machine is the only execution authority;

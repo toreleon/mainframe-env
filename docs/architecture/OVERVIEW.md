@@ -1,6 +1,9 @@
 # Architecture Overview
 
 Status: **Accepted by repository owner**
+Owner: **architecture maintainers**
+Scope: **system layers, dependency direction, and maintainability rules**
+Applies from: **mainframe-env 0.1.0**
 
 ## Architectural style
 

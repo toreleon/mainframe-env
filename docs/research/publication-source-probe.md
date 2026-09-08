@@ -834,14 +834,14 @@ were argued from.
 
 - **"nothing validates parameters" (AMS) is false.**
   `ams_operand_allowed` at
-  `crates/apps/mainframe-env-batch/src/service.rs:6169<!--f:ams.allowlist_line-->`
+  `crates/apps/mainframe-env-batch/src/service.rs:6232<!--f:ams.allowlist_line-->`
   is a per-command allowlist of **126<!--f:ams.allowlist_names--> distinct
   operand names**, 84<!--f:ams.allowlist_base_names--> of them the
   base set shared by `ALLOCATE`, `DEFINE CLUSTER`, `DEFINE NONVSAM`, `DEFINE
   ALTERNATEINDEX` and `ALTER` and the rest declared per command.
-  `unimplemented_ams_operand` at `:6047<!--f:ams.unimplemented_line-->` scans
+  `unimplemented_ams_operand` at `:6110<!--f:ams.unimplemented_line-->` scans
   every top-level term and its caller at
-  `:2925<!--f:ams.unimplemented_caller_line-->` raises `UnsupportedCapability` on
+  `:2995<!--f:ams.unimplemented_caller_line-->` raises `UnsupportedCapability` on
   capability `ams-operand` before any
   effect runs. The ruling — that `grammar.json` stays a recognition inventory and
   should not grow a parameter field — is *strengthened* by this, not weakened:

@@ -1,6 +1,9 @@
 # 0.1 Package Map
 
-Status: **Accepted by repository owner, with the V0 consolidation below**
+Status: **Accepted; current topology governed by ADR-0009**
+Owner: **architecture maintainers**
+Scope: **current package ownership, dependency layers, and split boundaries**
+Applies from: **mainframe-env 0.8.3 development**
 
 ## Scope rule
 
@@ -75,7 +78,7 @@ The exact count may shrink when two proposed packages do not enforce a real
 dependency boundary. It may grow only through an ADR demonstrating an in-scope
 0.1 requirement.
 
-## Accepted V0 consolidation
+## Current governed topology
 
 ADR-0005 described a 20-package consolidation target. The exact accepted 0.1
 machine inventory ultimately contains 24 workspace packages: the 20 boundary
@@ -86,8 +89,10 @@ workspace contains 26 packages.
 
 `conformance/0.1/inventory/packages.json` plus the versioned
 `package-additions.json` files are the current machine authority. ADR-0005 is a
-historical decision and needs a superseding ADR before package topology changes
-again; its original count must not be used as current workspace truth.
+historical decision whose original count must not be used as current workspace
+truth. [ADR-0009](../decisions/0009-current-package-topology.md) governs the
+current topology and requires a new superseding decision for any package
+addition, removal, layer move, or boundary-changing normal dependency.
 
 IR codecs remain with `mainframe-env-ir`; CICS contracts remain with
 `mainframe-env-host-api`; execution coordination remains with the interpreter
@@ -96,7 +101,8 @@ compiler kernel; JCL and JES share the batch state authority; and
 memory/SQL/artifact adapters share the store package. These units do not require
 independent 0.1 publication or provider selection boundaries. ADR 0005 records
 the decision, and the exact accepted mapping and justification is
-`conformance/0.1/inventory/packages.json`.
+`conformance/0.1/inventory/packages.json`, its versioned additions, and
+ADR-0009.
 
 ## Foundation packages
 

@@ -2,6 +2,7 @@
 
 - Status: **Frozen contract; implementation deviations tracked before 0.9.0**
 - Owner: execution and host-contract maintainers
+- Scope: canonical persisted host request/result digest representation
 - Applies from: mainframe-env 0.8.2 hardening
 
 `mainframe-env.effect-canonical@1` is a frozen binary representation of the typed

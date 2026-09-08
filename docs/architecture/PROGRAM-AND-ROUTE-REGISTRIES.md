@@ -1,6 +1,9 @@
 # Generated common-program and route registries
 
 Status: **Frozen for mainframe-env 0.2.0**
+Owner: **application, batch, and gateway maintainers**
+Scope: **generated common-program and route registries**
+Applies from: **mainframe-env 0.2.0**
 
 The reviewed `mainframe-env.common-program-catalog@1` is the single name-to-
 type boundary for JES utilities, nested Db2 TSO programs, and installed COBOL

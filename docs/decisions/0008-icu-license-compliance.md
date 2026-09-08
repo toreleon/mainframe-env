@@ -1,6 +1,9 @@
 # ADR-0008: Retain decNumber under the ICU License
 
 Status: **Accepted by repository owner**
+Owner: **repository owner**
+Scope: **locked ICU dependency approval and release license notices**
+Applies from: **mainframe-env 0.8.3 development**
 Date: **2026-09-08**
 
 ## Context
