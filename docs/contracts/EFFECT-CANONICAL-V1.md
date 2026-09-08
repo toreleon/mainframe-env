@@ -1,5 +1,9 @@
 # Canonical host effect representation, version 1
 
+- Status: **Frozen contract; implementation deviations tracked before 0.9.0**
+- Owner: execution and host-contract maintainers
+- Applies from: mainframe-env 0.8.2 hardening
+
 `mainframe-env.effect-canonical@1` is a frozen binary representation of the typed
 `HostRequest` and `Result<HostResult, HostProblem>` values. It is not Rust Debug,
 JSON text, a COBOL data layout, or a licensed mainframe representation.
@@ -58,7 +62,17 @@ Oversized requests fail before provider dispatch. A malformed/oversized successf
 mutation reply is UnknownOutcome after dispatch, not a retryable known rejection.
 An explicit UnknownOutcome remains unknown even if its provider also corrupts
 the sequence or declares an insufficient response budget. A journal encoding
-failure after dispatch leaves the intent for explicit reconciliation.
+failure after dispatch must leave a discoverable intent for explicit
+reconciliation.
+
+The current implementation does not yet satisfy that last requirement for a
+known-success mutation whose result journal write fails: it can return an
+infrastructure failure while leaving an intent that the reconciliation query
+does not enumerate. Provider-local Db2, IMS, MQ, and RACF replay digests also
+still contain diagnostic `Debug` encodings outside this canonical codec. These
+are release-blocking deviations R-01 and R-07 in the
+[pre-0.9 review](../reviews/PRE-0.9.0-DEEP-REVIEW.md), not exceptions to this
+contract.
 
 ## Persisted identity and upgrades
 

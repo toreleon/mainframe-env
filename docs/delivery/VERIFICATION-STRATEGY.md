@@ -65,9 +65,9 @@ Use Proptest for:
 - machine transition invariants; and
 - idempotency/effect sequence behavior.
 
-### Fuzzing
+### Fuzzing — planned, not yet implemented
 
-Persistent fuzz targets cover:
+The target state is for persistent fuzz targets to cover:
 
 - COBOL and JCL lexers/parsers/preprocessors;
 - IR text/binary decoders;
@@ -76,9 +76,11 @@ Persistent fuzz targets cover:
 - RACF/security request parsing and profile matching; and
 - checkpoint/configuration readers.
 
-Every discovered crash becomes a minimized regression fixture.
+Every discovered crash must become a minimized regression fixture. As of the
+pre-0.9 review, the repository has property tests but no persistent fuzz target
+or CI fuzz-smoke gate; this section is a requirement, not current evidence.
 
-### Model and concurrency checking
+### Model and concurrency checking — planned, not yet implemented
 
 - Kani checks bounded pure validators, arithmetic, and selected state-machine
   transitions where tractable.
@@ -86,6 +88,9 @@ Every discovered crash becomes a minimized regression fixture.
   with its limitations documented.
 - TLA+/TLC models durable work claim, lease, attempt, effect intent/result,
   cancellation, and recovery before multi-process durable promotion.
+
+No Kani harness, Loom dependency, or TLA+/TLC model is currently present. Do
+not cite this target-state section as a completed assurance layer.
 
 ### Failure and chaos testing
 
@@ -143,7 +148,8 @@ workspace.
 - profile build and test;
 - differential and property suites;
 - public API/schema compatibility check;
-- fuzz smoke corpus.
+- fuzz smoke corpus once the planned harness exists; until then the missing
+  gate remains an explicit release-readiness gap.
 
 ### Release gate
 

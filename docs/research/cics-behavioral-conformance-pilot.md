@@ -1,9 +1,9 @@
 # CICS file/UOW behavioral conformance pilot
 
-Status: implementation audit and scope freeze for CF-01. The audit started from
-`d7a47e8` on `main`; implementation work continues on
-`codex/resolve-issues-82-91`. A result below is called reproduced only when the
-named command was run against that candidate or this branch.
+Status: **Accepted pilot baseline on `main`**. The audit started from `d7a47e8`;
+the reviewed implementation and follow-up corrections merged through
+`1bd294c`. A result below is called reproduced only when the named command was
+run against the identified candidate.
 
 ## What the existing evidence proves
 

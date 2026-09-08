@@ -11,7 +11,7 @@ hashes, or test counts into Project fields.
 
 ## Version mapping
 
-| Version | Milestone | Epic | Implementation PR | State |
+| Version | Milestone | Epic | Primary implementation/release PR | State |
 |---|---|---|---|---|
 | 0.1.1 | `0.1.1` | [#25](https://github.com/toreleon/mainframe-env/issues/25) | — | Local release; closed |
 | 0.2.0 | `0.2.0` | [#8](https://github.com/toreleon/mainframe-env/issues/8) | [#1](https://github.com/toreleon/mainframe-env/pull/1) | Published; closed |
@@ -22,6 +22,7 @@ hashes, or test counts into Project fields.
 | 0.7.0 | `0.7.0` | [#13](https://github.com/toreleon/mainframe-env/issues/13) | [#2](https://github.com/toreleon/mainframe-env/pull/2) | Published; closed |
 | 0.8.0 | `0.8.0` | [#14](https://github.com/toreleon/mainframe-env/issues/14) | [#30](https://github.com/toreleon/mainframe-env/pull/30) | Published; closed |
 | 0.8.1 | `0.8.1` | [#42](https://github.com/toreleon/mainframe-env/issues/42) | [#43](https://github.com/toreleon/mainframe-env/pull/43) | Published; closed |
+| 0.8.2 | `0.8.2` | — | [#70](https://github.com/toreleon/mainframe-env/pull/70) | Published source bundle; closed |
 | 0.9.0 | `0.9.0` | [#15](https://github.com/toreleon/mainframe-env/issues/15) | — | Planned; open |
 | 0.10.0 | `0.10.0` | [#16](https://github.com/toreleon/mainframe-env/issues/16) | — | Planned; open |
 | 0.11.0 | `0.11.0` | [#17](https://github.com/toreleon/mainframe-env/issues/17) | — | Planned; open |
@@ -35,9 +36,10 @@ hashes, or test counts into Project fields.
 
 The abandoned 0.7.1 proposal is intentionally absent.
 
-Issue and pull request numbers share one sequence. Epics occupy #8–#25,
-pull requests occupy #1–#7, #26–#31, #41, and #43–#44, review issues occupy
-#32–#40, and #42 is the 0.8.1 patch epic.
+Issue and pull request numbers share one repository sequence. The table is the
+version-level mapping, not a promise that every infrastructure or repair pull
+request is enumerated. Version 0.8.2 was promoted as a patch/source-bundle
+release without a separate epic in this mapping.
 
 ## Pull request history
 
@@ -45,8 +47,9 @@ Pull requests are not Project items. The board tracks issues, and a pull
 request reaches it through the read-only `Linked pull requests` field on the
 epic it closes. That field is populated only by a closing keyword in the pull
 request description, so a pull request that closes no issue does not appear on
-the board at all. This table is therefore the durable record. Merge commits are
-the permanent identity; branches are deleted after merge.
+the board at all. This table is a curated release-history view; Git remains the
+complete authority. Merge commits are permanent identities, while branches may
+be deleted after merge.
 
 | PR | Branch | Merged | Merge commit | Closes | Result |
 |---|---|---|---|---|---|
@@ -66,13 +69,14 @@ the permanent identity; branches are deleted after merge.
 | [#41](https://github.com/toreleon/mainframe-env/pull/41) | `docs/consolidate-pr-epic-history` | 2026-09-05 | `c5fd90c` | — | Project and 0.8.0 review history consolidation |
 | [#43](https://github.com/toreleon/mainframe-env/pull/43) | `patch/0.8.1` | 2026-09-05 | `7e32999` | #32–#40 | Resolve every 0.8.0 review finding |
 | [#44](https://github.com/toreleon/mainframe-env/pull/44) | `release/0.8.1` | 2026-09-05 | `bc5594f` | — | 0.8.1 release commit, tag, and target receipts |
+| [#70](https://github.com/toreleon/mainframe-env/pull/70) | `release/bump-0.8.2` | 2026-09-06 | `316e2e1` | — | 0.8.2 release commit and source-bundle tag |
 
 `2926c54` from #29 is the integrated candidate that
 [the 0.8.0 status report](status/0.8.0.md) records as the starting point for
 `impl/0.8.0`.
 
-Infrastructure and documentation pull requests — #26 through #29 and #41 —
-close no epic, so this table is their only record.
+Infrastructure and documentation pull requests #26 through #29 and #41 close
+no epic; this table preserves their role in the 0.8.0/0.8.1 planning history.
 
 ### Pull request metadata
 
@@ -83,7 +87,7 @@ pull request has exactly one type label and one milestone.
 | Label | Meaning | Pull requests |
 |---|---|---|
 | `type:implementation` | Delivers a version's work packages | #1, #2, #3, #4, #5, #6, #30, #43 |
-| `type:release` | Promotes a version to a release commit and tag | #7, #31, #44 |
+| `type:release` | Promotes a version to a release commit and tag | #7, #31, #44, #70 |
 | `type:ci` | Continuous integration or tooling | #27, #28, #29 |
 | `documentation` | Repository documentation only | #26, #41 |
 
@@ -96,6 +100,13 @@ implementation: they merged during that cycle.
 
 Rule 3 permits expanding an epic into child issues once a version becomes
 active. The 0.8.0 review is the first expansion.
+
+The [pre-0.9.0 deep review](../../reviews/PRE-0.9.0-DEEP-REVIEW.md) expands
+roadmap epic [#15](https://github.com/toreleon/mainframe-env/issues/15) into 28
+independently closable findings: [#101](https://github.com/toreleon/mainframe-env/issues/101)
+through [#128](https://github.com/toreleon/mainframe-env/issues/128). The review
+index is the authoritative R-ID-to-issue mapping and retains the detailed
+evidence and closure criteria.
 
 | Issue | Priority | Finding |
 |---|---|---|
@@ -152,8 +163,9 @@ of fact, not proposals.
   request #30, not by a decision that the release contract was met. Rule 4
   linkage and rule 6 closure are in tension whenever an implementation pull
   request carries the keyword; a release-only keyword would avoid it.
-- The licensed z/OS 3.2/JES2 differential remains at 0/16 pending for 0.8.1
-  under the approved `pass-with-licensed-differential-pending` disposition;
+- The licensed z/OS 3.2/JES2 differential remains at 0/16 pending for the 0.8
+  line, including 0.8.2, under the approved
+  `pass-with-licensed-differential-pending` disposition;
   Hercules, local, and model outputs receive no licensed-equivalence credit.
   The licensed differential is a hard gate for
   [#23](https://github.com/toreleon/mainframe-env/issues/23) (0.17.0) and must

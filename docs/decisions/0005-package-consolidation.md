@@ -2,6 +2,12 @@
 
 Status: **Accepted by repository owner**
 
+Historical scope note: this ADR records the original consolidation target. The
+accepted 0.1 machine inventory later contained 24 workspace packages, and
+versioned additions in 0.2 and 0.8 bring the current workspace to 26. See the
+[package map](../architecture/PACKAGE-MAP.md) and machine inventories for
+current composition. A future topology change requires a superseding ADR.
+
 ## Context
 
 The initial package map proposed 28 crates so that every possible compiler,

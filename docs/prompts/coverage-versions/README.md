@@ -275,10 +275,12 @@ an earlier public profile. Do not weaken earlier released behavior, rewrite
 historical evidence, or silently change a durable/public contract.
 
 This managed implementation program authorizes implementation edits, local
-validation, the work-package commits above, pushing only the assigned isolated
-implementation branch, and opening one pull request against `main` after the
-entire minor exit gate passes. The pull request must list every work-package
-commit and evidence digest and must not claim the minor is released.
+validation, and bounded work-package commits. A large minor may use reviewable
+work-package pull requests when incomplete behavior remains unreachable from
+the public profile and each pull request preserves all prior gates. The final
+integration pull request against `main` must list every work package and
+evidence digest, pass the entire minor exit gate, and must not claim the minor
+is released.
 
 It does not authorize destructive migration, force-push, merge, tag,
 publication, deployment, production cutover, or a compatibility claim. Version

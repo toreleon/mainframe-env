@@ -19,6 +19,21 @@ CICS resource/EIB/condition contracts, and accepted 0.4.0 COBOL host ABI, 0.5.0
 SAF, and 0.6.0 data-authority evidence. Verify all three dependency gates before
 public integration.
 
+Also read and verify the current implementation baseline before editing:
+
+- `docs/delivery/coverage-versions/status/0.9.0.md`;
+- `docs/reviews/PRE-0.9.0-DEEP-REVIEW.md`;
+- `docs/research/cics-behavioral-conformance-pilot.md`;
+- `conformance/0.9/cics/pilot-rule-review.json`;
+- `conformance/0.9/cics/pilot-fixtures.json`;
+- `conformance/0.9/cics/pilot-environment.json`;
+- `docs/runbooks/cics-licensed-pilot.md`; and
+- `docs/contracts/EFFECT-CANONICAL-V1.md`.
+
+The pre-0.9 review currently records a no-go. Do not begin broad CIC-901 work
+until every P1 entry blocker is closed with its focused regression and the
+status document names one passing candidate.
+
 ## Implement in this order
 
 1. Freeze **CIC-901** generated grammar, command/option legality, resource keys,

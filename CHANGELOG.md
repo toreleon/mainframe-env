@@ -4,6 +4,41 @@ All notable changes to mainframe-env are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Added a docs-driven CICS file/unit-of-work conformance pilot with reviewed
+  rules, exact per-obligation observations, memory/SQLite execution, restart
+  faults, and a fail-closed licensed-capture adapter.
+- Added a reviewed COBOL numeric `MOVE` pilot and corrected floating-insertion,
+  capacity, sign, and overflow behavior found by that review.
+- Added cost-aware local Jenkins assurance, exact-candidate command receipts,
+  PostgreSQL parity helpers, and bounded dataset mutation checks.
+
+### Changed
+
+- Replaced the live GitHub Actions assurance path with the capped local Jenkins
+  workflow; hosted metadata remains historical rather than current evidence.
+- Moved official catalog extraction to pinned IBM topic markup and strengthened
+  locator, publication-byte, generated-registry, and source-review guards.
+- Versioned canonical host-effect digests and tightened installed-call replay,
+  live cancellation, deadline, provider-move, and DCOLLECT hardening after the
+  0.8.2 tag.
+
+### Fixed
+
+- Corrected RACF flat/nested syntax value handling and added generated-path
+  regressions.
+- Corrected Jenkins checkout/temp storage, tool selection, parameter handling,
+  shell portability, and release-target selection.
+
+### Known issues
+
+- These changes are not part of the published 0.8.2 tag even though the
+  workspace version still reads `0.8.2`. The
+  [pre-0.9 deep review](docs/reviews/PRE-0.9.0-DEEP-REVIEW.md) records the
+  release-truth, durability, security, CI, and documentation blockers that must
+  be resolved before 0.9.0 implementation and publication.
+
 ## [0.8.2] - 2026-09-06
 
 ### Fixed

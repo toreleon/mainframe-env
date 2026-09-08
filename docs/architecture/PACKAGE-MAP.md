@@ -77,7 +77,18 @@ dependency boundary. It may grow only through an ADR demonstrating an in-scope
 
 ## Accepted V0 consolidation
 
-The machine package inventory consolidates the proposed map to 20 packages.
+ADR-0005 described a 20-package consolidation target. The exact accepted 0.1
+machine inventory ultimately contains 24 workspace packages: the 20 boundary
+packages in that target plus the server and CLI entry applications and the
+conformance and xtask tooling packages. Later versioned additions introduced
+`mainframe-env-coverage` (0.2) and `mainframe-env-spool` (0.8), so the current
+workspace contains 26 packages.
+
+`conformance/0.1/inventory/packages.json` plus the versioned
+`package-additions.json` files are the current machine authority. ADR-0005 is a
+historical decision and needs a superseding ADR before package topology changes
+again; its original count must not be used as current workspace truth.
+
 IR codecs remain with `mainframe-env-ir`; CICS contracts remain with
 `mainframe-env-host-api`; execution coordination remains with the interpreter
 kernel; COBOL syntax, semantics, HIR, and lowering remain private modules of the
