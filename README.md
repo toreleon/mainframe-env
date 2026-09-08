@@ -45,9 +45,10 @@ cargo run --quiet -p mainframe-env-cli --bin mainframe-env -- \
   run conformance/0.1/fixtures/cobol/HELLO.cbl --format fixed
 ```
 
-The standalone server is still a development composition, not a turnkey
-deployment. In particular, a fresh store has no supported operator bootstrap
-command. See the [operations runbook](docs/runbooks/OPERATIONS.md) before
+The standalone server remains a development composition rather than a turnkey
+deployment. It now has named configuration overrides, reference-only runtime
+secrets, a first-administrator bootstrap, and explicit liveness/readiness
+signals. See the [operations runbook](docs/runbooks/OPERATIONS.md) before
 starting it.
 
 ## Architecture at a glance

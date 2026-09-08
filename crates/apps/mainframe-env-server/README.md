@@ -27,6 +27,17 @@ Artifact placement is explicit. Memory and SQLite profiles require
 PostgreSQL authority through `PostgresArtifactStore`. PostgreSQL startup fails
 closed rather than falling back to a node-local artifact directory.
 
+The standalone binary applies TOML, environment, then named CLI overrides. Its
+PostgreSQL URL, TLS private key, bootstrap credential, and package keys are
+resolved through the same bounded `SecretRef` provider; raw secret values have
+no parallel configuration fields. A fresh store stays unready until the
+one-time first administrator is durable; committed restart never resolves that
+one-time secret again. `/zosmf/info` reports the validated listener plus
+liveness, rollback-only store writability, retention saturation and warning,
+identity, capability, writable artifact/headroom, and queue-progress readiness
+components separately. Each JES worker must have made durable queue progress
+within three heartbeat intervals; a running but stalled worker fails readiness.
+
 The validated `retention` configuration defines lifecycle, idempotency, and
 archive lifetimes plus alert watermarks and a hard batch bound. Embedders can
 forecast headroom, atomically archive/prune eligible rows, inspect archives,

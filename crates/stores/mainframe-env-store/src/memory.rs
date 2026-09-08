@@ -11,10 +11,10 @@ use mainframe_env_execution_api::{
     ArtifactRef, AuditRecord, ExecutionId, IdempotencyKey, LifecycleEvent,
 };
 use mainframe_env_store_api::{
-    ArchivedRetentionRow, ArtifactRecord, ArtifactStore, AuditSink, CheckpointRecord,
-    CheckpointStore, CoreRetentionDependencySnapshot, EffectRecord, EffectRecoveryLease,
-    EffectState, EventStore, ExecutionRecord, ExecutionState, ExecutionStore, GenerationRecord,
-    GenerationStore, IdempotencyStore, JournalStore, OutboxRecord, OutboxStore,
+    ArchivedRetentionRow, ArtifactRecord, ArtifactStore, ArtifactStoreHealth, AuditSink,
+    CheckpointRecord, CheckpointStore, CoreRetentionDependencySnapshot, EffectRecord,
+    EffectRecoveryLease, EffectState, EventStore, ExecutionRecord, ExecutionState, ExecutionStore,
+    GenerationRecord, GenerationStore, IdempotencyStore, JournalStore, OutboxRecord, OutboxStore,
     ProviderRetentionDependency, ProviderRetentionObservationDeletion,
     ProviderRetentionObservationSource, ProviderRetentionRow, ProviderStateArchiveDeletion,
     ProviderStateArchiveReplacement, ProviderStateMutation, ProviderStateRecord,
@@ -706,6 +706,18 @@ impl SessionStore for MemoryStore {
 }
 
 impl ArtifactStore for MemoryStore {
+    fn health(&self) -> Result<ArtifactStoreHealth, StoreError> {
+        let state = self.lock()?;
+        Ok(ArtifactStoreHealth {
+            readable: true,
+            writable: true,
+            used_objects: Some(state.artifacts.len()),
+            max_objects: Some(self.limits.max_artifacts),
+            used_bytes: Some(state.blob_bytes),
+            max_bytes: Some(self.limits.max_total_blob_bytes),
+        })
+    }
+
     fn put_artifact(&self, record: ArtifactRecord) -> Result<(), StoreError> {
         validation::artifact(&record)?;
         let mut state = self.lock()?;
@@ -4050,6 +4062,44 @@ mod tests {
             payload: vec![1],
         };
         assert_eq!(store.put_artifact(conflicting), Err(StoreError::Conflict));
+    }
+
+    #[test]
+    fn artifact_health_fails_at_object_and_byte_saturation() {
+        fn one_byte_artifact() -> ArtifactRecord {
+            let payload = vec![1];
+            let digest: [u8; 32] = Sha256::digest(&payload).into();
+            ArtifactRecord {
+                artifact: ArtifactRef::new(
+                    format!("sha256:{:x}", Sha256::digest(&payload)),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+                media_type: "application/test".into(),
+                payload_digest: digest,
+                payload,
+            }
+        }
+
+        let object_limited = MemoryStore::new(StoreLimits {
+            max_artifacts: 1,
+            ..StoreLimits::default()
+        });
+        assert_eq!(object_limited.health().unwrap().object_headroom(), Some(1));
+        object_limited.put_artifact(one_byte_artifact()).unwrap();
+        let full = object_limited.health().unwrap();
+        assert_eq!(full.object_headroom(), Some(0));
+        assert!(!full.ready());
+
+        let byte_limited = MemoryStore::new(StoreLimits {
+            max_artifacts: 2,
+            max_total_blob_bytes: 1,
+            ..StoreLimits::default()
+        });
+        byte_limited.put_artifact(one_byte_artifact()).unwrap();
+        let full = byte_limited.health().unwrap();
+        assert_eq!(full.byte_headroom(), Some(0));
+        assert!(!full.ready());
     }
 
     #[test]

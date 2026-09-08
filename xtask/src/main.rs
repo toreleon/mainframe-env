@@ -58,7 +58,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -11884,16 +11884,46 @@ fn release_server_sqlite_smoke(root: &Path, binary: &Path) -> TaskResult {
     ));
     fs::create_dir(&directory).map_err(|error| format!("{}: {error}", directory.display()))?;
     let database = directory.join("state.db");
+    let result = (|| {
+        let (mut first, first_port) =
+            spawn_release_server(root, binary, &directory, &database, true)?;
+        let first_result = wait_for_release_readiness(&mut first, first_port);
+        stop_release_server(&mut first);
+        first_result?;
+
+        let (mut restarted, restarted_port) =
+            spawn_release_server(root, binary, &directory, &database, false)?;
+        let restart_result = wait_for_release_readiness(&mut restarted, restarted_port)
+            .and_then(|()| authenticate_release_administrator(restarted_port));
+        stop_release_server(&mut restarted);
+        restart_result
+    })();
+    if directory.exists() {
+        fs::remove_dir_all(&directory)
+            .map_err(|error| format!("{}: {error}", directory.display()))?;
+    }
+    result
+}
+
+fn spawn_release_server(
+    root: &Path,
+    binary: &Path,
+    directory: &Path,
+    database: &Path,
+    bootstrap_secret: bool,
+) -> TaskResult<(Child, u16)> {
     let listener = TcpListener::bind("127.0.0.1:0").map_err(|error| error.to_string())?;
     let port = listener
         .local_addr()
         .map_err(|error| error.to_string())?
         .port();
     drop(listener);
-    let mut child = Command::new(binary)
+    let mut command = Command::new(binary);
+    command
         .arg(root.join("config/mainframe-env.toml"))
-        .current_dir(&directory)
+        .current_dir(directory)
         .env("MAINFRAME_ENV_STORE", "sqlite")
+        .env("MAINFRAME_ENV_ARTIFACT_STORE", "local")
         .env("MAINFRAME_ENV_TLS", "false")
         .env("MAINFRAME_ENV_LISTEN", format!("127.0.0.1:{port}"))
         .env(
@@ -11901,65 +11931,110 @@ fn release_server_sqlite_smoke(root: &Path, binary: &Path) -> TaskResult {
             format!("sqlite://{}?mode=rwc", database.display()),
         )
         .stdout(Stdio::null())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    if bootstrap_secret {
+        command.env("MAINFRAME_ENV_SECRET_BOOTSTRAP_ADMIN", "VEVTVFBBU1M=");
+    } else {
+        command.env_remove("MAINFRAME_ENV_SECRET_BOOTSTRAP_ADMIN");
+    }
+    command
         .spawn()
-        .map_err(|error| format!("start release server: {error}"))?;
+        .map(|child| (child, port))
+        .map_err(|error| format!("start release server: {error}"))
+}
+
+fn wait_for_release_readiness(child: &mut Child, port: u16) -> TaskResult {
     let deadline = Instant::now() + Duration::from_secs(10);
-    let mut passed = false;
-    let mut failure = None;
     while Instant::now() < deadline {
         if let Some(status) = child.try_wait().map_err(|error| error.to_string())? {
             let mut stderr = String::new();
             if let Some(mut pipe) = child.stderr.take() {
                 let _ = pipe.read_to_string(&mut stderr);
             }
-            failure = Some(format!("release server exited {status}: {stderr}"));
-            break;
+            return Err(format!("release server exited {status}: {stderr}"));
         }
-        if let Ok(mut stream) = TcpStream::connect(("127.0.0.1", port)) {
-            let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
-            let _ = stream.set_write_timeout(Some(Duration::from_secs(2)));
-            if stream
-                .write_all(
-                    b"GET /zosmf/info HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
-                )
-                .is_ok()
+        if let Ok(response) = release_http_request(
+            port,
+            b"GET /zosmf/info HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+        ) && response
+            .lines()
+            .next()
+            .is_some_and(|line| line.contains(" 200 "))
+            && let Some((_, body)) = response.split_once("\r\n\r\n")
+            && let Ok(info) = serde_json::from_str::<Value>(body)
+        {
+            let component_ready = [
+                "accepting",
+                "writable_store",
+                "bootstrap_identity",
+                "host_capabilities",
+                "artifact_store",
+                "jes_workers",
+            ]
+            .into_iter()
+            .all(|component| info["readiness"][component].as_bool() == Some(true));
+            if info["live"].as_bool() == Some(true)
+                && info["ready"].as_bool() == Some(true)
+                && info["listen"].as_str() == Some(format!("127.0.0.1:{port}").as_str())
+                && info["zosmf_port"].as_str() == Some(port.to_string().as_str())
+                && component_ready
             {
-                let mut response = String::new();
-                if stream.read_to_string(&mut response).is_ok()
-                    && response.contains(" 200 ")
-                    && response.contains("\"ready\":true")
-                {
-                    passed = true;
-                    break;
-                }
+                return Ok(());
             }
         }
         thread::sleep(Duration::from_millis(50));
     }
-    if child
-        .try_wait()
-        .map_err(|error| error.to_string())?
-        .is_none()
-    {
+    Err("release SQLite server did not become fully ready".into())
+}
+
+fn authenticate_release_administrator(port: u16) -> TaskResult {
+    let response = release_http_request(
+        port,
+        b"POST /zosmf/services/authenticate HTTP/1.1\r\nHost: localhost\r\nAuthorization: Basic QURNSU46VEVTVFBBU1M=\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+    )?;
+    require(
+        response
+            .lines()
+            .next()
+            .is_some_and(|line| line.contains(" 200 ")),
+        "restarted release server rejected the persisted administrator",
+    )?;
+    let (_, body) = response
+        .split_once("\r\n\r\n")
+        .ok_or("release authentication response has no body")?;
+    let authentication: Value = serde_json::from_str(body).map_err(|error| error.to_string())?;
+    require(
+        authentication["user"] == Value::String("ADMIN".into())
+            && authentication["token"]
+                .as_str()
+                .is_some_and(|token| token.starts_with("session-")),
+        "restarted release server returned an invalid authentication receipt",
+    )
+}
+
+fn release_http_request(port: u16, request: &[u8]) -> TaskResult<String> {
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).map_err(|error| error.to_string())?;
+    stream
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .map_err(|error| error.to_string())?;
+    stream
+        .set_write_timeout(Some(Duration::from_secs(2)))
+        .map_err(|error| error.to_string())?;
+    stream
+        .write_all(request)
+        .map_err(|error| error.to_string())?;
+    let mut response = String::new();
+    stream
+        .read_to_string(&mut response)
+        .map_err(|error| error.to_string())?;
+    Ok(response)
+}
+
+fn stop_release_server(child: &mut Child) {
+    if child.try_wait().ok().flatten().is_none() {
         let _ = child.kill();
         let _ = child.wait();
     }
-    if database.exists() {
-        fs::remove_file(&database).map_err(|error| format!("{}: {error}", database.display()))?;
-    }
-    let artifacts = directory.join("mainframe-env-artifacts");
-    if artifacts.exists() {
-        fs::remove_dir_all(&artifacts)
-            .map_err(|error| format!("{}: {error}", artifacts.display()))?;
-    }
-    fs::remove_dir(&directory).map_err(|error| format!("{}: {error}", directory.display()))?;
-    require(
-        passed,
-        failure
-            .as_deref()
-            .unwrap_or("release SQLite server did not become ready"),
-    )
 }
 
 fn check_certification(root: &Path) -> TaskResult {

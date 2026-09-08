@@ -1018,6 +1018,28 @@ impl RacfService {
             })
     }
 
+    /// Verify that an active credentialed principal retains every bootstrap
+    /// administrator attribute.
+    ///
+    /// This is a proof of durable bootstrap completion, not an authorization
+    /// decision for an end-user request.
+    pub fn bootstrap_administrator_ready(&self, user: &PrincipalId) -> Result<bool, HostProblem> {
+        let snapshot = self.database.read()?;
+        if !snapshot.subsystem.running || !snapshot.database_status.active {
+            return Ok(false);
+        }
+        Ok(snapshot
+            .principals
+            .get(user.as_str())
+            .is_some_and(|principal| {
+                principal.state == PrincipalState::Active
+                    && principal.credential.is_some()
+                    && ["AUDITOR", "OPERATIONS", "SPECIAL"]
+                        .into_iter()
+                        .all(|attribute| principal.attributes.contains(attribute))
+            }))
+    }
+
     pub fn active_principal_epochs(
         &self,
     ) -> Result<BTreeMap<String, PrincipalAuthenticationEpoch>, HostProblem> {

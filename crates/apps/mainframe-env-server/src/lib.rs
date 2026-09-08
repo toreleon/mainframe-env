@@ -18,13 +18,15 @@ pub use cobol::{
     default_program_router,
 };
 pub use config::{
-    ArtifactProfile, ConfigOverrides, RetentionConfig, ServerConfig, StoreProfile, TlsConfig,
+    ArtifactProfile, BootstrapConfig, ConfigOverrides, RetentionConfig, ServerConfig, StoreProfile,
+    TlsConfig,
 };
 pub use environment_secrets::EnvironmentSecretResolver;
 pub use product::{
     ApplicationPublicationReceipt, BatchInstallReceipt, BatchProgramDefinition,
     HmacSha256PackageTrust, OnlineApplicationDefinition, OnlineInstallReceipt,
-    OnlineProgramDefinition, ProductMetrics, ProductServer,
+    OnlineProgramDefinition, ProductCapacityStatus, ProductMetrics, ProductReadiness,
+    ProductServer,
 };
 pub use retention_maintenance::{RetentionMaintenance, RetentionMaintenancePass};
 

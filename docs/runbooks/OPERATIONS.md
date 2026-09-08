@@ -2,70 +2,92 @@
 
 Status: **Development runbook for the current `main` binary**
 
-The `core-server` profile is a single-node development composition. It is not a
-turnkey production service. Read the current limitations below before using the
-sample configuration.
+The `core-server` remains a development composition rather than a turnkey
+production service. Its startup inputs and health boundary are nevertheless
+explicit and fail closed.
 
 ## Current operational limitations
 
-- The service invocation accepts one optional positional configuration path.
-  Retention subcommands add operation-specific flags, but there are still no
-  general CLI configuration overrides.
-- A fresh store has no operator-facing bootstrap command. The library exposes
-  bootstrap helpers for tests and embedding, but the shipped binary cannot
-  create the first authenticated administrator.
-- `postgres_url_reference` and `tls.private_key_reference` are validated as
-  non-empty markers but are not dereferenced by the binary. The current process
-  reads the actual PostgreSQL URL from `MAINFRAME_ENV_POSTGRES_URL` and the TLS
-  key path from `MAINFRAME_ENV_TLS_KEY_PATH`.
-- `ProductServer::metrics()` is an in-process API. No `/metrics` endpoint or
-  exporter is shipped.
+- `ProductServer::metrics()` is an in-process API; the standalone binary does
+  not yet expose a metrics exporter.
+- Process-environment `env-base64:` is the standalone secret provider. An
+  external vault or KMS requires an embedding application implementing the
+  same bounded resolver contract.
+- PostgreSQL and TLS secret rotation takes effect on a controlled restart.
+  Package-verification keys are resolved afresh for each verification.
 - Retention forecast/archive controls are privileged in-process APIs for an
   embedding control plane and offline subcommands of the standalone binary.
   There is no retention HTTP endpoint or background retention scheduler.
-- `/zosmf/info` is a liveness-oriented development probe. On a fresh store it
-  can report `ready=true` even though no principal can authenticate.
-
-These limitations are tracked as pre-0.9 blockers in the
-[deep review](../reviews/PRE-0.9.0-DEEP-REVIEW.md). Do not compensate for them
-with undocumented production procedures.
 
 ## Configuration sources
 
-Configuration precedence in the shipped binary is:
+Configuration precedence is:
 
-1. the TOML file (`config/mainframe-env.toml` by default, or the first
-   positional argument);
-2. the supported `MAINFRAME_ENV_*` environment overrides below; and
-3. `ConfigOverrides` only for library embedders, not the standalone binary.
+1. TOML (`config/mainframe-env.toml` by default, or the first positional path);
+2. supported `MAINFRAME_ENV_*` environment overrides; and
+3. named CLI flags, also represented by `ConfigOverrides` for embedders.
 
-Unknown TOML fields and unsupported schema versions fail closed.
+The positional path remains backward compatible. Run
+`mainframe-env-server --help` for the named override set. Unknown TOML fields,
+unsupported schemas, zero limits, incomplete bootstrap pairs, and an invalid
+store/artifact pairing fail before the listener starts. `listen` must be a
+concrete socket address with a nonzero port.
 
-| Environment variable | Current effect | Secret value? |
+| Environment variable | Effect | Secret value? |
 |---|---|---|
 | `MAINFRAME_ENV_LISTEN` | Override `listen` | No |
 | `MAINFRAME_ENV_STORE` | `memory`, `sqlite`, or `postgres` | No |
 | `MAINFRAME_ENV_SQLITE_URL` | Override the SQLite URL | Potentially |
-| `MAINFRAME_ENV_POSTGRES_URL_REF` | Override the validated reference marker | No |
-| `MAINFRAME_ENV_POSTGRES_URL` | Actual URL consumed by the current binary | **Yes** |
+| `MAINFRAME_ENV_POSTGRES_URL_REF` | Override the PostgreSQL `SecretRef` | No |
 | `MAINFRAME_ENV_ARTIFACT_STORE` | `local` for memory/SQLite or `shared` for PostgreSQL | No |
 | `MAINFRAME_ENV_ARTIFACT_ROOT` | Override the local artifact directory | No |
+| `MAINFRAME_ENV_MAX_BODY_BYTES` | Override the positive body bound | No |
+| `MAINFRAME_ENV_MAX_CONCURRENCY` | Override the positive request bound | No |
+| `MAINFRAME_ENV_TIMEOUT_MILLIS` | Override the positive request deadline | No |
+| `MAINFRAME_ENV_SHUTDOWN_MILLIS` | Override the positive shutdown deadline | No |
 | `MAINFRAME_ENV_TLS` | Enable or disable TLS | No |
-| `MAINFRAME_ENV_TLS_KEY_PATH` | Actual private-key path consumed by the current binary | Sensitive path |
-| `MAINFRAME_ENV_PACKAGE_HMAC_KEY_REFS` | JSON map of package key IDs to `env-base64:` references | References only |
-| `MAINFRAME_ENV_SECRET_*` | Base64-encoded package verification secret resolved on use | **Yes** |
+| `MAINFRAME_ENV_TLS_CERTIFICATE_PATH` | Override the public certificate path | No |
+| `MAINFRAME_ENV_TLS_KEY_REF` | Override the TLS private-key `SecretRef` | No |
+| `MAINFRAME_ENV_BOOTSTRAP_ADMIN` | Override the first administrator | No |
+| `MAINFRAME_ENV_BOOTSTRAP_SECRET_REF` | Override its credential `SecretRef` | No |
+| `MAINFRAME_ENV_PACKAGE_HMAC_KEY_REFS` | JSON map of key IDs to `SecretRef` values | No |
+| `MAINFRAME_ENV_SECRET_*` | Base64-encoded value resolved through an explicit reference | **Yes** |
 
-Package verification references must have the form
-`env-base64:MAINFRAME_ENV_SECRET_<NAME>`. Raw secret values must not be written
-to TOML, logs, evidence, shell history, or checked-in examples.
+Standalone references have the form
+`env-base64:MAINFRAME_ENV_SECRET_<NAME>`. The one bounded resolver reads them on
+demand and returns zeroizing bytes. Raw PostgreSQL URLs, credentials, private
+keys, and package keys do not have parallel configuration variables and must
+not appear in TOML, logs, evidence, shell history, or checked-in examples. The
+standalone binary rejects other `SecretRef` provider schemes before listening.
+
+## First-administrator bootstrap
+
+A fresh store is deliberately not ready until the paired `[bootstrap]`
+administrator and secret reference resolve. Before reading the credential, the
+server durably claims the selected first-principal name. Concurrent attempts to
+select another name fail before creating or changing a principal. The
+credential is passed through a bounded ephemeral scope to the shared RACF
+credential policy; it is never stored in configuration or provider state.
+
+After the administrator attributes, profiles, and durable completion marker
+commit, restart validates that marker before consulting the resolver. A partial
+bootstrap resumes only when its claim matches either an empty security database
+or the sole principal carrying all bootstrap-administrator attributes. An
+ordinary existing user is never promoted implicitly, and a different marker or
+replacement principal fails closed.
+
+Remove the bootstrap secret from the environment after the first successful
+startup; leave the reference in declarative configuration. Subsequent starts do
+not resolve it. Password changes use the authenticated RACF path, not bootstrap.
 
 ## Local SQLite smoke start
 
-This starts only the unauthenticated information route because the standalone
-binary has no first-user bootstrap workflow:
+Create a protected password file and use the sample configuration's reference:
 
 ```bash
+export MAINFRAME_ENV_SECRET_BOOTSTRAP_ADMIN="$(base64 < /secure/admin-password.bin)"
 MAINFRAME_ENV_STORE=sqlite \
+MAINFRAME_ENV_ARTIFACT_STORE=local \
 MAINFRAME_ENV_SQLITE_URL='sqlite://mainframe-env-dev.db?mode=rwc' \
 MAINFRAME_ENV_ARTIFACT_ROOT='mainframe-env-artifacts-dev' \
 MAINFRAME_ENV_TLS=false \
@@ -79,54 +101,62 @@ In another shell:
 curl --fail --silent --show-error http://127.0.0.1:10443/zosmf/info
 ```
 
-Treat this as a process/startup smoke test, not an authentication, worker, or
-production-readiness test.
+Remove `MAINFRAME_ENV_SECRET_BOOTSTRAP_ADMIN` after bootstrap. The response
+reports `live`, `ready`, and each readiness component separately.
 
 ## PostgreSQL and TLS inputs
 
-For the current implementation, provide both the reference markers in TOML and
-the actual process values:
+The concrete PostgreSQL URL and PEM private key are resolved only through the
+references in TOML:
 
 ```bash
 MAINFRAME_ENV_STORE=postgres \
 MAINFRAME_ENV_ARTIFACT_STORE=shared \
-MAINFRAME_ENV_POSTGRES_URL='postgres://USER:PASSWORD@HOST/DATABASE' \
+MAINFRAME_ENV_SECRET_POSTGRES_URL="$(base64 < /secure/postgres-url.txt)" \
+MAINFRAME_ENV_SECRET_TLS_PRIVATE_KEY="$(base64 < /secure/server.key)" \
+MAINFRAME_ENV_SECRET_BOOTSTRAP_ADMIN="$(base64 < /secure/admin-password.bin)" \
 MAINFRAME_ENV_TLS=true \
-MAINFRAME_ENV_TLS_KEY_PATH='/absolute/path/to/server.key' \
 cargo run --locked -p mainframe-env-server --bin mainframe-env-server -- \
   /absolute/path/to/mainframe-env.toml
 ```
 
-The certificate path still comes from `tls.certificate_path` in TOML. Restrict
-process-environment and file permissions appropriately. This temporary split
-between references and concrete values must be removed before production use.
+The public certificate path comes from `tls.certificate_path` or its
+environment/CLI override. PostgreSQL requires the shared artifact profile and
+never falls back to a node-local artifact root.
 
-## Readiness and health
+## Liveness and readiness
 
-`GET /zosmf/info` reports product and route-contract metadata plus the current
-development readiness boolean. A production readiness contract must also check
-at least:
+`GET /zosmf/info` is live whenever the process can serve it. `ready` becomes
+true only when all reported checks pass:
 
-- schema/migration compatibility and a writable durable-store probe;
-- first-principal/bootstrap completion and authentication health;
-- background worker health and queue progress;
-- artifact-store durability and visibility for the selected store profile; and
-- retention/capacity headroom for events, outbox records, sessions, and replay
-  journals.
+- the selected store opened at migration head, passes collision-safe
+  provider-state DML inside one rolled-back transaction, and reports bounded
+  retention-capacity counters without consuming provider quota or advancing
+  the provider mutation epoch;
+- the durable first-administrator marker names an active credentialed
+  principal with all bootstrap-administrator attributes;
+- every required host capability is registered;
+- the selected local/shared artifact authority passes a bounded read/write
+  probe and every enforced object/byte quota has headroom; and
+- exactly two JES worker tasks are running and each has successfully polled,
+  heartbeated, or committed the durable queue within three heartbeat intervals.
+  A live task with a hung store operation ages out and fails readiness.
 
-The current readiness bit now requires the JES worker pool to be started and
-not stopping. Until the remaining checks exist, external orchestration must not
-use `ready=true` as a production traffic gate.
+`retention_capacity` reports `healthy`, `low-watermark`, `high-watermark`,
+`full`, or `unavailable`. Healthy and low-watermark stores remain ready, with
+`retention_warning=true` at the low watermark so operators can reclaim space.
+High-watermark, full, and unavailable stores fail readiness before admission.
 
 ## Offline retention procedure
 
 The retention subcommands are filesystem/database operator controls, not
 network endpoints. They validate only the durable-store/retention configuration
 and open the SQLite or PostgreSQL durable state authority plus the shared
-store-only planner. They
-do not open Product, providers, artifact/package authorities, authentication or
-publication recovery, caches, `listen`, or workers. Memory and in-memory SQLite
-profiles are rejected because they cannot recover state across a restart.
+store-only planner. PostgreSQL resolves only its configured URL reference; the
+command does not resolve or open TLS, bootstrap, package trust, artifacts,
+Product, providers, authentication or publication recovery, caches, `listen`,
+or workers. Memory and in-memory SQLite profiles are rejected because they
+cannot recover state across a restart.
 Commands emit one compact JSON object on stdout; failures emit JSON on stderr
 and return non-zero.
 
@@ -206,40 +236,30 @@ live under continuous traffic.
 
 ## Shutdown
 
-Send `SIGTERM` or `SIGINT`. Admission and new JES claims stop, idle workers are
-woken, and the product waits up to `shutdown_millis` for its tracked active
-request set and bounded worker pool. A worker that cannot finish before the
-deadline is detached without a lease completion; its durable item becomes
-reclaimable at lease expiry with a higher fencing epoch. The current non-TLS
-Axum path does not independently enforce a hard transport shutdown deadline,
-so operators should verify process exit and investigate blocked synchronous
-backend work rather than immediately issuing `SIGKILL`.
+`SIGTERM` or `SIGINT` stops admission and new JES claims, wakes idle workers,
+and waits up to `shutdown_millis` for requests and the bounded worker pool. A
+worker that cannot finish is detached without completing its lease; after
+expiry a new worker may recover it only with a higher fencing epoch.
 
 ## Observability
 
-The library tracks request, failure, active-request, JES worker/active-work,
-authentication-session, console-message, and outbox counters. They are
-currently visible only to an
-embedding application or test through `ProductServer::metrics()`. The
-standalone binary does not install a metrics exporter or a tracing subscriber.
-
-Before production use, expose authenticated health/metrics endpoints, install a
-structured redacting tracing subscriber, define alert thresholds, and add
-retention/saturation metrics. Never log authorization headers, bearer tokens,
-database URLs, private-key material, package keys, or protected application
-fields.
+The library exposes request, failure, active-request, JES worker/healthy-worker,
+queue-progress/failure, active-work, session, console, and outbox counters
+through `ProductServer::metrics()`.
+Install a structured redacting subscriber and exporter in production. Never
+log authorization headers, bearer tokens, database URLs, private-key material,
+package keys, or protected application fields.
 
 ## Troubleshooting
 
 | Symptom | Check |
 |---|---|
-| Configuration is reported malformed | Schema version, unknown TOML fields, non-zero limits, TLS certificate/reference fields |
-| PostgreSQL reference appears valid but startup fails | `MAINFRAME_ENV_POSTGRES_URL` is still required by the current binary |
-| TLS reference appears valid but startup fails | `MAINFRAME_ENV_TLS_KEY_PATH` is still required and must point to readable PEM key material |
-| Information route works but authentication cannot succeed | A fresh standalone deployment has no supported first-user bootstrap path |
-| Requests exceed `timeout_millis` | Backend dispatch is currently synchronous; see the pre-0.9 timeout finding |
-| New work fails after extended uptime | Inspect retention forecasts and protected rows; archive eligible lifecycle/outbox/effect/replay batches, but resolve checkpoints or stale intents through their owning recovery workflows |
+| Configuration is malformed | Schema, unknown fields, positive limits, paired bootstrap, TLS references, and store/artifact pairing |
+| PostgreSQL startup fails | Referenced value exists, is bounded base64, decodes as UTF-8, and the artifact profile is `shared` |
+| TLS startup fails | Referenced value is bounded base64 containing PEM key bytes, not a key path |
+| `live=true`, `ready=false` on a fresh store | Supply the bootstrap pair and referenced credential once; inspect the readiness object |
+| Worker readiness becomes false | Inspect stopped tasks and leased work; expired leases remain fenced and recoverable |
+| Capacity status is low/high/full | Run an offline forecast and archive eligible rows; repair checkpoints, unresolved effects, or protected legacy rows through their owning workflows |
 
-For SQLite recovery procedures see [Backup and restore](BACKUP-RESTORE.md). For
-capacity assumptions and failure modes see
-[Capacity and recovery](CAPACITY-AND-RECOVERY.md).
+For SQLite recovery see [Backup and restore](BACKUP-RESTORE.md). For limits and
+operator reclamation see [Capacity and recovery](CAPACITY-AND-RECOVERY.md).

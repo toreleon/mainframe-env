@@ -157,6 +157,45 @@ impl SqliteStateStore {
         self.max_rows
     }
 
+    pub(crate) fn retention_writable_probe(&self) -> Result<(), StoreError> {
+        block_on(&self.runtime, async {
+            let mut transaction = self.pool.begin().await.map_err(infrastructure)?;
+            let outcome = async {
+                let key: String =
+                    sqlx::query_scalar("SELECT 'probe-' || lower(hex(randomblob(16)))")
+                        .fetch_one(&mut *transaction)
+                        .await
+                        .map_err(infrastructure)?;
+                let upserted = sqlx::query(
+                    "INSERT INTO provider_state(namespace,key,version,payload) \
+                     VALUES('server-readiness-probe',?,1,X'') \
+                     ON CONFLICT(namespace,key) DO UPDATE SET payload=excluded.payload",
+                )
+                .bind(&key)
+                .execute(&mut *transaction)
+                .await
+                .map_err(infrastructure)?
+                .rows_affected();
+                if upserted != 1 {
+                    return Err(StoreError::Conflict);
+                }
+                let deleted = sqlx::query(
+                    "DELETE FROM provider_state \
+                     WHERE namespace='server-readiness-probe' AND key=?",
+                )
+                .bind(key)
+                .execute(&mut *transaction)
+                .await
+                .map_err(infrastructure)?
+                .rows_affected();
+                (deleted == 1).then_some(()).ok_or(StoreError::Conflict)
+            }
+            .await;
+            transaction.rollback().await.map_err(infrastructure)?;
+            outcome
+        })?
+    }
+
     pub(crate) fn provider_state_usage(&self) -> Result<usize, StoreError> {
         let count: i64 = self
             .run(sqlx::query_scalar("SELECT COUNT(*) FROM provider_state").fetch_one(&self.pool))?;

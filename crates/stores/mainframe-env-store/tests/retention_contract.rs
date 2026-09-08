@@ -2965,6 +2965,33 @@ fn sqlite_reopens_nonempty_retention_authorities_before_and_after_prune() {
     let _ = std::fs::remove_dir(directory);
 }
 
+fn run_capacity_health_is_non_mutating(store: &dyn PlatformStore) {
+    let before_epoch = store.provider_state_retention_epoch().unwrap();
+    let first = store.retention_capacity_health(policy()).unwrap();
+    assert_eq!(
+        store.provider_state_retention_epoch().unwrap(),
+        before_epoch
+    );
+    let second = store.retention_capacity_health(policy()).unwrap();
+    assert_eq!(second, first);
+    assert_eq!(
+        store.provider_state_retention_epoch().unwrap(),
+        before_epoch
+    );
+}
+
+#[test]
+fn memory_capacity_health_does_not_mutate_provider_authority() {
+    run_capacity_health_is_non_mutating(&MemoryStore::new(StoreLimits::default()));
+}
+
+#[test]
+fn sqlite_capacity_health_rolls_back_its_writable_probe() {
+    run_capacity_health_is_non_mutating(
+        &SqliteStateStore::open("sqlite::memory:", 1024 * 1024, 64).unwrap(),
+    );
+}
+
 #[test]
 #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
 fn postgres_retention_contract() {
@@ -2981,6 +3008,7 @@ fn postgres_retention_contract() {
         clear_nonempty_retention_authorities(&reopened, &authority_fixture);
     }
     let store = PostgresStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap();
+    run_capacity_health_is_non_mutating(&store);
     assert!(
         store
             .retention_archives(RetentionTarget::SpoolJobs, 1)

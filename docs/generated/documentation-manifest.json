@@ -10,7 +10,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:21cb6716826c16ea90e35bdd5f38eef326c7a11c323ebe222cb58396285a9f24",
+      "sha256": "sha256:39b89d0558022eae3b520d4b02655aa0c8bbdcff178bd1dcb6c67fa11acd45e5",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -26,7 +26,7 @@
       "normative": false,
       "path": "README.md",
       "relative_links": 21,
-      "sha256": "sha256:17b77bf8fa10fcfb951a1ac1c7bbad12611545d8418b917609512f461120cc49",
+      "sha256": "sha256:de9b8f1741ef04426a311cc172ed84bdbc04175f32f4f737cd4caa1188573f68",
       "title": "mainframe-env",
       "xtask_commands": 4
     },
@@ -106,7 +106,7 @@
       "normative": false,
       "path": "crates/apps/mainframe-env-server/README.md",
       "relative_links": 0,
-      "sha256": "sha256:48fdf83d7da7c3f23082da1d9780c953c14f09e7193f29e6ae6c4d340f548ed2",
+      "sha256": "sha256:073db7972b5da005e02cb52d40f8d0dc2c40b79810f907f3f351f16f8b5d6a22",
       "title": "mainframe-env-server",
       "xtask_commands": 0
     },
@@ -146,7 +146,7 @@
       "normative": false,
       "path": "crates/contracts/mainframe-env-store-api/README.md",
       "relative_links": 0,
-      "sha256": "sha256:e2f6198379643761b709caf17b764d182ec3ea18b2ea099a9e5775e674f2086d",
+      "sha256": "sha256:71de6b5500fe2ae2e7e88bd3e9133221b41ebf3e2f1dc48d5911f463791474fb",
       "title": "mainframe-env-store-api",
       "xtask_commands": 0
     },
@@ -274,7 +274,7 @@
       "normative": false,
       "path": "crates/stores/mainframe-env-store/README.md",
       "relative_links": 0,
-      "sha256": "sha256:a9f1b7e9dda54f8f410a22be55e99a4d2f9fec403d5cfa085faf8452772cc879",
+      "sha256": "sha256:574c44e305cabc2a731ffcce5df313e482eab7c3dd9626e98ae1f7396aef850b",
       "title": "mainframe-env-store",
       "xtask_commands": 0
     },
@@ -561,7 +561,7 @@
       "path": "docs/contracts/RETENTION-LIFECYCLE-V1.md",
       "relative_links": 3,
       "scope": "all durable source families, provider replay and recovery graphs, age observations, retained archives, and offline maintenance",
-      "sha256": "sha256:0ef86e6e4d5002a3359c7a799ce54799bab0a4cd0fb41f67f144146a6f98186d",
+      "sha256": "sha256:28fd33e20bda77796c51533421f036916ff1f1c50f320fc83fa47f511e81ab55",
       "status": "Implemented",
       "title": "Durable retention lifecycle, version 1",
       "xtask_commands": 0
@@ -1417,8 +1417,8 @@
     {
       "normative": false,
       "path": "docs/runbooks/OPERATIONS.md",
-      "relative_links": 3,
-      "sha256": "sha256:f2340bebc27c399065170a2cf3910ac879d38c8efeed7cbddbed24d744b78e1f",
+      "relative_links": 2,
+      "sha256": "sha256:ed955abceb7726503493f609f5573d351c96a89782daee7ce16126f52e36537b",
       "title": "Core-server operations",
       "xtask_commands": 0
     },

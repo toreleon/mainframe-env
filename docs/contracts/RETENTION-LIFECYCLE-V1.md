@@ -254,9 +254,12 @@ operation.
 
 ## Forecasting and capacity
 
-`retention_capacity_health` reports constant-cost source capacity for all
-sixteen targets in frozen order plus the shared archive and observation row and
-byte authorities. `retention_forecast` additionally reports active, eligible,
+`retention_capacity_health` proves provider-state insert, update, delete, quota,
+and epoch-trigger authority inside one rolled-back transaction, then reports
+constant-cost source capacity for all sixteen targets in frozen order plus the
+shared archive and observation row and byte authorities. The collision-safe
+probe leaves no row, consumes no provider-state quota, and does not advance the
+provider mutation epoch. `retention_forecast` additionally reports active, eligible,
 and protected records; source headroom; target and shared archive/observation
 usage and headroom; all four watermarks; saturation; and bounded projections
 from an operator-supplied row-growth rate. Zero growth yields no time estimate;

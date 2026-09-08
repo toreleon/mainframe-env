@@ -140,6 +140,9 @@ fn postgres_quota_and_shared_artifact_contract() {
 
     let left = Arc::new(PostgresArtifactStore::open(&url, 1024, 2).unwrap());
     let right = Arc::new(PostgresArtifactStore::open(&url, 1024, 2).unwrap());
+    let empty_health = left.health().unwrap();
+    assert!(empty_health.ready());
+    assert_eq!(empty_health.object_headroom(), Some(2));
     let left_record = artifact(b"shared", "application/x-left");
     let right_record = artifact(b"shared", "application/x-right");
     let shared_id = left_record.artifact.clone();
@@ -178,6 +181,7 @@ fn postgres_quota_and_shared_artifact_contract() {
     );
     let winner = left.get_artifact(&shared_id).unwrap().unwrap();
     assert_eq!(right.get_artifact(&shared_id).unwrap(), Some(winner));
+    assert_eq!(left.health().unwrap().object_headroom(), Some(1));
 
     let crash_record = artifact(b"crash rollback", "application/octet-stream");
     runtime.block_on(async {
@@ -207,7 +211,10 @@ fn postgres_quota_and_shared_artifact_contract() {
         reopened.get_artifact(&crash_record.artifact).unwrap(),
         Some(crash_record)
     );
-    assert!(reopened.is_ready());
+    let full_health = reopened.health().unwrap();
+    assert_eq!(full_health.object_headroom(), Some(0));
+    assert!(!full_health.ready());
+    assert!(!reopened.is_ready());
 
     runtime
         .block_on(

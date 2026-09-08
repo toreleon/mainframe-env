@@ -1,7 +1,9 @@
+use crate::EnvironmentSecretResolver;
 use mainframe_env_host_api::HostProblem;
 use mainframe_env_store_api::RetentionPolicy;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -79,6 +81,13 @@ impl RetentionConfig {
     }
 }
 
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct BootstrapConfig {
+    pub administrator: Option<String>,
+    pub secret_reference: Option<String>,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ServerConfig {
@@ -98,6 +107,8 @@ pub struct ServerConfig {
     #[serde(default)]
     pub retention: RetentionConfig,
     pub tls: TlsConfig,
+    #[serde(default)]
+    pub bootstrap: BootstrapConfig,
 }
 
 impl Default for ServerConfig {
@@ -121,6 +132,7 @@ impl Default for ServerConfig {
                 certificate_path: None,
                 private_key_reference: None,
             },
+            bootstrap: BootstrapConfig::default(),
         }
     }
 }
@@ -133,7 +145,15 @@ pub struct ConfigOverrides {
     pub postgres_url_reference: Option<String>,
     pub artifact_profile: Option<ArtifactProfile>,
     pub artifact_root: Option<PathBuf>,
+    pub max_body_bytes: Option<usize>,
+    pub max_concurrency: Option<usize>,
+    pub timeout_millis: Option<u64>,
+    pub shutdown_millis: Option<u64>,
     pub tls_enabled: Option<bool>,
+    pub tls_certificate_path: Option<PathBuf>,
+    pub tls_private_key_reference: Option<String>,
+    pub bootstrap_administrator: Option<String>,
+    pub bootstrap_secret_reference: Option<String>,
 }
 
 impl ServerConfig {
@@ -198,8 +218,32 @@ impl ServerConfig {
             if let Some(value) = environment.get("MAINFRAME_ENV_ARTIFACT_ROOT") {
                 config.artifact_root = value.into();
             }
+            if let Some(value) = environment.get("MAINFRAME_ENV_MAX_BODY_BYTES") {
+                config.max_body_bytes = value.parse().map_err(|_| HostProblem::Malformed)?;
+            }
+            if let Some(value) = environment.get("MAINFRAME_ENV_MAX_CONCURRENCY") {
+                config.max_concurrency = value.parse().map_err(|_| HostProblem::Malformed)?;
+            }
+            if let Some(value) = environment.get("MAINFRAME_ENV_TIMEOUT_MILLIS") {
+                config.timeout_millis = value.parse().map_err(|_| HostProblem::Malformed)?;
+            }
+            if let Some(value) = environment.get("MAINFRAME_ENV_SHUTDOWN_MILLIS") {
+                config.shutdown_millis = value.parse().map_err(|_| HostProblem::Malformed)?;
+            }
             if let Some(value) = environment.get("MAINFRAME_ENV_TLS") {
                 config.tls.enabled = value.parse().map_err(|_| HostProblem::Malformed)?;
+            }
+            if let Some(value) = environment.get("MAINFRAME_ENV_TLS_CERTIFICATE_PATH") {
+                config.tls.certificate_path = Some(value.into());
+            }
+            if let Some(value) = environment.get("MAINFRAME_ENV_TLS_KEY_REF") {
+                config.tls.private_key_reference = Some(value.clone());
+            }
+            if let Some(value) = environment.get("MAINFRAME_ENV_BOOTSTRAP_ADMIN") {
+                config.bootstrap.administrator = Some(value.clone());
+            }
+            if let Some(value) = environment.get("MAINFRAME_ENV_BOOTSTRAP_SECRET_REF") {
+                config.bootstrap.secret_reference = Some(value.clone());
             }
             if let Some(value) = cli.listen {
                 config.listen = value;
@@ -210,8 +254,32 @@ impl ServerConfig {
             if let Some(value) = cli.artifact_root {
                 config.artifact_root = value;
             }
+            if let Some(value) = cli.max_body_bytes {
+                config.max_body_bytes = value;
+            }
+            if let Some(value) = cli.max_concurrency {
+                config.max_concurrency = value;
+            }
+            if let Some(value) = cli.timeout_millis {
+                config.timeout_millis = value;
+            }
+            if let Some(value) = cli.shutdown_millis {
+                config.shutdown_millis = value;
+            }
             if let Some(value) = cli.tls_enabled {
                 config.tls.enabled = value;
+            }
+            if let Some(value) = cli.tls_certificate_path {
+                config.tls.certificate_path = Some(value);
+            }
+            if let Some(value) = cli.tls_private_key_reference {
+                config.tls.private_key_reference = Some(value);
+            }
+            if let Some(value) = cli.bootstrap_administrator {
+                config.bootstrap.administrator = Some(value);
+            }
+            if let Some(value) = cli.bootstrap_secret_reference {
+                config.bootstrap.secret_reference = Some(value);
             }
         }
         if retention_only {
@@ -234,7 +302,7 @@ impl ServerConfig {
                 && self
                     .postgres_url_reference
                     .as_deref()
-                    .is_none_or(str::is_empty))
+                    .is_none_or(|reference| !valid_secret_reference(reference)))
         {
             Err(HostProblem::Malformed)
         } else {
@@ -245,7 +313,10 @@ impl ServerConfig {
     pub fn validate(&self) -> Result<(), HostProblem> {
         if self.schema_version != 1
             || self.profile != "core-server"
-            || self.listen.is_empty()
+            || self
+                .listen
+                .parse::<SocketAddr>()
+                .map_or(true, |address| address.port() == 0)
             || self.max_body_bytes == 0
             || self.max_concurrency == 0
             || self.timeout_millis == 0
@@ -258,7 +329,7 @@ impl ServerConfig {
                 && self
                     .postgres_url_reference
                     .as_deref()
-                    .is_none_or(str::is_empty))
+                    .is_none_or(|reference| !valid_secret_reference(reference)))
             || (self.store_profile == StoreProfile::Postgres
                 && self.artifact_profile != ArtifactProfile::Shared)
             || (self.store_profile != StoreProfile::Postgres
@@ -269,7 +340,18 @@ impl ServerConfig {
                         .tls
                         .private_key_reference
                         .as_deref()
-                        .is_none_or(str::is_empty)))
+                        .is_none_or(|reference| !valid_secret_reference(reference))))
+            || (self.bootstrap.administrator.is_some() != self.bootstrap.secret_reference.is_some())
+            || self
+                .bootstrap
+                .administrator
+                .as_deref()
+                .is_some_and(|administrator| !valid_bootstrap_administrator(administrator))
+            || self
+                .bootstrap
+                .secret_reference
+                .as_deref()
+                .is_some_and(|reference| !valid_secret_reference(reference))
         {
             Err(HostProblem::Malformed)
         } else {
@@ -284,6 +366,14 @@ fn parse_artifact_store(value: &str) -> Result<ArtifactProfile, HostProblem> {
         "shared" => Ok(ArtifactProfile::Shared),
         _ => Err(HostProblem::Malformed),
     }
+}
+
+fn valid_secret_reference(value: &str) -> bool {
+    EnvironmentSecretResolver::parse_reference(value).is_ok()
+}
+
+fn valid_bootstrap_administrator(value: &str) -> bool {
+    !value.is_empty() && value.len() <= 8 && value.bytes().all(|byte| byte.is_ascii_alphanumeric())
 }
 
 fn parse_store(value: &str) -> Result<StoreProfile, HostProblem> {
@@ -321,7 +411,7 @@ mod tests {
             &path,
             r#"schema_version=1
 profile="core-server"
-listen="file:1"
+listen="127.0.0.1:10001"
 store_profile="memory"
 sqlite_url="sqlite://file"
 artifact_root="artifacts"
@@ -336,14 +426,14 @@ enabled=false
         .unwrap();
         let config = ServerConfig::from_sources(
             Some(&path),
-            &BTreeMap::from([("MAINFRAME_ENV_LISTEN".into(), "env:2".into())]),
+            &BTreeMap::from([("MAINFRAME_ENV_LISTEN".into(), "127.0.0.1:10002".into())]),
             ConfigOverrides {
-                listen: Some("cli:3".into()),
+                listen: Some("127.0.0.1:10003".into()),
                 ..Default::default()
             },
         )
         .unwrap();
-        assert_eq!(config.listen, "cli:3");
+        assert_eq!(config.listen, "127.0.0.1:10003");
         let _ = std::fs::remove_file(path);
         let _ = std::fs::remove_dir(directory);
     }
@@ -362,7 +452,7 @@ enabled=false
     fn postgres_requires_the_shared_artifact_profile() {
         let mut config = ServerConfig {
             store_profile: StoreProfile::Postgres,
-            postgres_url_reference: Some("secret://postgres".into()),
+            postgres_url_reference: Some("env-base64:MAINFRAME_ENV_SECRET_POSTGRES_URL".into()),
             tls: TlsConfig {
                 enabled: false,
                 certificate_path: None,
@@ -442,6 +532,43 @@ enabled=false
     }
 
     #[test]
+    fn bootstrap_requires_an_explicit_principal_and_secret_reference_pair() {
+        let mut config = ServerConfig::default();
+        config.tls.enabled = false;
+        config.bootstrap.administrator = Some("ADMIN".into());
+        assert_eq!(config.validate(), Err(HostProblem::Malformed));
+        config.bootstrap.secret_reference =
+            Some("env-base64:MAINFRAME_ENV_SECRET_BOOTSTRAP_ADMIN".into());
+        assert!(config.validate().is_ok());
+
+        let environment = BTreeMap::from([
+            ("MAINFRAME_ENV_TLS".into(), "false".into()),
+            ("MAINFRAME_ENV_BOOTSTRAP_ADMIN".into(), "ENVADMIN".into()),
+            (
+                "MAINFRAME_ENV_BOOTSTRAP_SECRET_REF".into(),
+                "env-base64:MAINFRAME_ENV_SECRET_ENV_ADMIN".into(),
+            ),
+        ]);
+        let loaded = ServerConfig::from_sources(
+            None,
+            &environment,
+            ConfigOverrides {
+                bootstrap_administrator: Some("CLIADMIN".into()),
+                bootstrap_secret_reference: Some(
+                    "env-base64:MAINFRAME_ENV_SECRET_CLI_ADMIN".into(),
+                ),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(loaded.bootstrap.administrator.as_deref(), Some("CLIADMIN"));
+        assert_eq!(
+            loaded.bootstrap.secret_reference.as_deref(),
+            Some("env-base64:MAINFRAME_ENV_SECRET_CLI_ADMIN")
+        );
+    }
+
+    #[test]
     fn retention_validation_rejects_every_ephemeral_sqlite_form() {
         for url in [
             ":memory:",
@@ -466,5 +593,53 @@ enabled=false
                 "ephemeral SQLite URL was accepted: {url}"
             );
         }
+    }
+
+    #[test]
+    fn configured_listener_and_standalone_secret_provider_fail_closed() {
+        let mut config = ServerConfig::default();
+        config.tls.enabled = false;
+        for listen in ["not-an-address", "127.0.0.1:0"] {
+            config.listen = listen.into();
+            assert_eq!(config.validate(), Err(HostProblem::Malformed));
+        }
+        config.listen = "127.0.0.1:10443".into();
+        config.store_profile = StoreProfile::Postgres;
+        config.artifact_profile = ArtifactProfile::Shared;
+        config.postgres_url_reference = Some("secret://unsupported/postgres".into());
+        assert_eq!(config.validate(), Err(HostProblem::Malformed));
+        assert_eq!(config.validate_for_retention(), Err(HostProblem::Malformed));
+    }
+
+    #[test]
+    fn retention_loading_applies_only_durable_store_cli_overrides() {
+        let config = ServerConfig::from_sources_for_retention(
+            None,
+            &BTreeMap::new(),
+            ConfigOverrides {
+                store_profile: Some(StoreProfile::Sqlite),
+                sqlite_url: Some("sqlite://retention-cli.db?mode=rwc".into()),
+                listen: Some("not-a-listener".into()),
+                artifact_profile: Some(ArtifactProfile::Shared),
+                max_body_bytes: Some(0),
+                tls_enabled: Some(true),
+                tls_certificate_path: Some(PathBuf::new()),
+                tls_private_key_reference: Some("not-a-reference".into()),
+                bootstrap_administrator: Some("TOO-LONG-ADMIN".into()),
+                bootstrap_secret_reference: Some("not-a-reference".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(config.store_profile, StoreProfile::Sqlite);
+        assert_eq!(config.sqlite_url, "sqlite://retention-cli.db?mode=rwc");
+        assert_eq!(config.listen, ServerConfig::default().listen);
+        assert_eq!(config.artifact_profile, ArtifactProfile::Local);
+        assert_eq!(
+            config.max_body_bytes,
+            ServerConfig::default().max_body_bytes
+        );
+        assert_eq!(config.tls, ServerConfig::default().tls);
+        assert_eq!(config.bootstrap, BootstrapConfig::default());
     }
 }

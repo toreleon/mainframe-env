@@ -58,6 +58,11 @@ All notable changes to mainframe-env are documented here.
 - Added bounded, transactional retention archives and saturation forecasts for
   lifecycle events, delivered outbox rows, resolved effects, and Db2/IMS/MQ
   replay receipts while protecting checkpoints and unresolved recovery state.
+- Resolved PostgreSQL, TLS, bootstrap, and package secrets through one bounded
+  reference provider; added named CLI overrides, secure first-administrator
+  bootstrap with secret-free restart, and separate writable/auth/artifact/worker
+  readiness checks backed by rolled-back provider-state DML proof, retention
+  headroom, and per-worker queue-progress freshness.
 - Moved synchronous z/OSMF backend calls to a bounded four-worker lane and
   propagated finite HTTP deadlines plus live cancellation into invocations.
 - Classified mutating-effect journal failures after dispatch as unknown outcomes

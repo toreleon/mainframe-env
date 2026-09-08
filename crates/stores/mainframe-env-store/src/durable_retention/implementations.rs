@@ -7,6 +7,7 @@ macro_rules! durable_retention {
                 &self,
                 policy: RetentionPolicy,
             ) -> Result<mainframe_env_store_api::RetentionCapacityHealth, StoreError> {
+                self.retention_writable_probe()?;
                 let provider_rows = self.provider_state_usage()?;
                 let source_usage = RetentionTarget::ALL
                     .into_iter()

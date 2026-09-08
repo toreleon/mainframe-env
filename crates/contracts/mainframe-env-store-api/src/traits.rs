@@ -1,10 +1,10 @@
 use crate::{
-    ArtifactRecord, CheckpointRecord, EffectRecord, ExecutionRecord, ExecutionState,
-    GenerationRecord, OutboxRecord, ProviderStateArchiveDeletion, ProviderStateArchiveReplacement,
-    ProviderStateMutation, ProviderStateRecord, ProviderStateWrite, RetentionAgeReconciliation,
-    RetentionArchive, RetentionForecast, RetentionLegacyRow, RetentionPolicy, RetentionReceipt,
-    RetentionReconciliationReceipt, RetentionRequest, RetentionTarget, SessionRecord, StoreError,
-    WorkRecord,
+    ArtifactRecord, ArtifactStoreHealth, CheckpointRecord, EffectRecord, ExecutionRecord,
+    ExecutionState, GenerationRecord, OutboxRecord, ProviderStateArchiveDeletion,
+    ProviderStateArchiveReplacement, ProviderStateMutation, ProviderStateRecord,
+    ProviderStateWrite, RetentionAgeReconciliation, RetentionArchive, RetentionForecast,
+    RetentionLegacyRow, RetentionPolicy, RetentionReceipt, RetentionReconciliationReceipt,
+    RetentionRequest, RetentionTarget, SessionRecord, StoreError, WorkRecord,
 };
 use mainframe_env_execution_api::{
     ArtifactRef, AuditRecord, ExecutionId, IdempotencyKey, LifecycleEvent,
@@ -103,7 +103,11 @@ pub trait OutboxStore: Send + Sync {
 
 /// Forecasting and atomic archive-before-prune operations for bounded durable state.
 pub trait RetentionStore: Send + Sync {
-    /// Read bounded capacity counters without scanning eligibility or provider payload codecs.
+    /// Prove writable authority and read bounded capacity counters without payload-codec scans.
+    ///
+    /// Durable backends exercise provider-state create, update, and delete authority inside a
+    /// rolled-back transaction. Calling this method must not consume provider-state quota or
+    /// advance the provider mutation epoch.
     fn retention_capacity_health(
         &self,
         _policy: RetentionPolicy,
@@ -248,6 +252,13 @@ pub trait SessionStore: Send + Sync {
 }
 
 pub trait ArtifactStore: Send + Sync {
+    /// Prove readable and writable access and report every enforced capacity dimension.
+    ///
+    /// Implementations that cannot make those guarantees fail closed until
+    /// they provide a backend-specific probe.
+    fn health(&self) -> Result<ArtifactStoreHealth, StoreError> {
+        Err(StoreError::IncompatibleVersion)
+    }
     fn put_artifact(&self, record: ArtifactRecord) -> Result<(), StoreError>;
     fn get_artifact(&self, id: &ArtifactRef) -> Result<Option<ArtifactRecord>, StoreError>;
     fn delete_artifact(&self, id: &ArtifactRef) -> Result<(), StoreError>;

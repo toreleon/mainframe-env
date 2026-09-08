@@ -161,6 +161,58 @@ pub struct ArtifactRecord {
     pub payload: Vec<u8>,
 }
 
+/// A bounded, backend-reported artifact authority health and capacity snapshot.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ArtifactStoreHealth {
+    /// Whether the selected authority can read and validate its durable metadata.
+    pub readable: bool,
+    /// Whether a bounded write can reach the selected authority.
+    pub writable: bool,
+    /// Number of immutable objects currently charged to a configured object quota.
+    pub used_objects: Option<usize>,
+    /// Maximum immutable objects accepted by the authority, when it has a count quota.
+    pub max_objects: Option<usize>,
+    /// Bytes currently charged to the authority's enforced aggregate byte quota.
+    pub used_bytes: Option<usize>,
+    /// Maximum aggregate bytes accepted by the authority, when such a quota is enforced.
+    pub max_bytes: Option<usize>,
+}
+
+impl ArtifactStoreHealth {
+    /// Return remaining object slots when the backend exposes a count quota.
+    #[must_use]
+    pub fn object_headroom(self) -> Option<usize> {
+        self.max_objects
+            .zip(self.used_objects)
+            .and_then(|(capacity, used)| capacity.checked_sub(used))
+    }
+
+    /// Return remaining bytes when the backend exposes an aggregate byte quota.
+    #[must_use]
+    pub fn byte_headroom(self) -> Option<usize> {
+        self.max_bytes
+            .zip(self.used_bytes)
+            .and_then(|(capacity, used)| capacity.checked_sub(used))
+    }
+
+    /// Require readable and writable storage plus nonzero headroom in every reported quota.
+    #[must_use]
+    pub fn ready(self) -> bool {
+        self.readable
+            && self.writable
+            && headroom_ready(self.used_objects, self.max_objects)
+            && headroom_ready(self.used_bytes, self.max_bytes)
+    }
+}
+
+fn headroom_ready(used: Option<usize>, capacity: Option<usize>) -> bool {
+    match (used, capacity) {
+        (None, None) => true,
+        (Some(used), Some(capacity)) => used < capacity,
+        _ => false,
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GenerationRecord {
     pub provider: String,

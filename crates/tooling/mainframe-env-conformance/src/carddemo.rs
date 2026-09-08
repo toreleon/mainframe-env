@@ -6847,7 +6847,7 @@ async fn exercise_full_certification() -> Result<FullCertificationExercise, Corp
         env::temp_dir().join(format!("mainframe-env-carddemo-full-postgres-{nonce}"));
     let postgres_config = ServerConfig {
         store_profile: StoreProfile::Postgres,
-        postgres_url_reference: Some("secret://carddemo-full-postgres".into()),
+        postgres_url_reference: Some("env-base64:MAINFRAME_ENV_SECRET_PG".into()),
         artifact_profile: ArtifactProfile::Shared,
         artifact_root: postgres_root.clone(),
         tls: TlsConfig {

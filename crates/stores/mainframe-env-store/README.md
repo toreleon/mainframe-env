@@ -10,7 +10,9 @@ overwrite, event order is monotonic, and idempotency conflicts fail closed.
 PostgreSQL uses transaction-locked quota rows for both state and dedicated
 shared artifact objects; incompatible limits or count drift fail on open. Local
 artifacts publish through an atomic no-replace link after file sync and sync the
-containing directory. Public adapters include `MemoryStore`,
+containing directory. Artifact health performs a bounded write probe and
+reports the enforced object/byte quotas, so saturation is not advertised as
+ready. Public adapters include `MemoryStore`,
 `SqliteStateStore`, `PostgresStateStore`, `PostgresArtifactStore`, and
 `LocalArtifactStore`. Memory, SQLite, and PostgreSQL implement the same bounded
 retention policy: terminal lifecycle/outbox state, resolved effects, and expired

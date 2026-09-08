@@ -1,6 +1,6 @@
 use crate::validation;
 use mainframe_env_execution_api::ArtifactRef;
-use mainframe_env_store_api::{ArtifactRecord, ArtifactStore, StoreError};
+use mainframe_env_store_api::{ArtifactRecord, ArtifactStore, ArtifactStoreHealth, StoreError};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -42,11 +42,35 @@ impl LocalArtifactStore {
 
     #[must_use]
     pub fn is_ready(&self) -> bool {
-        self.root.join("objects").is_dir()
+        self.health().is_ok_and(ArtifactStoreHealth::ready)
     }
 }
 
 impl ArtifactStore for LocalArtifactStore {
+    fn health(&self) -> Result<ArtifactStoreHealth, StoreError> {
+        let objects = self.root.join("objects");
+        std::fs::read_dir(&objects)
+            .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
+        let destination = objects.join("readiness-probe");
+        let (temporary, mut file) = temporary_file(&objects, &destination)?;
+        if let Err(error) = file.write_all(b"ready").and_then(|()| file.sync_all()) {
+            let _ = std::fs::remove_file(&temporary);
+            return Err(StoreError::Infrastructure(error.to_string()));
+        }
+        drop(file);
+        std::fs::remove_file(&temporary)
+            .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
+        sync_directory(&objects)?;
+        Ok(ArtifactStoreHealth {
+            readable: true,
+            writable: true,
+            used_objects: None,
+            max_objects: None,
+            used_bytes: None,
+            max_bytes: None,
+        })
+    }
+
     fn put_artifact(&self, record: ArtifactRecord) -> Result<(), StoreError> {
         if record.payload.len() > self.max_artifact_bytes
             || record.media_type.is_empty()

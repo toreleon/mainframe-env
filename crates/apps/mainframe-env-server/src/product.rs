@@ -1,13 +1,15 @@
 use crate::cobol::bind_compatible_runtime_services;
 use crate::console_retention::{decode_console_log_rows, encode_console_log};
-#[cfg(test)]
-use crate::jes_worker::ManualJesClock;
 use crate::jes_worker::{
     DurableJesClock, JES_HEARTBEAT_MILLIS, JES_IDLE_MILLIS, JES_LEASE_TICKS,
-    JES_WORK_DEADLINE_TICKS, JES_WORK_GENERATION, JES_WORKER_COUNT, JesClock, JesWorkPayload,
+    JES_WORK_DEADLINE_TICKS, JES_WORK_GENERATION, JES_WORKER_COUNT, JES_WORKER_FRESHNESS_MILLIS,
+    JesClock, JesWorkPayload,
 };
 use crate::retention_maintenance::provider::RetentionPlanner;
-use crate::{ArtifactProfile, DefaultProgramRouter, ServerConfig, default_program_router};
+use crate::{
+    ArtifactProfile, DefaultProgramRouter, EnvironmentSecretResolver, ServerConfig,
+    default_program_router,
+};
 use axum::http::StatusCode;
 use base64::Engine;
 use mainframe_env_application::{
@@ -48,16 +50,18 @@ use mainframe_env_interpreter::{CoordinatorLimits, ExecutionCoordinator, Referen
 use mainframe_env_ir::CodecLimits;
 use mainframe_env_mq::{MqReplayClock, MqService, mq_providers};
 use mainframe_env_racf::{
-    MemorySecretResolver, PrincipalAuthenticationEpoch, RacfService, SecretResolver, racf_providers,
+    MemorySecretResolver, PrincipalAuthenticationEpoch, RacfService, ResolvedSecret,
+    SecretResolver, racf_providers,
 };
 use mainframe_env_spool::{SpoolRetentionClock, SpoolService, spool_providers};
 use mainframe_env_store::{LocalArtifactStore, MemoryStore};
 use mainframe_env_store_api::{
-    ArtifactRecord, ArtifactStore, CheckpointStore, EffectDigestFormat, EffectState,
-    ExecutionState, PlatformStore, ProviderStateMutation, ProviderStateRecord, ProviderStateStore,
-    ProviderStateWrite, RetentionAgeReconciliation, RetentionArchive, RetentionArchivePruneOutcome,
-    RetentionArchivePruneRequest, RetentionForecast, RetentionLegacyRow, RetentionReceipt,
-    RetentionReconciliationReceipt, RetentionTarget, StoreError, WorkRecord, WorkState,
+    ArtifactRecord, ArtifactStore, ArtifactStoreHealth, CheckpointStore, EffectDigestFormat,
+    EffectState, ExecutionState, PlatformStore, ProviderStateMutation, ProviderStateRecord,
+    ProviderStateStore, ProviderStateWrite, RetentionAgeReconciliation, RetentionArchive,
+    RetentionArchivePruneOutcome, RetentionArchivePruneRequest, RetentionForecast,
+    RetentionLegacyRow, RetentionReceipt, RetentionReconciliationReceipt, RetentionTarget,
+    SaturationLevel, StoreError, WorkRecord, WorkState,
 };
 use mainframe_env_zosmf::{
     Authentication, GatewayCallContext, GatewayProblem, GatewayRequest, GatewayResponse,
@@ -71,9 +75,10 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
+use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, Weak};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio_rustls::TlsAcceptor;
 use zeroize::Zeroizing;
 
@@ -85,9 +90,71 @@ pub struct ProductMetrics {
     pub sessions: usize,
     pub console_messages: usize,
     pub jes_workers: usize,
+    /// JES workers that completed a durable queue operation within the freshness deadline.
+    pub jes_worker_healthy: usize,
+    /// Successful JES queue polls, lease heartbeats, and terminal writes.
+    pub jes_worker_progress: u64,
+    /// Failed JES queue polls, lease heartbeats, joins, and terminal writes.
+    pub jes_worker_failures: u64,
     pub jes_active: usize,
     pub outbox_pending: usize,
     pub outbox_delivered: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+pub struct ProductReadiness {
+    pub accepting: bool,
+    pub writable_store: bool,
+    pub retention_capacity: ProductCapacityStatus,
+    pub retention_warning: bool,
+    pub bootstrap_identity: bool,
+    pub host_capabilities: bool,
+    pub artifact_store: bool,
+    pub jes_workers: bool,
+}
+
+impl ProductReadiness {
+    #[must_use]
+    pub const fn ready(self) -> bool {
+        self.accepting
+            && self.writable_store
+            && self.retention_capacity.accepts_traffic()
+            && self.bootstrap_identity
+            && self.host_capabilities
+            && self.artifact_store
+            && self.jes_workers
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ProductCapacityStatus {
+    Healthy,
+    LowWatermark,
+    HighWatermark,
+    Full,
+    Unavailable,
+}
+
+impl ProductCapacityStatus {
+    const fn accepts_traffic(self) -> bool {
+        matches!(self, Self::Healthy | Self::LowWatermark)
+    }
+
+    const fn warning(self) -> bool {
+        matches!(self, Self::LowWatermark | Self::HighWatermark | Self::Full)
+    }
+}
+
+impl From<SaturationLevel> for ProductCapacityStatus {
+    fn from(value: SaturationLevel) -> Self {
+        match value {
+            SaturationLevel::Healthy => Self::Healthy,
+            SaturationLevel::LowWatermark => Self::LowWatermark,
+            SaturationLevel::HighWatermark => Self::HighWatermark,
+            SaturationLevel::Full => Self::Full,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -337,6 +404,9 @@ pub struct ProductServer {
     jes_worker_notify: tokio::sync::Notify,
     jes_worker_handles: Mutex<Vec<tokio::task::JoinHandle<()>>>,
     jes_worker_active: AtomicUsize,
+    jes_worker_last_progress: Mutex<Vec<Option<Instant>>>,
+    jes_worker_progress: AtomicU64,
+    jes_worker_failures: AtomicU64,
     outbox_delivery: Mutex<()>,
     accepting: AtomicBool,
     requests: AtomicU64,
@@ -352,18 +422,18 @@ enum ProductArtifactStore {
 
 impl ProductArtifactStore {
     fn is_ready(&self) -> bool {
-        match self {
-            Self::Local(store) => store.is_ready(),
-            Self::Shared(store) => ArtifactRef::new(
-                "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-                InvocationLimits::default(),
-            )
-            .is_ok_and(|probe| store.get_artifact(&probe).is_ok()),
-        }
+        self.health().is_ok_and(ArtifactStoreHealth::ready)
     }
 }
 
 impl ArtifactStore for ProductArtifactStore {
+    fn health(&self) -> Result<ArtifactStoreHealth, StoreError> {
+        match self {
+            Self::Local(store) => store.health(),
+            Self::Shared(store) => store.health(),
+        }
+    }
+
     fn put_artifact(&self, record: ArtifactRecord) -> Result<(), StoreError> {
         match self {
             Self::Local(store) => store.put_artifact(record),
@@ -420,6 +490,10 @@ const JES_ALLOWED_WORK_CAPABILITIES: [&str; 15] = [
     "host.spool.write",
     "host.terminal",
 ];
+const BOOTSTRAP_NAMESPACE: &str = "server-bootstrap";
+const BOOTSTRAP_CLAIM_KEY: &str = "first-administrator-claim";
+const BOOTSTRAP_KEY: &str = "first-administrator";
+const BOOTSTRAP_CAS_ATTEMPTS: usize = 16;
 
 thread_local! {
     static GATEWAY_CALL_CONTEXT: RefCell<Option<GatewayCallContext>> = const { RefCell::new(None) };
@@ -482,7 +556,7 @@ impl HmacSha256PackageTrust {
         let references = encoded
             .into_iter()
             .map(|(key_id, reference)| {
-                SecretRef::new(reference, HostLimits::default())
+                EnvironmentSecretResolver::parse_reference(&reference)
                     .map(|reference| (key_id, reference))
             })
             .collect::<Result<BTreeMap<_, _>, _>>()?;
@@ -872,6 +946,9 @@ impl ProductServer {
             jes_worker_notify: tokio::sync::Notify::new(),
             jes_worker_handles: Mutex::new(Vec::new()),
             jes_worker_active: AtomicUsize::new(0),
+            jes_worker_last_progress: Mutex::new(vec![None; JES_WORKER_COUNT]),
+            jes_worker_progress: AtomicU64::new(0),
+            jes_worker_failures: AtomicU64::new(0),
             outbox_delivery: Mutex::new(()),
             accepting: AtomicBool::new(true),
             requests: AtomicU64::new(0),
@@ -889,30 +966,6 @@ impl ProductServer {
         let secrets = Arc::new(MemorySecretResolver::default());
         let program = default_program_router();
         Self::open(config, store, secrets, program)
-    }
-
-    #[cfg(test)]
-    fn open_with_clock(
-        config: ServerConfig,
-        store: Arc<dyn PlatformStore>,
-        clock: Arc<dyn JesClock>,
-    ) -> Result<Arc<Self>, HostProblem> {
-        if config.artifact_profile != ArtifactProfile::Local {
-            return Err(HostProblem::Malformed);
-        }
-        let artifacts = Arc::new(ProductArtifactStore::Local(
-            LocalArtifactStore::open(&config.artifact_root, 64 * 1024 * 1024)
-                .map_err(store_error)?,
-        ));
-        Self::open_configured(
-            config,
-            store,
-            Arc::new(MemorySecretResolver::default()),
-            default_program_router(),
-            Arc::new(RejectPackageTrust),
-            artifacts,
-            Some(clock),
-        )
     }
 
     pub fn memory_with_package_trust(
@@ -2525,6 +2578,156 @@ impl ProductServer {
 
     pub fn bootstrap_user(&self, user: &str, secret: &[u8]) -> Result<(), HostProblem> {
         self.bootstrap_identity(user, secret)?;
+        self.grant_bootstrap_profiles(user)
+    }
+
+    /// Create the first administrator from caller-owned secret bytes.
+    ///
+    /// Committed and recoverable partial bootstraps do not read these bytes.
+    /// A durable claim prevents concurrent starters from selecting different
+    /// first administrators.
+    pub fn bootstrap_administrator(&self, user: &str, secret: &[u8]) -> Result<(), HostProblem> {
+        self.bootstrap_administrator_with(user, || ResolvedSecret::new(secret.to_vec()))
+    }
+
+    /// Create the first administrator through a lazily resolved secret reference.
+    ///
+    /// The resolver is called only when no committed or recoverable partial
+    /// bootstrap exists. This permits operators to remove one-time bootstrap
+    /// material after the durable receipt has committed.
+    pub fn bootstrap_administrator_from_reference(
+        &self,
+        user: &str,
+        reference: &SecretRef,
+        resolver: &dyn SecretResolver,
+    ) -> Result<(), HostProblem> {
+        self.bootstrap_administrator_with(user, || resolver.resolve(reference))
+    }
+
+    fn bootstrap_administrator_with(
+        &self,
+        user: &str,
+        resolve: impl FnOnce() -> Result<ResolvedSecret, HostProblem>,
+    ) -> Result<(), HostProblem> {
+        let principal = PrincipalId::new(user.to_ascii_uppercase(), InvocationLimits::default())
+            .map_err(|_| HostProblem::Malformed)?;
+        if let Some(marker) = self.bootstrap_record(BOOTSTRAP_KEY)? {
+            self.validate_bootstrap_record(&marker, BOOTSTRAP_KEY, &principal)?;
+            if let Some(claim) = self.bootstrap_record(BOOTSTRAP_CLAIM_KEY)? {
+                self.validate_bootstrap_record(&claim, BOOTSTRAP_CLAIM_KEY, &principal)?;
+            }
+            return self.require_bootstrap_administrator(&principal);
+        }
+        self.acquire_bootstrap_claim(&principal)?;
+        if !self.racf.bootstrap_administrator_ready(&principal)? {
+            let secret = resolve()?;
+            let reference = SecretRef::new(
+                format!(
+                    "bootstrap-administrator:{}:{}",
+                    principal.as_str(),
+                    self.next_sequence()?
+                ),
+                HostLimits::default(),
+            )?;
+            let _scope = self.secrets.scoped(&reference, secret.to_vec())?;
+            if let Err(problem) = self
+                .racf
+                .bootstrap_administrator(principal.as_str(), &reference)
+                && (!matches!(
+                    problem,
+                    HostProblem::Unauthorized | HostProblem::IdempotencyConflict
+                ) || !self.racf.bootstrap_administrator_ready(&principal)?)
+            {
+                return Err(problem);
+            }
+        }
+        self.grant_bootstrap_profiles(principal.as_str())?;
+        self.commit_bootstrap_marker(&principal)
+    }
+
+    fn bootstrap_record(&self, key: &str) -> Result<Option<ProviderStateRecord>, HostProblem> {
+        self.store
+            .get_provider_state(BOOTSTRAP_NAMESPACE, key)
+            .map_err(store_error)
+    }
+
+    fn validate_bootstrap_record(
+        &self,
+        record: &ProviderStateRecord,
+        key: &str,
+        principal: &PrincipalId,
+    ) -> Result<(), HostProblem> {
+        if record.namespace != BOOTSTRAP_NAMESPACE || record.key != key || record.version != 1 {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let recorded =
+            std::str::from_utf8(&record.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
+        if recorded != principal.as_str() {
+            return Err(HostProblem::Unauthorized);
+        }
+        Ok(())
+    }
+
+    fn acquire_bootstrap_claim(&self, principal: &PrincipalId) -> Result<(), HostProblem> {
+        for _ in 0..BOOTSTRAP_CAS_ATTEMPTS {
+            if let Some(claim) = self.bootstrap_record(BOOTSTRAP_CLAIM_KEY)? {
+                return self.validate_bootstrap_record(&claim, BOOTSTRAP_CLAIM_KEY, principal);
+            }
+            let active = self.racf.active_principal_epochs()?;
+            let recoverable_partial = active.len() == 1
+                && active.contains_key(principal.as_str())
+                && self.racf.bootstrap_administrator_ready(principal)?;
+            if !active.is_empty() && !recoverable_partial {
+                return Err(HostProblem::Unauthorized);
+            }
+            match self.store.put_provider_state(
+                ProviderStateRecord {
+                    namespace: BOOTSTRAP_NAMESPACE.into(),
+                    key: BOOTSTRAP_CLAIM_KEY.into(),
+                    version: 1,
+                    payload: principal.as_str().as_bytes().to_vec(),
+                },
+                None,
+            ) {
+                Ok(()) => return Ok(()),
+                Err(StoreError::Conflict | StoreError::AlreadyExists) => continue,
+                Err(problem) => return Err(store_error(problem)),
+            }
+        }
+        Err(HostProblem::IdempotencyConflict)
+    }
+
+    fn commit_bootstrap_marker(&self, principal: &PrincipalId) -> Result<(), HostProblem> {
+        for _ in 0..BOOTSTRAP_CAS_ATTEMPTS {
+            if let Some(marker) = self.bootstrap_record(BOOTSTRAP_KEY)? {
+                return self.validate_bootstrap_record(&marker, BOOTSTRAP_KEY, principal);
+            }
+            match self.store.put_provider_state(
+                ProviderStateRecord {
+                    namespace: BOOTSTRAP_NAMESPACE.into(),
+                    key: BOOTSTRAP_KEY.into(),
+                    version: 1,
+                    payload: principal.as_str().as_bytes().to_vec(),
+                },
+                None,
+            ) {
+                Ok(()) => return Ok(()),
+                Err(StoreError::Conflict | StoreError::AlreadyExists) => continue,
+                Err(problem) => return Err(store_error(problem)),
+            }
+        }
+        Err(HostProblem::IdempotencyConflict)
+    }
+
+    fn require_bootstrap_administrator(&self, principal: &PrincipalId) -> Result<(), HostProblem> {
+        if self.racf.bootstrap_administrator_ready(principal)? {
+            Ok(())
+        } else {
+            Err(HostProblem::Unauthorized)
+        }
+    }
+
+    fn grant_bootstrap_profiles(&self, user: &str) -> Result<(), HostProblem> {
         for (class, pattern, access) in [
             (
                 "DATASET",
@@ -2543,11 +2746,24 @@ impl ProductServer {
             ("MQQUEUE", "**".into(), AccessIntent::Alter),
             ("MQUOW", "**".into(), AccessIntent::Control),
         ] {
-            match self.racf.define_profile(class, &pattern, user, None) {
-                Ok(()) | Err(HostProblem::IdempotencyConflict) => {}
-                Err(problem) => return Err(problem),
+            let mut granted = false;
+            for _ in 0..BOOTSTRAP_CAS_ATTEMPTS {
+                match self.racf.define_profile(class, &pattern, user, None) {
+                    Ok(()) | Err(HostProblem::IdempotencyConflict) => {}
+                    Err(problem) => return Err(problem),
+                }
+                match self.racf.permit(class, &pattern, user, access) {
+                    Ok(()) => {
+                        granted = true;
+                        break;
+                    }
+                    Err(HostProblem::IdempotencyConflict | HostProblem::NotFound) => continue,
+                    Err(problem) => return Err(problem),
+                }
             }
-            self.racf.permit(class, &pattern, user, access)?;
+            if !granted {
+                return Err(HostProblem::IdempotencyConflict);
+            }
         }
         Ok(())
     }
@@ -2587,17 +2803,18 @@ impl ProductServer {
         for ordinal in 0..JES_WORKER_COUNT {
             let server = Arc::downgrade(self);
             let worker = format!("jes-worker-{pool}-{ordinal}");
-            handles.push(runtime.spawn(Self::jes_worker_loop(server, worker)));
+            handles.push(runtime.spawn(Self::jes_worker_loop(server, worker, ordinal)));
         }
         Ok(())
     }
 
-    async fn jes_worker_loop(server: Weak<Self>, worker: String) {
+    async fn jes_worker_loop(server: Weak<Self>, worker: String, ordinal: usize) {
         loop {
             let Some(product) = server.upgrade() else {
                 return;
             };
             if product.jes_workers_stopping.load(Ordering::SeqCst) {
+                product.clear_jes_worker_progress(ordinal);
                 return;
             }
             let claim_product = product.clone();
@@ -2606,8 +2823,12 @@ impl ProductServer {
                 tokio::task::spawn_blocking(move || claim_product.claim_jes_work(&claim_worker))
                     .await;
             let claimed = match claimed {
-                Ok(Ok(value)) => value,
+                Ok(Ok(value)) => {
+                    product.record_jes_worker_progress(ordinal);
+                    value
+                }
                 Ok(Err(_)) | Err(_) => {
+                    product.record_jes_worker_failure(ordinal);
                     tokio::time::sleep(Duration::from_millis(JES_IDLE_MILLIS)).await;
                     continue;
                 }
@@ -2636,8 +2857,9 @@ impl ProductServer {
                         match tokio::task::spawn_blocking(move || {
                             heartbeat_product.heartbeat_jes_work(&heartbeat_work)
                         }).await {
-                            Ok(Ok(())) => {}
+                            Ok(Ok(())) => product.record_jes_worker_progress(ordinal),
                             Ok(Err(_)) | Err(_) => {
+                                product.record_jes_worker_failure(ordinal);
                                 lease_current = false;
                                 break execution.await;
                             }
@@ -2646,15 +2868,59 @@ impl ProductServer {
                 }
             };
             product.jes_worker_active.fetch_sub(1, Ordering::SeqCst);
-            if lease_current && let Ok(outcome) = joined {
-                let finish_product = product.clone();
-                let finish_work = work.clone();
-                let _ = tokio::task::spawn_blocking(move || {
-                    finish_product.finish_claimed_jes_work(&finish_work, outcome)
-                })
-                .await;
+            if lease_current {
+                if let Ok(outcome) = joined {
+                    let finish_product = product.clone();
+                    let finish_work = work.clone();
+                    match tokio::task::spawn_blocking(move || {
+                        finish_product.finish_claimed_jes_work(&finish_work, outcome)
+                    })
+                    .await
+                    {
+                        Ok(Ok(())) => product.record_jes_worker_progress(ordinal),
+                        Ok(Err(_)) | Err(_) => product.record_jes_worker_failure(ordinal),
+                    }
+                } else {
+                    product.record_jes_worker_failure(ordinal);
+                }
             }
         }
+    }
+
+    fn record_jes_worker_progress(&self, ordinal: usize) {
+        if let Ok(mut progress) = self.jes_worker_last_progress.lock()
+            && let Some(slot) = progress.get_mut(ordinal)
+        {
+            *slot = Some(Instant::now());
+        }
+        self.jes_worker_progress.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn record_jes_worker_failure(&self, ordinal: usize) {
+        self.clear_jes_worker_progress(ordinal);
+        self.jes_worker_failures.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn clear_jes_worker_progress(&self, ordinal: usize) {
+        if let Ok(mut progress) = self.jes_worker_last_progress.lock()
+            && let Some(slot) = progress.get_mut(ordinal)
+        {
+            *slot = None;
+        }
+    }
+
+    fn fresh_jes_workers_at(&self, now: Instant) -> usize {
+        self.jes_worker_last_progress.lock().map_or(0, |progress| {
+            progress
+                .iter()
+                .filter(|last| {
+                    last.is_some_and(|last| {
+                        now.saturating_duration_since(last)
+                            <= Duration::from_millis(JES_WORKER_FRESHNESS_MILLIS)
+                    })
+                })
+                .count()
+        })
     }
 
     fn claim_jes_work(&self, worker: &str) -> Result<Option<WorkRecord>, HostProblem> {
@@ -2890,6 +3156,30 @@ impl ProductServer {
     }
 
     #[cfg(test)]
+    fn open_with_clock(
+        config: ServerConfig,
+        store: Arc<dyn PlatformStore>,
+        clock: Arc<dyn JesClock>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        if config.artifact_profile != ArtifactProfile::Local {
+            return Err(HostProblem::Malformed);
+        }
+        let artifacts = Arc::new(ProductArtifactStore::Local(
+            LocalArtifactStore::open(&config.artifact_root, 64 * 1024 * 1024)
+                .map_err(store_error)?,
+        ));
+        Self::open_configured(
+            config,
+            store,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+            Arc::new(RejectPackageTrust),
+            artifacts,
+            Some(clock),
+        )
+    }
+
+    #[cfg(test)]
     fn run_jes_worker_once(&self, worker: &str) -> Result<Option<String>, HostProblem> {
         let Some(work) = self.claim_jes_work(worker)? else {
             return Ok(None);
@@ -2915,19 +3205,94 @@ impl ProductServer {
     }
 
     #[must_use]
+    pub const fn live(&self) -> bool {
+        true
+    }
+
+    #[must_use]
     pub fn ready(&self) -> bool {
-        self.accepting.load(Ordering::SeqCst)
-            && self.jes_workers_started.load(Ordering::SeqCst)
+        self.readiness().ready()
+    }
+
+    #[must_use]
+    pub fn readiness(&self) -> ProductReadiness {
+        let capacity = self
+            .config
+            .retention
+            .policy()
+            .ok()
+            .and_then(|policy| self.store.retention_capacity_health(policy).ok());
+        let retention_capacity = capacity
+            .as_ref()
+            .map_or(ProductCapacityStatus::Unavailable, |health| {
+                health.saturation.into()
+            });
+        ProductReadiness {
+            accepting: self.accepting.load(Ordering::SeqCst),
+            writable_store: capacity.is_some(),
+            retention_capacity,
+            retention_warning: retention_capacity.warning(),
+            bootstrap_identity: self.bootstrap_principal_ready(),
+            host_capabilities: [
+                "host.cics.execute",
+                "host.db2.read",
+                "host.db2.write",
+                "host.ims.read",
+                "host.ims.write",
+                "host.mq.read",
+                "host.mq.write",
+            ]
+            .into_iter()
+            .all(|capability| self.host.capability_ready(capability)),
+            artifact_store: self.artifacts.is_ready(),
+            jes_workers: self.jes_workers_ready(),
+        }
+    }
+
+    fn bootstrap_principal_ready(&self) -> bool {
+        let marker = match self
+            .store
+            .get_provider_state(BOOTSTRAP_NAMESPACE, BOOTSTRAP_KEY)
+        {
+            Ok(Some(marker)) if marker.version == 1 => marker,
+            _ => return false,
+        };
+        let administrator = std::str::from_utf8(&marker.payload)
+            .ok()
+            .and_then(|administrator| {
+                PrincipalId::new(administrator, InvocationLimits::default()).ok()
+            });
+        let Some(administrator) = administrator else {
+            return false;
+        };
+        match self.bootstrap_record(BOOTSTRAP_CLAIM_KEY) {
+            Ok(Some(claim))
+                if self
+                    .validate_bootstrap_record(&claim, BOOTSTRAP_CLAIM_KEY, &administrator)
+                    .is_err() =>
+            {
+                return false;
+            }
+            Ok(_) => {}
+            Err(_) => return false,
+        }
+        self.racf
+            .bootstrap_administrator_ready(&administrator)
+            .unwrap_or(false)
+    }
+
+    fn jes_workers_ready(&self) -> bool {
+        self.jes_workers_ready_at(Instant::now())
+    }
+
+    fn jes_workers_ready_at(&self, now: Instant) -> bool {
+        self.jes_workers_started.load(Ordering::SeqCst)
             && !self.jes_workers_stopping.load(Ordering::SeqCst)
-            && self.store.get_provider_state("jes-meta", "next-id").is_ok()
-            && self.host.capability_ready("host.cics.execute")
-            && self.host.capability_ready("host.db2.read")
-            && self.host.capability_ready("host.db2.write")
-            && self.host.capability_ready("host.ims.read")
-            && self.host.capability_ready("host.ims.write")
-            && self.host.capability_ready("host.mq.read")
-            && self.host.capability_ready("host.mq.write")
-            && self.artifacts.is_ready()
+            && self.fresh_jes_workers_at(now) == JES_WORKER_COUNT
+            && self.jes_worker_handles.lock().is_ok_and(|handles| {
+                handles.len() == JES_WORKER_COUNT
+                    && handles.iter().all(|handle| !handle.is_finished())
+            })
     }
 
     #[must_use]
@@ -2942,6 +3307,9 @@ impl ProductServer {
                 self.jes_workers_started.load(Ordering::Relaxed)
                     && !self.jes_workers_stopping.load(Ordering::Relaxed),
             ) * JES_WORKER_COUNT,
+            jes_worker_healthy: self.fresh_jes_workers_at(Instant::now()),
+            jes_worker_progress: self.jes_worker_progress.load(Ordering::Relaxed),
+            jes_worker_failures: self.jes_worker_failures.load(Ordering::Relaxed),
             jes_active: self.jes_worker_active.load(Ordering::Relaxed),
             outbox_pending: self
                 .store
@@ -3071,6 +3439,9 @@ impl ProductServer {
         if self.jes_worker_active.load(Ordering::SeqCst) != 0 {
             return false;
         }
+        if let Ok(mut progress) = self.jes_worker_last_progress.lock() {
+            progress.fill(None);
+        }
         true
     }
 
@@ -3159,15 +3530,24 @@ impl ProductServer {
             }
         }
         if matches!(request, GatewayRequest::Info) {
+            let readiness = self.readiness();
+            let listen = self
+                .config
+                .listen
+                .parse::<SocketAddr>()
+                .map_err(|_| gateway_problem(HostProblem::InfrastructureFailure))?;
             return Ok(GatewayResponse::json(
                 StatusCode::OK,
                 json!({
                     "zos_version":"mainframe-env 0.1",
-                    "zosmf_port":"10443",
+                    "zosmf_port":listen.port().to_string(),
+                    "listen":self.config.listen.as_str(),
                     "zosmf_version":"mainframe-env.zosmf@1",
                     "api_version":"1",
                     "product_version":env!("CARGO_PKG_VERSION"),
-                    "ready":self.ready(),
+                    "live":self.live(),
+                    "ready":readiness.ready(),
+                    "readiness":readiness,
                     "capabilities":["datasets","jobs","security","console"]
                 }),
             ));
@@ -6189,6 +6569,7 @@ fn install_publication_state(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::jes_worker::ManualJesClock;
     use axum::body::{Body, to_bytes};
     use axum::http::{Method, Request};
     use base64::Engine;
@@ -6203,6 +6584,7 @@ mod tests {
     };
     use mainframe_env_store::SqliteStateStore;
     use mainframe_env_store_api::{RetentionRequest, RetentionStore, WorkStore};
+    use std::sync::Barrier;
     use tower::ServiceExt;
 
     #[test]
@@ -6641,6 +7023,92 @@ mod tests {
         (server, store, clock)
     }
 
+    async fn wait_for_worker_health(server: &ProductServer, expected: usize) {
+        for _ in 0..4_000 {
+            if server.metrics().jes_worker_healthy == expected {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        panic!(
+            "JES worker health did not reach {expected}: {:?}",
+            server.metrics()
+        );
+    }
+
+    struct ToggleJesClock {
+        tick: AtomicU64,
+        failing: AtomicBool,
+    }
+
+    impl ToggleJesClock {
+        fn new(tick: u64) -> Self {
+            Self {
+                tick: AtomicU64::new(tick),
+                failing: AtomicBool::new(false),
+            }
+        }
+    }
+
+    impl JesClock for ToggleJesClock {
+        fn now_tick(&self) -> Result<u64, StoreError> {
+            if self.failing.load(Ordering::SeqCst) {
+                Err(StoreError::Infrastructure(
+                    "injected JES clock failure".into(),
+                ))
+            } else {
+                Ok(self.tick.fetch_add(1, Ordering::SeqCst))
+            }
+        }
+    }
+
+    struct HealthOnlyArtifactStore {
+        health: Result<ArtifactStoreHealth, StoreError>,
+    }
+
+    impl ArtifactStore for HealthOnlyArtifactStore {
+        fn health(&self) -> Result<ArtifactStoreHealth, StoreError> {
+            self.health.clone()
+        }
+
+        fn put_artifact(&self, _: ArtifactRecord) -> Result<(), StoreError> {
+            Err(StoreError::Infrastructure(
+                "health-only artifact store".into(),
+            ))
+        }
+
+        fn get_artifact(&self, _: &ArtifactRef) -> Result<Option<ArtifactRecord>, StoreError> {
+            Err(StoreError::Infrastructure(
+                "health-only artifact store".into(),
+            ))
+        }
+
+        fn delete_artifact(&self, _: &ArtifactRef) -> Result<(), StoreError> {
+            Err(StoreError::Infrastructure(
+                "health-only artifact store".into(),
+            ))
+        }
+    }
+
+    fn server_with_artifact_health(
+        health: Result<ArtifactStoreHealth, StoreError>,
+    ) -> Arc<ProductServer> {
+        let mut server_config = config();
+        server_config.store_profile = crate::StoreProfile::Postgres;
+        server_config.artifact_profile = ArtifactProfile::Shared;
+        server_config.postgres_url_reference =
+            Some("env-base64:MAINFRAME_ENV_SECRET_POSTGRES_URL".into());
+        let store: Arc<dyn PlatformStore> = Arc::new(MemoryStore::new(Default::default()));
+        ProductServer::open_with_artifact_store(
+            server_config,
+            store,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+            Arc::new(HealthOnlyArtifactStore { health }),
+        )
+        .unwrap()
+    }
+
     fn submit_direct(server: &ProductServer, user: &str, secret: &[u8], name: &str) -> Value {
         let response = server
             .handle(
@@ -6894,6 +7362,9 @@ mod tests {
     #[tokio::test]
     async fn bounded_worker_pool_starts_once_and_joins_on_shutdown() {
         let (server, _, _) = worker_test_server(400);
+        server
+            .bootstrap_administrator("ADMIN", b"TESTPASS")
+            .unwrap();
         server.start_background_workers().unwrap();
         server.start_background_workers().unwrap();
         assert_eq!(
@@ -6901,6 +7372,7 @@ mod tests {
             JES_WORKER_COUNT
         );
         assert_eq!(server.metrics().jes_workers, JES_WORKER_COUNT);
+        wait_for_worker_health(&server, JES_WORKER_COUNT).await;
         assert!(server.ready());
         assert!(server.graceful_shutdown().await);
         assert!(server.jes_worker_handles.lock().unwrap().is_empty());
@@ -6933,6 +7405,476 @@ mod tests {
                 WorkState::Completed
             );
         }
+        assert!(server.graceful_shutdown().await);
+    }
+
+    #[tokio::test]
+    async fn worker_readiness_tracks_queue_progress_and_persistent_failures() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let clock = Arc::new(ToggleJesClock::new(900));
+        let platform: Arc<dyn PlatformStore> = store;
+        let server = ProductServer::open_with_clock(config(), platform, clock.clone()).unwrap();
+        server
+            .bootstrap_administrator("ADMIN", b"TESTPASS")
+            .unwrap();
+        server.start_background_workers().unwrap();
+        wait_for_worker_health(&server, JES_WORKER_COUNT).await;
+        let before = server.metrics();
+        assert!(before.jes_worker_progress >= JES_WORKER_COUNT as u64);
+        assert!(server.readiness().jes_workers);
+
+        clock.failing.store(true, Ordering::SeqCst);
+        server.jes_worker_notify.notify_waiters();
+        for _ in 0..4_000 {
+            let metrics = server.metrics();
+            if metrics.jes_worker_failures >= JES_WORKER_COUNT as u64
+                && metrics.jes_worker_healthy == 0
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        let failed = server.metrics();
+        assert!(failed.jes_worker_failures >= JES_WORKER_COUNT as u64);
+        assert_eq!(failed.jes_worker_healthy, 0);
+        assert!(
+            server
+                .jes_worker_handles
+                .lock()
+                .unwrap()
+                .iter()
+                .all(|handle| !handle.is_finished())
+        );
+        assert!(!server.readiness().jes_workers);
+        assert!(server.graceful_shutdown().await);
+    }
+
+    #[tokio::test]
+    async fn worker_readiness_expires_when_progress_stalls_without_a_reported_failure() {
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("ADMIN", b"TESTPASS")
+            .unwrap();
+        server.start_background_workers().unwrap();
+        wait_for_worker_health(&server, JES_WORKER_COUNT).await;
+        assert!(server.jes_workers_ready_at(Instant::now()));
+        let failures = server.metrics().jes_worker_failures;
+
+        let stalled_observation =
+            Instant::now() + Duration::from_millis(JES_WORKER_FRESHNESS_MILLIS.saturating_mul(2));
+        assert!(!server.jes_workers_ready_at(stalled_observation));
+        assert_eq!(server.metrics().jes_worker_failures, failures);
+        assert!(
+            server
+                .jes_worker_handles
+                .lock()
+                .unwrap()
+                .iter()
+                .all(|handle| !handle.is_finished())
+        );
+        assert!(server.graceful_shutdown().await);
+    }
+
+    #[test]
+    fn artifact_readiness_rejects_write_denial_and_reported_saturation() {
+        let denied = server_with_artifact_health(Err(StoreError::Infrastructure(
+            "injected write denial".into(),
+        )));
+        assert!(!denied.readiness().artifact_store);
+
+        for health in [
+            ArtifactStoreHealth {
+                readable: true,
+                writable: true,
+                used_objects: Some(8),
+                max_objects: Some(8),
+                used_bytes: None,
+                max_bytes: None,
+            },
+            ArtifactStoreHealth {
+                readable: true,
+                writable: true,
+                used_objects: None,
+                max_objects: None,
+                used_bytes: Some(4096),
+                max_bytes: Some(4096),
+            },
+        ] {
+            assert!(
+                !server_with_artifact_health(Ok(health))
+                    .readiness()
+                    .artifact_store
+            );
+        }
+    }
+
+    #[test]
+    fn committed_bootstrap_restart_does_not_resolve_removed_secret() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let reference = SecretRef::new("test:one-time-admin", HostLimits::default()).unwrap();
+        let external = Arc::new(MemorySecretResolver::default());
+        external.insert(reference.as_str(), b"TESTPASS".to_vec());
+        let first_platform: Arc<dyn PlatformStore> = store.clone();
+        let first = ProductServer::open(
+            config(),
+            first_platform,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+        )
+        .unwrap();
+        first
+            .bootstrap_administrator_from_reference("ADMIN", &reference, external.as_ref())
+            .unwrap();
+        drop(first);
+        external.remove(reference.as_str());
+
+        let second_platform: Arc<dyn PlatformStore> = store;
+        let second = ProductServer::open(
+            config(),
+            second_platform,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+        )
+        .unwrap();
+        second
+            .bootstrap_administrator_from_reference("ADMIN", &reference, external.as_ref())
+            .unwrap();
+        assert!(second.verify("ADMIN", b"TESTPASS").is_ok());
+    }
+
+    #[test]
+    fn pending_bootstrap_claim_survives_missing_secret_and_rejects_replacement() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let reference = SecretRef::new("test:pending-admin", HostLimits::default()).unwrap();
+        let external = Arc::new(MemorySecretResolver::default());
+        let first_platform: Arc<dyn PlatformStore> = store.clone();
+        let first = ProductServer::open(
+            config(),
+            first_platform,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+        )
+        .unwrap();
+        assert_eq!(
+            first.bootstrap_administrator_from_reference("ADMIN", &reference, external.as_ref()),
+            Err(HostProblem::NotFound)
+        );
+        assert_eq!(
+            first
+                .bootstrap_record(BOOTSTRAP_CLAIM_KEY)
+                .unwrap()
+                .unwrap()
+                .payload,
+            b"ADMIN"
+        );
+        drop(first);
+
+        external.insert(reference.as_str(), b"TESTPASS".to_vec());
+        let second_platform: Arc<dyn PlatformStore> = store;
+        let second = ProductServer::open(
+            config(),
+            second_platform,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+        )
+        .unwrap();
+        assert_eq!(
+            second.bootstrap_administrator_from_reference("OTHER", &reference, external.as_ref()),
+            Err(HostProblem::Unauthorized)
+        );
+        second
+            .bootstrap_administrator_from_reference("ADMIN", &reference, external.as_ref())
+            .unwrap();
+        assert!(second.verify("ADMIN", b"TESTPASS").is_ok());
+        assert_eq!(second.racf.active_principal_epochs().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn bootstrap_rejects_ordinary_existing_user_and_mismatched_marker_before_mutation() {
+        let ordinary = ProductServer::memory(config()).unwrap();
+        ordinary.bootstrap_identity("ADMIN", b"TESTPASS").unwrap();
+        assert_eq!(
+            ordinary.bootstrap_administrator("ADMIN", b"TESTPASS"),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(
+            ordinary
+                .bootstrap_record(BOOTSTRAP_CLAIM_KEY)
+                .unwrap()
+                .is_none()
+        );
+        let principal = PrincipalId::new("ADMIN", InvocationLimits::default()).unwrap();
+        assert!(
+            !ordinary
+                .racf
+                .bootstrap_administrator_ready(&principal)
+                .unwrap()
+        );
+
+        let mismatch = ProductServer::memory(config()).unwrap();
+        mismatch
+            .store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: BOOTSTRAP_NAMESPACE.into(),
+                    key: BOOTSTRAP_KEY.into(),
+                    version: 1,
+                    payload: b"OTHER".to_vec(),
+                },
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            mismatch.bootstrap_administrator("ADMIN", b"TESTPASS"),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(mismatch.racf.active_principal_epochs().unwrap().is_empty());
+        assert!(
+            mismatch
+                .bootstrap_record(BOOTSTRAP_CLAIM_KEY)
+                .unwrap()
+                .is_none()
+        );
+
+        let claim_mismatch = ProductServer::memory(config()).unwrap();
+        claim_mismatch
+            .store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: BOOTSTRAP_NAMESPACE.into(),
+                    key: BOOTSTRAP_CLAIM_KEY.into(),
+                    version: 1,
+                    payload: b"OTHER".to_vec(),
+                },
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            claim_mismatch.bootstrap_administrator("ADMIN", b"TESTPASS"),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(
+            claim_mismatch
+                .racf
+                .active_principal_epochs()
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn bootstrap_recovers_proven_partial_administrator_without_reading_secret() {
+        let server = ProductServer::memory(config()).unwrap();
+        let reference = SecretRef::new("test:partial-admin", HostLimits::default()).unwrap();
+        let scope = server
+            .secrets
+            .scoped(&reference, b"TESTPASS".to_vec())
+            .unwrap();
+        server
+            .racf
+            .bootstrap_administrator("ADMIN", &reference)
+            .unwrap();
+        drop(scope);
+        assert!(server.bootstrap_record(BOOTSTRAP_KEY).unwrap().is_none());
+        server.bootstrap_administrator("ADMIN", b"").unwrap();
+        assert!(server.bootstrap_principal_ready());
+        assert!(server.verify("ADMIN", b"TESTPASS").is_ok());
+    }
+
+    #[test]
+    fn concurrent_bootstrap_claim_allows_exactly_one_principal() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let open = |store: Arc<MemoryStore>| {
+            let platform: Arc<dyn PlatformStore> = store;
+            ProductServer::open(
+                config(),
+                platform,
+                Arc::new(MemorySecretResolver::default()),
+                default_program_router(),
+            )
+            .unwrap()
+        };
+        let left = open(store.clone());
+        let right = open(store);
+        let barrier = Arc::new(Barrier::new(3));
+        let spawn = |server: Arc<ProductServer>, user: &'static str, barrier: Arc<Barrier>| {
+            std::thread::spawn(move || {
+                barrier.wait();
+                (user, server.bootstrap_administrator(user, b"TESTPASS"))
+            })
+        };
+        let left_worker = spawn(left.clone(), "ADMINA", barrier.clone());
+        let right_worker = spawn(right.clone(), "ADMINB", barrier.clone());
+        barrier.wait();
+        let outcomes = [left_worker.join().unwrap(), right_worker.join().unwrap()];
+        assert_eq!(
+            outcomes.iter().filter(|(_, result)| result.is_ok()).count(),
+            1
+        );
+        assert_eq!(
+            outcomes
+                .iter()
+                .filter(|(_, result)| *result == Err(HostProblem::Unauthorized))
+                .count(),
+            1
+        );
+        let winner = outcomes
+            .iter()
+            .find_map(|(user, result)| result.is_ok().then_some(*user))
+            .unwrap();
+        assert_eq!(
+            left.bootstrap_record(BOOTSTRAP_KEY)
+                .unwrap()
+                .unwrap()
+                .payload,
+            winner.as_bytes()
+        );
+        assert_eq!(left.racf.active_principal_epochs().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn info_reports_the_validated_configured_listener() {
+        let mut server_config = config();
+        server_config.listen = "127.0.0.1:20443".into();
+        let server = ProductServer::memory(server_config).unwrap();
+        let before_epoch = server.store.provider_state_retention_epoch().unwrap();
+        let before_capacity = server
+            .store
+            .retention_capacity_health(server.config.retention.policy().unwrap())
+            .unwrap();
+        let response = server
+            .handle(Authentication::Anonymous, GatewayRequest::Info)
+            .unwrap();
+        let mainframe_env_zosmf::GatewayBody::Json(info) = response.body else {
+            panic!("information response was not JSON")
+        };
+        assert_eq!(info["listen"], "127.0.0.1:20443");
+        assert_eq!(info["zosmf_port"], "20443");
+        assert_eq!(info["readiness"]["retention_capacity"], "healthy");
+        assert_eq!(info["readiness"]["retention_warning"], false);
+        let second = server
+            .handle(Authentication::Anonymous, GatewayRequest::Info)
+            .unwrap();
+        assert_eq!(second.status, StatusCode::OK);
+        assert_eq!(
+            server.store.provider_state_retention_epoch().unwrap(),
+            before_epoch
+        );
+        assert_eq!(
+            server
+                .store
+                .retention_capacity_health(server.config.retention.policy().unwrap())
+                .unwrap(),
+            before_capacity
+        );
+    }
+
+    #[test]
+    fn readiness_warns_at_low_capacity_and_rejects_high_and_full_capacity() {
+        let store = Arc::new(MemoryStore::new(mainframe_env_store::StoreLimits {
+            max_provider_state: 100,
+            ..Default::default()
+        }));
+        let platform: Arc<dyn PlatformStore> = store.clone();
+        let server = ProductServer::open(
+            config(),
+            platform,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+        )
+        .unwrap();
+        let policy = server.config.retention.policy().unwrap();
+        let provider_usage = |store: &MemoryStore| {
+            store
+                .retention_capacity_health(policy)
+                .unwrap()
+                .targets
+                .into_iter()
+                .find(|entry| entry.target == RetentionTarget::Db2Replay)
+                .unwrap()
+                .used
+        };
+        let fill_to = |target: usize| {
+            let used = provider_usage(&store);
+            assert!(used <= target);
+            for ordinal in used..target {
+                store
+                    .put_provider_state(
+                        ProviderStateRecord {
+                            namespace: "readiness-capacity-test".into(),
+                            key: format!("row-{ordinal:03}"),
+                            version: 1,
+                            payload: Vec::new(),
+                        },
+                        None,
+                    )
+                    .unwrap();
+            }
+        };
+
+        assert_eq!(
+            server.readiness().retention_capacity,
+            ProductCapacityStatus::Healthy
+        );
+        fill_to(70);
+        let low = server.readiness();
+        assert!(low.writable_store);
+        assert_eq!(low.retention_capacity, ProductCapacityStatus::LowWatermark);
+        assert!(low.retention_warning);
+        assert!(low.retention_capacity.accepts_traffic());
+        assert!(!low.ready());
+
+        fill_to(85);
+        let high = server.readiness();
+        assert!(high.writable_store);
+        assert_eq!(
+            high.retention_capacity,
+            ProductCapacityStatus::HighWatermark
+        );
+        assert!(high.retention_warning);
+        assert!(!high.retention_capacity.accepts_traffic());
+        assert!(!high.ready());
+
+        fill_to(100);
+        let full = server.readiness();
+        assert!(full.writable_store);
+        assert_eq!(full.retention_capacity, ProductCapacityStatus::Full);
+        assert!(full.retention_warning);
+        assert!(!full.retention_capacity.accepts_traffic());
+        assert!(!full.ready());
+    }
+
+    #[tokio::test]
+    async fn first_administrator_gates_readiness_and_bootstrap_is_fail_closed() {
+        let server = ProductServer::memory(config()).unwrap();
+        assert!(server.live());
+        assert!(!server.ready());
+        let initial = server.readiness();
+        assert!(initial.accepting && initial.writable_store && initial.artifact_store);
+        assert_eq!(initial.retention_capacity, ProductCapacityStatus::Healthy);
+        assert!(!initial.retention_warning);
+        assert!(!initial.bootstrap_identity);
+        assert!(!initial.jes_workers);
+
+        server
+            .bootstrap_administrator("ADMIN", b"TESTPASS")
+            .unwrap();
+        assert!(!server.ready());
+        server.start_background_workers().unwrap();
+        wait_for_worker_health(&server, JES_WORKER_COUNT).await;
+        let ready = server.readiness();
+        assert!(ready.ready() && ready.host_capabilities && ready.jes_workers);
+        assert!(server.verify("ADMIN", b"TESTPASS").is_ok());
+
+        // Declarative replay never replaces the established credential.
+        server
+            .bootstrap_administrator("ADMIN", b"DIFFERENT1")
+            .unwrap();
+        assert!(server.verify("ADMIN", b"TESTPASS").is_ok());
+        assert_eq!(
+            server.bootstrap_administrator("OTHER", b"OTHERPASS1"),
+            Err(HostProblem::Unauthorized)
+        );
         assert!(server.graceful_shutdown().await);
     }
 
@@ -6993,6 +7935,18 @@ mod tests {
         let empty = HmacSha256PackageTrust::from_environment(&environment, resolver).unwrap();
         assert!(!empty.verify("key-1", "hmac-sha256@1", &identity, &second));
         assert!(!format!("{reference:?}").contains("rotated-production-package-key"));
+
+        let unsupported = BTreeMap::from([(
+            "MAINFRAME_ENV_PACKAGE_HMAC_KEY_REFS".into(),
+            r#"{"key-1":"secret://unsupported/package-key"}"#.into(),
+        )]);
+        assert!(matches!(
+            HmacSha256PackageTrust::from_environment(
+                &unsupported,
+                Arc::new(MemorySecretResolver::default())
+            ),
+            Err(HostProblem::Malformed)
+        ));
     }
 
     fn signed_controller_package(
@@ -7637,7 +8591,9 @@ mod tests {
     #[tokio::test]
     async fn composed_job_auth_console_and_shutdown_routes_pass() {
         let server = ProductServer::memory(config()).unwrap();
-        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
         let app = server.router();
         let response = call(
             &app,
@@ -7745,6 +8701,7 @@ mod tests {
             .unwrap();
         assert_eq!(renewed.status(), StatusCode::OK);
         assert!(server.metrics().requests >= 4);
+        wait_for_worker_health(&server, JES_WORKER_COUNT).await;
         assert!(server.ready());
         assert!(server.graceful_shutdown().await);
         assert!(!server.ready());

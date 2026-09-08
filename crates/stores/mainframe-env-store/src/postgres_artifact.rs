@@ -2,11 +2,14 @@ use crate::postgres::{ARTIFACT_OBJECT_QUOTA, adjust_quota, finish_transaction, i
 use crate::runtime::{AdapterRuntime, block_on};
 use crate::validation;
 use mainframe_env_execution_api::ArtifactRef;
-use mainframe_env_store_api::{ArtifactRecord, ArtifactStore, StoreError};
+use mainframe_env_store_api::{ArtifactRecord, ArtifactStore, ArtifactStoreHealth, StoreError};
 use sqlx::Row;
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use std::future::Future;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::runtime::Builder;
+
+static HEALTH_PROBE_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
 /// A PostgreSQL-backed immutable object store shared by every product node.
 pub struct PostgresArtifactStore {
@@ -71,19 +74,83 @@ impl PostgresArtifactStore {
 
     #[must_use]
     pub fn is_ready(&self) -> bool {
-        self.run(
-            sqlx::query_scalar::<_, i64>(
-                "SELECT used_rows FROM store_quota WHERE quota_key=$1 AND max_rows=$2",
-            )
-            .bind(ARTIFACT_OBJECT_QUOTA)
-            .bind(i64::try_from(self.max_objects).unwrap_or(i64::MAX))
-            .fetch_optional(&self.pool),
-        )
-        .is_ok_and(|row| row.is_some())
+        self.health().is_ok_and(ArtifactStoreHealth::ready)
     }
 }
 
 impl ArtifactStore for PostgresArtifactStore {
+    fn health(&self) -> Result<ArtifactStoreHealth, StoreError> {
+        let expected_max =
+            i64::try_from(self.max_objects).map_err(|_| StoreError::CapacityExceeded)?;
+        let probe_key = format!(
+            "readiness-probe:{}:{}",
+            std::process::id(),
+            HEALTH_PROBE_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+        );
+        block_on(&self.runtime, async {
+            let mut transaction = self.pool.begin().await.map_err(infrastructure)?;
+            let outcome = async {
+                let row = sqlx::query(
+                    "SELECT max_rows,used_rows FROM store_quota WHERE quota_key=$1 FOR UPDATE",
+                )
+                .bind(ARTIFACT_OBJECT_QUOTA)
+                .fetch_optional(&mut *transaction)
+                .await
+                .map_err(infrastructure)?
+                .ok_or(StoreError::IncompatibleVersion)?;
+                let max_rows: i64 = row.try_get(0).map_err(infrastructure)?;
+                let used_rows: i64 = row.try_get(1).map_err(infrastructure)?;
+                let actual: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM artifact_object")
+                    .fetch_one(&mut *transaction)
+                    .await
+                    .map_err(infrastructure)?;
+                if max_rows != expected_max
+                    || used_rows < 0
+                    || actual != used_rows
+                    || used_rows > max_rows
+                {
+                    return Err(StoreError::IncompatibleVersion);
+                }
+                let affected = sqlx::query(
+                    "UPDATE store_quota SET used_rows=used_rows WHERE quota_key=$1 AND max_rows=$2",
+                )
+                .bind(ARTIFACT_OBJECT_QUOTA)
+                .bind(expected_max)
+                .execute(&mut *transaction)
+                .await
+                .map_err(infrastructure)?
+                .rows_affected();
+                if affected != 1 {
+                    return Err(StoreError::Conflict);
+                }
+                let inserted = sqlx::query(
+                    "INSERT INTO artifact_object(object_key,schema_version,media_type,payload_digest,payload) VALUES($1,1,'application/vnd.mainframe-env.readiness',decode(repeat('00',32),'hex'),''::bytea)",
+                )
+                .bind(probe_key)
+                .execute(&mut *transaction)
+                .await
+                .map_err(infrastructure)?
+                .rows_affected();
+                if inserted != 1 {
+                    return Err(StoreError::Conflict);
+                }
+                Ok(ArtifactStoreHealth {
+                    readable: true,
+                    writable: true,
+                    used_objects: Some(
+                        usize::try_from(used_rows).map_err(|_| StoreError::IncompatibleVersion)?,
+                    ),
+                    max_objects: Some(self.max_objects),
+                    used_bytes: None,
+                    max_bytes: None,
+                })
+            }
+            .await;
+            transaction.rollback().await.map_err(infrastructure)?;
+            outcome
+        })?
+    }
+
     fn put_artifact(&self, record: ArtifactRecord) -> Result<(), StoreError> {
         if record.payload.len() > self.max_artifact_bytes
             || record.media_type.is_empty()

@@ -11,6 +11,7 @@ pub(crate) const JES_WORKER_COUNT: usize = 2;
 pub(crate) const JES_LEASE_TICKS: u64 = 30_000;
 pub(crate) const JES_HEARTBEAT_MILLIS: u64 = 5_000;
 pub(crate) const JES_IDLE_MILLIS: u64 = 1_000;
+pub(crate) const JES_WORKER_FRESHNESS_MILLIS: u64 = JES_HEARTBEAT_MILLIS * 3;
 pub(crate) const JES_WORK_DEADLINE_TICKS: u64 = 24 * 60 * 60 * 1_000;
 const MAX_WORK_PAYLOAD_BYTES: usize = 16 * 1024;
 const MAX_CAPABILITIES: usize = 128;

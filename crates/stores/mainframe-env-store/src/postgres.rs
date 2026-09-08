@@ -150,6 +150,15 @@ impl PostgresStateStore {
         self.max_rows
     }
 
+    pub(crate) fn retention_writable_probe(&self) -> Result<(), StoreError> {
+        block_on(&self.runtime, async {
+            let mut transaction = self.pool.begin().await.map_err(infrastructure)?;
+            let outcome = prove_provider_state_writable(&mut transaction, self.max_rows).await;
+            transaction.rollback().await.map_err(infrastructure)?;
+            outcome
+        })?
+    }
+
     pub(crate) fn provider_state_usage(&self) -> Result<usize, StoreError> {
         let used: i64 = self.run(
             sqlx::query_scalar("SELECT used_rows FROM store_quota WHERE quota_key=$1")
@@ -947,6 +956,58 @@ impl PostgresStateStore {
             .await;
             finish_transaction(transaction, outcome).await
         })?
+    }
+}
+
+async fn prove_provider_state_writable(
+    transaction: &mut Transaction<'_, Postgres>,
+    expected_max_rows: usize,
+) -> Result<(), StoreError> {
+    let expected_max_rows =
+        i64::try_from(expected_max_rows).map_err(|_| StoreError::CapacityExceeded)?;
+    let quota = sqlx::query(
+        "UPDATE store_quota SET used_rows=used_rows \
+         WHERE quota_key=$1 AND max_rows=$2",
+    )
+    .bind(PROVIDER_STATE_QUOTA)
+    .bind(expected_max_rows)
+    .execute(&mut **transaction)
+    .await
+    .map_err(infrastructure)?
+    .rows_affected();
+    if quota != 1 {
+        return Err(StoreError::IncompatibleVersion);
+    }
+    let transaction_id: String = sqlx::query_scalar("SELECT txid_current()::text")
+        .fetch_one(&mut **transaction)
+        .await
+        .map_err(infrastructure)?;
+    let key = format!("transaction-{transaction_id}");
+    let upserted = sqlx::query(
+        "INSERT INTO provider_state(namespace,key,version,payload) \
+         VALUES('server-readiness-probe',$1,1,''::bytea) \
+         ON CONFLICT(namespace,key) DO UPDATE SET payload=EXCLUDED.payload",
+    )
+    .bind(&key)
+    .execute(&mut **transaction)
+    .await
+    .map_err(infrastructure)?
+    .rows_affected();
+    if upserted != 1 {
+        return Err(StoreError::Conflict);
+    }
+    let deleted = sqlx::query(
+        "DELETE FROM provider_state WHERE namespace='server-readiness-probe' AND key=$1",
+    )
+    .bind(key)
+    .execute(&mut **transaction)
+    .await
+    .map_err(infrastructure)?
+    .rows_affected();
+    if deleted == 1 {
+        Ok(())
+    } else {
+        Err(StoreError::Conflict)
     }
 }
 
@@ -2281,4 +2342,97 @@ async fn retention_observation_usage_in(
 
 fn infrastructure(error: sqlx::Error) -> StoreError {
     StoreError::Infrastructure(error.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+    fn writable_probe_requires_provider_state_dml_and_rolls_everything_back() {
+        let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")
+            .expect("explicit PostgreSQL test URL required");
+        let store = PostgresStateStore::open(&url, 1024 * 1024, 262_144).unwrap();
+        let expected_max_rows = store.max_rows;
+        drop(store);
+        let runtime = Builder::new_current_thread().enable_all().build().unwrap();
+        runtime.block_on(async {
+            let pool = PgPoolOptions::new()
+                .max_connections(1)
+                .connect(&url)
+                .await
+                .unwrap();
+            let suffix = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let role = format!("mainframe_r09_probe_{}_{}", std::process::id(), suffix);
+            // `role` is composed only from this process ID and a numeric timestamp.
+            sqlx::query(sqlx::AssertSqlSafe(format!("CREATE ROLE {role} NOLOGIN")))
+                .execute(&pool)
+                .await
+                .unwrap();
+            let snapshot = || async {
+                sqlx::query_as::<_, (i64, i64, i64)>(
+                    "SELECT \
+                       (SELECT epoch FROM retention_lock WHERE singleton=1), \
+                       (SELECT used_rows FROM store_quota WHERE quota_key='provider-state'), \
+                       (SELECT COUNT(*) FROM provider_state \
+                        WHERE namespace='server-readiness-probe')",
+                )
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            };
+            let before = snapshot().await;
+            sqlx::raw_sql(sqlx::AssertSqlSafe(format!(
+                "GRANT USAGE ON SCHEMA public TO {role}; \
+                 GRANT SELECT ON provider_state,store_quota,retention_lock TO {role}; \
+                 GRANT UPDATE ON store_quota,retention_lock TO {role}"
+            )))
+            .execute(&pool)
+            .await
+            .unwrap();
+
+            let mut denied = pool.begin().await.unwrap();
+            sqlx::query(sqlx::AssertSqlSafe(format!("SET LOCAL ROLE {role}")))
+                .execute(&mut *denied)
+                .await
+                .unwrap();
+            assert!(
+                prove_provider_state_writable(&mut denied, expected_max_rows)
+                    .await
+                    .is_err()
+            );
+            denied.rollback().await.unwrap();
+
+            sqlx::query(sqlx::AssertSqlSafe(format!(
+                "GRANT INSERT,UPDATE,DELETE ON provider_state TO {role}"
+            )))
+            .execute(&pool)
+            .await
+            .unwrap();
+            let mut allowed = pool.begin().await.unwrap();
+            sqlx::query(sqlx::AssertSqlSafe(format!("SET LOCAL ROLE {role}")))
+                .execute(&mut *allowed)
+                .await
+                .unwrap();
+            prove_provider_state_writable(&mut allowed, expected_max_rows)
+                .await
+                .unwrap();
+            allowed.rollback().await.unwrap();
+            assert_eq!(snapshot().await, before);
+
+            sqlx::query(sqlx::AssertSqlSafe(format!("DROP OWNED BY {role}")))
+                .execute(&pool)
+                .await
+                .unwrap();
+            sqlx::query(sqlx::AssertSqlSafe(format!("DROP ROLE {role}")))
+                .execute(&pool)
+                .await
+                .unwrap();
+        });
+    }
 }
