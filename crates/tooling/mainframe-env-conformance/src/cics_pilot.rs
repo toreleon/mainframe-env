@@ -179,6 +179,12 @@ pub struct CicsPilotReport {
     pub differential_credit: u8,
 }
 
+type EvidenceSelection<'a> = (
+    Vec<(&'a str, &'a str)>,
+    Vec<(&'a str, &'a str)>,
+    Vec<(&'a str, &'a str)>,
+);
+
 pub struct CicsPilotRuntime {
     case_driver: ScenarioOnlyDriver,
     readback_driver: ScenarioOnlyDriver,
@@ -1224,11 +1230,7 @@ fn compare_obligation(
     if obligation == "durable-restart" {
         return durable_restart_evidence(report, expected);
     }
-    let (commands, snapshots, resource_states): (
-        Vec<(&str, &str)>,
-        Vec<(&str, &str)>,
-        Vec<(&str, &str)>,
-    ) = match obligation {
+    let (commands, snapshots, resource_states): EvidenceSelection<'_> = match obligation {
         "plain-read" => (vec![("plain_read", "plain_read")], vec![], vec![]),
         "read-update" => (vec![("read_update", "read_update")], vec![], vec![]),
         "requires-read-update" => (
