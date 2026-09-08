@@ -4,10 +4,10 @@
 
 mod canonical;
 pub use canonical::{
-    EFFECT_CANONICAL_SCHEMA, MAX_CANONICAL_EFFECT_BYTES, PROVIDER_REPLAY_DIGEST_FORMAT,
-    canonical_db2_request_digest, canonical_ims_request_digest, canonical_mq_request_digest,
-    canonical_request_digest, canonical_request_size, canonical_result_digest,
-    canonical_result_size,
+    AUDIT_RESOURCE_DIGEST_DOMAIN, EFFECT_CANONICAL_SCHEMA, MAX_CANONICAL_EFFECT_BYTES,
+    PROVIDER_REPLAY_DIGEST_FORMAT, canonical_audit_resource_digest, canonical_db2_request_digest,
+    canonical_ims_request_digest, canonical_mq_request_digest, canonical_request_digest,
+    canonical_request_size, canonical_result_digest, canonical_result_size,
 };
 
 mod dataset;

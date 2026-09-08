@@ -2,10 +2,15 @@
 
 #![forbid(unsafe_code)]
 
+mod audit;
 mod context;
 mod identity;
 mod machine;
 
+pub use audit::{
+    AUDIT_RECORD_CONTRACT, AuditDecision, AuditRecord, AuditResourceDigest,
+    AuditResourceDigestFormat,
+};
 pub use context::{
     BoundedPayload, Cancellation, CancellationProbe, Invocation, InvocationLimits,
     InvocationProblem, Principal, ResourceLimits, ServiceClass,

@@ -1,11 +1,13 @@
 use mainframe_env_execution_api::{
-    ArtifactRef, ExecutionId, IdempotencyKey, InvocationLimits, LifecycleEvent, LifecycleEventKind,
-    PrincipalId, RunUnitId, Selector,
+    ArtifactRef, AuditDecision, AuditRecord, AuditResourceDigest, AuditResourceDigestFormat,
+    CapabilityId, ExecutionId, IdempotencyKey, InvocationLimits, LifecycleEvent,
+    LifecycleEventKind, PrincipalId, RunUnitId, Selector,
 };
 use mainframe_env_store::{MemoryStore, PostgresStateStore, SqliteStateStore, StoreLimits};
 use mainframe_env_store_api::{
-    ArtifactRecord, CheckpointRecord, EffectDigestFormat, EffectIntentMetadata, EffectRecord,
-    EffectRecoveryLease, EffectState, ExecutionRecord, ExecutionState, PlatformStore, StoreError,
+    ArtifactRecord, AuditSink, CheckpointRecord, EffectDigestFormat, EffectIntentMetadata,
+    EffectRecord, EffectRecoveryLease, EffectState, ExecutionRecord, ExecutionState,
+    IdempotencyStore, JournalStore, PlatformStore, StoreError,
 };
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -113,6 +115,14 @@ fn intent_record(execution: &ExecutionRecord, key: &str) -> EffectRecord {
                 )
                 .unwrap(),
             ),
+            audit_resource: Some(AuditResourceDigest {
+                format: AuditResourceDigestFormat::CanonicalHostResourceV1,
+                value: [9; 32],
+            }),
+            audit_invocation_key: Some(
+                IdempotencyKey::new("atomic-audit-invocation", InvocationLimits::default())
+                    .unwrap(),
+            ),
             created_tick: 2,
             recovery_after_tick: 2,
             epoch: 2,
@@ -120,6 +130,26 @@ fn intent_record(execution: &ExecutionRecord, key: &str) -> EffectRecord {
         },
         state: EffectState::Intent,
         result_digest: None,
+    }
+}
+
+fn audit_record(execution: &ExecutionRecord, effect: &EffectRecord, tick: u64) -> AuditRecord {
+    AuditRecord {
+        execution_id: execution.execution_id.clone(),
+        run_unit_id: execution.run_unit_id.clone(),
+        attempt: execution.attempt,
+        effect_sequence: effect.sequence,
+        observed_tick: tick,
+        principal: execution.principal.clone(),
+        invocation_key: effect.intent.audit_invocation_key.clone().unwrap(),
+        capability: effect.intent.capability.clone().unwrap_or_else(|| {
+            CapabilityId::new("host.state.write", InvocationLimits::default()).unwrap()
+        }),
+        resource: AuditResourceDigest {
+            format: AuditResourceDigestFormat::CanonicalHostResourceV1,
+            value: [9; 32],
+        },
+        decision: AuditDecision::Success,
     }
 }
 
@@ -302,6 +332,7 @@ fn assert_atomic_checkpoint_invariants(store: &dyn PlatformStore, prefix: &str) 
                 None,
                 event(&execution, 2, LifecycleEventKind::Suspended),
                 None,
+                None,
                 Some(hostile),
                 notification(&execution, 2),
             ),
@@ -321,6 +352,7 @@ fn assert_atomic_checkpoint_invariants(store: &dyn PlatformStore, prefix: &str) 
             1,
             None,
             event(&execution, 2, LifecycleEventKind::Suspended),
+            None,
             None,
             Some(valid.clone()),
             notification(&execution, 2),
@@ -472,6 +504,7 @@ fn assert_atomic_effect_invariants(store: &dyn PlatformStore, prefix: &str) {
                 ),
                 Some(intent.clone()),
                 None,
+                None,
                 notification(&execution, 2),
             )
             .unwrap();
@@ -481,6 +514,8 @@ fn assert_atomic_effect_invariants(store: &dyn PlatformStore, prefix: &str) {
             ..intent.clone()
         };
         let expected = mutate_result(case, &mut hostile);
+        let mut audit = audit_record(&execution, &hostile, 3);
+        audit.effect_sequence = 1;
         assert_eq!(
             store.commit_execution_step(
                 &execution.execution_id,
@@ -492,6 +527,7 @@ fn assert_atomic_effect_invariants(store: &dyn PlatformStore, prefix: &str) {
                     LifecycleEventKind::EffectResult { sequence: 1 },
                 ),
                 Some(hostile),
+                Some(audit),
                 None,
                 notification(&execution, 3),
             ),
@@ -520,6 +556,7 @@ fn assert_atomic_effect_invariants(store: &dyn PlatformStore, prefix: &str) {
             ),
             Some(intent.clone()),
             None,
+            None,
             notification(&execution, 2),
         ),
         Err(StoreError::InvalidSequence)
@@ -542,6 +579,7 @@ fn assert_atomic_effect_invariants(store: &dyn PlatformStore, prefix: &str) {
             ),
             Some(intent.clone()),
             None,
+            None,
             notification(&execution, 2),
         )
         .unwrap();
@@ -550,6 +588,32 @@ fn assert_atomic_effect_invariants(store: &dyn PlatformStore, prefix: &str) {
         result_digest: Some([3; 32]),
         ..intent.clone()
     };
+    assert_eq!(
+        store.commit_execution_step(
+            &execution.execution_id,
+            2,
+            None,
+            event(
+                &execution,
+                3,
+                LifecycleEventKind::EffectResult { sequence: 1 },
+            ),
+            Some(completed.clone()),
+            None,
+            None,
+            notification(&execution, 3),
+        ),
+        Err(StoreError::InvalidSequence),
+        "an effect result without its mandatory audit record must roll back"
+    );
+    assert_journal_unchanged(store, &execution, 2);
+    assert_eq!(store.effect(&intent.key).unwrap(), Some(intent.clone()));
+    assert!(
+        store
+            .audit_records(&execution.execution_id, 1, 8)
+            .unwrap()
+            .is_empty()
+    );
     let updated = store
         .commit_execution_step(
             &execution.execution_id,
@@ -561,12 +625,21 @@ fn assert_atomic_effect_invariants(store: &dyn PlatformStore, prefix: &str) {
                 LifecycleEventKind::EffectResult { sequence: 1 },
             ),
             Some(completed.clone()),
+            Some(audit_record(&execution, &completed, 3)),
             None,
             notification(&execution, 3),
         )
         .unwrap();
     assert_eq!(updated.version, 3);
     assert_eq!(store.effect(&intent.key).unwrap(), Some(completed));
+    assert_eq!(
+        store.audit_records(&execution.execution_id, 1, 8).unwrap(),
+        vec![audit_record(
+            &execution,
+            &store.effect(&intent.key).unwrap().unwrap(),
+            3
+        )]
+    );
 }
 
 fn run_contract(store: &dyn PlatformStore, label: &str) {
@@ -584,6 +657,61 @@ fn memory_atomic_invariants_contract() {
     run_contract(
         &MemoryStore::new(StoreLimits::default()),
         "memory-atomic-invariants",
+    );
+}
+
+#[test]
+fn memory_audit_capacity_rolls_back_effect_lifecycle_and_outbox_together() {
+    let store = MemoryStore::new(StoreLimits {
+        max_audits: 0,
+        ..StoreLimits::default()
+    });
+    let execution = execution_record("memory-audit-capacity");
+    admit(&store, &execution);
+    let intent = intent_record(&execution, "memory-audit-capacity-key");
+    store
+        .commit_execution_step(
+            &execution.execution_id,
+            1,
+            None,
+            event(
+                &execution,
+                2,
+                LifecycleEventKind::EffectIntent { sequence: 1 },
+            ),
+            Some(intent.clone()),
+            None,
+            None,
+            notification(&execution, 2),
+        )
+        .unwrap();
+    let completed = EffectRecord {
+        state: EffectState::Completed,
+        result_digest: Some([3; 32]),
+        ..intent.clone()
+    };
+    assert_eq!(
+        store.commit_execution_step(
+            &execution.execution_id,
+            2,
+            None,
+            event(
+                &execution,
+                3,
+                LifecycleEventKind::EffectResult { sequence: 1 },
+            ),
+            Some(completed.clone()),
+            Some(audit_record(&execution, &completed, 3)),
+            None,
+            notification(&execution, 3),
+        ),
+        Err(StoreError::CapacityExceeded)
+    );
+    assert_journal_unchanged(&store, &execution, 2);
+    assert_eq!(store.effect(&intent.key).unwrap(), Some(intent));
+    assert_eq!(
+        store.audit_records(&execution.execution_id, 1, 1),
+        Err(StoreError::CapacityExceeded)
     );
 }
 

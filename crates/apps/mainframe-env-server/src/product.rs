@@ -243,6 +243,7 @@ pub struct ProductServer {
     applications: ApplicationInstaller,
     applications_v2: Mutex<DurableApplicationsV2>,
     application_publication: Mutex<()>,
+    job_submission: Mutex<()>,
     online_programs: Mutex<BTreeMap<String, ArtifactRef>>,
     online_transactions: Mutex<BTreeMap<String, String>>,
     online_traces: Mutex<BTreeMap<String, Vec<CicsTraceEntry>>>,
@@ -746,6 +747,7 @@ impl ProductServer {
                 verifier: package_trust,
             }),
             application_publication: Mutex::new(()),
+            job_submission: Mutex::new(()),
             online_programs: Mutex::new(online_programs),
             online_transactions: Mutex::new(online_transactions),
             online_traces: Mutex::new(BTreeMap::new()),
@@ -1756,8 +1758,9 @@ impl ProductServer {
                     .restore_checkpoint(&checkpoint)
                     .map_err(|_| HostProblem::InfrastructureFailure)?;
             }
-            let coordinator = ExecutionCoordinator::with_host(
+            let coordinator = ExecutionCoordinator::with_host_audit_store(
                 self.host.clone(),
+                self.store.clone(),
                 CoordinatorLimits {
                     max_quanta: 100,
                     ..CoordinatorLimits::default()
@@ -2701,6 +2704,13 @@ impl ProductServer {
                 Ok(GatewayResponse::json(StatusCode::OK, Value::Array(items)))
             }
             GatewayRequest::JobSubmit { jcl } => {
+                // This single-node composition owns one JES worker identity and the store exposes
+                // FIFO rather than claim-by-id. Keep submit -> claim -> completion together so a
+                // slower mandatory audit cannot let one request steal another request's work.
+                let _submission = self
+                    .job_submission
+                    .lock()
+                    .map_err(|_| gateway_problem(HostProblem::InfrastructureFailure))?;
                 let capabilities = job_capabilities(&jcl);
                 let bundle = self.jcl_bundle(&principal, jcl)?;
                 let invocation = self
@@ -3584,19 +3594,22 @@ impl ProductServer {
         let sequence = self.next_sequence().map_err(gateway_problem)?;
         let mutation = dataset_mutation(&request);
         let idempotency_key = mutation.map(|mutation| mutation.idempotency_key.clone());
-        let result = self.host.invoke(
-            &invocation,
-            session_tick().map_err(gateway_problem)?,
-            invocation.cancellation_requested(),
-            EffectRequest {
-                run_unit: invocation.run_unit_id.clone(),
-                sequence: mutation.map_or(sequence, |mutation| mutation.sequence),
-                deadline_tick: invocation.deadline_tick,
-                idempotency_key,
-                request: HostRequest::Dataset(request),
-            },
-        );
-        match result.effect.outcome.map_err(gateway_problem)? {
+        let result = self
+            .host
+            .invoke(
+                &invocation,
+                session_tick().map_err(gateway_problem)?,
+                invocation.cancellation_requested(),
+                EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence: mutation.map_or(sequence, |mutation| mutation.sequence),
+                    deadline_tick: invocation.deadline_tick,
+                    idempotency_key,
+                    request: HostRequest::Dataset(request),
+                },
+            )
+            .persist_with(|audit| self.store.record_audit(audit).map_err(store_error));
+        match result.outcome.map_err(gateway_problem)? {
             HostResult::Dataset(result) => Ok(result),
             _ => Err(gateway_problem(HostProblem::ProviderFailure)),
         }
@@ -3704,27 +3717,30 @@ impl ProductServer {
                 &["host.security.authorize"],
             )
             .map_err(gateway_problem)?;
-        let result = self.host.invoke(
-            &invocation,
-            session_tick().map_err(gateway_problem)?,
-            invocation.cancellation_requested(),
-            EffectRequest {
-                run_unit: invocation.run_unit_id.clone(),
-                sequence: 1,
-                deadline_tick: invocation.deadline_tick,
-                idempotency_key: None,
-                request: HostRequest::Security(
-                    mainframe_env_host_api::SecurityRequest::Authorize {
-                        principal: invocation.principal.id().clone(),
-                        class: class.into(),
-                        resource: ResourceName::new(resource, 246)
-                            .map_err(|_| gateway_problem(HostProblem::Malformed))?,
-                        intent,
-                    },
-                ),
-            },
-        );
-        match result.effect.outcome.map_err(gateway_problem)? {
+        let result = self
+            .host
+            .invoke(
+                &invocation,
+                session_tick().map_err(gateway_problem)?,
+                invocation.cancellation_requested(),
+                EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence: 1,
+                    deadline_tick: invocation.deadline_tick,
+                    idempotency_key: None,
+                    request: HostRequest::Security(
+                        mainframe_env_host_api::SecurityRequest::Authorize {
+                            principal: invocation.principal.id().clone(),
+                            class: class.into(),
+                            resource: ResourceName::new(resource, 246)
+                                .map_err(|_| gateway_problem(HostProblem::Malformed))?,
+                            intent,
+                        },
+                    ),
+                },
+            )
+            .persist_with(|audit| self.store.record_audit(audit).map_err(store_error));
+        match result.outcome.map_err(gateway_problem)? {
             HostResult::Security(decision) => Ok(decision),
             _ => Err(gateway_problem(HostProblem::ProviderFailure)),
         }

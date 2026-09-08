@@ -1,7 +1,9 @@
 use crate::validation;
-use mainframe_env_execution_api::{ArtifactRef, ExecutionId, IdempotencyKey, LifecycleEvent};
+use mainframe_env_execution_api::{
+    ArtifactRef, AuditRecord, ExecutionId, IdempotencyKey, LifecycleEvent,
+};
 use mainframe_env_store_api::{
-    ArtifactRecord, ArtifactStore, CheckpointRecord, CheckpointStore, EffectRecord,
+    ArtifactRecord, ArtifactStore, AuditSink, CheckpointRecord, CheckpointStore, EffectRecord,
     EffectRecoveryLease, EffectState, EventStore, ExecutionRecord, ExecutionState, ExecutionStore,
     GenerationRecord, GenerationStore, IdempotencyStore, JournalStore, OutboxRecord, OutboxStore,
     ProviderStateMutation, ProviderStateRecord, ProviderStateStore, ProviderStateWrite,
@@ -21,6 +23,7 @@ pub struct StoreLimits {
     pub max_artifacts: usize,
     pub max_generations: usize,
     pub max_effects: usize,
+    pub max_audits: usize,
     pub max_outbox: usize,
     pub max_provider_state: usize,
     pub max_blob_bytes: usize,
@@ -39,6 +42,7 @@ impl Default for StoreLimits {
             max_artifacts: 4096,
             max_generations: 256,
             max_effects: 262_144,
+            max_audits: 262_144,
             max_outbox: 262_144,
             max_provider_state: 262_144,
             max_blob_bytes: 64 * 1024 * 1024,
@@ -57,6 +61,7 @@ struct State {
     artifacts: BTreeMap<ArtifactRef, ArtifactRecord>,
     generations: BTreeMap<String, GenerationRecord>,
     effects: BTreeMap<IdempotencyKey, EffectRecord>,
+    audits: Vec<AuditRecord>,
     outbox: BTreeMap<String, OutboxRecord>,
     provider_state: BTreeMap<(String, String), ProviderStateRecord>,
     blob_bytes: usize,
@@ -168,6 +173,56 @@ impl MemoryStore {
         Self::reserve_blob(state, 0, record.payload.len(), limits)?;
         state.outbox.insert(record.notification_id.clone(), record);
         Ok(())
+    }
+
+    fn append_audit_locked(
+        state: &mut State,
+        record: AuditRecord,
+        limits: StoreLimits,
+    ) -> Result<(), StoreError> {
+        validation::audit(&record)?;
+        if state.audits.len() >= limits.max_audits {
+            return Err(StoreError::CapacityExceeded);
+        }
+        state.audits.push(record);
+        Ok(())
+    }
+}
+
+impl AuditSink for MemoryStore {
+    fn record_audit(&self, record: AuditRecord) -> Result<(), StoreError> {
+        let mut state = self.lock()?;
+        Self::append_audit_locked(&mut state, record, self.limits)
+    }
+
+    fn audit_records(
+        &self,
+        execution_id: &ExecutionId,
+        start_effect_sequence: u64,
+        max: usize,
+    ) -> Result<Vec<AuditRecord>, StoreError> {
+        if max == 0 || max > self.limits.max_audits {
+            return Err(StoreError::CapacityExceeded);
+        }
+        let mut records = self
+            .lock()?
+            .audits
+            .iter()
+            .filter(|record| {
+                &record.execution_id == execution_id
+                    && record.effect_sequence >= start_effect_sequence
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        records.sort_by(|left, right| {
+            (left.attempt, left.effect_sequence, &left.invocation_key).cmp(&(
+                right.attempt,
+                right.effect_sequence,
+                &right.invocation_key,
+            ))
+        });
+        records.truncate(max);
+        Ok(records)
     }
 }
 
@@ -715,7 +770,8 @@ impl IdempotencyStore for MemoryStore {
         result_digest: [u8; 32],
     ) -> Result<EffectRecord, StoreError> {
         let mut state = self.lock()?;
-        let record = state.effects.get_mut(key).ok_or(StoreError::NotFound)?;
+        let mut staged = state.clone();
+        let record = staged.effects.get_mut(key).ok_or(StoreError::NotFound)?;
         validation::stale_reconciliation(
             key,
             record,
@@ -728,7 +784,18 @@ impl IdempotencyStore for MemoryStore {
         record.state = final_state;
         record.result_digest = Some(result_digest);
         validation::effect(record)?;
-        Ok(record.clone())
+        let updated = record.clone();
+        if updated.intent.audit_resource.is_some() {
+            let execution = staged
+                .executions
+                .get(&updated.execution_id)
+                .ok_or(StoreError::NotFound)?;
+            if let Some(audit) = validation::recovered_audit(execution, &updated, now_tick)? {
+                Self::append_audit_locked(&mut staged, audit, self.limits)?;
+            }
+        }
+        *state = staged;
+        Ok(updated)
     }
 
     fn reconcile_unknown(
@@ -816,6 +883,7 @@ impl JournalStore for MemoryStore {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn commit_execution_step(
         &self,
         execution_id: &ExecutionId,
@@ -823,6 +891,7 @@ impl JournalStore for MemoryStore {
         next_state: Option<ExecutionState>,
         event: LifecycleEvent,
         effect: Option<EffectRecord>,
+        audit: Option<AuditRecord>,
         checkpoint: Option<CheckpointRecord>,
         notification: OutboxRecord,
     ) -> Result<ExecutionRecord, StoreError> {
@@ -840,6 +909,7 @@ impl JournalStore for MemoryStore {
         if next_state.is_some_and(|next| !current.state.can_transition_to(next)) {
             return Err(StoreError::InvalidTransition);
         }
+        validation::audit_event(&current, &event, effect.as_ref(), audit.as_ref())?;
         let mut updated = current.clone();
         if let Some(next) = next_state {
             updated.state = next;
@@ -873,6 +943,9 @@ impl JournalStore for MemoryStore {
                     staged.effects.insert(effect.key.clone(), effect);
                 }
             }
+        }
+        if let Some(audit) = audit {
+            Self::append_audit_locked(&mut staged, audit, self.limits)?;
         }
         if let Some(checkpoint) = checkpoint {
             validation::checkpoint(&checkpoint)?;
@@ -1394,6 +1467,8 @@ mod tests {
                     )
                     .unwrap(),
                 ),
+                audit_resource: None,
+                audit_invocation_key: None,
                 created_tick: 1,
                 recovery_after_tick: 1,
                 epoch: 1,

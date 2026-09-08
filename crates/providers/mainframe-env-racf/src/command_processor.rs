@@ -3350,6 +3350,25 @@ mod tests {
         }
     }
 
+    impl mainframe_env_store_api::AuditSink for UnknownOutcomeStore {
+        fn record_audit(
+            &self,
+            record: mainframe_env_execution_api::AuditRecord,
+        ) -> Result<(), StoreError> {
+            self.inner.record_audit(record)
+        }
+
+        fn audit_records(
+            &self,
+            execution_id: &mainframe_env_execution_api::ExecutionId,
+            start_effect_sequence: u64,
+            max: usize,
+        ) -> Result<Vec<mainframe_env_execution_api::AuditRecord>, StoreError> {
+            self.inner
+                .audit_records(execution_id, start_effect_sequence, max)
+        }
+    }
+
     impl ProviderStateStore for UnknownOutcomeStore {
         fn get_provider_state(
             &self,

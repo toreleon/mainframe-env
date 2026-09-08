@@ -12,8 +12,9 @@ pub use model::{
     ProviderStateWrite, SessionRecord, StoreError, WorkRecord, WorkState,
 };
 pub use traits::{
-    ArtifactStore, CheckpointStore, EventStore, ExecutionStore, GenerationStore, IdempotencyStore,
-    JournalStore, OutboxStore, PlatformStore, ProviderStateStore, SessionStore, WorkStore,
+    ArtifactStore, AuditSink, CheckpointStore, EventStore, ExecutionStore, GenerationStore,
+    IdempotencyStore, JournalStore, OutboxStore, PlatformStore, ProviderStateStore, SessionStore,
+    WorkStore,
 };
 
 pub const STORE_CONTRACT: &str = "mainframe-env.store@1";

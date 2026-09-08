@@ -776,9 +776,7 @@ impl Program for CobolProgram {
                 Arc::clone(store),
                 CoordinatorLimits::default(),
             ),
-            (Some(host), None) => {
-                ExecutionCoordinator::with_host(Arc::clone(host), CoordinatorLimits::default())
-            }
+            (Some(_), None) => return Err(HostProblem::InfrastructureFailure),
             (None, _) => ExecutionCoordinator::local(CoordinatorLimits::default()),
         };
         match coordinator.execute_with_control(&mut machine, &invocation, || {

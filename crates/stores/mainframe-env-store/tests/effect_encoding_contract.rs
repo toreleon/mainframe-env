@@ -21,6 +21,8 @@ fn record(key: &str) -> EffectRecord {
             capability: Some(
                 mainframe_env_execution_api::CapabilityId::new("host.state.write", l).unwrap(),
             ),
+            audit_resource: None,
+            audit_invocation_key: None,
             created_tick: 5,
             recovery_after_tick: 10,
             epoch: 1,

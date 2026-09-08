@@ -1,6 +1,6 @@
 use mainframe_env_execution_api::{
-    ArtifactRef, CapabilityId, ExecutionId, IdempotencyKey, LifecycleEvent, PrincipalId, RunUnitId,
-    Selector,
+    ArtifactRef, AuditResourceDigest, CapabilityId, ExecutionId, IdempotencyKey, LifecycleEvent,
+    PrincipalId, RunUnitId, Selector,
 };
 use std::collections::BTreeMap;
 use std::fmt;
@@ -178,6 +178,10 @@ pub struct EffectIntentMetadata {
     pub owner: ExecutionId,
     pub attempt: u32,
     pub capability: Option<CapabilityId>,
+    /// Resource identity needed to reconstruct an audit after an in-doubt restart.
+    pub audit_resource: Option<AuditResourceDigest>,
+    /// Invocation identity used to make recovered audit records unique and correlatable.
+    pub audit_invocation_key: Option<IdempotencyKey>,
     pub created_tick: u64,
     pub recovery_after_tick: u64,
     pub epoch: u64,

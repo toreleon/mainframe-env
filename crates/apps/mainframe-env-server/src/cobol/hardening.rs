@@ -301,7 +301,11 @@ impl Fixture {
                     }),
                 },
             )
-            .effect
+            .persist_with(|audit| {
+                self.store
+                    .record_audit(audit)
+                    .map_err(|_| HostProblem::InfrastructureFailure)
+            })
     }
 
     fn batch(&self, program: &str, source: &str) -> EffectResult {

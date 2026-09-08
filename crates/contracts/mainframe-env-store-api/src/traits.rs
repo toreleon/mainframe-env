@@ -3,7 +3,20 @@ use crate::{
     GenerationRecord, OutboxRecord, ProviderStateMutation, ProviderStateRecord, ProviderStateWrite,
     SessionRecord, StoreError, WorkRecord,
 };
-use mainframe_env_execution_api::{ArtifactRef, ExecutionId, IdempotencyKey, LifecycleEvent};
+use mainframe_env_execution_api::{
+    ArtifactRef, AuditRecord, ExecutionId, IdempotencyKey, LifecycleEvent,
+};
+
+/// Mandatory persistence boundary for typed security-relevant host decisions.
+pub trait AuditSink: Send + Sync {
+    fn record_audit(&self, record: AuditRecord) -> Result<(), StoreError>;
+    fn audit_records(
+        &self,
+        execution_id: &ExecutionId,
+        start_effect_sequence: u64,
+        max: usize,
+    ) -> Result<Vec<AuditRecord>, StoreError>;
+}
 
 pub trait ExecutionStore: Send + Sync {
     fn create_execution(&self, record: ExecutionRecord) -> Result<(), StoreError>;
@@ -90,6 +103,7 @@ pub trait JournalStore: Send + Sync {
         event: LifecycleEvent,
         notification: OutboxRecord,
     ) -> Result<(), StoreError>;
+    #[allow(clippy::too_many_arguments)]
     fn commit_execution_step(
         &self,
         execution_id: &ExecutionId,
@@ -97,6 +111,7 @@ pub trait JournalStore: Send + Sync {
         next_state: Option<ExecutionState>,
         event: LifecycleEvent,
         effect: Option<EffectRecord>,
+        audit: Option<AuditRecord>,
         checkpoint: Option<CheckpointRecord>,
         notification: OutboxRecord,
     ) -> Result<ExecutionRecord, StoreError>;
@@ -185,7 +200,7 @@ pub trait IdempotencyStore: Send + Sync {
     }
 }
 
-pub trait ProviderStateStore: Send + Sync {
+pub trait ProviderStateStore: AuditSink + Send + Sync {
     fn get_provider_state(
         &self,
         namespace: &str,
@@ -232,6 +247,7 @@ pub trait PlatformStore:
     + IdempotencyStore
     + OutboxStore
     + JournalStore
+    + AuditSink
     + ProviderStateStore
     + Send
     + Sync
@@ -249,6 +265,7 @@ impl<T> PlatformStore for T where
         + IdempotencyStore
         + OutboxStore
         + JournalStore
+        + AuditSink
         + ProviderStateStore
         + Send
         + Sync

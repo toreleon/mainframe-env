@@ -1081,7 +1081,7 @@ mod tests {
     use argon2::Argon2;
     use argon2::password_hash::PasswordHasher;
     use mainframe_env_execution_api::{InvocationLimits, PrincipalId};
-    use mainframe_env_host_api::{AccessIntent, ResourceName, SecretRef, SecurityDecision};
+    use mainframe_env_host_api::{SecretRef, SecurityDecision};
     use mainframe_env_store::{MemoryStore, SqliteStateStore, StoreLimits};
     use std::collections::BTreeSet;
 
@@ -1250,17 +1250,6 @@ mod tests {
                 .authenticate(
                     &user,
                     &SecretRef::new("secret:user1", Default::default()).unwrap(),
-                )
-                .unwrap(),
-            SecurityDecision::Allow
-        );
-        assert_eq!(
-            service
-                .authorize(
-                    &user,
-                    "DATASET",
-                    &ResourceName::new("USER1.DATA", 246).unwrap(),
-                    AccessIntent::Read,
                 )
                 .unwrap(),
             SecurityDecision::Allow

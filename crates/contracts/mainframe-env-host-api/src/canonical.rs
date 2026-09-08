@@ -2,7 +2,10 @@
 use crate::dataset::*;
 use crate::names::*;
 use crate::request::*;
-use mainframe_env_execution_api::{BoundedPayload, IdempotencyKey, PrincipalId, RunUnitId};
+use mainframe_env_execution_api::{
+    AuditResourceDigest, AuditResourceDigestFormat, BoundedPayload, CapabilityId, IdempotencyKey,
+    PrincipalId, RunUnitId,
+};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
@@ -10,6 +13,8 @@ pub const EFFECT_CANONICAL_SCHEMA: &str = "mainframe-env.effect-canonical@1";
 pub const PROVIDER_REPLAY_DIGEST_FORMAT: &str = "mainframe-env.provider-replay-canonical@1";
 pub const REQUEST_DIGEST_DOMAIN: &[u8] = b"mainframe-env.effect-request@1\0";
 pub const RESULT_DIGEST_DOMAIN: &[u8] = b"mainframe-env.effect-result@1\0";
+pub const AUDIT_RESOURCE_DIGEST_DOMAIN: &[u8] = b"mainframe-env.audit-resource@1\0";
+const OVERSIZED_AUDIT_RESOURCE_DIGEST_DOMAIN: &[u8] = b"mainframe-env.audit-resource-oversized@1\0";
 /// A hard ceiling for the canonical journal representation, not the provider's payload budget.
 pub const MAX_CANONICAL_EFFECT_BYTES: usize = 64 * 1024 * 1024;
 
@@ -209,6 +214,7 @@ named!(
     RuntimeServiceName,
     SessionId,
     SecretRef,
+    CapabilityId,
     PrincipalId,
     RunUnitId,
     IdempotencyKey
@@ -247,6 +253,29 @@ fn digest<T: Canonical + ?Sized>(value: &T, domain: &[u8]) -> Result<[u8; 32], H
 /// SHA-256 over the versioned request domain and explicit typed bytes.
 pub fn canonical_request_digest(value: &HostRequest) -> Result<[u8; 32], HostProblem> {
     digest(value, REQUEST_DIGEST_DOMAIN)
+}
+/// SHA-256 over bounded explicit typed request bytes in the audit-resource v1 domain.
+///
+/// The request is never materialized in the audit record. Using an independent domain prevents
+/// an audit digest from being confused with an idempotency/replay digest. Oversized hostile
+/// requests use a separately domained canonical capability identity so audit generation itself
+/// cannot become an unbounded preflight operation.
+pub fn canonical_audit_resource_digest(value: &HostRequest) -> AuditResourceDigest {
+    digest(value, AUDIT_RESOURCE_DIGEST_DOMAIN).map_or_else(
+        |_| AuditResourceDigest {
+            format: AuditResourceDigestFormat::CanonicalHostOversizedResourceV1,
+            value: digest(
+                &value
+                    .required_capability(mainframe_env_execution_api::InvocationLimits::default()),
+                OVERSIZED_AUDIT_RESOURCE_DIGEST_DOMAIN,
+            )
+            .expect("a bounded capability identity is canonically encodable"),
+        },
+        |value| AuditResourceDigest {
+            format: AuditResourceDigestFormat::CanonicalHostResourceV1,
+            value,
+        },
+    )
 }
 /// Canonical Db2 replay identity in the same domain used by the host journal.
 pub fn canonical_db2_request_digest(value: &Db2Request) -> Result<[u8; 32], HostProblem> {

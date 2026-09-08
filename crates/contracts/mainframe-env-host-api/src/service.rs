@@ -1,16 +1,45 @@
 use crate::{
-    AuditEvent, EffectRequest, EffectResult, HostLimits, HostProblem, MAX_CANONICAL_EFFECT_BYTES,
-    RegistrySnapshot, canonical_request_size, canonical_result_size,
+    EffectRequest, EffectResult, HostLimits, HostProblem, MAX_CANONICAL_EFFECT_BYTES,
+    RegistrySnapshot, canonical_audit_resource_digest, canonical_request_size,
+    canonical_result_size,
 };
-use mainframe_env_execution_api::Invocation;
-use std::collections::BTreeMap;
+use mainframe_env_execution_api::{AuditDecision, AuditRecord, Invocation};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Arc;
 
+#[must_use = "host effects must not be consumed without their typed audit record"]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AuditedEffectResult {
-    pub effect: EffectResult,
-    pub audit: AuditEvent,
+    effect: EffectResult,
+    audit: AuditRecord,
+    mutation_dispatched: bool,
+}
+
+impl AuditedEffectResult {
+    /// Persist the typed audit record before exposing the effect to a non-transactional caller.
+    /// A sink failure after dispatching a mutation is conservatively reported as unknown.
+    pub fn persist_with(
+        self,
+        persist: impl FnOnce(AuditRecord) -> Result<(), HostProblem>,
+    ) -> EffectResult {
+        match persist(self.audit) {
+            Ok(()) => self.effect,
+            Err(_) if self.mutation_dispatched => EffectResult {
+                sequence: self.effect.sequence,
+                outcome: Err(HostProblem::UnknownOutcome),
+            },
+            Err(problem) => EffectResult {
+                sequence: self.effect.sequence,
+                outcome: Err(problem),
+            },
+        }
+    }
+
+    /// Transfer both records to a coordinator that commits them in one transaction.
+    #[must_use]
+    pub fn into_transaction_parts(self) -> (EffectResult, AuditRecord) {
+        (self.effect, self.audit)
+    }
 }
 
 pub struct ScopedHostService {
@@ -34,7 +63,9 @@ impl ScopedHostService {
         let capability = request
             .request
             .required_capability(mainframe_env_execution_api::InvocationLimits::default());
+        let resource = canonical_audit_resource_digest(&request.request);
         let sequence = request.sequence;
+        let mut mutation_dispatched = false;
         let result = if request.run_unit != invocation.run_unit_id {
             Err(HostProblem::Malformed)
         } else if cancellation_requested || invocation.cancellation_requested() {
@@ -69,6 +100,7 @@ impl ScopedHostService {
                 }
                 Ok(provider) => {
                     let mutating = request.request.is_mutating();
+                    mutation_dispatched = mutating;
                     match catch_unwind(AssertUnwindSafe(|| provider.invoke(invocation, request))) {
                         // Uncertainty is a control outcome, not an oversized success payload.
                         // Never erase it, even when an untrusted provider also corrupts the envelope.
@@ -106,37 +138,33 @@ impl ScopedHostService {
             }
         };
         let decision = match &result {
-            Ok(_) => "success",
-            Err(HostProblem::Unauthorized) => "deny",
-            Err(HostProblem::Cancelled) => "cancelled",
-            Err(HostProblem::TimedOut) => "timed-out",
-            Err(_) => "failure",
+            Ok(_) => AuditDecision::Success,
+            Err(HostProblem::Unauthorized) => AuditDecision::Deny,
+            Err(HostProblem::Cancelled) => AuditDecision::Cancelled,
+            Err(HostProblem::TimedOut) => AuditDecision::TimedOut,
+            Err(HostProblem::ProviderFailure) => AuditDecision::ProviderFailure,
+            Err(HostProblem::InfrastructureFailure) => AuditDecision::InfrastructureFailure,
+            Err(HostProblem::UnknownOutcome) => AuditDecision::UnknownOutcome,
+            Err(_) => AuditDecision::Rejected,
         };
         AuditedEffectResult {
             effect: EffectResult {
                 sequence,
                 outcome: result,
             },
-            audit: AuditEvent {
-                action: capability.as_str().to_string(),
-                resource_hash: "redacted-at-contract-boundary".to_string(),
-                decision: decision.to_string(),
-                fields: BTreeMap::from([
-                    (
-                        "execution".to_string(),
-                        invocation.execution_id.as_str().to_string(),
-                    ),
-                    (
-                        "audit_correlation".to_string(),
-                        invocation.audit_correlation.clone(),
-                    ),
-                    (
-                        "run_unit".to_string(),
-                        invocation.run_unit_id.as_str().to_string(),
-                    ),
-                    ("sequence".to_string(), sequence.to_string()),
-                ]),
+            audit: AuditRecord {
+                execution_id: invocation.execution_id.clone(),
+                run_unit_id: invocation.run_unit_id.clone(),
+                attempt: invocation.attempt,
+                effect_sequence: sequence,
+                observed_tick: now_tick,
+                principal: invocation.principal.id().clone(),
+                invocation_key: invocation.idempotency_key.clone(),
+                capability,
+                resource,
+                decision,
             },
+            mutation_dispatched,
         }
     }
 
@@ -147,6 +175,17 @@ impl ScopedHostService {
             mainframe_env_execution_api::InvocationLimits::default(),
         )
         .is_ok_and(|capability| self.registry.select(&capability).is_ok())
+    }
+}
+
+#[cfg(test)]
+impl AuditedEffectResult {
+    fn effect(&self) -> &EffectResult {
+        &self.effect
+    }
+
+    fn audit(&self) -> &AuditRecord {
+        &self.audit
     }
 }
 
@@ -235,38 +274,44 @@ mod tests {
     fn denial_never_invokes_provider() {
         let invocation = invocation(false);
         let result = service().invoke(&invocation, 1, false, request(&invocation.run_unit_id));
-        assert_eq!(result.effect.outcome, Err(HostProblem::Unauthorized));
-        assert_eq!(result.audit.decision, "deny");
+        assert_eq!(result.effect().outcome, Err(HostProblem::Unauthorized));
+        assert_eq!(result.audit().decision, AuditDecision::Deny);
     }
     #[test]
     fn panic_is_contained_as_infrastructure_failure() {
         let invocation = invocation(true);
         let result = service().invoke(&invocation, 1, false, request(&invocation.run_unit_id));
         assert_eq!(
-            result.effect.outcome,
+            result.effect().outcome,
             Err(HostProblem::InfrastructureFailure)
+        );
+        assert_eq!(
+            result.audit().decision,
+            AuditDecision::InfrastructureFailure
         );
     }
     #[test]
     fn identity_cancellation_and_deadline_fail_before_provider() {
         let active = invocation(true);
         let cancelled = service().invoke(&active, 1, true, request(&active.run_unit_id));
-        assert_eq!(cancelled.effect.outcome, Err(HostProblem::Cancelled));
+        assert_eq!(cancelled.effect().outcome, Err(HostProblem::Cancelled));
+        assert_eq!(cancelled.audit().decision, AuditDecision::Cancelled);
         let probe = CancellationProbe::new();
         let live = invocation(true).with_cancellation_probe(probe.clone());
         probe.request();
         let cancelled = service().invoke(&live, 1, false, request(&live.run_unit_id));
-        assert_eq!(cancelled.effect.outcome, Err(HostProblem::Cancelled));
+        assert_eq!(cancelled.effect().outcome, Err(HostProblem::Cancelled));
         let timed_out = service().invoke(
             &active,
             active.deadline_tick,
             false,
             request(&active.run_unit_id),
         );
-        assert_eq!(timed_out.effect.outcome, Err(HostProblem::TimedOut));
+        assert_eq!(timed_out.effect().outcome, Err(HostProblem::TimedOut));
+        assert_eq!(timed_out.audit().decision, AuditDecision::TimedOut);
         let other_run = RunUnitId::new("other", InvocationLimits::default()).unwrap();
         let malformed = service().invoke(&active, 1, false, request(&other_run));
-        assert_eq!(malformed.effect.outcome, Err(HostProblem::Malformed));
+        assert_eq!(malformed.effect().outcome, Err(HostProblem::Malformed));
     }
     #[test]
     fn missing_provider_fails_closed() {
@@ -278,7 +323,7 @@ mod tests {
         assert_eq!(
             empty
                 .invoke(&invocation, 1, false, request(&invocation.run_unit_id))
-                .effect
+                .effect()
                 .outcome,
             Err(HostProblem::Unsupported)
         );
@@ -291,18 +336,14 @@ mod tests {
         let generation_mismatch = invocation(true)
             .with_provider_generations(BTreeMap::from([(capability, "stale".into())]), limits)
             .unwrap();
-        assert_eq!(
-            service()
-                .invoke(
-                    &generation_mismatch,
-                    1,
-                    false,
-                    request(&generation_mismatch.run_unit_id)
-                )
-                .effect
-                .outcome,
-            Err(HostProblem::ProviderFailure)
+        let failed = service().invoke(
+            &generation_mismatch,
+            1,
+            false,
+            request(&generation_mismatch.run_unit_id),
         );
+        assert_eq!(failed.effect().outcome, Err(HostProblem::ProviderFailure));
+        assert_eq!(failed.audit().decision, AuditDecision::ProviderFailure);
 
         let cancelled = invocation(true).with_cancellation(
             mainframe_env_execution_api::Cancellation::new(
@@ -316,7 +357,7 @@ mod tests {
         assert_eq!(
             service()
                 .invoke(&cancelled, 1, false, request(&cancelled.run_unit_id))
-                .effect
+                .effect()
                 .outcome,
             Err(HostProblem::Cancelled)
         );
@@ -385,19 +426,19 @@ mod tests {
         let m = canonical_result_size(&reply, usize::MAX).unwrap();
         let (host, calls) = budget_service("host.state.read", n, m, reply.clone(), false);
         assert_eq!(
-            host.invoke(&inv, 1, false, req.clone()).effect.outcome,
+            host.invoke(&inv, 1, false, req.clone()).effect().outcome,
             reply
         );
         assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
         let (host, calls) = budget_service("host.state.read", n - 1, m, reply.clone(), false);
         assert_eq!(
-            host.invoke(&inv, 1, false, req.clone()).effect.outcome,
+            host.invoke(&inv, 1, false, req.clone()).effect().outcome,
             Err(HostProblem::ResourceExhausted)
         );
         assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
         let (host, calls) = budget_service("host.state.read", n, m - 1, reply, false);
         assert_eq!(
-            host.invoke(&inv, 1, false, req).effect.outcome,
+            host.invoke(&inv, 1, false, req).effect().outcome,
             Err(HostProblem::ResourceExhausted)
         );
         assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
@@ -414,7 +455,7 @@ mod tests {
             true,
         );
         assert_eq!(
-            host.invoke(&inv, 1, false, req).effect.outcome,
+            host.invoke(&inv, 1, false, req).effect().outcome,
             Err(HostProblem::UnknownOutcome)
         );
     }
@@ -447,9 +488,54 @@ mod tests {
         });
         let (host, calls) = budget_service("host.state.write", 4096, 1, reply, false);
         assert_eq!(
-            host.invoke(&inv, 1, false, req).effect.outcome,
+            host.invoke(&inv, 1, false, req).effect().outcome,
             Err(HostProblem::UnknownOutcome)
         );
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn mandatory_audit_failure_is_fail_closed_and_preserves_mutation_uncertainty() {
+        let inv = invocation(true);
+        let read = service()
+            .invoke(&inv, 1, false, request(&inv.run_unit_id))
+            .persist_with(|_| Err(HostProblem::ResourceExhausted));
+        assert_eq!(read.outcome, Err(HostProblem::ResourceExhausted));
+
+        let limits = InvocationLimits::default();
+        let mut invocation = invocation(true);
+        invocation.principal = Principal::new(
+            invocation.principal.id().clone(),
+            BTreeSet::from([CapabilityId::new("host.state.write", limits).unwrap()]),
+            limits,
+        )
+        .unwrap();
+        let key = IdempotencyKey::new("audit-failure-effect", limits).unwrap();
+        let request = EffectRequest {
+            run_unit: invocation.run_unit_id.clone(),
+            sequence: 1,
+            deadline_tick: 100,
+            idempotency_key: Some(key.clone()),
+            request: HostRequest::State(StateRequest::Put {
+                key: "x".into(),
+                value: vec![1],
+                expected_version: None,
+                mutation: crate::Mutation {
+                    sequence: 1,
+                    idempotency_key: key,
+                    transaction: None,
+                },
+            }),
+        };
+        let reply = Ok(crate::HostResult::State {
+            value: Some(vec![1]),
+            version: 1,
+        });
+        let (host, calls) = budget_service("host.state.write", 4096, 4096, reply, false);
+        let write = host
+            .invoke(&invocation, 1, false, request)
+            .persist_with(|_| Err(HostProblem::ResourceExhausted));
+        assert_eq!(write.outcome, Err(HostProblem::UnknownOutcome));
         assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
 }

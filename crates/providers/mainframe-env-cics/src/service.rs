@@ -240,6 +240,23 @@ pub struct CicsService {
 }
 
 impl CicsService {
+    fn invoke_host(
+        &self,
+        invocation: &Invocation,
+        now_tick: u64,
+        cancellation_requested: bool,
+        request: EffectRequest,
+    ) -> EffectResult {
+        ScopedHostService::invoke(
+            &self.host,
+            invocation,
+            now_tick,
+            cancellation_requested,
+            request,
+        )
+        .persist_with(|audit| self.store.record_audit(audit).map_err(store_error))
+    }
+
     pub fn open(
         host: Arc<ScopedHostService>,
         store: Arc<dyn ProviderStateStore>,
@@ -1825,7 +1842,7 @@ impl CicsService {
             .checked_add(1)
             .ok_or(HostProblem::ResourceExhausted)?;
         let key = nested_key(run, run.host_sequence)?;
-        let result = self.host.invoke(
+        let result = self.invoke_host(
             &run.invocation,
             run.invocation.deadline_tick.saturating_sub(1),
             false,
@@ -1853,7 +1870,7 @@ impl CicsService {
                 }),
             },
         );
-        match result.effect.outcome? {
+        match result.outcome? {
             HostResult::Db2(result) if result.sqlcode == 0 => Ok(()),
             HostResult::Db2(result) => Err(HostProblem::Condition {
                 name: format!("SQLCODE{}", result.sqlcode),
@@ -1881,7 +1898,7 @@ impl CicsService {
             .checked_add(1)
             .ok_or(HostProblem::ResourceExhausted)?;
         let key = nested_key(run, run.host_sequence)?;
-        let result = self.host.invoke(
+        let result = self.invoke_host(
             &run.invocation,
             run.invocation.deadline_tick.saturating_sub(1),
             false,
@@ -1911,7 +1928,7 @@ impl CicsService {
                 }),
             },
         );
-        match result.effect.outcome? {
+        match result.outcome? {
             HostResult::Ims(result) if result.status.trim().is_empty() => Ok(()),
             HostResult::Ims(result) => Err(HostProblem::Condition {
                 name: format!("IMS{}", result.status.trim()),
@@ -1939,7 +1956,7 @@ impl CicsService {
             .checked_add(1)
             .ok_or(HostProblem::ResourceExhausted)?;
         let key = nested_key(run, run.host_sequence)?;
-        let result = self.host.invoke(
+        let result = self.invoke_host(
             &run.invocation,
             run.invocation.deadline_tick.saturating_sub(1),
             false,
@@ -1970,7 +1987,7 @@ impl CicsService {
                 }),
             },
         );
-        match result.effect.outcome? {
+        match result.outcome? {
             HostResult::Mq(result) if result.completion_code == 0 => Ok(()),
             HostResult::Mq(result) => Err(HostProblem::Condition {
                 name: format!("MQRC{}", result.reason_code),
@@ -2721,7 +2738,7 @@ impl CicsService {
             .is_mutating()
             .then(|| nested_key(run, run.host_sequence))
             .transpose()?;
-        let result = self.host.invoke(
+        let result = self.invoke_host(
             &run.invocation,
             run.invocation.deadline_tick.saturating_sub(1),
             false,
@@ -2733,7 +2750,7 @@ impl CicsService {
                 request,
             },
         );
-        result.effect.outcome
+        result.outcome
     }
 
     fn condition(
@@ -2817,7 +2834,7 @@ impl CicsService {
         invocation: &Invocation,
         transaction: &str,
     ) -> Result<(), HostProblem> {
-        let result = self.host.invoke(
+        let result = self.invoke_host(
             invocation,
             0,
             false,
@@ -2838,7 +2855,7 @@ impl CicsService {
                 }),
             },
         );
-        match result.effect.outcome? {
+        match result.outcome? {
             HostResult::Security(SecurityDecision::Allow) => Ok(()),
             HostResult::Security(_) => Err(HostProblem::Unauthorized),
             _ => Err(HostProblem::ProviderFailure),
@@ -6006,13 +6023,15 @@ mod tests {
             HostLimits::default(),
         );
         let assign = request(CicsOperation::Assign, BTreeMap::new(), 1);
-        let selected = outer.invoke(
-            &invocation,
-            1,
-            false,
-            effect(&invocation.run_unit_id, assign, 1),
-        );
-        assert!(matches!(selected.effect.outcome, Ok(HostResult::Cics(_))));
+        let (selected, _) = outer
+            .invoke(
+                &invocation,
+                1,
+                false,
+                effect(&invocation.run_unit_id, assign, 1),
+            )
+            .into_transaction_parts();
+        assert!(matches!(selected.outcome, Ok(HostResult::Cics(_))));
         let asktime = request(CicsOperation::Asktime, BTreeMap::new(), 2);
         assert!(matches!(
             outer
@@ -6022,7 +6041,8 @@ mod tests {
                     false,
                     effect(&invocation.run_unit_id, asktime, 2),
                 )
-                .effect
+                .into_transaction_parts()
+                .0
                 .outcome,
             Ok(HostResult::Cics(CicsResponse { outputs, .. }))
                 if outputs.contains_key("ABSTIME")

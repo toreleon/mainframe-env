@@ -67,6 +67,7 @@ use mainframe_env_source::{
 use mainframe_env_store::{
     MemoryStore, PostgresArtifactStore, PostgresStateStore, SqliteStateStore,
 };
+use mainframe_env_store_api::AuditSink;
 use ring::hmac;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -7248,6 +7249,7 @@ async fn exercise_mq_authorization_routes(
     .map_err(|problem| CorpusProblem::new("carddemo.mq.route", format!("{problem:?}")))?;
     let outcome = mainframe_env_interpreter::ExecutionCoordinator::with_host(
         typed_host.clone(),
+        Arc::new(MemoryStore::new(Default::default())),
         mainframe_env_interpreter::CoordinatorLimits::default(),
     )
     .execute(
@@ -7288,7 +7290,11 @@ async fn exercise_mq_authorization_routes(
     };
     if typed_host
         .invoke(&denied, 1, false, denied_effect)
-        .effect
+        .persist_with(|audit| {
+            store
+                .record_audit(audit)
+                .map_err(|_| HostProblem::InfrastructureFailure)
+        })
         .outcome
         != Err(HostProblem::Unauthorized)
     {
@@ -8365,6 +8371,7 @@ async fn exercise_ims_routes(
     .map_err(|problem| CorpusProblem::new("carddemo.ims.route", format!("{problem:?}")))?;
     let coordinator = mainframe_env_interpreter::ExecutionCoordinator::with_host(
         host.clone(),
+        Arc::new(MemoryStore::new(Default::default())),
         mainframe_env_interpreter::CoordinatorLimits::default(),
     );
     let outcome = coordinator.execute(
@@ -8405,7 +8412,11 @@ async fn exercise_ims_routes(
     };
     if host
         .invoke(&denied_invocation, 1, false, denied_effect)
-        .effect
+        .persist_with(|audit| {
+            store
+                .record_audit(audit)
+                .map_err(|_| HostProblem::InfrastructureFailure)
+        })
         .outcome
         != Err(HostProblem::Unauthorized)
     {
@@ -8440,7 +8451,11 @@ async fn exercise_ims_routes(
     };
     if host
         .invoke(&mismatch, 1, false, mismatch_effect)
-        .effect
+        .persist_with(|audit| {
+            store
+                .record_audit(audit)
+                .map_err(|_| HostProblem::InfrastructureFailure)
+        })
         .outcome
         != Err(HostProblem::ProviderFailure)
     {

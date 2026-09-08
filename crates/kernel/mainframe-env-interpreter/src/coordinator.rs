@@ -2,16 +2,16 @@ use mainframe_env_diagnostics::{
     DiagnosticCode, DiagnosticLimits, ExecutionProblem, FailureCategory, Phase,
 };
 use mainframe_env_execution_api::{
-    ExecutionOutcome, Invocation, InvocationLimits, LifecycleEvent, LifecycleEventKind, Machine,
-    MachineDrive, MachineResume, Quantum,
+    AuditRecord, ExecutionOutcome, Invocation, InvocationLimits, LifecycleEvent,
+    LifecycleEventKind, Machine, MachineDrive, MachineResume, Quantum,
 };
 use mainframe_env_host_api::{
-    EffectRequest, EffectResult, HostProblem, ScopedHostService, canonical_request_digest,
-    canonical_result_digest,
+    EffectRequest, EffectResult, HostProblem, ScopedHostService, canonical_audit_resource_digest,
+    canonical_request_digest, canonical_result_digest,
 };
 use mainframe_env_store_api::{
-    CheckpointRecord, EffectDigestFormat, EffectIntentMetadata, EffectRecord, EffectState,
-    ExecutionRecord, ExecutionState, OutboxRecord, PlatformStore, StoreError,
+    AuditSink, CheckpointRecord, EffectDigestFormat, EffectIntentMetadata, EffectRecord,
+    EffectState, ExecutionRecord, ExecutionState, OutboxRecord, PlatformStore, StoreError,
 };
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -54,7 +54,26 @@ pub enum ExecutionControlError {
 pub struct ExecutionCoordinator {
     host: Option<Arc<ScopedHostService>>,
     store: Option<Arc<dyn PlatformStore>>,
+    audit_sink: Option<Arc<dyn AuditSink>>,
     limits: CoordinatorLimits,
+}
+
+struct PlatformAuditSink(Arc<dyn PlatformStore>);
+
+impl AuditSink for PlatformAuditSink {
+    fn record_audit(&self, record: AuditRecord) -> Result<(), StoreError> {
+        self.0.record_audit(record)
+    }
+
+    fn audit_records(
+        &self,
+        execution_id: &mainframe_env_execution_api::ExecutionId,
+        start_effect_sequence: u64,
+        max: usize,
+    ) -> Result<Vec<AuditRecord>, StoreError> {
+        self.0
+            .audit_records(execution_id, start_effect_sequence, max)
+    }
 }
 
 impl ExecutionCoordinator {
@@ -63,17 +82,35 @@ impl ExecutionCoordinator {
         Self {
             host: None,
             store: None,
+            audit_sink: None,
             limits,
         }
     }
 
     #[must_use]
-    pub fn with_host(host: Arc<ScopedHostService>, limits: CoordinatorLimits) -> Self {
+    pub fn with_host(
+        host: Arc<ScopedHostService>,
+        audit_sink: Arc<dyn AuditSink>,
+        limits: CoordinatorLimits,
+    ) -> Self {
         Self {
             host: Some(host),
             store: None,
+            audit_sink: Some(audit_sink),
             limits,
         }
+    }
+
+    /// Execute without a lifecycle journal while retaining every host decision in a platform
+    /// store's typed audit sink. Callers that share execution authority with the store must use
+    /// [`Self::durable`] instead.
+    #[must_use]
+    pub fn with_host_audit_store(
+        host: Arc<ScopedHostService>,
+        store: Arc<dyn PlatformStore>,
+        limits: CoordinatorLimits,
+    ) -> Self {
+        Self::with_host(host, Arc::new(PlatformAuditSink(store)), limits)
     }
 
     #[must_use]
@@ -85,6 +122,7 @@ impl ExecutionCoordinator {
         Self {
             host: Some(host),
             store: Some(store),
+            audit_sink: None,
             limits,
         }
     }
@@ -187,6 +225,7 @@ impl ExecutionCoordinator {
                             ));
                         }
                     };
+                    let audit_resource = canonical_audit_resource_digest(&effect.request);
                     let mutating = effect.request.is_mutating();
                     let capability = effect
                         .request
@@ -206,6 +245,8 @@ impl ExecutionCoordinator {
                             owner: invocation.execution_id.clone(),
                             attempt: invocation.attempt,
                             capability: Some(capability),
+                            audit_resource: Some(audit_resource),
+                            audit_invocation_key: Some(invocation.idempotency_key.clone()),
                             created_tick: control.now_tick,
                             recovery_after_tick: invocation.deadline_tick.min(effect.deadline_tick),
                             epoch: intent_epoch,
@@ -237,14 +278,13 @@ impl ExecutionCoordinator {
                         Ok(control) => control,
                         Err(outcome) => return outcome,
                     };
-                    let result = host
-                        .invoke(
-                            invocation,
-                            control.now_tick,
-                            control.cancellation_requested,
-                            effect,
-                        )
-                        .effect;
+                    let audited = host.invoke(
+                        invocation,
+                        control.now_tick,
+                        control.cancellation_requested,
+                        effect,
+                    );
+                    let (result, audit) = audited.into_transaction_parts();
                     let result_digest = match canonical_result_digest(&result.outcome) {
                         Ok(digest) => digest,
                         // Dispatch already happened; leave the durable intent for reconciliation.
@@ -264,14 +304,16 @@ impl ExecutionCoordinator {
                         record.result_digest = Some(result_digest);
                         record
                     });
-                    if record_step(
+                    if record_audited_step(
                         &mut journal,
+                        self.audit_sink.as_deref(),
                         None,
                         LifecycleEventKind::EffectResult {
                             sequence: result.sequence,
                         },
                         result_record,
                         None,
+                        audit,
                     )
                     .is_err()
                     {
@@ -543,6 +585,7 @@ impl JournalCursor {
         kind: LifecycleEventKind,
         effect: Option<EffectRecord>,
         checkpoint: Option<CheckpointRecord>,
+        audit: Option<AuditRecord>,
     ) -> Result<(), StoreError> {
         self.sequence = self
             .sequence
@@ -563,6 +606,7 @@ impl JournalCursor {
             next_state,
             event,
             effect,
+            audit,
             checkpoint,
             notification,
         )?;
@@ -625,9 +669,29 @@ fn record_step(
     checkpoint: Option<CheckpointRecord>,
 ) -> Result<(), StoreError> {
     if let Some(journal) = journal {
-        journal.record(next_state, event, effect, checkpoint)
+        journal.record(next_state, event, effect, checkpoint, None)
     } else {
         Ok(())
+    }
+}
+
+fn record_audited_step(
+    journal: &mut Option<JournalCursor>,
+    audit_sink: Option<&dyn AuditSink>,
+    next_state: Option<ExecutionState>,
+    event: LifecycleEventKind,
+    effect: Option<EffectRecord>,
+    checkpoint: Option<CheckpointRecord>,
+    audit: AuditRecord,
+) -> Result<(), StoreError> {
+    if let Some(journal) = journal {
+        journal.record(next_state, event, effect, checkpoint, Some(audit))
+    } else {
+        audit_sink
+            .ok_or(StoreError::Infrastructure(
+                "host execution requires an audit sink".into(),
+            ))?
+            .record_audit(audit)
     }
 }
 
@@ -718,10 +782,16 @@ fn problem(category: FailureCategory, message: &str) -> ExecutionProblem {
 mod tests {
     use super::*;
     use mainframe_env_execution_api::{
-        ArtifactRef, Completion, ExecutionId, IdempotencyKey, InvocationLimits, Principal,
-        PrincipalId, RequestId, ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
+        ArtifactRef, AuditDecision, AuditRecord, CapabilityId, Completion, ExecutionId,
+        IdempotencyKey, InvocationLimits, Principal, PrincipalId, RequestId, ResourceLimits,
+        RunUnitId, Selector, ServiceClass, TraceId,
+    };
+    use mainframe_env_host_api::{
+        CapabilityDescriptor, HostLimits, HostProvider, HostRequest, HostResult, RegistrySnapshot,
+        StateRequest,
     };
     use std::collections::{BTreeMap, BTreeSet};
+    use std::sync::Mutex;
 
     struct CompleteMachine;
     impl Machine for CompleteMachine {
@@ -1021,5 +1091,208 @@ mod tests {
             });
         // A host lookup would fail in this local-only coordinator. The stop wins first.
         assert_eq!(result, ExecutionOutcome::Cancelled);
+    }
+
+    struct FixedProvider {
+        descriptor: CapabilityDescriptor,
+        outcome: Result<HostResult, HostProblem>,
+    }
+
+    impl HostProvider for FixedProvider {
+        fn descriptor(&self) -> &CapabilityDescriptor {
+            &self.descriptor
+        }
+
+        fn invoke(&self, _: &Invocation, request: EffectRequest) -> EffectResult {
+            EffectResult {
+                sequence: request.sequence,
+                outcome: self.outcome.clone(),
+            }
+        }
+    }
+
+    struct OneHostCall(Option<EffectRequest>);
+
+    impl Machine for OneHostCall {
+        type Effect = EffectRequest;
+        type EffectResult = EffectResult;
+
+        fn drive(
+            &mut self,
+            resume: MachineResume<Self::EffectResult>,
+            _: Quantum,
+        ) -> MachineDrive<Self::Effect> {
+            match resume {
+                MachineResume::Start => MachineDrive::HostCall(self.0.take().unwrap()),
+                MachineResume::HostResult(_) => MachineDrive::Completed(Completion {
+                    return_code: 0,
+                    output: mainframe_env_execution_api::BoundedPayload::new(
+                        "test@1",
+                        Vec::new(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                }),
+                other => panic!("unexpected resume: {other:?}"),
+            }
+        }
+    }
+
+    struct RecordingAuditSink {
+        capacity: usize,
+        records: Mutex<Vec<AuditRecord>>,
+    }
+
+    impl RecordingAuditSink {
+        fn new(capacity: usize) -> Self {
+            Self {
+                capacity,
+                records: Mutex::new(Vec::new()),
+            }
+        }
+    }
+
+    impl AuditSink for RecordingAuditSink {
+        fn record_audit(&self, record: AuditRecord) -> Result<(), StoreError> {
+            let mut records = self.records.lock().map_err(|_| StoreError::Poisoned)?;
+            if records.len() >= self.capacity {
+                return Err(StoreError::CapacityExceeded);
+            }
+            records.push(record);
+            Ok(())
+        }
+
+        fn audit_records(
+            &self,
+            execution_id: &ExecutionId,
+            start_effect_sequence: u64,
+            max: usize,
+        ) -> Result<Vec<AuditRecord>, StoreError> {
+            Ok(self
+                .records
+                .lock()
+                .map_err(|_| StoreError::Poisoned)?
+                .iter()
+                .filter(|record| {
+                    &record.execution_id == execution_id
+                        && record.effect_sequence >= start_effect_sequence
+                })
+                .take(max)
+                .cloned()
+                .collect())
+        }
+    }
+
+    fn audited_host(outcome: Result<HostResult, HostProblem>) -> Arc<ScopedHostService> {
+        let limits = InvocationLimits::default();
+        let capability = CapabilityId::new("host.state.read", limits).unwrap();
+        let provider: Arc<dyn HostProvider> = Arc::new(FixedProvider {
+            descriptor: CapabilityDescriptor {
+                capability,
+                provider_id: "audit-test".into(),
+                generation: "audit-test@1".into(),
+                request_schema: "state-request@1".into(),
+                result_schema: "state-result@1".into(),
+                max_request_bytes: 4096,
+                max_result_bytes: 4096,
+                ready: true,
+            },
+            outcome,
+        });
+        Arc::new(ScopedHostService::new(
+            Arc::new(RegistrySnapshot::new(1, vec![provider], limits).unwrap()),
+            HostLimits::default(),
+        ))
+    }
+
+    fn audit_invocation(granted: bool) -> Invocation {
+        let limits = InvocationLimits::default();
+        let capability = CapabilityId::new("host.state.read", limits).unwrap();
+        let mut invocation = invocation();
+        invocation.principal = Principal::new(
+            PrincipalId::new("USER", limits).unwrap(),
+            granted.then_some(capability).into_iter().collect(),
+            limits,
+        )
+        .unwrap();
+        invocation
+    }
+
+    fn audit_request(invocation: &Invocation) -> EffectRequest {
+        EffectRequest {
+            run_unit: invocation.run_unit_id.clone(),
+            sequence: 1,
+            deadline_tick: 100,
+            idempotency_key: None,
+            request: HostRequest::State(StateRequest::Get { key: "one".into() }),
+        }
+    }
+
+    #[test]
+    fn mandatory_sink_persists_success_deny_cancellation_and_provider_failure() {
+        for (granted, outcome, expected) in [
+            (
+                true,
+                Ok(HostResult::State {
+                    value: Some(vec![1]),
+                    version: 1,
+                }),
+                AuditDecision::Success,
+            ),
+            (
+                false,
+                Ok(HostResult::State {
+                    value: Some(vec![1]),
+                    version: 1,
+                }),
+                AuditDecision::Deny,
+            ),
+            (
+                true,
+                Err(HostProblem::ProviderFailure),
+                AuditDecision::ProviderFailure,
+            ),
+            (true, Err(HostProblem::Cancelled), AuditDecision::Cancelled),
+        ] {
+            let invocation = audit_invocation(granted);
+            let sink = Arc::new(RecordingAuditSink::new(1));
+            let coordinator = ExecutionCoordinator::with_host(
+                audited_host(outcome),
+                sink.clone(),
+                CoordinatorLimits::default(),
+            );
+            let result = coordinator.execute(
+                &mut OneHostCall(Some(audit_request(&invocation))),
+                &invocation,
+                ExecutionControl::default(),
+            );
+            assert!(matches!(result, ExecutionOutcome::Completed(_)));
+            let records = sink.audit_records(&invocation.execution_id, 1, 8).unwrap();
+            assert_eq!(records.len(), 1);
+            assert_eq!(records[0].decision, expected);
+            assert_eq!(records[0].principal, *invocation.principal.id());
+            assert_eq!(records[0].capability.as_str(), "host.state.read");
+        }
+    }
+
+    #[test]
+    fn audit_capacity_saturation_blocks_non_durable_host_result() {
+        let invocation = audit_invocation(true);
+        let coordinator = ExecutionCoordinator::with_host(
+            audited_host(Ok(HostResult::State {
+                value: None,
+                version: 1,
+            })),
+            Arc::new(RecordingAuditSink::new(0)),
+            CoordinatorLimits::default(),
+        );
+        assert!(matches!(
+            coordinator.execute(
+                &mut OneHostCall(Some(audit_request(&invocation))),
+                &invocation,
+                ExecutionControl::default(),
+            ),
+            ExecutionOutcome::InfrastructureFailure(_)
+        ));
     }
 }

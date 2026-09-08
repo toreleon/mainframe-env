@@ -1,17 +1,20 @@
 use crate::{PostgresStateStore, SqliteStateStore, validation};
 use base64::Engine;
 use mainframe_env_execution_api::{
-    ArtifactRef, ExecutionId, IdempotencyKey, InvocationLimits, LifecycleEvent, LifecycleEventKind,
-    PrincipalId, RunUnitId, Selector,
+    ArtifactRef, AuditDecision, AuditRecord, AuditResourceDigest, AuditResourceDigestFormat,
+    CapabilityId, ExecutionId, IdempotencyKey, InvocationLimits, LifecycleEvent,
+    LifecycleEventKind, PrincipalId, RunUnitId, Selector,
 };
 use mainframe_env_store_api::{
-    ArtifactRecord, ArtifactStore, CheckpointRecord, CheckpointStore, EffectDigestFormat,
-    EffectRecord, EffectRecoveryLease, EffectState, EventStore, ExecutionRecord, ExecutionState,
-    ExecutionStore, GenerationRecord, GenerationStore, IdempotencyStore, JournalStore,
-    OutboxRecord, OutboxStore, ProviderStateRecord, ProviderStateStore, ProviderStateWrite,
-    SessionRecord, SessionStore, StoreError, WorkRecord, WorkState, WorkStore,
+    ArtifactRecord, ArtifactStore, AuditSink, CheckpointRecord, CheckpointStore,
+    EffectDigestFormat, EffectRecord, EffectRecoveryLease, EffectState, EventStore,
+    ExecutionRecord, ExecutionState, ExecutionStore, GenerationRecord, GenerationStore,
+    IdempotencyStore, JournalStore, OutboxRecord, OutboxStore, ProviderStateRecord,
+    ProviderStateStore, ProviderStateWrite, SessionRecord, SessionStore, StoreError, WorkRecord,
+    WorkState, WorkStore,
 };
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 
 macro_rules! durable_implementations {
     ($store:ty) => {
@@ -762,15 +765,33 @@ macro_rules! durable_implementations {
                 record.result_digest = Some(result_digest);
                 validation::effect(&record)?;
                 let next_version = row.version.checked_add(1).ok_or(StoreError::Conflict)?;
-                self.put_provider_state(
-                    state_record(
+                let mut writes = vec![ProviderStateWrite {
+                    record: state_record(
                         "durable-effect",
                         key.as_str(),
                         next_version,
                         encode_effect(&record)?,
                     ),
-                    Some(row.version),
-                )?;
+                    expected_version: Some(row.version),
+                }];
+                if record.intent.audit_resource.is_some() {
+                    let execution = self
+                        .get_execution(&record.execution_id)?
+                        .ok_or(StoreError::NotFound)?;
+                    if let Some(audit) = validation::recovered_audit(&execution, &record, now_tick)?
+                    {
+                        writes.push(ProviderStateWrite {
+                            record: state_record(
+                                &format!("durable-audit:{}", audit.execution_id),
+                                &format!("recovery:{}", audit_key(&audit)),
+                                1,
+                                encode_audit(&audit)?,
+                            ),
+                            expected_version: None,
+                        });
+                    }
+                }
+                self.put_provider_states_atomic(writes)?;
                 Ok(record)
             }
 
@@ -878,6 +899,73 @@ macro_rules! durable_implementations {
             }
         }
 
+        impl AuditSink for $store {
+            fn record_audit(&self, record: AuditRecord) -> Result<(), StoreError> {
+                validation::audit(&record)?;
+                let namespace = format!("durable-audit:{}", record.execution_id);
+                for _ in 0..4 {
+                    let next = self
+                        .list_provider_state(&namespace, self.max_rows().min(65_536))?
+                        .into_iter()
+                        .filter_map(|row| {
+                            row.key
+                                .strip_prefix("direct:")
+                                .and_then(|value| value.parse::<u64>().ok())
+                        })
+                        .max()
+                        .map_or(Some(1), |value| value.checked_add(1))
+                        .ok_or(StoreError::CapacityExceeded)?;
+                    match self.put_provider_state(
+                        state_record(
+                            &namespace,
+                            &format!("direct:{next:020}"),
+                            1,
+                            encode_audit(&record)?,
+                        ),
+                        None,
+                    ) {
+                        Ok(()) => return Ok(()),
+                        Err(StoreError::Conflict) => continue,
+                        Err(error) => return Err(error),
+                    }
+                }
+                Err(StoreError::Conflict)
+            }
+
+            fn audit_records(
+                &self,
+                execution_id: &ExecutionId,
+                start_effect_sequence: u64,
+                max: usize,
+            ) -> Result<Vec<AuditRecord>, StoreError> {
+                if max == 0 || max > 65_536 {
+                    return Err(StoreError::CapacityExceeded);
+                }
+                self.list_provider_state(
+                    &format!("durable-audit:{execution_id}"),
+                    self.max_rows().min(65_536),
+                )?
+                .into_iter()
+                .map(|row| decode_audit(&row.payload))
+                .collect::<Result<Vec<_>, _>>()
+                .map(|records| {
+                    let mut records = records
+                        .into_iter()
+                        .filter(|record| record.effect_sequence >= start_effect_sequence)
+                        .collect::<Vec<_>>();
+                    records.sort_by(|left, right| {
+                        (left.attempt, left.effect_sequence, &left.invocation_key).cmp(&(
+                            right.attempt,
+                            right.effect_sequence,
+                            &right.invocation_key,
+                        ))
+                    });
+                    records.truncate(max);
+                    records
+                })
+            }
+        }
+
         impl JournalStore for $store {
             fn admit_execution(
                 &self,
@@ -918,6 +1006,7 @@ macro_rules! durable_implementations {
                 ])
             }
 
+            #[allow(clippy::too_many_arguments)]
             fn commit_execution_step(
                 &self,
                 execution_id: &ExecutionId,
@@ -925,6 +1014,7 @@ macro_rules! durable_implementations {
                 next_state: Option<ExecutionState>,
                 event: LifecycleEvent,
                 effect: Option<EffectRecord>,
+                audit: Option<AuditRecord>,
                 checkpoint: Option<CheckpointRecord>,
                 notification: OutboxRecord,
             ) -> Result<ExecutionRecord, StoreError> {
@@ -935,6 +1025,7 @@ macro_rules! durable_implementations {
                 if execution.version != expected_version {
                     return Err(StoreError::Conflict);
                 }
+                validation::audit_event(&execution, &event, effect.as_ref(), audit.as_ref())?;
                 if let Some(next) = next_state {
                     if !execution.state.can_transition_to(next) {
                         return Err(StoreError::InvalidTransition);
@@ -1019,6 +1110,17 @@ macro_rules! durable_implementations {
                             encode_effect(&effect)?,
                         ),
                         expected_version: expected,
+                    });
+                }
+                if let Some(audit) = audit {
+                    writes.push(ProviderStateWrite {
+                        record: state_record(
+                            &format!("durable-audit:{}", audit.execution_id),
+                            &format!("journal:{:020}", event.sequence),
+                            1,
+                            encode_audit(&audit)?,
+                        ),
+                        expected_version: None,
                     });
                 }
                 if let Some(checkpoint) = checkpoint {
@@ -1246,6 +1348,109 @@ fn event_kind_back(value: &str) -> Result<LifecycleEventKind, StoreError> {
         "failed" => LifecycleEventKind::Failed,
         _ => return Err(StoreError::IncompatibleVersion),
     })
+}
+
+fn encode_audit(record: &AuditRecord) -> Result<Vec<u8>, StoreError> {
+    encode(json!({
+        "schema": 1,
+        "execution": record.execution_id.as_str(),
+        "run": record.run_unit_id.as_str(),
+        "attempt": record.attempt,
+        "effect_sequence": record.effect_sequence,
+        "tick": record.observed_tick,
+        "principal": record.principal.as_str(),
+        "invocation_key": record.invocation_key.as_str(),
+        "capability": record.capability.as_str(),
+        "resource_format": audit_resource_format(record.resource.format),
+        "resource_digest": hex(&record.resource.value),
+        "decision": audit_decision(record.decision),
+    }))
+}
+
+fn audit_key(record: &AuditRecord) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"mainframe-env.audit-key@1\0");
+    digest.update(record.invocation_key.as_str().as_bytes());
+    digest.update(record.attempt.to_be_bytes());
+    digest.update(record.effect_sequence.to_be_bytes());
+    hex(&digest.finalize())
+}
+
+fn decode_audit(bytes: &[u8]) -> Result<AuditRecord, StoreError> {
+    let value = decode(bytes)?;
+    if number(&value, "schema")? != 1 {
+        return Err(StoreError::IncompatibleVersion);
+    }
+    let limits = InvocationLimits::default();
+    let record = AuditRecord {
+        execution_id: ExecutionId::new(string(&value, "execution")?, limits)
+            .map_err(|_| StoreError::IncompatibleVersion)?,
+        run_unit_id: RunUnitId::new(string(&value, "run")?, limits)
+            .map_err(|_| StoreError::IncompatibleVersion)?,
+        attempt: u32::try_from(number(&value, "attempt")?)
+            .map_err(|_| StoreError::IncompatibleVersion)?,
+        effect_sequence: number(&value, "effect_sequence")?,
+        observed_tick: number(&value, "tick")?,
+        principal: PrincipalId::new(string(&value, "principal")?, limits)
+            .map_err(|_| StoreError::IncompatibleVersion)?,
+        invocation_key: IdempotencyKey::new(string(&value, "invocation_key")?, limits)
+            .map_err(|_| StoreError::IncompatibleVersion)?,
+        capability: CapabilityId::new(string(&value, "capability")?, limits)
+            .map_err(|_| StoreError::IncompatibleVersion)?,
+        resource: AuditResourceDigest {
+            format: audit_resource_format_back(string(&value, "resource_format")?)?,
+            value: digest_back(string(&value, "resource_digest")?)?,
+        },
+        decision: audit_decision_back(string(&value, "decision")?)?,
+    };
+    validation::audit(&record)?;
+    Ok(record)
+}
+
+const fn audit_resource_format(value: AuditResourceDigestFormat) -> &'static str {
+    match value {
+        AuditResourceDigestFormat::CanonicalHostResourceV1 => "canonical-host-resource-v1",
+        AuditResourceDigestFormat::CanonicalHostOversizedResourceV1 => {
+            "canonical-host-oversized-resource-v1"
+        }
+    }
+}
+
+fn audit_resource_format_back(value: &str) -> Result<AuditResourceDigestFormat, StoreError> {
+    match value {
+        "canonical-host-resource-v1" => Ok(AuditResourceDigestFormat::CanonicalHostResourceV1),
+        "canonical-host-oversized-resource-v1" => {
+            Ok(AuditResourceDigestFormat::CanonicalHostOversizedResourceV1)
+        }
+        _ => Err(StoreError::IncompatibleVersion),
+    }
+}
+
+const fn audit_decision(value: AuditDecision) -> &'static str {
+    match value {
+        AuditDecision::Success => "success",
+        AuditDecision::Deny => "deny",
+        AuditDecision::Cancelled => "cancelled",
+        AuditDecision::TimedOut => "timed-out",
+        AuditDecision::Rejected => "rejected",
+        AuditDecision::ProviderFailure => "provider-failure",
+        AuditDecision::InfrastructureFailure => "infrastructure-failure",
+        AuditDecision::UnknownOutcome => "unknown-outcome",
+    }
+}
+
+fn audit_decision_back(value: &str) -> Result<AuditDecision, StoreError> {
+    match value {
+        "success" => Ok(AuditDecision::Success),
+        "deny" => Ok(AuditDecision::Deny),
+        "cancelled" => Ok(AuditDecision::Cancelled),
+        "timed-out" => Ok(AuditDecision::TimedOut),
+        "rejected" => Ok(AuditDecision::Rejected),
+        "provider-failure" => Ok(AuditDecision::ProviderFailure),
+        "infrastructure-failure" => Ok(AuditDecision::InfrastructureFailure),
+        "unknown-outcome" => Ok(AuditDecision::UnknownOutcome),
+        _ => Err(StoreError::IncompatibleVersion),
+    }
 }
 
 fn encode_work(work: &WorkRecord) -> Result<Vec<u8>, StoreError> {
@@ -1496,6 +1701,11 @@ fn encode_effect(record: &EffectRecord) -> Result<Vec<u8>, StoreError> {
             "owner":record.intent.owner.as_str(),
             "attempt":record.intent.attempt,
             "capability":record.intent.capability.as_ref().map(|value| value.as_str()),
+            "audit_resource":record.intent.audit_resource.map(|resource| json!({
+                "format":audit_resource_format(resource.format),
+                "digest":hex(&resource.value),
+            })),
+            "audit_invocation_key":record.intent.audit_invocation_key.as_ref().map(|key| key.as_str()),
             "created_tick":record.intent.created_tick,
             "recovery_after_tick":record.intent.recovery_after_tick,
             "epoch":record.intent.epoch,
@@ -1510,7 +1720,7 @@ fn encode_effect(record: &EffectRecord) -> Result<Vec<u8>, StoreError> {
             value["result"] = json!(record.result_digest.map(|value| hex(&value)));
         }
         EffectDigestFormat::CanonicalHostV1 => {
-            value["schema"] = json!(3);
+            value["schema"] = json!(4);
             value["digest_format"] = json!("mainframe-env.effect-canonical@1");
             // Counter-era readers ignore schema numbers. Do not expose the old
             // required field names: their effect decoder must fail on downgrade.
@@ -1528,7 +1738,7 @@ fn decode_effect(key: &IdempotencyKey, bytes: &[u8]) -> Result<EffectRecord, Sto
     let digest_format = match (schema, format) {
         (1, None) => EffectDigestFormat::LegacyDebug,
         (1, Some(Value::String(v))) if v == "legacy-debug@0" => EffectDigestFormat::LegacyDebug,
-        (2 | 3, Some(Value::String(v))) if v == "mainframe-env.effect-canonical@1" => {
+        (2..=4, Some(Value::String(v))) if v == "mainframe-env.effect-canonical@1" => {
             EffectDigestFormat::CanonicalHostV1
         }
         _ => return Err(StoreError::IncompatibleVersion),
@@ -1553,7 +1763,7 @@ fn decode_effect(key: &IdempotencyKey, bytes: &[u8]) -> Result<EffectRecord, Sto
     let execution_id = ExecutionId::new(string(&value, "execution")?, limits)
         .map_err(|_| StoreError::IncompatibleVersion)?;
     let sequence = number(&value, "sequence")?;
-    let intent = decode_effect_intent(&value, &execution_id, sequence, schema == 3)?;
+    let intent = decode_effect_intent(&value, &execution_id, sequence, schema >= 3)?;
     let record = EffectRecord {
         execution_id,
         run_unit_id: RunUnitId::new(string(&value, "run")?, limits)
@@ -1588,6 +1798,8 @@ fn decode_effect_intent(
             owner: execution_id.clone(),
             attempt: 1,
             capability: None,
+            audit_resource: None,
+            audit_invocation_key: None,
             created_tick: 0,
             recovery_after_tick: 0,
             epoch: sequence,
@@ -1614,12 +1826,28 @@ fn decode_effect_intent(
                 .map_err(|_| StoreError::IncompatibleVersion)
         })
         .transpose()?;
+    let audit_resource = match metadata.get("audit_resource") {
+        Some(Value::Null) | None => None,
+        Some(resource) if resource.is_object() => Some(AuditResourceDigest {
+            format: audit_resource_format_back(string(resource, "format")?)?,
+            value: digest_back(string(resource, "digest")?)?,
+        }),
+        _ => return Err(StoreError::IncompatibleVersion),
+    };
+    let audit_invocation_key = optional_string(metadata, "audit_invocation_key")?
+        .map(|value| {
+            IdempotencyKey::new(value, InvocationLimits::default())
+                .map_err(|_| StoreError::IncompatibleVersion)
+        })
+        .transpose()?;
     Ok(mainframe_env_store_api::EffectIntentMetadata {
         owner: ExecutionId::new(string(metadata, "owner")?, InvocationLimits::default())
             .map_err(|_| StoreError::IncompatibleVersion)?,
         attempt: u32::try_from(number(metadata, "attempt")?)
             .map_err(|_| StoreError::IncompatibleVersion)?,
         capability,
+        audit_resource,
+        audit_invocation_key,
         created_tick: number(metadata, "created_tick")?,
         recovery_after_tick: number(metadata, "recovery_after_tick")?,
         epoch: number(metadata, "epoch")?,
@@ -1913,6 +2141,13 @@ mod effect_encoding_tests {
                     mainframe_env_execution_api::CapabilityId::new("host.state.write", limits)
                         .unwrap(),
                 ),
+                audit_resource: Some(AuditResourceDigest {
+                    format: AuditResourceDigestFormat::CanonicalHostResourceV1,
+                    value: [7; 32],
+                }),
+                audit_invocation_key: Some(
+                    IdempotencyKey::new("canonical-invocation", limits).unwrap(),
+                ),
                 created_tick: 1,
                 recovery_after_tick: 1,
                 epoch: 1,
@@ -1982,7 +2217,8 @@ mod effect_encoding_tests {
             (3, Value::Null),
             (3, json!("legacy-debug@0")),
             (3, json!("future@9")),
-            (4, json!("mainframe-env.effect-canonical@1")),
+            (4, Value::Null),
+            (5, json!("mainframe-env.effect-canonical@1")),
         ] {
             let mut bad = value.clone();
             bad["schema"] = json!(schema);

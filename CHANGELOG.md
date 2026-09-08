@@ -41,6 +41,9 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Persisted bounded typed host audit decisions with versioned canonical resource
+  digests; made effect-result, lifecycle, outbox, and audit commits atomic; and
+  made ordinary RACF authorization auditing fail closed and survive recovery.
 - Moved synchronous z/OSMF backend calls to a bounded four-worker lane and
   propagated finite HTTP deadlines plus live cancellation into invocations.
 - Classified mutating-effect journal failures after dispatch as unknown outcomes

@@ -34,6 +34,25 @@ fn golden_request_and_unknown_result_are_versioned_and_domain_separated() {
 }
 
 #[test]
+fn audit_resource_digest_is_versioned_deterministic_and_distinguishes_resources() {
+    let one = HostRequest::State(StateRequest::Get { key: "one".into() });
+    let two = HostRequest::State(StateRequest::Get { key: "two".into() });
+    assert_eq!(
+        canonical_audit_resource_digest(&one),
+        canonical_audit_resource_digest(&one)
+    );
+    assert_ne!(
+        canonical_audit_resource_digest(&one),
+        canonical_audit_resource_digest(&two)
+    );
+    assert_ne!(
+        canonical_audit_resource_digest(&one).value,
+        canonical_request_digest(&one).unwrap(),
+        "audit and replay identities use separate canonical domains"
+    );
+}
+
+#[test]
 fn provider_replay_digests_share_the_host_journal_encoding_and_have_golden_identities() {
     let limits = mainframe_env_execution_api::InvocationLimits::default();
     let mutation = |key: &str, sequence| Mutation {

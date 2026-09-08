@@ -1,7 +1,7 @@
 use mainframe_env_execution_api::{
-    ArtifactRef, BoundedPayload, CapabilityId, Completion, ExecutionId, IdempotencyKey, Invocation,
-    InvocationLimits, Machine, MachineDrive, MachineResume, Principal, PrincipalId, Quantum,
-    RequestId, ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
+    ArtifactRef, AuditDecision, BoundedPayload, CapabilityId, Completion, ExecutionId,
+    IdempotencyKey, Invocation, InvocationLimits, Machine, MachineDrive, MachineResume, Principal,
+    PrincipalId, Quantum, RequestId, ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
 };
 use mainframe_env_host_api::{
     CapabilityDescriptor, EffectRequest, EffectResult, HostLimits, HostProvider, HostRequest,
@@ -231,6 +231,13 @@ fn leave_known_success_orphan(store: Arc<dyn PlatformStore>, label: &str) -> Orp
     assert_eq!(intent.intent.recovery_after_tick, 10);
     assert_eq!(intent.intent.epoch, 4);
     assert_eq!(intent.intent.recovery_lease, None);
+    assert!(
+        store
+            .audit_records(&invocation.execution_id, 1, 8)
+            .unwrap()
+            .is_empty(),
+        "the failed terminal transaction must not leave a detached audit"
+    );
     Orphan {
         key,
         intent,
@@ -282,6 +289,13 @@ fn reconcile_after_restart(store: Arc<dyn PlatformStore>, orphan: Orphan) {
     assert_eq!(resolved.digest_format, orphan.intent.digest_format);
     assert_eq!(resolved.request_digest, orphan.intent.request_digest);
     assert!(resolved.result_digest.is_some());
+    let audits = store
+        .audit_records(&resolved.execution_id, resolved.sequence, 8)
+        .unwrap();
+    assert_eq!(audits.len(), 1);
+    assert_eq!(audits[0].decision, AuditDecision::Success);
+    assert_eq!(audits[0].resource, resolved.intent.audit_resource.unwrap());
+    assert_eq!(audits[0].capability, resolved.intent.capability.unwrap());
     assert_eq!(
         store
             .get_provider_state(&orphan.business_namespace, orphan.key.as_str())
@@ -312,11 +326,13 @@ fn stale_effect_recovery_sqlite_known_success_is_not_redispatched() {
     let root = std::env::temp_dir().join(unique("sqlite"));
     std::fs::create_dir(&root).unwrap();
     let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+    // Eleven rows exist after provider success. Event + outbox alone would fit at thirteen;
+    // the mandatory audit row is the capacity edge that forces the whole result transaction back.
     let store: Arc<dyn PlatformStore> =
-        Arc::new(SqliteStateStore::open(&url, 1024 * 1024, 11).unwrap());
+        Arc::new(SqliteStateStore::open(&url, 1024 * 1024, 13).unwrap());
     let orphan = leave_known_success_orphan(store, "sqlite");
     let reopened: Arc<dyn PlatformStore> =
-        Arc::new(SqliteStateStore::open(&url, 1024 * 1024, 11).unwrap());
+        Arc::new(SqliteStateStore::open(&url, 1024 * 1024, 13).unwrap());
     reconcile_after_restart(reopened, orphan);
     std::fs::remove_dir_all(root).unwrap();
 }
@@ -326,10 +342,11 @@ fn stale_effect_recovery_sqlite_known_success_is_not_redispatched() {
 fn postgres_stale_effect_recovery_known_success_is_not_redispatched() {
     let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")
         .expect("explicit PostgreSQL test URL required");
+    // Match the SQLite capacity edge: audit is the only terminal insert beyond the row budget.
     let store: Arc<dyn PlatformStore> =
-        Arc::new(PostgresStateStore::open(&url, 1024 * 1024, 11).unwrap());
+        Arc::new(PostgresStateStore::open(&url, 1024 * 1024, 13).unwrap());
     let orphan = leave_known_success_orphan(store, "postgres");
     let reopened: Arc<dyn PlatformStore> =
-        Arc::new(PostgresStateStore::open(&url, 1024 * 1024, 11).unwrap());
+        Arc::new(PostgresStateStore::open(&url, 1024 * 1024, 13).unwrap());
     reconcile_after_restart(reopened, orphan);
 }

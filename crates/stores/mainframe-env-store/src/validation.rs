@@ -1,5 +1,5 @@
 use mainframe_env_execution_api::{
-    ExecutionId, IdempotencyKey, LifecycleEvent, LifecycleEventKind,
+    AuditDecision, AuditRecord, ExecutionId, IdempotencyKey, LifecycleEvent, LifecycleEventKind,
 };
 use mainframe_env_store_api::{
     ArtifactRecord, CheckpointRecord, EffectRecord, EffectState, ExecutionRecord, ExecutionState,
@@ -31,6 +31,14 @@ pub(crate) fn new_outbox(record: &OutboxRecord) -> Result<(), StoreError> {
         || record.delivered
         || record.version != 1
     {
+        Err(StoreError::InvalidTransition)
+    } else {
+        Ok(())
+    }
+}
+
+pub(crate) fn audit(record: &AuditRecord) -> Result<(), StoreError> {
+    if record.attempt == 0 || record.effect_sequence == 0 {
         Err(StoreError::InvalidTransition)
     } else {
         Ok(())
@@ -290,6 +298,84 @@ pub(crate) fn effect_event(
     } else {
         Err(StoreError::InvalidSequence)
     }
+}
+
+pub(crate) fn audit_event(
+    execution: &ExecutionRecord,
+    event_record: &LifecycleEvent,
+    effect: Option<&EffectRecord>,
+    record: Option<&AuditRecord>,
+) -> Result<(), StoreError> {
+    let expected_effect_sequence = match &event_record.kind {
+        LifecycleEventKind::EffectResult { sequence } => *sequence,
+        _ if record.is_none() => return Ok(()),
+        _ => return Err(StoreError::InvalidSequence),
+    };
+    let record = record.ok_or(StoreError::InvalidSequence)?;
+    audit(record)?;
+    if record.execution_id != execution.execution_id
+        || record.run_unit_id != execution.run_unit_id
+        || record.principal != execution.principal
+        || record.attempt != execution.attempt
+        || record.attempt != event_record.attempt
+        || record.observed_tick != event_record.tick
+        || record.effect_sequence != expected_effect_sequence
+        || effect
+            .and_then(|effect| effect.intent.capability.as_ref())
+            .is_some_and(|capability| capability != &record.capability)
+        || effect
+            .and_then(|effect| effect.intent.audit_resource)
+            .is_some_and(|resource| resource != record.resource)
+        || effect
+            .and_then(|effect| effect.intent.audit_invocation_key.as_ref())
+            .is_some_and(|key| key != &record.invocation_key)
+    {
+        Err(StoreError::InvalidSequence)
+    } else {
+        Ok(())
+    }
+}
+
+pub(crate) fn recovered_audit(
+    execution: &ExecutionRecord,
+    effect: &EffectRecord,
+    observed_tick: u64,
+) -> Result<Option<AuditRecord>, StoreError> {
+    let Some(resource) = effect.intent.audit_resource else {
+        // Pre-R-02 intents remain recoverable, but did not retain enough data to synthesize an
+        // audit record safely.
+        return Ok(None);
+    };
+    let capability = effect
+        .intent
+        .capability
+        .clone()
+        .ok_or(StoreError::IncompatibleVersion)?;
+    let decision = match effect.state {
+        EffectState::Completed => AuditDecision::Success,
+        EffectState::Failed => AuditDecision::Rejected,
+        EffectState::Intent | EffectState::UnknownOutcome => {
+            return Err(StoreError::InvalidTransition);
+        }
+    };
+    let record = AuditRecord {
+        execution_id: effect.execution_id.clone(),
+        run_unit_id: effect.run_unit_id.clone(),
+        attempt: effect.intent.attempt,
+        effect_sequence: effect.sequence,
+        observed_tick,
+        principal: execution.principal.clone(),
+        invocation_key: effect
+            .intent
+            .audit_invocation_key
+            .clone()
+            .ok_or(StoreError::IncompatibleVersion)?,
+        capability,
+        resource,
+        decision,
+    };
+    audit(&record)?;
+    Ok(Some(record))
 }
 
 pub(crate) fn effect_execution(

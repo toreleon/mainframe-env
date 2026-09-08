@@ -741,16 +741,55 @@ impl RacfService {
         resource: &ResourceName,
         intent: AccessIntent,
     ) -> Result<SecurityDecision, HostProblem> {
-        let snapshot = self.database.read()?;
-        let decision = crate::saf::evaluate_access(
-            &snapshot,
-            principal.as_str(),
-            class,
-            resource.as_str(),
-            intent.into(),
-            &crate::saf::AccessEnvironment::default(),
-            false,
+        let mut resource_digest = Sha256::new();
+        resource_digest.update(b"mainframe-env.racf-authorize-resource@1\0");
+        resource_digest.update(
+            u64::try_from(class.len())
+                .map_err(|_| HostProblem::ResourceExhausted)?
+                .to_be_bytes(),
         );
+        resource_digest.update(class.as_bytes());
+        resource_digest.update(
+            u64::try_from(resource.as_str().len())
+                .map_err(|_| HostProblem::ResourceExhausted)?
+                .to_be_bytes(),
+        );
+        resource_digest.update(resource.as_str().as_bytes());
+        let resource_digest = format!("sha256:{:x}", resource_digest.finalize());
+        let audit_class = (!class.is_empty() && class.len() <= self.limits.max_name_bytes)
+            .then(|| class.to_ascii_uppercase());
+        let principal = principal.as_str().to_string();
+        let ((decision, _audit_id), _) = self.database.mutate_retry(|snapshot| {
+            let decision = crate::saf::evaluate_access(
+                snapshot,
+                &principal,
+                class,
+                resource.as_str(),
+                intent.into(),
+                &crate::saf::AccessEnvironment::default(),
+                false,
+            );
+            if snapshot.audits.len() >= self.limits.max_audits {
+                return Err(HostProblem::ResourceExhausted);
+            }
+            let audit_id = format!("AUDIT{:020}", snapshot.generation);
+            snapshot.audits.push(SecurityAuditRecord {
+                id: audit_id.clone(),
+                correlation: format!("DIRECT:{:020}", snapshot.generation),
+                actor: principal.clone(),
+                action: "AUTHORIZE".into(),
+                class: audit_class.clone(),
+                resource_digest: Some(resource_digest.clone()),
+                decision: decision.outcome,
+                status: decision.status,
+                fields: BTreeMap::from([(
+                    "RESOURCE_DIGEST_FORMAT".into(),
+                    AuditFieldValue::Text("mainframe-env.racf-authorize-resource@1".into()),
+                )]),
+                tick: 0,
+            });
+            Ok(((decision, audit_id), true))
+        })?;
         Ok(if decision.outcome == DecisionOutcome::Allow {
             SecurityDecision::Allow
         } else {
@@ -1553,6 +1592,64 @@ mod tests {
                 .unwrap(),
             SecurityDecision::Deny
         );
+        let audits = service.database.read().unwrap().audits;
+        let direct = audits
+            .iter()
+            .filter(|audit| audit.action == "AUTHORIZE")
+            .collect::<Vec<_>>();
+        assert_eq!(direct.len(), 2);
+        assert_eq!(direct[0].decision, DecisionOutcome::Allow);
+        assert_eq!(direct[1].decision, DecisionOutcome::Deny);
+        assert_ne!(direct[0].resource_digest, direct[1].resource_digest);
+        assert!(direct.iter().all(|audit| {
+            audit.fields.get("RESOURCE_DIGEST_FORMAT")
+                == Some(&AuditFieldValue::Text(
+                    "mainframe-env.racf-authorize-resource@1".into(),
+                ))
+        }));
+    }
+
+    #[test]
+    fn direct_authorization_fails_closed_when_its_audit_capacity_is_full() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let resolver = Arc::new(MemorySecretResolver::default());
+        resolver.insert("secret:user", b"PASSWORD".to_vec());
+        let service = RacfService::open(
+            store,
+            resolver,
+            RacfLimits {
+                max_audits: 1,
+                ..RacfLimits::default()
+            },
+        )
+        .unwrap();
+        let reference = SecretRef::new("secret:user", Default::default()).unwrap();
+        service.add_user("IBMUSER", &reference).unwrap();
+        service
+            .define_profile("DATASET", "USER.**", "IBMUSER", Some(AccessIntent::Read))
+            .unwrap();
+        let user = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        assert_eq!(
+            service
+                .authorize(
+                    &user,
+                    "DATASET",
+                    &ResourceName::new("USER.DATA", 246).unwrap(),
+                    AccessIntent::Read,
+                )
+                .unwrap(),
+            SecurityDecision::Allow
+        );
+        assert_eq!(
+            service.authorize(
+                &user,
+                "DATASET",
+                &ResourceName::new("USER.OTHER", 246).unwrap(),
+                AccessIntent::Read,
+            ),
+            Err(HostProblem::ResourceExhausted)
+        );
+        assert_eq!(service.database.read().unwrap().audits.len(), 1);
     }
 
     #[test]
@@ -1631,7 +1728,7 @@ mod tests {
         {
             let store: Arc<dyn ProviderStateStore> =
                 Arc::new(SqliteStateStore::open(&url, 32 * 1024 * 1024, 65_536).unwrap());
-            let service = RacfService::open(store, resolver, Default::default()).unwrap();
+            let service = RacfService::open(store, resolver.clone(), Default::default()).unwrap();
             assert_eq!(
                 service
                     .authorize(
@@ -1642,6 +1739,32 @@ mod tests {
                     )
                     .unwrap(),
                 SecurityDecision::Allow
+            );
+            let audits = service.database.read().unwrap().audits;
+            assert_eq!(
+                audits
+                    .iter()
+                    .filter(|audit| audit.action == "AUTHORIZE")
+                    .count(),
+                1,
+                "the ordinary authorization decision must survive a SQLite reopen"
+            );
+        }
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 32 * 1024 * 1024, 65_536).unwrap());
+            let service = RacfService::open(store, resolver, Default::default()).unwrap();
+            assert_eq!(
+                service
+                    .database
+                    .read()
+                    .unwrap()
+                    .audits
+                    .iter()
+                    .filter(|audit| audit.action == "AUTHORIZE")
+                    .count(),
+                1,
+                "the ordinary authorization audit must survive a process restart"
             );
         }
         let _ = std::fs::remove_file(path);

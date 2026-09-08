@@ -193,6 +193,7 @@ fn memory_store_scaling() {
                                                         e,
                                                         None,
                                                         None,
+                                                        None,
                                                         n,
                                                     )
                                                     .map(|_| ())
