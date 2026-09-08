@@ -1,4 +1,4 @@
-use crate::{PostgresStateStore, SqliteStateStore};
+use crate::{PostgresStateStore, SqliteStateStore, validation};
 use base64::Engine;
 use mainframe_env_execution_api::{
     ArtifactRef, ExecutionId, IdempotencyKey, InvocationLimits, LifecycleEvent, LifecycleEventKind,
@@ -12,18 +12,12 @@ use mainframe_env_store_api::{
     StoreError, WorkRecord, WorkState, WorkStore,
 };
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 
 macro_rules! durable_implementations {
     ($store:ty) => {
         impl ExecutionStore for $store {
             fn create_execution(&self, record: ExecutionRecord) -> Result<(), StoreError> {
-                if record.version != 1
-                    || record.attempt == 0
-                    || record.state != ExecutionState::Admitted
-                {
-                    return Err(StoreError::InvalidTransition);
-                }
+                validation::new_execution(&record)?;
                 self.put_provider_state(
                     state_record(
                         "durable-execution",
@@ -76,9 +70,7 @@ macro_rules! durable_implementations {
 
         impl EventStore for $store {
             fn append_event(&self, event: LifecycleEvent) -> Result<(), StoreError> {
-                if !event.validate() {
-                    return Err(StoreError::InvalidSequence);
-                }
+                validation::event(&event)?;
                 let namespace = format!("durable-event:{}", event.execution_id);
                 let events = self.list_provider_state(&namespace, 65536)?;
                 let expected = events.last().map_or(Ok(1), |row| {
@@ -360,16 +352,7 @@ macro_rules! durable_implementations {
 
         impl CheckpointStore for $store {
             fn put_checkpoint(&self, record: CheckpointRecord) -> Result<(), StoreError> {
-                if record.schema_version != 1
-                    || record.machine_schema_version == 0
-                    || record.provider_generation.is_empty()
-                    || record.security_classification.is_empty()
-                    || record.payload.is_empty()
-                    || record.payload_size != record.payload.len() as u64
-                    || Sha256::digest(&record.payload).as_slice() != record.payload_digest
-                {
-                    return Err(StoreError::IncompatibleVersion);
-                }
+                validation::checkpoint(&record)?;
                 let existing =
                     self.get_provider_state("durable-checkpoint", record.execution_id.as_str())?;
                 let (version, expected) =
@@ -431,12 +414,7 @@ macro_rules! durable_implementations {
 
         impl ArtifactStore for $store {
             fn put_artifact(&self, record: ArtifactRecord) -> Result<(), StoreError> {
-                let digest: [u8; 32] = Sha256::digest(&record.payload).into();
-                if record.payload_digest != digest
-                    || record.artifact.as_str() != format!("sha256:{}", hex(&digest))
-                {
-                    return Err(StoreError::IncompatibleVersion);
-                }
+                validation::artifact(&record)?;
                 if let Some(existing) = self.get_artifact(&record.artifact)? {
                     return if existing == record {
                         Ok(())
@@ -502,12 +480,7 @@ macro_rules! durable_implementations {
 
         impl IdempotencyStore for $store {
             fn record_intent(&self, record: EffectRecord) -> Result<(), StoreError> {
-                if record.sequence == 0
-                    || record.state != EffectState::Intent
-                    || record.result_digest.is_some()
-                {
-                    return Err(StoreError::InvalidTransition);
-                }
+                validation::intent(&record)?;
                 if let Some(existing) = self.effect(&record.key)? {
                     return if existing == record {
                         Ok(())
@@ -531,24 +504,9 @@ macro_rules! durable_implementations {
                 key: &IdempotencyKey,
                 record: EffectRecord,
             ) -> Result<(), StoreError> {
-                if &record.key != key
-                    || !matches!(
-                        record.state,
-                        EffectState::Completed | EffectState::Failed | EffectState::UnknownOutcome
-                    )
-                {
-                    return Err(StoreError::InvalidTransition);
-                }
+                validation::terminal(key, &record)?;
                 let intent = self.effect(key)?.ok_or(StoreError::NotFound)?;
-                if intent.execution_id != record.execution_id
-                    || intent.run_unit_id != record.run_unit_id
-                    || intent.sequence != record.sequence
-                    || intent.digest_format != record.digest_format
-                    || intent.request_digest != record.request_digest
-                    || intent.state != EffectState::Intent
-                {
-                    return Err(StoreError::Conflict);
-                }
+                validation::result(key, &intent, &record)?;
                 self.put_provider_state(
                     state_record("durable-effect", key.as_str(), 2, encode_effect(&record)?),
                     Some(1),
@@ -612,15 +570,7 @@ macro_rules! durable_implementations {
 
         impl OutboxStore for $store {
             fn append_notification(&self, record: OutboxRecord) -> Result<(), StoreError> {
-                if record.notification_id.is_empty()
-                    || record.topic.is_empty()
-                    || record.sequence == 0
-                    || record.attempt != 0
-                    || record.delivered
-                    || record.version != 1
-                {
-                    return Err(StoreError::InvalidTransition);
-                }
+                validation::new_outbox(&record)?;
                 if let Some(existing) = self
                     .get_provider_state("durable-outbox", &record.notification_id)?
                     .map(|row| decode_outbox(&row.payload, row.version))
@@ -697,22 +647,8 @@ macro_rules! durable_implementations {
                 event: LifecycleEvent,
                 notification: OutboxRecord,
             ) -> Result<(), StoreError> {
-                if execution.version != 1
-                    || execution.attempt == 0
-                    || execution.state != ExecutionState::Admitted
-                    || execution.execution_id != event.execution_id
-                    || !event.validate()
-                    || event.execution_id != notification.execution_id
-                    || event.sequence != notification.sequence
-                    || notification.version != 1
-                    || notification.delivered
-                {
-                    return Err(StoreError::InvalidSequence);
-                }
+                validation::admission(&execution, &event, &notification)?;
                 let namespace = format!("durable-event:{}", event.execution_id);
-                if event.sequence != 1 {
-                    return Err(StoreError::InvalidSequence);
-                }
                 self.put_provider_states_atomic(vec![
                     ProviderStateWrite {
                         record: state_record(
@@ -754,17 +690,10 @@ macro_rules! durable_implementations {
                 checkpoint: Option<CheckpointRecord>,
                 notification: OutboxRecord,
             ) -> Result<ExecutionRecord, StoreError> {
-                if &event.execution_id != execution_id
-                    || event.execution_id != notification.execution_id
-                    || event.sequence != notification.sequence
-                    || notification.version != 1
-                    || notification.delivered
-                {
-                    return Err(StoreError::InvalidSequence);
-                }
                 let mut execution = self
                     .get_execution(execution_id)?
                     .ok_or(StoreError::NotFound)?;
+                validation::execution_step(execution_id, &execution, &event, &notification)?;
                 if execution.version != expected_version {
                     return Err(StoreError::Conflict);
                 }
@@ -821,14 +750,22 @@ macro_rules! durable_implementations {
                     },
                 ];
                 if let Some(effect) = effect {
-                    if effect.execution_id != *execution_id {
-                        return Err(StoreError::Conflict);
-                    }
+                    validation::effect(&effect)?;
+                    validation::effect_execution(&execution, &effect)?;
                     let (version, expected) = match effect.state {
-                        EffectState::Intent => (1, None),
+                        EffectState::Intent => {
+                            validation::intent(&effect)?;
+                            validation::effect_event(&event, &effect)?;
+                            (1, None)
+                        }
                         EffectState::Completed
                         | EffectState::Failed
-                        | EffectState::UnknownOutcome => (2, Some(1)),
+                        | EffectState::UnknownOutcome => {
+                            let intent = self.effect(&effect.key)?.ok_or(StoreError::NotFound)?;
+                            validation::result(&effect.key, &intent, &effect)?;
+                            validation::effect_event(&event, &effect)?;
+                            (2, Some(1))
+                        }
                     };
                     writes.push(ProviderStateWrite {
                         record: state_record(
@@ -841,11 +778,8 @@ macro_rules! durable_implementations {
                     });
                 }
                 if let Some(checkpoint) = checkpoint {
-                    if checkpoint.execution_id != *execution_id
-                        || checkpoint.payload_size != checkpoint.payload.len() as u64
-                    {
-                        return Err(StoreError::IncompatibleVersion);
-                    }
+                    validation::checkpoint(&checkpoint)?;
+                    validation::checkpoint_execution(&execution, &checkpoint)?;
                     let existing =
                         self.get_provider_state("durable-checkpoint", execution_id.as_str())?;
                     let (version, expected) =
@@ -1184,11 +1118,7 @@ fn decode_checkpoint(bytes: &[u8]) -> Result<CheckpointRecord, StoreError> {
         payload_digest: digest_back(string(&value, "digest")?)?,
         payload: binary_back(string(&value, "payload")?)?,
     };
-    if record.payload_size != record.payload.len() as u64
-        || Sha256::digest(&record.payload).as_slice() != record.payload_digest
-    {
-        return Err(StoreError::IncompatibleVersion);
-    }
+    validation::checkpoint(&record)?;
     Ok(record)
 }
 
@@ -1223,9 +1153,7 @@ fn decode_artifact(id: &ArtifactRef, bytes: &[u8]) -> Result<ArtifactRecord, Sto
         payload_digest: digest_back(string(&value, "digest")?)?,
         payload: binary_back(string(&value, "payload")?)?,
     };
-    if Sha256::digest(&record.payload).as_slice() != record.payload_digest {
-        return Err(StoreError::IncompatibleVersion);
-    }
+    validation::artifact(&record)?;
     Ok(record)
 }
 
@@ -1304,7 +1232,7 @@ fn decode_effect(key: &IdempotencyKey, bytes: &[u8]) -> Result<EffectRecord, Sto
         }
     };
     let limits = InvocationLimits::default();
-    Ok(EffectRecord {
+    let record = EffectRecord {
         execution_id: ExecutionId::new(string(&value, "execution")?, limits)
             .map_err(|_| StoreError::IncompatibleVersion)?,
         run_unit_id: RunUnitId::new(string(&value, "run")?, limits)
@@ -1319,7 +1247,9 @@ fn decode_effect(key: &IdempotencyKey, bytes: &[u8]) -> Result<EffectRecord, Sto
             Some(Value::Null) | None => None,
             _ => return Err(StoreError::IncompatibleVersion),
         },
-    })
+    };
+    validation::effect(&record)?;
+    Ok(record)
 }
 fn effect_state(value: EffectState) -> &'static str {
     match value {
@@ -1394,6 +1324,7 @@ mod tests {
     use mainframe_env_store_api::{
         ArtifactStore, EventStore, ExecutionStore, JournalStore, OutboxStore, WorkStore,
     };
+    use sha2::{Digest, Sha256};
 
     #[test]
     fn sqlite_durable_traits_survive_reopen_and_enforce_integrity() {

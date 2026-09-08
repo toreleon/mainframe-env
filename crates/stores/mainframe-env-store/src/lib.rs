@@ -8,6 +8,7 @@ mod memory;
 mod postgres;
 mod runtime;
 mod sqlite;
+mod validation;
 
 pub use local_artifact::LocalArtifactStore;
 pub use memory::{MemoryStore, StoreLimits};

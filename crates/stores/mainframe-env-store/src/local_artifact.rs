@@ -1,6 +1,6 @@
+use crate::validation;
 use mainframe_env_execution_api::ArtifactRef;
 use mainframe_env_store_api::{ArtifactRecord, ArtifactStore, StoreError};
-use sha2::{Digest, Sha256};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -46,12 +46,7 @@ impl ArtifactStore for LocalArtifactStore {
         if record.payload.len() > self.max_artifact_bytes || record.media_type.is_empty() {
             return Err(StoreError::PayloadTooLarge);
         }
-        let digest: [u8; 32] = Sha256::digest(&record.payload).into();
-        if record.payload_digest != digest
-            || record.artifact.as_str() != format!("sha256:{}", hex(&digest))
-        {
-            return Err(StoreError::IncompatibleVersion);
-        }
+        validation::artifact(&record)?;
         let path = self.path(&record.artifact)?;
         let encoded = encode(&record)?;
         if path.exists() {
@@ -157,22 +152,17 @@ fn decode(artifact: &ArtifactRef, bytes: &[u8], max: usize) -> Result<ArtifactRe
         .get(payload_start..)
         .ok_or(StoreError::IncompatibleVersion)?
         .to_vec();
-    if payload.len() > max
-        || Sha256::digest(&payload).as_slice() != payload_digest
-        || artifact.as_str() != format!("sha256:{}", hex(&payload_digest))
-    {
-        return Err(StoreError::IncompatibleVersion);
+    if payload.len() > max {
+        return Err(StoreError::PayloadTooLarge);
     }
-    Ok(ArtifactRecord {
+    let record = ArtifactRecord {
         artifact: artifact.clone(),
         media_type,
         payload_digest,
         payload,
-    })
-}
-
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+    };
+    validation::artifact(&record)?;
+    Ok(record)
 }
 
 #[allow(dead_code)]
@@ -182,6 +172,11 @@ fn provider_private_path(_: &Path) {}
 mod tests {
     use super::*;
     use mainframe_env_execution_api::InvocationLimits;
+    use sha2::{Digest, Sha256};
+
+    fn hex(bytes: &[u8]) -> String {
+        bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+    }
 
     #[test]
     fn immutable_artifact_roundtrips_and_detects_corruption() {

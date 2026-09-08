@@ -111,5 +111,12 @@ if [[ -f "$root/crates/stores/mainframe-env-store/tests/effect_encoding_contract
     postgres_effect_domains_cannot_be_mixed -- --ignored --exact
   gates+=(postgres-effect)
 fi
+if [[ -f "$root/crates/stores/mainframe-env-store/tests/atomic_invariants_contract.rs" ]]; then
+  "$python_bin" -B "$root/tools/ci_assurance.py" record --output "$out" \
+    --gate postgres-atomic-invariants --expect-tests -- \
+    cargo test --locked -p mainframe-env-store --test atomic_invariants_contract \
+    postgres_atomic_invariants_contract -- --ignored --exact
+  gates+=(postgres-atomic-invariants)
+fi
 "$python_bin" -B "$root/tools/ci_assurance.py" summary --plan "$out/plan.json" \
   --directory "$out" --output "$out/summary.json" --gates "${gates[@]}"

@@ -11738,7 +11738,7 @@ mod tests {
     }
 
     #[test]
-    fn corrupted_common_checkpoint_fails_closed_on_restart() {
+    fn corrupted_common_checkpoint_is_rejected_before_restart() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let checkpoint_store: Arc<dyn CheckpointStore> = store.clone();
         let service =
@@ -11756,22 +11756,23 @@ mod tests {
         let execution_id = checkpoint_execution_id(&submitted.id).unwrap();
         let mut checkpoint = store.get_checkpoint(&execution_id).unwrap().unwrap();
         checkpoint.payload[0] ^= 0xff;
-        store.put_checkpoint(checkpoint).unwrap();
+        assert_eq!(
+            store.put_checkpoint(checkpoint),
+            Err(StoreError::IncompatibleVersion)
+        );
         drop(service);
 
         let checkpoint_store: Arc<dyn CheckpointStore> = store.clone();
         let provider_store: Arc<dyn ProviderStateStore> = store;
         let providers = spool_test_providers(provider_store.clone());
-        assert!(matches!(
-            BatchService::open_with_checkpoint_store(
-                host_with(builtins(), providers),
-                provider_store,
-                checkpoint_store,
-                Default::default(),
-                Default::default(),
-            ),
-            Err(HostProblem::InfrastructureFailure)
-        ));
+        BatchService::open_with_checkpoint_store(
+            host_with(builtins(), providers),
+            provider_store,
+            checkpoint_store,
+            Default::default(),
+            Default::default(),
+        )
+        .unwrap();
     }
 
     #[test]

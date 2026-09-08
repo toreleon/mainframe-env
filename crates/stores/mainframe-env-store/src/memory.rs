@@ -1,3 +1,4 @@
+use crate::validation;
 use mainframe_env_execution_api::{ArtifactRef, ExecutionId, IdempotencyKey, LifecycleEvent};
 use mainframe_env_store_api::{
     ArtifactRecord, ArtifactStore, CheckpointRecord, CheckpointStore, EffectRecord, EffectState,
@@ -131,9 +132,7 @@ impl MemoryStore {
         event: LifecycleEvent,
         limits: StoreLimits,
     ) -> Result<(), StoreError> {
-        if !event.validate() {
-            return Err(StoreError::InvalidSequence);
-        }
+        validation::event(&event)?;
         let total: usize = state.events.values().map(Vec::len).sum();
         if total >= limits.max_events {
             return Err(StoreError::CapacityExceeded);
@@ -155,15 +154,7 @@ impl MemoryStore {
         record: OutboxRecord,
         limits: StoreLimits,
     ) -> Result<(), StoreError> {
-        if record.notification_id.is_empty()
-            || record.topic.is_empty()
-            || record.sequence == 0
-            || record.attempt != 0
-            || record.delivered
-            || record.version != 1
-        {
-            return Err(StoreError::InvalidTransition);
-        }
+        validation::new_outbox(&record)?;
         if let Some(existing) = state.outbox.get(&record.notification_id) {
             return if existing == &record {
                 Ok(())
@@ -182,9 +173,7 @@ impl MemoryStore {
 
 impl ExecutionStore for MemoryStore {
     fn create_execution(&self, record: ExecutionRecord) -> Result<(), StoreError> {
-        if record.attempt == 0 || record.version == 0 || record.state != ExecutionState::Admitted {
-            return Err(StoreError::InvalidTransition);
-        }
+        validation::new_execution(&record)?;
         let mut state = self.lock()?;
         if state.executions.contains_key(&record.execution_id) {
             return Err(StoreError::AlreadyExists);
@@ -421,15 +410,7 @@ fn clear_lease(work: &mut WorkRecord) {
 
 impl CheckpointStore for MemoryStore {
     fn put_checkpoint(&self, record: CheckpointRecord) -> Result<(), StoreError> {
-        if record.schema_version == 0
-            || record.machine_schema_version == 0
-            || record.provider_generation.is_empty()
-            || record.security_classification.is_empty()
-            || record.payload.is_empty()
-            || record.payload_size != record.payload.len() as u64
-        {
-            return Err(StoreError::IncompatibleVersion);
-        }
+        validation::checkpoint(&record)?;
         let mut state = self.lock()?;
         let old = state
             .checkpoints
@@ -491,6 +472,7 @@ impl SessionStore for MemoryStore {
 
 impl ArtifactStore for MemoryStore {
     fn put_artifact(&self, record: ArtifactRecord) -> Result<(), StoreError> {
+        validation::artifact(&record)?;
         let mut state = self.lock()?;
         if let Some(existing) = state.artifacts.get(&record.artifact) {
             return if existing == &record {
@@ -544,12 +526,7 @@ impl GenerationStore for MemoryStore {
 
 impl IdempotencyStore for MemoryStore {
     fn record_intent(&self, record: EffectRecord) -> Result<(), StoreError> {
-        if record.sequence == 0
-            || record.state != EffectState::Intent
-            || record.result_digest.is_some()
-        {
-            return Err(StoreError::InvalidTransition);
-        }
+        validation::intent(&record)?;
         let mut state = self.lock()?;
         if let Some(existing) = state.effects.get(&record.key) {
             return if existing == &record {
@@ -566,25 +543,10 @@ impl IdempotencyStore for MemoryStore {
     }
 
     fn record_result(&self, key: &IdempotencyKey, record: EffectRecord) -> Result<(), StoreError> {
-        if &record.key != key
-            || !matches!(
-                record.state,
-                EffectState::Completed | EffectState::Failed | EffectState::UnknownOutcome
-            )
-        {
-            return Err(StoreError::InvalidTransition);
-        }
+        validation::terminal(key, &record)?;
         let mut state = self.lock()?;
         let intent = state.effects.get(key).ok_or(StoreError::NotFound)?;
-        if intent.execution_id != record.execution_id
-            || intent.run_unit_id != record.run_unit_id
-            || intent.sequence != record.sequence
-            || intent.digest_format != record.digest_format
-            || intent.request_digest != record.request_digest
-            || intent.state != EffectState::Intent
-        {
-            return Err(StoreError::Conflict);
-        }
+        validation::result(key, intent, &record)?;
         state.effects.insert(key.clone(), record);
         Ok(())
     }
@@ -674,15 +636,7 @@ impl JournalStore for MemoryStore {
         event: LifecycleEvent,
         notification: OutboxRecord,
     ) -> Result<(), StoreError> {
-        if execution.version != 1
-            || execution.attempt == 0
-            || execution.state != ExecutionState::Admitted
-            || execution.execution_id != event.execution_id
-            || event.execution_id != notification.execution_id
-            || event.sequence != notification.sequence
-        {
-            return Err(StoreError::InvalidSequence);
-        }
+        validation::admission(&execution, &event, &notification)?;
         let mut state = self.lock()?;
         let mut staged = state.clone();
         if staged.executions.contains_key(&execution.execution_id) {
@@ -710,12 +664,6 @@ impl JournalStore for MemoryStore {
         checkpoint: Option<CheckpointRecord>,
         notification: OutboxRecord,
     ) -> Result<ExecutionRecord, StoreError> {
-        if &event.execution_id != execution_id
-            || event.execution_id != notification.execution_id
-            || event.sequence != notification.sequence
-        {
-            return Err(StoreError::InvalidSequence);
-        }
         let mut state = self.lock()?;
         let mut staged = state.clone();
         let current = staged
@@ -723,12 +671,14 @@ impl JournalStore for MemoryStore {
             .get(execution_id)
             .cloned()
             .ok_or(StoreError::NotFound)?;
-        if current.version != expected_version
-            || next_state.is_some_and(|next| !current.state.can_transition_to(next))
-        {
+        validation::execution_step(execution_id, &current, &event, &notification)?;
+        if current.version != expected_version {
+            return Err(StoreError::Conflict);
+        }
+        if next_state.is_some_and(|next| !current.state.can_transition_to(next)) {
             return Err(StoreError::InvalidTransition);
         }
-        let mut updated = current;
+        let mut updated = current.clone();
         if let Some(next) = next_state {
             updated.state = next;
         }
@@ -737,8 +687,12 @@ impl JournalStore for MemoryStore {
             .executions
             .insert(execution_id.clone(), updated.clone());
         if let Some(effect) = effect {
+            validation::effect(&effect)?;
+            validation::effect_execution(&current, &effect)?;
             match effect.state {
                 EffectState::Intent => {
+                    validation::intent(&effect)?;
+                    validation::effect_event(&event, &effect)?;
                     if staged.effects.contains_key(&effect.key) {
                         return Err(StoreError::Conflict);
                     }
@@ -752,26 +706,15 @@ impl JournalStore for MemoryStore {
                         .effects
                         .get(&effect.key)
                         .ok_or(StoreError::NotFound)?;
-                    if intent.execution_id != effect.execution_id
-                        || intent.run_unit_id != effect.run_unit_id
-                        || intent.sequence != effect.sequence
-                        || intent.digest_format != effect.digest_format
-                        || intent.request_digest != effect.request_digest
-                        || intent.state != EffectState::Intent
-                    {
-                        return Err(StoreError::Conflict);
-                    }
+                    validation::result(&effect.key, intent, &effect)?;
+                    validation::effect_event(&event, &effect)?;
                     staged.effects.insert(effect.key.clone(), effect);
                 }
             }
         }
         if let Some(checkpoint) = checkpoint {
-            if checkpoint.execution_id != *execution_id
-                || checkpoint.payload_size != checkpoint.payload.len() as u64
-                || checkpoint.payload.is_empty()
-            {
-                return Err(StoreError::IncompatibleVersion);
-            }
+            validation::checkpoint(&checkpoint)?;
+            validation::checkpoint_execution(&current, &checkpoint)?;
             let old = staged
                 .checkpoints
                 .get(execution_id)
@@ -955,6 +898,7 @@ mod tests {
     use mainframe_env_execution_api::{
         InvocationLimits, LifecycleEventKind, PrincipalId, RunUnitId, Selector,
     };
+    use sha2::{Digest, Sha256};
 
     struct Ids {
         execution: ExecutionId,
@@ -1137,20 +1081,24 @@ mod tests {
     #[test]
     fn artifact_is_immutable() {
         let store = MemoryStore::new(StoreLimits::default());
-        let ids = ids();
+        let payload = vec![1];
+        let hash = Sha256::digest(&payload);
+        let identity = format!("sha256:{hash:x}");
+        let digest: [u8; 32] = hash.into();
+        let artifact = ArtifactRef::new(identity, InvocationLimits::default()).unwrap();
         let first = ArtifactRecord {
-            artifact: ids.artifact.clone(),
+            artifact: artifact.clone(),
             media_type: "application/test".into(),
-            payload_digest: [1; 32],
-            payload: vec![1],
+            payload_digest: digest,
+            payload,
         };
         store.put_artifact(first.clone()).unwrap();
         assert!(store.put_artifact(first).is_ok());
         let conflicting = ArtifactRecord {
-            artifact: ids.artifact,
-            media_type: "application/test".into(),
-            payload_digest: [2; 32],
-            payload: vec![2],
+            artifact,
+            media_type: "application/other".into(),
+            payload_digest: digest,
+            payload: vec![1],
         };
         assert_eq!(store.put_artifact(conflicting), Err(StoreError::Conflict));
     }
@@ -1258,6 +1206,7 @@ mod tests {
         assert_eq!(store.record_intent(conflict), Err(StoreError::Conflict));
         let unknown = EffectRecord {
             state: EffectState::UnknownOutcome,
+            result_digest: Some([2; 32]),
             ..intent
         };
         store.record_result(&ids.idem, unknown.clone()).unwrap();
