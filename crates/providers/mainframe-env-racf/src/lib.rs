@@ -17,9 +17,10 @@ pub use authority::{
 };
 pub use command::{
     CommandDescriptor, CommandDiagnostic, CommandDiagnosticCode, CommandDomain, CommandFamily,
-    CommandLanguageLimits, RacrouteDescriptor, RacrouteRequestType, SuppliedClassDescriptor,
-    SyntaxTokenBehavior, SyntaxTokenDescriptor, ValidatedCommand, command_descriptors,
-    racroute_descriptors, recognize_command, supplied_class_descriptors, validate_command,
+    CommandLanguageLimits, FlatValueRoleDescriptor, RacrouteDescriptor, RacrouteRequestType,
+    SuppliedClassDescriptor, SyntaxTokenBehavior, SyntaxTokenDescriptor, ValidatedCommand,
+    command_descriptors, racroute_descriptors, recognize_command, supplied_class_descriptors,
+    validate_command,
 };
 pub use command_processor::{CommandContext, CommandObjectKind, CommandRecord, CommandResult};
 pub use database::{SecurityDatabase, SecurityDatabaseSummary, SecuritySemanticProjection};

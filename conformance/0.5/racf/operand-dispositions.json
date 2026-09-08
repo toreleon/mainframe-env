@@ -1119,7 +1119,8 @@
         "context_only": []
       },
       "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
-      "syntax_contexts": []
+      "syntax_contexts": [],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0002",
@@ -1178,7 +1179,8 @@
             ]
           ]
         }
-      ]
+      ],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0003",
@@ -1348,7 +1350,8 @@
             ]
           ]
         }
-      ]
+      ],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0004",
@@ -1411,7 +1414,8 @@
             ]
           ]
         }
-      ]
+      ],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0005",
@@ -1450,7 +1454,8 @@
             ]
           ]
         }
-      ]
+      ],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0006",
@@ -1639,7 +1644,8 @@
             ]
           ]
         }
-      ]
+      ],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0007",
@@ -1661,7 +1667,8 @@
         "context_only": []
       },
       "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
-      "syntax_contexts": []
+      "syntax_contexts": [],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0008",
@@ -1691,7 +1698,8 @@
           "note": "RACF is emitted by syntax text but is not an executable keyword in an unambiguous command or operand path; arbitrary occurrences remain data.",
           "within_paths": []
         }
-      ]
+      ],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0009",
@@ -1711,7 +1719,8 @@
         "context_only": []
       },
       "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
-      "syntax_contexts": []
+      "syntax_contexts": [],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0010",
@@ -1731,7 +1740,8 @@
         "context_only": []
       },
       "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
-      "syntax_contexts": []
+      "syntax_contexts": [],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0011",
@@ -1753,7 +1763,8 @@
         "context_only": []
       },
       "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
-      "syntax_contexts": []
+      "syntax_contexts": [],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0012",
@@ -1780,7 +1791,8 @@
         "context_only": []
       },
       "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
-      "syntax_contexts": []
+      "syntax_contexts": [],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0013",
@@ -1800,7 +1812,8 @@
         "context_only": []
       },
       "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
-      "syntax_contexts": []
+      "syntax_contexts": [],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0014",
@@ -1820,7 +1833,8 @@
         "context_only": []
       },
       "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
-      "syntax_contexts": []
+      "syntax_contexts": [],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0015",
@@ -1842,7 +1856,8 @@
         "context_only": []
       },
       "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
-      "syntax_contexts": []
+      "syntax_contexts": [],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0016",
@@ -1998,6 +2013,22 @@
               "WHEN"
             ]
           ]
+        }
+      ],
+      "flat_value_roles": [
+        {
+          "within_path": [
+            "WHEN"
+          ],
+          "roles": [
+            "TERMINAL",
+            "CONSOLE",
+            "SYSTEM",
+            "APPLICATION",
+            "APPL",
+            "TIME"
+          ],
+          "note": "These implemented PERMIT WHEN markers consume the immediately following flat word as data; that value cannot be reclassified as a sibling syntax token."
         }
       ]
     },
@@ -2323,7 +2354,8 @@
             ]
           ]
         }
-      ]
+      ],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0018",
@@ -2371,7 +2403,8 @@
             ]
           ]
         }
-      ]
+      ],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0019",
@@ -2410,7 +2443,8 @@
             ]
           ]
         }
-      ]
+      ],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0022",
@@ -2561,7 +2595,8 @@
           "note": "REXX is emitted by syntax text but is not an executable keyword in an unambiguous command or operand path; arbitrary occurrences remain data.",
           "within_paths": []
         }
-      ]
+      ],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0023",
@@ -2662,7 +2697,8 @@
           "note": "REXX is emitted by syntax text but is not an executable keyword in an unambiguous command or operand path; arbitrary occurrences remain data.",
           "within_paths": []
         }
-      ]
+      ],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0024",
@@ -2683,7 +2719,8 @@
         "context_only": []
       },
       "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
-      "syntax_contexts": []
+      "syntax_contexts": [],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0025",
@@ -2703,7 +2740,8 @@
         "context_only": []
       },
       "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
-      "syntax_contexts": []
+      "syntax_contexts": [],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0026",
@@ -2740,7 +2778,8 @@
           "note": "The pinned syntax presents OUTPUT as a command-level selector; this exact occurrence returns UnsupportedCapability before effects.",
           "within_paths": []
         }
-      ]
+      ],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0027",
@@ -2783,7 +2822,8 @@
         "context_only": []
       },
       "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
-      "syntax_contexts": []
+      "syntax_contexts": [],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0028",
@@ -2817,7 +2857,8 @@
             ]
           ]
         }
-      ]
+      ],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0029",
@@ -2866,7 +2907,8 @@
             ]
           ]
         }
-      ]
+      ],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0030",
@@ -2890,7 +2932,8 @@
         "context_only": []
       },
       "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
-      "syntax_contexts": []
+      "syntax_contexts": [],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0031",
@@ -3038,7 +3081,8 @@
             ]
           ]
         }
-      ]
+      ],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0032",
@@ -3060,7 +3104,8 @@
         "context_only": []
       },
       "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
-      "syntax_contexts": []
+      "syntax_contexts": [],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0033",
@@ -3079,7 +3124,8 @@
         "context_only": []
       },
       "emulator_behavior": "Every listed publication-only or syntax-only top-level name is deliberately unsupported; the parser recognizes it and returns UnsupportedCapability(racf-command-operand) before authorization, audit, or state mutation.",
-      "syntax_contexts": []
+      "syntax_contexts": [],
+      "flat_value_roles": []
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0034",
@@ -3134,7 +3180,8 @@
             ]
           ]
         }
-      ]
+      ],
+      "flat_value_roles": []
     }
   ],
   "context_only_syntax_only_names": 4,

@@ -53,6 +53,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["CSDATA", "DATA", "DFP", "MODEL", "OMVS", "OVM", "OWNER", "SUPGROUP", "TERMUACC", "TME", "UNIVERSAL"],
         unsupported_operands: &["AT", "NOTERMUACC", "ONLYAT"],
         syntax_tokens: &[],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::AddSd,
@@ -68,6 +69,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["ADDCATEGORY", "AUDIT", "DATA", "DFP", "FCLASS", "FROM", "GENERIC", "LEVEL", "MODEL", "NOTIFY", "OWNER", "SECLABEL", "SET", "UACC", "UNIT", "VOLUME", "WARNING"],
         unsupported_operands: &["AT", "CSDATA", "ERASE", "FGENERIC", "FILESEQ", "FVOLUME", "NOCSDATA", "NOSET", "ONLYAT", "RETPD", "SECLEVEL", "SETONLY", "TAPE", "TME"],
         syntax_tokens: &[SyntaxTokenDescriptor { token: "NO", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["CSDATA"], ] }, SyntaxTokenDescriptor { token: "CKDS", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["DFP", "DATAKEY"], ] }, ],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::AddUser,
@@ -83,6 +85,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["ADSP", "AUDITOR", "AUTHORITY", "CICS", "CSDATA", "DATA", "DCE", "DFLTGRP", "DFP", "EIM", "GRPACC", "INTERVAL", "KERB", "LANGUAGE", "LNOTES", "MFA", "MODEL", "NAME", "NDS", "NETVIEW", "NOADSP", "NOAUDITOR", "NOGRPACC", "NOOPERATIONS", "NOPASSWORD", "NORESTRICTED", "NOSPECIAL", "OMVS", "OPERATIONS", "OPERPARM", "OVM", "OWNER", "PASSWORD", "PHRASE", "PROXY", "RESTRICTED", "REVOKE", "SECLABEL", "SPECIAL", "TME", "TSO", "UACC", "WORKATTR"],
         unsupported_operands: &["ADDCATEGORY", "AT", "CLAUTH", "NOCLAUTH", "NOCONTAIN", "NOOIDCARD", "NOROAUDIT", "OIDCARD", "ONLYAT", "REVOKE", "ROAUDIT", "SECLEVEL", "WHEN"],
         syntax_tokens: &[SyntaxTokenDescriptor { token: "OPERATOR-CLASS", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["CICS", "OPCLASS"], &["OPERPARM"], ] }, SyntaxTokenDescriptor { token: "OPERATOR-ID", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["CICS", "OPIDENT"], &["OPERPARM"], ] }, SyntaxTokenDescriptor { token: "OPERATOR-PRIORITY", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["CICS", "OPPRTY"], &["OPERPARM"], ] }, SyntaxTokenDescriptor { token: "TIMEOUT-VALUE", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["CICS", "TIMEOUT"], &["OPERPARM"], ] }, SyntaxTokenDescriptor { token: "FORCE", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["CICS", "XRFSOFF"], ] }, SyntaxTokenDescriptor { token: "NOFORCE", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["CICS", "XRFSOFF"], ] }, SyntaxTokenDescriptor { token: "WAADDR1", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["WORKATTR"], ] }, SyntaxTokenDescriptor { token: "WAADDR2", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["WORKATTR"], ] }, SyntaxTokenDescriptor { token: "WAADDR3", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["WORKATTR"], ] }, SyntaxTokenDescriptor { token: "WAADDR4", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["WORKATTR"], ] }, ],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::AltSd,
@@ -98,6 +101,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["ADDCATEGORY", "AUDIT", "DATA", "DFP", "FCLASS", "FROM", "GENERIC", "LEVEL", "MODEL", "NOADDCATEGORY", "NOAUDIT", "NODATA", "NOLEVEL", "NONOTIFY", "NOSECLABEL", "NOWARNING", "NOTIFY", "OWNER", "SECLABEL", "SET", "UACC", "UNIT", "VOLUME", "WARNING"],
         unsupported_operands: &["ADDVOL", "ALTVOL", "AT", "CSDATA", "DELCATEGORY", "DELVOL", "ERASE", "GLOBALAUDIT", "NOCSDATA", "NODFP", "NOERASE", "NOSECLEVEL", "NOSET", "NOTME", "ONLYAT", "RETPD", "SECLEVEL", "TME"],
         syntax_tokens: &[SyntaxTokenDescriptor { token: "NO", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["CSDATA"], ] }, SyntaxTokenDescriptor { token: "CKDS", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["DFP", "DATAKEY"], ] }, ],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::AltGroup,
@@ -113,6 +117,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["CSDATA", "DATA", "DFP", "MODEL", "NODATA", "NOMODEL", "NOTERMUACC", "NOUNIVERSAL", "OMVS", "OVM", "OWNER", "SUPGROUP", "TERMUACC", "TME", "UNIVERSAL"],
         unsupported_operands: &["AT", "NOCSDATA", "NODFP", "NOOMVS", "NOOVM", "NOTME", "ONLYAT"],
         syntax_tokens: &[SyntaxTokenDescriptor { token: "NO", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["CSDATA"], ] }, ],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::AltUser,
@@ -128,6 +133,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["ADSP", "AUDITOR", "AUTHORITY", "CICS", "CSDATA", "DATA", "DCE", "DFLTGRP", "DFP", "EIM", "GRPACC", "INTERVAL", "KERB", "LANGUAGE", "LNOTES", "MFA", "MODEL", "NAME", "NDS", "NETVIEW", "NOADSP", "NOAUDITOR", "NOGRPACC", "NOINTERVAL", "NOOPERATIONS", "NOPASSWORD", "NORESTRICTED", "NOSPECIAL", "OMVS", "OPERATIONS", "OPERPARM", "OVM", "OWNER", "PASSWORD", "PHRASE", "PROXY", "RESTRICTED", "RESUME", "REVOKE", "SECLABEL", "SPECIAL", "TME", "TSO", "UACC", "WORKATTR"],
         unsupported_operands: &["ADDCATEGORY", "ALLOWCONTAIN", "AT", "CLAUTH", "CONTAIN", "DELCATEGORY", "EXPIRED", "GROUP", "NEVERCONTAIN", "NOCICS", "NOCLAUTH", "NOCONTAIN", "NOCSDATA", "NODATA", "NODCE", "NODFP", "NOEIM", "NOEXPIRED", "NOKERB", "NOLANGUAGE", "NOLNOTES", "NOMFA", "NOMODEL", "NONDS", "NONETVIEW", "NOOIDCARD", "NOOMVS", "NOOPERPARM", "NOOVM", "NOPHRASE", "NOPROXY", "NORESUME", "NOREVOKE", "NOROAUDIT", "NOSECLABEL", "NOSECLEVEL", "NOTSO", "NOUAUDIT", "NOWORKATTR", "OIDCARD", "ONLYAT", "PWCLEAN", "PWCONVERT", "ROAUDIT", "SECLEVEL", "UAUDIT", "WHEN"],
         syntax_tokens: &[SyntaxTokenDescriptor { token: "FORCE", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["CICS", "XRFSOFF"], ] }, SyntaxTokenDescriptor { token: "NOFORCE", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["CICS", "XRFSOFF"], ] }, SyntaxTokenDescriptor { token: "WAADDR1", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["WORKATTR"], ] }, SyntaxTokenDescriptor { token: "NOWAADDR1", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["WORKATTR"], ] }, SyntaxTokenDescriptor { token: "WAADDR2", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["WORKATTR"], ] }, SyntaxTokenDescriptor { token: "NOWAADDR2", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["WORKATTR"], ] }, SyntaxTokenDescriptor { token: "WAADDR3", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["WORKATTR"], ] }, SyntaxTokenDescriptor { token: "NOWAADDR3", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["WORKATTR"], ] }, SyntaxTokenDescriptor { token: "WAADDR4", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["WORKATTR"], ] }, SyntaxTokenDescriptor { token: "NOWAADDR4", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["WORKATTR"], ] }, ],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::Connect,
@@ -143,6 +149,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["ADSP", "AUDITOR", "AUTHORITY", "GROUP", "GRPACC", "NOADSP", "NOAUDITOR", "NOGRPACC", "NOOPERATIONS", "NOSPECIAL", "OPERATIONS", "OWNER", "RESUME", "REVOKE", "SPECIAL", "UACC"],
         unsupported_operands: &["AT", "NORESUME", "NOREVOKE", "ONLYAT"],
         syntax_tokens: &[],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::DelSd,
@@ -158,6 +165,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["GENERIC", "NOSET", "SET", "VOLUME"],
         unsupported_operands: &["AT", "ONLYAT"],
         syntax_tokens: &[SyntaxTokenDescriptor { token: "RACF", behavior: SyntaxTokenBehavior::AnalysisOnly, command_level: false, within_paths: &[] }, ],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::DelGroup,
@@ -173,6 +181,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &[],
         unsupported_operands: &["AT", "ONLYAT"],
         syntax_tokens: &[],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::DelUser,
@@ -188,6 +197,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &[],
         unsupported_operands: &["AT", "ONLYAT"],
         syntax_tokens: &[],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::Display,
@@ -203,6 +213,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["ALL", "MAPPING", "NODE", "SIGNON", "USER"],
         unsupported_operands: &["APPL", "GROUP", "MAPPING", "NODE", "POE", "SECLABEL"],
         syntax_tokens: &[],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::ListDsd,
@@ -218,6 +229,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["ALL", "AUTHUSER", "DA", "GENERIC", "HISTORY", "ID", "MULTI", "NORACF", "PREFIX", "VOLUME"],
         unsupported_operands: &["AT", "CSDATA", "DATASET", "DFP", "DSNS", "NOGENERIC", "ONLYAT", "STATISTICS", "TME"],
         syntax_tokens: &[],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::ListGrp,
@@ -233,6 +245,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["ALL", "AUTHUSER", "CSDATA", "DFP", "HISTORY", "NORACF", "OMVS", "OVM", "TME"],
         unsupported_operands: &["AT", "ONLYAT"],
         syntax_tokens: &[],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::ListUser,
@@ -248,6 +261,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["ALL", "CICS", "CSDATA", "DCE", "DFP", "EIM", "HISTORY", "KERB", "LANGUAGE", "LNOTES", "MFA", "NDS", "NETVIEW", "NORACF", "OMVS", "OPERPARM", "OVM", "PROXY", "TME", "TSO", "WORKATTR"],
         unsupported_operands: &["AT", "ONLYAT"],
         syntax_tokens: &[],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::Password,
@@ -263,6 +277,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["INTERVAL", "NOINTERVAL", "PASSWORD", "PHRASE", "USER"],
         unsupported_operands: &["AT", "NOPHRASEINT", "ONLYAT", "PHRASEINT"],
         syntax_tokens: &[],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::Permit,
@@ -278,6 +293,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["ACCESS", "CLASS", "DELETE", "GENERIC", "ID", "RESET", "WHEN"],
         unsupported_operands: &["AT", "FCLASS", "FGENERIC", "FROM", "FVOLUME", "ONLYAT", "VOLUME"],
         syntax_tokens: &[SyntaxTokenDescriptor { token: "ALL", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["RESET"], ] }, SyntaxTokenDescriptor { token: "STANDARD", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["RESET"], ] }, SyntaxTokenDescriptor { token: "APPCPORT", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["WHEN"], ] }, SyntaxTokenDescriptor { token: "CONSOLE", behavior: SyntaxTokenBehavior::Implemented, command_level: false, within_paths: &[&["WHEN"], ] }, SyntaxTokenDescriptor { token: "CRITERIA", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["WHEN"], ] }, SyntaxTokenDescriptor { token: "JESINPUT", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["WHEN"], ] }, SyntaxTokenDescriptor { token: "JES", behavior: SyntaxTokenBehavior::AnalysisOnly, command_level: false, within_paths: &[] }, SyntaxTokenDescriptor { token: "PROGRAM", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["WHEN"], ] }, SyntaxTokenDescriptor { token: "SERVAUTH", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["WHEN"], ] }, SyntaxTokenDescriptor { token: "SYSID", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["WHEN"], ] }, SyntaxTokenDescriptor { token: "TERMINAL", behavior: SyntaxTokenBehavior::Implemented, command_level: false, within_paths: &[&["WHEN"], ] }, ],
+        flat_value_roles: &[FlatValueRoleDescriptor { role: "TERMINAL", within_path: &["WHEN"] }, FlatValueRoleDescriptor { role: "CONSOLE", within_path: &["WHEN"] }, FlatValueRoleDescriptor { role: "SYSTEM", within_path: &["WHEN"] }, FlatValueRoleDescriptor { role: "APPLICATION", within_path: &["WHEN"] }, FlatValueRoleDescriptor { role: "APPL", within_path: &["WHEN"] }, FlatValueRoleDescriptor { role: "TIME", within_path: &["WHEN"] }, ],
     },
     CommandDescriptor {
         family: CommandFamily::Racdcert,
@@ -293,6 +309,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["ADD", "ALTER", "CERTAUTH", "CHECKCERT", "CONNECT", "DELETE", "EXPORT", "GENCERT", "GENREQ", "ID", "IMPORT", "LIST", "LISTCHAIN", "RING", "SITE", "START", "STOP"],
         unsupported_operands: &["ADDRING", "ADDTOKEN", "ALTMAP", "ALTNAME", "BIND", "BPECC", "CRITERIA", "DEFAULT", "DELMAP", "DELRING", "DELTOKEN", "DSA", "DSN", "FORCE", "FORMAT", "FROMICSF", "HIGHTRUST", "ICSF", "IDNFILTER", "KEYUSAGE", "LABEL", "LISTMAP", "LISTRING", "LISTTOKEN", "MAP", "MULTIID", "NEWCRITERIA", "NEWLABEL", "NISTECC", "NOTAFTER", "NOTBEFORE", "NOTRUST", "PASSWORD", "PBE", "PCICC", "PKDS", "REKEY", "REMOVE", "ROLLOVER", "RSA", "SDNFILTER", "SEQNUM", "SIGATTR", "SIGNWITH", "SIZE", "SUBJECTSDN", "TOKEN", "TRUST", "UNBIND", "USAGE", "WITHLABEL"],
         syntax_tokens: &[SyntaxTokenDescriptor { token: "SERIALNUMBER", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["ALTER"], &["DELETE"], &["LIST"], ] }, SyntaxTokenDescriptor { token: "ISSUERSDN", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["ALTER", "SERIALNUMBER"], &["DELETE", "SERIALNUMBER"], &["LIST", "SERIALNUMBER"], ] }, SyntaxTokenDescriptor { token: "PERSONAL", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["BIND", "USAGE"], &["CONNECT", "USAGE"], ] }, SyntaxTokenDescriptor { token: "CERTDER", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["EXPORT", "FORMAT"], ] }, SyntaxTokenDescriptor { token: "CERTB64", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["EXPORT", "FORMAT"], ] }, SyntaxTokenDescriptor { token: "PKCS7DER", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["EXPORT", "FORMAT"], ] }, SyntaxTokenDescriptor { token: "PKCS7B64", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["EXPORT", "FORMAT"], ] }, SyntaxTokenDescriptor { token: "PKCS12DER", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["EXPORT", "FORMAT"], ] }, SyntaxTokenDescriptor { token: "PKCS12B64", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["EXPORT", "FORMAT"], ] }, SyntaxTokenDescriptor { token: "AES", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["EXPORT", "PBE"], ] }, SyntaxTokenDescriptor { token: "CN", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["GENCERT", "SUBJECTSDN"], ] }, SyntaxTokenDescriptor { token: "OU", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["GENCERT", "SUBJECTSDN"], ] }, SyntaxTokenDescriptor { token: "SP", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["GENCERT", "SUBJECTSDN"], ] }, SyntaxTokenDescriptor { token: "DATE", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["GENCERT", "NOTBEFORE"], &["GENCERT", "NOTAFTER"], &["REKEY", "NOTBEFORE"], &["REKEY", "NOTAFTER"], ] }, SyntaxTokenDescriptor { token: "TIME", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["GENCERT", "NOTBEFORE"], &["GENCERT", "NOTAFTER"], &["REKEY", "NOTBEFORE"], &["REKEY", "NOTAFTER"], ] }, SyntaxTokenDescriptor { token: "RSAPSS", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["GENCERT", "SIGATTR"], &["REKEY", "SIGATTR"], ] }, ],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::Raclink,
@@ -308,6 +325,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["DEFINE", "LIST", "NODE", "PEER", "PWDONLY", "UNDEFINE"],
         unsupported_operands: &["APPROVE", "ID", "NODE"],
         syntax_tokens: &[SyntaxTokenDescriptor { token: "NOPWSYNC", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["DEFINE", "PEER"], ] }, SyntaxTokenDescriptor { token: "PWSYNC", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["DEFINE", "PEER"], ] }, ],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::Racmap,
@@ -323,6 +341,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["DELAPPLE", "DELCERT", "DELDN", "DELNMAP", "DELREGISTRY", "ID", "LIST", "MAP", "QUERY", "SDNFILTER", "WITHLABEL"],
         unsupported_operands: &["DELMAP", "LISTMAP", "SDNFILTER", "WITHLABEL"],
         syntax_tokens: &[SyntaxTokenDescriptor { token: "NAME", behavior: SyntaxTokenBehavior::Implemented, command_level: false, within_paths: &[&["MAP", "USERDIDFILTER"], &["MAP", "REGISTRY"], ] }, ],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::Racpriv,
@@ -338,6 +357,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["WRITEDOWN"],
         unsupported_operands: &[],
         syntax_tokens: &[],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::Racprmck,
@@ -353,6 +373,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["MEMBER"],
         unsupported_operands: &[],
         syntax_tokens: &[],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::Ralter,
@@ -368,6 +389,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["ADDCATEGORY", "AUDIT", "DATA", "FROM", "LEVEL", "NOADDCATEGORY", "NOAUDIT", "NODATA", "NOLEVEL", "NONOTIFY", "NOSECLABEL", "NOWARNING", "NOTIFY", "OWNER", "SECLABEL", "UACC", "WARNING"],
         unsupported_operands: &["ADDMEM", "ADDVOL", "APPLDATA", "AT", "CDTINFO", "CFDEF", "CSDATA", "DELCATEGORY", "DELMEM", "DELVOL", "DLFDATA", "EIM", "GLOBALAUDIT", "ICSF", "ICTX", "IDTPARMS", "JES", "KERB", "MFA", "MFPOLICY", "NOAPPLDATA", "NOCDTINFO", "NOCFDEF", "NOCSDATA", "NODLFDATA", "NOEIM", "NOICSF", "NOICTX", "NOIDTPARMS", "NOJES", "NOKERB", "NOMFA", "NOMFPOLICY", "NOPROXY", "NOSECLEVEL", "NOSESSION", "NOSIGVER", "NOSINGLEDSN", "NOSSIGNON", "NOSTDATA", "NOSVFMR", "NOTIMEZONE", "NOTME", "NOTVTOC", "ONLYAT", "PROXY", "SECLEVEL", "SESSION", "SIGVER", "SINGLEDSN", "SSIGNON", "STDATA", "SVFMR", "TIMEZONE", "TME", "TVTOC", "WHEN"],
         syntax_tokens: &[SyntaxTokenDescriptor { token: "UPPER", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["CDTINFO", "CASE"], ] }, SyntaxTokenDescriptor { token: "ASIS", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["CDTINFO", "CASE"], ] }, SyntaxTokenDescriptor { token: "NORMAL", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["CDTINFO", "MACPROCESSING"], ] }, SyntaxTokenDescriptor { token: "REVERSE", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["CDTINFO", "MACPROCESSING"], ] }, SyntaxTokenDescriptor { token: "EQUAL", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["CDTINFO", "MACPROCESSING"], ] }, SyntaxTokenDescriptor { token: "REXX", behavior: SyntaxTokenBehavior::AnalysisOnly, command_level: false, within_paths: &[] }, ],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::Rdefine,
@@ -383,6 +405,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["ADDCATEGORY", "AUDIT", "DATA", "LEVEL", "NOTIFY", "OWNER", "SECLABEL", "UACC", "WARNING"],
         unsupported_operands: &["ADDMEM", "APPLDATA", "AT", "CDTINFO", "CFDEF", "CSDATA", "DLFDATA", "EIM", "FCLASS", "FGENERIC", "FROM", "FVOLUME", "ICSF", "ICTX", "IDTPARMS", "JES", "KERB", "MFA", "MFPOLICY", "NOCSDATA", "ONLYAT", "PROXY", "SECLEVEL", "SESSION", "SIGVER", "SINGLEDSN", "SSIGNON", "STDATA", "SVFMR", "TIMEZONE", "TME", "TVTOC", "WHEN"],
         syntax_tokens: &[SyntaxTokenDescriptor { token: "NORMAL", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["CDTINFO", "MACPROCESSING"], ] }, SyntaxTokenDescriptor { token: "REVERSE", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["CDTINFO", "MACPROCESSING"], ] }, SyntaxTokenDescriptor { token: "EQUAL", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["CDTINFO", "MACPROCESSING"], ] }, SyntaxTokenDescriptor { token: "REXX", behavior: SyntaxTokenBehavior::AnalysisOnly, command_level: false, within_paths: &[] }, ],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::Rdelete,
@@ -398,6 +421,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &[],
         unsupported_operands: &["AT", "NOGENERIC", "ONLYAT"],
         syntax_tokens: &[],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::Remove,
@@ -413,6 +437,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["GROUP", "OWNER"],
         unsupported_operands: &["AT", "ONLYAT"],
         syntax_tokens: &[],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::Restart,
@@ -428,6 +453,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &[],
         unsupported_operands: &["COMMAND", "CONNECTION", "ENF", "ENF86", "MESSAGE", "RACLINK", "RECEIVE", "SEND", "SIGNAL"],
         syntax_tokens: &[SyntaxTokenDescriptor { token: "OUTPUT", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: true, within_paths: &[] }, ],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::Rlist,
@@ -443,6 +469,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["ALL", "AUTHUSER", "CDTINFO", "GLOBAL", "HISTORY", "NORACF", "RESGROUP"],
         unsupported_operands: &["AT", "CFDEF", "CSDATA", "DLFDATA", "EIM", "GENERIC", "GLOBAL", "ICSF", "ICTX", "IDTPARMS", "JES", "KERB", "MFA", "MFPOLICY", "NOGENERIC", "NOYOURACC", "ONLYAT", "PROXY", "SESSION", "SIGVER", "SSIGNON", "STATISTICS", "STDATA", "SVFMR", "TME", "TVTOC"],
         syntax_tokens: &[],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::Rvary,
@@ -458,6 +485,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["ACTIVE", "DATASHARE", "DATASET", "INACTIVE", "LIST", "NODATASHARE", "PASSWORD", "SWITCH"],
         unsupported_operands: &["NOCLASSACT", "NOLIST", "PASSWORD"],
         syntax_tokens: &[SyntaxTokenDescriptor { token: "NOTAPE", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["INACTIVE"], ] }, ],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::Search,
@@ -473,6 +501,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["AGE", "ALL", "CATALOG", "CLASS", "CLIST", "FILTER", "LEVEL", "MASK", "MODEL", "NOLIST", "SECLABEL"],
         unsupported_operands: &["AT", "CATALOG", "CATEGORY", "EXPIRES", "GENERIC", "GID", "LIST", "NOGENERIC", "NOMASK", "NONVSAM", "ONLYAT", "SECLEVEL", "TAPE", "UID", "USER", "VOLUME", "VSAM", "WARNING"],
         syntax_tokens: &[SyntaxTokenDescriptor { token: "DATASET", behavior: SyntaxTokenBehavior::Implemented, command_level: false, within_paths: &[&["CLASS"], ] }, ],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::Set,
@@ -488,6 +517,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["AUTOAPPL", "AUTODIRECT", "AUTOPWD", "AUTOSIGNON", "LIST", "NOAUTOAPPL", "NOAUTODIRECT", "NOAUTOPWD", "NOAUTOSIGNON", "NOTRACE", "TRACE"],
         unsupported_operands: &["FULLRRSFCOMM", "GENERICANCHOR", "INCLUDE", "JESNODE", "NOPWSYNC", "PWSYNC"],
         syntax_tokens: &[],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::Setropts,
@@ -503,6 +533,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["ADDCREATOR", "AUDIT", "CLASSACT", "CMDVIOL", "ERASE", "GENERIC", "GLOBAL", "INACTIVE", "JESBATCHALLRACF", "LIST", "LOGOPTIONS", "MLACTIVE", "MODEL", "NOADDCREATOR", "NOAUDIT", "NOCLASSACT", "NOCMDVIOL", "NOGENERIC", "NOJESBATCHALLRACF", "NOMLACTIVE", "NOPROGRAM", "NORACLIST", "NORULES", "NOSECLEVELAUDIT", "NOSECLABELAUDIT", "NOWHENPROGRAM", "PASSWORD", "PHRASE", "PROGRAM", "RACLIST", "REFRESH", "RULES", "SECLEVELAUDIT", "SECLABELAUDIT", "WHENPROGRAM"],
         unsupported_operands: &["ADSP", "APPLAUDIT", "AT", "CATDSNS", "COMPATMODE", "EGN", "ENHANCEDGENERICOWNER", "GENCMD", "GENERICOWNER", "GENLIST", "GRPLIST", "INITSTATS", "JES", "KERBLVL", "LANGUAGE", "MLFSOBJ", "MLIPCOBJ", "MLNAMES", "MLQUIET", "MLS", "MLSTABLE", "NOADSP", "NOAPPLAUDIT", "NOCATDSNS", "NOCOMPATMODE", "NOEGN", "NOERASE", "NOGENCMD", "NOGENERICOWNER", "NOGENLIST", "NOGLOBAL", "NOGRPLIST", "NOINACTIVE", "NOINITSTATS", "NOMLNAMES", "NOMLQUIET", "NOMLS", "NOMLSTABLE", "NOMODEL", "NOOPERAUDIT", "NOPREFIX", "NOPROTECTALL", "NOREALDSN", "NOSAUDIT", "NOSECLABELCONTROL", "NOSECLBYSYSTEM", "NOSESSIONINTERVAL", "NOSTATISTICS", "NOTAPEDSN", "NOWHEN", "ONLYAT", "OPERAUDIT", "PREFIX", "PROTECTALL", "REALDSN", "RETPD", "RVARYPW", "SAUDIT", "SECLABELCONTROL", "SECLBYSYSTEM", "SESSIONINTERVAL", "STATISTICS", "TAPEDSN", "TERMINAL", "WHEN"],
         syntax_tokens: &[SyntaxTokenDescriptor { token: "RULE", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["PASSWORD"], ] }, SyntaxTokenDescriptor { token: "NORULE", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["PASSWORD"], ] }, SyntaxTokenDescriptor { token: "NONE", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["TERMINAL"], ] }, SyntaxTokenDescriptor { token: "READ", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["TERMINAL"], ] }, SyntaxTokenDescriptor { token: "PROGRAM", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["WHEN"], &["NOWHEN"], ] }, ],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::Signoff,
@@ -518,6 +549,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["AT", "EVERYONE", "LIST", "USER"],
         unsupported_operands: &["APPL", "GROUP", "POE", "SECLABEL"],
         syntax_tokens: &[],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::Stop,
@@ -533,6 +565,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &[],
         unsupported_operands: &["ENF86"],
         syntax_tokens: &[],
+        flat_value_roles: &[],
     },
     CommandDescriptor {
         family: CommandFamily::Target,
@@ -548,6 +581,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         operands: &["DELETE", "DESCRIPTION", "DORMANT", "LIST", "LOCAL", "NODE", "OPERATIVE", "PREFIX", "PROTOCOL", "PURGE", "REROUTE", "WORKSPACE"],
         unsupported_operands: &["ALLOWINBOUND", "DENYINBOUND", "LISTPROTOCOL", "MAIN", "NEWMAIN", "NEWPREFIX", "NEWWORKSPACE", "PLEXNEWMAIN", "REROUTE", "RESETDENYINBOUNDCOUNT", "SYSNAME", "WDSQUAL"],
         syntax_tokens: &[SyntaxTokenDescriptor { token: "INMSG", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["PURGE"], ] }, SyntaxTokenDescriptor { token: "OUTMSG", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_paths: &[&["PURGE"], ] }, ],
+        flat_value_roles: &[],
     },
 ];
 

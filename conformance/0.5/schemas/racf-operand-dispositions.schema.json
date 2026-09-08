@@ -141,7 +141,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["row_id", "keyword", "source_only", "syntax_only", "syntax_contexts", "emulator_behavior"],
+        "required": ["row_id", "keyword", "source_only", "syntax_only", "syntax_contexts", "flat_value_roles", "emulator_behavior"],
         "properties": {
           "row_id": {"type": "string", "pattern": "^ibm-zos-3\\.2-racf-saf-2026:racf-command-families:[0-9]{4}$"},
           "keyword": {"type": "string", "pattern": "^[A-Z]+$", "maxLength": 16},
@@ -151,6 +151,11 @@
             "type": "array",
             "uniqueItems": true,
             "items": {"$ref": "#/$defs/syntax_context"}
+          },
+          "flat_value_roles": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {"$ref": "#/$defs/flat_value_roles"}
           },
           "emulator_behavior": {"type": "string", "minLength": 32, "maxLength": 512}
         }
@@ -199,6 +204,21 @@
             "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]*$", "maxLength": 32}
           }
         },
+        "note": {"type": "string", "minLength": 24, "maxLength": 512}
+      }
+    },
+    "flat_value_roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["within_path", "roles", "note"],
+      "properties": {
+        "within_path": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]*$", "maxLength": 32}
+        },
+        "roles": {"$ref": "#/$defs/names"},
         "note": {"type": "string", "minLength": 24, "maxLength": 512}
       }
     },

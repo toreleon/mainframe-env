@@ -31,6 +31,25 @@ pub struct CommandDescriptor {
     operands: &'static [&'static str],
     unsupported_operands: &'static [&'static str],
     syntax_tokens: &'static [SyntaxTokenDescriptor],
+    flat_value_roles: &'static [FlatValueRoleDescriptor],
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FlatValueRoleDescriptor {
+    role: &'static str,
+    within_path: &'static [&'static str],
+}
+
+impl FlatValueRoleDescriptor {
+    #[must_use]
+    pub const fn role(self) -> &'static str {
+        self.role
+    }
+
+    #[must_use]
+    pub const fn within_path(self) -> &'static [&'static str] {
+        self.within_path
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -94,8 +113,8 @@ pub struct RacrouteDescriptor {
 
 mod generated {
     use super::{
-        CommandDescriptor, CommandDomain, RacrouteDescriptor, SuppliedClassDescriptor,
-        SyntaxTokenBehavior, SyntaxTokenDescriptor,
+        CommandDescriptor, CommandDomain, FlatValueRoleDescriptor, RacrouteDescriptor,
+        SuppliedClassDescriptor, SyntaxTokenBehavior, SyntaxTokenDescriptor,
     };
     include!("generated/racf_command_catalog.rs");
 }
@@ -165,6 +184,11 @@ impl CommandDescriptor {
     #[must_use]
     pub const fn syntax_tokens(self) -> &'static [SyntaxTokenDescriptor] {
         self.syntax_tokens
+    }
+
+    #[must_use]
+    pub const fn flat_value_roles(self) -> &'static [FlatValueRoleDescriptor] {
+        self.flat_value_roles
     }
 }
 
@@ -580,12 +604,25 @@ pub(crate) fn parse_command(
                                         Some(&path),
                                     ));
                                 }
-                                // Inner grammars use both KEY(VALUE) and flat KEY VALUE. Keep one
-                                // preceding word as the role of a flat value. A word that opens
-                                // parentheses starts a new role and is checked at the enclosing
-                                // path, so `WHEN(TERMINAL PROGRAM)` preserves PROGRAM as data while
-                                // `WHEN(PROGRAM(...))` still fails loudly.
-                                flat_parent = Some(nested.clone());
+                                let mut nested_path = base_path.clone();
+                                nested_path.push(&nested);
+                                let contextual_role =
+                                    descriptor.syntax_tokens.iter().any(|syntax| {
+                                        syntax
+                                            .within_paths
+                                            .iter()
+                                            .any(|expected| expected.starts_with(&nested_path))
+                                    });
+                                let declared_flat_role =
+                                    descriptor.flat_value_roles.iter().any(|role| {
+                                        role.role == nested && role.within_path == base_path
+                                    });
+                                // Inner grammars use both KEY(VALUE) and flat KEY VALUE. Only a
+                                // generated structural prefix or an explicitly declared runtime
+                                // role consumes the next flat word. Data cannot invent a role that
+                                // hides a following sibling keyword.
+                                flat_parent =
+                                    (contextual_role || declared_flat_role).then(|| nested.clone());
                                 pending_parent = Some(nested);
                             } else {
                                 pending_parent = None;
@@ -1065,6 +1102,8 @@ mod tests {
             "ADDUSER USER1 OPERPARM(OPERATOR-CLASS(X))",
             "ADDSD HLQ.DATA DFP(DATAKEY CKDS)",
             "PERMIT APP WHEN(PROGRAM(X))",
+            "PERMIT APP WHEN(TERMINAL TERM1 PROGRAM X)",
+            "PERMIT APP WHEN(X PROGRAM)",
             "RACDCERT EXPORT(CERT1 FORMAT CERTDER)",
             "RESTART OUTPUT",
         ] {
@@ -1111,6 +1150,26 @@ mod tests {
                 || descriptor.command_level()
                 || !descriptor.within_paths().is_empty()
         }));
+        let flat_roles = command_descriptors()
+            .iter()
+            .flat_map(|descriptor| descriptor.flat_value_roles())
+            .collect::<Vec<_>>();
+        assert_eq!(flat_roles.len(), 6);
+        assert!(flat_roles.iter().all(|role| role.within_path() == ["WHEN"]));
+        assert_eq!(
+            flat_roles
+                .iter()
+                .map(|role| role.role())
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                "APPL",
+                "APPLICATION",
+                "CONSOLE",
+                "SYSTEM",
+                "TERMINAL",
+                "TIME"
+            ])
+        );
         let setropts = command_descriptors()
             .iter()
             .find(|descriptor| descriptor.keyword() == "SETROPTS")

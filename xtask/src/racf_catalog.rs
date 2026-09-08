@@ -21,6 +21,7 @@ const RACF_ORACLE_ID: &str = "racf.zos32.licensed-campaign";
 struct OperandDispositionProjection {
     unsupported_operands: BTreeMap<String, BTreeSet<String>>,
     syntax_tokens: BTreeMap<String, Vec<SyntaxTokenProjection>>,
+    flat_value_roles: BTreeMap<String, Vec<FlatValueRoleProjection>>,
 }
 
 struct SyntaxTokenProjection {
@@ -28,6 +29,11 @@ struct SyntaxTokenProjection {
     runtime_behavior: String,
     command_level: bool,
     within_paths: Vec<Vec<String>>,
+}
+
+struct FlatValueRoleProjection {
+    name: String,
+    within_path: Vec<String>,
 }
 
 pub(super) fn generate(root: &Path) -> TaskResult {
@@ -711,6 +717,18 @@ fn render(root: &Path) -> TaskResult<Vec<u8>> {
                 out.push_str("] }, ");
             }
         }
+        out.push_str("],\n        flat_value_roles: &[");
+        if let Some(roles) = dispositions.flat_value_roles.get(row_id) {
+            for role in roles {
+                out.push_str("FlatValueRoleDescriptor { role: ");
+                out.push_str(&format!("{:?}, within_path: &[", role.name));
+                separated_strings(
+                    &mut out,
+                    role.within_path.iter().map(String::as_str).collect(),
+                );
+                out.push_str("] }, ");
+            }
+        }
         out.push_str("],\n    },\n");
     }
     out.push_str("];\n\npub const SUPPLIED_CLASS_DESCRIPTORS: &[SuppliedClassDescriptor] = &[\n");
@@ -971,6 +989,8 @@ fn check_operand_dispositions(
     let mut syntax_gaps = BTreeSet::new();
     let mut syntax_context_names = BTreeSet::new();
     let mut syntax_tokens = BTreeMap::<String, Vec<SyntaxTokenProjection>>::new();
+    let mut flat_value_roles = BTreeMap::<String, Vec<FlatValueRoleProjection>>::new();
+    let mut seen_flat_roles = BTreeSet::new();
     for entry in publication_entries {
         let row_id = text(entry, "row_id", &dispositions_path)?;
         let keyword = text(entry, "keyword", &dispositions_path)?;
@@ -1114,6 +1134,44 @@ fn check_operand_dispositions(
                     within_paths,
                 });
         }
+        for group in array(entry, "flat_value_roles", &dispositions_path)? {
+            let within_path = string_array(group, "within_path", &dispositions_path)?
+                .into_iter()
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            let parent = within_path.first().ok_or_else(|| {
+                format!("RACF flat value role for {keyword} has an empty parent path")
+            })?;
+            require(
+                operands.contains(parent)
+                    || source_only.contains(&(row_id.to_string(), parent.clone())),
+                &format!(
+                    "RACF flat value role for {keyword} names unknown parent operand {parent}"
+                ),
+            )?;
+            let roles = string_array(group, "roles", &dispositions_path)?;
+            require(
+                !roles.is_empty(),
+                &format!("RACF flat value role group for {keyword} is empty"),
+            )?;
+            for role in roles {
+                require(
+                    seen_flat_roles.insert((
+                        row_id.to_string(),
+                        within_path.clone(),
+                        role.to_string(),
+                    )),
+                    &format!("duplicate RACF flat value role {keyword} {role}"),
+                )?;
+                flat_value_roles
+                    .entry(row_id.to_string())
+                    .or_default()
+                    .push(FlatValueRoleProjection {
+                        name: role.to_string(),
+                        within_path: within_path.clone(),
+                    });
+            }
+        }
     }
 
     let classified_source = implemented_source
@@ -1192,6 +1250,7 @@ fn check_operand_dispositions(
     Ok(OperandDispositionProjection {
         unsupported_operands: unsupported_by_row,
         syntax_tokens,
+        flat_value_roles,
     })
 }
 
