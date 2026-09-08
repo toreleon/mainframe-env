@@ -126,10 +126,11 @@ release-grade work on every event:
   checked-out SHA is the execution authority;
 - concurrent runs of the same job are serialized to bound local disk use;
 - documentation-only changes skip the ordinary Rust suite but still run the
-  locked dependency-policy and full-notice checks;
-- pull requests run `cargo deny check`, target-production license-notice
+  immutable supply-chain, locked dependency-policy, and full-notice checks;
+- pull requests run the supply-chain gate, `cargo deny check`, target-production license-notice
   validation, formatting, specification and COBOL exit checks, workspace tests,
-  Clippy, and the contract MSRV gate;
+  Clippy, and a Rust 1.95.0 check over the full workspace, all targets, and all
+  features;
 - the integrated `main` commit runs the complete workspace and documentation
   gates; the MSRV result is not repeated for a standard merge commit;
 - a manual `full` run adds complete conformance, certification, evidence, and
@@ -147,6 +148,12 @@ whose total capacity is at most 10 GiB. Selected backend parity uses a
 disposable PostgreSQL 18 cluster whose data, socket and log also stay in that
 workspace.
 
+The Jenkins WAR, complete plugin dependency closure, Rust compiler/Cargo
+commits, and separately installed tool versions are locked and checked before
+credit. Tracked actions require commit SHAs, tracked images require digests,
+and tracked package installation is forbidden. The reviewed inventory and
+update procedure are in `docs/runbooks/CI-SUPPLY-CHAIN.md`.
+
 ### Milestone gate
 
 - affected package suites;
@@ -163,6 +170,7 @@ workspace.
 - overload/backpressure and cancellation evidence;
 - database backup/restore and restart recovery;
 - release-binary SQLite startup, readiness, and shutdown smoke;
+- immutable CI/controller inputs and full-workspace MSRV;
 - blocking `cargo deny check` plus deterministic full target-production license
   notices;
 - compatibility and cutover rehearsal; and

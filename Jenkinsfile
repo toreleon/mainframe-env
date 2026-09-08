@@ -83,6 +83,9 @@ pipeline {
                       required_paths=(
                         Jenkinsfile
                         tools/ci_assurance.py
+                        tools/supply_chain.py
+                        tools/ci-inputs.lock.json
+                        tools/jenkins/controller-plugins.lock.json
                         tools/dataset_mutations.py
                         tools/jenkins/disk_guard.py
                         tools/jenkins/postgres_parity.sh
@@ -252,6 +255,10 @@ pipeline {
                     set -euo pipefail
                     out="$CARGO_TARGET_DIR/ci-assurance"
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record \
+                      --output "$out" --gate supply-chain -- \
+                      "$MAINFRAME_ENV_PYTHON" -B tools/supply_chain.py check \
+                        --runtime ci --jenkins-home "$JENKINS_HOME"
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record \
                       --output "$out" --gate cargo-deny -- cargo deny check
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record \
                       --output "$out" --gate license-notices -- cargo xtask license-notices --check
@@ -338,7 +345,7 @@ pipeline {
             }
         }
 
-        stage('Contract MSRV') {
+        stage('MSRV') {
             when { expression { env.CI_MSRV_REQUIRED == 'true' } }
             steps {
                 sh '''#!/bin/bash
@@ -347,15 +354,9 @@ pipeline {
                       echo 'Rust 1.95.0 is required; install it on the Jenkins node before running CI.' >&2
                       exit 1
                     }
-                    cargo +1.95.0 check --locked \
-                      -p mainframe-env-source \
-                      -p mainframe-env-diagnostics \
-                      -p mainframe-env-encoding \
-                      -p mainframe-env-ir \
-                      -p mainframe-env-compiler-api \
-                      -p mainframe-env-execution-api \
-                      -p mainframe-env-host-api \
-                      -p mainframe-env-store-api
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record \
+                      --output "$CARGO_TARGET_DIR/ci-assurance" --gate msrv -- \
+                      cargo +1.95.0 check --workspace --all-targets --all-features --locked
                 '''
             }
         }
@@ -392,6 +393,7 @@ pipeline {
                       aarch64-apple-darwin|x86_64-unknown-linux-gnu) ;;
                       *) echo "unsupported release target: $target" >&2; exit 1 ;;
                     esac
+                    "$MAINFRAME_ENV_PYTHON" -B tools/supply_chain.py check --runtime release
                     cargo xtask release --target "$target"
                     git diff --exit-code -- "release/$version/targets/$target"
                     cargo xtask release --check --target "$target"

@@ -14,13 +14,11 @@ postgres_bin() {
     candidate="$(cd "$(brew --prefix postgresql@18 2>/dev/null)/bin" && pwd -P)"
   fi
   [[ -n "$candidate" && -x "$candidate/postgres" ]] || {
-    echo "PostgreSQL 18 tools are required (macOS: brew install postgresql@18)" >&2
+    echo "the exact PostgreSQL version in tools/ci-inputs.lock.json is required" >&2
     return 1
   }
-  "$candidate/postgres" --version | grep -Eq 'PostgreSQL\)?[[:space:]]+18\.' || {
-    echo "backend parity requires PostgreSQL major version 18" >&2
-    return 1
-  }
+  PATH="$candidate:$PATH" "$python_bin" -B "$root/tools/supply_chain.py" check \
+    --runtime postgres >/dev/null
   printf '%s\n' "$candidate"
 }
 

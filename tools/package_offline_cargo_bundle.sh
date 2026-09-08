@@ -3,6 +3,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+python_bin="${MAINFRAME_ENV_PYTHON:-$("$root/tools/jenkins/select-python.sh")}"
 out="$root/dist"
 tag=""
 
@@ -26,6 +27,9 @@ head="$(git -C "$root" rev-parse HEAD)"
 tag_commit="$(git -C "$root" rev-parse --verify "refs/tags/$tag^{commit}")"
 [[ "$head" == "$tag_commit" ]] \
   || { echo "release bundle requires HEAD at $tag ($tag_commit), got $head" >&2; exit 1; }
+[[ -z "$(git -C "$root" status --porcelain --untracked-files=normal)" ]] \
+  || { echo "release bundle requires a clean tagged source tree" >&2; exit 1; }
+"$python_bin" -B "$root/tools/supply_chain.py" check --runtime offline
 
 target_root="${CARGO_TARGET_DIR:-$root/target}"
 mkdir -p "$target_root" "$out"
@@ -46,6 +50,15 @@ cp "$root/LICENSE" "$sdk/LICENSE"
 cp "$root/NOTICE" "$sdk/NOTICE"
 mkdir -p "$sdk/LICENSES"
 cp "$root/LICENSES/ICU.txt" "$sdk/LICENSES/ICU.txt"
+mkdir -p "$sdk/SUPPLY-CHAIN"
+cp "$root/tools/ci-inputs.lock.json" "$sdk/SUPPLY-CHAIN/ci-inputs.lock.json"
+cp "$root/tools/jenkins/controller-plugins.lock.json" \
+  "$sdk/SUPPLY-CHAIN/jenkins-controller-plugins.lock.json"
+
+"$python_bin" -B "$root/tools/supply_chain.py" record-offline \
+  --vendor "$sdk/vendor" --output "$sdk/SUPPLY-CHAIN/BUILD-INPUTS.json"
+"$python_bin" -B "$root/tools/supply_chain.py" verify-offline \
+  --vendor "$sdk/vendor" --record "$sdk/SUPPLY-CHAIN/BUILD-INPUTS.json"
 
 cat > "$sdk/README.md" <<'EOF'
 # mainframe-env offline Cargo dependency bundle
@@ -60,6 +73,10 @@ The Rust compiler and source checkout are not included.
 The mainframe-env Apache-2.0 license, project NOTICE, and the complete retained
 ICU text for the locked decNumber dependency are included at the archive root.
 Each vendored crate retains its own complete license and notice files.
+
+`SUPPLY-CHAIN/BUILD-INPUTS.json` binds the source revision, locked input files,
+vendored tree, and exact tool executables used to assemble this archive. The
+reviewed controller/plugin and CI input locks are retained beside it.
 EOF
 
 echo "==> verifying a clean checkout with networking disabled in Cargo"

@@ -79,9 +79,11 @@ Common local checks are:
 
 ```bash
 cargo fmt --all -- --check
+"$(tools/jenkins/select-python.sh)" -B tools/supply_chain.py check
 cargo deny check
 cargo xtask license-notices --check
 cargo xtask docs --check
+cargo +1.95.0 check --workspace --all-targets --all-features --locked
 cargo xtask spec --check
 cargo xtask architecture-fast --check
 cargo test --workspace --all-features --locked --no-fail-fast

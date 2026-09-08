@@ -936,7 +936,8 @@ git diff --check                  # when the repository is under Git
 
 Also verify:
 
-- Rust MSRV 1.95 contract crates and pinned Rust 1.98 full workspace;
+- Rust MSRV 1.95 and pinned Rust 1.98 across the full workspace, all targets,
+  and all features;
 - core-server and conformance closures separately;
 - release builds on advertised operating systems;
 - SQLite local and PostgreSQL production profiles;

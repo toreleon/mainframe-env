@@ -1,16 +1,16 @@
 {
   "counts": {
-    "markdown_documents": 173,
+    "markdown_documents": 174,
     "navigation_groups": 5,
     "normative_documents": 31,
-    "xtask_commands": 155
+    "xtask_commands": 156
   },
   "documents": [
     {
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:773f3482c67718d7fff1d2ae11ccdbdea7503b31c676b86786bff9d6bb7bf855",
+      "sha256": "sha256:434b4059f552cdaae4d5058918edf61e314376e6af7b2d63f2d20e8c7f64abab",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CONTRIBUTING.md",
       "relative_links": 4,
-      "sha256": "sha256:59b39f17db1ed8c26bea962b672cd98f0b1ea9c4091d0d86f51b966e665c9e29",
+      "sha256": "sha256:412e8cd77b345e95932f762c0b1fcfe9f3be7a219208ce6dfd3a7e107f9b9e81",
       "title": "Contributing to mainframe-env",
       "xtask_commands": 4
     },
@@ -26,7 +26,7 @@
       "normative": false,
       "path": "README.md",
       "relative_links": 21,
-      "sha256": "sha256:c75a7469fd8c0e1ec2200162a81fc69ed69c9c1680091f585634c406d0b91c94",
+      "sha256": "sha256:17b77bf8fa10fcfb951a1ac1c7bbad12611545d8418b917609512f461120cc49",
       "title": "mainframe-env",
       "xtask_commands": 4
     },
@@ -669,7 +669,7 @@
       "path": "docs/delivery/VERIFICATION-STRATEGY.md",
       "relative_links": 0,
       "scope": "verification layers, assurance tiers, and required evidence",
-      "sha256": "sha256:a554bc19be3a893192f082cc058414fd4268257da94e61aea99b7460cc17dd09",
+      "sha256": "sha256:9184d94ace40b68b3a4f52942a9e81dd70d8310baef07d0571d885b132d254c8",
       "status": "Accepted by repository owner",
       "title": "0.1 Verification Strategy",
       "xtask_commands": 0
@@ -681,7 +681,7 @@
       "path": "docs/delivery/VERSIONING-AND-RELEASES.md",
       "relative_links": 0,
       "scope": "version authorities, release gates, artifacts, and publication",
-      "sha256": "sha256:6821e66efef29c2e3e91b445cbf4ba5f078dcd25a31bda84cd3e6702c711f1e7",
+      "sha256": "sha256:00162eb0e90c1f33fdbbe2b12eeac2b26e0897e739c14f29c7b810d165acc9a8",
       "status": "Accepted by repository owner",
       "title": "Versioning, Phase Commits, and Release Gates",
       "xtask_commands": 0
@@ -1014,7 +1014,7 @@
       "normative": false,
       "path": "docs/delivery/hardening/54-assurance-tiers.md",
       "relative_links": 0,
-      "sha256": "sha256:fc984955b3dc237572351c549e823debfb517980f2d0b13b5a36b7a52036eddd",
+      "sha256": "sha256:0d7098311ee8563fbd7fe692c04f7d04edb23619ef7cd0ab13a5fa198798c0d1",
       "title": "#54 — selected PR gates and explicit full campaigns",
       "xtask_commands": 0
     },
@@ -1062,7 +1062,7 @@
       "normative": false,
       "path": "docs/prompts/IMPLEMENT_MAINFRAME_ENV_0_1.md",
       "relative_links": 0,
-      "sha256": "sha256:73df06c3c0befa60229249afd93209696734015183e9c2f94be90e3ef58f208e",
+      "sha256": "sha256:f38125869c2ddd341b8125c5274594f6d7869b78840fb0dc1d32e7f314e4c88a",
       "title": "Execution Prompt — Implement mainframe-env 0.1 End to End",
       "xtask_commands": 8
     },
@@ -1332,9 +1332,17 @@
     },
     {
       "normative": false,
-      "path": "docs/runbooks/JENKINS-LOCAL.md",
+      "path": "docs/runbooks/CI-SUPPLY-CHAIN.md",
       "relative_links": 0,
-      "sha256": "sha256:f9e844e9a2f3fd4555b88f5d97ca35cdfc330bb84f373fcc74afee092b12aa14",
+      "sha256": "sha256:6b1629589a80ee1fb4b4fb95725f7c409ae7303eff95ea200ca52cc011482475",
+      "title": "CI supply-chain inputs",
+      "xtask_commands": 1
+    },
+    {
+      "normative": false,
+      "path": "docs/runbooks/JENKINS-LOCAL.md",
+      "relative_links": 1,
+      "sha256": "sha256:3a225008b18a3e1e4343fabbc2588dbc7cff8bb28452c2d6da459a22de413b1e",
       "title": "Local Jenkins CI",
       "xtask_commands": 0
     },

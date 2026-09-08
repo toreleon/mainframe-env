@@ -66,19 +66,24 @@ class SelectionTests(unittest.TestCase):
             self.assertTrue(p['full']);self.assertTrue(p['msrv']);self.assertTrue(p['store'])
             self.assertTrue(set(ci.FULL)<=set(p['primary_gates']))
             self.assertIn('certification',p['primary_gates'])
+            self.assertIn('supply-chain',p['primary_gates'])
             self.assertIn('cargo-deny',p['primary_gates'])
+            self.assertIn('msrv',p['primary_gates'])
 
     @patch.object(ci,'identity',return_value={'candidate':'a'*40,'tree':'b'*40})
     def test_dependency_policy_blocks_even_a_prose_only_pull_request(self,_):
         with patch.object(ci.subprocess,'check_output',return_value=b'README.md\0'):
             plan=ci.make_plan(Path('.'),{},'pull_request','refs/pull/1/merge','c'*40)
         self.assertFalse(plan['build'])
-        self.assertEqual(plan['primary_gates'],['cargo-deny','license-notices','docs'])
+        self.assertEqual(plan['primary_gates'],['supply-chain','cargo-deny','license-notices','docs'])
 
     def test_jenkins_and_offline_release_bundle_enforce_license_distribution(self):
         jenkins=(ROOT/'Jenkinsfile').read_text()
         self.assertIn('--gate cargo-deny -- cargo deny check',jenkins)
         self.assertIn('--gate license-notices -- cargo xtask license-notices --check',jenkins)
+        self.assertIn('--gate supply-chain',jenkins)
+        self.assertIn('--gate msrv',jenkins)
+        self.assertIn('cargo +1.95.0 check --workspace --all-targets --all-features --locked',jenkins)
         self.assertIn("command -v cargo-deny",jenkins)
         bundle=(ROOT/'tools/package_offline_cargo_bundle.sh').read_text()
         for required in ['LICENSE','NOTICE','LICENSES/ICU.txt']:
@@ -93,7 +98,7 @@ class SelectionTests(unittest.TestCase):
         plan=ci.make_plan(Path('.'),{},'pull_request','refs/pull/1/merge','b'*40)
         self.assertFalse(plan['build']);self.assertFalse(plan['msrv'])
         self.assertTrue(plan['docs'])
-        self.assertEqual(plan['primary_gates'],['cargo-deny','license-notices','docs'])
+        self.assertEqual(plan['primary_gates'],['supply-chain','cargo-deny','license-notices','docs'])
 
     def test_jenkins_pull_request_context_uses_explicit_comparison_sha(self):
         context=ci.jenkins_context(Path('.'),{
@@ -132,6 +137,8 @@ class SelectionTests(unittest.TestCase):
         push=ci.make_plan(Path('.'),{'merge_commit':True},'push','refs/heads/main')
         full=ci.make_plan(Path('.'),{'merge_commit':True},'manual','refs/heads/main')
         self.assertFalse(push['msrv']);self.assertTrue(full['msrv'])
+        self.assertNotIn('msrv',push['primary_gates'])
+        self.assertIn('msrv',full['primary_gates'])
     @patch.object(ci,'identity',return_value={'candidate':'a'*40,'tree':'b'*40})
     def test_missing_diff_fails_closed_to_all_not_prose(self,_):
         p=ci.make_plan(Path('.'),{},'pull_request','refs/pull/1/merge')

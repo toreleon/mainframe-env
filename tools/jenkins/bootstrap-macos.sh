@@ -42,4 +42,7 @@ mkdir -p "$volume/jenkins-home" "$volume/cargo-home" "$volume/tmp/controller"
   --minimum-free-bytes 0
 
 printf '\nCapped Jenkins volume is ready at %s.\n' "$volume"
+printf 'Install or update the locked controller inputs with:\n'
+printf '  %q -B %q install-jenkins --home %q\n' \
+  "$python_bin" "$repo_root/tools/supply_chain.py" "$volume/jenkins-home"
 printf 'Start the controller with: tools/jenkins/run-local.sh --volume %q\n' "$volume"

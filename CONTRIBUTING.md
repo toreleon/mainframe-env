@@ -38,8 +38,10 @@ environment. A skipped external test receives no evidence credit.
 
 ```bash
 cargo fmt --all -- --check
+"$(tools/jenkins/select-python.sh)" -B tools/supply_chain.py check
 cargo deny check
 cargo xtask license-notices --check
+cargo +1.95.0 check --workspace --all-targets --all-features --locked
 cargo xtask spec --check
 cargo xtask architecture-fast --check
 cargo test --workspace --all-features --locked --no-fail-fast
@@ -51,6 +53,10 @@ git diff --check
 `cargo deny check` is mandatory for every change. License additions require an
 explicit repository decision and complete distributable notice text; do not
 silently waive a rejected dependency.
+
+CI input changes must follow the reviewed process in
+`docs/runbooks/CI-SUPPLY-CHAIN.md`. Floating actions, container tags, ambient
+package installs, and unreviewed Jenkins plugins are rejected mechanically.
 
 ## Public and durable changes
 

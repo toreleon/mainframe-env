@@ -90,7 +90,8 @@ A `0.1.0-alpha.N` release may be prepared only when:
   typed CICS vertical path work through public services;
 - no old implementation is linked;
 - selected fixtures and hostile controls pass;
-- packages build on the pinned toolchain; and
+- the full workspace, all targets, and all features check on both the pinned
+  toolchain and declared MSRV; and
 - known incomplete JCL/JES/z/OSMF/durability work is explicitly documented.
 
 Alpha is for architecture and integration validation, not production use.
@@ -165,6 +166,11 @@ A release candidate/final release produces, as applicable:
 - backup, restore, upgrade, rollback, and capacity runbooks; and
 - release manifest mapping every artifact to source commit, content digest,
   toolchain, target, features/profile, and dependency lock identity.
+
+Offline Cargo bundles additionally retain `SUPPLY-CHAIN/BUILD-INPUTS.json`,
+which binds the exact vendored tree, source revision, locked CI/controller
+inputs, and build-tool executable identities. CI input changes follow
+`docs/runbooks/CI-SUPPLY-CHAIN.md`.
 
 Raw credentials, local absolute paths, uncontrolled raw evidence, temporary
 files, oracle binaries, test datasets, and current OpenMainframe implementation

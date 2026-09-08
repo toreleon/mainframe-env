@@ -9,14 +9,17 @@ Actions; committed GitHub receipts remain historical evidence only.
 The inexpensive selector runs for all main-target PRs and main pushes, including
 document changes. A prose-only change runs selector tests and records an empty
 obligation plan; the foundation, MSRV and backend jobs are explicitly skipped,
-not credited as passed. New/unknown paths and missing comparison history select
-all obligations instead of guessing that no checks are required. Deleted paths
-and both sides of a rename are considered using Git's no-renames diff mode.
+not credited as passed. The supply-chain, dependency-license, and complete
+notice gates remain mandatory. New/unknown paths and missing comparison history
+select all obligations instead of guessing that no checks are required. Deleted
+paths and both sides of a rename are considered using Git's no-renames diff mode.
 
 A relevant PR retains the existing formatting, specification, COBOL-exit,
 workspace-test and Clippy gates. It additionally runs selected architecture-fast
 and evidence-fast gates in that same Rust build job, reusing compiled dependencies
-rather than duplicating a whole workspace build in a new assurance job.
+rather than duplicating a whole workspace build in a new assurance job. Its MSRV
+gate checks the complete workspace, all targets, and all features on the exact
+Rust/Cargo 1.95.0 identity.
 
 Architecture-fast retains dependency-direction/declared-graph, common coordinator
 route and dehardcoding checks, but omits the two targeted runtime tests and release
@@ -69,7 +72,10 @@ benchmark or credits unavailable external systems.
 The local Jenkins job uses no PR secrets. The optional GitHub publication
 credential is injected only into its explicitly selected stage; PostgreSQL
 parity uses a disposable local cluster. Every gate runs against the checked-out
-SHA emitted by selection. Cargo downloads are
+SHA emitted by selection. The controller WAR, complete plugin closure,
+toolchains, and host-tool versions are locked and verified by
+`tools/supply_chain.py`; the update process is in
+`docs/runbooks/CI-SUPPLY-CHAIN.md`. Cargo downloads are
 shared on the capped volume, while build targets stay in the build workspace and
 are deleted after each run. Prose avoids Rust, PostgreSQL and mutation work;
 relevant code keeps one local build rather than scheduling duplicate builds.
@@ -78,7 +84,7 @@ relevant code keeps one local build rather than scheduling duplicate builds.
 runner details, observed test count, exit status, wall seconds and log SHA-256.
 Receipts from another commit, missing commands and empty selected test runs cannot
 pass. Unselected full gates are listed separately. The Jenkins build result
-requires every selected foundation, MSRV and enabled backend stage to succeed.
+requires every selected policy, foundation, MSRV and enabled backend stage to succeed.
 A job receipt is not a release acceptance decision for epic #46.
 
 The experiment below measures actual warm command overhead on one runner and

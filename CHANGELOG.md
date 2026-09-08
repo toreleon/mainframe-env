@@ -49,6 +49,9 @@ All notable changes to mainframe-env are documented here.
   reconciliation and credential-redacted RACF command digests.
 - Unified execution-journal, effect, checkpoint, and artifact invariants across
   memory, SQLite, and PostgreSQL stores, with hostile-record rollback contracts.
+- Expanded the Rust 1.95.0 gate to the complete workspace, all targets, and all
+  features; locked Jenkins and external CI inputs immutably; and embedded exact
+  supply-chain input identities in offline Cargo bundles.
 - Added the complete Apache-2.0 project license and ICU attribution, generated
   deterministic full notices from each target production dependency closure,
   and made dependency-license policy a blocking CI and release gate.
