@@ -209,14 +209,14 @@ pipeline {
                     set -euo pipefail
                     "$MAINFRAME_ENV_PYTHON" -B -m unittest discover -s tools/tests -p 'test_ci_assurance.py'
                     "$MAINFRAME_ENV_PYTHON" -B -m unittest discover -s tools/tests -p 'test_jenkins_disk_guard.py'
-                    merge_args=()
-                    [[ "$MAINFRAME_ENV_MERGE_COMMIT" == true ]] && merge_args+=(--merge-commit)
+                    merge_flag=''
+                    [[ "$MAINFRAME_ENV_MERGE_COMMIT" == true ]] && merge_flag='--merge-commit'
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py plan \
                       --event "$MAINFRAME_ENV_CI_EVENT" \
                       --ref "$MAINFRAME_ENV_CI_REF" \
                       --base "${MAINFRAME_ENV_CI_BASE:-}" \
                       --output "$CARGO_TARGET_DIR/ci-assurance/plan.json" \
-                      "${merge_args[@]}"
+                      ${merge_flag:+$merge_flag}
                 '''
                 script {
                     def plan = new groovy.json.JsonSlurperClassic().parseText(
