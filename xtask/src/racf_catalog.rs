@@ -766,9 +766,10 @@ fn render(root: &Path) -> TaskResult<Vec<u8>> {
 ///
 /// The load-bearing clauses are set equality in all three populations and the empty catalog-gap
 /// classifications. A publication-only name cannot appear without an explicit implementation,
-/// context-only, or deferral decision, and a disposition cannot outlive the projection fact it
-/// explains. Deliberately unsupported publication names are returned to the generator so runtime
-/// recognition and the review decision cannot drift.
+/// context-only, or deferral decision, a catalog-only name cannot remain without a reviewed
+/// emulator behavior, and a disposition cannot outlive the projection fact it explains.
+/// Deliberately unsupported names are returned to the generator so runtime recognition and the
+/// review decision cannot drift.
 fn check_operand_dispositions(
     root: &Path,
     families: &[Value],
@@ -839,6 +840,9 @@ fn check_operand_dispositions(
     let mut seen = BTreeSet::new();
     let mut applied = BTreeSet::new();
     let mut deferred = BTreeSet::new();
+    let mut implemented_catalog_only = BTreeSet::new();
+    let mut opaque_catalog_only = BTreeSet::new();
+    let mut unsupported_catalog_only = BTreeSet::new();
     for entry in entries {
         let row_id = text(entry, "row_id", &dispositions_path)?;
         let operand = text(entry, "operand_name", &dispositions_path)?;
@@ -872,7 +876,27 @@ fn check_operand_dispositions(
                 operands.contains(operand),
                 &format!("{keyword} no longer carries the deferred operand {operand}"),
             )?;
+            require(
+                text(entry, "review_status", &dispositions_path)? == "reviewed-and-intended",
+                &format!("RACF operand {operand} of {keyword} has not been reviewed and intended"),
+            )?;
             let key = (row_id.to_string(), operand.to_string());
+            match text(entry, "emulator_classification", &dispositions_path)? {
+                "implemented" => {
+                    implemented_catalog_only.insert(key.clone());
+                }
+                "opaque-profile-field" => {
+                    opaque_catalog_only.insert(key.clone());
+                }
+                "deliberately-unimplemented" => {
+                    unsupported_catalog_only.insert(key.clone());
+                }
+                value => return Err(format!("unknown RACF emulator classification {value}")),
+            }
+            require(
+                text(entry, "emulator_behavior", &dispositions_path)?.len() >= 24,
+                &format!("RACF operand {operand} of {keyword} lacks emulator behavior"),
+            )?;
             deferred.insert(key);
         }
     }
@@ -907,6 +931,19 @@ fn check_operand_dispositions(
         ("applied_names", applied.len() as u64),
         ("remaining_catalog_only_names", deferred.len() as u64),
         ("remaining_catalog_only_families", families_of(&deferred)),
+        ("reviewed_catalog_only_names", deferred.len() as u64),
+        (
+            "implemented_catalog_only_names",
+            implemented_catalog_only.len() as u64,
+        ),
+        (
+            "opaque_catalog_only_names",
+            opaque_catalog_only.len() as u64,
+        ),
+        (
+            "unsupported_catalog_only_names",
+            unsupported_catalog_only.len() as u64,
+        ),
     ] {
         require(
             integer(&dispositions, field, &dispositions_path)? == expected,
@@ -1124,7 +1161,10 @@ fn check_operand_dispositions(
     }
 
     let mut unsupported_by_row = BTreeMap::<String, BTreeSet<String>>::new();
-    for (row_id, name) in unsupported_source {
+    for (row_id, name) in unsupported_catalog_only
+        .into_iter()
+        .chain(unsupported_source)
+    {
         unsupported_by_row.entry(row_id).or_default().insert(name);
     }
     Ok(OperandDispositionProjection {

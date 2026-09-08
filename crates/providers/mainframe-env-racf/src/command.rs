@@ -973,6 +973,8 @@ mod tests {
         for input in [
             "ADDGROUP OPER AT(NODE1)",
             "ADDGROUP OPER NOTERMUACC",
+            "ADDUSER USER1 REVOKE",
+            "DISPLAY MAPPING",
             "RACDCERT TRUST",
         ] {
             let problem = validate_command(input, Default::default())
@@ -1037,7 +1039,7 @@ mod tests {
                 .iter()
                 .map(|descriptor| descriptor.unsupported_operands().len())
                 .sum::<usize>(),
-            429
+            439
         );
         let syntax = command_descriptors()
             .iter()
@@ -1072,6 +1074,12 @@ mod tests {
                 && syntax.behavior() == SyntaxTokenBehavior::UnsupportedCapability
                 && syntax.within_operands() == ["WHEN", "NOWHEN"]
         }));
+        let display = command_descriptors()
+            .iter()
+            .find(|descriptor| descriptor.keyword() == "DISPLAY")
+            .unwrap();
+        assert!(display.unsupported_operands().contains(&"MAPPING"));
+        assert!(!display.unsupported_operands().contains(&"ALL"));
     }
 
     #[test]

@@ -2,7 +2,7 @@
   "schema_version": "mainframe-env.racf-operand-dispositions@2",
   "baseline_id": "ibm-zos-3.2-racf-saf-2026",
   "coverage_credit": 0,
-  "description": "Disposition of both directions of the RACF command operand projection. The catalog-only baseline retains its original applied/deferred record. Every source-only and syntax-only name is classified per command; syntax-only runtime behavior is scoped to explicit command or operand contexts. The xtask gate enforces exact set equality and generates fail-closed runtime recognition.",
+  "description": "Reviewed disposition of both directions of the RACF command operand projection. The 68-name catalog-only baseline has 6 applied corrections and 62 reviewed, intended emulator spellings. Every source-only and syntax-only name is classified per command; syntax-only runtime behavior is additionally scoped to explicit command or operand contexts. The xtask gate enforces exact set equality and generates fail-closed runtime recognition.",
   "baseline_catalog_only_names": 68,
   "baseline_catalog_only_families": 21,
   "applied_names": 6,
@@ -31,7 +31,12 @@
       "topic_sha256": "12c201c5a7fb21ced7d84ef23606d2eb0442cdff870dc2180a0809372cd1d977",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned ADDUSER topic"
+      "note": "the name does not occur anywhere in the pinned ADDUSER topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "opaque-profile-field",
+      "emulator_behavior": "The command processor preserves INTERVAL and its values in the USER BASE profile segment; it claims no stronger RACF semantic for that field."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0003",
@@ -42,7 +47,12 @@
       "topic_sha256": "12c201c5a7fb21ced7d84ef23606d2eb0442cdff870dc2180a0809372cd1d977",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned ADDUSER topic"
+      "note": "the name does not occur anywhere in the pinned ADDUSER topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The ADDUSER handler passes MFA to apply_mfa, which creates or updates the user's bounded factor record using only a safe secret reference, or applies its requested inactive/delete transition."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0003",
@@ -53,7 +63,12 @@
       "topic_sha256": "12c201c5a7fb21ced7d84ef23606d2eb0442cdff870dc2180a0809372cd1d977",
       "applied": false,
       "reason": "named-only-in-prose-not-in-the-syntax",
-      "note": "occurs only in prose describing the SETROPTS PASSWORD(REVOKE) option"
+      "note": "occurs only in prose describing the SETROPTS PASSWORD(REVOKE) option",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "deliberately-unimplemented",
+      "emulator_behavior": "The parser recognizes REVOKE for ADDUSER and returns UnsupportedCapability with capability racf-command-operand before authorization, audit, or state mutation; only ALTUSER implements the principal-state transition."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0003",
@@ -64,7 +79,12 @@
       "topic_sha256": "12c201c5a7fb21ced7d84ef23606d2eb0442cdff870dc2180a0809372cd1d977",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned ADDUSER topic"
+      "note": "the name does not occur anywhere in the pinned ADDUSER topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "opaque-profile-field",
+      "emulator_behavior": "The command processor preserves TME and its values in the USER BASE profile segment; it claims no stronger RACF semantic for that field."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0004",
@@ -75,7 +95,12 @@
       "topic_sha256": "e3beb3c94c424803da656a9993e95aa903ad64a16b7a8b4b5548c9cdca8446d6",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned ALTDSD topic"
+      "note": "the name does not occur anywhere in the pinned ALTDSD topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "opaque-profile-field",
+      "emulator_behavior": "The command processor preserves FCLASS and its values in the RESOURCE BASE profile segment; it claims no stronger RACF semantic for that field."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0004",
@@ -86,7 +111,12 @@
       "topic_sha256": "e3beb3c94c424803da656a9993e95aa903ad64a16b7a8b4b5548c9cdca8446d6",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned ALTDSD topic"
+      "note": "the name does not occur anywhere in the pinned ALTDSD topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "opaque-profile-field",
+      "emulator_behavior": "The command processor preserves FROM and its values in the RESOURCE BASE profile segment; it claims no stronger RACF semantic for that field."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0004",
@@ -97,7 +127,12 @@
       "topic_sha256": "e3beb3c94c424803da656a9993e95aa903ad64a16b7a8b4b5548c9cdca8446d6",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned ALTDSD topic"
+      "note": "the name does not occur anywhere in the pinned ALTDSD topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "opaque-profile-field",
+      "emulator_behavior": "The command processor preserves MODEL and its values in the RESOURCE BASE profile segment; it claims no stronger RACF semantic for that field."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0004",
@@ -108,7 +143,12 @@
       "topic_sha256": "e3beb3c94c424803da656a9993e95aa903ad64a16b7a8b4b5548c9cdca8446d6",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned ALTDSD topic"
+      "note": "the name does not occur anywhere in the pinned ALTDSD topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The ALTDSD handler clears the target dataset profile's category set before publishing the next profile version."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0004",
@@ -119,7 +159,12 @@
       "topic_sha256": "e3beb3c94c424803da656a9993e95aa903ad64a16b7a8b4b5548c9cdca8446d6",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned ALTDSD topic"
+      "note": "the name does not occur anywhere in the pinned ALTDSD topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The ALTDSD handler replaces the target dataset profile's audit policy with AuditPolicy::None."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0004",
@@ -130,7 +175,12 @@
       "topic_sha256": "e3beb3c94c424803da656a9993e95aa903ad64a16b7a8b4b5548c9cdca8446d6",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned ALTDSD topic"
+      "note": "the name does not occur anywhere in the pinned ALTDSD topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The ALTDSD handler resets the target dataset profile's modeled security level to zero."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0005",
@@ -154,7 +204,12 @@
       "topic_sha256": "9f42b9dd856a399d6de652f5a34619cdc3e88f7f8be022bb79cee5267cf58cac",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned ALTGROUP topic"
+      "note": "the name does not occur anywhere in the pinned ALTGROUP topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The ALTGROUP handler sets the target GroupProfile universal flag to false and advances its version."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0005",
@@ -178,7 +233,12 @@
       "topic_sha256": "9f42b9dd856a399d6de652f5a34619cdc3e88f7f8be022bb79cee5267cf58cac",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned ALTGROUP topic"
+      "note": "the name does not occur anywhere in the pinned ALTGROUP topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The ALTGROUP handler sets the target GroupProfile universal flag to true and advances its version."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0006",
@@ -189,7 +249,12 @@
       "topic_sha256": "5cddb1c4163683719a619bbb8fed87c9e71f9e3191ec6615f257ce1a7d61d7ac",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned ALTUSER topic"
+      "note": "the name does not occur anywhere in the pinned ALTUSER topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "opaque-profile-field",
+      "emulator_behavior": "The command processor preserves INTERVAL and its values in the USER BASE profile segment; it claims no stronger RACF semantic for that field."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0006",
@@ -200,7 +265,12 @@
       "topic_sha256": "5cddb1c4163683719a619bbb8fed87c9e71f9e3191ec6615f257ce1a7d61d7ac",
       "applied": false,
       "reason": "named-only-in-prose-not-in-the-syntax",
-      "note": "occurs only in prose directing the reader to the PASSWORD command's NOINTERVAL keyword"
+      "note": "occurs only in prose directing the reader to the PASSWORD command's NOINTERVAL keyword",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "opaque-profile-field",
+      "emulator_behavior": "The command processor preserves NOINTERVAL and its values in the USER BASE profile segment; it claims no stronger RACF semantic for that field."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0006",
@@ -211,7 +281,12 @@
       "topic_sha256": "5cddb1c4163683719a619bbb8fed87c9e71f9e3191ec6615f257ce1a7d61d7ac",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned ALTUSER topic"
+      "note": "the name does not occur anywhere in the pinned ALTUSER topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "opaque-profile-field",
+      "emulator_behavior": "The command processor preserves TME and its values in the USER BASE profile segment; it claims no stronger RACF semantic for that field."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0011",
@@ -222,7 +297,12 @@
       "topic_sha256": "a5b964ddb860114bda5a05972ffbdfd877f4996171a97d0b208d9f4f27f52be4",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned DISPLAY topic"
+      "note": "the name does not occur anywhere in the pinned DISPLAY topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The query processor accepts ALL for DISPLAY as a presentation selector and returns the command's fixed bounded typed-record projection; it does not alter which matching objects are selected."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0011",
@@ -233,7 +313,12 @@
       "topic_sha256": "a5b964ddb860114bda5a05972ffbdfd877f4996171a97d0b208d9f4f27f52be4",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned DISPLAY topic"
+      "note": "the name does not occur anywhere in the pinned DISPLAY topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "deliberately-unimplemented",
+      "emulator_behavior": "The parser recognizes MAPPING for DISPLAY and returns UnsupportedCapability with capability racf-command-operand before authorization, audit, or state mutation."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0011",
@@ -244,7 +329,12 @@
       "topic_sha256": "a5b964ddb860114bda5a05972ffbdfd877f4996171a97d0b208d9f4f27f52be4",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned DISPLAY topic"
+      "note": "the name does not occur anywhere in the pinned DISPLAY topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "deliberately-unimplemented",
+      "emulator_behavior": "The parser recognizes NODE for DISPLAY and returns UnsupportedCapability with capability racf-command-operand before authorization, audit, or state mutation."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0012",
@@ -255,7 +345,12 @@
       "topic_sha256": "337e7409b7b6a4b6a3da82e89df16f0373739350da0a650c7c00d7120da5a680",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned LISTDSD topic"
+      "note": "the name does not occur anywhere in the pinned LISTDSD topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The query processor accepts DA for LISTDSD as a presentation selector and returns the command's fixed bounded typed-record projection; it does not alter which matching objects are selected."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0012",
@@ -266,7 +361,12 @@
       "topic_sha256": "337e7409b7b6a4b6a3da82e89df16f0373739350da0a650c7c00d7120da5a680",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned LISTDSD topic"
+      "note": "the name does not occur anywhere in the pinned LISTDSD topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The query processor accepts MULTI for LISTDSD as a presentation selector and returns the command's fixed bounded typed-record projection; it does not alter which matching objects are selected."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0013",
@@ -277,7 +377,12 @@
       "topic_sha256": "75278370261ab3f3ffa716b8b7036dac909eff836aedfa1cbe69f64568faa1a0",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned LISTGRP topic"
+      "note": "the name does not occur anywhere in the pinned LISTGRP topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The query processor accepts ALL for LISTGRP as a presentation selector and returns the command's fixed bounded typed-record projection; it does not alter which matching objects are selected."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0013",
@@ -288,7 +393,12 @@
       "topic_sha256": "75278370261ab3f3ffa716b8b7036dac909eff836aedfa1cbe69f64568faa1a0",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned LISTGRP topic"
+      "note": "the name does not occur anywhere in the pinned LISTGRP topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The query processor accepts AUTHUSER for LISTGRP as a presentation selector and returns the command's fixed bounded typed-record projection; it does not alter which matching objects are selected."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0013",
@@ -299,7 +409,12 @@
       "topic_sha256": "75278370261ab3f3ffa716b8b7036dac909eff836aedfa1cbe69f64568faa1a0",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned LISTGRP topic"
+      "note": "the name does not occur anywhere in the pinned LISTGRP topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The query processor accepts HISTORY for LISTGRP as a presentation selector and returns the command's fixed bounded typed-record projection; it does not alter which matching objects are selected."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0014",
@@ -310,7 +425,12 @@
       "topic_sha256": "07f23c1154625ab787a650ef6a987bb572dd67c6a4a154589ef1f16c886f1d05",
       "applied": false,
       "reason": "named-only-in-prose-not-in-the-syntax",
-      "note": "occurs only inside a sample command output listing, not in the syntax"
+      "note": "occurs only inside a sample command output listing, not in the syntax",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The query processor accepts ALL for LISTUSER as a presentation selector and returns the command's fixed bounded typed-record projection; it does not alter which matching objects are selected."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0014",
@@ -321,7 +441,12 @@
       "topic_sha256": "07f23c1154625ab787a650ef6a987bb572dd67c6a4a154589ef1f16c886f1d05",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned LISTUSER topic"
+      "note": "the name does not occur anywhere in the pinned LISTUSER topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The query processor accepts HISTORY for LISTUSER as a presentation selector and returns the command's fixed bounded typed-record projection; it does not alter which matching objects are selected."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0014",
@@ -332,7 +457,12 @@
       "topic_sha256": "07f23c1154625ab787a650ef6a987bb572dd67c6a4a154589ef1f16c886f1d05",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned LISTUSER topic"
+      "note": "the name does not occur anywhere in the pinned LISTUSER topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The query processor accepts TME for LISTUSER as a presentation selector and returns the command's fixed bounded typed-record projection; it does not alter which matching objects are selected."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0017",
@@ -343,7 +473,12 @@
       "topic_sha256": "79aa1d7b451785f67c3f67b4a37ba6a6b893eadca1b289094d368679dbac11b1",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned RACDCERT topic"
+      "note": "the name does not occur anywhere in the pinned RACDCERT topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The RACDCERT handler selects one certificate by the START value, sets its active flag to true, and advances its version."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0017",
@@ -354,7 +489,12 @@
       "topic_sha256": "79aa1d7b451785f67c3f67b4a37ba6a6b893eadca1b289094d368679dbac11b1",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned RACDCERT topic"
+      "note": "the name does not occur anywhere in the pinned RACDCERT topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The RACDCERT handler selects one certificate by the STOP value, sets its active flag to false, and advances its version."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0018",
@@ -365,7 +505,12 @@
       "topic_sha256": "a33911f17b0a708fbbbc22f5835f0d5c5196d38eafb77b0e2902ee87ea345493",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned RACLINK topic"
+      "note": "the name does not occur anywhere in the pinned RACLINK topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "deliberately-unimplemented",
+      "emulator_behavior": "The parser recognizes NODE for RACLINK and returns UnsupportedCapability with capability racf-command-operand before authorization, audit, or state mutation."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0018",
@@ -377,7 +522,12 @@
       "applied": false,
       "reason": "published-as-a-value-or-subordinate-term",
       "published_under": "DEFINE",
-      "note": "the publication publishes PEER subordinate to DEFINE, not as a top-level operand of RACLINK"
+      "note": "the publication publishes PEER subordinate to DEFINE, not as a top-level operand of RACLINK",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The RACLINK DEFINE handler records the created user association with its peer flag set to true."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0018",
@@ -388,7 +538,12 @@
       "topic_sha256": "a33911f17b0a708fbbbc22f5835f0d5c5196d38eafb77b0e2902ee87ea345493",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned RACLINK topic"
+      "note": "the name does not occur anywhere in the pinned RACLINK topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The RACLINK DEFINE handler records the created user association with password_sync set to true."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0019",
@@ -399,7 +554,12 @@
       "topic_sha256": "48e9fd9c9ca33806943d3729cd1fcc0ef74fbd4876c8f984c2abf6e8db66f2b7",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned RACMAP topic"
+      "note": "the name does not occur anywhere in the pinned RACMAP topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The RACMAP delete handler removes the identity-mapping record named by DELAPPLE and returns NotFound when it is absent."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0019",
@@ -410,7 +570,12 @@
       "topic_sha256": "48e9fd9c9ca33806943d3729cd1fcc0ef74fbd4876c8f984c2abf6e8db66f2b7",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned RACMAP topic"
+      "note": "the name does not occur anywhere in the pinned RACMAP topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The RACMAP delete handler removes the identity-mapping record named by DELCERT and returns NotFound when it is absent."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0019",
@@ -421,7 +586,12 @@
       "topic_sha256": "48e9fd9c9ca33806943d3729cd1fcc0ef74fbd4876c8f984c2abf6e8db66f2b7",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned RACMAP topic"
+      "note": "the name does not occur anywhere in the pinned RACMAP topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The RACMAP delete handler removes the identity-mapping record named by DELDN and returns NotFound when it is absent."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0019",
@@ -432,7 +602,12 @@
       "topic_sha256": "48e9fd9c9ca33806943d3729cd1fcc0ef74fbd4876c8f984c2abf6e8db66f2b7",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned RACMAP topic"
+      "note": "the name does not occur anywhere in the pinned RACMAP topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The RACMAP delete handler removes the identity-mapping record named by DELNMAP and returns NotFound when it is absent."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0019",
@@ -443,7 +618,12 @@
       "topic_sha256": "48e9fd9c9ca33806943d3729cd1fcc0ef74fbd4876c8f984c2abf6e8db66f2b7",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned RACMAP topic"
+      "note": "the name does not occur anywhere in the pinned RACMAP topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The RACMAP delete handler removes the identity-mapping record named by DELREGISTRY and returns NotFound when it is absent."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0019",
@@ -454,7 +634,12 @@
       "topic_sha256": "48e9fd9c9ca33806943d3729cd1fcc0ef74fbd4876c8f984c2abf6e8db66f2b7",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned RACMAP topic"
+      "note": "the name does not occur anywhere in the pinned RACMAP topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The RACMAP query path returns the bounded identity-mapping records owned by the selected local user."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0019",
@@ -465,7 +650,12 @@
       "topic_sha256": "48e9fd9c9ca33806943d3729cd1fcc0ef74fbd4876c8f984c2abf6e8db66f2b7",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned RACMAP topic"
+      "note": "the name does not occur anywhere in the pinned RACMAP topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "deliberately-unimplemented",
+      "emulator_behavior": "The parser recognizes SDNFILTER for RACMAP and returns UnsupportedCapability with capability racf-command-operand before authorization, audit, or state mutation."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0019",
@@ -477,7 +667,12 @@
       "applied": false,
       "reason": "published-as-a-value-or-subordinate-term",
       "published_under": "MAP",
-      "note": "the publication publishes WITHLABEL subordinate to MAP, not as a top-level operand of RACMAP"
+      "note": "the publication publishes WITHLABEL subordinate to MAP, not as a top-level operand of RACMAP",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "deliberately-unimplemented",
+      "emulator_behavior": "The parser recognizes WITHLABEL for RACMAP and returns UnsupportedCapability with capability racf-command-operand before authorization, audit, or state mutation."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0020",
@@ -527,7 +722,12 @@
       "topic_sha256": "804a48ec4b963087ecdf83d94ba5936d118b8f24c6735648ecbc30c384e1fcd3",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned RALTER topic"
+      "note": "the name does not occur anywhere in the pinned RALTER topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "opaque-profile-field",
+      "emulator_behavior": "The command processor preserves FROM and its values in the RESOURCE BASE profile segment; it claims no stronger RACF semantic for that field."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0022",
@@ -538,7 +738,12 @@
       "topic_sha256": "804a48ec4b963087ecdf83d94ba5936d118b8f24c6735648ecbc30c384e1fcd3",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned RALTER topic"
+      "note": "the name does not occur anywhere in the pinned RALTER topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The RALTER handler clears the target general-resource profile's category set before publishing the next profile version."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0022",
@@ -549,7 +754,12 @@
       "topic_sha256": "804a48ec4b963087ecdf83d94ba5936d118b8f24c6735648ecbc30c384e1fcd3",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned RALTER topic"
+      "note": "the name does not occur anywhere in the pinned RALTER topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The RALTER handler replaces the target general-resource profile's audit policy with AuditPolicy::None."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0022",
@@ -560,7 +770,12 @@
       "topic_sha256": "804a48ec4b963087ecdf83d94ba5936d118b8f24c6735648ecbc30c384e1fcd3",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned RALTER topic"
+      "note": "the name does not occur anywhere in the pinned RALTER topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The RALTER handler resets the target general-resource profile's modeled security level to zero."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0027",
@@ -571,7 +786,12 @@
       "topic_sha256": "c3482a1c50f130416dfd135b73563eaf8728917a9279047c487788454066a488",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned RLIST topic"
+      "note": "the name does not occur anywhere in the pinned RLIST topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "deliberately-unimplemented",
+      "emulator_behavior": "The parser recognizes GLOBAL for RLIST and returns UnsupportedCapability with capability racf-command-operand before authorization, audit, or state mutation."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0028",
@@ -582,7 +802,12 @@
       "topic_sha256": "0f1a85dcc8b5deb7d0d22428f4f704cb2b5bf4faf104403f4b209dd67744dfda",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned RVARY topic"
+      "note": "the name does not occur anywhere in the pinned RVARY topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "deliberately-unimplemented",
+      "emulator_behavior": "The parser recognizes PASSWORD for RVARY and returns UnsupportedCapability with capability racf-command-operand before authorization, audit, or state mutation."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0029",
@@ -593,7 +818,12 @@
       "topic_sha256": "03237277681e9504c79e2f5ed8b89d70d2c8b95366f748911d040caf6ea34464",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned SEARCH topic"
+      "note": "the name does not occur anywhere in the pinned SEARCH topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "deliberately-unimplemented",
+      "emulator_behavior": "The parser recognizes CATALOG for SEARCH and returns UnsupportedCapability with capability racf-command-operand before authorization, audit, or state mutation."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0030",
@@ -604,7 +834,12 @@
       "topic_sha256": "b33f2fd51ee8ef9d095df47a2cbe8b11b38e189b2e82b74a7a983252104125d4",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned SET topic"
+      "note": "the name does not occur anywhere in the pinned SET topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The SET handler stores AUTOSIGNON=true in the authority's modeled operational flag map."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0030",
@@ -615,7 +850,12 @@
       "topic_sha256": "b33f2fd51ee8ef9d095df47a2cbe8b11b38e189b2e82b74a7a983252104125d4",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned SET topic"
+      "note": "the name does not occur anywhere in the pinned SET topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The SET handler stores AUTOSIGNON=false in the authority's modeled operational flag map."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0030",
@@ -626,7 +866,12 @@
       "topic_sha256": "b33f2fd51ee8ef9d095df47a2cbe8b11b38e189b2e82b74a7a983252104125d4",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned SET topic"
+      "note": "the name does not occur anywhere in the pinned SET topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The SET handler disables the RACF subsystem trace flag and returns the resulting policy record."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0031",
@@ -638,7 +883,12 @@
       "applied": false,
       "reason": "catalog-fuses-operand-and-value",
       "published_form": "JES(BATCHALLRACF)",
-      "note": "the publication writes JES(BATCHALLRACF): the catalog name concatenates an operand and its value, so correcting it means modelling operand values, not renaming a name"
+      "note": "the publication writes JES(BATCHALLRACF): the catalog name concatenates an operand and its value, so correcting it means modelling operand values, not renaming a name",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The SETROPTS handler sets SecurityPolicyOptions.jes_batch_all_racf to true."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0031",
@@ -650,7 +900,12 @@
       "applied": false,
       "reason": "catalog-fuses-operand-and-value",
       "published_form": "JES(NOBATCHALLRACF)",
-      "note": "the publication writes JES(NOBATCHALLRACF): the catalog name concatenates an operand and its value, so correcting it means modelling operand values, not renaming a name"
+      "note": "the publication writes JES(NOBATCHALLRACF): the catalog name concatenates an operand and its value, so correcting it means modelling operand values, not renaming a name",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The SETROPTS handler sets SecurityPolicyOptions.jes_batch_all_racf to false."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0031",
@@ -662,7 +917,12 @@
       "applied": false,
       "reason": "catalog-fuses-operand-and-value",
       "published_form": "NOWHEN(PROGRAM)",
-      "note": "the publication writes NOWHEN(PROGRAM): the catalog name concatenates an operand and its value, so correcting it means modelling operand values, not renaming a name"
+      "note": "the publication writes NOWHEN(PROGRAM): the catalog name concatenates an operand and its value, so correcting it means modelling operand values, not renaming a name",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The SETROPTS handler sets SecurityPolicyOptions.program_control to false."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0031",
@@ -674,7 +934,12 @@
       "applied": false,
       "reason": "published-as-a-value-or-subordinate-term",
       "published_under": "PASSWORD",
-      "note": "the publication publishes NORULES subordinate to PASSWORD, not as a top-level operand of SETROPTS"
+      "note": "the publication publishes NORULES subordinate to PASSWORD, not as a top-level operand of SETROPTS",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The SETROPTS handler sets SecurityPolicyOptions.rules to false."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0031",
@@ -686,7 +951,12 @@
       "applied": false,
       "reason": "catalog-fuses-operand-and-value",
       "published_form": "NOWHEN(PROGRAM)",
-      "note": "the publication writes NOWHEN(PROGRAM): the catalog name concatenates an operand and its value, so correcting it means modelling operand values, not renaming a name"
+      "note": "the publication writes NOWHEN(PROGRAM): the catalog name concatenates an operand and its value, so correcting it means modelling operand values, not renaming a name",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The SETROPTS handler sets SecurityPolicyOptions.when_program to false."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0031",
@@ -697,7 +967,12 @@
       "topic_sha256": "9190c0472b8e0c19aba79a4bdc1ab8a7745c2aa5dffecaab05c3f0332d54fe5c",
       "applied": false,
       "reason": "named-only-in-prose-not-in-the-syntax",
-      "note": "occurs only inside a sample SETROPTS LIST output listing, not in the syntax"
+      "note": "occurs only inside a sample SETROPTS LIST output listing, not in the syntax",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The SETROPTS handler reads PHRASE(MINIMUM(...)) into phrase_minimum and validates it against the password bounds before publishing policy."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0031",
@@ -709,7 +984,12 @@
       "applied": false,
       "reason": "catalog-fuses-operand-and-value",
       "published_form": "WHEN(PROGRAM)",
-      "note": "the publication writes WHEN(PROGRAM): the catalog name concatenates an operand and its value, so correcting it means modelling operand values, not renaming a name"
+      "note": "the publication writes WHEN(PROGRAM): the catalog name concatenates an operand and its value, so correcting it means modelling operand values, not renaming a name",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The SETROPTS handler sets SecurityPolicyOptions.program_control to true."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0031",
@@ -720,7 +1000,12 @@
       "topic_sha256": "9190c0472b8e0c19aba79a4bdc1ab8a7745c2aa5dffecaab05c3f0332d54fe5c",
       "applied": false,
       "reason": "named-only-in-prose-not-in-the-syntax",
-      "note": "occurs only inside a sample SETROPTS LIST output listing; the published operands are RULEn, NORULEn and NORULES"
+      "note": "occurs only inside a sample SETROPTS LIST output listing; the published operands are RULEn, NORULEn and NORULES",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The SETROPTS handler sets SecurityPolicyOptions.rules to true."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0031",
@@ -732,7 +1017,12 @@
       "applied": false,
       "reason": "catalog-fuses-operand-and-value",
       "published_form": "WHEN(PROGRAM)",
-      "note": "the publication writes WHEN(PROGRAM): the catalog name concatenates an operand and its value, so correcting it means modelling operand values, not renaming a name"
+      "note": "the publication writes WHEN(PROGRAM): the catalog name concatenates an operand and its value, so correcting it means modelling operand values, not renaming a name",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The SETROPTS handler sets SecurityPolicyOptions.when_program to true."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0032",
@@ -743,7 +1033,12 @@
       "topic_sha256": "e22782d97188b41f1b9cf661294364c02248c971376be678360043fd451ebb38",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned SIGNOFF topic"
+      "note": "the name does not occur anywhere in the pinned SIGNOFF topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The SIGNOFF handler limits its active-session query or transition to sessions whose node equals the normalized AT value."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0032",
@@ -754,7 +1049,12 @@
       "topic_sha256": "e22782d97188b41f1b9cf661294364c02248c971376be678360043fd451ebb38",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned SIGNOFF topic"
+      "note": "the name does not occur anywhere in the pinned SIGNOFF topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The SIGNOFF handler requires SPECIAL, selects every matching active session, marks each session signed off, and deletes its active ACEE."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0032",
@@ -765,7 +1065,12 @@
       "topic_sha256": "e22782d97188b41f1b9cf661294364c02248c971376be678360043fd451ebb38",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned SIGNOFF topic"
+      "note": "the name does not occur anywhere in the pinned SIGNOFF topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "implemented",
+      "emulator_behavior": "The SIGNOFF LIST path returns matching active sessions without changing their session or ACEE state."
     },
     {
       "row_id": "ibm-zos-3.2-racf-saf-2026:racf-command-families:0034",
@@ -776,7 +1081,12 @@
       "topic_sha256": "7be100bf59d6f02be2ad631757cd630e4ff2433860d65402350578178d77d848",
       "applied": false,
       "reason": "not-published-for-this-command",
-      "note": "the name does not occur anywhere in the pinned TARGET topic"
+      "note": "the name does not occur anywhere in the pinned TARGET topic",
+      "review_status": "reviewed-and-intended",
+      "reviewed_by": "Codex automated review",
+      "review_basis": "Compared the entry's pinned topic digest and projection classification with the current RACF parser and command-processor control flow; no licensed behavior claim is inferred.",
+      "emulator_classification": "deliberately-unimplemented",
+      "emulator_behavior": "The parser recognizes REROUTE for TARGET and returns UnsupportedCapability with capability racf-command-operand before authorization, audit, or state mutation."
     }
   ],
   "source_only_names": 429,
@@ -2597,5 +2907,9 @@
       ]
     }
   ],
-  "context_only_syntax_only_names": 4
+  "context_only_syntax_only_names": 4,
+  "reviewed_catalog_only_names": 62,
+  "implemented_catalog_only_names": 43,
+  "opaque_catalog_only_names": 9,
+  "unsupported_catalog_only_names": 10
 }

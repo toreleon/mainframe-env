@@ -645,7 +645,8 @@ and 4<!--f:racf.rows_at_depth_1--> at one.
 Commit ff50ae5 fixed a collapse that had been flattening it. `syntax_only` —
 76<!--f:racf.syntax_only-->
 uppercase tokens the `Syntax` table shows that the `Parameters` tree never
-reaches — is a reviewer's question, not a defect claim.
+reaches — is retained as a distinct projection population and is now explicitly
+classified below rather than left as an unanswered review question.
 
 The alias finding is closed. **All 34<!--f:racf.alias_lists_reproduced--> catalog
 alias lists reproduce exactly**,
@@ -667,10 +668,13 @@ verified against the topic that publishes it: `ADDGROUP`/`ALTGROUP` `TERMINAL` �
 `ON` → `WRITEDOWN`. `TERMINAL` occurs zero times in `addgroup.htm` and
 `altgrp.htm`, and `racpriv.htm` publishes `WRITEDOWN` as its only `dt` term.
 
-**62<!--f:racf.remaining_catalog_only_names--> catalog operand names across
-19<!--f:racf.remaining_catalog_only_families--> families are dispositioned but not
-applied**, and that is the largest open item this record has. They are recorded
-one by one in `conformance/0.5/racf/operand-dispositions.json` with a reason:
+**All 62<!--f:racf.reviewed_catalog_only_names--> retained catalog-only operands
+across 19<!--f:racf.remaining_catalog_only_families--> families now carry a named
+review, an emulator classification, and a description of the behavior the code
+actually provides.** The review is recorded transparently as an automated Codex
+review against the pinned topic/projection and the current parser and processor
+control flow; it claims no licensed equivalence. The publication-side reasons
+remain:
 48<!--f:racf.reason.not_published_for_this_command-->
 `not-published-for-this-command`,
 6<!--f:racf.reason.catalog_fuses_operand_and_value-->
@@ -683,19 +687,34 @@ one by one in `conformance/0.5/racf/operand-dispositions.json` with a reason:
 `RACMAP` (8<!--f:racf.dispositioned.racmap-->) and `ALTDSD`
 (6<!--f:racf.dispositioned.altdsd-->).
 
-That file *is* gated. `check_operand_dispositions` in `xtask/src/racf_catalog.rs`
-enforces set equality between the projection's `catalog_only` names and the
-undeferred dispositions, so an unpublished operand cannot be added to the catalog
-without being dispositioned, and a disposition cannot outlive the name it
-explains. But the gate is one-sided in two ways a reader should hold onto:
+Of those 62, 43<!--f:racf.implemented_catalog_only_names--> reach an existing
+semantic handler, 9<!--f:racf.opaque_catalog_only_names--> are deliberately
+preserved as opaque BASE-profile compatibility fields, and
+10<!--f:racf.unsupported_catalog_only_names--> are deliberately unsupported.
+The unsupported set is generated into the command descriptors and raises a
+structured `UnsupportedCapability` before any state mutation rather than being
+accepted as a no-op.
 
-1. A *reason* is not a correction. 62<!--f:racf.catalog_only--> names the
-   publication does not publish are
-   still in the catalog, accepted with an explanation attached.
-2. Nothing gates the other direction at all. 429<!--f:racf.source_only--> operand
-   names the publication
-   publishes and the catalog does not carry are reported by the projection and
-   checked by nothing.
+The publication-to-catalog direction is gated as well. All
+429<!--f:racf.source_only--> `source_only` names are classified:
+0<!--f:racf.implemented_source_only_names--> implemented,
+429<!--f:racf.unsupported_source_only_names--> deliberately unsupported, and
+the catalog-gap count is 0<!--f:racf.catalog_gap_source_only_names-->. Of the
+76<!--f:racf.syntax_only--> names printed in a Syntax section but absent from
+the Parameters tree, 4<!--f:racf.implemented_syntax_only_names--> are implemented,
+68<!--f:racf.unsupported_syntax_only_names--> are deliberately unsupported in
+their recorded command or enclosing-operand contexts, and
+4<!--f:racf.context_only_syntax_only_names--> are analysis-only words without an
+unambiguous executable context. Arbitrary occurrences of those four remain
+ordinary data. The syntax-only catalog-gap count is
+0<!--f:racf.catalog_gap_syntax_only_names-->.
+
+`check_operand_dispositions` in `xtask/src/racf_catalog.rs` enforces exact set
+equality for `catalog_only`, `source_only`, and `syntax_only`, rejects overlapping
+or stale classifications, and requires both catalog-gap sets to remain empty.
+The projection still carries zero coverage credit: these decisions prove how
+the emulator treats every observed name, not that its modeled behavior is a
+licensed RACF differential match.
 
 ## Known limitations
 

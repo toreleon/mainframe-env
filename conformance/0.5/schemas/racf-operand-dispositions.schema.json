@@ -14,6 +14,10 @@
     "applied_names",
     "remaining_catalog_only_names",
     "remaining_catalog_only_families",
+    "reviewed_catalog_only_names",
+    "implemented_catalog_only_names",
+    "opaque_catalog_only_names",
+    "unsupported_catalog_only_names",
     "source_only_names",
     "source_only_families",
     "implemented_source_only_names",
@@ -38,6 +42,10 @@
     "applied_names": {"type": "integer", "minimum": 0},
     "remaining_catalog_only_names": {"type": "integer", "minimum": 0},
     "remaining_catalog_only_families": {"type": "integer", "minimum": 0},
+    "reviewed_catalog_only_names": {"type": "integer", "minimum": 0},
+    "implemented_catalog_only_names": {"type": "integer", "minimum": 0},
+    "opaque_catalog_only_names": {"type": "integer", "minimum": 0},
+    "unsupported_catalog_only_names": {"type": "integer", "minimum": 0},
     "source_only_names": {"type": "integer", "minimum": 0},
     "source_only_families": {"type": "integer", "minimum": 0},
     "implemented_source_only_names": {"type": "integer", "minimum": 0},
@@ -86,6 +94,17 @@
           "published_operand": {"type": "string", "pattern": "^[A-Z][A-Z0-9]+$", "maxLength": 32},
           "published_form": {"type": "string", "minLength": 1, "maxLength": 128},
           "published_under": {"type": "string", "minLength": 1, "maxLength": 64},
+          "review_status": {"const": "reviewed-and-intended"},
+          "reviewed_by": {"type": "string", "minLength": 3, "maxLength": 128},
+          "review_basis": {"type": "string", "minLength": 32, "maxLength": 512},
+          "emulator_classification": {
+            "enum": [
+              "implemented",
+              "opaque-profile-field",
+              "deliberately-unimplemented"
+            ]
+          },
+          "emulator_behavior": {"type": "string", "minLength": 24, "maxLength": 512},
           "note": {"type": "string", "minLength": 16, "maxLength": 512}
         },
         "allOf": [
@@ -100,6 +119,18 @@
           {
             "if": {"properties": {"reason": {"const": "published-as-a-value-or-subordinate-term"}}},
             "then": {"required": ["published_under"]}
+          },
+          {
+            "if": {"properties": {"applied": {"const": false}}},
+            "then": {
+              "required": [
+                "review_status",
+                "reviewed_by",
+                "review_basis",
+                "emulator_classification",
+                "emulator_behavior"
+              ]
+            }
           }
         ]
       }

@@ -202,6 +202,32 @@ class IndependentFigureTests(unittest.TestCase):
             self.figures["catalog.rows_total"].value,
         )
 
+    def test_racf_retained_catalog_classifications_recompute_from_named_entries(self):
+        source = REPOSITORY / "conformance/0.5/racf/operand-dispositions.json"
+        book = json.loads(source.read_text(encoding="utf-8"))
+        retained = [entry for entry in book["dispositions"] if not entry["applied"]]
+        counts = {
+            classification: sum(
+                entry["emulator_classification"] == classification for entry in retained
+            )
+            for classification in (
+                "implemented",
+                "opaque-profile-field",
+                "deliberately-unimplemented",
+            )
+        }
+        expected = {
+            "implemented": (43, "implemented"),
+            "opaque-profile-field": (9, "opaque"),
+            "deliberately-unimplemented": (10, "unsupported"),
+        }
+        for classification, (count, figure) in expected.items():
+            self.assertEqual(count, counts[classification])
+            self.assertEqual(
+                count,
+                self.figures[f"racf.{figure}_catalog_only_names"].value,
+            )
+
     def test_racf_publication_classifications_recompute_from_each_named_entry(self):
         source = REPOSITORY / "conformance/0.5/racf/operand-dispositions.json"
         book = json.loads(source.read_text(encoding="utf-8"))

@@ -81,7 +81,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         min_positionals: 1,
         max_positionals: 1,
         operands: &["ADSP", "AUDITOR", "AUTHORITY", "CICS", "CSDATA", "DATA", "DCE", "DFLTGRP", "DFP", "EIM", "GRPACC", "INTERVAL", "KERB", "LANGUAGE", "LNOTES", "MFA", "MODEL", "NAME", "NDS", "NETVIEW", "NOADSP", "NOAUDITOR", "NOGRPACC", "NOOPERATIONS", "NOPASSWORD", "NORESTRICTED", "NOSPECIAL", "OMVS", "OPERATIONS", "OPERPARM", "OVM", "OWNER", "PASSWORD", "PHRASE", "PROXY", "RESTRICTED", "REVOKE", "SECLABEL", "SPECIAL", "TME", "TSO", "UACC", "WORKATTR"],
-        unsupported_operands: &["ADDCATEGORY", "AT", "CLAUTH", "NOCLAUTH", "NOCONTAIN", "NOOIDCARD", "NOROAUDIT", "OIDCARD", "ONLYAT", "ROAUDIT", "SECLEVEL", "WHEN"],
+        unsupported_operands: &["ADDCATEGORY", "AT", "CLAUTH", "NOCLAUTH", "NOCONTAIN", "NOOIDCARD", "NOROAUDIT", "OIDCARD", "ONLYAT", "REVOKE", "ROAUDIT", "SECLEVEL", "WHEN"],
         syntax_tokens: &[SyntaxTokenDescriptor { token: "OPERATOR-CLASS", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_operands: &["CICS", "OPERPARM"] }, SyntaxTokenDescriptor { token: "OPERATOR-ID", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_operands: &["CICS", "OPERPARM"] }, SyntaxTokenDescriptor { token: "OPERATOR-PRIORITY", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_operands: &["CICS", "OPERPARM"] }, SyntaxTokenDescriptor { token: "TIMEOUT-VALUE", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_operands: &["CICS", "OPERPARM"] }, SyntaxTokenDescriptor { token: "FORCE", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_operands: &["CICS"] }, SyntaxTokenDescriptor { token: "NOFORCE", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_operands: &["CICS"] }, SyntaxTokenDescriptor { token: "WAADDR1", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_operands: &["WORKATTR"] }, SyntaxTokenDescriptor { token: "WAADDR2", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_operands: &["WORKATTR"] }, SyntaxTokenDescriptor { token: "WAADDR3", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_operands: &["WORKATTR"] }, SyntaxTokenDescriptor { token: "WAADDR4", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_operands: &["WORKATTR"] }, ],
     },
     CommandDescriptor {
@@ -201,7 +201,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         min_positionals: 0,
         max_positionals: 0,
         operands: &["ALL", "MAPPING", "NODE", "SIGNON", "USER"],
-        unsupported_operands: &["APPL", "GROUP", "POE", "SECLABEL"],
+        unsupported_operands: &["APPL", "GROUP", "MAPPING", "NODE", "POE", "SECLABEL"],
         syntax_tokens: &[],
     },
     CommandDescriptor {
@@ -306,7 +306,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         min_positionals: 1,
         max_positionals: 1,
         operands: &["DEFINE", "LIST", "NODE", "PEER", "PWDONLY", "UNDEFINE"],
-        unsupported_operands: &["APPROVE", "ID"],
+        unsupported_operands: &["APPROVE", "ID", "NODE"],
         syntax_tokens: &[SyntaxTokenDescriptor { token: "NOPWSYNC", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_operands: &["DEFINE"] }, SyntaxTokenDescriptor { token: "PWSYNC", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_operands: &["DEFINE"] }, ],
     },
     CommandDescriptor {
@@ -321,7 +321,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         min_positionals: 0,
         max_positionals: 0,
         operands: &["DELAPPLE", "DELCERT", "DELDN", "DELNMAP", "DELREGISTRY", "ID", "LIST", "MAP", "QUERY", "SDNFILTER", "WITHLABEL"],
-        unsupported_operands: &["DELMAP", "LISTMAP"],
+        unsupported_operands: &["DELMAP", "LISTMAP", "SDNFILTER", "WITHLABEL"],
         syntax_tokens: &[SyntaxTokenDescriptor { token: "NAME", behavior: SyntaxTokenBehavior::Implemented, command_level: false, within_operands: &["MAP"] }, ],
     },
     CommandDescriptor {
@@ -441,7 +441,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         min_positionals: 1,
         max_positionals: 129,
         operands: &["ALL", "AUTHUSER", "CDTINFO", "GLOBAL", "HISTORY", "NORACF", "RESGROUP"],
-        unsupported_operands: &["AT", "CFDEF", "CSDATA", "DLFDATA", "EIM", "GENERIC", "ICSF", "ICTX", "IDTPARMS", "JES", "KERB", "MFA", "MFPOLICY", "NOGENERIC", "NOYOURACC", "ONLYAT", "PROXY", "SESSION", "SIGVER", "SSIGNON", "STATISTICS", "STDATA", "SVFMR", "TME", "TVTOC"],
+        unsupported_operands: &["AT", "CFDEF", "CSDATA", "DLFDATA", "EIM", "GENERIC", "GLOBAL", "ICSF", "ICTX", "IDTPARMS", "JES", "KERB", "MFA", "MFPOLICY", "NOGENERIC", "NOYOURACC", "ONLYAT", "PROXY", "SESSION", "SIGVER", "SSIGNON", "STATISTICS", "STDATA", "SVFMR", "TME", "TVTOC"],
         syntax_tokens: &[],
     },
     CommandDescriptor {
@@ -456,7 +456,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         min_positionals: 0,
         max_positionals: 0,
         operands: &["ACTIVE", "DATASHARE", "DATASET", "INACTIVE", "LIST", "NODATASHARE", "PASSWORD", "SWITCH"],
-        unsupported_operands: &["NOCLASSACT", "NOLIST"],
+        unsupported_operands: &["NOCLASSACT", "NOLIST", "PASSWORD"],
         syntax_tokens: &[SyntaxTokenDescriptor { token: "NOTAPE", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_operands: &["INACTIVE"] }, ],
     },
     CommandDescriptor {
@@ -471,7 +471,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         min_positionals: 0,
         max_positionals: 0,
         operands: &["AGE", "ALL", "CATALOG", "CLASS", "CLIST", "FILTER", "LEVEL", "MASK", "MODEL", "NOLIST", "SECLABEL"],
-        unsupported_operands: &["AT", "CATEGORY", "EXPIRES", "GENERIC", "GID", "LIST", "NOGENERIC", "NOMASK", "NONVSAM", "ONLYAT", "SECLEVEL", "TAPE", "UID", "USER", "VOLUME", "VSAM", "WARNING"],
+        unsupported_operands: &["AT", "CATALOG", "CATEGORY", "EXPIRES", "GENERIC", "GID", "LIST", "NOGENERIC", "NOMASK", "NONVSAM", "ONLYAT", "SECLEVEL", "TAPE", "UID", "USER", "VOLUME", "VSAM", "WARNING"],
         syntax_tokens: &[SyntaxTokenDescriptor { token: "DATASET", behavior: SyntaxTokenBehavior::Implemented, command_level: false, within_operands: &["CLASS"] }, ],
     },
     CommandDescriptor {
@@ -546,7 +546,7 @@ pub const COMMAND_DESCRIPTORS: &[CommandDescriptor] = &[
         min_positionals: 0,
         max_positionals: 0,
         operands: &["DELETE", "DESCRIPTION", "DORMANT", "LIST", "LOCAL", "NODE", "OPERATIVE", "PREFIX", "PROTOCOL", "PURGE", "REROUTE", "WORKSPACE"],
-        unsupported_operands: &["ALLOWINBOUND", "DENYINBOUND", "LISTPROTOCOL", "MAIN", "NEWMAIN", "NEWPREFIX", "NEWWORKSPACE", "PLEXNEWMAIN", "RESETDENYINBOUNDCOUNT", "SYSNAME", "WDSQUAL"],
+        unsupported_operands: &["ALLOWINBOUND", "DENYINBOUND", "LISTPROTOCOL", "MAIN", "NEWMAIN", "NEWPREFIX", "NEWWORKSPACE", "PLEXNEWMAIN", "REROUTE", "RESETDENYINBOUNDCOUNT", "SYSNAME", "WDSQUAL"],
         syntax_tokens: &[SyntaxTokenDescriptor { token: "INMSG", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_operands: &["PURGE"] }, SyntaxTokenDescriptor { token: "OUTMSG", behavior: SyntaxTokenBehavior::UnsupportedCapability, command_level: false, within_operands: &["PURGE"] }, ],
     },
 ];

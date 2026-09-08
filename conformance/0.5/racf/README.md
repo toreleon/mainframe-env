@@ -106,12 +106,14 @@ Neither is a defect claim, and neither may be applied to `command-language.json`
 without a reviewed disposition per name.
 
 `operand-dispositions.json` is the executable review record for all three
-populations. Its per-command publication dispositions classify every
+populations. Its catalog-only entries preserve the pinned topic identity and
+record a named reviewer, the evidence basis, and the concrete emulator behavior
+for each retained spelling. Its per-command publication dispositions classify every
 `source_only` and `syntax_only` name as implemented, deliberately unimplemented,
 context-only, or a catalog gap. `cargo xtask racf-catalog --check` requires exact
 set equality with the projection, rejects any unapplied catalog gap, and
 generates separate top-level operand and syntax-token inventories. Source-only
-operands return
+and deliberately unsupported retained catalog-only operands return
 `UnsupportedCapability(racf-command-operand)` at command level. A deliberately
 unsupported syntax-only token returns that problem only at its recorded command
 or enclosing-operand context; it never shadows a positional or an unrelated
