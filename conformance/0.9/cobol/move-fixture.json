@@ -1,0 +1,36 @@
+{
+  "schema_version": "mainframe-env.cobol-move-pilot-fixture@1",
+  "fixture_id": "cobol.numeric-move.floating-sign-v1",
+  "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0026",
+  "compiler_options": {
+    "source_format": "free",
+    "target": "reference",
+    "codepage": 37,
+    "explicit_overrides": []
+  },
+  "scope": {
+    "sender": "signed integer PIC S9(9) COMP-5",
+    "receiver": "numeric-edited PIC ----9 USAGE DISPLAY",
+    "values": [100, -911, 0, 99999, 999999]
+  },
+  "program_source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. MOVEPILOT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 SOURCE-X PIC S9(9) COMP-5 VALUE 0.\n01 EDITED-X PIC ----9.\nPROCEDURE DIVISION.\nMOVE 100 TO SOURCE-X.\nMOVE SOURCE-X TO EDITED-X.\nDISPLAY EDITED-X.\nMOVE -911 TO SOURCE-X.\nMOVE SOURCE-X TO EDITED-X.\nDISPLAY EDITED-X.\nMOVE 0 TO SOURCE-X.\nMOVE SOURCE-X TO EDITED-X.\nDISPLAY EDITED-X.\nMOVE 99999 TO SOURCE-X.\nMOVE SOURCE-X TO EDITED-X.\nDISPLAY EDITED-X.\nMOVE 999999 TO SOURCE-X.\nMOVE SOURCE-X TO EDITED-X.\nDISPLAY EDITED-X.\nSTOP RUN.\n",
+  "expected_output_hex": "20203130300a202d3931310a20202020300a20393939390a20393939390a",
+  "expectation_authority": {
+    "kind": "maintainer-reviewed-golden",
+    "review_correction_date": "2026-09-08",
+    "source_rules": ["cobol.move.numeric-editing", "cobol.picture.floating-insertion-capacity"],
+    "independent_control": {
+      "tool": "GnuCOBOL 3.2.0",
+      "command": "cobc -x -free move-pilot.cob && ./move-pilot",
+      "observed_output_hex": "20203130300a202d3931310a20202020300a20393939390a20393939390a",
+      "coverage_credit": 0,
+      "licensed_credit": 0
+    }
+  },
+  "comparison_policy": {
+    "version": "cobol-numeric-move-bytes@1",
+    "exact_fields": ["output_bytes"],
+    "normalizable_fields": [],
+    "licensed_credit": 0
+  }
+}

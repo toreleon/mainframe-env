@@ -27,6 +27,23 @@ class SelectionTests(unittest.TestCase):
     def test_shared_contracts_cannot_select_an_empty_or_partial_set(self):
         for path in ['crates/contracts/mainframe-env-host-api/src/request.rs','crates/foundation/mainframe-env-ir/src/lib.rs','Cargo.lock','Cargo.toml','conformance/spec/manifest.json']:
             self.assertEqual(set(ci.obligations([path])), ci.ALL)
+    def test_cics_pilot_manifest_review_fixture_observation_and_provider_paths_are_selected(self):
+        for path, required in {
+            'conformance/0.9/manifests/cics-file-uow-topics.json': ci.ALL,
+            'conformance/0.9/cics/pilot-rule-review.json': ci.ALL,
+            'conformance/0.9/cics/pilot-fixtures.json': ci.ALL,
+            'conformance/0.9/cobol/move-rule-review.json': ci.ALL,
+            'conformance/0.9/cobol/move-fixture.json': ci.ALL,
+            'conformance/0.9/oracles/cics-licensed-differential.json': ci.ALL,
+            'crates/tooling/mainframe-env-conformance/src/cics_pilot.rs': {'architecture','evidence','runtime'},
+            'crates/tooling/mainframe-env-conformance/src/cobol_move_pilot.rs': {'architecture','evidence','runtime'},
+            'crates/tooling/mainframe-env-conformance/src/cics_licensed.rs': {'architecture','evidence','runtime'},
+            'crates/providers/mainframe-env-cics/src/service.rs': {'architecture','evidence','store','runtime','mutation'},
+            'crates/contracts/mainframe-env-coverage/src/conformance.rs': ci.ALL,
+            'docs/architecture/CONFORMANCE-IR.md': ci.ALL,
+        }.items():
+            with self.subTest(path=path):
+                self.assertTrue(set(required) <= set(ci.obligations([path])))
     def test_prose_is_cheap_but_mixed_changes_are_not(self):
         for path in ['README.md','docs/research/market.md','docs/runbooks/start.md','docs/delivery/hardening/notes.md']:
             self.assertEqual(ci.obligations([path]), [])

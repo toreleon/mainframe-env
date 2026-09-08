@@ -21,6 +21,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 mod abi;
 mod carddemo;
+mod cics_licensed;
+mod cics_pilot;
 mod cobol_assurance;
 mod cobol_clauses;
 mod cobol_conditions;
@@ -32,6 +34,7 @@ mod cobol_function_boundaries;
 mod cobol_functions;
 mod cobol_intrinsics;
 mod cobol_licensed;
+mod cobol_move_pilot;
 mod cobol_phrases;
 mod cobol_recovery;
 mod cobol_reference;
@@ -74,6 +77,13 @@ pub use carddemo::{
     verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
     verify_carddemo_vsam_from_env,
 };
+pub use cics_licensed::{
+    CicsOracleCapture, CicsOracleExpectation, CicsOracleImport, CicsOracleObservation,
+    import_cics_oracle_capture,
+};
+pub use cics_pilot::{
+    CicsPilotReport, CicsPilotRuntime, cics_pilot_runtime, run_cics_pilot_profiles,
+};
 pub use dataset::{
     DatasetConformanceRuntime, dataset_conformance_runtime, run_dataset_conformance,
 };
@@ -96,6 +106,9 @@ pub use cobol_function_boundaries::verify_cobol_function_boundary_runtime_fixtur
 pub use cobol_functions::verify_cobol_function_fixtures;
 pub use cobol_intrinsics::verify_cobol_function_runtime_fixtures;
 pub use cobol_licensed::{licensed_fixture_digest, verify_cobol_licensed_receipt_from_env};
+pub use cobol_move_pilot::{
+    CobolMovePilotReport, CobolMovePilotRuntime, cobol_move_pilot_runtime, run_cobol_move_pilot,
+};
 pub use cobol_phrases::verify_cobol_statement_phrase_runtime_fixtures;
 pub use cobol_recovery::verify_cobol_recovery_fixtures;
 pub use cobol_reference::{

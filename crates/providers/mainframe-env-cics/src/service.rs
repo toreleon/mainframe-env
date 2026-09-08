@@ -83,7 +83,12 @@ pub struct CicsFileDefinition {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CicsFileStatus {
     Open,
+    /// The file is closed and enabled, so the next online file request auto-opens it.
+    ClosedEnabled,
+    /// The file is closed and unavailable to implicit open; file requests receive NOTOPEN.
     Closed,
+    /// The file is disabled; this is distinct from the CLOSED + UNENABLED state.
+    Disabled,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -155,6 +160,7 @@ struct Run {
     current_records: BTreeMap<String, Vec<u8>>,
     current_record_values: BTreeMap<String, Vec<u8>>,
     undo: Vec<DatasetUndo>,
+    undo_version: Option<u64>,
     browses: BTreeMap<String, String>,
     trace: Vec<CicsTraceEntry>,
 }
@@ -214,6 +220,16 @@ struct State {
     transient_bytes: usize,
     #[cfg(feature = "fault-injection")]
     file_failure: Option<(CicsOperation, String)>,
+    #[cfg(feature = "fault-injection")]
+    file_fault: Option<(CicsOperation, String, CicsFileFaultPoint)>,
+}
+
+#[cfg(feature = "fault-injection")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CicsFileFaultPoint {
+    BeforeIntent,
+    AfterIntent,
+    AfterMutation,
 }
 
 pub struct CicsService {
@@ -329,6 +345,8 @@ impl CicsService {
                 transient_bytes,
                 #[cfg(feature = "fault-injection")]
                 file_failure: None,
+                #[cfg(feature = "fault-injection")]
+                file_fault: None,
             }),
         }))
     }
@@ -355,6 +373,27 @@ impl CicsService {
         let file = normalize_terminal_name(file, 16)?;
         let mut state = self.lock()?;
         if state.file_failure.replace((operation, file)).is_some() {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "fault-injection")]
+    pub fn inject_file_fault_once(
+        &self,
+        operation: CicsOperation,
+        file: &str,
+        point: CicsFileFaultPoint,
+    ) -> Result<(), HostProblem> {
+        if !matches!(
+            operation,
+            CicsOperation::Write | CicsOperation::Rewrite | CicsOperation::Delete
+        ) {
+            return Err(HostProblem::Malformed);
+        }
+        let file = normalize_terminal_name(file, 16)?;
+        let mut state = self.lock()?;
+        if state.file_fault.replace((operation, file, point)).is_some() {
             return Err(HostProblem::IdempotencyConflict);
         }
         Ok(())
@@ -829,6 +868,7 @@ impl CicsService {
         }) {
             return Err(HostProblem::Malformed);
         }
+        let (undo, undo_version) = self.load_undo(&invocation.run_unit_id)?;
         let mut state = self.lock()?;
         if !state.sessions.contains_key(session.as_str()) {
             return Err(HostProblem::NotFound);
@@ -858,7 +898,8 @@ impl CicsService {
                 retrieve,
                 current_records: BTreeMap::new(),
                 current_record_values: BTreeMap::new(),
-                undo: Vec::new(),
+                undo,
+                undo_version,
                 browses: BTreeMap::new(),
                 trace: Vec::new(),
             },
@@ -883,6 +924,7 @@ impl CicsService {
         }) {
             return Err(HostProblem::Malformed);
         }
+        let (undo, undo_version) = self.load_undo(&invocation.run_unit_id)?;
         let mut state = self.lock()?;
         if !state.sessions.contains_key(session.as_str()) {
             return Err(HostProblem::NotFound);
@@ -934,7 +976,8 @@ impl CicsService {
                 retrieve: Vec::new(),
                 current_records: BTreeMap::new(),
                 current_record_values: BTreeMap::new(),
-                undo: Vec::new(),
+                undo,
+                undo_version,
                 browses: BTreeMap::new(),
                 trace: Vec::new(),
             },
@@ -1737,8 +1780,12 @@ impl CicsService {
         if outcome == CicsUnitOfWorkOutcome::RolledBack {
             self.rollback_run(run)?;
         } else {
-            run.undo.clear();
+            self.clear_undo(run)?;
         }
+        // A syncpoint ends every no-token file update context regardless of
+        // whether the unit of work commits or rolls back.
+        run.current_records.clear();
+        run.current_record_values.clear();
         if self
             .store
             .put_provider_state(
@@ -1935,7 +1982,7 @@ impl CicsService {
     }
 
     fn rollback_run(&self, run: &mut Run) -> Result<(), HostProblem> {
-        let undo = std::mem::take(&mut run.undo);
+        let undo = run.undo.clone();
         for operation in undo.into_iter().rev() {
             let sequence = run
                 .host_sequence
@@ -1968,7 +2015,7 @@ impl CicsService {
         }
         run.current_records.clear();
         run.current_record_values.clear();
-        Ok(())
+        self.clear_undo(run)
     }
 
     fn uow_response(
@@ -2042,7 +2089,9 @@ impl CicsService {
             }
             let status = match value.bytes() {
                 b"OPEN" => CicsFileStatus::Open,
-                b"CLOSED" => CicsFileStatus::Closed,
+                b"CLOSED-ENABLED" => CicsFileStatus::ClosedEnabled,
+                b"CLOSED" | b"CLOSED-UNENABLED" => CicsFileStatus::Closed,
+                b"DISABLED" => CicsFileStatus::Disabled,
                 _ => return Err(HostProblem::Malformed),
             };
             if requested.insert(normalized, status).is_some() {
@@ -2133,24 +2182,69 @@ impl CicsService {
             }
         }
         let definition = {
-            let state = self.lock()?;
-            if state
-                .file_statuses
-                .get(&logical_name)
-                .is_some_and(|record| record.status == CicsFileStatus::Closed)
-            {
-                return Err(HostProblem::Condition {
-                    name: "DISABLED".into(),
-                    response: 84,
-                    response2: 0,
-                });
+            let mut state = self.lock()?;
+            match state.file_statuses.get(&logical_name).copied() {
+                Some(DurableFileStatus {
+                    status: CicsFileStatus::Closed,
+                    ..
+                }) => {
+                    return Err(HostProblem::Condition {
+                        name: "NOTOPEN".into(),
+                        response: 19,
+                        response2: 60,
+                    });
+                }
+                Some(DurableFileStatus {
+                    status: CicsFileStatus::Disabled,
+                    ..
+                }) => {
+                    return Err(HostProblem::Condition {
+                        name: "DISABLED".into(),
+                        response: 84,
+                        response2: 0,
+                    });
+                }
+                Some(
+                    current @ DurableFileStatus {
+                        status: CicsFileStatus::ClosedEnabled,
+                        ..
+                    },
+                ) => {
+                    let version = current
+                        .version
+                        .checked_add(1)
+                        .ok_or(HostProblem::ResourceExhausted)?;
+                    self.store
+                        .put_provider_state(
+                            ProviderStateRecord {
+                                namespace: "cics-file-status".into(),
+                                key: logical_name.clone(),
+                                version,
+                                payload: encode_file_status(CicsFileStatus::Open),
+                            },
+                            Some(current.version),
+                        )
+                        .map_err(store_error)?;
+                    state.file_statuses.insert(
+                        logical_name.clone(),
+                        DurableFileStatus {
+                            status: CicsFileStatus::Open,
+                            version,
+                        },
+                    );
+                }
+                Some(DurableFileStatus {
+                    status: CicsFileStatus::Open,
+                    ..
+                })
+                | None => {}
             }
             state.file_aliases.get(&logical_name).cloned()
         };
         let ccsid = definition.as_ref().and_then(|definition| definition.ccsid);
         let name = definition
             .map(|definition| definition.dataset.as_str().to_string())
-            .unwrap_or(logical_name);
+            .unwrap_or_else(|| logical_name.clone());
         let dataset = DatasetName::new(name, 128).map_err(|_| HostProblem::Malformed)?;
         let dataset_key = dataset.as_str().to_string();
         self.authorize(
@@ -2158,7 +2252,15 @@ impl CicsService {
             "DATASET",
             dataset.as_str(),
             access_for(request.operation),
-        )?;
+        )
+        .map_err(|problem| match problem {
+            HostProblem::Unauthorized => HostProblem::Condition {
+                name: "NOTAUTH".into(),
+                response: 70,
+                response2: 101,
+            },
+            other => other,
+        })?;
         let member = argument_optional(request, "MEMBER")
             .map(|name| MemberName::new(name, 8).map_err(|_| HostProblem::Malformed))
             .transpose()?;
@@ -2232,7 +2334,7 @@ impl CicsService {
                     .ok_or_else(|| HostProblem::Condition {
                         name: "INVREQ".into(),
                         response: 16,
-                        response2: 0,
+                        response2: 30,
                     })?;
                 DatasetRequest::RewriteRecord {
                     dataset: dataset.clone(),
@@ -2304,7 +2406,41 @@ impl CicsService {
             _ => return Err(HostProblem::Malformed),
         };
         let operation = request.operation;
-        let result = self.nested(run, HostRequest::Dataset(host_request))?;
+        #[cfg(feature = "fault-injection")]
+        if self.consume_file_fault(operation, &logical_name, CicsFileFaultPoint::BeforeIntent)? {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        if let Some(undo) = pending_undo.clone() {
+            self.append_undo(run, undo)?;
+        }
+        #[cfg(feature = "fault-injection")]
+        if self.consume_file_fault(operation, &logical_name, CicsFileFaultPoint::AfterIntent)? {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let result = self
+            .nested(run, HostRequest::Dataset(host_request))
+            .map_err(|problem| match (operation, problem) {
+                (CicsOperation::Read, HostProblem::NotFound) => HostProblem::Condition {
+                    name: "NOTFND".into(),
+                    response: 13,
+                    response2: 80,
+                },
+                (
+                    CicsOperation::Read,
+                    HostProblem::Condition {
+                        name, response: 13, ..
+                    },
+                ) if name == "NOTFND" => HostProblem::Condition {
+                    name,
+                    response: 13,
+                    response2: 80,
+                },
+                (_, other) => other,
+            })?;
+        #[cfg(feature = "fault-injection")]
+        if self.consume_file_fault(operation, &logical_name, CicsFileFaultPoint::AfterMutation)? {
+            return Err(HostProblem::InfrastructureFailure);
+        }
         let mut browse_key = None;
         let payload = match result {
             HostResult::Dataset(DatasetResult::Records {
@@ -2312,13 +2448,17 @@ impl CicsService {
                 identities,
                 ..
             }) => {
-                if let Some(identity) = identities.first() {
+                if request.arguments.contains_key("OPTION.UPDATE")
+                    && let Some(identity) = identities.first()
+                {
                     run.current_records
                         .insert(dataset_key.clone(), identity.clone());
                 }
                 let record = records.into_iter().next().unwrap_or_default();
-                run.current_record_values
-                    .insert(dataset_key.clone(), record.clone());
+                if request.arguments.contains_key("OPTION.UPDATE") {
+                    run.current_record_values
+                        .insert(dataset_key.clone(), record.clone());
+                }
                 decode_dataset_bytes(ccsid, &record)?
             }
             HostResult::Dataset(DatasetResult::Browse {
@@ -2333,7 +2473,9 @@ impl CicsService {
                     run.browses.remove(&dataset_key);
                     run.current_records.remove(&dataset_key);
                 }
-                if let Some(identity) = identity {
+                if request.arguments.contains_key("OPTION.UPDATE")
+                    && let Some(identity) = identity
+                {
                     run.current_records.insert(dataset_key.clone(), identity);
                 }
                 browse_key = key
@@ -2349,7 +2491,7 @@ impl CicsService {
                     });
                 }
                 let record = record.unwrap_or_default();
-                if !record.is_empty() {
+                if !record.is_empty() && request.arguments.contains_key("OPTION.UPDATE") {
                     run.current_record_values
                         .insert(dataset_key.clone(), record.clone());
                 }
@@ -2358,7 +2500,7 @@ impl CicsService {
             HostResult::Dataset(_) => Vec::new(),
             _ => return Err(HostProblem::ProviderFailure),
         };
-        if operation == CicsOperation::Delete {
+        if matches!(operation, CicsOperation::Delete | CicsOperation::Rewrite) {
             run.current_records.remove(&dataset_key);
             run.current_record_values.remove(&dataset_key);
         } else if operation == CicsOperation::Write
@@ -2367,11 +2509,10 @@ impl CicsService {
             run.current_records
                 .insert(dataset_key.clone(), encode_dataset_bytes(ccsid, &identity)?);
         }
-        if let Some(record) = mutated_record {
+        if let Some(record) = mutated_record
+            && operation != CicsOperation::Rewrite
+        {
             run.current_record_values.insert(dataset_key, record);
-        }
-        if let Some(undo) = pending_undo {
-            run.undo.push(undo);
         }
         let mut response = self.response(
             run,
@@ -2745,6 +2886,83 @@ impl CicsService {
             .map_err(|_| HostProblem::InfrastructureFailure)
     }
 
+    fn load_undo(
+        &self,
+        run_unit: &RunUnitId,
+    ) -> Result<(Vec<DatasetUndo>, Option<u64>), HostProblem> {
+        let Some(record) = self
+            .store
+            .get_provider_state("cics-uow-undo", run_unit.as_str())
+            .map_err(store_error)?
+        else {
+            return Ok((Vec::new(), None));
+        };
+        Ok((
+            decode_undo(&record.payload, self.limits)?,
+            Some(record.version),
+        ))
+    }
+
+    fn append_undo(&self, run: &mut Run, operation: DatasetUndo) -> Result<(), HostProblem> {
+        let mut next = run.undo.clone();
+        if next.len() >= self.limits.max_queue_records {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        next.push(operation);
+        let version = run
+            .undo_version
+            .unwrap_or(0)
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "cics-uow-undo".into(),
+                    key: run.invocation.run_unit_id.as_str().into(),
+                    version,
+                    payload: encode_undo(&next)?,
+                },
+                run.undo_version,
+            )
+            .map_err(store_error)?;
+        run.undo = next;
+        run.undo_version = Some(version);
+        Ok(())
+    }
+
+    fn clear_undo(&self, run: &mut Run) -> Result<(), HostProblem> {
+        if let Some(version) = run.undo_version {
+            self.store
+                .delete_provider_state(
+                    "cics-uow-undo",
+                    run.invocation.run_unit_id.as_str(),
+                    version,
+                )
+                .map_err(store_error)?;
+        }
+        run.undo.clear();
+        run.undo_version = None;
+        Ok(())
+    }
+
+    #[cfg(feature = "fault-injection")]
+    fn consume_file_fault(
+        &self,
+        operation: CicsOperation,
+        file: &str,
+        point: CicsFileFaultPoint,
+    ) -> Result<bool, HostProblem> {
+        let mut state = self.lock()?;
+        let hit = state
+            .file_fault
+            .as_ref()
+            .is_some_and(|value| value == &(operation, file.to_string(), point));
+        if hit {
+            state.file_fault = None;
+        }
+        Ok(hit)
+    }
+
     fn persist_session(
         &self,
         key: &str,
@@ -2859,6 +3077,7 @@ fn run_for(
         current_records: BTreeMap::new(),
         current_record_values: BTreeMap::new(),
         undo: Vec::new(),
+        undo_version: None,
         browses: BTreeMap::new(),
         trace: Vec::new(),
     }
@@ -3236,8 +3455,88 @@ fn condition_name(name: &str) -> &'static str {
         "LENGERR" => "LENGERR",
         "ENDFILE" => "ENDFILE",
         "PGMIDERR" => "PGMIDERR",
+        "NOTAUTH" => "NOTAUTH",
+        "NOTFND" => "NOTFND",
+        "NOTOPEN" => "NOTOPEN",
+        "IOERR" => "IOERR",
+        "LOCKED" => "LOCKED",
+        "RECORDBUSY" => "RECORDBUSY",
         _ => "ERROR",
     }
+}
+
+fn encode_undo(operations: &[DatasetUndo]) -> Result<Vec<u8>, HostProblem> {
+    let mut payload = b"MECUNDO1".to_vec();
+    payload.extend_from_slice(
+        &u32::try_from(operations.len())
+            .map_err(|_| HostProblem::ResourceExhausted)?
+            .to_be_bytes(),
+    );
+    for operation in operations {
+        match operation {
+            DatasetUndo::Restore {
+                dataset,
+                key,
+                record,
+            } => {
+                payload.push(1);
+                field(&mut payload, dataset.as_str().as_bytes())?;
+                field(&mut payload, key)?;
+                field(&mut payload, record)?;
+            }
+            DatasetUndo::Delete { dataset, key } => {
+                payload.push(2);
+                field(&mut payload, dataset.as_str().as_bytes())?;
+                field(&mut payload, key)?;
+            }
+        }
+    }
+    Ok(payload)
+}
+
+fn decode_undo(payload: &[u8], limits: CicsLimits) -> Result<Vec<DatasetUndo>, HostProblem> {
+    let mut reader = Reader {
+        bytes: payload,
+        at: 0,
+    };
+    if reader.take(8)? != b"MECUNDO1" {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let count = usize::try_from(u32::from_be_bytes(
+        reader
+            .take(4)?
+            .try_into()
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+    ))
+    .map_err(|_| HostProblem::ResourceExhausted)?;
+    if count > limits.max_queue_records {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let mut operations = Vec::with_capacity(count);
+    for _ in 0..count {
+        let kind = reader.take(1)?[0];
+        let dataset = DatasetName::new(
+            String::from_utf8(reader.field(128)?)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            128,
+        )
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let key = reader.field(limits.max_queue_bytes)?;
+        let operation = match kind {
+            1 => DatasetUndo::Restore {
+                dataset,
+                key,
+                record: reader.field(limits.max_queue_bytes)?,
+            },
+            2 => DatasetUndo::Delete { dataset, key },
+            _ => return Err(HostProblem::InfrastructureFailure),
+        };
+        operations.push(operation);
+    }
+    if reader.at != payload.len() {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(operations)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -3624,14 +3923,18 @@ fn decode_file_definition(bytes: &[u8]) -> Result<CicsFileDefinition, HostProble
 fn encode_file_status(status: CicsFileStatus) -> Vec<u8> {
     match status {
         CicsFileStatus::Open => b"OPEN".to_vec(),
+        CicsFileStatus::ClosedEnabled => b"CLOSED-ENABLED".to_vec(),
         CicsFileStatus::Closed => b"CLOSED".to_vec(),
+        CicsFileStatus::Disabled => b"DISABLED".to_vec(),
     }
 }
 
 fn decode_file_status(bytes: &[u8]) -> Result<CicsFileStatus, HostProblem> {
     match bytes {
         b"OPEN" => Ok(CicsFileStatus::Open),
-        b"CLOSED" => Ok(CicsFileStatus::Closed),
+        b"CLOSED-ENABLED" => Ok(CicsFileStatus::ClosedEnabled),
+        b"CLOSED" | b"CLOSED-UNENABLED" => Ok(CicsFileStatus::Closed),
+        b"DISABLED" => Ok(CicsFileStatus::Disabled),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }
@@ -5389,11 +5692,80 @@ mod tests {
         assert_eq!(
             service.invoke(&effect(&invocation.run_unit_id, read.clone(), 3), read),
             Err(HostProblem::Condition {
+                name: "NOTOPEN".into(),
+                response: 19,
+                response2: 60,
+            })
+        );
+
+        let enable_closed = request(
+            CicsOperation::SetFileStatus,
+            BTreeMap::from([("TRANSACT".into(), status(b"CLOSED-ENABLED"))]),
+            4,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, enable_closed.clone(), 4),
+                enable_closed,
+            )
+            .unwrap();
+        let auto_open_read = request(
+            CicsOperation::Read,
+            BTreeMap::from([("FILE".into(), argument(b"TRANSACT"))]),
+            5,
+        );
+        assert_ne!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, auto_open_read.clone(), 5),
+                auto_open_read
+            ),
+            Err(HostProblem::Condition {
+                name: "NOTOPEN".into(),
+                response: 19,
+                response2: 60,
+            })
+        );
+        assert_eq!(service.file_status("TRANSACT"), Ok(CicsFileStatus::Open));
+
+        let disable = request(
+            CicsOperation::SetFileStatus,
+            BTreeMap::from([("TRANSACT".into(), status(b"DISABLED"))]),
+            6,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, disable.clone(), 6),
+                disable,
+            )
+            .unwrap();
+        let disabled_read = request(
+            CicsOperation::Read,
+            BTreeMap::from([("FILE".into(), argument(b"TRANSACT"))]),
+            7,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, disabled_read.clone(), 7),
+                disabled_read
+            ),
+            Err(HostProblem::Condition {
                 name: "DISABLED".into(),
                 response: 84,
                 response2: 0,
             })
         );
+
+        let close_again = request(
+            CicsOperation::SetFileStatus,
+            BTreeMap::from([("TRANSACT".into(), status(b"CLOSED-UNENABLED"))]),
+            8,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, close_again.clone(), 8),
+                close_again,
+            )
+            .unwrap();
         drop(service);
         let restarted = CicsService::open(authorities(), store, CicsLimits::default()).unwrap();
         assert_eq!(
@@ -5429,7 +5801,10 @@ mod tests {
             .unwrap();
         let next = request(
             CicsOperation::ReadNext,
-            BTreeMap::from([("DATASET".into(), argument(b"CARDDAT"))]),
+            BTreeMap::from([
+                ("DATASET".into(), argument(b"CARDDAT")),
+                ("OPTION.UPDATE".into(), argument(b"")),
+            ]),
             2,
         );
         let browsed = service
@@ -5453,7 +5828,10 @@ mod tests {
             .unwrap();
         let delete = request(
             CicsOperation::Delete,
-            BTreeMap::from([("DATASET".into(), argument(b"CARDDAT"))]),
+            BTreeMap::from([
+                ("DATASET".into(), argument(b"CARDDAT")),
+                ("RIDFLD".into(), argument(b"AA")),
+            ]),
             4,
         );
         service
@@ -5512,6 +5890,7 @@ mod tests {
             BTreeMap::from([
                 ("DATASET".into(), argument(b"ACCTDAT")),
                 ("RIDFLD".into(), argument(b"AA")),
+                ("OPTION.UPDATE".into(), argument(b"")),
             ]),
             1,
         );
@@ -5558,6 +5937,56 @@ mod tests {
                     ..
                 }
             ] if record == b"AA22" && restored == b"AA11"
+        ));
+    }
+
+    #[test]
+    fn plain_read_does_not_authorize_rewrite_update_context() {
+        let trace = Arc::new(DatasetTrace::default());
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service =
+            CicsService::open(traced_authorities(trace.clone()), store, Default::default())
+                .unwrap();
+        let (invocation, _) = registered(&service);
+        service
+            .register_file_aliases(&BTreeMap::from([(
+                "ACCTDAT".into(),
+                DatasetName::new("CARDDEMO.ACCTDAT", 128).unwrap(),
+            )]))
+            .unwrap();
+        let read = request(
+            CicsOperation::Read,
+            BTreeMap::from([
+                ("DATASET".into(), argument(b"ACCTDAT")),
+                ("RIDFLD".into(), argument(b"AA")),
+            ]),
+            1,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, read.clone(), 1), read)
+            .unwrap();
+        let rewrite = request(
+            CicsOperation::Rewrite,
+            BTreeMap::from([
+                ("DATASET".into(), argument(b"ACCTDAT")),
+                ("FROM".into(), argument(b"AA22")),
+            ]),
+            2,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, rewrite.clone(), 2),
+                rewrite,
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 30,
+            })
+        );
+        assert!(matches!(
+            trace.requests.lock().unwrap().as_slice(),
+            [DatasetRequest::Read { .. }]
         ));
     }
 

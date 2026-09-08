@@ -12,3 +12,6 @@ pub use service::{
     CicsLimits, CicsService, CicsTerminalExecution, CicsTerminalSnapshot, CicsTraceEntry,
     cics_provider,
 };
+
+#[cfg(feature = "fault-injection")]
+pub use service::CicsFileFaultPoint;

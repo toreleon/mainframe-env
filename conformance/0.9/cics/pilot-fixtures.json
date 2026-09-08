@@ -1,0 +1,48 @@
+{
+  "schema_version": "mainframe-env.cics-pilot-fixtures@1",
+  "fixture_id": "cics.file-uow.pilot-v1",
+  "initial": {"key": "AA", "record": "AA11"},
+  "updates": {"committed": "AA22", "rolled_back": "AA33"},
+  "expected": {
+    "plain_read": {"condition": "NORMAL", "resp": 0, "resp2": 0, "record": "AA11"},
+    "invalid_plain_read": {"condition": "NORMAL", "resp": 0, "resp2": 0, "record": "AA11"},
+    "rewrite_without_update": {"condition": "INVREQ", "resp": 16, "resp2": 30, "record_after": "AA11"},
+    "read_update": {"condition": "NORMAL", "resp": 0, "resp2": 0, "record": "AA11"},
+    "rewrite_commit": {"condition": "NORMAL", "resp": 0, "resp2": 0, "record_after": "AA22"},
+    "syncpoint_commit": {"condition": "NORMAL", "resp": 0, "resp2": 0, "record_after": "AA22"},
+    "context_read_update": {"condition": "NORMAL", "resp": 0, "resp2": 0, "record": "AA22"},
+    "context_syncpoint": {"condition": "NORMAL", "resp": 0, "resp2": 0},
+    "rewrite_after_syncpoint": {"condition": "INVREQ", "resp": 16, "resp2": 30, "record_after": "AA22"},
+    "rollback_read_update": {"condition": "NORMAL", "resp": 0, "resp2": 0, "record": "AA22"},
+    "rewrite_before_rollback": {"condition": "NORMAL", "resp": 0, "resp2": 0},
+    "read_before_rollback": {"condition": "NORMAL", "resp": 0, "resp2": 0, "record": "AA33"},
+    "syncpoint_rollback": {"condition": "NORMAL", "resp": 0, "resp2": 0, "record_after": "AA22"},
+    "final_read": {"condition": "NORMAL", "resp": 0, "resp2": 0, "record": "AA22"},
+    "missing_record": {"condition": "NOTFND", "resp": 13, "resp2": 80},
+    "unauthorized": {"condition": "NOTAUTH", "resp": 70, "resp2": 101, "record_after": "AA22"},
+    "closed_unenabled": {"precondition": {"open_status": "CLOSED", "enable_status": "UNENABLED"}, "condition": "NOTOPEN", "resp": 19, "resp2": 60, "record_after": "AA22"},
+    "closed_enabled": {"precondition": {"open_status": "CLOSED", "enable_status": "ENABLED"}, "condition": "NORMAL", "resp": 0, "resp2": 0, "record": "AA22", "record_after": "AA22", "resource_state_after": "Open"},
+    "durable_restart": {"claimed_profiles": ["sqlite"], "fault_points": ["before-intent", "after-intent", "after-mutation"], "record_after": "AA11"}
+  },
+  "comparison_policy": {
+    "version": "cics-file-uow-comparison@2",
+    "exact_fields": ["resp", "resp2", "record_bytes", "resource_state", "durable_claim_profile", "fault_point", "licensed_application_output"],
+    "normalizable_fields": [],
+    "diagnostic_only_fields": ["raw_local_application_outputs"],
+    "unspecified_fields": ["condition_label", "internal_trace_order", "provider_state_versions", "timestamps"]
+  },
+  "licensed_expected_observations": [
+    {"scenario_id": "plain-read", "application_output": "PLAIN:000:000:AA11\n", "record_hex": "c1c1f1f1"},
+    {"scenario_id": "read-update", "application_output": "UPDATE1:000:000:AA11\n", "record_hex": "c1c1f1f1"},
+    {"scenario_id": "missing-record", "application_output": "MISSING:013:080\n", "record_hex": "c1c1f2f2"},
+    {"scenario_id": "unauthorized", "application_output": "UNAUTHORIZED:070:101\n", "record_hex": "c1c1f2f2"},
+    {"scenario_id": "closed-file", "application_output": "CLOSED:019:060\nCLOSEDENABLED:000:000:AA22\n", "record_hex": "c1c1f2f2"},
+    {"scenario_id": "requires-read-update", "application_output": "INVPLAIN:000:000:AA11\nINVALID:016:030\n", "record_hex": "c1c1f1f1"},
+    {"scenario_id": "rewrite-record", "application_output": "UPDATE1:000:000:AA11\nREWRITE1:000:000\n", "record_hex": "c1c1f2f2"},
+    {"scenario_id": "forbidden-mutation-on-invreq", "application_output": "INVPLAIN:000:000:AA11\nINVALID:016:030\n", "record_hex": "c1c1f1f1"},
+    {"scenario_id": "context-invalidated-at-syncpoint", "application_output": "CTXREAD:000:000:AA22\nCTXSYNC:000:000\nCTXREWRITE:016:030\n", "record_hex": "c1c1f2f2"},
+    {"scenario_id": "commit-boundary", "application_output": "COMMIT:000:000\n", "record_hex": "c1c1f2f2"},
+    {"scenario_id": "rollback-boundary", "application_output": "UPDATE2:000:000:AA22\nREWRITE2:000:000\nPREBACKOUT:000:000:AA33\nROLLBACK:000:000\nFINAL:000:000:AA22\n", "record_hex": "c1c1f2f2"},
+    {"scenario_id": "durable-restart", "application_output": "before-intent:RECOVERED:000:000\nafter-intent:RECOVERED:000:000\nafter-mutation:RECOVERED:000:000\n", "record_hex": "c1c1f1f1"}
+  ]
+}

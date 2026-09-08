@@ -51,6 +51,36 @@ class ClassificationTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 module.apply_mutation(source, mutation)
 
+    def test_cics_product_mutation_anchors_are_unique_and_scenarios_are_unchanged(self):
+        source = (TOOL.parents[1] / module.CICS_SOURCE).read_text()
+        scenarios = (TOOL.parents[1] / module.CICS_SCENARIOS).read_bytes()
+        for mutation in module.CICS_MUTATIONS:
+            changed = module.apply_mutation(source, mutation)
+            self.assertNotEqual(changed, source)
+            self.assertEqual(
+                changed.partition('#[cfg(test)]')[2],
+                source.partition('#[cfg(test)]')[2],
+            )
+            self.assertEqual(
+                module.digest(scenarios),
+                module.digest((TOOL.parents[1] / module.CICS_SCENARIOS).read_bytes()),
+            )
+
+    def test_cobol_move_product_mutation_anchor_is_unique_and_scenario_is_unchanged(self):
+        source = (TOOL.parents[1] / module.COBOL_MOVE_SOURCE).read_text()
+        scenarios = (TOOL.parents[1] / module.COBOL_MOVE_SCENARIOS).read_bytes()
+        for mutation in module.COBOL_MOVE_MUTATIONS:
+            changed = module.apply_mutation(source, mutation)
+            self.assertNotEqual(changed, source)
+            self.assertEqual(
+                changed.partition('#[cfg(test)]')[2],
+                source.partition('#[cfg(test)]')[2],
+            )
+            self.assertEqual(
+                module.digest(scenarios),
+                module.digest((TOOL.parents[1] / module.COBOL_MOVE_SCENARIOS).read_bytes()),
+            )
+
 
 if __name__ == '__main__':
     unittest.main()

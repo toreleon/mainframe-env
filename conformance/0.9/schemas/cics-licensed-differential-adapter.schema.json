@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/cics-licensed-differential-adapter-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "pilot_id", "capture_contract", "required_scenarios", "origin_policy", "environment_manifest_fields", "handoff", "licensed_campaign_status", "differential_gate"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.cics-licensed-differential-adapter@1"},
+    "pilot_id": {"const": "cics-file-uow-local-v1"},
+    "capture_contract": {"const": "mainframe-env.cics-oracle-capture@1"},
+    "required_scenarios": {"type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+    "origin_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "trusted_authority_id", "signature_algorithm", "public_key_source", "self_declared_origin_is_evidence", "local_model_and_synthetic_credit"],
+      "properties": {
+        "kind": {"const": "licensed-ibm"},
+        "trusted_authority_id": {"const": "ibm-cics-protected-runner"},
+        "signature_algorithm": {"const": "ed25519"},
+        "public_key_source": {"const": "MAINFRAME_ENV_CICS_ORACLE_PUBLIC_KEY"},
+        "self_declared_origin_is_evidence": {"const": false},
+        "local_model_and_synthetic_credit": {"const": 0}
+      }
+    },
+    "environment_manifest_fields": {"type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+    "handoff": {"type": "string", "pattern": "^docs/runbooks/[^/]+\\.md$"},
+    "licensed_campaign_status": {"enum": ["not-run", "completed"]},
+    "differential_gate": {"enum": ["pending", "scoped-result-imported"]}
+  },
+  "$defs": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9_.@+\\-]+$"}
+  }
+}

@@ -42,6 +42,7 @@ pub struct RowSpec {
     pub oracle: Option<OracleRef>,
     pub applicable_gates: GateSet,
     pub obligations: Vec<ObligationId>,
+    pub reviewed_rules: Vec<ReviewedRuleRef>,
 }
 
 pub struct ConformanceCase {
@@ -54,6 +55,8 @@ pub struct ConformanceCase {
     pub expected: Vec<ObservationRef>,
     pub recovery: Option<RecoveryRef>,
     pub oracle: Option<OracleRef>,
+    pub reviewed_rules: Vec<ReviewedRuleRef>,
+    pub scenario: Option<ScenarioId>,
 }
 ```
 
@@ -71,12 +74,20 @@ recovery
 oracle
 applicable_gates
 obligations
+reviewed_rules
 ```
 
 References resolve through bounded typed registries owned by the relevant
 compiler or subsystem. The IR does not embed Rust source, shell commands,
 application names, arbitrary expressions, or duplicated product algorithms.
 Add predicate or observation forms only when a real official row requires them.
+
+Publication-derived behavioral rules remain candidates until a maintainer
+accepts them. Accepted rules enter the `reviewed_rules` artifact registry by
+identity and digest; rows and cases reference that registry. Schema-valid
+output, automated extraction, or a model-generated self-review cannot promote
+a rule. Changing the accepted review artifact therefore changes the spec digest
+and invalidates prior execution evidence.
 
 An obligation is the smallest independently testable requirement needed to
 credit one row/gate pair: for example a valid form, a boundary, a documented
@@ -196,6 +207,14 @@ declares its participating drivers, ordering/failure points, and exact
 `(row_id, obligation_id, gate)` credits. Scenario success cannot infer coverage
 for rows it did not map, and it does not replace subsystem cases.
 
+A registered Rust `ConformanceScenarioDriver` is the bounded execution
+mechanism. It runs the owned product route and returns an observation map keyed
+by every exact credit declared by its `ScenarioSpec`. The shared runner requires
+set equality before evaluating the ordinary typed observation registry:
+missing, duplicate, extra, and unknown per-credit observations fail closed. A
+scenario-bound case cannot fall back to the one-case driver path. Scenario
+metadata and a scenario-wide success flag therefore cannot emit row credit.
+
 ## Commands and feedback tiers
 
 The 0.3 foundation provides these stable entry points:
@@ -215,7 +234,10 @@ cargo xtask release-certify
 
 Cases are deterministically sharded by subsystem, operation family, gate, and
 obligation. Exact results may be cached by candidate SHA, catalog/spec digest,
-runner version, selected shard, fixture/oracle identity, and environment class.
+runner version, selected shard, fixture/oracle identity, environment class, and
+the digest of a behavior-relevant environment manifest. The manifest covers
+store/provider adapters, encoding, resource definition, recoverability,
+principal/security configuration, and oracle adapter identity.
 The runner must reject incomplete shard sets and never reuse a cached verdict
 after any key changes. A ledger declares the complete expected obligation set so
 parallel execution cannot silently omit a shard.
@@ -235,6 +257,10 @@ From 0.3 onward, retained conformance evidence is minimal:
 - derived coverage ledger;
 - CI verdict/reference; and
 - shipped artifact digest.
+
+Each verdict states the candidate, catalog, spec, runner, and environment
+manifest identities directly as well as their combined cache identity. Import
+recomputes them and rejects any stale or conflicting component.
 
 Migration, recovery, or licensed-oracle receipts are added only when those gates
 apply. Do not add per-review schemas, free-form command transcripts, test-count

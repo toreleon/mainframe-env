@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/cics-oracle-capture-v1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "candidate_digest", "spec_digest", "fixture_digest", "source_review_digest", "environment_manifest_digest", "comparison_policy", "raw_capture_digest", "observations", "origin"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.cics-oracle-capture@1"},
+    "candidate_digest": {"$ref": "#/$defs/digest"},
+    "spec_digest": {"$ref": "#/$defs/digest"},
+    "fixture_digest": {"$ref": "#/$defs/digest"},
+    "source_review_digest": {"$ref": "#/$defs/digest"},
+    "environment_manifest_digest": {"$ref": "#/$defs/digest"},
+    "comparison_policy": {"$ref": "#/$defs/id"},
+    "raw_capture_digest": {"$ref": "#/$defs/digest"},
+    "observations": {"type": "array", "minItems": 1, "maxItems": 32, "items": {"$ref": "#/$defs/observation"}},
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "authority", "run_job_id", "signature"],
+      "properties": {
+        "kind": {"enum": ["licensed-ibm", "local", "model", "synthetic"]},
+        "authority": {"$ref": "#/$defs/id"},
+        "run_job_id": {"$ref": "#/$defs/id"},
+        "signature": {"type": ["string", "null"], "maxLength": 256}
+      }
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9_.:/@+\\-]+$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenario_id", "application_output", "record_hex"],
+      "properties": {
+        "scenario_id": {"$ref": "#/$defs/id"},
+        "application_output": {"type": "string", "maxLength": 16384},
+        "record_hex": {"type": "string", "maxLength": 16384, "pattern": "^(?:[0-9a-f]{2})*$"}
+      }
+    }
+  }
+}
