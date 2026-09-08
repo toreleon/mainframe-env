@@ -223,40 +223,51 @@ neither can be mistaken for a match.
 
 ## Row identity checks out everywhere
 
-A topic-located catalog row carries a `topic:PATH;topic-id:SLUG;heading:TITLE`
-locator, and `conformance/tools/verify_topic_locators.py` resolves each one
-against the live publication, checking three things: the topic path answers, the
-tree publishes that topic-id slug at that path, and the heading still reads what
-the row says it reads. This audits row *identity* rather than row *content*. It
-is the only check the two baselines with no syntax reader of their own — db2 and
-zosmf — get at all.
+A publication-located catalog row carries either a
+`topic:PATH;topic-id:SLUG;heading:TITLE`, `html-table:`, or `html-link:` locator.
+`conformance/tools/verify_topic_locators.py` resolves all three forms against
+the live publication. Topic locators check the topic path, tree slug and
+heading. Table locators check the complete row or header-cell identity the
+catalog cites. Link locators check the reviewed label and target filename as one
+pair. This audits row *identity* rather than row *content*. It is also the only
+publication check the db2 and zosmf baselines receive.
 
-**865<!--f:catalog.topic_located_total--> of
-865<!--f:catalog.topic_located_total--> topic-located rows resolve exactly:**
+**The live audit returned `exact` for every publication-located row.** The
+audited population is 1,501<!--f:catalog.publication_located_total--> rows:
 
-| Baseline | Rows | Exact | Not a topic locator |
-|---|---|---|---|
-| cobol | 173<!--f:catalog.rows.cobol--> | 173<!--f:catalog.topic_located.cobol--> | 0 |
-| jcl-jes2 | 237<!--f:catalog.rows.jcl_jes2--> | 237<!--f:catalog.topic_located.jcl_jes2--> | 0 |
-| dataset-vsam-ams | 36<!--f:catalog.rows.dataset_vsam_ams--> | 31<!--f:catalog.topic_located.dataset_vsam_ams--> | 5<!--f:catalog.other_located.dataset_vsam_ams--> (`roadmap-normalization:`) |
-| racf-saf | 48<!--f:catalog.rows.racf_saf--> | 34<!--f:catalog.topic_located.racf_saf--> | 14<!--f:catalog.other_located.racf_saf--> (`html-table:`) |
-| zosmf | 216<!--f:catalog.rows.zosmf--> | 216<!--f:catalog.topic_located.zosmf--> | 0 |
-| db2 | 174<!--f:catalog.rows.db2--> | 174<!--f:catalog.topic_located.db2--> | 0 |
-| cics | 571<!--f:catalog.rows.cics--> | 0<!--f:catalog.topic_located.cics--> | 571<!--f:catalog.other_located.cics--> (`html-table:`) |
-| ims | 25<!--f:catalog.rows.ims--> | 0<!--f:catalog.topic_located.ims--> | 25<!--f:catalog.other_located.ims--> (`html-table:`) |
-| mq | 26<!--f:catalog.rows.mq--> | 0<!--f:catalog.topic_located.mq--> | 26<!--f:catalog.other_located.mq--> (`html-link:`) |
+| Baseline | Rows | Topic locators | Embedded locators | Documented normalization |
+|---|---|---|---|---|
+| cobol | 173<!--f:catalog.rows.cobol--> | 173<!--f:catalog.topic_located.cobol--> | 0 | 0 |
+| jcl-jes2 | 237<!--f:catalog.rows.jcl_jes2--> | 237<!--f:catalog.topic_located.jcl_jes2--> | 0 | 0 |
+| dataset-vsam-ams | 36<!--f:catalog.rows.dataset_vsam_ams--> | 31<!--f:catalog.topic_located.dataset_vsam_ams--> | 0 | 5<!--f:catalog.other_located.dataset_vsam_ams--> |
+| racf-saf | 48<!--f:catalog.rows.racf_saf--> | 34<!--f:catalog.topic_located.racf_saf--> | 14<!--f:catalog.other_located.racf_saf--> | 0 |
+| zosmf | 216<!--f:catalog.rows.zosmf--> | 216<!--f:catalog.topic_located.zosmf--> | 0 | 0 |
+| db2 | 174<!--f:catalog.rows.db2--> | 174<!--f:catalog.topic_located.db2--> | 0 | 0 |
+| cics | 571<!--f:catalog.rows.cics--> | 0<!--f:catalog.topic_located.cics--> | 571<!--f:catalog.other_located.cics--> | 0 |
+| ims | 25<!--f:catalog.rows.ims--> | 0<!--f:catalog.topic_located.ims--> | 25<!--f:catalog.other_located.ims--> | 0 |
+| mq | 26<!--f:catalog.rows.mq--> | 0<!--f:catalog.topic_located.mq--> | 26<!--f:catalog.other_located.mq--> | 0 |
 
-No topic was missing and none had moved. The
-641<!--f:catalog.not_topic_located_total--> rows reported as "not a topic
-locator" are exactly the 610<!--f:catalog.html_table_total--> `html-table:`,
-26<!--f:catalog.html_link_total--> `html-link:` and
-5<!--f:catalog.roadmap_normalization_total--> `roadmap-normalization:` rows the
-catalogs carry; each is reported with that reason rather than dropped, so
-865<!--f:catalog.topic_located_total--> +
-641<!--f:catalog.not_topic_located_total--> accounts for all
-1,506<!--f:catalog.rows_total--> rows. Every
-figure in that table is a count of `source_locator` values in
-`conformance/0.2/catalogs/*.json` and can be recomputed offline.
+The embedded population is 636<!--f:catalog.embedded_located_total--> rows:
+all 610<!--f:catalog.html_table_total--> `html-table:` rows and all
+26<!--f:catalog.html_link_total--> `html-link:` rows. CICS is resolved by the
+complete command/EIBFN/family tuple, IMS by its body-row ordinal plus call and
+command, RACROUTE by the unique request-type header cell at the catalog ordinal,
+and MQ by the unique call-name/target pair. Two byte-identical `MQMHBUF` anchors
+collapse to one semantic link and the report records both occurrences.
+
+The remaining 5<!--f:catalog.roadmap_normalization_total-->
+`roadmap-normalization:` rows are not publication-match claims. They are the
+deliberate five-row VSAM organization taxonomy documented in
+`conformance/0.2/catalogs/README.md`, and the verifier reports each as
+`skipped:documented-roadmap-normalization`. Thus
+865<!--f:catalog.topic_located_total--> topic rows +
+636<!--f:catalog.embedded_located_total--> embedded rows +
+5<!--f:catalog.roadmap_normalization_total--> documented normalization rows
+accounts for all 1,506<!--f:catalog.rows_total--> rows. Every count in the table
+comes from `source_locator` values in `conformance/0.2/catalogs/*.json` and is
+recomputed offline. The live audit found no missing, moved, retitled, or
+ambiguous topic, table row, header cell, or link; an unreachable source remains
+`skipped` rather than becoming a false `missing` finding.
 
 A heading is never the sole discriminator — the topic path is resolved first —
 and two of the four ways a heading may match are deliberately looser than string
@@ -270,7 +281,7 @@ equality. Both are counted separately in the report rather than folded into
 | `h1-without-chapter-number` | 113<!--f:catalog.chapter_numbered_headings--> |
 | `table-row` | 20<!--f:catalog.table_cited_rows--> |
 
-Those are the verdict names `verify_topic_locators.py` actually emits, and the
+Those are the topic-locator match names `verify_topic_locators.py` actually emits, and the
 last of them was wrong here until 2026-09-08: this table used to name a verdict
 `table-cell`, which no tool in the tree has ever emitted. The successful
 table verdict is `table-row` — the row is what the ordinal discriminates, and
@@ -299,8 +310,9 @@ cite a topic and one row of a shared table together, and are checked against tha
 row's cells; a topic that no longer carries the named table reports `retitled`,
 not a silent pass.
 
-Whatever else is thin about these catalogs, their inventories are anchored to
-the publications they cite.
+Whatever else is thin about these catalogs, every publication-located inventory
+is anchored to the source it cites, and every normalized row is explicitly
+identified as such.
 
 ## Each publication needs its own reader
 
@@ -853,29 +865,22 @@ were argued from.
 |---|---|
 | Db2 | 832<!--f:pins.topics.db2--> topics pinned and all 174<!--f:catalog.rows.db2--> rows resolve. No syntax reader; statement syntax is published as the same DITA railroad markup COBOL uses, so the COBOL reader is the nearest starting point. |
 | z/OSMF | REST families rather than a command language. All 216<!--f:catalog.rows.zosmf--> rows resolve; a syntax projection does not apply without a different comparison model. |
-| CICS, IMS, MQ | All three pin topics and all three reproduce. Their rows are located by `html-table:` and `html-link:` rather than by topic, so the locator audit reports them as skipped with that reason. None of the three has a syntax reader. CICS is the largest of them and the one most often assumed to be done: its 571<!--f:catalog.rows.cics--> rows are `html-table:` locators into a single pinned topic, the EIBFN function-code table in `dfha8mf.html`, which gives an inventory anchored to the publication and nothing that reads the publication's syntax — the same position JCL and RACF were in before this work. There is no `conformance/0.9` directory and no CICS reader anywhere in the tree; 0.9.0, which owns the CICS API, is a proposed coverage version with no code behind it yet. |
+| CICS, IMS, MQ | All three pin topics and all three reproduce. The locator audit resolves every `html-table:` and `html-link:` identity exactly: 571<!--f:catalog.rows.cics--> CICS rows, 25<!--f:catalog.rows.ims--> IMS rows and 26<!--f:catalog.rows.mq--> MQ rows. None has a syntax reader. CICS remains the largest and the one most often assumed to be done: its rows cite the EIBFN function-code table in `dfha8mf.html`, which proves the inventory and still says nothing about each command's syntax. There is no `conformance/0.9` directory and no CICS syntax reader in the tree; 0.9.0 remains proposed and this audit does not implement it. |
 
-The open items, in order of size:
+The remaining publication-analysis gaps, in order of size:
 
-1. **429<!--f:racf.source_only--> RACF operand names the publication publishes
-   and the catalog does not
-   carry**, and 62<!--f:racf.catalog_only--> it carries that the publication does
-   not publish. The second
-   set is dispositioned and gated; the first is reported and gated by nothing.
-2. **688<!--f:ams.source_parameters--> AMS parameters against a grammar that
-   records none**, pending the
-   contract decision above.
-3. **75<!--f:cobol.distinct_keywords_missing--> COBOL keywords across
-   29<!--f:cobol.rows_with_missing_keywords--> rows** that appear in no catalog
-   form. This read 69 until 2026-09-08; commit 397a6b8 held each form to the
-   diagram its own statement draws, which moved the forms the keywords are
-   counted against.
-4. **No syntax reader for Db2, CICS, IMS or MQ**, which between them carry 796
+1. **No syntax reader for Db2, CICS, IMS or MQ**, which between them carry 796
    of the 1,506<!--f:catalog.rows_total--> catalog rows
    (174<!--f:catalog.rows.db2--> + 571<!--f:catalog.rows.cics--> +
    25<!--f:catalog.rows.ims--> + 26<!--f:catalog.rows.mq-->); z/OSMF's
    216<!--f:catalog.rows.zosmf--> need a
-   different comparison model rather than a reader.
+   different comparison model rather than a reader. Their row identities are
+   audited; syntax depth is the remaining gap.
+2. **75<!--f:cobol.distinct_keywords_missing--> COBOL keywords across
+   29<!--f:cobol.rows_with_missing_keywords--> rows** that appear in no catalog
+   form. This read 69 until 2026-09-08; commit 397a6b8 held each form to the
+   diagram its own statement draws, which moved the forms the keywords are
+   counted against.
 
 ## Corrections
 
