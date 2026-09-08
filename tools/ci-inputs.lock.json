@@ -18,6 +18,9 @@
       "version": "0.20.2",
       "install": "cargo +1.98.0 install cargo-deny --version 0.20.2 --locked"
     },
+    "docker": {
+      "version": "29.4.3"
+    },
     "git": {
       "version": "2.50.1"
     },
@@ -36,7 +39,9 @@
   },
   "tracked_remote_inputs": {
     "github_actions": [],
-    "container_images": [],
+    "container_images": [
+      "docker.io/library/debian@sha256:5ae3c39ebd15e229dcedd5cee596b2497182493d41ff162e824ba13fc1b2b867"
+    ],
     "package_install_commands": []
   },
   "offline_bundle": {
@@ -53,6 +58,7 @@
       "tools/jenkins/controller-plugins.lock.json",
       "tools/jenkins/select-python.sh",
       "tools/package_offline_cargo_bundle.sh",
+      "tools/reproducible_archive.py",
       "tools/supply_chain.py"
     ]
   },

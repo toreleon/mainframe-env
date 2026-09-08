@@ -33,6 +33,8 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Made the offline Cargo archive reproducible twice in one digest-pinned GNU
+  tar environment and made local and GitHub release assets immutable by digest.
 - Bounded and zeroized transient authentication secrets, randomized and
   unified credential policy, and replaced durable raw bearer tokens with
   hashed, rotating, expiring sessions with a durable cross-server user quota

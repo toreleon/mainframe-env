@@ -13,9 +13,10 @@ governed by two reviewed locks:
 `tools/supply_chain.py check` enumerates files with `git ls-files`. A tracked
 GitHub action must use a 40-hex commit, a tracked container must use an
 `@sha256:` digest, and tracked CI cannot install ambient packages. The current
-inventory contains no GitHub actions, containers, or package-install commands.
-The Jenkins controller, plugins, Rust toolchains, Cargo dependencies, and host
-tools are the locked inputs instead.
+inventory contains no GitHub actions or package-install commands and exactly
+one Linux/amd64 archive image pinned by digest. The Jenkins controller, plugins,
+Rust toolchains, Cargo dependencies, archive image, and host tools are locked
+inputs.
 
 ## Deliberately unsupported local files
 
@@ -56,8 +57,8 @@ plugin validation as a blocking `supply-chain` gate.
 
 The host must already provide the exact versions in `tools/ci-inputs.lock.json`.
 The lock currently requires Rust/Cargo 1.98.0, Rust/Cargo 1.95.0 for MSRV,
-Python 3.12.13, Git 2.50.1, Java 21.0.12.1, cargo-deny 0.20.2, PostgreSQL 18.6,
-and GitHub CLI 2.92.0. Install cargo-deny only from its immutable Cargo package
+Python 3.12.13, Git 2.50.1, Docker 29.4.3, Java 21.0.12.1, cargo-deny 0.20.2,
+PostgreSQL 18.6, and GitHub CLI 2.92.0. Install cargo-deny only from its immutable Cargo package
 coordinate:
 
 ```bash
@@ -76,13 +77,16 @@ scope. Each resulting archive contains:
 - the two reviewed lock files; and
 - `SUPPLY-CHAIN/BUILD-INPUTS.json`, which binds the tag commit, Cargo lock,
   Rust toolchain file, CI locks, complete vendored-tree bytes and modes, and the
-  versions plus executable SHA-256 values of Cargo, rustc, Git, Python, tar,
-  and gzip.
+  versions plus executable SHA-256 values of Cargo, rustc, Git, Python, and the
+  container runtime.
 
-The record is regenerated and byte-validated before packaging. This closes
-input identity; it does not claim that platform tar behavior is reproducible.
-Archive normalization and publication immutability remain the separate R-14
-boundary.
+The record also binds the exact Linux/amd64 container image digest and the GNU
+tar 1.34/gzip 1.12 pair inside it. Packaging copies the source tree into two
+clean directories with deliberately different mtimes, normalizes member order,
+time, ownership, mode, extended metadata, and gzip headers, and requires both
+archives to have the same SHA-256 before publishing either. Existing local or
+GitHub assets are retained only when their bytes match; different bytes fail
+closed and are never clobbered.
 
 ## Reviewed updates
 

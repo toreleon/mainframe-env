@@ -422,7 +422,8 @@ pipeline {
                         if ! gh release view "$tag" >/dev/null 2>&1; then
                           gh release create "$tag" --verify-tag --title "mainframe-env $version" --generate-notes
                         fi
-                        gh release upload "$tag" "$archive" "$archive.sha256" --clobber
+                        "$MAINFRAME_ENV_PYTHON" -B tools/publish_release_assets.py \
+                          --tag "$tag" "$archive" "$archive.sha256"
                     '''
                 }
             }

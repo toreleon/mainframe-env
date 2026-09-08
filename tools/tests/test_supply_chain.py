@@ -31,7 +31,13 @@ class SupplyChainTests(unittest.TestCase):
         self.assertEqual(len(jenkins_lock["plugins"]), 63)
         self.assertEqual(
             ci_lock["tracked_remote_inputs"],
-            {"github_actions": [], "container_images": [], "package_install_commands": []},
+            {
+                "github_actions": [],
+                "container_images": [
+                    "docker.io/library/debian@sha256:5ae3c39ebd15e229dcedd5cee596b2497182493d41ff162e824ba13fc1b2b867"
+                ],
+                "package_install_commands": [],
+            },
         )
         tracked = set(supply_chain.tracked_files(ROOT))
         self.assertTrue(set(ci_lock["unsupported_local_inputs"]).isdisjoint(tracked))

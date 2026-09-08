@@ -10,7 +10,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:ddfa12cf086d7383affceea9e8a8d8f8a003b3324365be5b93129b4c602083f4",
+      "sha256": "sha256:fc5fa88bf36fcb1fb792153e3de5f70f9ee8d48beba1955ac9e9f775b8874ec2",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -681,7 +681,7 @@
       "path": "docs/delivery/VERSIONING-AND-RELEASES.md",
       "relative_links": 0,
       "scope": "version authorities, release gates, artifacts, and publication",
-      "sha256": "sha256:00162eb0e90c1f33fdbbe2b12eeac2b26e0897e739c14f29c7b810d165acc9a8",
+      "sha256": "sha256:456dda9f2bd971a5c3ab2b1ff99987fd23e997d6743ef15156f40953390884d2",
       "status": "Accepted by repository owner",
       "title": "Versioning, Phase Commits, and Release Gates",
       "xtask_commands": 0
@@ -1334,7 +1334,7 @@
       "normative": false,
       "path": "docs/runbooks/CI-SUPPLY-CHAIN.md",
       "relative_links": 0,
-      "sha256": "sha256:6b1629589a80ee1fb4b4fb95725f7c409ae7303eff95ea200ca52cc011482475",
+      "sha256": "sha256:84f22f5e7cd83bf4738966bc509cb99e7d0c1c8634ab41117f9618df8d932c41",
       "title": "CI supply-chain inputs",
       "xtask_commands": 1
     },

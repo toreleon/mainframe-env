@@ -28,6 +28,9 @@ SAFE_ID = re.compile(r"[a-z0-9][a-z0-9-]{0,127}\Z")
 SAFE_VERSION = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,191}\Z")
 ACTION = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@[0-9a-f]{40}\Z")
 IMAGE = re.compile(r"[^\s@]+@sha256:[0-9a-f]{64}\Z")
+ARCHIVE_IMAGE_DECLARATION = re.compile(
+    r'^REPRODUCIBLE_ARCHIVE_IMAGE = "([^"\s]+@sha256:[0-9a-f]{64})"$'
+)
 MAX_JSON_BYTES = 1024 * 1024
 MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
 MAX_TREE_FILES = 200_000
@@ -102,7 +105,15 @@ def validate_ci_lock(root: Path) -> dict:
         require(re.fullmatch(r"[0-9a-f]{40}", toolchain["rustc_commit"] or ""), f"bad Rust {name} commit")
         require(re.fullmatch(r"[0-9a-f]{40}", toolchain["cargo_commit"] or ""), f"bad Cargo {name} commit")
 
-    expected_tools = {"cargo-deny", "git", "github-cli", "java", "postgresql", "python"}
+    expected_tools = {
+        "cargo-deny",
+        "docker",
+        "git",
+        "github-cli",
+        "java",
+        "postgresql",
+        "python",
+    }
     require(set(lock["tools"]) == expected_tools, "CI tool lock set differs")
     for name, tool in lock["tools"].items():
         require(isinstance(tool, dict), f"tool {name} lock is not an object")
@@ -192,6 +203,9 @@ def scan_external_inputs(root: Path, tracked: list[str]) -> dict[str, list[str]]
         is_workflow = relative.startswith(".github/workflows/") and relative.endswith((".yml", ".yaml"))
         for number, line in enumerate(text.splitlines(), 1):
             stripped = line.strip()
+            archive_image = ARCHIVE_IMAGE_DECLARATION.fullmatch(stripped)
+            if archive_image:
+                images.add(archive_image.group(1))
             if is_workflow:
                 use = re.match(r"-?\s*uses:\s*['\"]?([^'\"#\s]+)", stripped)
                 if use:
@@ -304,6 +318,13 @@ def verify_runtime(ci_lock: dict, scope: str) -> None:
         git = command_output(["git", "--version"])
         match = re.search(r"git version ([0-9]+\.[0-9]+\.[0-9]+)", git)
         require(match is not None and match.group(1) == tools["git"]["version"], f"Git must be exactly {tools['git']['version']}")
+    if scope in {"offline", "all"}:
+        docker = command_output(["docker", "--version"])
+        match = re.search(r"Docker version ([0-9]+\.[0-9]+\.[0-9]+),", docker)
+        require(
+            match is not None and match.group(1) == tools["docker"]["version"],
+            f"Docker must be exactly {tools['docker']['version']}",
+        )
     if scope in {"ci", "offline", "all"}:
         verify_rust("workspace", ci_lock["rust"]["workspace"])
         verify_active_rust(ci_lock["rust"]["workspace"])
@@ -509,18 +530,25 @@ def offline_record(root: Path, vendor: Path) -> dict:
     require(re.fullmatch(r"[0-9a-f]{40}", revision) is not None, "offline source revision is invalid")
     tools = {
         "cargo": executable_identity("cargo", ["cargo", "-Vv"]),
+        "docker": executable_identity("docker", ["docker", "--version"]),
         "git": executable_identity("git", ["git", "--version"]),
-        "gzip": executable_identity("gzip", ["gzip", "--version"]),
         "python": executable_identity("python", [sys.executable, "--version"], sys.executable),
         "rustc": executable_identity("rustc", ["rustc", "-Vv"]),
-        "tar": executable_identity("tar", ["tar", "--version"]),
     }
+    archive_images = ci_lock["tracked_remote_inputs"]["container_images"]
+    require(len(archive_images) == 1, "offline archive environment lock differs")
     return {
-        "schema_version": "mainframe-env.offline-build-inputs@1",
+        "schema_version": "mainframe-env.offline-build-inputs@2",
         "source_revision": revision,
         "locked_files": inputs,
         "vendor": tree_identity(vendor),
         "tools": tools,
+        "archive_environment": {
+            "image": archive_images[0],
+            "platform": "linux/amd64",
+            "tar": "GNU tar 1.34",
+            "gzip": "gzip 1.12",
+        },
         "jenkins_controller_version": jenkins_lock["controller"]["version"],
     }
 

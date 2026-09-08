@@ -76,7 +76,9 @@ Each vendored crate retains its own complete license and notice files.
 
 `SUPPLY-CHAIN/BUILD-INPUTS.json` binds the source revision, locked input files,
 vendored tree, and exact tool executables used to assemble this archive. The
-reviewed controller/plugin and CI input locks are retained beside it.
+reviewed controller/plugin and CI input locks are retained beside it. The final
+archive is reproduced from two clean staging copies in the digest-pinned GNU
+tar environment before its immutable local path is accepted.
 EOF
 
 echo "==> verifying a clean checkout with networking disabled in Cargo"
@@ -92,15 +94,6 @@ CARGO_NET_OFFLINE=true CARGO_TARGET_DIR="$stage/verify-target" \
 
 archive="$out/mainframe-env-${version}-cargo-vendor.tar.gz"
 echo "==> packaging $archive"
-if tar --version 2>/dev/null | grep -qi 'gnu tar'; then
-  tar_flags=(--format=ustar --numeric-owner --owner=0 --group=0 --mtime=@0 --sort=name)
-else
-  tar_flags=(--format=ustar --numeric-owner --uid 0 --gid 0 --uname '' --gname '')
-fi
-tar "${tar_flags[@]}" -C "$sdk" -cf - . | gzip -9 -n > "$archive"
-if command -v sha256sum >/dev/null 2>&1; then
-  sha256sum "$archive" | sed 's|  .*/|  |' > "$archive.sha256"
-else
-  shasum -a 256 "$archive" | sed 's|  .*/|  |' > "$archive.sha256"
-fi
+"$python_bin" -B "$root/tools/reproducible_archive.py" \
+  --source "$sdk" --output "$archive"
 printf 'bundle: %s\n' "$archive"

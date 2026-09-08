@@ -212,6 +212,14 @@ For `0.1.x`, use:
 7. release commit and annotated tag; and
 8. publish only after artifact/provenance verification.
 
+The supported offline Cargo archive is produced only by
+`tools/package_offline_cargo_bundle.sh`. Its archive helper uses the locked
+Linux/amd64 GNU-tar image, perturbs and normalizes two clean copies, and accepts
+the output only when both SHA-256 digests match. Publication downloads any
+same-named GitHub asset and skips it only when the bytes match. A different
+remote digest or a concurrent name collision stops publication; release assets
+are never uploaded with overwrite semantics.
+
 Patch releases may add backward-compatible optional behavior or fix defects.
 They may not remove or silently redefine supported 0.1 behavior.
 
