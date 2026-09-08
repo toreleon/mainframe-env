@@ -24,6 +24,9 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Updated the 0.9 CICS implementation plan to require the integrated 28-finding
+  hardening baseline, bounded family slices, per-slice security/recovery,
+  explicit backend validation, and early licensed-campaign planning.
 - Split Db2, IMS, and MQ durable state into independently versioned object,
   index, cursor, unit-of-work, and replay rows with atomic legacy migration.
 - Assigned post-0.8.2 work the distinct `0.8.3` development identity and made

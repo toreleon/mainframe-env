@@ -10,7 +10,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:f2e778d1e07797286e4df410f84c7bec024afb8c8d441e34e857951b48b5f959",
+      "sha256": "sha256:e0e0836d8cfc461820012b0ede6880537479ea9fd2c05bdcfe08fa3efe1c9487",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -901,8 +901,8 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/0.9.0.md",
-      "relative_links": 2,
-      "sha256": "sha256:7926a194bade25310c1983e512aef68f8c4ba0b375c41f03de9467f2a2093d59",
+      "relative_links": 6,
+      "sha256": "sha256:d79022271dc5e53888cbfbff4f25e0d3fb1b76f7d976c6e0a0ba1a87f9ebad23",
       "title": "mainframe-env 0.9.0 — Complete CICS application API",
       "xtask_commands": 0
     },
@@ -1005,8 +1005,8 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
-      "relative_links": 12,
-      "sha256": "sha256:a5d2bc849d97b67f2b405a5f7aa6c3e1636ed13e4cdbf9787ec06662cb0d94a6",
+      "relative_links": 18,
+      "sha256": "sha256:b9436a5b5bac7bf2f84f4a6ff6f7da913468c7efb1fc06d8a4a1e27af2d20898",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },
@@ -1246,7 +1246,7 @@
       "normative": false,
       "path": "docs/prompts/coverage-versions/IMPLEMENT_0_9_0.md",
       "relative_links": 1,
-      "sha256": "sha256:e6276eedd5135cc492dec3df1ac58fc40a2f5894b481d9ad6f86792c8353c6ad",
+      "sha256": "sha256:06a25be2063d00c3df582eef78f0b0d314220d82288acac7b59a48cff9d66fd2",
       "title": "Execution Prompt — Implement mainframe-env 0.9.0",
       "xtask_commands": 0
     },
@@ -1254,7 +1254,7 @@
       "normative": false,
       "path": "docs/prompts/coverage-versions/README.md",
       "relative_links": 19,
-      "sha256": "sha256:a66c9e50ed7cf862373bfa883ea0ee2a342e5d872820de3279e73ca4e54e34a4",
+      "sha256": "sha256:740ad1d2fceb3ddfea6bde1504572660a58b31200596eeecb4b6420e3d6a092a",
       "title": "Implementation prompts for IBM coverage minor releases",
       "xtask_commands": 0
     },
