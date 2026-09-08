@@ -2052,18 +2052,12 @@ fn validate_xml_suppress(cursor: &mut Cursor<'_>) -> Result<(), &'static str> {
             validate_xml_when(cursor)?;
         } else if cursor.eat("EVERY") {
             if cursor.eat("NUMERIC") || cursor.eat("NONNUMERIC") {
-                let _ = cursor.eat("ATTRIBUTE")
-                    || cursor.eat("ELEMENT")
-                    || cursor.eat("CONTENT");
-            } else if !(cursor.eat("ATTRIBUTE")
-                || cursor.eat("ELEMENT")
-                || cursor.eat("CONTENT"))
-            {
+                let _ = cursor.eat("ATTRIBUTE") || cursor.eat("ELEMENT") || cursor.eat("CONTENT");
+            } else if !(cursor.eat("ATTRIBUTE") || cursor.eat("ELEMENT") || cursor.eat("CONTENT")) {
                 return Err("EVERY requires an XML class or role");
             }
             validate_xml_when(cursor)?;
-        } else if cursor.at_any(&["NUMERIC", "NONNUMERIC", "ATTRIBUTE", "ELEMENT", "CONTENT"])
-        {
+        } else if cursor.at_any(&["NUMERIC", "NONNUMERIC", "ATTRIBUTE", "ELEMENT", "CONTENT"]) {
             return Err("generic XML suppression keywords require EVERY");
         } else {
             cursor.operand()?;
