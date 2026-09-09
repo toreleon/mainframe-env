@@ -1,0 +1,91 @@
+{
+  "schema_version": "mainframe-env.cobol-arithmetic-rule-review@1",
+  "review_status": "accepted",
+  "scope": "Issue #140 receiver-local SIZE ERROR behavior and issue #141 ADD CORRESPONDING name, qualification, and eligibility behavior",
+  "pinned_source": {
+    "manifest": "conformance/0.3/generated/cobol-topic-manifest.json",
+    "product": "SS6SG3_6.5",
+    "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0002",
+    "topic_path": "SS6SG3_6.5/lr/ref/rlpsadd.html",
+    "sha256": "sha256:0d41bb5458c78b6477731c50c532c36731f89a4a12e6ce88e1123c138b6b6e35",
+    "retained_publication_bytes": false,
+    "coverage_credit": 0
+  },
+  "semantic_publication": {
+    "product": "SS6SG3_6.5",
+    "publication_number": "SC27-8713-04",
+    "revision_date": "2026-05-31",
+    "url": "https://www.ibm.com/docs/en/SS6SG3_6.5/pdf/lrmvs.pdf",
+    "sha256": "sha256:8b86cbd2d838d8f460dcbe8d1e74d2266799ce1534f4cfdbc08469c36748e85e",
+    "retained_in_repository": false,
+    "verified_on": "2026-09-09",
+    "coverage_credit": 0,
+    "locators": {
+      "size_error": "SIZE ERROR phrases",
+      "corresponding": "CORRESPONDING phrase",
+      "add_format_3": "ADD statement, Format 3"
+    }
+  },
+  "grammar_projection": {
+    "path": "conformance/0.3/generated/cobol-html-grammar-projection.json",
+    "required_format_titles": [
+      "Format 1: ADD statement",
+      "Format 2: ADD statement with GIVING phrase",
+      "Format 3: ADD statement with CORRESPONDING phrase"
+    ]
+  },
+  "decisions": [
+    {
+      "rule_id": "cobol.add.receiver-local-size-error",
+      "decision": "accepted",
+      "source_locator": "SIZE ERROR phrases",
+      "fixture_case": "receiver-local-size-error"
+    },
+    {
+      "rule_id": "cobol.add.size-error-after-receiver-processing",
+      "decision": "accepted",
+      "source_locator": "SIZE ERROR phrases",
+      "fixture_case": "receiver-local-size-error"
+    },
+    {
+      "rule_id": "cobol.add.no-handler-overflow-truncates",
+      "decision": "accepted",
+      "source_locator": "SIZE ERROR phrases",
+      "fixture_case": "receiver-overflow-without-handler"
+    },
+    {
+      "rule_id": "cobol.add-corresponding.relative-qualification",
+      "decision": "accepted",
+      "source_locator": "CORRESPONDING phrase",
+      "fixture_case": "corresponding-relative-qualifiers"
+    },
+    {
+      "rule_id": "cobol.add-corresponding.no-pair-no-op",
+      "decision": "accepted",
+      "source_locator": "CORRESPONDING phrase",
+      "fixture_case": "corresponding-no-pair-no-op"
+    },
+    {
+      "rule_id": "cobol.add-corresponding.numeric-edited-eligible",
+      "decision": "accepted",
+      "source_locator": "CORRESPONDING phrase",
+      "fixture_case": "corresponding-numeric-edited-eligible"
+    }
+  ],
+  "review_authority": {
+    "kind": "maintainer-directed-issue-remediation",
+    "reviewed_on": "2026-09-09",
+    "issues": [
+      "https://github.com/toreleon/mainframe-env/issues/140",
+      "https://github.com/toreleon/mainframe-env/issues/141"
+    ],
+    "result": "accepted for candidate-side exact-byte and typed-plan conformance"
+  },
+  "evidence_boundary": {
+    "licensed_ibm_differential_run": false,
+    "licensed_credit": 0,
+    "differential_credit": 0,
+    "candidate_outputs_are_source_authority": false,
+    "expected_bytes_are_loaded_from": "conformance/0.9/cobol/arithmetic-fixtures.json"
+  }
+}

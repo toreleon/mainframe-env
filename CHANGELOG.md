@@ -9,9 +9,13 @@ All notable changes to mainframe-env are documented here.
 - Added ADR-0011 and the first typed-HIR vertical slices: resolved COBOL
   arithmetic plans, typed CICS file/unit-of-work plans, versioned executable
   dialect identities, and bounded canonical plan codecs.
-- Added candidate-bound product-source mutants for typed decimal addition,
-  receiver rounding, and atomic multi-receiver assignment; the unchanged
-  arithmetic conformance path must kill every representative mutant.
+- Added candidate-bound product-source mutants for typed decimal receiver-local
+  updates, operand capture, condition timing, rounding, and qualified
+  `ADD CORRESPONDING`; unchanged exact-result tests must kill every
+  representative mutant.
+- Added a reviewed, pinned-source COBOL arithmetic pilot with independent
+  golden bytes and typed-plan observations for `SIZE ERROR`, relative
+  qualification, numeric-edited eligibility, and the no-pair no-op.
 - Added persistent bounded COBOL-parser and IR-decoder fuzzing, Loom schedule
   models with a negative concurrency mutant, and instrumented critical-package
   coverage reporting as receipt-backed full CI gates.
@@ -30,6 +34,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Advanced decimal assignment to a policy-bearing `@2` contract with explicit
+  arithmetic context, COBOL numeric-storage ABI, receiver-update, condition,
+  and rounding behavior. The exact `@1` compatibility route remains readable,
+  while an independent `ledger.formula@1` adapter proves bounded reuse without
+  importing COBOL HIR.
 - Advanced artifact publication to `mainframe-env.artifact@3`; manifests now
   carry the exact dialect namespace/major set derived from their executable
   payload while historical `@2` artifacts retain their original contract.
@@ -52,6 +61,17 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Corrected typed ADD/COMPUTE receiver-local `SIZE ERROR` commits, resolved
+  `ADD CORRESPONDING` by relative qualifiers with bilateral uniqueness and
+  subordinate-item exclusions, and made selected-table compatibility preserve
+  the requested occurrence while invalid or unrepresentable forms fail before
+  publication.
+- Moved decimal/CICS plan decoding, slot binding, and condition-topology checks
+  into dialect-aware HIR/MIR/artifact verification, while retaining defensive
+  machine admission.
+- Persisted versioned executable manifests with installed artifacts and required
+  manifest-aware admission before installed batch, online, nested-call, reload,
+  or continuation execution.
 - Routed the CICS file/UOW pilot through the durable execution coordinator and
   bounded arithmetic-expression grammar descent before typed HIR construction.
 - Persisted bounded typed host audit decisions with versioned canonical resource

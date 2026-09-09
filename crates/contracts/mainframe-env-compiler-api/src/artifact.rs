@@ -412,9 +412,12 @@ fn dialect_contracts(legal: &LegalModule) -> BTreeSet<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::stage::tests::{
+        CicsPlanFixture, DecimalPlanFixture, cics_boundary_fixture, decimal_boundary_fixture,
+    };
     use mainframe_env_ir::{
-        CodecLimits, IrLimits, LegalityProfile, ModuleBuilder, OperationCatalog, OperationIdentity,
-        OperationSchema,
+        CodecLimits, DecimalPlanLimits, IrLimits, LegalityProfile, ModuleBuilder, OperationCatalog,
+        OperationIdentity, OperationSchema,
     };
     use mainframe_env_source::{
         LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
@@ -682,5 +685,135 @@ mod tests {
             ),
             Err(CompilerProblem::Legality(_))
         ));
+    }
+
+    #[test]
+    fn artifact_reader_enforces_typed_cics_semantics_before_runtime_construction() {
+        let manifest = ArtifactManifest {
+            compiler_generation: "compiler-v3".into(),
+            target: CompileTarget::new("reference").unwrap(),
+            options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            host_interfaces: BTreeSet::new(),
+            ir_contract: mainframe_env_ir::IR_ENVELOPE_CONTRACT.into(),
+            dialect_contracts: BTreeSet::from([
+                "cics.file@1".into(),
+                "mainframe.core.cobol@1".into(),
+                "test@1".into(),
+            ]),
+        };
+        let valid = cics_boundary_fixture(CicsPlanFixture::Valid);
+        let payload = encode_binary(&valid.module, CodecLimits::default()).unwrap();
+        let artifact = ValidatedArtifact::read(
+            VersionedArtifactManifest::V3(manifest.clone()),
+            &payload,
+            &valid.catalog,
+            &valid.profile,
+            CodecLimits::default(),
+            ArtifactLimits::default(),
+        )
+        .expect("canonical typed CICS artifact should be accepted");
+        assert_eq!(artifact.legal().report().operation_count, 4);
+
+        for kind in [
+            CicsPlanFixture::Empty,
+            CicsPlanFixture::WrongType,
+            CicsPlanFixture::NonCanonical,
+            CicsPlanFixture::OperationMismatch,
+            CicsPlanFixture::MissingLayout,
+            CicsPlanFixture::WrongLayoutExtent,
+            CicsPlanFixture::ReadOnlyOutput,
+        ] {
+            let invalid = cics_boundary_fixture(kind);
+            let payload = encode_binary(&invalid.module, CodecLimits::default()).unwrap();
+            let decoded = decode_binary(&payload, CodecLimits::default()).unwrap();
+            assert_eq!(
+                encode_binary(&decoded, CodecLimits::default()).unwrap(),
+                payload,
+                "{kind:?} fixture must retain a canonical outer IR envelope"
+            );
+            assert!(
+                matches!(
+                    ValidatedArtifact::read(
+                        VersionedArtifactManifest::V3(manifest.clone()),
+                        &payload,
+                        &invalid.catalog,
+                        &invalid.profile,
+                        CodecLimits::default(),
+                        ArtifactLimits::default(),
+                    ),
+                    Err(CompilerProblem::Legality(detail)) if detail.contains("SemanticMismatch")
+                ),
+                "{kind:?} must be rejected by the artifact legal boundary"
+            );
+        }
+    }
+
+    #[test]
+    fn artifact_reader_enforces_decimal_plan_layout_and_topology_semantics() {
+        let legacy_manifest = || {
+            VersionedArtifactManifest::V2(ArtifactManifestV2 {
+                compiler_generation: "compiler-v2".into(),
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+                host_interfaces: BTreeSet::new(),
+                ir_contract: mainframe_env_ir::IR_ENVELOPE_CONTRACT.into(),
+            })
+        };
+        for kind in [
+            DecimalPlanFixture::Valid,
+            DecimalPlanFixture::ValidCondition,
+        ] {
+            let valid = decimal_boundary_fixture(kind);
+            let payload = encode_binary(&valid.module, CodecLimits::default()).unwrap();
+            ValidatedArtifact::read(
+                legacy_manifest(),
+                &payload,
+                &valid.catalog,
+                &valid.profile,
+                CodecLimits::default(),
+                ArtifactLimits::default(),
+            )
+            .expect("canonical typed decimal artifact should be accepted");
+        }
+
+        for kind in [
+            DecimalPlanFixture::EmptyBytes,
+            DecimalPlanFixture::WrongType,
+            DecimalPlanFixture::Truncated,
+            DecimalPlanFixture::NonCanonical,
+            DecimalPlanFixture::WrongVersion,
+            DecimalPlanFixture::OperationMajorMismatch,
+            DecimalPlanFixture::EffectMismatch,
+            DecimalPlanFixture::SlotMismatch,
+            DecimalPlanFixture::MissingLayout,
+            DecimalPlanFixture::NonNumericLayout,
+            DecimalPlanFixture::WrongLayoutExtent,
+            DecimalPlanFixture::MissingConditionOwner,
+            DecimalPlanFixture::OrphanConditionBranch,
+            DecimalPlanFixture::InvalidFalseTarget,
+            DecimalPlanFixture::UnexpectedTrueEdge,
+            DecimalPlanFixture::Oversized,
+        ] {
+            let invalid = decimal_boundary_fixture(kind);
+            let mut codec = CodecLimits::default();
+            if matches!(kind, DecimalPlanFixture::Oversized) {
+                codec.ir.max_attribute_bytes = DecimalPlanLimits::default().max_encoded_bytes + 1;
+            }
+            let payload = encode_binary(&invalid.module, codec).unwrap();
+            assert!(
+                matches!(
+                    ValidatedArtifact::read(
+                        legacy_manifest(),
+                        &payload,
+                        &invalid.catalog,
+                        &invalid.profile,
+                        codec,
+                        ArtifactLimits::default(),
+                    ),
+                    Err(CompilerProblem::Legality(detail)) if detail.contains("SemanticMismatch")
+                ),
+                "{kind:?} must be rejected by the artifact legal boundary"
+            );
+        }
     }
 }

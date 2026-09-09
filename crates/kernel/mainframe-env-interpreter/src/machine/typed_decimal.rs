@@ -1,8 +1,12 @@
 use super::*;
 use crate::runtime::{CobolArithmetic, CobolDecimal, CobolRounding, RuntimeContractProblem};
 use mainframe_env_ir::{
-    DecimalAssignmentPlan, DecimalExpression, DecimalPlanLimits, DecimalReceiver,
-    DecimalRoundingPolicy, DecimalStorageSlot, Effect, decode_decimal_assignment_plan,
+    DecimalArithmeticContext, DecimalAssignmentPlan, DecimalConditionContract,
+    DecimalConditionPolicy, DecimalExpression, DecimalOperationContract, DecimalPlanLimits,
+    DecimalPlanWireVersion, DecimalReceiver, DecimalReceiverUpdatePolicy, DecimalRoundingPolicy,
+    DecimalStorageAbi, DecimalStorageSlot, Effect, Module, OperationCatalog, OperationSchema,
+    OperationSemanticContract, decimal_assignment_plan_wire_version,
+    decode_decimal_assignment_plan, verify_semantic_contracts,
 };
 
 const NAMESPACE: &str = "mainframe.decimal";
@@ -16,25 +20,57 @@ const SIZE_ERROR_BRANCH: u8 = 1;
 const NOT_SIZE_ERROR_BRANCH: u8 = 2;
 
 pub(super) fn operation_identity() -> OperationIdentity {
-    OperationIdentity::new(NAMESPACE, NAME, 1).expect("static typed decimal operation")
+    OperationIdentity::new(NAMESPACE, NAME, 2).expect("static typed decimal operation")
+}
+
+fn legacy_operation_identity() -> OperationIdentity {
+    OperationIdentity::new(NAMESPACE, NAME, 1).expect("static legacy decimal operation")
+}
+
+pub(super) fn operation_identities() -> [OperationIdentity; 2] {
+    [legacy_operation_identity(), operation_identity()]
 }
 
 pub(super) fn is_assign(operation: &Operation) -> bool {
     operation.identity.namespace() == NAMESPACE
         && operation.identity.name() == NAME
-        && operation.identity.major() == 1
+        && matches!(operation.identity.major(), 1 | 2)
 }
 
-pub(super) fn validate_module_operations(operations: &[&Operation]) -> Result<(), MachineProblem> {
-    for operation in operations
-        .iter()
-        .copied()
-        .filter(|operation| is_assign(operation))
-    {
-        let plan = plan(operation)?;
-        validate_declared_slots(operation, &plan)?;
+pub(super) fn validate_module_operations(module: &Module) -> Result<(), MachineProblem> {
+    let mut catalog = OperationCatalog::default();
+    for identity in operation_identities() {
+        let (expected_plan_version, allowed_semantic_origins) = if identity.major() == 1 {
+            (
+                DecimalPlanWireVersion::LegacyV1,
+                BTreeSet::from(["cobol.add@1".into(), "cobol.compute@1".into()]),
+            )
+        } else {
+            (DecimalPlanWireVersion::PolicyV2, BTreeSet::new())
+        };
+        let mut schema = OperationSchema::pure(identity, 0, 0);
+        schema.semantic_contract =
+            OperationSemanticContract::DecimalAssignment(DecimalOperationContract {
+                plan_attribute: PLAN_ATTRIBUTE.into(),
+                expected_plan_version,
+                allowed_semantic_origins,
+                layout_definition_operation: Some(
+                    OperationIdentity::new("mainframe.core.cobol", "define", 1)
+                        .expect("static COBOL layout definition identity"),
+                ),
+                condition: Some(DecimalConditionContract {
+                    status: SIZE_ERROR_STATUS.into(),
+                    status_attribute: CONDITION_STATUS_ATTRIBUTE.into(),
+                    branch_mask_attribute: CONDITION_BRANCHES_ATTRIBUTE.into(),
+                    branch_polarity_attribute: CONDITION_POLARITY_ATTRIBUTE.into(),
+                }),
+            });
+        catalog
+            .register(schema)
+            .expect("unique typed decimal identity");
     }
-    Ok(())
+    verify_semantic_contracts(module, &catalog)
+        .map_err(|problem| MachineProblem::InvalidArtifact(problem.to_string()))
 }
 
 pub(super) fn validate_machine(machine: &ReferenceMachine) -> Result<(), MachineProblem> {
@@ -90,7 +126,12 @@ pub(super) fn execute_with_condition(
     operation: &Operation,
 ) -> Result<(), MachineProblem> {
     match execute(machine, operation) {
-        Ok(()) => machine.condition_status.arithmetic_size_error = false,
+        Ok(DecimalExecutionStatus::Success) => {
+            machine.condition_status.arithmetic_size_error = false
+        }
+        Ok(DecimalExecutionStatus::ReceiverSizeError) => {
+            machine.condition_status.arithmetic_size_error = true
+        }
         Err(MachineProblem::SizeError) => {
             machine.condition_status.arithmetic_size_error = true;
             if !has_size_error_handler(operation)? {
@@ -102,24 +143,59 @@ pub(super) fn execute_with_condition(
     Ok(())
 }
 
-fn execute(machine: &mut ReferenceMachine, operation: &Operation) -> Result<(), MachineProblem> {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum DecimalExecutionStatus {
+    Success,
+    ReceiverSizeError,
+}
+
+fn execute(
+    machine: &mut ReferenceMachine,
+    operation: &Operation,
+) -> Result<DecimalExecutionStatus, MachineProblem> {
     let plan = plan(operation)?;
     validate_declared_slots(operation, &plan)?;
     validate_plan_slots(machine, operation, &plan)?;
+    let preserve_failed_receiver = has_size_error_handler(operation)?;
+
+    // Both supported policies capture operands before any receiving-field
+    // store. The policy then makes conversion failure either historical
+    // whole-batch atomicity (@1) or receiver-local with successful stores (@2).
+    let evaluated = plan
+        .assignments
+        .iter()
+        .map(|assignment| evaluate(machine, operation, &plan, &assignment.expression))
+        .collect::<Result<Vec<_>, _>>()?;
     let mut staged = Vec::with_capacity(plan.assignments.len());
-    for assignment in &plan.assignments {
-        let value = evaluate(machine, operation, &assignment.expression)?;
-        staged.push(stage_receiver(
-            machine,
-            operation,
-            &assignment.receiver,
-            value,
-        )?);
+    let mut receiver_size_error = false;
+    for (assignment, value) in plan.assignments.iter().zip(evaluated) {
+        match stage_receiver(machine, operation, &assignment.receiver, value) {
+            Ok(write) => staged.push(write),
+            Err(MachineProblem::SizeError)
+                if plan.policy.receiver_update
+                    == DecimalReceiverUpdatePolicy::CapturedOperandsReceiverLocalV1 =>
+            {
+                receiver_size_error = true;
+                if !preserve_failed_receiver {
+                    staged.push(stage_receiver_truncated(
+                        machine,
+                        operation,
+                        &assignment.receiver,
+                        value,
+                    )?);
+                }
+            }
+            Err(problem) => return Err(problem),
+        }
     }
     for (view, bytes) in staged {
         machine.bases[view.base][view.offset..view.offset + view.length].copy_from_slice(&bytes);
     }
-    Ok(())
+    if receiver_size_error {
+        Ok(DecimalExecutionStatus::ReceiverSizeError)
+    } else {
+        Ok(DecimalExecutionStatus::Success)
+    }
 }
 
 fn plan(operation: &Operation) -> Result<DecimalAssignmentPlan, MachineProblem> {
@@ -145,17 +221,61 @@ fn plan(operation: &Operation) -> Result<DecimalAssignmentPlan, MachineProblem> 
         Some(Attribute::Bytes(bytes)) => bytes,
         _ => return Err(invalid_plan("missing bytes attribute assignment_plan")),
     };
+    let expected_version = match operation.identity.major() {
+        1 => DecimalPlanWireVersion::LegacyV1,
+        2 => DecimalPlanWireVersion::PolicyV2,
+        _ => return Err(invalid_plan("unsupported executable operation version")),
+    };
+    let actual_version = decimal_assignment_plan_wire_version(bytes)
+        .map_err(|problem| invalid_plan(&problem.to_string()))?;
+    if actual_version != expected_version {
+        return Err(invalid_plan(
+            "executable operation and decimal plan versions do not match",
+        ));
+    }
     let plan = decode_decimal_assignment_plan(bytes, DecimalPlanLimits::default())
         .map_err(|problem| invalid_plan(&problem.to_string()))?;
-    if !matches!(
-        plan.semantic_origin.as_str(),
-        "cobol.add@1" | "cobol.compute@1"
-    ) {
+    validate_execution_policy(&plan, expected_version)?;
+    if expected_version == DecimalPlanWireVersion::LegacyV1
+        && !matches!(
+            plan.semantic_origin.as_str(),
+            "cobol.add@1" | "cobol.compute@1"
+        )
+    {
         return Err(invalid_plan(
-            "semantic origin is not an approved COBOL operation",
+            "legacy semantic origin is not an approved COBOL operation",
         ));
     }
     Ok(plan)
+}
+
+fn validate_execution_policy(
+    plan: &DecimalAssignmentPlan,
+    version: DecimalPlanWireVersion,
+) -> Result<(), MachineProblem> {
+    let supported = match version {
+        DecimalPlanWireVersion::LegacyV1 => {
+            plan.policy.arithmetic_context == DecimalArithmeticContext::LegacyCobolModuleV1
+                && plan.policy.storage_abi == DecimalStorageAbi::CobolNumericV1
+                && plan.policy.receiver_update
+                    == DecimalReceiverUpdatePolicy::CapturedOperandsAtomicV1
+                && plan.policy.condition == DecimalConditionPolicy::CobolSizeErrorV1
+        }
+        DecimalPlanWireVersion::PolicyV2 => {
+            matches!(
+                plan.policy.arithmetic_context,
+                DecimalArithmeticContext::Decimal18V1 | DecimalArithmeticContext::Decimal34V1
+            ) && plan.policy.storage_abi == DecimalStorageAbi::CobolNumericV1
+                && plan.policy.receiver_update
+                    == DecimalReceiverUpdatePolicy::CapturedOperandsReceiverLocalV1
+                && plan.policy.condition == DecimalConditionPolicy::CobolSizeErrorV1
+        }
+    };
+    if supported {
+        Ok(())
+    } else {
+        Err(invalid_plan("unsupported decimal execution policy"))
+    }
 }
 
 fn condition_declaration(operation: &Operation) -> Result<u8, MachineProblem> {
@@ -467,6 +587,7 @@ fn validate_machine_slot(
 fn evaluate(
     machine: &ReferenceMachine,
     operation: &Operation,
+    plan: &DecimalAssignmentPlan,
     expression: &DecimalExpression,
 ) -> Result<Decimal, MachineProblem> {
     match expression {
@@ -496,7 +617,7 @@ fn evaluate(
             })
         }
         DecimalExpression::Negate(value) => {
-            let value = evaluate(machine, operation, value)?;
+            let value = evaluate(machine, operation, plan, value)?;
             decimal_checked(Decimal {
                 coefficient: value
                     .coefficient
@@ -506,30 +627,41 @@ fn evaluate(
             })
         }
         DecimalExpression::Add { left, right } => decimal_add(
-            machine.arithmetic_mode,
-            evaluate(machine, operation, left)?,
-            evaluate(machine, operation, right)?,
+            arithmetic_mode(machine, plan)?,
+            evaluate(machine, operation, plan, left)?,
+            evaluate(machine, operation, plan, right)?,
         ),
         DecimalExpression::Subtract { left, right } => decimal_subtract(
-            machine.arithmetic_mode,
-            evaluate(machine, operation, left)?,
-            evaluate(machine, operation, right)?,
+            arithmetic_mode(machine, plan)?,
+            evaluate(machine, operation, plan, left)?,
+            evaluate(machine, operation, plan, right)?,
         ),
         DecimalExpression::Multiply { left, right } => decimal_multiply(
-            machine.arithmetic_mode,
-            evaluate(machine, operation, left)?,
-            evaluate(machine, operation, right)?,
+            arithmetic_mode(machine, plan)?,
+            evaluate(machine, operation, plan, left)?,
+            evaluate(machine, operation, plan, right)?,
         ),
         DecimalExpression::Divide { left, right } => {
-            let left = evaluate(machine, operation, left)?;
-            let right = evaluate(machine, operation, right)?;
+            let left = evaluate(machine, operation, plan, left)?;
+            let right = evaluate(machine, operation, plan, right)?;
             let scale = left
                 .scale
                 .max(right.scale)
                 .checked_add(9)
                 .ok_or(MachineProblem::SizeError)?;
-            decimal_divide(machine.arithmetic_mode, left, right, scale)
+            decimal_divide(arithmetic_mode(machine, plan)?, left, right, scale)
         }
+    }
+}
+
+fn arithmetic_mode(
+    machine: &ReferenceMachine,
+    plan: &DecimalAssignmentPlan,
+) -> Result<CobolArithmeticMode, MachineProblem> {
+    match plan.policy.arithmetic_context {
+        DecimalArithmeticContext::LegacyCobolModuleV1 => Ok(machine.arithmetic_mode),
+        DecimalArithmeticContext::Decimal18V1 => Ok(CobolArithmeticMode::Compatible),
+        DecimalArithmeticContext::Decimal34V1 => Ok(CobolArithmeticMode::Extended),
     }
 }
 
@@ -583,6 +715,40 @@ fn stage_receiver(
         if stored.coefficient != original.coefficient {
             return Err(MachineProblem::SizeError);
         }
+    }
+    Ok((view, bytes))
+}
+
+fn stage_receiver_truncated(
+    machine: &ReferenceMachine,
+    operation: &Operation,
+    receiver: &DecimalReceiver,
+    value: Decimal,
+) -> Result<(StorageView, Vec<u8>), MachineProblem> {
+    let layout = runtime_layout(machine, operation, &receiver.target, true)?;
+    if matches!(
+        layout.category,
+        LayoutCategory::FloatShort | LayoutCategory::FloatLong
+    ) {
+        return Err(MachineProblem::SizeError);
+    }
+    let view = machine.storage_view(&layout.name)?.clone();
+    let value = round_to_scale(value, layout.scale, receiver.rounding)?;
+    let digits = u32::try_from(layout.digits).map_err(|_| MachineProblem::SizeError)?;
+    let modulus = ten_power(digits)?;
+    let truncated = Decimal {
+        coefficient: value.coefficient % modulus,
+        scale: value.scale,
+    };
+    let bytes = encode_decimal(&layout, truncated)?;
+    if bytes.len() != view.length
+        || machine
+            .bases
+            .get(view.base)
+            .and_then(|storage| storage.get(view.offset..view.offset.saturating_add(view.length)))
+            .is_none()
+    {
+        return Err(MachineProblem::DataException);
     }
     Ok((view, bytes))
 }
@@ -780,6 +946,38 @@ mod tests {
             scale: 0,
             length: 1,
             initial: b"0",
+        },
+        TestLayout {
+            name: "FIRST-X",
+            category: "numeric_display",
+            digits: 1,
+            scale: 0,
+            length: 1,
+            initial: b"1",
+        },
+        TestLayout {
+            name: "MIDDLE-X",
+            category: "numeric_display",
+            digits: 1,
+            scale: 0,
+            length: 1,
+            initial: b"2",
+        },
+        TestLayout {
+            name: "LAST-X",
+            category: "numeric_display",
+            digits: 1,
+            scale: 0,
+            length: 1,
+            initial: b"3",
+        },
+        TestLayout {
+            name: "WIDE-X",
+            category: "numeric_display",
+            digits: 19,
+            scale: 0,
+            length: 19,
+            initial: b"0000000000000000000",
         },
     ];
 
@@ -1009,13 +1207,24 @@ mod tests {
                 )
                 .unwrap();
         }
+        let halt_attributes = if branches.is_empty() {
+            BTreeMap::new()
+        } else {
+            BTreeMap::from([
+                (
+                    "control_node".into(),
+                    Attribute::Integer((branches.len() + 1) as i64),
+                ),
+                ("control_role".into(), Attribute::Text("terminator".into())),
+            ])
+        };
         builder
             .add_operation(
                 block,
                 OperationIdentity::new(super::super::NAMESPACE, "halt", 1).unwrap(),
                 Vec::new(),
                 0,
-                BTreeMap::new(),
+                halt_attributes,
                 Vec::new(),
                 Vec::new(),
                 None,
@@ -1028,6 +1237,24 @@ mod tests {
         make_plan: impl FnOnce(&BTreeMap<String, StorageId>) -> DecimalAssignmentPlan,
     ) -> ReferenceMachine {
         let bytes = binary(operation_identity(), make_plan, |plan| plan, false);
+        ReferenceMachine::from_binary(&bytes, invocation(), CodecLimits::default()).unwrap()
+    }
+
+    fn machine_with_size_error_handler(
+        make_plan: impl FnOnce(&BTreeMap<String, StorageId>) -> DecimalAssignmentPlan,
+    ) -> ReferenceMachine {
+        let bytes = binary_with_conditions(
+            operation_identity(),
+            make_plan,
+            |plan| plan,
+            false,
+            i64::from(SIZE_ERROR_BRANCH),
+            &[TestBranch {
+                polarity: Some(true),
+                status: Some(SIZE_ERROR_STATUS),
+                control_text: Some("ON SIZE ERROR"),
+            }],
+        );
         ReferenceMachine::from_binary(&bytes, invocation(), CodecLimits::default()).unwrap()
     }
 
@@ -1044,8 +1271,15 @@ mod tests {
     fn plan(assignments: Vec<DecimalAssignment>) -> DecimalAssignmentPlan {
         DecimalAssignmentPlan {
             semantic_origin: "cobol.compute@1".into(),
+            policy: mainframe_env_ir::DecimalExecutionPolicy::decimal34_v1(),
             assignments,
         }
+    }
+
+    fn as_legacy_plan_bytes(mut bytes: Vec<u8>) -> Vec<u8> {
+        bytes[4..6].copy_from_slice(&1u16.to_be_bytes());
+        bytes.drain(6..11);
+        bytes
     }
 
     fn division_by_zero_plan(slots: &BTreeMap<String, StorageId>) -> DecimalAssignmentPlan {
@@ -1100,6 +1334,13 @@ mod tests {
         });
         assert!(matches!(drive(&mut machine), MachineDrive::Completed(_)));
         assert_eq!(machine.variable("RESULT-X").unwrap().bytes(), b"014");
+    }
+
+    #[test]
+    fn current_empty_assignment_plan_is_an_explicit_noop() {
+        let mut machine = machine(|_| plan(Vec::new()));
+        assert!(matches!(drive(&mut machine), MachineDrive::Completed(_)));
+        assert_eq!(machine.variable("RESULT-X").unwrap().bytes(), b"000");
     }
 
     #[test]
@@ -1250,8 +1491,8 @@ mod tests {
     }
 
     #[test]
-    fn a_late_receiver_error_commits_none_of_the_staged_batch() {
-        let mut machine = machine(|slots| {
+    fn receiver_local_size_error_preserves_only_the_failing_receiver() {
+        let mut machine = machine_with_size_error_handler(|slots| {
             let first = assignment(
                 DecimalExpression::Literal {
                     coefficient: 9,
@@ -1269,9 +1510,163 @@ mod tests {
             second.receiver.rounding = DecimalRoundingPolicy::Prohibited;
             plan(vec![first, second])
         });
-        assert!(matches!(drive(&mut machine), MachineDrive::Condition(_)));
-        assert_eq!(machine.variable("GOOD-X").unwrap().bytes(), b"1");
+        assert!(matches!(drive(&mut machine), MachineDrive::Completed(_)));
+        assert!(machine.condition_status.arithmetic_size_error);
+        assert_eq!(machine.variable("GOOD-X").unwrap().bytes(), b"9");
         assert_eq!(machine.variable("SMALL-X").unwrap().bytes(), b"0");
+    }
+
+    #[test]
+    fn first_middle_and_last_receiver_failures_do_not_suppress_other_results() {
+        for (failed, expected) in [(0, *b"156"), (1, *b"426"), (2, *b"453")] {
+            let mut machine = machine_with_size_error_handler(|slots| {
+                plan(
+                    ["FIRST-X", "MIDDLE-X", "LAST-X"]
+                        .into_iter()
+                        .enumerate()
+                        .map(|(index, name)| {
+                            assignment(
+                                DecimalExpression::Literal {
+                                    coefficient: if index == failed {
+                                        10
+                                    } else {
+                                        i128::try_from(index).unwrap() + 4
+                                    },
+                                    scale: 0,
+                                },
+                                slot(slots, name),
+                            )
+                        })
+                        .collect(),
+                )
+            });
+            assert!(matches!(drive(&mut machine), MachineDrive::Completed(_)));
+            assert!(machine.condition_status.arithmetic_size_error);
+            for (name, value) in ["FIRST-X", "MIDDLE-X", "LAST-X"].into_iter().zip(expected) {
+                assert_eq!(machine.variable(name).unwrap().bytes(), &[value]);
+            }
+        }
+    }
+
+    #[test]
+    fn all_success_and_all_failure_receiver_batches_have_exact_results() {
+        let make_plan = |failed: bool| {
+            move |slots: &BTreeMap<String, StorageId>| {
+                plan(
+                    ["FIRST-X", "MIDDLE-X", "LAST-X"]
+                        .into_iter()
+                        .enumerate()
+                        .map(|(index, name)| {
+                            assignment(
+                                DecimalExpression::Literal {
+                                    coefficient: if failed {
+                                        10
+                                    } else {
+                                        i128::try_from(index).unwrap() + 4
+                                    },
+                                    scale: 0,
+                                },
+                                slot(slots, name),
+                            )
+                        })
+                        .collect(),
+                )
+            }
+        };
+
+        let mut success = machine(make_plan(false));
+        assert!(matches!(drive(&mut success), MachineDrive::Completed(_)));
+        assert_eq!(success.variable("FIRST-X").unwrap().bytes(), b"4");
+        assert_eq!(success.variable("MIDDLE-X").unwrap().bytes(), b"5");
+        assert_eq!(success.variable("LAST-X").unwrap().bytes(), b"6");
+
+        let mut failure = machine_with_size_error_handler(make_plan(true));
+        assert!(matches!(drive(&mut failure), MachineDrive::Completed(_)));
+        assert!(failure.condition_status.arithmetic_size_error);
+        assert_eq!(failure.variable("FIRST-X").unwrap().bytes(), b"1");
+        assert_eq!(failure.variable("MIDDLE-X").unwrap().bytes(), b"2");
+        assert_eq!(failure.variable("LAST-X").unwrap().bytes(), b"3");
+    }
+
+    #[test]
+    fn receiver_overflow_without_size_error_handler_truncates_and_continues() {
+        let mut machine = machine(|slots| {
+            plan(vec![
+                assignment(
+                    DecimalExpression::Literal {
+                        coefficient: 6,
+                        scale: 0,
+                    },
+                    slot(slots, "GOOD-X"),
+                ),
+                assignment(
+                    DecimalExpression::Literal {
+                        coefficient: 42,
+                        scale: 0,
+                    },
+                    slot(slots, "SMALL-X"),
+                ),
+            ])
+        });
+        assert!(matches!(drive(&mut machine), MachineDrive::Completed(_)));
+        assert_eq!(machine.variable("GOOD-X").unwrap().bytes(), b"6");
+        assert_eq!(machine.variable("SMALL-X").unwrap().bytes(), b"2");
+    }
+
+    #[test]
+    fn operands_are_captured_before_any_receiver_is_written() {
+        let mut machine = machine(|slots| {
+            plan(vec![
+                assignment(
+                    DecimalExpression::Storage(slot(slots, "B")),
+                    slot(slots, "A"),
+                ),
+                assignment(
+                    DecimalExpression::Storage(slot(slots, "A")),
+                    slot(slots, "B"),
+                ),
+            ])
+        });
+        assert!(matches!(drive(&mut machine), MachineDrive::Completed(_)));
+        assert_eq!(machine.variable("A").unwrap().bytes(), b"003");
+        assert_eq!(machine.variable("B").unwrap().bytes(), b"002");
+    }
+
+    #[test]
+    fn shared_expression_failure_does_not_commit_any_receiver() {
+        let mut machine = machine(|slots| {
+            let failed_expression = || DecimalExpression::Divide {
+                left: Box::new(DecimalExpression::Literal {
+                    coefficient: 1,
+                    scale: 0,
+                }),
+                right: Box::new(DecimalExpression::Literal {
+                    coefficient: 0,
+                    scale: 0,
+                }),
+            };
+            plan(vec![
+                assignment(
+                    DecimalExpression::Literal {
+                        coefficient: 4,
+                        scale: 0,
+                    },
+                    slot(slots, "FIRST-X"),
+                ),
+                assignment(failed_expression(), slot(slots, "MIDDLE-X")),
+                assignment(
+                    DecimalExpression::Literal {
+                        coefficient: 6,
+                        scale: 0,
+                    },
+                    slot(slots, "LAST-X"),
+                ),
+            ])
+        });
+        assert!(matches!(drive(&mut machine), MachineDrive::Condition(_)));
+        assert_eq!(machine.variable("FIRST-X").unwrap().bytes(), b"1");
+        assert_eq!(machine.variable("MIDDLE-X").unwrap().bytes(), b"2");
+        assert_eq!(machine.variable("LAST-X").unwrap().bytes(), b"3");
     }
 
     #[test]
@@ -1300,7 +1695,7 @@ mod tests {
         ));
 
         let wrong = binary(
-            OperationIdentity::new(NAMESPACE, NAME, 2).unwrap(),
+            OperationIdentity::new(NAMESPACE, NAME, 3).unwrap(),
             valid,
             |bytes| bytes,
             false,
@@ -1454,7 +1849,7 @@ mod tests {
     }
 
     #[test]
-    fn unapproved_semantic_origin_is_rejected_during_construction() {
+    fn current_origin_is_provenance_and_does_not_select_execution() {
         let bytes = binary(
             operation_identity(),
             |slots| {
@@ -1465,15 +1860,162 @@ mod tests {
                     },
                     slot(slots, "RESULT-X"),
                 )]);
-                value.semantic_origin = "cobol.multiply@1".into();
+                value.semantic_origin = "ledger.formula@1".into();
                 value
             },
             |bytes| bytes,
             false,
         );
+        let mut machine =
+            ReferenceMachine::from_binary(&bytes, invocation(), CodecLimits::default()).unwrap();
+        assert!(matches!(drive(&mut machine), MachineDrive::Completed(_)));
+        assert_eq!(machine.variable("RESULT-X").unwrap().bytes(), b"001");
+    }
+
+    #[test]
+    fn operation_plan_version_and_unknown_policy_fail_closed() {
+        let current_plan_under_legacy_identity = binary(
+            legacy_operation_identity(),
+            |slots| {
+                plan(vec![assignment(
+                    DecimalExpression::Literal {
+                        coefficient: 1,
+                        scale: 0,
+                    },
+                    slot(slots, "RESULT-X"),
+                )])
+            },
+            |bytes| bytes,
+            false,
+        );
         assert!(matches!(
-            ReferenceMachine::from_binary(&bytes, invocation(), CodecLimits::default()),
+            ReferenceMachine::from_binary(
+                &current_plan_under_legacy_identity,
+                invocation(),
+                CodecLimits::default()
+            ),
             Err(MachineProblem::InvalidArtifact(_))
         ));
+
+        let foreign_legacy_origin = binary(
+            legacy_operation_identity(),
+            |slots| {
+                let mut value = plan(vec![assignment(
+                    DecimalExpression::Literal {
+                        coefficient: 1,
+                        scale: 0,
+                    },
+                    slot(slots, "RESULT-X"),
+                )]);
+                value.semantic_origin = "ledger.formula@1".into();
+                value
+            },
+            as_legacy_plan_bytes,
+            false,
+        );
+        assert!(matches!(
+            ReferenceMachine::from_binary(
+                &foreign_legacy_origin,
+                invocation(),
+                CodecLimits::default()
+            ),
+            Err(MachineProblem::InvalidArtifact(_))
+        ));
+
+        let unknown_policy = binary(
+            operation_identity(),
+            |slots| {
+                plan(vec![assignment(
+                    DecimalExpression::Literal {
+                        coefficient: 1,
+                        scale: 0,
+                    },
+                    slot(slots, "RESULT-X"),
+                )])
+            },
+            |mut bytes| {
+                bytes[7] = u8::MAX;
+                bytes
+            },
+            false,
+        );
+        assert!(matches!(
+            ReferenceMachine::from_binary(&unknown_policy, invocation(), CodecLimits::default()),
+            Err(MachineProblem::InvalidArtifact(_))
+        ));
+    }
+
+    #[test]
+    fn explicit_arithmetic_context_changes_the_exact_result() {
+        let run = |policy: mainframe_env_ir::DecimalExecutionPolicy| {
+            let bytes = binary(
+                operation_identity(),
+                |slots| {
+                    let mut value = plan(vec![assignment(
+                        DecimalExpression::Add {
+                            left: Box::new(DecimalExpression::Literal {
+                                coefficient: 999_999_999_999_999_999,
+                                scale: 0,
+                            }),
+                            right: Box::new(DecimalExpression::Literal {
+                                coefficient: 2,
+                                scale: 0,
+                            }),
+                        },
+                        slot(slots, "WIDE-X"),
+                    )]);
+                    value.policy = policy;
+                    value.semantic_origin = "ledger.formula@1".into();
+                    value
+                },
+                |bytes| bytes,
+                false,
+            );
+            let mut machine =
+                ReferenceMachine::from_binary(&bytes, invocation(), CodecLimits::default())
+                    .unwrap();
+            assert!(matches!(drive(&mut machine), MachineDrive::Completed(_)));
+            machine.variable("WIDE-X").unwrap().bytes().to_vec()
+        };
+        assert_eq!(
+            run(mainframe_env_ir::DecimalExecutionPolicy::decimal18_v1()),
+            b"1000000000000000000"
+        );
+        assert_eq!(
+            run(mainframe_env_ir::DecimalExecutionPolicy::decimal34_v1()),
+            b"1000000000000000001"
+        );
+    }
+
+    #[test]
+    fn historical_assign_v1_preserves_whole_batch_receiver_atomicity() {
+        let bytes = binary(
+            legacy_operation_identity(),
+            |slots| {
+                plan(vec![
+                    assignment(
+                        DecimalExpression::Literal {
+                            coefficient: 9,
+                            scale: 0,
+                        },
+                        slot(slots, "GOOD-X"),
+                    ),
+                    assignment(
+                        DecimalExpression::Literal {
+                            coefficient: 10,
+                            scale: 0,
+                        },
+                        slot(slots, "SMALL-X"),
+                    ),
+                ])
+            },
+            as_legacy_plan_bytes,
+            false,
+        );
+        let mut machine =
+            ReferenceMachine::from_binary(&bytes, invocation(), CodecLimits::default()).unwrap();
+        assert!(matches!(drive(&mut machine), MachineDrive::Condition(_)));
+        assert_eq!(machine.variable("GOOD-X").unwrap().bytes(), b"1");
+        assert_eq!(machine.variable("SMALL-X").unwrap().bytes(), b"0");
     }
 }

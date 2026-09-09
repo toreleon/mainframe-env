@@ -1,11 +1,12 @@
 use mainframe_env_execution_api::{ArtifactRef, InvocationLimits};
 use mainframe_env_store::{PostgresArtifactStore, PostgresStateStore};
 use mainframe_env_store_api::{
-    ArtifactRecord, ArtifactStore, ProviderStateMutation, ProviderStateRecord, ProviderStateStore,
-    ProviderStateWrite, StoreError,
+    ArtifactRecord, ArtifactStore, ExecutableArtifactMetadata, ProviderStateMutation,
+    ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
 };
 use sha2::{Digest, Sha256};
 use sqlx::postgres::PgPoolOptions;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Barrier};
 
 fn hex(bytes: &[u8]) -> String {
@@ -24,6 +25,7 @@ fn artifact(payload: &[u8], media_type: &str) -> ArtifactRecord {
         media_type: media_type.into(),
         payload_digest,
         payload,
+        executable: None,
     }
 }
 
@@ -183,7 +185,22 @@ fn postgres_quota_and_shared_artifact_contract() {
     assert_eq!(right.get_artifact(&shared_id).unwrap(), Some(winner));
     assert_eq!(left.health().unwrap().object_headroom(), Some(1));
 
-    let crash_record = artifact(b"crash rollback", "application/octet-stream");
+    let mut crash_record = artifact(b"crash rollback", "application/vnd.mainframe-env.core-mir");
+    crash_record.executable = Some(
+        ExecutableArtifactMetadata {
+            artifact_contract: "mainframe-env.artifact@3".into(),
+            compatibility_profile: "mainframe-env.cobol.reference@1".into(),
+            compiler_generation: "mainframe-env-cobol-0.8.3".into(),
+            target: "reference".into(),
+            options: BTreeMap::new(),
+            host_interfaces: BTreeSet::from(["mainframe-env.host@1".into()]),
+            ir_contract: "mainframe-env.ir-envelope@1".into(),
+            dialect_contracts: Some(BTreeSet::from(["mainframe.core.cobol@1".into()])),
+            semantic_identity: format!("semantic-sha256:{:064x}", 1),
+            manifest_payload_digest: [0; 32],
+        }
+        .bind_to_payload(&crash_record.payload_digest),
+    );
     runtime.block_on(async {
         let mut transaction = pool.begin().await.unwrap();
         sqlx::query("UPDATE store_quota SET used_rows=used_rows+1 WHERE quota_key='artifact-object'")

@@ -4,11 +4,12 @@ use mainframe_env_host_api::{
     HostResult, SpoolFileSummary, SpoolRequest, SpoolResult,
 };
 use mainframe_env_store_api::{
-    ArtifactRecord, ArtifactStore, ProviderStateRecord, ProviderStateStore, StoreError,
+    ArtifactRecord, ArtifactStore, ExecutableArtifactMetadata, ProviderStateRecord,
+    ProviderStateStore, StoreError,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use crate::retention::{JobState, Replay, SPOOL_STATE_CONTRACT, STATE_NAMESPACE, decode_job_state};
@@ -281,6 +282,7 @@ impl SpoolService {
                 media_type: "application/vnd.mainframe-env.spool-chunk+json".into(),
                 payload_digest: digest,
                 payload,
+                executable: None,
             })
             .map_err(store_problem)?;
         file_state.artifacts.push(artifact.as_str().into());
@@ -571,6 +573,13 @@ impl ArtifactStore for ProviderArtifactStore {
         if record.payload.len() > self.max_bytes {
             return Err(StoreError::PayloadTooLarge);
         }
+        if record
+            .executable
+            .as_ref()
+            .is_some_and(|metadata| !metadata.validates_payload(&record.payload_digest))
+        {
+            return Err(StoreError::IncompatibleVersion);
+        }
         if let Some(existing) = self.get_artifact(&record.artifact)? {
             return if existing == record {
                 Ok(())
@@ -612,18 +621,78 @@ impl ArtifactStore for ProviderArtifactStore {
 }
 
 #[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct ArtifactEnvelope {
+    #[serde(default = "legacy_artifact_envelope_schema")]
+    schema_version: u32,
     media_type: String,
     payload_digest: [u8; 32],
     payload: Vec<u8>,
+    #[serde(default)]
+    executable: Option<ExecutableArtifactEnvelope>,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ExecutableArtifactEnvelope {
+    artifact_contract: String,
+    compatibility_profile: String,
+    compiler_generation: String,
+    target: String,
+    options: BTreeMap<String, String>,
+    host_interfaces: BTreeSet<String>,
+    ir_contract: String,
+    dialect_contracts: Option<BTreeSet<String>>,
+    semantic_identity: String,
+    manifest_payload_digest: [u8; 32],
+}
+
+const fn legacy_artifact_envelope_schema() -> u32 {
+    1
+}
+
+impl From<ExecutableArtifactMetadata> for ExecutableArtifactEnvelope {
+    fn from(metadata: ExecutableArtifactMetadata) -> Self {
+        Self {
+            artifact_contract: metadata.artifact_contract,
+            compatibility_profile: metadata.compatibility_profile,
+            compiler_generation: metadata.compiler_generation,
+            target: metadata.target,
+            options: metadata.options,
+            host_interfaces: metadata.host_interfaces,
+            ir_contract: metadata.ir_contract,
+            dialect_contracts: metadata.dialect_contracts,
+            semantic_identity: metadata.semantic_identity,
+            manifest_payload_digest: metadata.manifest_payload_digest,
+        }
+    }
+}
+
+impl From<ExecutableArtifactEnvelope> for ExecutableArtifactMetadata {
+    fn from(metadata: ExecutableArtifactEnvelope) -> Self {
+        Self {
+            artifact_contract: metadata.artifact_contract,
+            compatibility_profile: metadata.compatibility_profile,
+            compiler_generation: metadata.compiler_generation,
+            target: metadata.target,
+            options: metadata.options,
+            host_interfaces: metadata.host_interfaces,
+            ir_contract: metadata.ir_contract,
+            dialect_contracts: metadata.dialect_contracts,
+            semantic_identity: metadata.semantic_identity,
+            manifest_payload_digest: metadata.manifest_payload_digest,
+        }
+    }
 }
 
 impl From<ArtifactRecord> for ArtifactEnvelope {
     fn from(record: ArtifactRecord) -> Self {
         Self {
+            schema_version: 2,
             media_type: record.media_type,
             payload_digest: record.payload_digest,
             payload: record.payload,
+            executable: record.executable.map(Into::into),
         }
     }
 }
@@ -631,15 +700,28 @@ impl From<ArtifactRecord> for ArtifactEnvelope {
 impl ArtifactEnvelope {
     fn into_record(self, id: &ArtifactRef) -> Result<ArtifactRecord, StoreError> {
         let digest: [u8; 32] = Sha256::digest(&self.payload).into();
-        if digest != self.payload_digest || id.as_str() != format!("sha256:{}", hex(&digest)) {
+        if !matches!(self.schema_version, 1 | 2)
+            || (self.schema_version == 1 && self.executable.is_some())
+            || digest != self.payload_digest
+            || id.as_str() != format!("sha256:{}", hex(&digest))
+        {
             return Err(StoreError::IncompatibleVersion);
         }
-        Ok(ArtifactRecord {
+        let record = ArtifactRecord {
             artifact: id.clone(),
             media_type: self.media_type,
             payload_digest: self.payload_digest,
             payload: self.payload,
-        })
+            executable: self.executable.map(Into::into),
+        };
+        if record
+            .executable
+            .as_ref()
+            .is_some_and(|metadata| !metadata.validates_payload(&record.payload_digest))
+        {
+            return Err(StoreError::IncompatibleVersion);
+        }
+        Ok(record)
     }
 }
 
@@ -1034,6 +1116,74 @@ mod tests {
             SpoolService::open(provider_store, artifacts.clone(), Default::default()).unwrap(),
             artifacts,
         )
+    }
+
+    #[test]
+    fn provider_artifact_store_retains_executable_metadata_and_reads_legacy_envelopes() {
+        let state = Arc::new(MemoryStore::new(Default::default()));
+        let (_, artifacts) = service(state.clone());
+        let payload = b"versioned executable".to_vec();
+        let digest: [u8; 32] = Sha256::digest(&payload).into();
+        let artifact = ArtifactRef::new(
+            format!("sha256:{}", hex(&digest)),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let record = ArtifactRecord {
+            artifact: artifact.clone(),
+            media_type: "application/vnd.mainframe-env.core-mir".into(),
+            payload_digest: digest,
+            payload,
+            executable: Some(
+                ExecutableArtifactMetadata {
+                    artifact_contract: "mainframe-env.artifact@3".into(),
+                    compatibility_profile: "mainframe-env.cobol.reference@1".into(),
+                    compiler_generation: "mainframe-env-cobol-0.8.3".into(),
+                    target: "reference".into(),
+                    options: BTreeMap::new(),
+                    host_interfaces: BTreeSet::from(["mainframe-env.host@1".into()]),
+                    ir_contract: "mainframe-env.ir-envelope@1".into(),
+                    dialect_contracts: Some(BTreeSet::from(["mainframe.core.cobol@1".into()])),
+                    semantic_identity: format!("semantic-sha256:{:064x}", 1),
+                    manifest_payload_digest: [0; 32],
+                }
+                .bind_to_payload(&digest),
+            ),
+        };
+        artifacts.put_artifact(record.clone()).unwrap();
+        assert_eq!(artifacts.get_artifact(&artifact).unwrap(), Some(record));
+
+        let legacy_payload = b"legacy opaque".to_vec();
+        let legacy_digest: [u8; 32] = Sha256::digest(&legacy_payload).into();
+        let legacy_id = ArtifactRef::new(
+            format!("sha256:{}", hex(&legacy_digest)),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        state
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: ARTIFACT_NAMESPACE.into(),
+                    key: legacy_id.as_str().into(),
+                    version: 1,
+                    payload: serde_json::to_vec(&serde_json::json!({
+                        "media_type": "application/octet-stream",
+                        "payload_digest": legacy_digest,
+                        "payload": legacy_payload,
+                    }))
+                    .unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            artifacts
+                .get_artifact(&legacy_id)
+                .unwrap()
+                .unwrap()
+                .executable,
+            None
+        );
     }
 
     #[test]

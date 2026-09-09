@@ -71,6 +71,24 @@ grammars and protocols, not imposed as a universal frontend framework.
 | `LegalizedMir` | Every executable operation has a registered schema and backend route |
 | `PublishedArtifact` | Immutable bytes and compatibility metadata committed atomically |
 
+Typed dialect schemas attach their static validator through
+`OperationSchema::semantic_contract`. The common verifier invokes that one
+dialect-owned contract when constructing `VerifiedHir`, again when consuming a
+`LoweredMir` into `LegalizedMir`, and while admitting serialized artifact bytes.
+The compiler, artifact reader, and interpreter therefore do not carry separate
+copies of decimal-plan or CICS-plan validation rules.
+
+The HIR boundary intentionally uses storage-arena binding because executable
+COBOL layout-definition operations do not exist there yet. At MIR and artifact
+boundaries, each referenced slot must also have one exact
+`mainframe.core.cobol@1.define` binding with the same storage identity, qualified
+name, full extent, known category, and the required numeric/writable use. The
+same validation covers plan wire version versus operation major, operation
+identity, exact storage declarations, effects and runtime imports, and the
+registered arithmetic-condition topology. Current values, runtime subscripts,
+authorization, provider/resource generations, transaction state, and
+checkpoint context remain runtime checks.
+
 Parsed and semantic construction is private to the compiler implementation.
 The executable proof chain consumes verified HIR into lowered MIR and then
 legalized MIR; publication encodes that legal module internally. Semantic
@@ -147,6 +165,36 @@ cobol.*                   specialized COBOL execution
 cics.* / db2.* / ims.*   specialized host semantics
 mq.* / dataset.*          specialized host semantics
 ```
+
+The current shared decimal assignment boundary is
+`mainframe.decimal@2.assign` with a
+`mainframe-env.decimal-assignment-plan@2` payload. The plan, rather than its
+producer name, selects an 18- or 34-digit/truncating arithmetic context, the explicitly
+COBOL-owned numeric-storage ABI, captured-operand/receiver-local update rules,
+the COBOL size-error condition contract, and per-receiver rounding. A receiver
+that overflows is preserved when `ON SIZE ERROR` is declared and receives its
+truncated result otherwise; successful sibling receivers commit before the
+condition branch is selected. A bounded
+`ledger.formula@1` adapter exercises this contract through ordinary IR
+verification and reference-machine execution without importing COBOL HIR.
+This proves reuse of the IR framework and declared arithmetic behavior, not a
+universal HIR or a complete second language. The historical operation/plan @1
+pair remains an exact, allowlisted COBOL compatibility route; version or policy
+mismatches fail closed.
+
+For `ADD CORRESPONDING`, COBOL HIR resolves pairs from the leaf name plus the
+relative qualifier path below each selected group, requires uniqueness on both
+sides, and excludes subordinate `FILLER`, `REDEFINES`, `RENAMES`, `OCCURS`,
+index, and pointer-family items. The selected groups themselves are treated
+separately: a valid table-group subscript remains on an explicit compatibility
+route that preserves the selected occurrence, while a missing required
+subscript or reference modification is rejected before publication. UTF-8
+groups are currently outside the representable `ADD CORRESPONDING` typed slice;
+that implementation limitation is an explicit compile-time rejection, not a
+claim that the COBOL construct itself is invalid. Numeric `USAGE NATIONAL`
+pairs are also rejected explicitly until a versioned storage ABI supports their
+national-byte encoding; they must never be misclassified as an empty
+corresponding set.
 
 A language may retain a valid independent HIR while still sharing lifecycle,
 diagnostics, effects, host capabilities, artifact publication, and execution

@@ -3,7 +3,9 @@ use crate::{
     RegistrySnapshot, canonical_audit_resource_digest, canonical_request_size,
     canonical_result_size,
 };
+use mainframe_env_execution_api::CapabilityId;
 use mainframe_env_execution_api::{AuditDecision, AuditRecord, Invocation};
+use std::collections::BTreeMap;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Arc;
 
@@ -52,6 +54,21 @@ impl ScopedHostService {
     #[must_use]
     pub fn new(registry: Arc<RegistrySnapshot>, limits: HostLimits) -> Self {
         Self { registry, limits }
+    }
+
+    /// Preflight exact provider-generation requirements before restoring any
+    /// state or dispatching the first effect.
+    pub fn validate_provider_generations(
+        &self,
+        generations: &BTreeMap<CapabilityId, String>,
+    ) -> Result<(), HostProblem> {
+        for (capability, generation) in generations {
+            let provider = self.registry.select(capability)?;
+            if provider.descriptor().generation != *generation {
+                return Err(HostProblem::ProviderFailure);
+            }
+        }
+        Ok(())
     }
 
     pub fn invoke(
@@ -334,6 +351,18 @@ mod tests {
     fn provider_generation_and_durable_cancellation_are_rechecked() {
         let limits = InvocationLimits::default();
         let capability = CapabilityId::new("host.state.read", limits).unwrap();
+        assert_eq!(
+            service()
+                .validate_provider_generations(&BTreeMap::from([(capability.clone(), "1".into())])),
+            Ok(())
+        );
+        assert_eq!(
+            service().validate_provider_generations(&BTreeMap::from([(
+                capability.clone(),
+                "stale".into()
+            )])),
+            Err(HostProblem::ProviderFailure)
+        );
         let generation_mismatch = invocation(true)
             .with_provider_generations(BTreeMap::from([(capability, "stale".into())]), limits)
             .unwrap();

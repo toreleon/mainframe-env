@@ -35,6 +35,13 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
+pub(crate) mod artifact;
+mod runtime;
+use artifact::{AdmittedProgram, admit_published_artifact};
+pub(crate) use runtime::bind_compatible_runtime_services;
+pub use runtime::compatible_system_services;
+use runtime::with_compatible_runtime_services;
+
 /// An embedding can supply a logical clock and a run-scoped cancellation source.
 /// All nested invocations use the same source and inherited deadline/scope.
 /// Default production ticks are Unix milliseconds advanced by a monotonic clock.
@@ -172,47 +179,6 @@ pub fn default_program_router() -> Arc<DefaultProgramRouter> {
     Arc::new(DefaultProgramRouter { router, cobol })
 }
 
-#[must_use]
-pub const fn compatible_system_services() -> &'static [&'static str] {
-    &["CEEDAYS", "COBDATFT", "MVSWAIT", "CEE3ABD"]
-}
-
-pub(crate) fn bind_compatible_runtime_services(
-    invocation: &mut Invocation,
-) -> Result<(), HostProblem> {
-    let limits = InvocationLimits::default();
-    for name in compatible_system_services() {
-        let key = format!("cobol.runtime-service.{name}");
-        let value = format!("le:{name}:1");
-        if let Some(existing) = invocation.bindings.get(&key) {
-            if existing.schema() != "mainframe-env.runtime-service-selector@1"
-                || existing.bytes() != value.as_bytes()
-            {
-                return Err(HostProblem::Malformed);
-            }
-            continue;
-        }
-        if invocation.bindings.len() >= limits.max_bindings {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        invocation.bindings.insert(
-            key,
-            BoundedPayload::new(
-                "mainframe-env.runtime-service-selector@1",
-                value.into_bytes(),
-                limits,
-            )
-            .map_err(|_| HostProblem::ResourceExhausted)?,
-        );
-    }
-    Ok(())
-}
-
-fn with_compatible_runtime_services(mut invocation: Invocation) -> Result<Invocation, HostProblem> {
-    bind_compatible_runtime_services(&mut invocation)?;
-    Ok(invocation)
-}
-
 fn persist_batch_file_cursors(
     store: &dyn PlatformStore,
     key: &str,
@@ -308,47 +274,21 @@ impl CobolProgram {
         Ok(observation)
     }
 
-    fn execute_installed(
+    fn execute_admitted(
         &self,
         parent: &Invocation,
         program: &str,
+        admitted: AdmittedProgram,
         payload: &BoundedPayload,
         identity: &str,
         writes: &mut Vec<ProviderStateWrite>,
     ) -> Result<BoundedPayload, HostProblem> {
         let store = self.store.get().ok_or(HostProblem::InfrastructureFailure)?;
-        let artifacts = self
-            .artifacts
-            .get()
-            .ok_or(HostProblem::InfrastructureFailure)?;
-        let name = program.to_ascii_uppercase();
-        let catalog = match store
-            .get_provider_state("batch-program", &name)
-            .map_err(|_| HostProblem::InfrastructureFailure)?
-        {
-            Some(catalog) => catalog,
-            None => store
-                .get_provider_state("online-program", &name)
-                .map_err(|_| HostProblem::InfrastructureFailure)?
-                .ok_or_else(|| HostProblem::Condition {
-                    name: format!("PROGRAM-NOTFOUND:{name}"),
-                    response: -7,
-                    response2: 0,
-                })?,
-        };
-        let artifact = ArtifactRef::new(
-            String::from_utf8(catalog.payload).map_err(|_| HostProblem::InfrastructureFailure)?,
-            InvocationLimits::default(),
-        )
-        .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let record = artifacts
-            .get_artifact(&artifact)
-            .map_err(|_| HostProblem::InfrastructureFailure)?
-            .ok_or_else(|| HostProblem::Condition {
-                name: format!("ARTIFACT-NOTFOUND:{name}"),
-                response: -8,
-                response2: 0,
-            })?;
+        let AdmittedProgram {
+            artifact,
+            executable,
+            name,
+        } = admitted;
         let call_values = decode_cobol_call_values(payload)?;
         let limits = InvocationLimits::default();
         let sequence = identity;
@@ -390,7 +330,7 @@ impl CobolProgram {
         let mut invocation = with_compatible_runtime_services(invocation)?;
         invocation.cancellation = parent.cancellation.clone();
         let mut machine = ReferenceMachine::from_binary(
-            &record.payload,
+            executable.payload(),
             invocation.clone(),
             CodecLimits::default(),
         )
@@ -487,6 +427,19 @@ impl CobolProgram {
         }
     }
 
+    #[cfg(test)]
+    fn execute_installed(
+        &self,
+        parent: &Invocation,
+        program: &str,
+        payload: &BoundedPayload,
+        identity: &str,
+        writes: &mut Vec<ProviderStateWrite>,
+    ) -> Result<BoundedPayload, HostProblem> {
+        let admitted = self.preflight_installed_program(program, false)?;
+        self.execute_admitted(parent, program, admitted, payload, identity, writes)
+    }
+
     fn execute_runtime_service(
         &self,
         selector: &RuntimeServiceSelector,
@@ -507,29 +460,17 @@ impl CobolProgram {
         &self,
         parent: &Invocation,
         program: &str,
+        admitted: AdmittedProgram,
         payload: &BoundedPayload,
         identity: &str,
     ) -> Result<ProgramOutput, HostProblem> {
         let input: ProgramInput =
             serde_json::from_slice(payload.bytes()).map_err(|_| HostProblem::Malformed)?;
-        let store = self.store.get().ok_or(HostProblem::InfrastructureFailure)?;
-        let artifacts = self
-            .artifacts
-            .get()
-            .ok_or(HostProblem::InfrastructureFailure)?;
-        let catalog = store
-            .get_provider_state("batch-program", &program.to_ascii_uppercase())
-            .map_err(|_| HostProblem::InfrastructureFailure)?
-            .ok_or(HostProblem::NotFound)?;
-        let artifact = ArtifactRef::new(
-            String::from_utf8(catalog.payload).map_err(|_| HostProblem::InfrastructureFailure)?,
-            InvocationLimits::default(),
-        )
-        .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let record = artifacts
-            .get_artifact(&artifact)
-            .map_err(|_| HostProblem::InfrastructureFailure)?
-            .ok_or(HostProblem::NotFound)?;
+        let AdmittedProgram {
+            artifact,
+            executable,
+            ..
+        } = admitted;
         let limits = InvocationLimits::default();
         let sequence = identity;
         let mut bindings = parent.bindings.clone();
@@ -604,7 +545,7 @@ impl CobolProgram {
         let mut invocation = with_compatible_runtime_services(invocation)?;
         invocation.cancellation = parent.cancellation.clone();
         let mut machine = ReferenceMachine::from_binary(
-            &record.payload,
+            executable.payload(),
             invocation.clone(),
             CodecLimits::default(),
         )
@@ -698,6 +639,7 @@ impl Program for CobolProgram {
         let CompilerResult::Published { artifact, .. } = compiled else {
             return Err(HostProblem::Malformed);
         };
+        let executable = admit_published_artifact(&artifact)?;
         let limits = InvocationLimits::default();
         let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
         let invocation = Invocation::new(
@@ -766,7 +708,7 @@ impl Program for CobolProgram {
         let mut invocation = with_compatible_runtime_services(invocation)?;
         invocation.cancellation = parent.cancellation.clone();
         let mut machine = ReferenceMachine::from_binary(
-            artifact.payload(),
+            executable.payload(),
             invocation.clone(),
             CodecLimits::default(),
         )

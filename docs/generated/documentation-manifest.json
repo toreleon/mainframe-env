@@ -10,7 +10,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:a12ee99efe781f9e4d6e46bf92c409df454bb52eede37d1355e7fec982c1b585",
+      "sha256": "sha256:6da36b3e8ae0f8f6a6a4f8cc32ee525e6e08c882c382d7c377bce94aa37b8a49",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -361,7 +361,7 @@
       "path": "docs/architecture/COMPILER-AND-IR.md",
       "relative_links": 1,
       "scope": "compiler stages, IR contracts, and publication pipeline",
-      "sha256": "sha256:040f59feab7a0841dc9573b61a322febb9a5ba23642efb26f58f862a3f7d4eb4",
+      "sha256": "sha256:decf65f2175cdb2f9335f81602d6cf58d367f92049c5a7d9402654edd18146c0",
       "status": "Accepted by repository owner",
       "title": "Compiler and IR Architecture",
       "xtask_commands": 0
@@ -705,7 +705,7 @@
       "path": "docs/decisions/0011-typed-language-hir-and-semantic-ir.md",
       "relative_links": 0,
       "scope": "language HIR, executable semantic IR, host effects, and compatibility boundaries",
-      "sha256": "sha256:a146931e799c6bc9fb9494918f85761a0945b601ea5795f79513d1aab8e7bb03",
+      "sha256": "sha256:7efe0e3e42700c0ae0e9cb24d51889f726bfd7db87ea6278f0b61c007a477b2f",
       "status": "Accepted by repository owner",
       "title": "ADR-0011: Adopt language-specific HIR and versioned semantic IR dialects",
       "xtask_commands": 0
@@ -1110,7 +1110,7 @@
       "normative": false,
       "path": "docs/delivery/hardening/53-dataset-mutations.md",
       "relative_links": 0,
-      "sha256": "sha256:8fbf0af46b855d99f26e54a18fb039cd2b53c20c0ea9e7b02650cd0a327ad04d",
+      "sha256": "sha256:d3211a0b632627cbef51a9c5bee13c7352420fac1387b86e672d3acc1cb88ecf",
       "title": "Dataset evidence terminology and source-mutation campaign (#53)",
       "xtask_commands": 0
     },

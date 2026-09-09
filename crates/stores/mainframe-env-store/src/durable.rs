@@ -16,6 +16,9 @@ use mainframe_env_store_api::{
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
+mod artifact;
+use artifact::{decode_artifact, encode_artifact};
+
 pub(crate) const AUDIT_NAMESPACE: &str = "durable-audit-v1";
 
 pub(crate) fn audit_storage_key(execution_id: &ExecutionId, suffix: &str) -> String {
@@ -1776,23 +1779,6 @@ fn decode_session(bytes: &[u8], version: u64) -> Result<SessionRecord, StoreErro
     })
 }
 
-fn encode_artifact(record: &ArtifactRecord) -> Result<Vec<u8>, StoreError> {
-    encode(
-        json!({"schema":1,"media":record.media_type,"digest":hex(&record.payload_digest),"payload":binary(&record.payload)}),
-    )
-}
-fn decode_artifact(id: &ArtifactRef, bytes: &[u8]) -> Result<ArtifactRecord, StoreError> {
-    let value = decode(bytes)?;
-    let record = ArtifactRecord {
-        artifact: id.clone(),
-        media_type: string(&value, "media")?.into(),
-        payload_digest: digest_back(string(&value, "digest")?)?,
-        payload: binary_back(string(&value, "payload")?)?,
-    };
-    validation::artifact(&record)?;
-    Ok(record)
-}
-
 fn encode_generation(record: &GenerationRecord) -> Result<Vec<u8>, StoreError> {
     encode(
         json!({"schema":1,"generation":record.generation,"ready":record.ready,"draining":record.draining}),
@@ -2175,6 +2161,7 @@ mod tests {
                     media_type: "application/octet-stream".into(),
                     payload_digest: digest,
                     payload,
+                    executable: None,
                 })
                 .unwrap();
             let event = LifecycleEvent {
@@ -2299,6 +2286,57 @@ mod tests {
 #[cfg(test)]
 mod effect_encoding_tests {
     use super::*;
+    use mainframe_env_store_api::ExecutableArtifactMetadata;
+    use std::collections::{BTreeMap, BTreeSet};
+
+    #[test]
+    fn executable_artifact_metadata_codec_is_exact_and_legacy_absence_is_explicit() {
+        let payload = b"artifact".to_vec();
+        let digest: [u8; 32] = Sha256::digest(&payload).into();
+        let record = ArtifactRecord {
+            artifact: ArtifactRef::new(
+                format!("sha256:{}", hex(&digest)),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            media_type: "application/vnd.mainframe-env.core-mir".into(),
+            payload_digest: digest,
+            payload,
+            executable: Some(
+                ExecutableArtifactMetadata {
+                    artifact_contract: "mainframe-env.artifact@3".into(),
+                    compatibility_profile: "mainframe-env.cobol.reference@1".into(),
+                    compiler_generation: "mainframe-env-cobol-0.8.3".into(),
+                    target: "reference".into(),
+                    options: BTreeMap::from([("dialect".into(), "enterprise".into())]),
+                    host_interfaces: BTreeSet::from(["mainframe-env.host@1".into()]),
+                    ir_contract: "mainframe-env.ir-envelope@1".into(),
+                    dialect_contracts: Some(BTreeSet::from(["mainframe.core.cobol@1".into()])),
+                    semantic_identity: format!("semantic-sha256:{:064x}", 1),
+                    manifest_payload_digest: [0; 32],
+                }
+                .bind_to_payload(&digest),
+            ),
+        };
+        assert_eq!(
+            decode_artifact(&record.artifact, &encode_artifact(&record).unwrap()).unwrap(),
+            record
+        );
+        let legacy = serde_json::to_vec(&json!({
+            "schema": 1,
+            "media": record.media_type,
+            "digest": hex(&record.payload_digest),
+            "payload": binary(&record.payload),
+        }))
+        .unwrap();
+        assert_eq!(
+            decode_artifact(&record.artifact, &legacy)
+                .unwrap()
+                .executable,
+            None
+        );
+    }
+
     fn record() -> EffectRecord {
         let limits = InvocationLimits::default();
         EffectRecord {

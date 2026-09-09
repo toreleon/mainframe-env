@@ -1,5 +1,8 @@
 mod functions;
+mod layout_utils;
 mod structure;
+
+use layout_utils::hex_nibble;
 
 pub use functions::{
     CobolIntrinsicArgument, CobolIntrinsicCall, CobolSpecialRegisterReference, IntrinsicValueType,
@@ -101,6 +104,7 @@ pub struct CobolLayout {
     pub alignment: usize,
     pub initial: Vec<u8>,
     pub alias_of: Option<String>,
+    pub occurs_clause: bool,
     pub occurs: usize,
     pub occurs_min: usize,
     pub unbounded: bool,
@@ -1179,6 +1183,8 @@ fn layout_one(
         alignment,
         initial,
         alias_of: target.map(|(_, qualified)| qualified),
+        occurs_clause: contains_word(&spec.words, "OCCURS")
+            || contains_word(&description.words, "OCCURS"),
         occurs: spec.occurs_max,
         occurs_min: spec.occurs_min,
         unbounded: spec.unbounded,
@@ -1441,6 +1447,7 @@ fn layout_specials(
                 alignment: 1,
                 initial: Vec::new(),
                 alias_of: Some(target.qualified_name.clone()),
+                occurs_clause: false,
                 occurs: 1,
                 occurs_min: 1,
                 unbounded: false,
@@ -1502,6 +1509,7 @@ fn layout_specials(
                 alignment: 1,
                 initial: Vec::new(),
                 alias_of: Some(start.qualified_name.clone()),
+                occurs_clause: false,
                 occurs: 1,
                 occurs_min: 1,
                 unbounded: false,
@@ -1545,6 +1553,7 @@ fn layout_specials(
                 alignment: 1,
                 initial: Vec::new(),
                 alias_of: None,
+                occurs_clause: false,
                 occurs: 1,
                 occurs_min: 1,
                 unbounded: false,
@@ -2830,15 +2839,6 @@ fn hexadecimal_literal(value: &str) -> Option<Vec<u8>> {
             Some((high << 4) | low)
         })
         .collect()
-}
-
-const fn hex_nibble(value: u8) -> Option<u8> {
-    match value {
-        b'0'..=b'9' => Some(value - b'0'),
-        b'a'..=b'f' => Some(value - b'a' + 10),
-        b'A'..=b'F' => Some(value - b'A' + 10),
-        _ => None,
-    }
 }
 
 fn keyword_index(source: &str, keyword: &str) -> Option<usize> {

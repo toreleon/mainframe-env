@@ -3,19 +3,128 @@
 use crate::StorageId;
 use std::fmt;
 
-/// Stable wire identity for a canonical decimal assignment plan.
-pub const DECIMAL_ASSIGNMENT_PLAN_CONTRACT: &str = "mainframe-env.decimal-assignment-plan@1";
+/// Stable wire identity written for a canonical decimal assignment plan.
+pub const DECIMAL_ASSIGNMENT_PLAN_CONTRACT: &str = "mainframe-env.decimal-assignment-plan@2";
+/// Historical plan identity whose execution policy was implicit in COBOL module state.
+pub const LEGACY_DECIMAL_ASSIGNMENT_PLAN_CONTRACT: &str = "mainframe-env.decimal-assignment-plan@1";
 
 const MAGIC: &[u8; 4] = b"MDAP";
-const VERSION: u16 = 1;
+const LEGACY_VERSION: u16 = 1;
+const VERSION: u16 = 2;
 const MIN_ENCODED_ASSIGNMENT_BYTES: usize = 16;
+
+/// Version selected by the canonical decimal-plan wire header.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum DecimalPlanWireVersion {
+    /// Historical plan whose arithmetic context came from COBOL module config.
+    LegacyV1,
+    /// Current plan carrying every execution policy explicitly.
+    PolicyV2,
+}
+
+impl DecimalPlanWireVersion {
+    /// Stable contract identity represented by this wire version.
+    #[must_use]
+    pub const fn contract(self) -> &'static str {
+        match self {
+            Self::LegacyV1 => LEGACY_DECIMAL_ASSIGNMENT_PLAN_CONTRACT,
+            Self::PolicyV2 => DECIMAL_ASSIGNMENT_PLAN_CONTRACT,
+        }
+    }
+}
+
+/// Precision and arithmetic-context policy for expression evaluation.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum DecimalArithmeticContext {
+    /// Historical v1 behavior: select 18 or 34 digits from COBOL module config.
+    /// This value is read-only compatibility state and cannot be emitted in v2.
+    LegacyCobolModuleV1,
+    /// 18 digits, exponent range -9999..=9999, primitive truncation, and nine
+    /// guard places for division.
+    Decimal18V1,
+    /// 34 digits, exponent range -9999..=9999, primitive truncation, and nine
+    /// guard places for division.
+    Decimal34V1,
+}
+
+/// ABI used to decode and encode storage referenced by a decimal plan.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum DecimalStorageAbi {
+    /// Version 1 COBOL numeric layout metadata and physical encodings.
+    CobolNumericV1,
+}
+
+/// Visibility and commit policy for assignment receivers.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum DecimalReceiverUpdatePolicy {
+    /// Capture and convert every receiver, then commit the whole batch atomically.
+    CapturedOperandsAtomicV1,
+    /// Capture every operand first and commit receiver-local results. A COBOL
+    /// adapter preserves a conversion-failed receiver when `ON SIZE ERROR` is
+    /// declared, or stores its truncated result when that handler is absent.
+    CapturedOperandsReceiverLocalV1,
+}
+
+/// Condition contract raised by decimal evaluation and receiver conversion.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum DecimalConditionPolicy {
+    /// COBOL `arithmetic-size-error@1`, including handler-dependent receiver
+    /// preservation/truncation and condition timing after all receiver work.
+    CobolSizeErrorV1,
+}
+
+/// Complete, versioned behavior selected by a decimal executable plan.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct DecimalExecutionPolicy {
+    /// Precision, exponent, and division context.
+    pub arithmetic_context: DecimalArithmeticContext,
+    /// Storage metadata and byte encoding.
+    pub storage_abi: DecimalStorageAbi,
+    /// Receiver capture and update behavior.
+    pub receiver_update: DecimalReceiverUpdatePolicy,
+    /// Failure-to-condition mapping.
+    pub condition: DecimalConditionPolicy,
+}
+
+impl DecimalExecutionPolicy {
+    /// Current explicit policy matching COBOL `ARITH(COMPAT)` arithmetic.
+    #[must_use]
+    pub const fn decimal18_v1() -> Self {
+        Self {
+            arithmetic_context: DecimalArithmeticContext::Decimal18V1,
+            storage_abi: DecimalStorageAbi::CobolNumericV1,
+            receiver_update: DecimalReceiverUpdatePolicy::CapturedOperandsReceiverLocalV1,
+            condition: DecimalConditionPolicy::CobolSizeErrorV1,
+        }
+    }
+
+    /// Current explicit policy matching COBOL `ARITH(EXTEND)` arithmetic.
+    #[must_use]
+    pub const fn decimal34_v1() -> Self {
+        Self {
+            arithmetic_context: DecimalArithmeticContext::Decimal34V1,
+            storage_abi: DecimalStorageAbi::CobolNumericV1,
+            receiver_update: DecimalReceiverUpdatePolicy::CapturedOperandsReceiverLocalV1,
+            condition: DecimalConditionPolicy::CobolSizeErrorV1,
+        }
+    }
+
+    const fn legacy_cobol_v1() -> Self {
+        Self {
+            arithmetic_context: DecimalArithmeticContext::LegacyCobolModuleV1,
+            storage_abi: DecimalStorageAbi::CobolNumericV1,
+            receiver_update: DecimalReceiverUpdatePolicy::CapturedOperandsAtomicV1,
+            condition: DecimalConditionPolicy::CobolSizeErrorV1,
+        }
+    }
+}
 
 /// Resource limits applied while encoding and decoding decimal assignment plans.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DecimalPlanLimits {
     /// Maximum size of the complete encoded plan.
     pub max_encoded_bytes: usize,
-    /// Maximum number of assignments in one atomic batch.
+    /// Maximum number of assignments in one bounded execution batch.
     pub max_assignments: usize,
     /// Maximum total expression nodes across the batch.
     pub max_expression_nodes: usize,
@@ -138,13 +247,15 @@ pub struct DecimalAssignment {
 /// An ordered, bounded batch of typed decimal assignments.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DecimalAssignmentPlan {
-    /// Stable identity of the language operation or semantic rule that produced the plan.
+    /// Stable identity of the frontend rule that produced the plan; provenance only.
     pub semantic_origin: String,
-    /// Assignments evaluated and committed according to the owning executable operation.
+    /// Versioned execution behavior, independent of producer identity.
+    pub policy: DecimalExecutionPolicy,
+    /// Assignments evaluated and committed according to `policy`.
     pub assignments: Vec<DecimalAssignment>,
 }
 
-/// Encode a decimal assignment plan into its canonical version-1 wire form.
+/// Encode a decimal assignment plan into its canonical policy-bearing v2 wire form.
 pub fn encode_decimal_assignment_plan(
     plan: &DecimalAssignmentPlan,
     limits: DecimalPlanLimits,
@@ -153,6 +264,7 @@ pub fn encode_decimal_assignment_plan(
     let mut writer = Writer::new(limits.max_encoded_bytes);
     writer.extend(MAGIC)?;
     writer.u16(VERSION)?;
+    encode_policy(&mut writer, plan.policy)?;
     writer.string(&plan.semantic_origin, limits.max_semantic_origin_bytes)?;
     writer.count(plan.assignments.len())?;
     let mut nodes = 0usize;
@@ -164,7 +276,26 @@ pub fn encode_decimal_assignment_plan(
     Ok(writer.finish())
 }
 
-/// Decode and validate one canonical version-1 decimal assignment plan.
+fn encode_legacy_decimal_assignment_plan(
+    plan: &DecimalAssignmentPlan,
+    limits: DecimalPlanLimits,
+) -> Result<Vec<u8>, DecimalPlanCodecProblem> {
+    validate_plan_for_version(plan, limits, DecimalPlanWireVersion::LegacyV1)?;
+    let mut writer = Writer::new(limits.max_encoded_bytes);
+    writer.extend(MAGIC)?;
+    writer.u16(LEGACY_VERSION)?;
+    writer.string(&plan.semantic_origin, limits.max_semantic_origin_bytes)?;
+    writer.count(plan.assignments.len())?;
+    let mut nodes = 0usize;
+    for assignment in &plan.assignments {
+        encode_slot(&mut writer, &assignment.receiver.target, limits)?;
+        writer.byte(rounding_tag(assignment.receiver.rounding))?;
+        encode_expression(&mut writer, &assignment.expression, limits, &mut nodes, 1)?;
+    }
+    Ok(writer.finish())
+}
+
+/// Decode and validate one canonical v1 or v2 decimal assignment plan.
 pub fn decode_decimal_assignment_plan(
     bytes: &[u8],
     limits: DecimalPlanLimits,
@@ -176,13 +307,15 @@ pub fn decode_decimal_assignment_plan(
     if reader.take(MAGIC.len())? != MAGIC {
         return Err(DecimalPlanCodecProblem::BadMagic);
     }
-    if reader.u16()? != VERSION {
-        return Err(DecimalPlanCodecProblem::UnsupportedVersion);
-    }
+    let version = version_from_u16(reader.u16()?)?;
+    let policy = match version {
+        DecimalPlanWireVersion::LegacyV1 => DecimalExecutionPolicy::legacy_cobol_v1(),
+        DecimalPlanWireVersion::PolicyV2 => decode_policy(&mut reader)?,
+    };
     let semantic_origin = reader.string(limits.max_semantic_origin_bytes)?;
     validate_semantic_origin(&semantic_origin, limits)?;
     let count = reader.count(limits.max_assignments)?;
-    if count == 0 {
+    if count == 0 && version == DecimalPlanWireVersion::LegacyV1 {
         return Err(DecimalPlanCodecProblem::Malformed);
     }
     if count > reader.remaining().len() / MIN_ENCODED_ASSIGNMENT_BYTES {
@@ -204,21 +337,46 @@ pub fn decode_decimal_assignment_plan(
     }
     let plan = DecimalAssignmentPlan {
         semantic_origin,
+        policy,
         assignments,
     };
-    validate_plan(&plan, limits)?;
-    if encode_decimal_assignment_plan(&plan, limits)? != bytes {
+    validate_plan_for_version(&plan, limits, version)?;
+    let canonical = match version {
+        DecimalPlanWireVersion::LegacyV1 => encode_legacy_decimal_assignment_plan(&plan, limits)?,
+        DecimalPlanWireVersion::PolicyV2 => encode_decimal_assignment_plan(&plan, limits)?,
+    };
+    if canonical != bytes {
         return Err(DecimalPlanCodecProblem::NonCanonical);
     }
     Ok(plan)
+}
+
+/// Return the declared decimal-plan wire version without decoding its payload.
+pub fn decimal_assignment_plan_wire_version(
+    bytes: &[u8],
+) -> Result<DecimalPlanWireVersion, DecimalPlanCodecProblem> {
+    let mut reader = Reader::new(bytes);
+    if reader.take(MAGIC.len())? != MAGIC {
+        return Err(DecimalPlanCodecProblem::BadMagic);
+    }
+    version_from_u16(reader.u16()?)
 }
 
 fn validate_plan(
     plan: &DecimalAssignmentPlan,
     limits: DecimalPlanLimits,
 ) -> Result<(), DecimalPlanCodecProblem> {
+    validate_plan_for_version(plan, limits, DecimalPlanWireVersion::PolicyV2)
+}
+
+fn validate_plan_for_version(
+    plan: &DecimalAssignmentPlan,
+    limits: DecimalPlanLimits,
+    version: DecimalPlanWireVersion,
+) -> Result<(), DecimalPlanCodecProblem> {
     validate_semantic_origin(&plan.semantic_origin, limits)?;
-    if plan.assignments.is_empty() {
+    validate_policy(plan.policy, version)?;
+    if plan.assignments.is_empty() && version == DecimalPlanWireVersion::LegacyV1 {
         return Err(DecimalPlanCodecProblem::Malformed);
     }
     if plan.assignments.len() > limits.max_assignments
@@ -232,6 +390,99 @@ fn validate_plan(
         validate_expression(&assignment.expression, limits, &mut nodes, 1)?;
     }
     Ok(())
+}
+
+fn validate_policy(
+    policy: DecimalExecutionPolicy,
+    version: DecimalPlanWireVersion,
+) -> Result<(), DecimalPlanCodecProblem> {
+    match (version, policy.arithmetic_context) {
+        (DecimalPlanWireVersion::LegacyV1, DecimalArithmeticContext::LegacyCobolModuleV1)
+            if policy.storage_abi == DecimalStorageAbi::CobolNumericV1
+                && policy.receiver_update
+                    == DecimalReceiverUpdatePolicy::CapturedOperandsAtomicV1
+                && policy.condition == DecimalConditionPolicy::CobolSizeErrorV1 =>
+        {
+            Ok(())
+        }
+        (
+            DecimalPlanWireVersion::PolicyV2,
+            DecimalArithmeticContext::Decimal18V1 | DecimalArithmeticContext::Decimal34V1,
+        ) if policy.storage_abi == DecimalStorageAbi::CobolNumericV1
+            && policy.receiver_update
+                == DecimalReceiverUpdatePolicy::CapturedOperandsReceiverLocalV1
+            && policy.condition == DecimalConditionPolicy::CobolSizeErrorV1 =>
+        {
+            Ok(())
+        }
+        _ => Err(DecimalPlanCodecProblem::UnsupportedPolicy),
+    }
+}
+
+const fn version_from_u16(version: u16) -> Result<DecimalPlanWireVersion, DecimalPlanCodecProblem> {
+    match version {
+        LEGACY_VERSION => Ok(DecimalPlanWireVersion::LegacyV1),
+        VERSION => Ok(DecimalPlanWireVersion::PolicyV2),
+        _ => Err(DecimalPlanCodecProblem::UnsupportedVersion),
+    }
+}
+
+fn encode_policy(
+    writer: &mut Writer,
+    policy: DecimalExecutionPolicy,
+) -> Result<(), DecimalPlanCodecProblem> {
+    validate_policy(policy, DecimalPlanWireVersion::PolicyV2)?;
+    writer.byte(1)?;
+    writer.byte(match policy.arithmetic_context {
+        DecimalArithmeticContext::Decimal18V1 => 1,
+        DecimalArithmeticContext::Decimal34V1 => 2,
+        DecimalArithmeticContext::LegacyCobolModuleV1 => {
+            return Err(DecimalPlanCodecProblem::UnsupportedPolicy);
+        }
+    })?;
+    writer.byte(match policy.storage_abi {
+        DecimalStorageAbi::CobolNumericV1 => 1,
+    })?;
+    writer.byte(match policy.receiver_update {
+        DecimalReceiverUpdatePolicy::CapturedOperandsReceiverLocalV1 => 1,
+        DecimalReceiverUpdatePolicy::CapturedOperandsAtomicV1 => {
+            return Err(DecimalPlanCodecProblem::UnsupportedPolicy);
+        }
+    })?;
+    writer.byte(match policy.condition {
+        DecimalConditionPolicy::CobolSizeErrorV1 => 1,
+    })
+}
+
+fn decode_policy(
+    reader: &mut Reader<'_>,
+) -> Result<DecimalExecutionPolicy, DecimalPlanCodecProblem> {
+    if reader.byte()? != 1 {
+        return Err(DecimalPlanCodecProblem::UnsupportedPolicy);
+    }
+    let arithmetic_context = match reader.byte()? {
+        1 => DecimalArithmeticContext::Decimal18V1,
+        2 => DecimalArithmeticContext::Decimal34V1,
+        _ => return Err(DecimalPlanCodecProblem::UnsupportedPolicy),
+    };
+    let storage_abi = match reader.byte()? {
+        1 => DecimalStorageAbi::CobolNumericV1,
+        _ => return Err(DecimalPlanCodecProblem::UnsupportedPolicy),
+    };
+    let receiver_update = match reader.byte()? {
+        1 => DecimalReceiverUpdatePolicy::CapturedOperandsReceiverLocalV1,
+        _ => return Err(DecimalPlanCodecProblem::UnsupportedPolicy),
+    };
+    let condition = match reader.byte()? {
+        1 => DecimalConditionPolicy::CobolSizeErrorV1,
+        _ => return Err(DecimalPlanCodecProblem::UnsupportedPolicy),
+    };
+    Ok(DecimalExecutionPolicy {
+        arithmetic_context,
+        storage_abi,
+        receiver_update,
+        condition,
+    })
 }
 
 fn validate_semantic_origin(
@@ -629,6 +880,8 @@ pub enum DecimalPlanCodecProblem {
     BadMagic,
     /// The input uses an unsupported decimal-plan wire version.
     UnsupportedVersion,
+    /// The plan selects an unsupported or version-incompatible execution policy.
+    UnsupportedPolicy,
     /// The input ends before a declared value is complete.
     Truncated,
     /// Bytes remain after the one complete plan.
@@ -713,6 +966,7 @@ mod tests {
         ];
         DecimalAssignmentPlan {
             semantic_origin: "cobol.add-assign@1".into(),
+            policy: DecimalExecutionPolicy::decimal34_v1(),
             assignments: policies
                 .into_iter()
                 .enumerate()
@@ -722,8 +976,8 @@ mod tests {
     }
 
     fn first_expression_offset(bytes: &[u8]) -> usize {
-        let origin_length = usize::from(u16::from_be_bytes(bytes[6..8].try_into().unwrap()));
-        let assignment = 8 + origin_length + 4;
+        let origin_length = usize::from(u16::from_be_bytes(bytes[11..13].try_into().unwrap()));
+        let assignment = 13 + origin_length + 4;
         let name_length = usize::from(u16::from_be_bytes(
             bytes[assignment + 4..assignment + 6].try_into().unwrap(),
         ));
@@ -752,7 +1006,7 @@ mod tests {
         );
 
         let mut wrong_version = encoded.clone();
-        wrong_version[4..6].copy_from_slice(&2u16.to_be_bytes());
+        wrong_version[4..6].copy_from_slice(&3u16.to_be_bytes());
         assert_eq!(
             decode_decimal_assignment_plan(&wrong_version, limits),
             Err(DecimalPlanCodecProblem::UnsupportedVersion)
@@ -851,6 +1105,7 @@ mod tests {
         let mut encoded = Vec::new();
         encoded.extend_from_slice(MAGIC);
         encoded.extend_from_slice(&VERSION.to_be_bytes());
+        encoded.extend_from_slice(&[1, 2, 1, 1, 1]);
         encoded.extend_from_slice(&(origin.len() as u16).to_be_bytes());
         encoded.extend_from_slice(origin);
         encoded.extend_from_slice(&u32::MAX.to_be_bytes());
@@ -881,6 +1136,69 @@ mod tests {
         );
     }
 
+    #[test]
+    fn policy_tags_and_legacy_only_policy_fail_closed() {
+        let limits = DecimalPlanLimits::default();
+        let encoded = encode_decimal_assignment_plan(&complete_plan(), limits).unwrap();
+        for offset in 6..=10 {
+            let mut unsupported = encoded.clone();
+            unsupported[offset] = u8::MAX;
+            assert_eq!(
+                decode_decimal_assignment_plan(&unsupported, limits),
+                Err(DecimalPlanCodecProblem::UnsupportedPolicy)
+            );
+        }
+
+        let mut legacy_only = complete_plan();
+        legacy_only.policy = DecimalExecutionPolicy::legacy_cobol_v1();
+        assert_eq!(
+            encode_decimal_assignment_plan(&legacy_only, limits),
+            Err(DecimalPlanCodecProblem::UnsupportedPolicy)
+        );
+    }
+
+    #[test]
+    fn historical_v1_plan_decodes_canonically_without_becoming_v2() {
+        let limits = DecimalPlanLimits::default();
+        let mut historical = complete_plan();
+        historical.policy = DecimalExecutionPolicy::legacy_cobol_v1();
+        historical.semantic_origin = "cobol.compute@1".into();
+        let encoded = encode_legacy_decimal_assignment_plan(&historical, limits).unwrap();
+        assert_eq!(
+            decimal_assignment_plan_wire_version(&encoded),
+            Ok(DecimalPlanWireVersion::LegacyV1)
+        );
+        assert_eq!(
+            decode_decimal_assignment_plan(&encoded, limits),
+            Ok(historical)
+        );
+        assert_eq!(
+            decimal_assignment_plan_wire_version(
+                &encode_decimal_assignment_plan(&complete_plan(), limits).unwrap()
+            ),
+            Ok(DecimalPlanWireVersion::PolicyV2)
+        );
+    }
+
+    #[test]
+    fn policy_v2_admits_an_explicit_noop_while_legacy_v1_does_not() {
+        let limits = DecimalPlanLimits::default();
+        let mut noop = complete_plan();
+        noop.semantic_origin = "cobol.add@1".into();
+        noop.assignments.clear();
+        let encoded = encode_decimal_assignment_plan(&noop, limits).unwrap();
+        assert_eq!(
+            decode_decimal_assignment_plan(&encoded, limits),
+            Ok(noop.clone())
+        );
+
+        noop.policy = DecimalExecutionPolicy::legacy_cobol_v1();
+        assert_eq!(
+            encode_legacy_decimal_assignment_plan(&noop, limits),
+            Err(DecimalPlanCodecProblem::Malformed)
+        );
+    }
+
     proptest! {
         #[test]
         fn literal_plans_round_trip(
@@ -890,6 +1208,7 @@ mod tests {
         ) {
             let plan = DecimalAssignmentPlan {
                 semantic_origin: "test.literal@1".into(),
+                policy: DecimalExecutionPolicy::decimal18_v1(),
                 assignments: vec![assignment(
                     usize::from(slot_index),
                     DecimalRoundingPolicy::NearestEven,

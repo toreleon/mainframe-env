@@ -2,10 +2,14 @@ use mainframe_env_execution_api::{
     AuditDecision, AuditRecord, ExecutionId, IdempotencyKey, LifecycleEvent, LifecycleEventKind,
 };
 use mainframe_env_store_api::{
-    ArtifactRecord, CheckpointRecord, EffectRecord, EffectState, ExecutionRecord, ExecutionState,
-    MAX_EFFECT_RECOVERY_OWNER_BYTES, OutboxRecord, StoreError,
+    ArtifactRecord, CheckpointRecord, EffectRecord, EffectState, ExecutableArtifactMetadata,
+    ExecutionRecord, ExecutionState, MAX_EFFECT_RECOVERY_OWNER_BYTES, OutboxRecord, StoreError,
 };
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, BTreeSet};
+
+const MAX_EXECUTABLE_METADATA_BYTES: usize = 256 * 1024;
 
 pub(crate) fn new_execution(record: &ExecutionRecord) -> Result<(), StoreError> {
     if record.version != 1
@@ -69,11 +73,138 @@ pub(crate) fn artifact(record: &ArtifactRecord) -> Result<(), StoreError> {
     let digest: [u8; 32] = Sha256::digest(&record.payload).into();
     if record.payload_digest != digest
         || record.artifact.as_str() != format!("sha256:{}", hex(&digest))
+        || record
+            .executable
+            .as_ref()
+            .is_some_and(|metadata| !metadata.validates_payload(&digest))
     {
         Err(StoreError::IncompatibleVersion)
     } else {
         Ok(())
     }
+}
+
+fn validate_executable_metadata(metadata: &ExecutableArtifactMetadata) -> Result<(), StoreError> {
+    if metadata.validate() {
+        Ok(())
+    } else {
+        Err(StoreError::IncompatibleVersion)
+    }
+}
+
+pub(crate) fn encode_executable_metadata(
+    metadata: &ExecutableArtifactMetadata,
+) -> Result<Vec<u8>, StoreError> {
+    validate_executable_metadata(metadata)?;
+    let bytes = serde_json::to_vec(&json!({
+        "schema": "mainframe-env.executable-artifact-metadata@2",
+        "artifact_contract": metadata.artifact_contract,
+        "compatibility_profile": metadata.compatibility_profile,
+        "compiler_generation": metadata.compiler_generation,
+        "target": metadata.target,
+        "options": metadata.options,
+        "host_interfaces": metadata.host_interfaces,
+        "ir_contract": metadata.ir_contract,
+        "dialect_contracts": metadata.dialect_contracts,
+        "semantic_identity": metadata.semantic_identity,
+        "manifest_payload_digest": hex(&metadata.manifest_payload_digest),
+    }))
+    .map_err(|_| StoreError::IncompatibleVersion)?;
+    if bytes.len() > MAX_EXECUTABLE_METADATA_BYTES {
+        return Err(StoreError::PayloadTooLarge);
+    }
+    Ok(bytes)
+}
+
+pub(crate) fn decode_executable_metadata(
+    bytes: &[u8],
+) -> Result<ExecutableArtifactMetadata, StoreError> {
+    if bytes.is_empty() || bytes.len() > MAX_EXECUTABLE_METADATA_BYTES {
+        return Err(StoreError::IncompatibleVersion);
+    }
+    let value: Value =
+        serde_json::from_slice(bytes).map_err(|_| StoreError::IncompatibleVersion)?;
+    let object = value.as_object().ok_or(StoreError::IncompatibleVersion)?;
+    let expected = [
+        "schema",
+        "artifact_contract",
+        "compatibility_profile",
+        "compiler_generation",
+        "target",
+        "options",
+        "host_interfaces",
+        "ir_contract",
+        "dialect_contracts",
+        "semantic_identity",
+        "manifest_payload_digest",
+    ];
+    if object.len() != expected.len()
+        || expected.iter().any(|key| !object.contains_key(*key))
+        || object.get("schema").and_then(Value::as_str)
+            != Some("mainframe-env.executable-artifact-metadata@2")
+    {
+        return Err(StoreError::IncompatibleVersion);
+    }
+    let text = |key: &str| {
+        object
+            .get(key)
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .ok_or(StoreError::IncompatibleVersion)
+    };
+    let options = object
+        .get("options")
+        .and_then(Value::as_object)
+        .ok_or(StoreError::IncompatibleVersion)?
+        .iter()
+        .map(|(key, value)| {
+            value
+                .as_str()
+                .map(|value| (key.clone(), value.to_string()))
+                .ok_or(StoreError::IncompatibleVersion)
+        })
+        .collect::<Result<BTreeMap<_, _>, _>>()?;
+    let strings = |key: &str| -> Result<BTreeSet<String>, StoreError> {
+        let values = object
+            .get(key)
+            .and_then(Value::as_array)
+            .ok_or(StoreError::IncompatibleVersion)?;
+        let result = values
+            .iter()
+            .map(|value| {
+                value
+                    .as_str()
+                    .map(str::to_string)
+                    .ok_or(StoreError::IncompatibleVersion)
+            })
+            .collect::<Result<BTreeSet<_>, _>>()?;
+        if result.len() != values.len() {
+            return Err(StoreError::IncompatibleVersion);
+        }
+        Ok(result)
+    };
+    let dialect_contracts = match object.get("dialect_contracts") {
+        Some(Value::Null) => None,
+        Some(_) => Some(strings("dialect_contracts")?),
+        None => return Err(StoreError::IncompatibleVersion),
+    };
+    let metadata = ExecutableArtifactMetadata {
+        artifact_contract: text("artifact_contract")?,
+        compatibility_profile: text("compatibility_profile")?,
+        compiler_generation: text("compiler_generation")?,
+        target: text("target")?,
+        options,
+        host_interfaces: strings("host_interfaces")?,
+        ir_contract: text("ir_contract")?,
+        dialect_contracts,
+        semantic_identity: text("semantic_identity")?,
+        manifest_payload_digest: hex_back(&text("manifest_payload_digest")?)?,
+    };
+    validate_executable_metadata(&metadata)?;
+    if encode_executable_metadata(&metadata)? != bytes {
+        return Err(StoreError::IncompatibleVersion);
+    }
+    Ok(metadata)
 }
 
 pub(crate) fn effect(record: &EffectRecord) -> Result<(), StoreError> {
@@ -423,4 +554,23 @@ pub(crate) fn checkpoint_execution(
 
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn hex_back(value: &str) -> Result<[u8; 32], StoreError> {
+    if value.len() != 64 {
+        return Err(StoreError::IncompatibleVersion);
+    }
+    let mut bytes = [0_u8; 32];
+    for (index, pair) in value.as_bytes().as_chunks::<2>().0.iter().enumerate() {
+        let digit = |byte| match byte {
+            b'0'..=b'9' => Some(byte - b'0'),
+            b'a'..=b'f' => Some(byte - b'a' + 10),
+            _ => None,
+        };
+        bytes[index] = digit(pair[0])
+            .zip(digit(pair[1]))
+            .map(|(high, low)| (high << 4) | low)
+            .ok_or(StoreError::IncompatibleVersion)?;
+    }
+    Ok(bytes)
 }

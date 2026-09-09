@@ -3,11 +3,11 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    abi, carddemo, cics_licensed, cics_pilot, cobol_assurance, cobol_clauses, cobol_conditions,
-    cobol_data, cobol_exit, cobol_files, cobol_frontend, cobol_function_boundaries,
-    cobol_functions, cobol_intrinsics, cobol_licensed, cobol_move_pilot, cobol_phrases,
-    cobol_recovery, cobol_reference, cobol_registers, cobol_runtime, cobol_statements, dataset,
-    dataset_reference, jcl, racf, racf_oracle,
+    abi, carddemo, cics_licensed, cics_pilot, cobol_arithmetic_pilot, cobol_assurance,
+    cobol_clauses, cobol_conditions, cobol_data, cobol_exit, cobol_files, cobol_frontend,
+    cobol_function_boundaries, cobol_functions, cobol_intrinsics, cobol_licensed, cobol_move_pilot,
+    cobol_phrases, cobol_recovery, cobol_reference, cobol_registers, cobol_runtime,
+    cobol_statements, dataset, dataset_reference, jcl, racf, racf_oracle,
 };
 use mainframe_env_compiler::CobolCompiler;
 use mainframe_env_compiler_api::{
@@ -70,6 +70,10 @@ pub use jcl::{JclExitReceipt, JclFixtureRuntime, jcl_fixture_runtime, verify_jcl
 pub use racf::{racf_runtime, racf_runtime_with};
 pub use racf_oracle::{RACF_ORACLE_RELATIVE_PATH, RacfOracleCampaign, RacfOracleCase};
 
+pub use cobol_arithmetic_pilot::{
+    CobolArithmeticCaseReport, CobolArithmeticPilotReport, CobolArithmeticPilotRuntime,
+    cobol_arithmetic_pilot_runtime, run_cobol_arithmetic_pilot,
+};
 pub use cobol_assurance::verify_cobol_assurance_sources;
 pub use cobol_clauses::verify_cobol_semantic_fixtures;
 pub use cobol_conditions::verify_cobol_condition_fixtures;
@@ -181,6 +185,10 @@ mod tests {
     use super::*;
     use mainframe_env_diagnostics::Completeness;
     use mainframe_env_encoding::CodePage;
+    use mainframe_env_ir::{
+        CICS_EXECUTABLE_DESCRIPTORS, OperationSemanticContract,
+        cics_executable_descriptor_for_identity,
+    };
     use proptest::prelude::*;
     #[test]
     fn hello_selected_route_matches_frozen_output() {
@@ -359,14 +367,34 @@ mod tests {
     }
     #[test]
     fn compiler_and_interpreter_operation_registries_match() {
-        let compiler: BTreeSet<_> = mainframe_env_compiler::core_mir_catalog()
-            .identities()
-            .cloned()
-            .collect();
-        assert_eq!(
-            compiler,
-            mainframe_env_interpreter::supported_operations().clone()
-        );
+        let catalog = mainframe_env_compiler::core_mir_catalog();
+        let compiler: BTreeSet<_> = catalog.identities().cloned().collect();
+        let interpreter = mainframe_env_interpreter::supported_operations();
+        assert_eq!(compiler, interpreter.clone());
+        for descriptor in CICS_EXECUTABLE_DESCRIPTORS {
+            let identity = descriptor.identity();
+            let schema = catalog
+                .get(&identity)
+                .expect("compiler registers every typed CICS descriptor");
+            assert!(interpreter.contains(&identity));
+            assert_eq!(
+                schema.allowed_effects,
+                descriptor.effects.iter().copied().collect()
+            );
+            assert_eq!(
+                schema.runtime_import.as_deref(),
+                Some(descriptor.runtime_import)
+            );
+            let OperationSemanticContract::CicsEffect(contract) = &schema.semantic_contract else {
+                panic!("typed CICS descriptor must select the CICS plan validator")
+            };
+            assert_eq!(contract.expected_operation, Some(descriptor.operation));
+            assert_eq!(
+                cics_executable_descriptor_for_identity(&schema.identity)
+                    .map(|registered| registered.operation),
+                Some(descriptor.operation)
+            );
+        }
     }
     #[test]
     fn arithmetic_conformance_programs_use_the_typed_decimal_dialect() {
@@ -376,7 +404,7 @@ mod tests {
             artifact
                 .manifest()
                 .dialect_contracts
-                .contains("mainframe.decimal@1")
+                .contains("mainframe.decimal@2")
         );
         let module = mainframe_env_ir::decode_binary(
             artifact.payload(),
@@ -398,7 +426,7 @@ mod tests {
             .filter(|operation| {
                 operation.identity.namespace() == "mainframe.decimal"
                     && operation.identity.name() == "assign"
-                    && operation.identity.major() == 1
+                    && operation.identity.major() == 2
             })
             .collect::<Vec<_>>();
         assert_eq!(typed.len(), 4);
@@ -409,9 +437,93 @@ mod tests {
         }));
         assert!(matches!(
             execute(&artifact, 1024),
-            MachineDrive::Completed(done) if done.output.bytes() == b"05070349\n"
+            MachineDrive::Completed(done) if done.output.bytes() == b"05070369\n"
         ));
     }
+
+    #[test]
+    fn arithmetic_size_error_preserves_successful_receivers_and_condition_timing() {
+        let add = compile("IDENTIFICATION DIVISION. PROGRAM-ID. RECEIVERERR. DATA DIVISION. WORKING-STORAGE SECTION. 01 GOOD-X PIC 9 VALUE 4. 01 SMALL-X PIC 9 VALUE 9. 01 ERROR-X PIC 9 VALUE 0. PROCEDURE DIVISION. ADD 2 TO GOOD-X SMALL-X ON SIZE ERROR MOVE 1 TO ERROR-X NOT ON SIZE ERROR MOVE 2 TO ERROR-X END-ADD. DISPLAY GOOD-X SMALL-X ERROR-X. STOP RUN.").unwrap();
+        assert!(matches!(
+            execute(&add, 1024),
+            MachineDrive::Completed(done) if done.output.bytes() == b"691\n"
+        ));
+
+        let no_handler = compile("IDENTIFICATION DIVISION. PROGRAM-ID. TRUNCATEERR. DATA DIVISION. WORKING-STORAGE SECTION. 01 GOOD-X PIC 9 VALUE 4. 01 SMALL-X PIC 9 VALUE 9. PROCEDURE DIVISION. ADD 2 TO GOOD-X SMALL-X. DISPLAY GOOD-X SMALL-X. STOP RUN.").unwrap();
+        assert!(matches!(
+            execute(&no_handler, 1024),
+            MachineDrive::Completed(done) if done.output.bytes() == b"61\n"
+        ));
+
+        let compute = compile("IDENTIFICATION DIVISION. PROGRAM-ID. COMPUTEERR. DATA DIVISION. WORKING-STORAGE SECTION. 01 GOOD-X PIC 99 VALUE 4. 01 SMALL-X PIC 9 VALUE 9. 01 ERROR-X PIC 9 VALUE 0. PROCEDURE DIVISION. COMPUTE GOOD-X SMALL-X = 12 ON SIZE ERROR MOVE 1 TO ERROR-X NOT ON SIZE ERROR MOVE 2 TO ERROR-X END-COMPUTE. DISPLAY GOOD-X SMALL-X ERROR-X. STOP RUN.").unwrap();
+        assert!(matches!(
+            execute(&compute, 1024),
+            MachineDrive::Completed(done) if done.output.bytes() == b"1291\n"
+        ));
+
+        let corresponding = compile("IDENTIFICATION DIVISION. PROGRAM-ID. CORRERR. DATA DIVISION. WORKING-STORAGE SECTION. 01 SOURCE-G. 05 GOOD-X PIC 9 VALUE 2. 05 SMALL-X PIC 9 VALUE 2. 01 TARGET-G. 05 GOOD-X PIC 99 VALUE 4. 05 SMALL-X PIC 9 VALUE 9. 01 ERROR-X PIC 9 VALUE 0. PROCEDURE DIVISION. ADD CORRESPONDING SOURCE-G TO TARGET-G ON SIZE ERROR MOVE 1 TO ERROR-X NOT ON SIZE ERROR MOVE 2 TO ERROR-X END-ADD. DISPLAY GOOD-X OF TARGET-G SMALL-X OF TARGET-G ERROR-X. STOP RUN.").unwrap();
+        assert!(matches!(
+            execute(&corresponding, 1024),
+            MachineDrive::Completed(done) if done.output.bytes() == b"0691\n"
+        ));
+    }
+
+    #[test]
+    fn legacy_selector_arithmetic_preserves_successful_receivers_on_size_error() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. LEGACYERR. DATA DIVISION. WORKING-STORAGE SECTION. 01 SOURCE-G. 05 SOURCE-X PIC 9 OCCURS 2 TIMES VALUE 2. 01 GOOD-X PIC 9 VALUE 4. 01 SMALL-X PIC 9 VALUE 9. 01 ERROR-X PIC 9 VALUE 0. PROCEDURE DIVISION. ADD SOURCE-X(1) TO GOOD-X SMALL-X ON SIZE ERROR MOVE 1 TO ERROR-X NOT ON SIZE ERROR MOVE 2 TO ERROR-X END-ADD. DISPLAY GOOD-X SMALL-X ERROR-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let module = mainframe_env_ir::decode_binary(
+            artifact.payload(),
+            mainframe_env_ir::CodecLimits::default(),
+        )
+        .unwrap();
+        assert!(
+            module
+                .regions()
+                .iter()
+                .flat_map(|region| &region.blocks)
+                .flat_map(|block| &block.operations)
+                .any(|operation| {
+                    operation.identity.namespace() == "mainframe.core.cobol"
+                        && operation.identity.name() == "add"
+                })
+        );
+        assert!(matches!(
+            execute(&artifact, 1024),
+            MachineDrive::Completed(done) if done.output.bytes() == b"691\n"
+        ));
+    }
+
+    #[test]
+    fn typed_arithmetic_captures_overlapping_alias_operands_before_ordered_writes() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. ALIASMATH. DATA DIVISION. WORKING-STORAGE SECTION. 01 BASE-X PIC 99 VALUE 19. 01 WIDE-X REDEFINES BASE-X PIC 99. 01 NARROW-X REDEFINES BASE-X PIC 9. PROCEDURE DIVISION. ADD 2 TO WIDE-X NARROW-X. DISPLAY BASE-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let module = mainframe_env_ir::decode_binary(
+            artifact.payload(),
+            mainframe_env_ir::CodecLimits::default(),
+        )
+        .unwrap();
+        let operations = module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .collect::<Vec<_>>();
+        assert!(operations.iter().any(|operation| {
+            operation.identity.namespace() == "mainframe.decimal"
+                && operation.identity.name() == "assign"
+                && operation.identity.major() == 2
+        }));
+        assert!(!operations.iter().any(|operation| {
+            operation.identity.namespace() == "mainframe.core.cobol"
+                && operation.identity.name() == "add"
+        }));
+        assert!(matches!(
+            execute(&artifact, 1024),
+            MachineDrive::Completed(done) if done.output.bytes() == b"31\n"
+        ));
+    }
+
     #[test]
     fn every_publishable_layout_category_decodes_and_constructs_the_machine() {
         use mainframe_env_ir::{Attribute, decode_binary};
@@ -848,7 +960,7 @@ mod tests {
     }
 
     #[test]
-    fn multiple_arithmetic_receivers_are_atomic_on_size_error() {
+    fn multiple_arithmetic_receivers_preserve_successful_results_on_size_error() {
         let normal = compile("IDENTIFICATION DIVISION. PROGRAM-ID. MULTIRECV. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9 VALUE 1. 01 B PIC 9 VALUE 2. 01 C PIC 9 VALUE 3. PROCEDURE DIVISION. ADD A TO B C. SUBTRACT A FROM B C. DISPLAY B C. STOP RUN.").unwrap();
         assert!(matches!(
             execute(&normal, 1024),
@@ -858,18 +970,147 @@ mod tests {
         let size_error = compile("IDENTIFICATION DIVISION. PROGRAM-ID. MULTISIZE. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9 VALUE 1. 01 B PIC 9 VALUE 9. 01 C PIC 9 VALUE 5. PROCEDURE DIVISION. ADD A TO B C ON SIZE ERROR DISPLAY 'SIZE' END-ADD. DISPLAY B C. STOP RUN.").unwrap();
         assert!(matches!(
             execute(&size_error, 1024),
-            MachineDrive::Completed(done) if done.output.bytes() == b"SIZE\n95\n"
+            MachineDrive::Completed(done) if done.output.bytes() == b"SIZE\n96\n"
         ));
     }
 
     #[test]
-    fn add_corresponding_matches_numeric_descendants_atomically() {
+    fn add_corresponding_updates_matching_numeric_descendants() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CORR. DATA DIVISION. WORKING-STORAGE SECTION. 01 SOURCE-G. 05 COUNT-X PIC 99 VALUE 2. 05 NESTED-G. 10 AMOUNT-X PIC 99 VALUE 3. 05 TEXT-X PIC X VALUE 'S'. 01 TARGET-G. 05 COUNT-X PIC 99 VALUE 10. 05 NESTED-G. 10 AMOUNT-X PIC 99 VALUE 20. 05 TEXT-X PIC X VALUE 'T'. PROCEDURE DIVISION. ADD CORRESPONDING SOURCE-G TO TARGET-G. DISPLAY COUNT-X OF TARGET-G AMOUNT-X OF NESTED-G OF TARGET-G TEXT-X OF TARGET-G. STOP RUN.";
         let artifact = compile(source).unwrap();
         assert!(matches!(
             execute(&artifact, 1024),
             MachineDrive::Completed(done) if done.output.bytes() == b"1223T\n"
         ));
+    }
+
+    #[test]
+    fn add_corresponding_uses_relative_qualifiers_through_the_typed_route() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CORRQUAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 SRC-G. 05 MATCH-X PIC 99 VALUE 1. 05 LEFT-G. 10 AMOUNT PIC 99 VALUE 2. 01 DST-G. 05 MATCH-X PIC 99 VALUE 10. 05 RIGHT-G. 10 AMOUNT PIC 99 VALUE 20. PROCEDURE DIVISION. ADD CORRESPONDING SRC-G TO DST-G. DISPLAY MATCH-X OF DST-G. DISPLAY AMOUNT OF RIGHT-G OF DST-G. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let module = mainframe_env_ir::decode_binary(
+            artifact.payload(),
+            mainframe_env_ir::CodecLimits::default(),
+        )
+        .unwrap();
+        let operations = module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .collect::<Vec<_>>();
+        assert!(operations.iter().any(|operation| {
+            operation.identity.namespace() == "mainframe.decimal"
+                && operation.identity.name() == "assign"
+        }));
+        assert!(!operations.iter().any(|operation| {
+            operation.identity.namespace() == "mainframe.core.cobol"
+                && operation.identity.name() == "add"
+        }));
+        assert!(matches!(
+            execute(&artifact, 1024),
+            MachineDrive::Completed(done) if done.output.bytes() == b"11\n20\n"
+        ));
+
+        let no_pairs = compile("IDENTIFICATION DIVISION. PROGRAM-ID. CORRNONE. DATA DIVISION. WORKING-STORAGE SECTION. 01 SRC-G. 05 SOURCE-ONLY PIC 99 VALUE 12. 01 DST-G. 05 TARGET-ONLY PIC 99 VALUE 34. PROCEDURE DIVISION. ADD CORRESPONDING SRC-G TO DST-G. DISPLAY TARGET-ONLY OF DST-G. STOP RUN.").unwrap();
+        assert!(matches!(
+            execute(&no_pairs, 1024),
+            MachineDrive::Completed(done) if done.output.bytes() == b"34\n"
+        ));
+    }
+
+    #[test]
+    fn add_corresponding_compatibility_route_preserves_the_selected_occurrence() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CORROCCUR. DATA DIVISION. WORKING-STORAGE SECTION. 01 IDX PIC 9 VALUE 2. 01 SRC-ROOT. 05 SRC-G. 10 VALUE-X PIC 99 VALUE 1. 01 DST-ROOT. 05 DST-G OCCURS 2 TIMES. 10 VALUE-X PIC 99 VALUE 10. PROCEDURE DIVISION. ADD CORRESPONDING SRC-G TO DST-G(IDX). DISPLAY VALUE-X OF DST-G(1). DISPLAY VALUE-X OF DST-G(2). STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let module = mainframe_env_ir::decode_binary(
+            artifact.payload(),
+            mainframe_env_ir::CodecLimits::default(),
+        )
+        .unwrap();
+        assert!(
+            module
+                .regions()
+                .iter()
+                .flat_map(|region| &region.blocks)
+                .flat_map(|block| &block.operations)
+                .any(|operation| {
+                    operation.identity.namespace() == "mainframe.core.cobol"
+                        && operation.identity.name() == "add"
+                })
+        );
+        assert!(matches!(
+            execute(&artifact, 1024),
+            MachineDrive::Completed(done) if done.output.bytes() == b"10\n11\n"
+        ));
+    }
+
+    #[test]
+    fn add_corresponding_compatibility_route_honors_qualification_and_exclusions() {
+        // The receiver subscript deliberately selects the compatibility route.
+        // AMOUNT is repeated under both matching and mismatching relative
+        // qualifiers, while TABLE-X is ineligible because it has OCCURS.
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CORROCCQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 IDX PIC 9 VALUE 2. 01 SRC-G. 05 MATCH-X PIC 99 VALUE 1. 05 LEFT-G. 10 AMOUNT PIC 99 VALUE 2. 05 SOURCE-ONLY-G. 10 AMOUNT PIC 99 VALUE 3. 05 TABLE-X PIC 99 OCCURS 1 TIMES VALUE 4. 01 DST-ROOT. 05 DST-G OCCURS 2 TIMES. 10 MATCH-X PIC 99 VALUE 10. 10 LEFT-G. 15 AMOUNT PIC 99 VALUE 20. 10 TARGET-ONLY-G. 15 AMOUNT PIC 99 VALUE 30. 10 TABLE-X PIC 99 OCCURS 1 TIMES VALUE 40. PROCEDURE DIVISION. ADD CORRESPONDING SRC-G TO DST-G(IDX). DISPLAY DST-G(1). DISPLAY DST-G(2). STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let module = mainframe_env_ir::decode_binary(
+            artifact.payload(),
+            mainframe_env_ir::CodecLimits::default(),
+        )
+        .unwrap();
+        let operations = module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .collect::<Vec<_>>();
+        assert!(operations.iter().any(|operation| {
+            operation.identity.namespace() == "mainframe.core.cobol"
+                && operation.identity.name() == "add"
+        }));
+        assert!(!operations.iter().any(|operation| {
+            operation.identity.namespace() == "mainframe.decimal"
+                && operation.identity.name() == "assign"
+        }));
+        assert!(matches!(
+            execute(&artifact, 1024),
+            // occurrence 1 is untouched; occurrence 2 changes only MATCH-X
+            // and LEFT-G/AMOUNT, preserving TARGET-ONLY-G/AMOUNT and TABLE-X.
+            MachineDrive::Completed(done) if done.output.bytes() == b"10203040\n11223040\n"
+        ));
+    }
+
+    #[test]
+    fn add_corresponding_requires_bilateral_uniqueness_at_execution() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CORRAMBIG. DATA DIVISION. WORKING-STORAGE SECTION. 01 SRC-DUP. 05 FILLER. 10 AMOUNT PIC 99 VALUE 1. 05 FILLER. 10 AMOUNT PIC 99 VALUE 2. 01 DST-ONE. 05 AMOUNT PIC 99 VALUE 10. 01 SRC-ONE. 05 AMOUNT PIC 99 VALUE 3. 01 DST-DUP. 05 FILLER. 10 AMOUNT PIC 99 VALUE 20. 05 FILLER. 10 AMOUNT PIC 99 VALUE 30. PROCEDURE DIVISION. ADD CORRESPONDING SRC-DUP TO DST-ONE. ADD CORRESPONDING SRC-ONE TO DST-DUP. DISPLAY AMOUNT OF DST-ONE. DISPLAY DST-DUP. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        assert!(matches!(
+            execute(&artifact, 1024),
+            MachineDrive::Completed(done) if done.output.bytes() == b"10\n2030\n"
+        ));
+    }
+
+    #[test]
+    fn add_corresponding_excludes_occurs_and_redefines_items_at_execution() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CORRELIG. DATA DIVISION. WORKING-STORAGE SECTION. 01 SRC-G. 05 GOOD-X PIC 99 VALUE 1. 05 TABLE-X PIC 99 OCCURS 1 TIMES VALUE 2. 05 BASE-S PIC 99 VALUE 3. 05 REDEF-X REDEFINES BASE-S PIC 99. 01 DST-G. 05 GOOD-X PIC 99 VALUE 10. 05 TABLE-X PIC 99 OCCURS 1 TIMES VALUE 20. 05 BASE-T PIC 99 VALUE 30. 05 REDEF-X REDEFINES BASE-T PIC 99. PROCEDURE DIVISION. ADD CORRESPONDING SRC-G TO DST-G. DISPLAY DST-G. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        match execute(&artifact, 1024) {
+            MachineDrive::Completed(done) => {
+                assert_eq!(done.output.bytes(), b"112030\n")
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn invalid_or_unrepresentable_corresponding_groups_fail_before_publication() {
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. NOSUB. DATA DIVISION. WORKING-STORAGE SECTION. 01 SRC-ROOT. 05 SRC-G. 10 VALUE-X PIC 99. 01 DST-ROOT. 05 DST-G OCCURS 2 TIMES. 10 VALUE-X PIC 99. PROCEDURE DIVISION. ADD CORRESPONDING SRC-G TO DST-G. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. REFMOD. DATA DIVISION. WORKING-STORAGE SECTION. 01 SRC-G. 05 VALUE-X PIC 99. 01 DST-G. 05 VALUE-X PIC 99. PROCEDURE DIVISION. ADD CORRESPONDING SRC-G(1:2) TO DST-G. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. NATIONAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 SRC-G GROUP-USAGE NATIONAL. 05 VALUE-X PIC 99. 01 DST-G GROUP-USAGE NATIONAL. 05 VALUE-X PIC 99. PROCEDURE DIVISION. ADD CORRESPONDING SRC-G TO DST-G. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. UTF8GROUP. DATA DIVISION. WORKING-STORAGE SECTION. 01 SRC-G GROUP-USAGE UTF-8. 05 TEXT-X PIC U. 01 DST-G GROUP-USAGE UTF-8. 05 TEXT-X PIC U. PROCEDURE DIVISION. ADD CORRESPONDING SRC-G TO DST-G. STOP RUN.",
+        ] {
+            assert!(compile(source).is_err(), "invalid form published: {source}");
+        }
     }
 
     #[test]
@@ -1528,11 +1769,11 @@ mod tests {
             other => panic!("{other:?}"),
         }
 
-        let overflow = "IDENTIFICATION DIVISION. PROGRAM-ID. OVERFLOW. DATA DIVISION. WORKING-STORAGE SECTION. 01 X PIC 99 VALUE 99. PROCEDURE DIVISION. ADD 1 TO X. STOP RUN.";
+        let overflow = "IDENTIFICATION DIVISION. PROGRAM-ID. OVERFLOW. DATA DIVISION. WORKING-STORAGE SECTION. 01 X PIC 99 VALUE 99. PROCEDURE DIVISION. ADD 1 TO X. DISPLAY X. STOP RUN.";
         let artifact = compile(overflow).unwrap();
         assert!(matches!(
             execute(&artifact, 1024),
-            MachineDrive::Condition(condition) if condition.name == "SIZE-ERROR"
+            MachineDrive::Completed(done) if done.output.bytes() == b"00\n"
         ));
     }
     #[test]

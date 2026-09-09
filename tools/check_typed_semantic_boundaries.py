@@ -41,10 +41,32 @@ def reject(source: str, patterns: list[str], scope: str) -> None:
 
 def check(root: Path) -> None:
     compiler_manifest = read(root, "crates/kernel/mainframe-env-compiler/Cargo.toml")
-    require(
-        "mainframe-env-host-api" not in compiler_manifest,
-        "the language frontend must not depend on the host-provider contract",
-    )
+    compiler_dependencies = tomllib.loads(compiler_manifest).get("dependencies", {})
+    for forbidden_dependency in [
+        "mainframe-env-interpreter",
+        "mainframe-env-host-api",
+        "mainframe-env-store-api",
+        "mainframe-env-cics",
+    ]:
+        require(
+            forbidden_dependency not in compiler_dependencies,
+            f"the language frontend must not depend on {forbidden_dependency}",
+        )
+
+    ir_dependencies = tomllib.loads(
+        read(root, "crates/foundation/mainframe-env-ir/Cargo.toml")
+    ).get("dependencies", {})
+    for forbidden_dependency in [
+        "mainframe-env-compiler",
+        "mainframe-env-interpreter",
+        "mainframe-env-host-api",
+        "mainframe-env-store-api",
+        "mainframe-env-cics",
+    ]:
+        require(
+            forbidden_dependency not in ir_dependencies,
+            f"the generic IR framework must not depend on {forbidden_dependency}",
+        )
 
     decimal_hir = production(
         read(root, "crates/kernel/mainframe-env-compiler/src/hir/decimal.rs")
@@ -56,6 +78,8 @@ def check(root: Path) -> None:
         'CONDITION_BRANCHES_ATTRIBUTE: &str = "typed_condition_branches"',
         '"cobol.add@1"',
         '"cobol.compute@1"',
+        "DecimalPlanWireVersion::PolicyV2",
+        "DecimalExecutionPolicy",
         "encode_decimal_assignment_plan",
     ]:
         require(required in decimal_hir, f"typed decimal compiler boundary omits {required}")
@@ -63,13 +87,34 @@ def check(root: Path) -> None:
     cics_hir = production(read(root, "crates/kernel/mainframe-env-compiler/src/hir/cics.rs"))
     for required in [
         'CICS_PLAN_ATTRIBUTE: &str = "cics_plan"',
-        '("cics.file", "read")',
-        '("cics.file", "rewrite")',
-        '("cics.recovery", "syncpoint")',
-        'schema.runtime_import = Some("host.cics".into())',
+        "CICS_EXECUTABLE_DESCRIPTORS",
+        "cics_executable_descriptor",
+        ".runtime_import",
         "encode_cics_effect_plan",
     ]:
         require(required in cics_hir, f"typed CICS compiler boundary omits {required}")
+    reject(
+        cics_hir,
+        ['"cics.file"', '"cics.recovery"', "Effect::DatasetRead", "Effect::DatasetWrite"],
+        "typed CICS compiler ownership",
+    )
+
+    cics_descriptors = production(
+        read(root, "crates/foundation/mainframe-env-ir/src/cics_descriptor.rs")
+    )
+    for required in [
+        "pub const CICS_EXECUTABLE_DESCRIPTORS",
+        'pub const CICS_RUNTIME_IMPORT: &str = "host.cics"',
+        'namespace: "cics.file"',
+        'namespace: "cics.recovery"',
+        "operation: CicsPlanOperation::Read",
+        "operation: CicsPlanOperation::Rewrite",
+        "operation: CicsPlanOperation::Syncpoint",
+        "Effect::DatasetRead",
+        "Effect::DatasetWrite",
+        "Effect::Transaction",
+    ]:
+        require(required in cics_descriptors, f"typed CICS descriptor registry omits {required}")
 
     lower = production(read(root, "crates/kernel/mainframe-env-compiler/src/lower.rs"))
     for required in [
@@ -100,8 +145,12 @@ def check(root: Path) -> None:
     )
     for required in [
         "decode_decimal_assignment_plan",
+        "decimal_assignment_plan_wire_version",
+        "verify_semantic_contracts",
+        "operation_identities",
+        "CapturedOperandsReceiverLocalV1",
+        "CapturedOperandsAtomicV1",
         "validate_declared_slots",
-        "let mut staged",
         "cobol.add@1",
         "cobol.compute@1",
         "typed_condition_status",
@@ -149,12 +198,17 @@ def check(root: Path) -> None:
     )
     for required in [
         "decode_cics_effect_plan",
-        '(FILE_NAMESPACE, "read", 1)',
-        '(FILE_NAMESPACE, "rewrite", 1)',
-        '(RECOVERY_NAMESPACE, "syncpoint", 1)',
-        "expected_effects",
+        "CICS_EXECUTABLE_DESCRIPTORS",
+        "cics_executable_descriptor_for_identity",
+        "cics_executable_descriptor",
+        ".runtime_import",
     ]:
         require(required in cics_runtime, f"typed CICS runtime omits {required}")
+    reject(
+        cics_runtime,
+        ['"cics.file"', '"cics.recovery"', "Effect::DatasetRead", "Effect::DatasetWrite"],
+        "typed CICS runtime ownership",
+    )
 
     machine = production(
         read(root, "crates/kernel/mainframe-env-interpreter/src/machine.rs")
@@ -166,7 +220,7 @@ def check(root: Path) -> None:
     )
     require(
         "operations.extend(typed_cics::operation_identities())" in machine
-        and "operations.insert(typed_decimal::operation_identity())" in machine,
+        and "operations.extend(typed_decimal::operation_identities())" in machine,
         "reference-machine dialect registry omits a typed operation family",
     )
     decimal_branch = between(machine, "    fn control_branch", "    fn prepare_search")
@@ -203,6 +257,103 @@ def check(root: Path) -> None:
         "verify_legal(module, catalog, profile)",
     ]:
         require(required in artifact_model, f"artifact compatibility reader omits {required}")
+
+    stage = production(
+        read(root, "crates/contracts/mainframe-env-compiler-api/src/stage.rs")
+    )
+    for required in [
+        "pub struct VerifiedHir",
+        "pub struct LoweredMir",
+        "pub struct LegalizedMir",
+        "pub fn verify(",
+        "pub fn lower(self, module: Module) -> LoweredMir",
+        "pub fn legalize(",
+        "verify_legal(lowered.module, catalog, profile)",
+    ]:
+        require(required in stage, f"typed proof-stage boundary omits {required}")
+
+    ir_catalog = production(read(root, "crates/foundation/mainframe-env-ir/src/catalog.rs"))
+    ir_verify = production(read(root, "crates/foundation/mainframe-env-ir/src/verify.rs"))
+    semantic_verify = production(
+        read(root, "crates/foundation/mainframe-env-ir/src/semantic_verify.rs")
+    )
+    require(
+        "pub enum OperationSemanticContract" in ir_catalog
+        and "DecimalAssignment(DecimalOperationContract)" in ir_catalog
+        and "CicsEffect(CicsOperationContract)" in ir_catalog
+        and "verify_semantic_contracts(module, catalog)" in ir_verify,
+        "generic IR verification does not invoke registered dialect semantics",
+    )
+    require(
+        "cics_executable_descriptor" in semantic_verify,
+        "generic IR semantic verification bypasses the dialect-owned CICS effect registry",
+    )
+    for required in [
+        "decode_decimal_assignment_plan",
+        "decode_cics_effect_plan",
+        "decimal plan wire version does not match operation major",
+        "operation storage declarations differ from plan slots",
+        "typed condition branch mask does not match control topology",
+    ]:
+        require(required in semantic_verify, f"typed semantic verifier omits {required}")
+
+    framework = read(
+        root, "crates/tooling/mainframe-env-conformance/src/framework.rs"
+    )
+    require(
+        "fn compiler_and_interpreter_operation_registries_match()" in framework
+        and "mainframe_env_compiler::core_mir_catalog()" in framework
+        and "mainframe_env_interpreter::supported_operations()" in framework
+        and "CICS_EXECUTABLE_DESCRIPTORS" in framework
+        and "OperationSemanticContract::CicsEffect" in framework
+        and "schema.allowed_effects" in framework
+        and "schema.runtime_import" in framework,
+        "compiler and runtime executable registries lack a consistency check",
+    )
+    cics_coordinator = production(
+        read(
+            root,
+            "crates/tooling/mainframe-env-conformance/src/cics_pilot/coordinator.rs",
+        )
+    )
+    for required in [
+        "ExecutionCoordinator::durable(",
+        ".execute(",
+        "LifecycleEventKind::EffectIntent",
+        "LifecycleEventKind::EffectResult",
+        "EffectState::Completed",
+    ]:
+        require(
+            required in cics_coordinator,
+            f"typed CICS product proof bypasses coordinator invariant {required}",
+        )
+    reject(
+        cics_coordinator,
+        ["ScopedHostService::invoke", ".invoke("],
+        "typed CICS coordinator proof",
+    )
+
+    store_model = production(
+        read(root, "crates/contracts/mainframe-env-store-api/src/model.rs")
+    )
+    server_cobol = production(read(root, "crates/apps/mainframe-env-server/src/cobol.rs"))
+    server_artifact = production(
+        read(root, "crates/apps/mainframe-env-server/src/cobol/artifact.rs")
+    )
+    server_product = production(read(root, "crates/apps/mainframe-env-server/src/product.rs"))
+    require(
+        "pub struct ExecutableArtifactMetadata" in store_model
+        and "pub executable: Option<ExecutableArtifactMetadata>" in store_model,
+        "artifact persistence does not retain versioned executable metadata",
+    )
+    require(
+        "pub(crate) fn admit_executable_artifact" in server_artifact
+        and "ValidatedArtifact::read" in server_artifact
+        and "admit_executable_artifact(&record)?" in server_product
+        and "ReferenceMachine::from_binary(\n                &record.payload" not in server_cobol
+        and "ReferenceMachine::from_binary(\n                &record.payload" not in server_product,
+        "normal product load or restore bypasses manifest-aware artifact admission",
+    )
     release = tomllib.loads(read(root, "release.toml"))
     versions = json.loads(read(root, "conformance/0.2/inventory/versions.json"))
     require(
@@ -229,6 +380,23 @@ def check(root: Path) -> None:
         and "mainframe-env-compiler" not in application_manifest
         and "mainframe-env-interpreter" not in application_manifest,
         "resource-definition parsing must remain outside COBOL HIR and the program VM",
+    )
+
+    decimal_adapter = read(
+        root, "crates/tooling/mainframe-env-conformance/src/decimal_adapter.rs"
+    )
+    for required in [
+        'LEDGER_FORMULA_CONTRACT: &str = "ledger.formula@1"',
+        "verify_legal",
+        'OperationIdentity::new(DECIMAL_NAMESPACE, "assign", major)',
+        "DecimalExecutionPolicy::decimal18_v1()",
+        "DecimalExecutionPolicy::decimal34_v1()",
+    ]:
+        require(required in decimal_adapter, f"independent decimal adapter omits {required}")
+    reject(
+        decimal_adapter,
+        ["mainframe_env_compiler", "CobolHir", '"cobol.add@1"', '"cobol.compute@1"'],
+        "independent decimal adapter",
     )
 
 

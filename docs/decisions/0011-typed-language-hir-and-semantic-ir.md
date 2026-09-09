@@ -49,6 +49,21 @@ Each arrow is an owned validation boundary. No later layer may infer that an
 earlier layer successfully resolved a construct merely because source text or
 an untyped string survived into the artifact.
 
+### Responsibility and dependency matrix
+
+| Component | Responsibility | Dependency boundary |
+| --- | --- | --- |
+| Generic IR framework | Common representation, registration, codec infrastructure, and verification mechanisms | Has no dependency on a language frontend, runtime adapter, interpreter, or provider implementation |
+| Dialect | Operation schemas, typed plans, dialect-specific codecs, and static validation rules | Depends on generic contracts only; it does not import compiler, interpreter, or provider implementations |
+| Language frontend/lowering | Language-specific interpretation, binding, policies, condition semantics, and source provenance | May depend on generic IR and dialect contracts; it must not depend on interpreter or provider implementations |
+| Runtime adapter | Execute an already-resolved contract and evaluate genuinely dynamic inputs | May depend on generic IR, dialect contracts, and typed host APIs; it must not import language HIR or provider implementations |
+| Provider | Own subsystem resources, authorization, transitions, recovery, and its resource-generation state | Consumes typed host requests through the coordinator; it must not import frontend/HIR types or create a second execution/state authority |
+
+This matrix governs ownership, not file placement. A dialect need not live in a
+separate crate, but validator reuse must follow the dependency boundary: a
+compiler cannot reuse validation by importing an interpreter or provider, and
+a runtime adapter cannot become a second provider or execution coordinator.
+
 ### Language HIR remains language-specific
 
 Each programming-language frontend owns its own HIR types, verification rules,
@@ -104,6 +119,50 @@ A specialized operation may compose shared decimal, storage, or control
 semantics. That reuse must not erase COBOL receiver rules, CICS conditions,
 Db2 transaction behavior, aliasing, provenance, or failure taxonomy.
 
+#### Decimal assignment responsibility and policy
+
+`mainframe.decimal@2.assign` is a shared executable operation, not a universal
+HIR and not a claim that every language has COBOL arithmetic. Its canonical
+`mainframe-env.decimal-assignment-plan@2` payload separates provenance from
+the policies that select observable execution:
+
+| Contract element | Responsibility | Current reviewed value |
+| --- | --- | --- |
+| `semantic_origin` | Frontend provenance only; it never selects v2 dispatch or behavior | COBOL emits `cobol.add@1` or `cobol.compute@1`; the bounded ledger adapter emits `ledger.formula@1` |
+| arithmetic context | Shared decimal evaluator precision, exponent range, primitive rounding, and division guard scale | `Decimal18V1` or `Decimal34V1`: 18 or 34 digits, exponent range -9999 through 9999, primitive truncation, nine division guard places |
+| storage ABI | Adapter-visible layout metadata and physical numeric bytes | `CobolNumericV1`; reuse is explicit and does not rename this ABI as language-neutral |
+| receiver update | Operand visibility and conversion-failure commit behavior | `CapturedOperandsReceiverLocalV1`: capture all operands and commit receiver-local results; preserve a failed receiver when `ON SIZE ERROR` is declared, otherwise store its truncated result |
+| condition policy | Mapping of evaluation/conversion failures to executable control | `CobolSizeErrorV1`, paired with the typed `cobol.arithmetic-size-error@1` branch contract; the condition is selected only after all receiver work |
+| receiver rounding | Per-destination conversion behavior | The plan carries one `DecimalRoundingPolicy` for each receiver |
+
+The independent `ledger.formula@1` conformance adapter parses its own bounded
+input, selects the same declared policy types, emits `mainframe.decimal@2.assign`,
+passes ordinary IR semantic verification, and executes in the production
+reference machine. It imports neither COBOL HIR nor the COBOL ADD/COMPUTE
+producer identities. Its exact 18-versus-34-digit result demonstrates reuse of
+the declared arithmetic boundary; its selection of `CobolNumericV1` and
+`CobolSizeErrorV1` keeps the remaining language-specific obligations visible.
+This is a bounded adapter proof, not implementation of a second complete
+programming language.
+
+The historical pair `mainframe.decimal@1.assign` and
+`mainframe-env.decimal-assignment-plan@1` retains its reviewed implicit COBOL
+module arithmetic context, whole-batch receiver atomicity, and COBOL-origin
+allowlist. The v1 reader maps those bytes only to a read-only legacy policy.
+Writers emit v2. Operation/plan version mismatches, unknown policy tags, a v1
+origin outside its allowlist, and attempts to emit the legacy policy in v2 all
+fail closed; v2 never dispatches by `semantic_origin`.
+
+The unconditional whole-batch behavior in the older source-token arithmetic
+handler predates the typed-HIR change (it is present at the PR base
+`8b7459a`). It is not an expected-result authority. Current token-compatible
+ADD/SUBTRACT execution captures every operand and commits successful receivers.
+When a receiver conversion fails, it preserves that receiver only when an
+`ON SIZE ERROR` phrase is present; without the phrase it stores the truncated
+result. Condition selection happens after receiver processing. This bug fix is
+distinct from the immutable decimal-plan `@1` reader above, whose published
+byte contract remains intentionally unchanged.
+
 ### Typed host effects are the integration boundary
 
 Providers consume owned typed requests, never source text, frontend syntax, or
@@ -122,6 +181,24 @@ checkpointing, replay, and recovery. A typed-IR migration must pass through the
 existing provider and store authorities; it must not create a direct
 interpreter-to-store path or a second subsystem implementation.
 
+For the migrated CICS `READ`, `REWRITE`, and `SYNCPOINT` pilot, ownership is
+explicit and deliberately narrow:
+
+| Fact | Authoritative owner | Consumers/check |
+| --- | --- | --- |
+| executable command identity, semantic major, exact effect sequence, and `host.cics` import | typed CICS dialect descriptor registry in generic IR | compiler catalog, static verifier, and runtime registry consume the same descriptor |
+| typed operand/option/output direction and operation-specific static shape | `CicsEffectPlan` codec and its dialect validator | COBOL lowering must construct a canonical valid plan; artifact admission rechecks it |
+| source spelling, COBOL reference resolution, and static storage binding | COBOL frontend/HIR lowering | no provider or runtime token parser participates |
+| executable registration and legal host binding | compiler MIR catalog materialized from the dialect descriptors | the compiler/interpreter registry consistency test checks every descriptor and the architecture guard rejects duplicated identity/effect tables |
+| evaluation of dynamic storage values and mapping to typed `HostRequest::Cics` | reference-machine CICS runtime adapter | the adapter consumes an already-resolved plan and does not own provider state |
+| resource authorization, file/update context, unit-of-work transition, rollback/commit, and recovery | existing scoped host, CICS/dataset providers, coordinator, and stores | the durable CICS pilot checks coordinator lifecycle, ordered effect journal, audit sequence, and mutating-effect completion |
+
+Adding another CICS command to this mechanism requires extending the descriptor,
+plan-shape rules, frontend translation, adapter mapping, and focused
+transition/recovery tests together. This bounded consistency contract avoids a
+second allowlist without introducing a universal semantic DSL; broader command
+families remain follow-up work under #130/#15.
+
 ### JCL and resource DSLs remain separate
 
 JCL lowers to a typed immutable job/workflow plan executed by JES and batch
@@ -133,11 +210,14 @@ resource artifacts consumed by their owning subsystem. They may share source,
 provenance, diagnostics, artifact lifecycle, security, store, and conformance
 contracts without sharing a programming-language HIR or execution loop.
 
-The initial adoption proof for this decision is the existing versioned JCL
-`JobPlan`/JES path. BMS and CSD remain separate, subsystem-owned parser/resource
-paths and are not represented as program operations; standalone serialization
-of their current in-memory resource models is a later vertical slice, not a
-claim made by the ADD/COMPUTE and CICS pilot migration.
+Workflow independence is proven by the existing versioned JCL `JobPlan`/JES
+path. IR-framework and shared-decimal reuse are separately proven by the
+bounded `ledger.formula@1` adapter described above. BMS and CSD remain separate,
+subsystem-owned parser/resource paths and are not represented as program
+operations; standalone serialization of their current in-memory resource
+models is a later vertical slice, not a claim made by the ADD/COMPUTE, decimal
+adapter, and CICS pilot migration. Complete PL/I, HLASM, and REXX frontends also
+remain unimplemented.
 
 ### Compatibility is explicit and fail-closed
 
@@ -166,6 +246,26 @@ Historical artifacts, checkpoints, conformance verdicts, and differential
 evidence remain bound to the contract versions that produced them; a compiler
 upgrade does not rewrite that history.
 
+The product-owned COBOL reference environment currently admits the following
+exact compatibility profile before installation, execution, or resume:
+
+| Profile field | Admitted value/range | Decision |
+| --- | --- | --- |
+| environment profile | `mainframe-env.cobol.reference@1` | Host compatibility is owned by the product environment, not deferred to a provider effect |
+| source artifact contract | `mainframe-env.artifact@2` or `mainframe-env.artifact@3` | `@2` is the retained pre-dialect-manifest reader; writers emit only `@3`; every other version is rejected |
+| compiler generation and target | exactly `mainframe-env-cobol-0.8.3` and `reference` | No cross-generation semantic compatibility is inferred |
+| normalized options | exactly `cobol.effective-arith` (`compatible` or `extended`), `cobol.effective-dispsign` (`compatible` or `separate`), and `cobol.effective-lp` (`32` or `64`) | Unknown or missing semantic options are rejected |
+| host ABI set | exactly `mainframe-env.host@1` and `mainframe-env.cics@1` | Capability and resource authorization still occur at dispatch |
+| IR envelope | exactly `mainframe-env.ir-envelope@1` | Canonical bytes and the registered executable profile are revalidated |
+
+For `@2`, the reader derives the missing dialect set only in the admitted
+in-memory view; it preserves the original payload, content digest, source
+contract, and recorded semantic identity. For `@3`, the declared dialect set
+must equal the immutable payload's executable dialects. Persisted metadata is
+canonically bound to its semantic identity and payload digest. A checkpoint
+resume additionally requires the same artifact identity and recorded provider
+generations before any terminal, exchange, coordinator, or provider mutation.
+
 Artifact semantic identity includes frontend/compiler generation, normalized
 options, dialect requirements, and host-interface requirements. Exact payload
 identity remains separate. Checkpoint restoration validates the artifact and
@@ -187,6 +287,22 @@ Migration proceeds as vertical semantic slices rather than as a flag day:
 5. Exercise a bounded second frontend or clearly different family against the
    same IR/effect framework without importing COBOL HIR or forking the
    coordinator/provider contracts.
+
+The current family routes and retirement conditions are intentionally bounded:
+
+| Family/forms | Current selected route | Deliberate compatibility scope | Cutover/deprecation criterion |
+| --- | --- | --- | --- |
+| COBOL `ADD` and `COMPUTE` with statically resolved numeric operands, receivers, and supported bounded expressions | Typed COBOL HIR to `mainframe.decimal@2.assign`; tests assert both operation selection and exact values/bytes | Runtime subscripts, special registers/intrinsics, and expressions beyond the current typed depth remain explicit `mainframe.core.cobol` operations | Model remaining dynamic references as typed deferred expressions with runtime bounds checks, verify their static shape, and land route-plus-result and mutation tests before removing the source-token route |
+| COBOL `ADD CORRESPONDING` with unmodified, unsubscripted eligible group operands | COBOL HIR resolves relative-qualified, bilaterally unique pairs and emits `mainframe.decimal@2.assign` | A valid selected table-group subscript uses the explicit core-COBOL route; missing required subscripts, reference modification, UTF-8 groups in this slice, and numeric national-byte pairs fail before publication rather than falling through | Add a versioned typed selected-group reference/offset contract, runtime bounds checks, qualification/exclusion tests on both routes, and exact byte evidence before retiring this compatibility route |
+| Migrated CICS commands with statically resolved option direction and bindings | Typed CICS plan through the existing machine, coordinator, typed host request, and provider | Commands/options outside the declared pilot remain on their documented existing route; a malformed typed plan never falls back to token interpretation | Extend the authoritative descriptors and binding verifier with command-specific transition/recovery tests before moving each additional command family; do not infer completion of all CICS 0.9 work |
+| Published decimal operation/plan major `@1` | Read-only version-selected compatibility handler | Historical bytes and semantic identities remain immutable | Retain for the documented artifact range; removal requires an explicit compatibility/version decision and is independent of source-route cutover |
+
+There is one default route for each recognized form: typed selection happens in
+the frontend, and a malformed or unsupported typed artifact fails its declared
+contract. Compatibility execution is selected only for the forms named above;
+the runtime does not retry source-token interpretation after typed validation or
+execution fails. Thus migration may be incremental without leaving two
+interchangeable default interpretations indefinitely.
 
 Every migrated slice requires parser recognition, static semantic validation,
 HIR verification/legalization, exact value or byte execution, applicable

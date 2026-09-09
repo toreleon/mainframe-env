@@ -224,6 +224,10 @@ pub(crate) fn lower_to_core(
                 }),
             ),
             (
+                "occurs_clause".into(),
+                Attribute::Integer(i64::from(layout.occurs_clause)),
+            ),
+            (
                 "occurs_min".into(),
                 Attribute::Integer(layout.occurs_min as i64),
             ),
@@ -263,6 +267,10 @@ pub(crate) fn lower_to_core(
             (
                 "parent".into(),
                 Attribute::Text(layout.parent.clone().unwrap_or_default()),
+            ),
+            (
+                "alias_of".into(),
+                Attribute::Text(layout.alias_of.clone().unwrap_or_default()),
             ),
             (
                 "condition_values".into(),
@@ -397,7 +405,7 @@ pub(crate) fn lower_to_core(
             .map_err(|_| LowerProblem::LimitExceeded)?;
     }
     if structured {
-        lower_structured(hir, &mut builder, block, &storage)?;
+        lower_structured(hir, &mut builder, block, &storage, arithmetic_mode)?;
     } else {
         for statement in &hir.statements {
             lower_statement(
@@ -407,6 +415,7 @@ pub(crate) fn lower_to_core(
                 block,
                 &storage,
                 BTreeMap::new(),
+                arithmetic_mode,
             )?;
         }
     }
@@ -418,6 +427,7 @@ fn lower_structured(
     builder: &mut ModuleBuilder,
     block: mainframe_env_ir::BlockId,
     storage: &BTreeMap<String, mainframe_env_ir::StorageId>,
+    arithmetic_mode: &str,
 ) -> Result<(), LowerProblem> {
     let typed_size_error_branches = typed_size_error_branch_polarities(hir)?;
     for node in &hir.control_nodes {
@@ -498,7 +508,15 @@ fn lower_structured(
             );
         }
         if let Some(statement) = node.statement.and_then(|index| hir.statements.get(index)) {
-            lower_statement(statement, hir, builder, block, storage, control)?;
+            lower_statement(
+                statement,
+                hir,
+                builder,
+                block,
+                storage,
+                control,
+                arithmetic_mode,
+            )?;
         } else {
             builder
                 .add_operation(
@@ -603,6 +621,7 @@ fn lower_statement(
     block: mainframe_env_ir::BlockId,
     storage: &BTreeMap<String, mainframe_env_ir::StorageId>,
     attributes: BTreeMap<String, Attribute>,
+    arithmetic_mode: &str,
 ) -> Result<(), LowerProblem> {
     if let Some(resolved) = statement.resolved.as_ref()
         && matches!(
@@ -610,7 +629,9 @@ fn lower_statement(
             crate::HirResolvedStatement::Add(_) | crate::HirResolvedStatement::Compute(_)
         )
     {
-        let encoded = crate::hir::decimal::encode_statement(resolved, storage)
+        let policy = crate::hir::decimal::execution_policy(arithmetic_mode)
+            .map_err(|_| LowerProblem::InvalidOperation)?;
+        let encoded = crate::hir::decimal::encode_statement(resolved, storage, policy)
             .map_err(|_| LowerProblem::InvalidOperation)?;
         let mut operation_attributes = attributes;
         operation_attributes.remove("control_text");

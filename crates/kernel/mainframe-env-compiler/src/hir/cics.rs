@@ -4,10 +4,11 @@ use super::{
     HirDataReference, HirProblem, HirResolvedStatement, HirStatement, StatementKind,
 };
 use mainframe_env_ir::{
-    Attribute, BlockId, CicsCondition, CicsEffectPlan, CicsNamedOperand, CicsOperandName,
-    CicsOperandValue, CicsOutputBinding, CicsOutputName, CicsPlanLimits, CicsPlanOperation,
-    CicsPlanOption, CicsStorageSlot, Effect, ModuleBuilder, OperationCatalog, OperationIdentity,
-    OperationSchema, StorageId, StorageReference, encode_cics_effect_plan,
+    Attribute, BlockId, CICS_EXECUTABLE_DESCRIPTORS, CicsCondition, CicsEffectPlan,
+    CicsNamedOperand, CicsOperandName, CicsOperandValue, CicsOperationContract, CicsOutputBinding,
+    CicsOutputName, CicsPlanLimits, CicsPlanOperation, CicsPlanOption, CicsStorageSlot, Effect,
+    ModuleBuilder, OperationCatalog, OperationIdentity, OperationSchema, OperationSemanticContract,
+    StorageId, StorageReference, cics_executable_descriptor, encode_cics_effect_plan,
 };
 use std::collections::BTreeMap;
 
@@ -26,34 +27,13 @@ pub(crate) enum CicsPlanProblem {
 }
 
 pub(crate) fn executable_identity(operation: HirCicsOperation) -> OperationIdentity {
-    let (namespace, name) = match operation {
-        HirCicsOperation::Read => ("cics.file", "read"),
-        HirCicsOperation::Rewrite => ("cics.file", "rewrite"),
-        HirCicsOperation::Syncpoint => ("cics.recovery", "syncpoint"),
-    };
-    OperationIdentity::new(namespace, name, 1).expect("static typed CICS identity")
+    cics_executable_descriptor(plan_operation(operation)).identity()
 }
 
 pub(crate) fn operation_effects(operation: HirCicsOperation) -> Vec<Effect> {
-    match operation {
-        HirCicsOperation::Read => vec![
-            Effect::DatasetRead,
-            Effect::MemoryRead,
-            Effect::MemoryWrite,
-            Effect::Condition,
-            Effect::Transaction,
-        ],
-        HirCicsOperation::Rewrite => vec![
-            Effect::DatasetWrite,
-            Effect::MemoryRead,
-            Effect::MemoryWrite,
-            Effect::Condition,
-            Effect::Transaction,
-        ],
-        HirCicsOperation::Syncpoint => {
-            vec![Effect::MemoryWrite, Effect::Condition, Effect::Transaction]
-        }
-    }
+    cics_executable_descriptor(plan_operation(operation))
+        .effects
+        .to_vec()
 }
 
 pub(crate) fn register_hir_operation(catalog: &mut OperationCatalog) {
@@ -61,29 +41,34 @@ pub(crate) fn register_hir_operation(catalog: &mut OperationCatalog) {
         .expect("static typed CICS HIR identity");
     let mut schema = OperationSchema::pure(identity, 0, 0);
     schema.required_attributes = [CICS_PLAN_ATTRIBUTE.into()].into_iter().collect();
-    schema.allowed_effects = [
-        HirCicsOperation::Read,
-        HirCicsOperation::Rewrite,
-        HirCicsOperation::Syncpoint,
-    ]
-    .into_iter()
-    .flat_map(operation_effects)
-    .collect();
+    schema.allowed_effects = CICS_EXECUTABLE_DESCRIPTORS
+        .iter()
+        .flat_map(|descriptor| descriptor.effects.iter().copied())
+        .collect();
+    schema.semantic_contract = OperationSemanticContract::CicsEffect(CicsOperationContract {
+        plan_attribute: CICS_PLAN_ATTRIBUTE.into(),
+        expected_operation: None,
+        layout_definition_operation: None,
+    });
     catalog
         .register(schema)
         .expect("unique typed CICS HIR operation");
 }
 
 pub(crate) fn register_executable_operations(catalog: &mut OperationCatalog) {
-    for operation in [
-        HirCicsOperation::Read,
-        HirCicsOperation::Rewrite,
-        HirCicsOperation::Syncpoint,
-    ] {
-        let mut schema = OperationSchema::pure(executable_identity(operation), 0, 0);
+    for descriptor in CICS_EXECUTABLE_DESCRIPTORS {
+        let mut schema = OperationSchema::pure(descriptor.identity(), 0, 0);
         schema.required_attributes = [CICS_PLAN_ATTRIBUTE.into()].into_iter().collect();
-        schema.allowed_effects = operation_effects(operation).into_iter().collect();
-        schema.runtime_import = Some("host.cics".into());
+        schema.allowed_effects = descriptor.effects.iter().copied().collect();
+        schema.runtime_import = Some(descriptor.runtime_import.into());
+        schema.semantic_contract = OperationSemanticContract::CicsEffect(CicsOperationContract {
+            plan_attribute: CICS_PLAN_ATTRIBUTE.into(),
+            expected_operation: Some(descriptor.operation),
+            layout_definition_operation: Some(
+                OperationIdentity::new("mainframe.core.cobol", "define", 1)
+                    .expect("static COBOL layout definition identity"),
+            ),
+        });
         catalog
             .register(schema)
             .expect("unique typed CICS executable operation");

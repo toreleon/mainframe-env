@@ -1,3 +1,4 @@
+use crate::cobol::artifact::admit_executable_artifact;
 use crate::cobol::bind_compatible_runtime_services;
 use crate::console_retention::{decode_console_log_rows, encode_console_log};
 use crate::jes_worker::{
@@ -157,19 +158,13 @@ impl From<SaturationLevel> for ProductCapacityStatus {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct OnlineProgramDefinition {
-    pub name: String,
-    pub artifact: ArtifactRef,
-    pub payload: Vec<u8>,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct BatchProgramDefinition {
-    pub name: String,
-    pub artifact: ArtifactRef,
-    pub payload: Vec<u8>,
-}
+mod artifact;
+pub use artifact::{BatchProgramDefinition, OnlineProgramDefinition};
+mod continuation;
+use continuation::{
+    OnlineMachineContinuation, decode_online_machine_continuation,
+    encode_online_machine_continuation,
+};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BatchInstallReceipt {
@@ -236,12 +231,6 @@ pub struct OnlineInstallReceipt {
     pub maps: usize,
     pub identity: String,
     pub replayed: bool,
-}
-
-struct OnlineMachineContinuation {
-    program: String,
-    checkpoint: BoundedPayload,
-    version: u64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -689,6 +678,7 @@ impl ProductServer {
         jes_clock: Option<Arc<dyn JesClock>>,
     ) -> Result<Arc<Self>, HostProblem> {
         config.validate()?;
+        let installed = artifact::preflight_installed(store.as_ref(), artifacts.as_ref())?;
         let jes_clock: Arc<dyn JesClock> = match jes_clock {
             Some(clock) => clock,
             None => Arc::new(DurableJesClock::new(store.clone()).map_err(store_error)?),
@@ -837,55 +827,8 @@ impl ProductServer {
                 text: entry.text,
             })
             .collect();
-        let mut online_programs = BTreeMap::new();
-        for row in store
-            .list_provider_state("online-program", 4096)
-            .map_err(store_error)?
-        {
-            let artifact = ArtifactRef::new(
-                String::from_utf8(row.payload).map_err(|_| HostProblem::InfrastructureFailure)?,
-                InvocationLimits::default(),
-            )
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-            if artifacts
-                .get_artifact(&artifact)
-                .map_err(store_error)?
-                .is_none()
-                || online_programs.insert(row.key, artifact).is_some()
-            {
-                return Err(HostProblem::InfrastructureFailure);
-            }
-        }
-        let mut online_transactions = BTreeMap::new();
-        for row in store
-            .list_provider_state("online-transaction", 4096)
-            .map_err(store_error)?
-        {
-            let program =
-                String::from_utf8(row.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
-            if !online_programs.contains_key(&program)
-                || online_transactions.insert(row.key, program).is_some()
-            {
-                return Err(HostProblem::InfrastructureFailure);
-            }
-        }
-        for row in store
-            .list_provider_state("batch-program", 4096)
-            .map_err(store_error)?
-        {
-            let artifact = ArtifactRef::new(
-                String::from_utf8(row.payload).map_err(|_| HostProblem::InfrastructureFailure)?,
-                InvocationLimits::default(),
-            )
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-            if artifacts
-                .get_artifact(&artifact)
-                .map_err(store_error)?
-                .is_none()
-            {
-                return Err(HostProblem::InfrastructureFailure);
-            }
-        }
+        let online_programs = installed.online_programs;
+        let online_transactions = installed.online_transactions;
         cics.register_programs(&online_programs.keys().cloned().collect())?;
         let sequence = match store
             .get_provider_state("server-meta", "next-sequence")
@@ -1052,27 +995,37 @@ impl ProductServer {
             return Err(HostProblem::Malformed);
         }
         let mut programs = BTreeMap::new();
+        let mut artifact_records = Vec::with_capacity(definition.programs.len());
         let mut identity = Sha256::new();
         for definition in &definition.programs {
             let name = normalize_online_name(&definition.name, 128)?;
-            let digest: [u8; 32] = Sha256::digest(&definition.payload).into();
-            if definition.artifact.as_str() != format!("sha256:{}", hex_digest(&digest))
-                || programs
-                    .insert(name.clone(), definition.artifact.clone())
-                    .is_some()
+            if programs
+                .insert(name.clone(), definition.artifact.clone())
+                .is_some()
             {
                 return Err(HostProblem::IdempotencyConflict);
             }
-            self.artifacts
-                .put_artifact(ArtifactRecord {
-                    artifact: definition.artifact.clone(),
-                    media_type: "application/vnd.mainframe-env.core-mir".into(),
-                    payload_digest: digest,
-                    payload: definition.payload.clone(),
-                })
-                .map_err(store_error)?;
+            let record = artifact::admitted_record(
+                &definition.artifact,
+                &definition.payload,
+                &definition.manifest,
+                &definition.semantic_identity,
+            )?;
+            if let Some(existing) = artifact_records
+                .iter()
+                .find(|existing: &&ArtifactRecord| existing.artifact == record.artifact)
+            {
+                if existing != &record {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+            } else {
+                artifact_records.push(record);
+            }
             digest_online_field(&mut identity, name.as_bytes());
             digest_online_field(&mut identity, definition.artifact.as_str().as_bytes());
+        }
+        for record in artifact_records {
+            self.artifacts.put_artifact(record).map_err(store_error)?;
         }
         let mut transactions = BTreeMap::new();
         for (transaction, program) in &definition.transactions {
@@ -1164,27 +1117,37 @@ impl ProductServer {
             return Err(HostProblem::Malformed);
         }
         let mut programs = BTreeMap::new();
+        let mut artifact_records = Vec::with_capacity(definitions.len());
         let mut identity = Sha256::new();
         for definition in &definitions {
             let name = normalize_online_name(&definition.name, 128)?;
-            let digest: [u8; 32] = Sha256::digest(&definition.payload).into();
-            if definition.artifact.as_str() != format!("sha256:{}", hex_digest(&digest))
-                || programs
-                    .insert(name.clone(), definition.artifact.clone())
-                    .is_some()
+            if programs
+                .insert(name.clone(), definition.artifact.clone())
+                .is_some()
             {
                 return Err(HostProblem::IdempotencyConflict);
             }
-            self.artifacts
-                .put_artifact(ArtifactRecord {
-                    artifact: definition.artifact.clone(),
-                    media_type: "application/vnd.mainframe-env.core-mir".into(),
-                    payload_digest: digest,
-                    payload: definition.payload.clone(),
-                })
-                .map_err(store_error)?;
+            let record = artifact::admitted_record(
+                &definition.artifact,
+                &definition.payload,
+                &definition.manifest,
+                &definition.semantic_identity,
+            )?;
+            if let Some(existing) = artifact_records
+                .iter()
+                .find(|existing: &&ArtifactRecord| existing.artifact == record.artifact)
+            {
+                if existing != &record {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+            } else {
+                artifact_records.push(record);
+            }
             digest_online_field(&mut identity, name.as_bytes());
             digest_online_field(&mut identity, definition.artifact.as_str().as_bytes());
+        }
+        for record in artifact_records {
+            self.artifacts.put_artifact(record).map_err(store_error)?;
         }
         let mut writes = Vec::new();
         for (name, artifact) in &programs {
@@ -2023,6 +1986,8 @@ impl ProductServer {
         &self,
         session: &SessionId,
         program: &str,
+        artifact: &ArtifactRef,
+        provider_generations: &BTreeMap<CapabilityId, String>,
         checkpoint: &BoundedPayload,
         current_version: Option<u64>,
     ) -> Result<u64, HostProblem> {
@@ -2036,7 +2001,12 @@ impl ProductServer {
                     namespace: "online-machine-continuation".into(),
                     key: session.as_str().into(),
                     version,
-                    payload: encode_online_machine_continuation(program, checkpoint)?,
+                    payload: encode_online_machine_continuation(
+                        program,
+                        artifact,
+                        provider_generations,
+                        checkpoint,
+                    )?,
                 },
                 current_version,
             )
@@ -2206,8 +2176,13 @@ impl ProductServer {
         program: &str,
         now_tick: u64,
     ) -> Result<(), HostProblem> {
+        let saved = self.preflight_online_continuation(session, Some(program))?;
+        if saved.is_none() {
+            self.preflight_online_program(program)?;
+        }
         let mut exchange = self.online_exchange(session)?;
         if let Some(state) = exchange.as_ref() {
+            self.preflight_online_exchange_state(state)?;
             if state.principal != principal.as_str()
                 || state.program != normalize_online_name(program, 128)?
             {
@@ -2264,6 +2239,11 @@ impl ProductServer {
             }
         };
         let mut invocation = context.invocation;
+        if let Some(continuation) = saved.as_ref() {
+            invocation
+                .provider_generations
+                .clone_from(&continuation.provider_generations);
+        }
         invocation.bindings.insert(
             "cics.commarea".into(),
             BoundedPayload::new(
@@ -2292,7 +2272,6 @@ impl ProductServer {
             .map_err(|_| HostProblem::ResourceExhausted)?,
         );
         bind_compatible_runtime_services(&mut invocation)?;
-        let saved = self.online_machine_continuation(session)?;
         let mut saved_version = saved.as_ref().map(|saved| saved.version);
         let mut saved_checkpoint = saved.as_ref().map(|saved| saved.checkpoint.clone());
         let mut current = normalize_online_name(
@@ -2315,17 +2294,25 @@ impl ProductServer {
                 .get_artifact(&artifact)
                 .map_err(store_error)?
                 .ok_or(HostProblem::NotFound)?;
+            if frame == 0
+                && saved
+                    .as_ref()
+                    .is_some_and(|continuation| continuation.artifact != artifact)
+            {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            let executable = admit_executable_artifact(&record)?;
             invocation.selector =
                 Selector::new(format!("program:{current}"), InvocationLimits::default())
                     .map_err(|_| HostProblem::InfrastructureFailure)?;
-            invocation.artifact = artifact;
+            invocation.artifact = artifact.clone();
             invocation.idempotency_key = IdempotencyKey::new(
                 format!("{root_idempotency}:{frame}:{current}"),
                 InvocationLimits::default(),
             )
             .map_err(|_| HostProblem::ResourceExhausted)?;
             let mut machine = ReferenceMachine::from_binary(
-                &record.payload,
+                executable.payload(),
                 invocation.clone(),
                 CodecLimits::default(),
             )
@@ -2363,6 +2350,8 @@ impl ProductServer {
                     let _ = self.persist_online_machine_continuation(
                         session,
                         &current,
+                        &artifact,
+                        &invocation.provider_generations,
                         &checkpoint,
                         saved_version,
                     )?;
@@ -2384,6 +2373,8 @@ impl ProductServer {
                     return Ok(());
                 }
                 ExecutionOutcome::Transfer(transfer) if transfer.replace_frame => {
+                    let (next_program, _) =
+                        self.preflight_online_program(transfer.selector.as_str())?;
                     self.clear_online_machine_continuation(session, saved_version)?;
                     saved_version = None;
                     self.online_traces
@@ -2398,7 +2389,7 @@ impl ProductServer {
                             response2: 0,
                             payload_bytes: 0,
                         });
-                    current = normalize_online_name(transfer.selector.as_str(), 128)?;
+                    current = next_program;
                     invocation.bindings.insert(
                         "cics.commarea".into(),
                         BoundedPayload::new(
@@ -4070,6 +4061,10 @@ impl ProductServer {
                 )
                 .map_err(|_| gateway_problem(HostProblem::InfrastructureFailure))?;
                 let online = self.online_transaction(&transaction)?;
+                if let Some((_, artifact)) = online.as_ref() {
+                    artifact::preflight_one(self.artifacts.as_ref(), artifact)
+                        .map_err(gateway_problem)?;
+                }
                 let invocation = self.cics_invocation(
                     &principal,
                     &transaction,
@@ -4178,9 +4173,13 @@ impl ProductServer {
             } => {
                 let session = terminal_session_id(&session)?;
                 let principal_id = terminal_principal(&principal)?;
+                self.preflight_online_continuation(&session, None)
+                    .map_err(gateway_problem)?;
                 let snapshot = self.online_exchange(&session).map_err(gateway_problem)?;
                 let mut start_fresh_task = snapshot.is_none();
                 if let Some(exchange) = snapshot {
+                    self.preflight_online_exchange_state(&exchange)
+                        .map_err(gateway_problem)?;
                     let tick = current_tick()?;
                     self.cics
                         .validate_terminal_resume(&session, &principal_id, &csrf_token, tick)
@@ -4218,13 +4217,23 @@ impl ProductServer {
                         .cics
                         .terminal_snapshot(&session, &principal_id, current_tick()?)
                         .map_err(gateway_problem)?;
-                    let invocation =
-                        self.cics_invocation(&principal, &snapshot.transaction, None)?;
+                    let online = self.online_transaction(&snapshot.transaction)?;
+                    if let Some((_, artifact)) = online.as_ref() {
+                        artifact::preflight_one(self.artifacts.as_ref(), artifact)
+                            .map_err(gateway_problem)?;
+                    }
+                    let invocation = self.cics_invocation(
+                        &principal,
+                        &snapshot.transaction,
+                        online.as_ref().map(|(_, artifact)| artifact.clone()),
+                    )?;
                     let resumed = self
                         .cics
                         .resume_terminal(invocation, &session, &csrf_token, current_tick()?)
                         .map_err(gateway_problem)?;
-                    let online = self.online_transaction(&resumed.transaction)?;
+                    if resumed.transaction != snapshot.transaction {
+                        return Err(gateway_problem(HostProblem::InfrastructureFailure));
+                    }
                     if let Some((program, _)) = online {
                         self.run_online_exchange(
                             &session,
@@ -5127,20 +5136,7 @@ impl ProductServer {
                 principal,
                 &format!("cics:{}", transaction.to_ascii_uppercase()),
                 ServiceClass::Interactive,
-                &[
-                    "host.security.authorize",
-                    "host.cics.execute",
-                    "host.dataset.read",
-                    "host.dataset.write",
-                    "host.db2.read",
-                    "host.db2.write",
-                    "host.ims.read",
-                    "host.ims.write",
-                    "host.mq.read",
-                    "host.mq.write",
-                    "host.program.invoke",
-                    "host.clock",
-                ],
+                &continuation::ONLINE_PROVIDER_CAPABILITIES,
             )
             .map_err(gateway_problem)?;
         if let Some(artifact) = artifact {
@@ -6024,76 +6020,6 @@ fn normalize_online_name(value: &str, max: usize) -> Result<String, HostProblem>
     }
 }
 
-fn encode_online_machine_continuation(
-    program: &str,
-    checkpoint: &BoundedPayload,
-) -> Result<Vec<u8>, HostProblem> {
-    let mut encoded = b"MEOM1".to_vec();
-    for value in [
-        program.as_bytes(),
-        checkpoint.schema().as_bytes(),
-        checkpoint.bytes(),
-    ] {
-        encoded.extend_from_slice(
-            &u32::try_from(value.len())
-                .map_err(|_| HostProblem::ResourceExhausted)?
-                .to_be_bytes(),
-        );
-        encoded.extend_from_slice(value);
-    }
-    Ok(encoded)
-}
-
-fn decode_online_machine_continuation(
-    record: &ProviderStateRecord,
-) -> Result<OnlineMachineContinuation, HostProblem> {
-    if !record.payload.starts_with(b"MEOM1") {
-        return Err(HostProblem::InfrastructureFailure);
-    }
-    let mut at = 5usize;
-    let mut next = || -> Result<Vec<u8>, HostProblem> {
-        let length = usize::try_from(u32::from_be_bytes(
-            record
-                .payload
-                .get(at..at + 4)
-                .ok_or(HostProblem::InfrastructureFailure)?
-                .try_into()
-                .map_err(|_| HostProblem::InfrastructureFailure)?,
-        ))
-        .map_err(|_| HostProblem::InfrastructureFailure)?;
-        at += 4;
-        let end = at
-            .checked_add(length)
-            .ok_or(HostProblem::InfrastructureFailure)?;
-        let value = record
-            .payload
-            .get(at..end)
-            .ok_or(HostProblem::InfrastructureFailure)?
-            .to_vec();
-        at = end;
-        Ok(value)
-    };
-    let program = String::from_utf8(next()?).map_err(|_| HostProblem::InfrastructureFailure)?;
-    let schema = String::from_utf8(next()?).map_err(|_| HostProblem::InfrastructureFailure)?;
-    let bytes = next()?;
-    if at != record.payload.len() {
-        return Err(HostProblem::InfrastructureFailure);
-    }
-    Ok(OnlineMachineContinuation {
-        program: normalize_online_name(&program, 128)?,
-        checkpoint: BoundedPayload::new(
-            schema,
-            bytes,
-            InvocationLimits {
-                max_payload_bytes: 64 * 1024 * 1024,
-                ..InvocationLimits::default()
-            },
-        )
-        .map_err(|_| HostProblem::InfrastructureFailure)?,
-        version: record.version,
-    })
-}
-
 fn encode_online_exchange(state: &OnlineExchangeState) -> Result<Vec<u8>, HostProblem> {
     validate_online_exchange(state)?;
     serde_json::to_vec(state).map_err(|_| HostProblem::InfrastructureFailure)
@@ -6575,8 +6501,9 @@ mod tests {
     use base64::Engine;
     use mainframe_env_compiler::CobolCompiler;
     use mainframe_env_compiler_api::{
-        CompilationMode, CompileOptions, CompileTarget, CompilerRequest, CompilerResult,
-        CompilerService,
+        ARTIFACT_CONTRACT, ArtifactManifestV2, CompilationMode, CompileOptions, CompileTarget,
+        CompilerRequest, CompilerResult, CompilerService, LEGACY_ARTIFACT_CONTRACT,
+        PublishedArtifact, VersionedArtifactManifest,
     };
     use mainframe_env_db2::Db2TableDefinition;
     use mainframe_env_source::{
@@ -6976,6 +6903,755 @@ mod tests {
             )),
             ..ServerConfig::default()
         }
+    }
+
+    fn published_fixture(name: &str, body: &str) -> PublishedArtifact {
+        let limits = SourceLimits::default();
+        let path = LogicalPath::new(format!("{name}.cbl"), limits.max_path_bytes).unwrap();
+        let source = format!(
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. {name}.\nPROCEDURE DIVISION.\n{body}\nSTOP RUN.\n"
+        );
+        let bundle = SourceBundle::new(
+            &path,
+            vec![
+                SourceFile::input(
+                    path.as_str(),
+                    source.into_bytes(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("fixture did not publish");
+        };
+        artifact
+    }
+
+    #[test]
+    fn product_install_rejects_manifest_and_payload_mismatches_before_catalog_mutation() {
+        let server = ProductServer::memory(config()).unwrap();
+        let artifact = published_fixture("ADMIT", "DISPLAY 'ADMITTED'.");
+
+        let assert_rejected =
+            |name: &str, manifest: VersionedArtifactManifest, payload: Vec<u8>| {
+                let digest: [u8; 32] = Sha256::digest(&payload).into();
+                let reference = ArtifactRef::new(
+                    format!("sha256:{}", hex_digest(&digest)),
+                    InvocationLimits::default(),
+                )
+                .unwrap();
+                let result = server.install_batch_programs(vec![BatchProgramDefinition {
+                    name: name.into(),
+                    artifact: reference.clone(),
+                    payload,
+                    manifest,
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }]);
+                assert_eq!(result, Err(HostProblem::ProviderFailure));
+                assert!(server.artifacts.get_artifact(&reference).unwrap().is_none());
+                assert!(
+                    server
+                        .store
+                        .get_provider_state("batch-program", name)
+                        .unwrap()
+                        .is_none()
+                );
+            };
+
+        let mut missing = artifact.manifest().clone();
+        missing.dialect_contracts.clear();
+        assert_rejected(
+            "MISSING",
+            VersionedArtifactManifest::V3(missing),
+            artifact.payload().to_vec(),
+        );
+        let mut extra = artifact.manifest().clone();
+        extra.dialect_contracts.insert("invented.dialect@1".into());
+        assert_rejected(
+            "EXTRA",
+            VersionedArtifactManifest::V3(extra),
+            artifact.payload().to_vec(),
+        );
+        let mut wrong_major = artifact.manifest().clone();
+        let first = wrong_major.dialect_contracts.pop_first().unwrap();
+        let namespace = first.rsplit_once('@').unwrap().0;
+        wrong_major
+            .dialect_contracts
+            .insert(format!("{namespace}@99"));
+        assert_rejected(
+            "WRONGMAJOR",
+            VersionedArtifactManifest::V3(wrong_major),
+            artifact.payload().to_vec(),
+        );
+        let other = published_fixture("OTHER", "EXEC CICS SYNCPOINT END-EXEC.");
+        assert_rejected(
+            "WRONGMANIFEST",
+            VersionedArtifactManifest::V3(other.manifest().clone()),
+            artifact.payload().to_vec(),
+        );
+        let mut missing_host = artifact.manifest().clone();
+        missing_host.host_interfaces.remove("mainframe-env.cics@1");
+        assert_rejected(
+            "MISSINGHOST",
+            VersionedArtifactManifest::V3(missing_host),
+            artifact.payload().to_vec(),
+        );
+        let mut wrong_generation = artifact.manifest().clone();
+        wrong_generation.compiler_generation = "mainframe-env-cobol-9.9.9".into();
+        assert_rejected(
+            "WRONGGEN",
+            VersionedArtifactManifest::V3(wrong_generation),
+            artifact.payload().to_vec(),
+        );
+        let mut unknown_option = artifact.manifest().clone();
+        let mut options = unknown_option.options.values().clone();
+        options.insert("unreviewed-runtime-switch".into(), "enabled".into());
+        unknown_option.options = CompileOptions::new(options).unwrap();
+        assert_rejected(
+            "BADOPTION",
+            VersionedArtifactManifest::V3(unknown_option),
+            artifact.payload().to_vec(),
+        );
+        assert_rejected(
+            "MALFORMED",
+            VersionedArtifactManifest::V3(artifact.manifest().clone()),
+            b"not canonical IR".to_vec(),
+        );
+
+        let mut wrong_identity = BatchProgramDefinition::current("WRONGIDENTITY", &artifact);
+        wrong_identity.artifact =
+            ArtifactRef::new(format!("sha256:{:064x}", 0), InvocationLimits::default()).unwrap();
+        assert_eq!(
+            server.install_batch_programs(vec![wrong_identity]),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        assert!(
+            server
+                .store
+                .get_provider_state("batch-program", "WRONGIDENTITY")
+                .unwrap()
+                .is_none()
+        );
+
+        let good = BatchProgramDefinition::current("GOODFIRST", &artifact);
+        let good_id = good.artifact.clone();
+        let mut bad = BatchProgramDefinition::current("BADSECOND", &artifact);
+        let VersionedArtifactManifest::V3(bad_manifest) = &mut bad.manifest else {
+            unreachable!()
+        };
+        bad_manifest.dialect_contracts.insert("unexpected@7".into());
+        assert_eq!(
+            server.install_batch_programs(vec![good, bad]),
+            Err(HostProblem::ProviderFailure)
+        );
+        assert!(server.artifacts.get_artifact(&good_id).unwrap().is_none());
+    }
+
+    struct StaticArtifactStore {
+        record: Mutex<ArtifactRecord>,
+    }
+
+    impl ArtifactStore for StaticArtifactStore {
+        fn health(&self) -> Result<ArtifactStoreHealth, StoreError> {
+            Ok(ArtifactStoreHealth {
+                readable: true,
+                writable: true,
+                used_objects: Some(1),
+                max_objects: Some(2),
+                used_bytes: None,
+                max_bytes: None,
+            })
+        }
+
+        fn put_artifact(&self, record: ArtifactRecord) -> Result<(), StoreError> {
+            let current = self
+                .record
+                .lock()
+                .map_err(|_| StoreError::Infrastructure("poisoned artifact fixture".into()))?;
+            if *current == record {
+                Ok(())
+            } else {
+                Err(StoreError::Conflict)
+            }
+        }
+
+        fn get_artifact(&self, id: &ArtifactRef) -> Result<Option<ArtifactRecord>, StoreError> {
+            let record = self
+                .record
+                .lock()
+                .map_err(|_| StoreError::Infrastructure("poisoned artifact fixture".into()))?;
+            Ok((record.artifact == *id).then(|| record.clone()))
+        }
+
+        fn delete_artifact(&self, _: &ArtifactRef) -> Result<(), StoreError> {
+            Err(StoreError::NotFound)
+        }
+    }
+
+    #[test]
+    fn product_reload_rejects_missing_unsupported_or_incompatible_executable_metadata() {
+        let artifact = published_fixture("RELOAD", "DISPLAY 'RELOAD'.");
+        let reject = |mutate: fn(&mut ArtifactRecord), rebind: bool| {
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let reference = ArtifactRef::new(
+                artifact.content_id().to_reference(),
+                InvocationLimits::default(),
+            )
+            .unwrap();
+            let mut record = crate::cobol::artifact::published_artifact_record(&artifact).unwrap();
+            mutate(&mut record);
+            if rebind {
+                let payload_digest = record.payload_digest;
+                let metadata = record.executable.as_mut().unwrap();
+                metadata.manifest_payload_digest =
+                    metadata.expected_manifest_payload_digest(&payload_digest);
+            }
+            let artifacts = Arc::new(StaticArtifactStore {
+                record: Mutex::new(record),
+            });
+            store
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: "batch-program".into(),
+                        key: "RELOAD".into(),
+                        version: 1,
+                        payload: reference.as_str().as_bytes().to_vec(),
+                    },
+                    None,
+                )
+                .unwrap();
+            let mut server_config = config();
+            server_config.store_profile = crate::StoreProfile::Postgres;
+            server_config.artifact_profile = ArtifactProfile::Shared;
+            server_config.postgres_url_reference =
+                Some("env-base64:MAINFRAME_ENV_SECRET_POSTGRES_URL".into());
+            let platform: Arc<dyn PlatformStore> = store.clone();
+            let artifacts: Arc<dyn ArtifactStore> = artifacts;
+            assert!(matches!(
+                ProductServer::open_with_artifact_store(
+                    server_config,
+                    platform,
+                    Arc::new(MemorySecretResolver::default()),
+                    default_program_router(),
+                    artifacts,
+                ),
+                Err(HostProblem::ProviderFailure)
+            ));
+        };
+        reject(|record| record.executable = None, false);
+        reject(
+            |record| {
+                record.executable.as_mut().unwrap().artifact_contract =
+                    "mainframe-env.artifact@1".into();
+            },
+            true,
+        );
+        reject(
+            |record| {
+                record.executable.as_mut().unwrap().compatibility_profile =
+                    "mainframe-env.cobol.other-runtime@1".into();
+            },
+            true,
+        );
+        reject(
+            |record| {
+                record
+                    .executable
+                    .as_mut()
+                    .unwrap()
+                    .host_interfaces
+                    .insert("mainframe-env.future-host@9".into());
+            },
+            true,
+        );
+        reject(
+            |record| {
+                record
+                    .executable
+                    .as_mut()
+                    .unwrap()
+                    .host_interfaces
+                    .remove("mainframe-env.cics@1");
+            },
+            true,
+        );
+        reject(
+            |record| {
+                record.executable.as_mut().unwrap().compiler_generation =
+                    "mainframe-env-cobol-9.9.9".into();
+            },
+            true,
+        );
+        reject(
+            |record| {
+                record
+                    .executable
+                    .as_mut()
+                    .unwrap()
+                    .options
+                    .insert("unreviewed-runtime-switch".into(), "enabled".into());
+            },
+            true,
+        );
+        reject(
+            |record| {
+                record.executable.as_mut().unwrap().semantic_identity =
+                    format!("semantic-sha256:{:064x}", 9);
+            },
+            false,
+        );
+    }
+
+    #[test]
+    fn invalid_startup_artifact_preflight_leaves_store_and_router_unmodified() {
+        let published = published_fixture("STARTUP", "DISPLAY 'STARTUP'.");
+        let valid = crate::cobol::artifact::published_artifact_record(&published).unwrap();
+        let reference = valid.artifact.clone();
+        let mut invalid = valid.clone();
+        invalid.executable.as_mut().unwrap().compiler_generation =
+            "mainframe-env-cobol-9.9.9".into();
+        let payload_digest = invalid.payload_digest;
+        let metadata = invalid.executable.as_mut().unwrap();
+        metadata.manifest_payload_digest =
+            metadata.expected_manifest_payload_digest(&payload_digest);
+        let artifacts = Arc::new(StaticArtifactStore {
+            record: Mutex::new(invalid),
+        });
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "batch-program".into(),
+                    key: "STARTUP".into(),
+                    version: 1,
+                    payload: reference.as_str().as_bytes().to_vec(),
+                },
+                None,
+            )
+            .unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: LEGACY_AUTH_SESSION_NAMESPACE.into(),
+                    key: "retained-before-preflight".into(),
+                    version: 1,
+                    payload: b"must remain".to_vec(),
+                },
+                None,
+            )
+            .unwrap();
+        let mut server_config = config();
+        server_config.store_profile = crate::StoreProfile::Postgres;
+        server_config.artifact_profile = ArtifactProfile::Shared;
+        server_config.postgres_url_reference =
+            Some("env-base64:MAINFRAME_ENV_SECRET_POSTGRES_URL".into());
+        let router = default_program_router();
+        let platform: Arc<dyn PlatformStore> = store.clone();
+        let artifact_store: Arc<dyn ArtifactStore> = artifacts.clone();
+        assert!(matches!(
+            ProductServer::open_with_artifact_store(
+                server_config.clone(),
+                platform,
+                Arc::new(MemorySecretResolver::default()),
+                router.clone(),
+                artifact_store,
+            ),
+            Err(HostProblem::ProviderFailure)
+        ));
+        assert!(
+            store
+                .get_provider_state(LEGACY_AUTH_SESSION_NAMESPACE, "retained-before-preflight")
+                .unwrap()
+                .is_some()
+        );
+
+        *artifacts.record.lock().unwrap() = valid;
+        let platform: Arc<dyn PlatformStore> = store;
+        let artifact_store: Arc<dyn ArtifactStore> = artifacts;
+        ProductServer::open_with_artifact_store(
+            server_config,
+            platform,
+            Arc::new(MemorySecretResolver::default()),
+            router,
+            artifact_store,
+        )
+        .expect("failed preflight must not bind the shared router");
+    }
+
+    #[test]
+    fn installed_call_preflight_rejects_before_protocol_or_replay_reservation() {
+        use mainframe_env_host_api::{ProgramName, ProgramRequest};
+
+        let published = published_fixture("PREFLIGHT", "DISPLAY 'PREFLIGHT'.");
+        let record = crate::cobol::artifact::published_artifact_record(&published).unwrap();
+        let artifacts = Arc::new(StaticArtifactStore {
+            record: Mutex::new(record),
+        });
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let mut server_config = config();
+        server_config.store_profile = crate::StoreProfile::Postgres;
+        server_config.artifact_profile = ArtifactProfile::Shared;
+        server_config.postgres_url_reference =
+            Some("env-base64:MAINFRAME_ENV_SECRET_POSTGRES_URL".into());
+        let platform: Arc<dyn PlatformStore> = store.clone();
+        let artifact_store: Arc<dyn ArtifactStore> = artifacts.clone();
+        let server = ProductServer::open_with_artifact_store(
+            server_config,
+            platform,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+            artifact_store,
+        )
+        .unwrap();
+        server
+            .install_batch_programs(vec![BatchProgramDefinition::current(
+                "PREFLIGHT",
+                &published,
+            )])
+            .unwrap();
+        let mut record = artifacts.record.lock().unwrap();
+        record.executable.as_mut().unwrap().compiler_generation =
+            "mainframe-env-cobol-9.9.9".into();
+        let payload_digest = record.payload_digest;
+        let metadata = record.executable.as_mut().unwrap();
+        metadata.manifest_payload_digest =
+            metadata.expected_manifest_payload_digest(&payload_digest);
+        drop(record);
+
+        let limits = InvocationLimits::default();
+        let capability = CapabilityId::new("host.program.invoke", limits).unwrap();
+        let parent = Invocation::new(
+            RequestId::new("preflight-parent-request", limits).unwrap(),
+            ExecutionId::new("preflight-parent-execution", limits).unwrap(),
+            RunUnitId::new("preflight-parent-run", limits).unwrap(),
+            None,
+            Selector::new("program:PARENT", limits).unwrap(),
+            ArtifactRef::new("artifact:parent", limits).unwrap(),
+            Principal::new(
+                PrincipalId::new("IBMUSER", limits).unwrap(),
+                BTreeSet::from([capability.clone()]),
+                limits,
+            )
+            .unwrap(),
+            ServiceClass::Batch,
+            0,
+            u64::MAX,
+            TraceId::new("preflight-parent-trace", limits).unwrap(),
+            IdempotencyKey::new("preflight-parent-key", limits).unwrap(),
+            1,
+            ResourceLimits::default(),
+            BTreeMap::new(),
+            limits,
+        )
+        .unwrap()
+        .with_provider_generations(BTreeMap::from([(capability, "1".into())]), limits)
+        .unwrap();
+        let effect = EffectRequest {
+            run_unit: parent.run_unit_id.clone(),
+            sequence: 1,
+            deadline_tick: parent.deadline_tick,
+            idempotency_key: Some(IdempotencyKey::new("preflight-call", limits).unwrap()),
+            request: HostRequest::Program(ProgramRequest::Call {
+                program: ProgramName::new("PREFLIGHT", 128).unwrap(),
+                payload: BoundedPayload::new(
+                    "mainframe-env.program.input@1",
+                    b"{}".to_vec(),
+                    limits,
+                )
+                .unwrap(),
+                service: None,
+            }),
+        };
+        assert_eq!(
+            server.program.invoke(&parent, effect).outcome,
+            Err(HostProblem::ProviderFailure)
+        );
+        for namespace in [
+            crate::cobol::retention::CALL_PROTOCOL_NAMESPACE,
+            crate::cobol::retention::CALL_REPLAY_NAMESPACE,
+        ] {
+            assert!(store.list_provider_state(namespace, 8).unwrap().is_empty());
+        }
+    }
+
+    async fn execute_installed_batch_job(
+        server: &Arc<ProductServer>,
+        job_name: &str,
+        program: &str,
+    ) -> Vec<u8> {
+        let app = server.router();
+        let response = call(
+            &app,
+            Method::PUT,
+            "/zosmf/restjobs/jobs",
+            format!("//{job_name} JOB CLASS=A\n//STEP1 EXEC PGM={program}\n"),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let job: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), 65_536).await.unwrap()).unwrap();
+        let id = job["jobid"].as_str().unwrap();
+        let completed = wait_for_terminal_job(server, id).await;
+        assert_eq!(completed.return_code, Some(0));
+        let files = call(
+            &app,
+            Method::GET,
+            &format!("/zosmf/restjobs/jobs/{job_name}/{id}/files"),
+            "",
+        )
+        .await;
+        assert_eq!(files.status(), StatusCode::OK);
+        let files: Value =
+            serde_json::from_slice(&to_bytes(files.into_body(), 65_536).await.unwrap()).unwrap();
+        let mut output = Vec::new();
+        for file in files.as_array().unwrap() {
+            let file_id = file["id"].as_u64().unwrap();
+            let records = call(
+                &app,
+                Method::GET,
+                &format!("/zosmf/restjobs/jobs/{job_name}/{id}/files/{file_id}/records"),
+                "",
+            )
+            .await;
+            if records.status() == StatusCode::OK {
+                output.extend_from_slice(&to_bytes(records.into_body(), 65_536).await.unwrap());
+            }
+        }
+        output
+    }
+
+    #[tokio::test]
+    async fn current_v3_artifact_installs_reloads_and_executes_with_exact_manifest() {
+        let published = published_fixture("CURRV3", "DISPLAY 'CURRENT-V3'.");
+        let definition = BatchProgramDefinition::current("CURRV3", &published);
+        let artifact = definition.artifact.clone();
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-current-artifact-{}-{:?}-{}",
+            std::process::id(),
+            std::thread::current().id(),
+            session_tick().unwrap()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let mut server_config = config();
+        server_config.store_profile = crate::StoreProfile::Sqlite;
+        server_config.sqlite_url = url.clone();
+        server_config.artifact_root = root.join("artifacts");
+        let secrets = Arc::new(MemorySecretResolver::default());
+        let first_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let first_platform: Arc<dyn PlatformStore> = first_store.clone();
+        let first = ProductServer::open(
+            server_config.clone(),
+            first_platform,
+            secrets.clone(),
+            default_program_router(),
+        )
+        .unwrap();
+        first.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        first.install_batch_programs(vec![definition]).unwrap();
+        let stored = first.artifacts.get_artifact(&artifact).unwrap().unwrap();
+        let metadata = stored.executable.as_ref().unwrap();
+        assert_eq!(metadata.artifact_contract, ARTIFACT_CONTRACT);
+        assert_eq!(
+            metadata.compatibility_profile,
+            crate::cobol::artifact::COBOL_REFERENCE_COMPATIBILITY_PROFILE
+        );
+        assert_eq!(
+            metadata.compiler_generation,
+            published.manifest().compiler_generation
+        );
+        assert_eq!(metadata.target, published.manifest().target.as_str());
+        assert_eq!(&metadata.options, published.manifest().options.values());
+        assert_eq!(
+            &metadata.host_interfaces,
+            &published.manifest().host_interfaces
+        );
+        assert_eq!(metadata.ir_contract, published.manifest().ir_contract);
+        assert_eq!(
+            metadata.dialect_contracts.as_ref(),
+            Some(&published.manifest().dialect_contracts)
+        );
+        assert_eq!(
+            metadata.semantic_identity,
+            published.semantic_id().to_reference()
+        );
+        assert!(metadata.validates_payload(&stored.payload_digest));
+        drop((first, first_store));
+
+        let second_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let second_platform: Arc<dyn PlatformStore> = second_store.clone();
+        let second = ProductServer::open(
+            server_config,
+            second_platform,
+            secrets,
+            default_program_router(),
+        )
+        .unwrap();
+        let reloaded = second.artifacts.get_artifact(&artifact).unwrap().unwrap();
+        assert_eq!(reloaded, stored);
+        let accepted = admit_executable_artifact(&reloaded).unwrap();
+        assert_eq!(accepted.source_contract(), ARTIFACT_CONTRACT);
+        assert_eq!(accepted.content_id().to_reference(), artifact.as_str());
+        assert_eq!(accepted.manifest(), published.manifest());
+        let output = execute_installed_batch_job(&second, "CURRJOB", "CURRV3").await;
+        assert!(
+            output
+                .windows(b"CURRENT-V3".len())
+                .any(|part| part == b"CURRENT-V3")
+        );
+        drop((second, second_store));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[tokio::test]
+    async fn retained_historical_v2_artifact_installs_reloads_and_executes_unchanged() {
+        const HISTORICAL_SOURCE_COMMIT: &str = "c029219f0dd647d9255b4334d93167f5524d062d";
+        const HISTORICAL_SHA256: &str =
+            "cf5de374e76c07ff001af9a20053fd8692f55337a4ebece2085ce62c436d58db";
+        const HISTORICAL_SEMANTIC_ID: &str =
+            "semantic-sha256:f27f98bc6fa22cc145c9df52483b26346b2e1a9aac3272df49fa14f731ec45c9";
+        const HISTORICAL_B64: &str =
+            include_str!("../../../../conformance/0.9/cobol/artifact-v2-c029219.b64");
+        let provenance: Value = serde_json::from_str(include_str!(
+            "../../../../conformance/0.9/cobol/artifact-v2-c029219.json"
+        ))
+        .unwrap();
+        assert_eq!(provenance["source_commit"], HISTORICAL_SOURCE_COMMIT);
+        assert_eq!(provenance["artifact_contract"], LEGACY_ARTIFACT_CONTRACT);
+        assert_eq!(
+            provenance["content_id"],
+            format!("sha256:{HISTORICAL_SHA256}")
+        );
+        assert_eq!(provenance["semantic_id"], HISTORICAL_SEMANTIC_ID);
+        let payload = base64::engine::general_purpose::STANDARD
+            .decode(HISTORICAL_B64.trim())
+            .unwrap();
+        assert_eq!(format!("{:x}", Sha256::digest(&payload)), HISTORICAL_SHA256);
+        assert_eq!(
+            HISTORICAL_SOURCE_COMMIT,
+            "c029219f0dd647d9255b4334d93167f5524d062d"
+        );
+        assert_eq!(payload.len(), 1261);
+        let manifest = ArtifactManifestV2 {
+            compiler_generation: "mainframe-env-cobol-0.8.3".into(),
+            target: CompileTarget::new("reference").unwrap(),
+            options: CompileOptions::new(BTreeMap::from([
+                ("cobol.effective-arith".into(), "extended".into()),
+                ("cobol.effective-dispsign".into(), "compatible".into()),
+                ("cobol.effective-lp".into(), "32".into()),
+            ]))
+            .unwrap(),
+            host_interfaces: BTreeSet::from([
+                "mainframe-env.host@1".into(),
+                "mainframe-env.cics@1".into(),
+            ]),
+            ir_contract: mainframe_env_ir::IR_ENVELOPE_CONTRACT.into(),
+        };
+        let artifact = ArtifactRef::new(
+            format!("sha256:{HISTORICAL_SHA256}"),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-historical-artifact-{}-{:?}-{}",
+            std::process::id(),
+            std::thread::current().id(),
+            session_tick().unwrap()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let mut server_config = config();
+        server_config.store_profile = crate::StoreProfile::Sqlite;
+        server_config.sqlite_url = url.clone();
+        server_config.artifact_root = root.join("artifacts");
+        let secrets = Arc::new(MemorySecretResolver::default());
+        let first_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let first_platform: Arc<dyn PlatformStore> = first_store.clone();
+        let first = ProductServer::open(
+            server_config.clone(),
+            first_platform,
+            secrets.clone(),
+            default_program_router(),
+        )
+        .unwrap();
+        first.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        first
+            .install_batch_programs(vec![BatchProgramDefinition {
+                name: "HISTV2".into(),
+                artifact: artifact.clone(),
+                payload: payload.clone(),
+                manifest: VersionedArtifactManifest::V2(manifest.clone()),
+                semantic_identity: HISTORICAL_SEMANTIC_ID.into(),
+            }])
+            .unwrap();
+        let stored = first.artifacts.get_artifact(&artifact).unwrap().unwrap();
+        let metadata = stored.executable.as_ref().unwrap();
+        assert_eq!(metadata.artifact_contract, LEGACY_ARTIFACT_CONTRACT);
+        assert_eq!(
+            metadata.compatibility_profile,
+            crate::cobol::artifact::COBOL_REFERENCE_COMPATIBILITY_PROFILE
+        );
+        assert_eq!(
+            metadata.compiler_generation,
+            manifest.compiler_generation.as_str()
+        );
+        assert_eq!(metadata.target, manifest.target.as_str());
+        assert_eq!(&metadata.options, manifest.options.values());
+        assert_eq!(&metadata.host_interfaces, &manifest.host_interfaces);
+        assert_eq!(metadata.ir_contract, manifest.ir_contract.as_str());
+        assert_eq!(metadata.dialect_contracts, None);
+        assert_eq!(metadata.semantic_identity, HISTORICAL_SEMANTIC_ID);
+        assert!(metadata.validates_payload(&stored.payload_digest));
+        assert_eq!(stored.payload, payload);
+        let stored_digest: [u8; 32] = Sha256::digest(&stored.payload).into();
+        assert_eq!(stored.payload_digest, stored_digest);
+        drop((first, first_store));
+
+        let second_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let second_platform: Arc<dyn PlatformStore> = second_store.clone();
+        let second = ProductServer::open(
+            server_config,
+            second_platform,
+            secrets,
+            default_program_router(),
+        )
+        .unwrap();
+        let reloaded = second.artifacts.get_artifact(&artifact).unwrap().unwrap();
+        assert_eq!(reloaded, stored);
+        let accepted = admit_executable_artifact(&reloaded).unwrap();
+        assert_eq!(accepted.source_contract(), LEGACY_ARTIFACT_CONTRACT);
+        assert_eq!(accepted.content_id().to_reference(), artifact.as_str());
+        assert_eq!(
+            accepted.manifest().dialect_contracts,
+            BTreeSet::from(["mainframe.core.cobol@1".into()])
+        );
+        assert_eq!(
+            provenance["derived_dialect_contracts"],
+            serde_json::json!(["mainframe.core.cobol@1"])
+        );
+        let output = execute_installed_batch_job(&second, "HISTJOB", "HISTV2").await;
+        assert!(output.windows(b"HELLO".len()).any(|part| part == b"HELLO"));
+        drop((second, second_store));
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
@@ -8396,7 +9072,7 @@ mod tests {
         app: &axum::Router,
         method: Method,
         uri: &str,
-        body: &'static str,
+        body: impl Into<Body>,
     ) -> axum::response::Response {
         let mut request = Request::builder()
             .method(method.clone())
@@ -8406,7 +9082,7 @@ mod tests {
             request = request.header("x-csrf-zosmf-header", "true");
         }
         app.clone()
-            .oneshot(request.body(Body::from(body)).unwrap())
+            .oneshot(request.body(body.into()).unwrap())
             .await
             .unwrap()
     }
@@ -8843,8 +9519,10 @@ mod tests {
             .install_online_application(OnlineApplicationDefinition {
                 programs: vec![OnlineProgramDefinition {
                     name: "ONLINE".into(),
-                    artifact: artifact_ref,
+                    artifact: artifact_ref.clone(),
                     payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
                 }],
                 transactions: BTreeMap::from([("CC00".into(), "ONLINE".into())]),
                 maps: vec![BmsMapDefinition {
@@ -8871,6 +9549,21 @@ mod tests {
                 }],
             })
             .unwrap();
+        let stored = server
+            .artifacts
+            .get_artifact(&artifact_ref)
+            .unwrap()
+            .unwrap();
+        let metadata = stored.executable.as_ref().unwrap();
+        assert_eq!(metadata.artifact_contract, ARTIFACT_CONTRACT);
+        assert_eq!(
+            metadata.compatibility_profile,
+            crate::cobol::artifact::COBOL_REFERENCE_COMPATIBILITY_PROFILE
+        );
+        assert_eq!(
+            metadata.dialect_contracts.as_ref(),
+            Some(&artifact.manifest().dialect_contracts)
+        );
         let response = call(
             &server.router(),
             Method::POST,
@@ -8977,6 +9670,8 @@ mod tests {
                     name: "PSEUDO".into(),
                     artifact: artifact_ref.clone(),
                     payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
                 }],
                 transactions: BTreeMap::from([("PS00".into(), "PSEUDO".into())]),
                 maps: vec![BmsMapDefinition {
@@ -9033,12 +9728,11 @@ mod tests {
             Ok(())
         );
         assert_handoff(&server, &first_context.invocation.execution_id);
-        assert!(
-            server
-                .online_machine_continuation(&session)
-                .unwrap()
-                .is_some()
-        );
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        assert_eq!(continuation.artifact, artifact_ref);
         assert!(server.online_exchange(&session).unwrap().is_none());
 
         // Recreate the exact crash gap after the handoff event but before CICS
@@ -9083,6 +9777,29 @@ mod tests {
             Err(HostProblem::NotFound)
         ));
 
+        let original_continuation = server
+            .store
+            .get_provider_state("online-machine-continuation", session.as_str())
+            .unwrap()
+            .unwrap();
+        let decoded = decode_online_machine_continuation(&original_continuation).unwrap();
+        let mut incompatible_continuation = original_continuation.clone();
+        incompatible_continuation.version += 1;
+        incompatible_continuation.payload = encode_online_machine_continuation(
+            &decoded.program,
+            &ArtifactRef::new(format!("sha256:{:064x}", 0), InvocationLimits::default()).unwrap(),
+            &decoded.provider_generations,
+            &decoded.checkpoint,
+        )
+        .unwrap();
+        server
+            .store
+            .put_provider_state(
+                incompatible_continuation.clone(),
+                Some(original_continuation.version),
+            )
+            .unwrap();
+
         server
             .cics
             .submit_terminal_input(
@@ -9104,6 +9821,69 @@ mod tests {
         let completed_context = server
             .cics
             .terminal_execution(&session, &principal, 5)
+            .unwrap();
+        let sends_before = server
+            .online_operation_count(CicsOperation::SendText)
+            .unwrap();
+        assert_eq!(
+            server.run_online_exchange(&session, &principal, "PSEUDO", 5),
+            Err(HostProblem::InfrastructureFailure)
+        );
+        assert_eq!(
+            server
+                .online_operation_count(CicsOperation::SendText)
+                .unwrap(),
+            sends_before
+        );
+        assert!(server.online_exchange(&session).unwrap().is_none());
+        assert!(
+            server
+                .store
+                .get_execution(&completed_context.invocation.execution_id)
+                .unwrap()
+                .is_none()
+        );
+        let mut wrong_generations = decoded.provider_generations.clone();
+        *wrong_generations.values_mut().next().unwrap() = "incompatible-generation".into();
+        let mut generation_incompatible = original_continuation.clone();
+        generation_incompatible.version = incompatible_continuation.version + 1;
+        generation_incompatible.payload = encode_online_machine_continuation(
+            &decoded.program,
+            &artifact_ref,
+            &wrong_generations,
+            &decoded.checkpoint,
+        )
+        .unwrap();
+        server
+            .store
+            .put_provider_state(
+                generation_incompatible.clone(),
+                Some(incompatible_continuation.version),
+            )
+            .unwrap();
+        assert_eq!(
+            server.run_online_exchange(&session, &principal, "PSEUDO", 5),
+            Err(HostProblem::ProviderFailure)
+        );
+        assert_eq!(
+            server
+                .online_operation_count(CicsOperation::SendText)
+                .unwrap(),
+            sends_before
+        );
+        assert!(server.online_exchange(&session).unwrap().is_none());
+        assert!(
+            server
+                .store
+                .get_execution(&completed_context.invocation.execution_id)
+                .unwrap()
+                .is_none()
+        );
+        let mut restored_continuation = original_continuation;
+        restored_continuation.version = generation_incompatible.version + 1;
+        server
+            .store
+            .put_provider_state(restored_continuation, Some(generation_incompatible.version))
             .unwrap();
         server
             .run_online_exchange(&session, &principal, "PSEUDO", 5)
@@ -9276,11 +10056,15 @@ mod tests {
                         name: "RECOVER".into(),
                         artifact: artifact_ref.clone(),
                         payload: artifact.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                        semantic_identity: artifact.semantic_id().to_reference(),
                     },
                     OnlineProgramDefinition {
                         name: "KNOWNFAIL".into(),
                         artifact: known_artifact_ref.clone(),
                         payload: known_artifact.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(known_artifact.manifest().clone()),
+                        semantic_identity: known_artifact.semantic_id().to_reference(),
                     },
                 ],
                 transactions: BTreeMap::from([
@@ -9536,6 +10320,8 @@ mod tests {
                 )
                 .unwrap(),
                 payload: artifact.payload().to_vec(),
+                manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                semantic_identity: artifact.semantic_id().to_reference(),
             }])
             .unwrap();
         let response = call(
@@ -9593,6 +10379,8 @@ mod tests {
                 )
                 .unwrap(),
                 payload: abender.payload().to_vec(),
+                manifest: VersionedArtifactManifest::V3(abender.manifest().clone()),
+                semantic_identity: abender.semantic_id().to_reference(),
             }])
             .unwrap();
         let response = call(

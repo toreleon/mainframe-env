@@ -774,12 +774,14 @@ mod tests {
         let jcl_handlers = runtime();
         let cics_handlers = cics_pilot_runtime();
         let cobol_move_handlers = cobol_move_pilot_runtime();
+        let cobol_arithmetic_handlers = cobol_arithmetic_pilot_runtime();
         combined_conformance_runtime(
             &spec,
             &dataset_handlers,
             &jcl_handlers,
             &cics_handlers,
             &cobol_move_handlers,
+            &cobol_arithmetic_handlers,
             ConformanceLimits::default(),
         )
         .unwrap();

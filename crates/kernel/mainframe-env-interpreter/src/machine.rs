@@ -26,6 +26,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::OnceLock;
 
 use typed_decimal::{decimal_add, decimal_divide, decimal_multiply, decimal_subtract};
+mod corresponding;
+mod decimal_commit;
 mod typed_cics;
 mod typed_decimal;
 
@@ -117,6 +119,8 @@ struct LayoutMetadata {
     dynamic: bool,
     dynamic_limit: usize,
     parent: Option<String>,
+    alias_of: Option<String>,
+    occurs_clause: bool,
     condition_values: Vec<String>,
     object_class: Option<String>,
 }
@@ -1189,7 +1193,6 @@ impl ReferenceMachine {
 
     /// Installs the bounded low-storage chain used by batch programs that inspect
     /// the MVS PSA, TCB, and TIOT through COBOL linkage pointers.
-    ///
     /// The compatibility storage is only installed when the compiled module
     /// declares the complete structure. Modules with none of the conventional
     /// names are left unchanged; partial declarations fail closed.
@@ -2189,11 +2192,14 @@ impl ReferenceMachine {
                 typed_decimal::execute_with_condition(self, operation)?;
             }
             "add" | "subtract" | "multiply" | "divide" | "compute" => {
-                match self.arithmetic(name, &args) {
-                    Ok(()) => self.condition_status.arithmetic_size_error = false,
+                let handles_size_error = self.has_condition_handler(operation, "ON SIZE ERROR");
+                match self.arithmetic(name, &args, handles_size_error) {
+                    Ok(receiver_size_error) => {
+                        self.condition_status.arithmetic_size_error = receiver_size_error
+                    }
                     Err(MachineProblem::SizeError) => {
                         self.condition_status.arithmetic_size_error = true;
-                        if !self.has_condition_handler(operation, "ON SIZE ERROR") {
+                        if !handles_size_error {
                             return Err(MachineProblem::SizeError);
                         }
                     }
@@ -5208,15 +5214,20 @@ impl ReferenceMachine {
         Ok(Some((base, offset)))
     }
 
-    fn arithmetic(&mut self, name: &str, args: &[String]) -> Result<(), MachineProblem> {
+    fn arithmetic(
+        &mut self,
+        name: &str,
+        args: &[String],
+        preserve_failed_receiver: bool,
+    ) -> Result<bool, MachineProblem> {
         if matches!(name, "add" | "subtract") {
-            return self.add_or_subtract(name, args);
+            return self.add_or_subtract(name, args, preserve_failed_receiver);
         }
         if name == "multiply" {
-            return self.multiply_statement(args);
+            return self.multiply_statement(args).map(|()| false);
         }
         if name == "divide" {
-            return self.divide_statement(args);
+            return self.divide_statement(args).map(|()| false);
         }
         let rounded = args.iter().any(|argument| argument == "ROUNDED");
         let (target, value) = match name {
@@ -5325,6 +5336,7 @@ impl ReferenceMachine {
             _ => return Err(MachineProblem::InvalidOperation),
         };
         self.write_decimal_mode(&target, value, rounded)
+            .map(|()| false)
     }
 
     fn multiply_statement(&mut self, args: &[String]) -> Result<(), MachineProblem> {
@@ -5421,12 +5433,17 @@ impl ReferenceMachine {
         self.commit_decimal_assignments(assignments)
     }
 
-    fn add_or_subtract(&mut self, name: &str, args: &[String]) -> Result<(), MachineProblem> {
+    fn add_or_subtract(
+        &mut self,
+        name: &str,
+        args: &[String],
+        preserve_failed_receiver: bool,
+    ) -> Result<bool, MachineProblem> {
         if args
             .first()
             .is_some_and(|token| matches!(token.as_str(), "CORRESPONDING" | "CORR"))
         {
-            return self.add_or_subtract_corresponding(name, args);
+            return self.add_or_subtract_corresponding(name, args, preserve_failed_receiver);
         }
         let separator = position(args, if name == "add" { "TO" } else { "FROM" });
         let giving = position(args, "GIVING");
@@ -5496,68 +5513,7 @@ impl ReferenceMachine {
                 assignments.push((target, value, rounded));
             }
         }
-        self.commit_decimal_assignments(assignments)
-    }
-
-    fn add_or_subtract_corresponding(
-        &mut self,
-        name: &str,
-        args: &[String],
-    ) -> Result<(), MachineProblem> {
-        let separator = position(args, if name == "add" { "TO" } else { "FROM" })
-            .ok_or(MachineProblem::InvalidOperation)?;
-        if separator <= 1 {
-            return Err(MachineProblem::InvalidOperation);
-        }
-        let target_end = args[separator + 1..]
-            .iter()
-            .position(|token| matches!(token.as_str(), "ROUNDED" | "ON" | "NOT"))
-            .map_or(args.len(), |offset| separator + 1 + offset);
-        let source = self.reference(&args[1..separator])?;
-        let target = self.reference(&args[separator + 1..target_end])?;
-        if !is_group(source.layout.category) || !is_group(target.layout.category) {
-            return Err(MachineProblem::DataException);
-        }
-        let rounded = args[target_end..].iter().any(|token| token == "ROUNDED");
-        let sources = self.group_numeric_descendants(&source.layout.name);
-        let targets = self.group_numeric_descendants(&target.layout.name);
-        let mut assignments = Vec::new();
-        for target in targets {
-            let matching = sources
-                .iter()
-                .filter(|source| source.simple_name == target.simple_name)
-                .collect::<Vec<_>>();
-            if matching.len() != 1 {
-                continue;
-            }
-            let source_value = self.decimal(&matching[0].name)?;
-            let target_value = self.decimal(&target.name)?;
-            assignments.push((
-                vec![target.name],
-                if name == "add" {
-                    decimal_add(self.arithmetic_mode, target_value, source_value)?
-                } else {
-                    decimal_subtract(self.arithmetic_mode, target_value, source_value)?
-                },
-                rounded,
-            ));
-        }
-        if assignments.is_empty() {
-            return Err(MachineProblem::DataException);
-        }
-        self.commit_decimal_assignments(assignments)
-    }
-
-    fn group_numeric_descendants(&self, root: &str) -> Vec<LayoutMetadata> {
-        self.layouts
-            .values()
-            .filter(|layout| {
-                is_numeric(layout.category)
-                    && layout.simple_name != "FILLER"
-                    && self.layout_is_descendant_of(layout, root)
-            })
-            .cloned()
-            .collect()
+        self.commit_decimal_assignments_receiver_local(assignments, preserve_failed_receiver)
     }
 
     fn group_elementary_descendants(&self, root: &str) -> Vec<LayoutMetadata> {
@@ -5620,38 +5576,6 @@ impl ReferenceMachine {
         Ok(items)
     }
 
-    fn commit_decimal_assignments(
-        &mut self,
-        assignments: Vec<(Vec<String>, Decimal, bool)>,
-    ) -> Result<(), MachineProblem> {
-        let staged = assignments
-            .into_iter()
-            .map(|(target, value, rounded)| {
-                let reference = self.reference(&target)?;
-                if reference.length != reference.layout.length
-                    || !is_numeric(reference.layout.category)
-                {
-                    return Err(MachineProblem::DataException);
-                }
-                let value = if matches!(
-                    reference.layout.category,
-                    LayoutCategory::FloatShort | LayoutCategory::FloatLong
-                ) {
-                    value
-                } else if rounded {
-                    decimal_rescale_rounded(value, reference.layout.scale)?
-                } else {
-                    decimal_rescale(value, reference.layout.scale)?
-                };
-                let bytes = encode_decimal(&reference.layout, value)?;
-                Ok((reference, bytes))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        for (reference, bytes) in staged {
-            self.write_reference(&reference, &bytes)?;
-        }
-        Ok(())
-    }
     fn eval_expression(&self, args: &[String]) -> Result<Decimal, MachineProblem> {
         let mut position = 0usize;
         let value = self.expression_additive(args, &mut position)?;
@@ -9366,8 +9290,8 @@ fn validate_module(module: &Module) -> Result<(), MachineProblem> {
             "illegal operation or terminator".into(),
         ));
     }
-    typed_cics::validate_module_operations(&operations)?;
-    typed_decimal::validate_module_operations(&operations)?;
+    typed_cics::validate_module_operations(module)?;
+    typed_decimal::validate_module_operations(module)?;
     Ok(())
 }
 pub fn supported_operations() -> &'static BTreeSet<OperationIdentity> {
@@ -9435,7 +9359,7 @@ pub fn supported_operations() -> &'static BTreeSet<OperationIdentity> {
             .map(|name| OperationIdentity::new(NAMESPACE, name, 1).expect("static operation"))
             .collect::<BTreeSet<_>>();
         operations.extend(typed_cics::operation_identities());
-        operations.insert(typed_decimal::operation_identity());
+        operations.extend(typed_decimal::operation_identities());
         operations
     })
 }
@@ -9569,6 +9493,12 @@ fn layout_metadata(operations: &[Operation]) -> Result<LayoutState, MachineProbl
                 "" => None,
                 parent => Some(parent.to_ascii_uppercase()),
             },
+            alias_of: optional_text_attribute(operation, "alias_of")
+                .filter(|value| !value.is_empty())
+                .map(str::to_ascii_uppercase),
+            occurs_clause: optional_integer_attribute(operation, "occurs_clause")
+                .unwrap_or_default()
+                != 0,
             condition_values: text_attribute(operation, "condition_values")?
                 .split('\u{1f}')
                 .filter(|value| !value.is_empty())
@@ -13131,6 +13061,8 @@ mod tests {
             dynamic: false,
             dynamic_limit: 0,
             parent: None,
+            alias_of: None,
+            occurs_clause: false,
             condition_values: Vec::new(),
             object_class: None,
         };
@@ -13172,6 +13104,8 @@ mod tests {
             dynamic: false,
             dynamic_limit: 0,
             parent: None,
+            alias_of: None,
+            occurs_clause: false,
             condition_values: Vec::new(),
             object_class: None,
         };

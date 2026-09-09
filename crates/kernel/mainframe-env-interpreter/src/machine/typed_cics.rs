@@ -1,12 +1,12 @@
 use super::*;
 use mainframe_env_ir::{
-    CicsCondition, CicsEffectPlan, CicsOperandName, CicsOperandValue, CicsOutputName,
-    CicsPlanLimits, CicsPlanOperation, CicsPlanOption, CicsStorageSlot, Effect,
-    decode_cics_effect_plan,
+    CICS_EXECUTABLE_DESCRIPTORS, CicsCondition, CicsEffectPlan, CicsExecutableDescriptor,
+    CicsOperandName, CicsOperandValue, CicsOperationContract, CicsOutputName, CicsPlanLimits,
+    CicsPlanOperation, CicsPlanOption, CicsStorageSlot, Effect, Module, OperationCatalog,
+    OperationSchema, OperationSemanticContract, cics_executable_descriptor,
+    cics_executable_descriptor_for_identity, decode_cics_effect_plan, verify_semantic_contracts,
 };
 
-const FILE_NAMESPACE: &str = "cics.file";
-const RECOVERY_NAMESPACE: &str = "cics.recovery";
 const PLAN_ATTRIBUTE: &str = "cics_plan";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -15,29 +15,42 @@ pub(super) enum CicsTarget {
     Resolved(CicsStorageSlot),
 }
 
-pub(super) fn operation_identities() -> [OperationIdentity; 3] {
-    [
-        OperationIdentity::new(FILE_NAMESPACE, "read", 1).expect("static typed CICS operation"),
-        OperationIdentity::new(FILE_NAMESPACE, "rewrite", 1).expect("static typed CICS operation"),
-        OperationIdentity::new(RECOVERY_NAMESPACE, "syncpoint", 1)
-            .expect("static typed CICS operation"),
-    ]
+pub(super) fn operation_identities() -> Vec<OperationIdentity> {
+    CICS_EXECUTABLE_DESCRIPTORS
+        .iter()
+        .map(|descriptor| descriptor.identity())
+        .collect()
 }
 
 pub(super) fn is_typed(operation: &Operation) -> bool {
     expected_operation(&operation.identity).is_some()
 }
 
-pub(super) fn validate_module_operations(operations: &[&Operation]) -> Result<(), MachineProblem> {
-    for operation in operations
-        .iter()
-        .copied()
-        .filter(|operation| is_typed(operation))
-    {
-        let plan = plan(operation)?;
-        validate_declared_slots(operation, &plan)?;
+pub(super) fn validate_module_operations(module: &Module) -> Result<(), MachineProblem> {
+    let mut catalog = OperationCatalog::default();
+    for descriptor in CICS_EXECUTABLE_DESCRIPTORS {
+        catalog
+            .register(operation_schema(descriptor))
+            .expect("unique typed CICS identity");
     }
-    Ok(())
+    verify_semantic_contracts(module, &catalog)
+        .map_err(|problem| MachineProblem::InvalidArtifact(problem.to_string()))
+}
+
+fn operation_schema(descriptor: CicsExecutableDescriptor) -> OperationSchema {
+    let mut schema = OperationSchema::pure(descriptor.identity(), 0, 0);
+    schema.required_attributes = [PLAN_ATTRIBUTE.into()].into_iter().collect();
+    schema.allowed_effects = descriptor.effects.iter().copied().collect();
+    schema.runtime_import = Some(descriptor.runtime_import.into());
+    schema.semantic_contract = OperationSemanticContract::CicsEffect(CicsOperationContract {
+        plan_attribute: PLAN_ATTRIBUTE.into(),
+        expected_operation: Some(descriptor.operation),
+        layout_definition_operation: Some(
+            OperationIdentity::new("mainframe.core.cobol", "define", 1)
+                .expect("static COBOL layout definition identity"),
+        ),
+    });
+    schema
 }
 
 pub(super) fn validate_machine(machine: &ReferenceMachine) -> Result<(), MachineProblem> {
@@ -570,34 +583,11 @@ fn read_slot(
 }
 
 fn expected_operation(identity: &OperationIdentity) -> Option<CicsPlanOperation> {
-    match (identity.namespace(), identity.name(), identity.major()) {
-        (FILE_NAMESPACE, "read", 1) => Some(CicsPlanOperation::Read),
-        (FILE_NAMESPACE, "rewrite", 1) => Some(CicsPlanOperation::Rewrite),
-        (RECOVERY_NAMESPACE, "syncpoint", 1) => Some(CicsPlanOperation::Syncpoint),
-        _ => None,
-    }
+    cics_executable_descriptor_for_identity(identity).map(|descriptor| descriptor.operation)
 }
 
 fn expected_effects(operation: CicsPlanOperation) -> &'static [Effect] {
-    match operation {
-        CicsPlanOperation::Read => &[
-            Effect::DatasetRead,
-            Effect::MemoryRead,
-            Effect::MemoryWrite,
-            Effect::Condition,
-            Effect::Transaction,
-        ],
-        CicsPlanOperation::Rewrite => &[
-            Effect::DatasetWrite,
-            Effect::MemoryRead,
-            Effect::MemoryWrite,
-            Effect::Condition,
-            Effect::Transaction,
-        ],
-        CicsPlanOperation::Syncpoint => {
-            &[Effect::MemoryWrite, Effect::Condition, Effect::Transaction]
-        }
-    }
+    cics_executable_descriptor(operation).effects
 }
 
 const fn host_operation(operation: CicsPlanOperation) -> CicsOperation {
@@ -913,7 +903,7 @@ mod tests {
             Err(MachineProblem::InvalidArtifact(_))
         ));
         let wrong_major = module(
-            OperationIdentity::new(RECOVERY_NAMESPACE, "syncpoint", 2).unwrap(),
+            OperationIdentity::new("cics.recovery", "syncpoint", 2).unwrap(),
             &syncpoint,
             expected_effects(CicsPlanOperation::Syncpoint).to_vec(),
             false,
@@ -924,6 +914,42 @@ mod tests {
             super::super::validate_module(&wrong_major),
             Err(MachineProblem::InvalidArtifact(_))
         ));
+    }
+
+    #[test]
+    fn dialect_descriptors_drive_interpreter_registry_and_contracts() {
+        assert_eq!(
+            operation_identities().into_iter().collect::<BTreeSet<_>>(),
+            CICS_EXECUTABLE_DESCRIPTORS
+                .iter()
+                .map(|descriptor| descriptor.identity())
+                .collect()
+        );
+        for descriptor in CICS_EXECUTABLE_DESCRIPTORS {
+            let identity = descriptor.identity();
+            assert_eq!(expected_operation(&identity), Some(descriptor.operation));
+            assert_eq!(expected_effects(descriptor.operation), descriptor.effects);
+            let schema = operation_schema(descriptor);
+            assert_eq!(schema.identity, identity);
+            assert_eq!(
+                schema.allowed_effects,
+                descriptor.effects.iter().copied().collect()
+            );
+            assert_eq!(
+                schema.runtime_import.as_deref(),
+                Some(descriptor.runtime_import)
+            );
+            assert_eq!(
+                schema.semantic_contract,
+                OperationSemanticContract::CicsEffect(CicsOperationContract {
+                    plan_attribute: PLAN_ATTRIBUTE.into(),
+                    expected_operation: Some(descriptor.operation),
+                    layout_definition_operation: Some(
+                        OperationIdentity::new("mainframe.core.cobol", "define", 1).unwrap(),
+                    ),
+                })
+            );
+        }
     }
 
     #[test]

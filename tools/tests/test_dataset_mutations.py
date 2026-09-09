@@ -87,20 +87,75 @@ class ClassificationTests(unittest.TestCase):
 
     def test_typed_arithmetic_product_mutation_anchors_are_unique_and_scenario_is_unchanged(self):
         source = (TOOL.parents[1] / module.TYPED_ARITHMETIC_SOURCE).read_text()
-        scenarios = (TOOL.parents[1] / module.TYPED_ARITHMETIC_SCENARIOS).read_bytes()
+        tests = source.partition('#[cfg(test)]')[2]
         for mutation in module.TYPED_ARITHMETIC_MUTATIONS:
             changed = module.apply_mutation(source, mutation)
             self.assertNotEqual(changed, source)
             self.assertEqual(
                 changed.partition('#[cfg(test)]')[2],
-                source.partition('#[cfg(test)]')[2],
+                tests,
             )
             self.assertEqual(
-                module.digest(scenarios),
+                module.digest(tests.encode()),
                 module.digest(
-                    (TOOL.parents[1] / module.TYPED_ARITHMETIC_SCENARIOS).read_bytes()
+                    (TOOL.parents[1] / module.TYPED_ARITHMETIC_SOURCE)
+                    .read_text()
+                    .partition('#[cfg(test)]')[2]
+                    .encode()
                 ),
             )
+
+    def test_corresponding_product_mutation_anchors_are_unique_and_tests_are_unchanged(self):
+        source = (TOOL.parents[1] / module.COBOL_CORRESPONDING_SOURCE).read_text()
+        tests = source.partition('#[cfg(test)]')[2]
+        for mutation in module.COBOL_CORRESPONDING_MUTATIONS:
+            changed = module.apply_mutation(source, mutation)
+            self.assertNotEqual(changed, source)
+            self.assertEqual(changed.partition('#[cfg(test)]')[2], tests)
+
+    def test_selected_product_tests_match_the_recorded_expected_sets(self):
+        arithmetic = (TOOL.parents[1] / module.TYPED_ARITHMETIC_SOURCE).read_text()
+        arithmetic_names = {
+            'machine::typed_decimal::tests::' + name
+            for name in module.re.findall(
+                r'#\[test\]\s*fn\s+([A-Za-z0-9_]+)',
+                arithmetic.partition('#[cfg(test)]')[2],
+            )
+        }
+        self.assertEqual(arithmetic_names, module.TYPED_ARITHMETIC_EXPECTED_TESTS)
+
+        corresponding = (TOOL.parents[1] / module.COBOL_CORRESPONDING_SCENARIOS).read_text()
+        corresponding_names = {
+            'framework::tests::' + name
+            for name in module.re.findall(
+                r'#\[test\]\s*fn\s+(add_corresponding_[A-Za-z0-9_]+)',
+                corresponding.partition('#[cfg(test)]')[2],
+            )
+        }
+        self.assertEqual(
+            corresponding_names,
+            module.COBOL_CORRESPONDING_EXPECTED_TESTS,
+        )
+
+    def test_v4_inventory_replaces_the_obsolete_atomic_batch_mutant(self):
+        self.assertEqual(module.SCHEMA_VERSION, 'mainframe-env.source-mutations@4')
+        arithmetic_ids = {mutation.identity for mutation in module.TYPED_ARITHMETIC_MUTATIONS}
+        self.assertEqual(len(arithmetic_ids), 7)
+        self.assertNotIn('typed-decimal-write-before-batch-validates', arithmetic_ids)
+        self.assertEqual(len(module.COBOL_CORRESPONDING_MUTATIONS), 3)
+        self.assertEqual(
+            sum(
+                len(mutations)
+                for mutations in (
+                    module.MUTATIONS,
+                    module.CICS_MUTATIONS,
+                    module.COBOL_MOVE_MUTATIONS,
+                    module.TYPED_ARITHMETIC_MUTATIONS,
+                    module.COBOL_CORRESPONDING_MUTATIONS,
+                )
+            ),
+            20,
+        )
 
 
 if __name__ == '__main__':

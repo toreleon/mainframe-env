@@ -137,7 +137,7 @@ impl ArtifactStore for LocalArtifactStore {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(error) => return Err(StoreError::Infrastructure(error.to_string())),
         };
-        if bytes.len() > self.max_artifact_bytes.saturating_add(4096) {
+        if bytes.len() > self.max_artifact_bytes.saturating_add(256 * 1024 + 4096) {
             return Err(StoreError::PayloadTooLarge);
         }
         decode(id, &bytes, self.max_artifact_bytes).map(Some)
@@ -182,20 +182,37 @@ fn sync_directory(path: &Path) -> Result<(), StoreError> {
 }
 
 fn encode(record: &ArtifactRecord) -> Result<Vec<u8>, StoreError> {
-    let mut output = b"MEAR1".to_vec();
+    let metadata = record
+        .executable
+        .as_ref()
+        .map(validation::encode_executable_metadata)
+        .transpose()?
+        .unwrap_or_default();
+    let mut output = b"MEAR2".to_vec();
     output.extend_from_slice(
         &u32::try_from(record.media_type.len())
             .map_err(|_| StoreError::PayloadTooLarge)?
             .to_be_bytes(),
     );
+    output.extend_from_slice(
+        &u32::try_from(metadata.len())
+            .map_err(|_| StoreError::PayloadTooLarge)?
+            .to_be_bytes(),
+    );
     output.extend_from_slice(record.media_type.as_bytes());
     output.extend_from_slice(&record.payload_digest);
+    output.extend_from_slice(&metadata);
     output.extend_from_slice(&record.payload);
     Ok(output)
 }
 
 fn decode(artifact: &ArtifactRef, bytes: &[u8], max: usize) -> Result<ArtifactRecord, StoreError> {
-    if bytes.get(..5) != Some(b"MEAR1") || bytes.len() < 41 {
+    let legacy = bytes.get(..5) == Some(b"MEAR1");
+    if !legacy && bytes.get(..5) != Some(b"MEAR2") {
+        return Err(StoreError::IncompatibleVersion);
+    }
+    let header = if legacy { 9 } else { 13 };
+    if bytes.len() < header + 32 {
         return Err(StoreError::IncompatibleVersion);
     }
     let media_length = usize::try_from(u32::from_be_bytes(
@@ -204,15 +221,28 @@ fn decode(artifact: &ArtifactRef, bytes: &[u8], max: usize) -> Result<ArtifactRe
             .map_err(|_| StoreError::IncompatibleVersion)?,
     ))
     .map_err(|_| StoreError::IncompatibleVersion)?;
-    let digest_start = 9usize
+    let metadata_length = if legacy {
+        0
+    } else {
+        usize::try_from(u32::from_be_bytes(
+            bytes[9..13]
+                .try_into()
+                .map_err(|_| StoreError::IncompatibleVersion)?,
+        ))
+        .map_err(|_| StoreError::IncompatibleVersion)?
+    };
+    let digest_start = header
         .checked_add(media_length)
         .ok_or(StoreError::PayloadTooLarge)?;
-    let payload_start = digest_start
+    let metadata_start = digest_start
         .checked_add(32)
+        .ok_or(StoreError::PayloadTooLarge)?;
+    let payload_start = metadata_start
+        .checked_add(metadata_length)
         .ok_or(StoreError::PayloadTooLarge)?;
     let media_type = String::from_utf8(
         bytes
-            .get(9..digest_start)
+            .get(header..digest_start)
             .ok_or(StoreError::IncompatibleVersion)?
             .to_vec(),
     )
@@ -221,10 +251,19 @@ fn decode(artifact: &ArtifactRef, bytes: &[u8], max: usize) -> Result<ArtifactRe
         return Err(StoreError::IncompatibleVersion);
     }
     let payload_digest: [u8; 32] = bytes
-        .get(digest_start..payload_start)
+        .get(digest_start..metadata_start)
         .ok_or(StoreError::IncompatibleVersion)?
         .try_into()
         .map_err(|_| StoreError::IncompatibleVersion)?;
+    let executable = if metadata_length == 0 {
+        None
+    } else {
+        Some(validation::decode_executable_metadata(
+            bytes
+                .get(metadata_start..payload_start)
+                .ok_or(StoreError::IncompatibleVersion)?,
+        )?)
+    };
     let payload = bytes
         .get(payload_start..)
         .ok_or(StoreError::IncompatibleVersion)?
@@ -237,6 +276,7 @@ fn decode(artifact: &ArtifactRef, bytes: &[u8], max: usize) -> Result<ArtifactRe
         media_type,
         payload_digest,
         payload,
+        executable,
     };
     validation::artifact(&record)?;
     Ok(record)
@@ -249,7 +289,9 @@ fn provider_private_path(_: &Path) {}
 mod tests {
     use super::*;
     use mainframe_env_execution_api::InvocationLimits;
+    use mainframe_env_store_api::ExecutableArtifactMetadata;
     use sha2::{Digest, Sha256};
+    use std::collections::{BTreeMap, BTreeSet};
     use std::sync::Arc;
 
     fn hex(bytes: &[u8]) -> String {
@@ -268,6 +310,7 @@ mod tests {
             media_type: media_type.into(),
             payload_digest: digest,
             payload,
+            executable: None,
         }
     }
 
@@ -351,6 +394,46 @@ mod tests {
                 .to_string_lossy()
                 .ends_with(".tmp")
         }));
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[test]
+    fn executable_manifest_metadata_survives_reopen_exactly() {
+        let directory = directory("executable-metadata");
+        let store = LocalArtifactStore::open(&directory, 1024).unwrap();
+        let mut record = record(
+            b"canonical artifact",
+            "application/vnd.mainframe-env.core-mir",
+        );
+        record.executable = Some(
+            ExecutableArtifactMetadata {
+                artifact_contract: "mainframe-env.artifact@2".into(),
+                compatibility_profile: "mainframe-env.cobol.reference@1".into(),
+                compiler_generation: "mainframe-env-cobol-0.8.3".into(),
+                target: "reference".into(),
+                options: BTreeMap::from([("cobol.flag".into(), "on".into())]),
+                host_interfaces: BTreeSet::from(["mainframe-env.host@1".into()]),
+                ir_contract: "mainframe-env.ir-envelope@1".into(),
+                dialect_contracts: None,
+                semantic_identity: format!("semantic-sha256:{:064x}", 1),
+                manifest_payload_digest: [0; 32],
+            }
+            .bind_to_payload(&record.payload_digest),
+        );
+        store.put_artifact(record.clone()).unwrap();
+        drop(store);
+        let reopened = LocalArtifactStore::open(&directory, 1024).unwrap();
+        assert_eq!(
+            reopened.get_artifact(&record.artifact).unwrap(),
+            Some(record.clone())
+        );
+        let mut tampered = record;
+        tampered.executable.as_mut().unwrap().semantic_identity =
+            format!("semantic-sha256:{:064x}", 2);
+        assert_eq!(
+            reopened.put_artifact(tampered),
+            Err(StoreError::IncompatibleVersion)
+        );
         let _ = std::fs::remove_dir_all(directory);
     }
 

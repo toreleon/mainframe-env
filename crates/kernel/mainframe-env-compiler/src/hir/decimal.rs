@@ -4,10 +4,11 @@ use super::{
     HirUnaryOperator, StatementKind, effects,
 };
 use mainframe_env_ir::{
-    Attribute, BlockId, DecimalAssignment, DecimalAssignmentPlan, DecimalExpression,
-    DecimalPlanLimits, DecimalReceiver, DecimalRoundingPolicy, DecimalStorageSlot, Effect,
-    ModuleBuilder, OperationCatalog, OperationIdentity, OperationSchema, StorageId,
-    StorageReference, encode_decimal_assignment_plan,
+    Attribute, BlockId, DecimalAssignment, DecimalAssignmentPlan, DecimalConditionContract,
+    DecimalExecutionPolicy, DecimalExpression, DecimalOperationContract, DecimalPlanLimits,
+    DecimalPlanWireVersion, DecimalReceiver, DecimalRoundingPolicy, DecimalStorageSlot, Effect,
+    ModuleBuilder, OperationCatalog, OperationIdentity, OperationSchema, OperationSemanticContract,
+    StorageId, StorageReference, encode_decimal_assignment_plan,
 };
 use std::collections::BTreeMap;
 
@@ -31,11 +32,39 @@ pub(crate) enum DecimalPlanProblem {
     InvalidStorageExtent(String),
     InvalidLiteral,
     InvalidPlan,
+    InvalidArithmeticContext,
+}
+
+pub(crate) fn execution_policy(
+    arithmetic_mode: &str,
+) -> Result<DecimalExecutionPolicy, DecimalPlanProblem> {
+    match arithmetic_mode {
+        "compatible" => Ok(DecimalExecutionPolicy::decimal18_v1()),
+        "extended" => Ok(DecimalExecutionPolicy::decimal34_v1()),
+        _ => Err(DecimalPlanProblem::InvalidArithmeticContext),
+    }
+}
+
+pub(crate) fn hir_execution_policy(
+    arithmetic_mode: &str,
+) -> Result<DecimalExecutionPolicy, HirProblem> {
+    execution_policy(arithmetic_mode).map_err(|_| {
+        HirProblem::InvalidResolvedStatement(
+            StatementKind::Compute,
+            0,
+            "invalid effective arithmetic context".into(),
+        )
+    })
 }
 
 pub(crate) fn executable_identity() -> OperationIdentity {
-    OperationIdentity::new(DECIMAL_NAMESPACE, DECIMAL_ASSIGN, 1)
+    OperationIdentity::new(DECIMAL_NAMESPACE, DECIMAL_ASSIGN, 2)
         .expect("static decimal assignment identity")
+}
+
+fn legacy_executable_identity() -> OperationIdentity {
+    OperationIdentity::new(DECIMAL_NAMESPACE, DECIMAL_ASSIGN, 1)
+        .expect("static legacy decimal assignment identity")
 }
 
 pub(crate) fn register_hir_operations(catalog: &mut OperationCatalog) {
@@ -45,6 +74,16 @@ pub(crate) fn register_hir_operations(catalog: &mut OperationCatalog) {
         let mut schema = OperationSchema::pure(identity, 0, 0);
         schema.required_attributes = [ASSIGNMENT_PLAN_ATTRIBUTE.into()].into_iter().collect();
         schema.allowed_effects = effects(kind).into_iter().collect();
+        schema.semantic_contract =
+            OperationSemanticContract::DecimalAssignment(DecimalOperationContract {
+                plan_attribute: ASSIGNMENT_PLAN_ATTRIBUTE.into(),
+                expected_plan_version: DecimalPlanWireVersion::PolicyV2,
+                allowed_semantic_origins: [format!("cobol.{}@1", kind.slug())]
+                    .into_iter()
+                    .collect(),
+                layout_definition_operation: None,
+                condition: None,
+            });
         catalog
             .register(schema)
             .expect("unique typed HIR operation");
@@ -52,20 +91,51 @@ pub(crate) fn register_hir_operations(catalog: &mut OperationCatalog) {
 }
 
 pub(crate) fn register_executable_operation(catalog: &mut OperationCatalog) {
-    let mut schema = OperationSchema::pure(executable_identity(), 0, 0);
-    schema.required_attributes = [
-        ASSIGNMENT_PLAN_ATTRIBUTE.into(),
-        CONDITION_STATUS_ATTRIBUTE.into(),
-        CONDITION_BRANCHES_ATTRIBUTE.into(),
-    ]
-    .into_iter()
-    .collect();
-    schema.allowed_effects = [Effect::MemoryRead, Effect::MemoryWrite, Effect::Condition]
+    for (identity, version, origins) in [
+        (
+            legacy_executable_identity(),
+            DecimalPlanWireVersion::LegacyV1,
+            ["cobol.add@1".into(), "cobol.compute@1".into()]
+                .into_iter()
+                .collect(),
+        ),
+        (
+            executable_identity(),
+            DecimalPlanWireVersion::PolicyV2,
+            Default::default(),
+        ),
+    ] {
+        let mut schema = OperationSchema::pure(identity, 0, 0);
+        schema.required_attributes = [
+            ASSIGNMENT_PLAN_ATTRIBUTE.into(),
+            CONDITION_STATUS_ATTRIBUTE.into(),
+            CONDITION_BRANCHES_ATTRIBUTE.into(),
+        ]
         .into_iter()
         .collect();
-    catalog
-        .register(schema)
-        .expect("unique decimal assignment operation");
+        schema.allowed_effects = [Effect::MemoryRead, Effect::MemoryWrite, Effect::Condition]
+            .into_iter()
+            .collect();
+        schema.semantic_contract =
+            OperationSemanticContract::DecimalAssignment(DecimalOperationContract {
+                plan_attribute: ASSIGNMENT_PLAN_ATTRIBUTE.into(),
+                expected_plan_version: version,
+                allowed_semantic_origins: origins,
+                layout_definition_operation: Some(
+                    OperationIdentity::new("mainframe.core.cobol", "define", 1)
+                        .expect("static COBOL layout definition identity"),
+                ),
+                condition: Some(DecimalConditionContract {
+                    status: SIZE_ERROR_STATUS.into(),
+                    status_attribute: CONDITION_STATUS_ATTRIBUTE.into(),
+                    branch_mask_attribute: CONDITION_BRANCHES_ATTRIBUTE.into(),
+                    branch_polarity_attribute: CONDITION_POLARITY_ATTRIBUTE.into(),
+                }),
+            });
+        catalog
+            .register(schema)
+            .expect("unique decimal assignment operation");
+    }
 }
 
 pub(crate) fn emit_hir_operation(
@@ -73,13 +143,14 @@ pub(crate) fn emit_hir_operation(
     builder: &mut ModuleBuilder,
     block: BlockId,
     storage_ids: &BTreeMap<String, StorageId>,
+    policy: DecimalExecutionPolicy,
 ) -> Result<bool, HirProblem> {
     let Some(resolved @ (HirResolvedStatement::Add(_) | HirResolvedStatement::Compute(_))) =
         statement.resolved.as_ref()
     else {
         return Ok(false);
     };
-    let encoded = encode_statement(resolved, storage_ids).map_err(|problem| {
+    let encoded = encode_statement(resolved, storage_ids, policy).map_err(|problem| {
         HirProblem::InvalidResolvedStatement(
             statement.kind,
             statement.line,
@@ -111,6 +182,7 @@ pub(crate) fn emit_hir_operation(
 pub(crate) fn encode_statement(
     resolved: &HirResolvedStatement,
     storage_ids: &BTreeMap<String, StorageId>,
+    policy: DecimalExecutionPolicy,
 ) -> Result<EncodedDecimalAssignment, DecimalPlanProblem> {
     let mut context = PlanContext {
         storage_ids,
@@ -119,6 +191,7 @@ pub(crate) fn encode_statement(
     let plan = match resolved {
         HirResolvedStatement::Add(add) => DecimalAssignmentPlan {
             semantic_origin: "cobol.add@1".into(),
+            policy,
             assignments: match &add.mode {
                 HirAddMode::To { sources, receivers } => {
                     let sources = context.sum(sources)?;
@@ -159,6 +232,7 @@ pub(crate) fn encode_statement(
             let expression = context.expression(&compute.expression)?;
             DecimalAssignmentPlan {
                 semantic_origin: "cobol.compute@1".into(),
+                policy,
                 assignments: context
                     .assign_receivers(&compute.receivers, |_, _| Ok(expression.clone()))?,
             }

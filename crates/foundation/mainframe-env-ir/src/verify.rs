@@ -1,5 +1,8 @@
 use crate::model::validate_extent;
-use crate::{IrProblem, LegalityProfile, Module, OperationCatalog, OperationIdentity};
+use crate::{
+    IrProblem, LegalityProfile, Module, OperationCatalog, OperationIdentity,
+    verify_semantic_contracts,
+};
 use std::collections::BTreeSet;
 use std::fmt;
 
@@ -128,6 +131,8 @@ pub fn verify(
         .iter()
         .try_fold(0u64, |sum, storage| sum.checked_add(storage.size))
         .ok_or(VerificationProblem::ResourceOverflow)?;
+    verify_semantic_contracts(module, catalog)
+        .map_err(|problem| VerificationProblem::SemanticMismatch(problem.identity))?;
     Ok(VerificationReport {
         operation_count,
         value_count: values_seen,
@@ -178,6 +183,7 @@ pub enum VerificationProblem {
     IllegalOperation(OperationIdentity),
     AnalysisOnlyOperation(OperationIdentity),
     MissingRuntimeImport(String),
+    SemanticMismatch(OperationIdentity),
     ResourceOverflow,
     Model(IrProblem),
 }

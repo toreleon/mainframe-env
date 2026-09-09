@@ -5,6 +5,9 @@ use mainframe_env_source::SourceBundle;
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
 
+mod corresponding_reference;
+use corresponding_reference::corresponding_group_reference_at;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum HirResolvedStatement {
     Add(HirAddStatement),
@@ -105,6 +108,8 @@ pub struct HirSizeErrorPolicy {
 pub struct HirCorrespondingPair {
     pub source: HirDataReference,
     pub receiver: HirArithmeticReceiver,
+    pub source_declaration: Vec<SourceSpan>,
+    pub receiver_declaration: Vec<SourceSpan>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -348,58 +353,100 @@ fn resolve_add_corresponding(
     options: &[StatementOption],
     semantic: &SemanticModel,
 ) -> Resolution<HirAddStatement> {
-    let (source_group, source_end) = data_reference_at(tokens, 1, semantic)?;
+    let (source_group, source_end) = corresponding_group_reference_at(tokens, 1, semantic)?;
     if tokens.get(source_end).is_none_or(|token| token != "TO") {
         return Err(ResolutionFailure::Invalid(
             "ADD CORRESPONDING has no TO boundary".into(),
         ));
     }
-    let (target_group, target_end) = data_reference_at(tokens, source_end + 1, semantic)?;
+    let (target_group, target_end) =
+        corresponding_group_reference_at(tokens, source_end + 1, semantic)?;
     let rounded = match tokens.get(target_end..).unwrap_or_default() {
         [] => HirRounding::Truncate,
         [word] if word == "ROUNDED" => HirRounding::Rounded,
         _ => return Err(ResolutionFailure::Unsupported),
     };
-    if !is_group(source_group.category) || !is_group(target_group.category) {
+    if !is_add_corresponding_group(source_group.category)
+        || !is_add_corresponding_group(target_group.category)
+    {
         return Err(ResolutionFailure::Invalid(
-            "ADD CORRESPONDING operands must be groups".into(),
+            "ADD CORRESPONDING operands must be alphanumeric or national groups".into(),
         ));
     }
+    let layouts_by_name = semantic
+        .layouts
+        .iter()
+        .map(|layout| (layout.qualified_name.as_str(), layout))
+        .collect::<BTreeMap<_, _>>();
     let sources = semantic
         .layouts
         .iter()
-        .filter(|layout| {
-            layout.name != "FILLER"
-                && is_numeric(layout.category)
-                && descendant_of(layout, &source_group.qualified_name, &semantic.layouts)
+        .filter_map(|layout| {
+            corresponding_key(layout, &source_group.qualified_name, &layouts_by_name)
+                .filter(|_| {
+                    corresponding_item_eligible(
+                        layout,
+                        &source_group.qualified_name,
+                        &layouts_by_name,
+                    )
+                })
+                .map(|key| (key, layout))
         })
-        .collect::<Vec<_>>();
-    let pairs = semantic
+        .fold(
+            BTreeMap::<Vec<String>, Vec<&CobolLayout>>::new(),
+            |mut candidates, (key, layout)| {
+                candidates.entry(key).or_default().push(layout);
+                candidates
+            },
+        );
+    let targets = semantic
         .layouts
         .iter()
-        .filter(|layout| {
-            layout.name != "FILLER"
-                && is_numeric(layout.category)
-                && descendant_of(layout, &target_group.qualified_name, &semantic.layouts)
+        .filter_map(|layout| {
+            corresponding_key(layout, &target_group.qualified_name, &layouts_by_name)
+                .filter(|_| {
+                    corresponding_item_eligible(
+                        layout,
+                        &target_group.qualified_name,
+                        &layouts_by_name,
+                    )
+                })
+                .map(|key| (key, layout))
         })
-        .filter_map(|target| {
-            let matches = sources
-                .iter()
-                .filter(|source| source.name == target.name)
-                .copied()
-                .collect::<Vec<_>>();
-            (matches.len() == 1).then(|| HirCorrespondingPair {
-                source: matches[0].into(),
-                receiver: HirArithmeticReceiver {
-                    target: target.into(),
-                    rounding: rounded,
-                },
+        .collect::<Vec<_>>();
+    let target_counts = targets.iter().fold(
+        BTreeMap::<Vec<String>, usize>::new(),
+        |mut counts, (key, _)| {
+            *counts.entry(key.clone()).or_default() += 1;
+            counts
+        },
+    );
+    let mut unsupported_national_pair = false;
+    let pairs = targets
+        .into_iter()
+        .filter_map(|(key, target)| {
+            let matches = sources.get(&key)?;
+            (matches.len() == 1 && target_counts.get(&key) == Some(&1)).then(|| {
+                if matches[0].usage == CobolUsage::National || target.usage == CobolUsage::National
+                {
+                    unsupported_national_pair = true;
+                }
+                HirCorrespondingPair {
+                    source: matches[0].into(),
+                    receiver: HirArithmeticReceiver {
+                        target: target.into(),
+                        rounding: rounded,
+                    },
+                    source_declaration: matches[0].source.clone(),
+                    receiver_declaration: target.source.clone(),
+                }
             })
         })
         .collect::<Vec<_>>();
-    if pairs.is_empty() {
+    if unsupported_national_pair {
         return Err(ResolutionFailure::Invalid(
-            "ADD CORRESPONDING has no unique numeric pair".into(),
+            "ADD CORRESPONDING numeric USAGE NATIONAL storage is not supported by the declared decimal ABI"
+                .into(),
         ));
     }
     Ok(HirAddStatement {
@@ -410,6 +457,79 @@ fn resolve_add_corresponding(
         },
         size_error: size_error_policy(options),
     })
+}
+
+fn corresponding_key(
+    layout: &CobolLayout,
+    selected_group: &str,
+    layouts: &BTreeMap<&str, &CobolLayout>,
+) -> Option<Vec<String>> {
+    // Store the leaf first and then its implicit qualifiers. The selected
+    // sending/receiving group is deliberately the exclusive boundary, so its
+    // own name and any outer hierarchy never affect correspondence.
+    let mut key = vec![layout.name.clone()];
+    let mut parent = layout.parent.as_deref()?;
+    while parent != selected_group {
+        let qualifier = layouts.get(parent)?;
+        // FILLER is not a data-name and therefore cannot be an implicit
+        // qualifier. Omitting it also lets the uniqueness check reject two
+        // otherwise indistinguishable leaves under separate filler groups.
+        if qualifier.name != "FILLER" {
+            key.push(qualifier.name.clone());
+        }
+        parent = qualifier.parent.as_deref()?;
+    }
+    Some(key)
+}
+
+fn corresponding_item_eligible(
+    layout: &CobolLayout,
+    selected_group: &str,
+    layouts: &BTreeMap<&str, &CobolLayout>,
+) -> bool {
+    if layout.name == "FILLER" || !is_corresponding_numeric(layout.category) {
+        return false;
+    }
+    let mut subordinate = layout;
+    loop {
+        if matches!(
+            subordinate.usage,
+            CobolUsage::Index
+                | CobolUsage::Pointer
+                | CobolUsage::Pointer32
+                | CobolUsage::ProcedurePointer
+                | CobolUsage::FunctionPointer
+                | CobolUsage::ObjectReference
+        ) || subordinate.alias_of.is_some()
+            || subordinate.occurs_clause
+            || matches!(subordinate.category, DataCategory::Rename)
+        {
+            return false;
+        }
+        let Some(parent) = subordinate.parent.as_deref() else {
+            return false;
+        };
+        if parent == selected_group {
+            return true;
+        }
+        let Some(parent) = layouts.get(parent) else {
+            return false;
+        };
+        subordinate = parent;
+    }
+}
+
+const fn is_corresponding_numeric(category: DataCategory) -> bool {
+    matches!(
+        category,
+        DataCategory::NumericDisplay
+            | DataCategory::NumericEdited
+            | DataCategory::NationalEdited
+            | DataCategory::PackedDecimal
+            | DataCategory::Binary
+            | DataCategory::FloatShort
+            | DataCategory::FloatLong
+    )
 }
 
 fn resolve_compute(
@@ -772,20 +892,6 @@ fn has_option(options: &[StatementOption], expected: StatementOptionKind) -> boo
     options.iter().any(|option| option.kind == expected)
 }
 
-fn descendant_of(layout: &CobolLayout, root: &str, layouts: &[CobolLayout]) -> bool {
-    let mut parent = layout.parent.as_deref();
-    while let Some(name) = parent {
-        if name == root {
-            return true;
-        }
-        parent = layouts
-            .iter()
-            .find(|candidate| candidate.qualified_name == name)
-            .and_then(|candidate| candidate.parent.as_deref());
-    }
-    false
-}
-
 const fn is_numeric(category: DataCategory) -> bool {
     matches!(
         category,
@@ -798,11 +904,8 @@ const fn is_numeric(category: DataCategory) -> bool {
     )
 }
 
-const fn is_group(category: DataCategory) -> bool {
-    matches!(
-        category,
-        DataCategory::Group | DataCategory::NationalGroup | DataCategory::Utf8Group
-    )
+const fn is_add_corresponding_group(category: DataCategory) -> bool {
+    matches!(category, DataCategory::Group | DataCategory::NationalGroup)
 }
 
 fn resolve_cics(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsStatement> {
@@ -1148,6 +1251,348 @@ mod tests {
             compute.expression,
             HirNumericExpression::LengthOf(HirDataReference { dynamic: true, .. })
         ));
+    }
+
+    #[test]
+    fn add_corresponding_matches_the_exact_relative_qualifier_path() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CORRQUAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 SRC-G. 05 MATCH-X PIC 99 VALUE 1. 05 LEFT-G. 10 AMOUNT PIC 99 VALUE 2. 01 DST-G. 05 MATCH-X PIC 99 VALUE 10. 05 RIGHT-G. 10 AMOUNT PIC 99 VALUE 20. PROCEDURE DIVISION. ADD CORRESPONDING SRC-G TO DST-G. STOP RUN.";
+        let hir = analyze(source).hir.expect("qualified CORRESPONDING HIR");
+        let statement = hir
+            .statements
+            .iter()
+            .find(|statement| statement.kind == StatementKind::Add)
+            .expect("ADD CORRESPONDING statement");
+        let Some(HirResolvedStatement::Add(HirAddStatement {
+            mode:
+                HirAddMode::Corresponding {
+                    source_group,
+                    target_group,
+                    pairs,
+                },
+            ..
+        })) = statement.resolved.as_ref()
+        else {
+            panic!("typed ADD CORRESPONDING")
+        };
+        assert_eq!(source_group.qualified_name, "SRC-G");
+        assert_eq!(target_group.qualified_name, "DST-G");
+        assert_eq!(pairs.len(), 1);
+        assert_eq!(pairs[0].source.qualified_name, "SRC-G.MATCH-X");
+        assert_eq!(pairs[0].receiver.target.qualified_name, "DST-G.MATCH-X");
+        assert!(!statement.source.is_empty());
+        for (spans, declaration) in [
+            (&pairs[0].source_declaration, "05 MATCH-X PIC 99 VALUE 1"),
+            (&pairs[0].receiver_declaration, "05 MATCH-X PIC 99 VALUE 10"),
+        ] {
+            let [span] = spans.as_slice() else {
+                panic!("one exact fixture declaration span")
+            };
+            let start = source.find(declaration).expect("fixture declaration");
+            assert_eq!(span.source.as_str(), "typed.cbl");
+            assert_eq!(
+                span.source_start..span.source_end,
+                start..start + declaration.len()
+            );
+            assert_eq!(&source[span.source_start..span.source_end], declaration);
+        }
+
+        let operation = hir
+            .module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .find(|operation| {
+                operation.identity.namespace() == "cobol.hir"
+                    && operation.identity.name() == "add"
+                    && operation.identity.major() == 2
+            })
+            .expect("typed ADD operation");
+        let mainframe_env_ir::Attribute::Bytes(bytes) = &operation.attributes["assignment_plan"]
+        else {
+            panic!("typed assignment plan")
+        };
+        let plan = mainframe_env_ir::decode_decimal_assignment_plan(
+            bytes,
+            mainframe_env_ir::DecimalPlanLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(plan.assignments.len(), 1);
+        assert_eq!(
+            plan.assignments[0].receiver.target.qualified_layout_name,
+            "DST-G.MATCH-X"
+        );
+        let mainframe_env_ir::DecimalExpression::Add { left, right } =
+            &plan.assignments[0].expression
+        else {
+            panic!("corresponding addition")
+        };
+        assert!(matches!(
+            left.as_ref(),
+            mainframe_env_ir::DecimalExpression::Storage(slot)
+                if slot.qualified_layout_name == "DST-G.MATCH-X"
+        ));
+        assert!(matches!(
+            right.as_ref(),
+            mainframe_env_ir::DecimalExpression::Storage(slot)
+                if slot.qualified_layout_name == "SRC-G.MATCH-X"
+        ));
+    }
+
+    #[test]
+    fn add_corresponding_uses_qualifiers_to_make_repeated_leaves_unique() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CORRUNIQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 SRC-G. 05 LEFT-G. 10 AMOUNT PIC 99. 05 RIGHT-G. 10 AMOUNT PIC 99. 01 DST-G. 05 LEFT-G. 10 AMOUNT PIC 99. 05 RIGHT-G. 10 AMOUNT PIC 99. PROCEDURE DIVISION. ADD CORRESPONDING SRC-G TO DST-G. STOP RUN.";
+        let hir = analyze(source).hir.expect("qualified duplicate-leaf HIR");
+        let pairs = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Add(HirAddStatement {
+                    mode: HirAddMode::Corresponding { pairs, .. },
+                    ..
+                })) => Some(pairs),
+                _ => None,
+            })
+            .expect("resolved pairs");
+        assert_eq!(
+            pairs
+                .iter()
+                .map(|pair| (
+                    pair.source.qualified_name.as_str(),
+                    pair.receiver.target.qualified_name.as_str(),
+                ))
+                .collect::<Vec<_>>(),
+            [
+                ("SRC-G.LEFT-G.AMOUNT", "DST-G.LEFT-G.AMOUNT"),
+                ("SRC-G.RIGHT-G.AMOUNT", "DST-G.RIGHT-G.AMOUNT"),
+            ]
+        );
+    }
+
+    #[test]
+    fn add_corresponding_requires_bilateral_uniqueness_after_filler_qualification() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CORRAMBIG. DATA DIVISION. WORKING-STORAGE SECTION. 01 SRC-DUP. 05 FILLER. 10 AMOUNT PIC 99. 05 FILLER. 10 AMOUNT PIC 99. 01 DST-ONE. 05 AMOUNT PIC 99. 01 SRC-ONE. 05 AMOUNT PIC 99. 01 DST-DUP. 05 FILLER. 10 AMOUNT PIC 99. 05 FILLER. 10 AMOUNT PIC 99. PROCEDURE DIVISION. ADD CORRESPONDING SRC-DUP TO DST-ONE. ADD CORRESPONDING SRC-ONE TO DST-DUP. STOP RUN.";
+        let hir = analyze(source).hir.expect("ambiguous CORRESPONDING HIR");
+        let pair_counts = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Add(HirAddStatement {
+                    mode: HirAddMode::Corresponding { pairs, .. },
+                    ..
+                })) => Some(pairs.len()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(pair_counts, [0, 0]);
+    }
+
+    #[test]
+    fn add_corresponding_applies_documented_item_category_clause_and_usage_exclusions() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CORRELIG. DATA DIVISION. WORKING-STORAGE SECTION. 01 SRC-G. 05 GOOD-X PIC 99. 05 EDIT-X PIC +99. 05 PACK-X PIC S9(3) COMP-3. 05 BINARY-X PIC S9(4) COMP. 05 FLOAT-X COMP-1. 05 TABLE-X PIC 99 OCCURS 1 TIMES. 05 BASE-X PIC 99. 05 REDEF-X REDEFINES BASE-X PIC 99. 05 INDEX-X USAGE INDEX. 05 POINTER-X USAGE POINTER. 05 POINTER32-X USAGE POINTER-32. 05 PROC-X USAGE PROCEDURE-POINTER. 05 FUNC-X USAGE FUNCTION-POINTER. 05 OBJECT-X USAGE OBJECT REFERENCE. 05 FILLER PIC 99. 05 TEXT-X PIC XX. 66 RENAMED-X RENAMES GOOD-X. 01 DST-G. 05 GOOD-X PIC 99. 05 EDIT-X PIC +99. 05 PACK-X PIC S9(3) COMP-3. 05 BINARY-X PIC S9(4) COMP. 05 FLOAT-X COMP-1. 05 TABLE-X PIC 99 OCCURS 1 TIMES. 05 BASE-X PIC 99. 05 REDEF-X REDEFINES BASE-X PIC 99. 05 INDEX-X USAGE INDEX. 05 POINTER-X USAGE POINTER. 05 POINTER32-X USAGE POINTER-32. 05 PROC-X USAGE PROCEDURE-POINTER. 05 FUNC-X USAGE FUNCTION-POINTER. 05 OBJECT-X USAGE OBJECT REFERENCE. 05 FILLER PIC 99. 05 TEXT-X PIC XX. 66 RENAMED-X RENAMES GOOD-X. PROCEDURE DIVISION. ADD CORRESPONDING SRC-G TO DST-G. STOP RUN.";
+        let analysis = analyze(source);
+        let semantic = analysis.semantic.as_ref().expect("semantic model");
+        assert!(semantic.layout("SRC-G.TABLE-X").unwrap().occurs_clause);
+        assert!(semantic.layout("DST-G.TABLE-X").unwrap().occurs_clause);
+        let hir = analysis.hir.expect("eligible CORRESPONDING HIR");
+        let pairs = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Add(HirAddStatement {
+                    mode: HirAddMode::Corresponding { pairs, .. },
+                    ..
+                })) => Some(pairs),
+                _ => None,
+            })
+            .expect("resolved pairs");
+        assert_eq!(
+            pairs
+                .iter()
+                .map(|pair| pair.source.qualified_name.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "SRC-G.GOOD-X",
+                "SRC-G.EDIT-X",
+                "SRC-G.PACK-X",
+                "SRC-G.BINARY-X",
+                "SRC-G.FLOAT-X",
+                "SRC-G.BASE-X",
+            ]
+        );
+        assert!(pairs.iter().all(|pair| {
+            ![
+                "TABLE-X",
+                "REDEF-X",
+                "INDEX-X",
+                "POINTER-X",
+                "POINTER32-X",
+                "PROC-X",
+                "FUNC-X",
+                "OBJECT-X",
+                "FILLER",
+                "RENAMED-X",
+            ]
+            .iter()
+            .any(|excluded| pair.source.qualified_name.contains(excluded))
+        }));
+    }
+
+    #[test]
+    fn add_corresponding_excludes_descendants_of_forbidden_subordinate_groups() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CORRNEST. DATA DIVISION. WORKING-STORAGE SECTION. 01 SRC-G. 05 GOOD-X PIC 99. 05 TABLE-G OCCURS 1 TIMES. 10 TABLE-X PIC 99. 05 BASE-G. 10 BASE-X PIC 99. 05 REDEF-G REDEFINES BASE-G. 10 REDEF-X PIC 99. 01 DST-G. 05 GOOD-X PIC 99. 05 TABLE-G OCCURS 1 TIMES. 10 TABLE-X PIC 99. 05 BASE-G. 10 BASE-X PIC 99. 05 REDEF-G REDEFINES BASE-G. 10 REDEF-X PIC 99. PROCEDURE DIVISION. ADD CORRESPONDING SRC-G TO DST-G. STOP RUN.";
+        let hir = analyze(source)
+            .hir
+            .expect("CORRESPONDING with nested exclusions");
+        let pairs = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Add(HirAddStatement {
+                    mode: HirAddMode::Corresponding { pairs, .. },
+                    ..
+                })) => Some(pairs),
+                _ => None,
+            })
+            .expect("resolved pairs");
+        assert_eq!(
+            pairs
+                .iter()
+                .map(|pair| pair.source.qualified_name.as_str())
+                .collect::<Vec<_>>(),
+            ["SRC-G.GOOD-X", "SRC-G.BASE-G.BASE-X"]
+        );
+    }
+
+    #[test]
+    fn add_corresponding_does_not_apply_subordinate_exclusions_to_selected_groups() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CORRROOT. DATA DIVISION. WORKING-STORAGE SECTION. 01 SRC-BASE. 05 VALUE-X PIC 99. 01 SRC-G REDEFINES SRC-BASE. 05 VALUE-X PIC 99. 01 DST-BASE. 05 VALUE-X PIC 99. 01 DST-G REDEFINES DST-BASE. 05 VALUE-X PIC 99. PROCEDURE DIVISION. ADD CORRESPONDING SRC-G TO DST-G. STOP RUN.";
+        let hir = analyze(source)
+            .hir
+            .expect("selected REDEFINES groups remain eligible");
+        let Some(HirResolvedStatement::Add(HirAddStatement {
+            mode:
+                HirAddMode::Corresponding {
+                    source_group,
+                    target_group,
+                    pairs,
+                },
+            ..
+        })) = hir
+            .statements
+            .iter()
+            .find(|statement| statement.kind == StatementKind::Add)
+            .and_then(|statement| statement.resolved.as_ref())
+        else {
+            panic!("typed ADD CORRESPONDING")
+        };
+        assert_eq!(source_group.qualified_name, "SRC-G");
+        assert_eq!(target_group.qualified_name, "DST-G");
+        assert_eq!(pairs.len(), 1);
+        assert_eq!(pairs[0].source.qualified_name, "SRC-G.VALUE-X");
+        assert_eq!(pairs[0].receiver.target.qualified_name, "DST-G.VALUE-X");
+    }
+
+    #[test]
+    fn subscripted_selected_group_uses_the_explicit_compatibility_route() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CORRSUB. DATA DIVISION. WORKING-STORAGE SECTION. 01 IDX PIC 9 VALUE 2. 01 SRC-ROOT. 05 SRC-G. 10 VALUE-X PIC 99 VALUE 1. 01 DST-ROOT. 05 DST-G OCCURS 2 TIMES. 10 VALUE-X PIC 99 VALUE 10. PROCEDURE DIVISION. ADD CORRESPONDING SRC-G TO DST-G(IDX). STOP RUN.";
+        let hir = analyze(source).hir.expect("subscript compatibility HIR");
+        let add = hir
+            .statements
+            .iter()
+            .find(|statement| statement.kind == StatementKind::Add)
+            .expect("ADD CORRESPONDING statement");
+        assert!(add.resolved.is_none());
+        assert!(add.arguments.iter().any(|argument| argument == "IDX"));
+    }
+
+    #[test]
+    fn table_group_without_required_subscript_is_rejected() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CORRNOSUB. DATA DIVISION. WORKING-STORAGE SECTION. 01 SRC-ROOT. 05 SRC-G. 10 VALUE-X PIC 99 VALUE 1. 01 DST-ROOT. 05 DST-G OCCURS 2 TIMES. 10 VALUE-X PIC 99 VALUE 10. PROCEDURE DIVISION. ADD CORRESPONDING SRC-G TO DST-G. STOP RUN.";
+        let analysis = analyze(source);
+        assert!(analysis.semantic.is_some());
+        assert!(analysis.hir.is_none());
+        assert!(analysis.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("table group operand requires subscripting")
+        }));
+    }
+
+    #[test]
+    fn reference_modified_selected_group_fails_closed() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CORRREFM. DATA DIVISION. WORKING-STORAGE SECTION. 01 SRC-G. 05 VALUE-X PIC 99 VALUE 1. 01 DST-G. 05 VALUE-X PIC 99 VALUE 10. PROCEDURE DIVISION. ADD CORRESPONDING SRC-G(1:2) TO DST-G. STOP RUN.";
+        let analysis = analyze(source);
+        assert!(analysis.semantic.is_some());
+        assert!(analysis.hir.is_none());
+        assert!(analysis.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("cannot be reference modified")
+        }));
+    }
+
+    #[test]
+    fn unsupported_national_numeric_pairs_are_not_silently_misencoded_or_ignored() {
+        for pictures in [("99", "999"), ("+99", "+999")] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CORRNATL. DATA DIVISION. WORKING-STORAGE SECTION. 01 SRC-G GROUP-USAGE NATIONAL. 05 AMOUNT PIC {}. 01 DST-G GROUP-USAGE NATIONAL. 05 AMOUNT PIC {}. PROCEDURE DIVISION. ADD CORRESPONDING SRC-G TO DST-G. STOP RUN.",
+                pictures.0, pictures.1
+            );
+            let analysis = analyze(&source);
+            assert!(analysis.semantic.is_some());
+            assert!(analysis.hir.is_none());
+            assert!(analysis.diagnostics.iter().any(|diagnostic| {
+                diagnostic
+                    .public_message()
+                    .contains("numeric USAGE NATIONAL storage is not supported")
+            }));
+        }
+    }
+
+    #[test]
+    fn utf8_groups_are_outside_the_current_typed_add_corresponding_slice() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CORRUTF8. DATA DIVISION. WORKING-STORAGE SECTION. 01 SRC-G GROUP-USAGE UTF-8. 05 TEXT-X PIC U. 01 DST-G GROUP-USAGE UTF-8. 05 TEXT-X PIC U. PROCEDURE DIVISION. ADD CORRESPONDING SRC-G TO DST-G. STOP RUN.";
+        let analysis = analyze(source);
+        assert!(analysis.semantic.is_some());
+        assert!(analysis.hir.is_none());
+        assert!(analysis.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("must be alphanumeric or national groups")
+        }));
+    }
+
+    #[test]
+    fn valid_add_corresponding_without_pairs_is_an_explicit_typed_noop() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CORRNONE. DATA DIVISION. WORKING-STORAGE SECTION. 01 SRC-G. 05 SOURCE-ONLY PIC 99. 01 DST-G. 05 TARGET-ONLY PIC 99. PROCEDURE DIVISION. ADD CORRESPONDING SRC-G TO DST-G. STOP RUN.";
+        let analysis = analyze(source);
+        assert!(analysis.diagnostics.is_empty());
+        let hir = analysis.hir.expect("typed no-pair HIR");
+        let add = hir
+            .statements
+            .iter()
+            .find(|statement| statement.kind == StatementKind::Add)
+            .expect("ADD statement");
+        assert!(matches!(
+            add.resolved.as_ref(),
+            Some(HirResolvedStatement::Add(HirAddStatement {
+                mode: HirAddMode::Corresponding { pairs, .. },
+                ..
+            })) if pairs.is_empty()
+        ));
+        assert!(
+            hir.module
+                .regions()
+                .iter()
+                .flat_map(|region| &region.blocks)
+                .flat_map(|block| &block.operations)
+                .any(|operation| {
+                    operation.identity.namespace() == "cobol.hir"
+                        && operation.identity.name() == "add"
+                        && operation.identity.major() == 2
+                })
+        );
     }
 
     #[test]

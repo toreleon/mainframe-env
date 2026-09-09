@@ -1,0 +1,24 @@
+{
+  "schema_version": "mainframe-env.retained-artifact-fixture@1",
+  "source_commit": "c029219f0dd647d9255b4334d93167f5524d062d",
+  "artifact_contract": "mainframe-env.artifact@2",
+  "content_id": "sha256:cf5de374e76c07ff001af9a20053fd8692f55337a4ebece2085ce62c436d58db",
+  "semantic_id": "semantic-sha256:f27f98bc6fa22cc145c9df52483b26346b2e1a9aac3272df49fa14f731ec45c9",
+  "payload_bytes": 1261,
+  "compiler_generation": "mainframe-env-cobol-0.8.3",
+  "target": "reference",
+  "options": {
+    "cobol.effective-arith": "extended",
+    "cobol.effective-dispsign": "compatible",
+    "cobol.effective-lp": "32"
+  },
+  "host_interfaces": [
+    "mainframe-env.cics@1",
+    "mainframe-env.host@1"
+  ],
+  "ir_contract": "mainframe-env.ir-envelope@1",
+  "derived_dialect_contracts": [
+    "mainframe.core.cobol@1"
+  ],
+  "source_fixture": "crates/kernel/mainframe-env-compiler/src/service.rs::tests::HELLO"
+}

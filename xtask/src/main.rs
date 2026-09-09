@@ -15,8 +15,9 @@ mod work_package_seal;
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use mainframe_env_conformance::{
     CicsOracleExpectation, CicsOracleImport, CicsOracleObservation, CicsPilotRuntime,
-    CobolMovePilotRuntime, DatasetConformanceRuntime, RACF_ORACLE_RELATIVE_PATH,
-    RacfOracleCampaign, cics_pilot_runtime, cobol_move_pilot_runtime, dataset_conformance_runtime,
+    CobolArithmeticPilotRuntime, CobolMovePilotRuntime, DatasetConformanceRuntime,
+    RACF_ORACLE_RELATIVE_PATH, RacfOracleCampaign, cics_pilot_runtime,
+    cobol_arithmetic_pilot_runtime, cobol_move_pilot_runtime, dataset_conformance_runtime,
     gnucobol_reference_fixture_digest, import_cics_oracle_capture, licensed_fixture_digest,
     run_dataset_reference_simulation, run_gnucobol_reference_campaign,
     verify_carddemo_application_package_from_env, verify_carddemo_base_batch_from_env,
@@ -868,6 +869,7 @@ fn check_spec(root: &Path) -> TaskResult {
     let spec = compile_shared_spec(root)?;
     check_cics_pilot_inputs(root, &spec)?;
     check_cobol_move_pilot_inputs(root, &spec)?;
+    check_cobol_arithmetic_pilot_inputs(root, &spec)?;
     if let Ok(receipt_path) = env::var("MAINFRAME_ENV_COBOL65_LICENSED_ORACLE_RECEIPT") {
         let receipt_path = fs::canonicalize(PathBuf::from(receipt_path))
             .map_err(|error| format!("licensed COBOL receipt: {error}"))?;
@@ -1228,6 +1230,203 @@ fn check_cobol_move_pilot_inputs(root: &Path, spec: &CompiledSpec) -> TaskResult
         ),
         _ => Err("COBOL MOVE pilot review status is unknown".into()),
     }
+}
+
+fn check_cobol_arithmetic_pilot_inputs(root: &Path, spec: &CompiledSpec) -> TaskResult {
+    let review_path = root.join("conformance/0.9/cobol/arithmetic-rule-review.json");
+    if !review_path.is_file() {
+        return Ok(());
+    }
+    let fixture_path = root.join("conformance/0.9/cobol/arithmetic-fixtures.json");
+    let manifest_path = root.join("conformance/0.3/generated/cobol-topic-manifest.json");
+    let projection_path = root.join("conformance/0.3/generated/cobol-html-grammar-projection.json");
+    let review = json(&review_path)?;
+    let fixture = json(&fixture_path)?;
+    let manifest = json(&manifest_path)?;
+    let projection = json(&projection_path)?;
+    let row_id = "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0002";
+
+    let add_topic = array(&manifest, "topics", &manifest_path)?
+        .iter()
+        .find(|topic| topic["id"] == "add")
+        .ok_or("pinned COBOL ADD topic is missing")?;
+    let add_topics = array(add_topic, "topics", &manifest_path)?;
+    require(
+        manifest["product"] == "SS6SG3_6.5"
+            && manifest["retained_in_repository"] == false
+            && manifest["coverage_credit"] == 0
+            && add_topic["row_id"] == row_id
+            && add_topics.len() == 1
+            && add_topics[0]["topic_path"] == "SS6SG3_6.5/lr/ref/rlpsadd.html"
+            && add_topics[0]["sha256"]
+                == "sha256:0d41bb5458c78b6477731c50c532c36731f89a4a12e6ce88e1123c138b6b6e35"
+            && review["pinned_source"]["manifest"]
+                == "conformance/0.3/generated/cobol-topic-manifest.json"
+            && review["pinned_source"]["product"] == manifest["product"]
+            && review["pinned_source"]["row_id"] == add_topic["row_id"]
+            && review["pinned_source"]["topic_path"] == add_topics[0]["topic_path"]
+            && review["pinned_source"]["sha256"] == add_topics[0]["sha256"]
+            && review["pinned_source"]["retained_publication_bytes"] == false
+            && review["pinned_source"]["coverage_credit"] == 0,
+        "COBOL arithmetic review drifted from the already pinned ADD topic",
+    )?;
+    require(
+        review["semantic_publication"]["product"] == "SS6SG3_6.5"
+            && review["semantic_publication"]["publication_number"] == "SC27-8713-04"
+            && review["semantic_publication"]["revision_date"] == "2026-05-31"
+            && review["semantic_publication"]["url"]
+                == "https://www.ibm.com/docs/en/SS6SG3_6.5/pdf/lrmvs.pdf"
+            && review["semantic_publication"]["sha256"]
+                == "sha256:8b86cbd2d838d8f460dcbe8d1e74d2266799ce1534f4cfdbc08469c36748e85e"
+            && review["semantic_publication"]["retained_in_repository"] == false
+            && review["semantic_publication"]["coverage_credit"] == 0
+            && review["semantic_publication"]["locators"]["size_error"] == "SIZE ERROR phrases"
+            && review["semantic_publication"]["locators"]["corresponding"]
+                == "CORRESPONDING phrase"
+            && review["semantic_publication"]["locators"]["add_format_3"]
+                == "ADD statement, Format 3",
+        "COBOL arithmetic semantic rules lack an exact publication digest or locator",
+    )?;
+
+    let add_projection = array(&projection, "rows", &projection_path)?
+        .iter()
+        .find(|row| row["row_id"] == row_id)
+        .ok_or("COBOL ADD grammar projection is missing")?;
+    let required_titles = review["grammar_projection"]["required_format_titles"]
+        .as_array()
+        .ok_or("COBOL arithmetic grammar review titles are missing")?
+        .iter()
+        .filter_map(Value::as_str)
+        .collect::<BTreeSet<_>>();
+    let projected_titles = add_projection["format_titles"]
+        .as_array()
+        .ok_or("COBOL ADD projected format titles are missing")?
+        .iter()
+        .filter_map(Value::as_str)
+        .collect::<BTreeSet<_>>();
+    require(
+        review["grammar_projection"]["path"]
+            == "conformance/0.3/generated/cobol-html-grammar-projection.json"
+            && required_titles
+                == BTreeSet::from([
+                    "Format 1: ADD statement",
+                    "Format 2: ADD statement with GIVING phrase",
+                    "Format 3: ADD statement with CORRESPONDING phrase",
+                ])
+            && required_titles.is_subset(&projected_titles),
+        "COBOL arithmetic review is not closed over the pinned ADD grammar forms",
+    )?;
+
+    let decisions = array(&review, "decisions", &review_path)?;
+    let reviewed_rules = decisions
+        .iter()
+        .map(|decision| text(decision, "rule_id", &review_path).map(str::to_string))
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    let reviewed_cases = decisions
+        .iter()
+        .map(|decision| text(decision, "fixture_case", &review_path).map(str::to_string))
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    let cases = array(&fixture, "cases", &fixture_path)?;
+    let fixture_cases = cases
+        .iter()
+        .map(|case| text(case, "case_id", &fixture_path).map(str::to_string))
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    let fixture_rules = cases
+        .iter()
+        .flat_map(|case| {
+            case["rule_ids"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+        })
+        .collect::<BTreeSet<_>>();
+    require(
+        review["review_status"] == "accepted"
+            && decisions.len() == 6
+            && decisions.iter().all(|decision| {
+                decision["decision"] == "accepted"
+                    && matches!(
+                        decision["source_locator"].as_str(),
+                        Some("SIZE ERROR phrases" | "CORRESPONDING phrase")
+                    )
+            })
+            && reviewed_rules == fixture_rules
+            && reviewed_cases == fixture_cases
+            && fixture_cases
+                == BTreeSet::from([
+                    "receiver-local-size-error".to_string(),
+                    "receiver-overflow-without-handler".to_string(),
+                    "corresponding-relative-qualifiers".to_string(),
+                    "corresponding-no-pair-no-op".to_string(),
+                    "corresponding-numeric-edited-eligible".to_string(),
+                ]),
+        "COBOL arithmetic decisions and fixture cases are not closed",
+    )?;
+
+    let expected_contracts = BTreeMap::from([
+        (
+            "receiver-local-size-error",
+            json!(["3639310a", [2], [2], ["GOOD-X", "SMALL-X"]]),
+        ),
+        (
+            "receiver-overflow-without-handler",
+            json!(["36310a", [2], [2], ["GOOD-X", "SMALL-X"]]),
+        ),
+        (
+            "corresponding-relative-qualifiers",
+            json!(["31310a32300a", [2], [1], ["DST-G.MATCH-X"]]),
+        ),
+        (
+            "corresponding-no-pair-no-op",
+            json!(["33340a", [2], [0], []]),
+        ),
+        (
+            "corresponding-numeric-edited-eligible",
+            json!(["31310a2b32320a", [2], [2], ["DST-G.GOOD-X", "DST-G.EDIT-X"]]),
+        ),
+    ]);
+    require(
+        fixture["schema_version"] == "mainframe-env.cobol-arithmetic-pilot-fixtures@1"
+            && fixture["fixture_id"] == "cobol.typed-arithmetic.issue-140-141-v1"
+            && fixture["row_id"] == row_id
+            && cases.iter().all(|case| {
+                case["program_source"]
+                    .as_str()
+                    .is_some_and(|source| source.contains("ADD"))
+                    && expected_contracts
+                        .get(case["case_id"].as_str().unwrap_or_default())
+                        .is_some_and(|expected| {
+                            *expected
+                                == json!([
+                                    case["expected_output_hex"],
+                                    case["expected_typed_plan"]["operation_majors"],
+                                    case["expected_typed_plan"]["assignment_counts"],
+                                    case["expected_typed_plan"]["assignment_targets"],
+                                ])
+                        })
+                    && case["expected_typed_plan"]["semantic_origins"] == json!(["cobol.add@1"])
+                    && case["expected_typed_plan"]["execution_policies"]
+                        == json!(["decimal34-v1/cobol-numeric-v1/captured-operands-receiver-local-v1/cobol-size-error-v1"])
+            })
+            && fixture["expectation_authority"]["external_control"]["status"] == "not-run"
+            && fixture["expectation_authority"]["external_control"]["coverage_credit"] == 0
+            && fixture["expectation_authority"]["external_control"]["licensed_credit"] == 0
+            && fixture["comparison_policy"]["normalizable_fields"]
+                .as_array()
+                .is_some_and(Vec::is_empty)
+            && review["evidence_boundary"]["licensed_ibm_differential_run"] == false
+            && review["evidence_boundary"]["licensed_credit"] == 0
+            && review["evidence_boundary"]["differential_credit"] == 0
+            && review["evidence_boundary"]["candidate_outputs_are_source_authority"] == false,
+        "COBOL arithmetic independent exact-byte or typed-plan contracts drifted",
+    )?;
+    require(
+        spec.cases()
+            .any(|case| case.test_id().as_str() == "cobol.typed-arithmetic.contract.executed"),
+        "accepted COBOL arithmetic review is not promoted through the shared runner",
+    )
 }
 
 fn import_cics_oracle(
@@ -1941,6 +2140,16 @@ fn check_cobol_statement_bindings(
                 .any(|case| case.test_id().as_str() == "cobol.numeric-move.bytes.executed")
         {
             expected_obligations.insert("numeric-move-bytes");
+        }
+        if row
+            .row_id()
+            .as_str()
+            .ends_with(":procedure-statements:0002")
+            && spec
+                .cases()
+                .any(|case| case.test_id().as_str() == "cobol.typed-arithmetic.contract.executed")
+        {
+            expected_obligations.insert("typed-arithmetic-semantics");
         }
         if matches!(
             row.row_id().as_str().rsplit(':').next(),
@@ -4096,7 +4305,8 @@ fn augment_ams_spec(root: &Path, spec: &mut Value) -> TaskResult {
 
 fn augment_docs_driven_pilots(root: &Path, spec: &mut Value) -> TaskResult {
     augment_cics_pilot_spec(root, spec)?;
-    augment_cobol_move_pilot_spec(root, spec)
+    augment_cobol_move_pilot_spec(root, spec)?;
+    augment_cobol_arithmetic_pilot_spec(root, spec)
 }
 
 fn registry_values_mut<'a>(spec: &'a mut Value, name: &str) -> TaskResult<&'a mut Vec<Value>> {
@@ -4486,6 +4696,110 @@ fn augment_cobol_move_pilot_spec(root: &Path, spec: &mut Value) -> TaskResult {
     Ok(())
 }
 
+fn augment_cobol_arithmetic_pilot_spec(root: &Path, spec: &mut Value) -> TaskResult {
+    let review_path = root.join("conformance/0.9/cobol/arithmetic-rule-review.json");
+    if !review_path.is_file() {
+        return Ok(());
+    }
+    let review = json(&review_path)?;
+    if review["review_status"] == "pending-maintainer" {
+        return Ok(());
+    }
+    require(
+        review["review_status"] == "accepted",
+        "COBOL arithmetic review status is unknown",
+    )?;
+    let decisions = array(&review, "decisions", &review_path)?;
+    require(
+        decisions.len() == 6
+            && decisions
+                .iter()
+                .all(|decision| decision["decision"] == "accepted"),
+        "COBOL arithmetic cannot promote incomplete review decisions",
+    )?;
+    let rules = decisions
+        .iter()
+        .map(|decision| text(decision, "rule_id", &review_path).map(str::to_string))
+        .collect::<TaskResult<BTreeSet<_>>>()?;
+    require(
+        rules.len() == 6,
+        "COBOL arithmetic accepted rule set is incomplete",
+    )?;
+    let review_digest = format!("sha256:{}", file_digest(&review_path)?);
+    registry_values_mut(spec, "drivers")?
+        .push(Value::String("cobol.typed-arithmetic.product-path".into()));
+    registry_values_mut(spec, "observations")?.push(Value::String(
+        "cobol.typed-arithmetic.exact-contract".into(),
+    ));
+    registry_values_mut(spec, "fixtures")?.push(json!({
+        "id": "cobol.typed-arithmetic.issue-140-141-v1",
+        "digest": format!("sha256:{}", file_digest(&root.join("conformance/0.9/cobol/arithmetic-fixtures.json"))?)
+    }));
+    registry_values_mut(spec, "reviewed_rules")?.extend(
+        rules
+            .iter()
+            .map(|rule| json!({"id": rule, "digest": review_digest})),
+    );
+    let row_id = "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0002";
+    require(
+        document_values_mut(spec, "cases")?.iter().any(|case| {
+            case["row_id"] == row_id
+                && case["test_id"] == "cobol.condition.add-size-error"
+                && case["gate"] == "conditioned"
+        }) && document_values_mut(spec, "cases")?.iter().any(|case| {
+            case["row_id"] == row_id
+                && case["test_id"] == "cobol.statement-phrase-runtime.add-corresponding"
+                && case["gate"] == "executed"
+        }),
+        "COBOL arithmetic pilot must extend the existing ADD condition and phrase bindings",
+    )?;
+    let rows = document_values_mut(spec, "rows")?;
+    let row = rows
+        .iter_mut()
+        .find(|row| row["row_id"] == row_id)
+        .ok_or("COBOL ADD row is missing from current Conformance IR")?;
+    row["obligations"]
+        .as_array_mut()
+        .ok_or("COBOL ADD obligations are missing")?
+        .push(Value::String("typed-arithmetic-semantics".into()));
+    row["postconditions"]
+        .as_array_mut()
+        .ok_or("COBOL ADD postconditions are missing")?
+        .push(Value::String(
+            "cobol.typed-arithmetic.exact-contract".into(),
+        ));
+    let mut row_rules = row["reviewed_rules"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::to_string)
+        .collect::<BTreeSet<_>>();
+    row_rules.extend(rules.iter().cloned());
+    row["reviewed_rules"] = Value::Array(row_rules.into_iter().map(Value::String).collect());
+    document_values_mut(spec, "obligations")?.push(json!({
+        "row_id": row_id,
+        "obligation_id": "typed-arithmetic-semantics",
+        "applicable_gates": ["executed"],
+    }));
+    document_values_mut(spec, "cases")?.push(json!({
+        "spec_version": "mainframe-env.conformance-ir@1",
+        "row_id": row_id,
+        "obligation_id": "typed-arithmetic-semantics",
+        "gate": "executed",
+        "test_id": "cobol.typed-arithmetic.contract.executed",
+        "driver": "cobol.typed-arithmetic.product-path",
+        "input": "cobol.typed-arithmetic.issue-140-141-v1",
+        "preconditions": [],
+        "expected": ["cobol.typed-arithmetic.exact-contract"],
+        "recovery": null,
+        "oracle": "cobol.enterprise-6.5.licensed",
+        "reviewed_rules": rules,
+        "scenario": null,
+    }));
+    Ok(())
+}
+
 fn official_catalog_rows(root: &Path) -> TaskResult<Vec<OfficialCatalogRow>> {
     let index_path = root.join("conformance/0.2/catalogs/index.json");
     let index = json(&index_path)?;
@@ -4604,12 +4918,14 @@ fn check_focused_conformance_interface(root: &Path, args: &ConformanceArgs) -> T
     let jcl_handlers = jcl_conformance::runtime();
     let cics_handlers = cics_pilot_runtime();
     let cobol_move_handlers = cobol_move_pilot_runtime();
+    let cobol_arithmetic_handlers = cobol_arithmetic_pilot_runtime();
     let runtime = combined_conformance_runtime(
         &spec,
         &dataset_handlers,
         &jcl_handlers,
         &cics_handlers,
         &cobol_move_handlers,
+        &cobol_arithmetic_handlers,
         limits,
     )?;
     let context = RunnerContext::new(candidate_digest(root)?, "local", limits)
@@ -4673,12 +4989,14 @@ fn run_focused_cics(root: &Path, args: &ConformanceArgs) -> TaskResult {
     let jcl_handlers = jcl_conformance::runtime();
     let cics_handlers = cics_pilot_runtime();
     let cobol_move_handlers = cobol_move_pilot_runtime();
+    let cobol_arithmetic_handlers = cobol_arithmetic_pilot_runtime();
     let runtime = combined_conformance_runtime(
         &spec,
         &dataset_handlers,
         &jcl_handlers,
         &cics_handlers,
         &cobol_move_handlers,
+        &cobol_arithmetic_handlers,
         limits,
     )?;
     let context = RunnerContext::new_with_environment_manifest(
@@ -4761,12 +5079,14 @@ fn check_cobol_exit(root: &Path) -> TaskResult {
     let jcl_handlers = jcl_conformance::runtime();
     let cics_handlers = cics_pilot_runtime();
     let cobol_move_handlers = cobol_move_pilot_runtime();
+    let cobol_arithmetic_handlers = cobol_arithmetic_pilot_runtime();
     let runtime = combined_conformance_runtime(
         &spec,
         &dataset_handlers,
         &jcl_handlers,
         &cics_handlers,
         &cobol_move_handlers,
+        &cobol_arithmetic_handlers,
         limits,
     )?;
     let report = ConformanceRunner::new(&spec, runtime, limits)
@@ -4976,12 +5296,14 @@ fn check_focused_dataset_or_jcl_conformance_interface(
         let jcl_handlers = jcl_conformance::runtime();
         let cics_handlers = cics_pilot_runtime();
         let cobol_move_handlers = cobol_move_pilot_runtime();
+        let cobol_arithmetic_handlers = cobol_arithmetic_pilot_runtime();
         let runtime = combined_conformance_runtime(
             &spec,
             &dataset_handlers,
             &jcl_handlers,
             &cics_handlers,
             &cobol_move_handlers,
+            &cobol_arithmetic_handlers,
             ConformanceLimits::default(),
         )
         .map_err(|problem| problem.to_string())?;
@@ -5051,12 +5373,14 @@ fn run_focused_racf(
     let jcl_handlers = jcl_conformance::runtime();
     let cics_handlers = cics_pilot_runtime();
     let cobol_move_handlers = cobol_move_pilot_runtime();
+    let cobol_arithmetic_handlers = cobol_arithmetic_pilot_runtime();
     let runtime = combined_conformance_runtime(
         spec,
         &dataset_handlers,
         &jcl_handlers,
         &cics_handlers,
         &cobol_move_handlers,
+        &cobol_arithmetic_handlers,
         limits,
     )?;
     let report = ConformanceRunner::new(spec, runtime, limits)
@@ -5121,12 +5445,14 @@ fn run_focused_jcl(
     let jcl_handlers = jcl_conformance::runtime();
     let cics_handlers = cics_pilot_runtime();
     let cobol_move_handlers = cobol_move_pilot_runtime();
+    let cobol_arithmetic_handlers = cobol_arithmetic_pilot_runtime();
     let runtime = combined_conformance_runtime(
         spec,
         &dataset_handlers,
         &jcl_handlers,
         &cics_handlers,
         &cobol_move_handlers,
+        &cobol_arithmetic_handlers,
         limits,
     )?;
     let report = ConformanceRunner::new(spec, runtime, limits)
@@ -5208,6 +5534,7 @@ fn combined_conformance_runtime<'a>(
     jcl: &'a jcl_conformance::JclConformanceRuntime,
     cics: &'a CicsPilotRuntime,
     cobol_move: &'a CobolMovePilotRuntime,
+    cobol_arithmetic: &'a CobolArithmeticPilotRuntime,
     limits: ConformanceLimits,
 ) -> Result<RuntimeRegistry<'a>, String> {
     let cobol = mainframe_env_conformance::cobol_conformance_handlers(limits)?;
@@ -5237,6 +5564,9 @@ fn combined_conformance_runtime<'a>(
         .bind(spec, &mut drivers, &mut observations, limits)
         .map_err(|problem| problem.to_string())?;
     cobol_move
+        .bind(spec, &mut drivers, &mut observations, limits)
+        .map_err(|problem| problem.to_string())?;
+    cobol_arithmetic
         .bind(spec, &mut drivers, &mut observations, limits)
         .map_err(|problem| problem.to_string())?;
     let runtime = mainframe_env_conformance::racf_runtime_with(

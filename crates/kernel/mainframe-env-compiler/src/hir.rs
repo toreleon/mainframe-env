@@ -10,14 +10,11 @@ use mainframe_env_ir::{
 use mainframe_env_source::SourceBundle;
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
-
 pub(crate) mod cics;
 pub(crate) mod decimal;
 mod statement_grammar;
 mod typed;
-
 pub use typed::*;
-
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum StatementKind {
     Accept,
@@ -387,7 +384,8 @@ impl CobolHir {
                 }),
         });
         typed::attach_locations(&mut statements, source);
-        let module = build_module(&statements, &semantic.layouts, limits)?;
+        let mode = syntax.effective_compiler_options().arithmetic_mode();
+        let module = build_module(&statements, &semantic.layouts, mode.as_str(), limits)?;
         Ok(Self {
             program_id: semantic.program_id.clone(),
             program_lifecycle: installed_lifecycle(syntax.semantic_text(), semantic).into(),
@@ -450,6 +448,7 @@ pub fn cobol_hir_catalog() -> OperationCatalog {
 fn build_module(
     statements: &[HirStatement],
     layouts: &[CobolLayout],
+    arithmetic_mode: &str,
     limits: IrLimits,
 ) -> Result<Module, HirProblem> {
     let mut builder = ModuleBuilder::new(limits);
@@ -510,11 +509,12 @@ fn build_module(
     let block = builder
         .add_block(region)
         .map_err(|_| HirProblem::StatementLimitExceeded)?;
+    let decimal_policy = decimal::hir_execution_policy(arithmetic_mode)?;
     for statement in statements {
         if cics::emit_hir_operation(statement, &mut builder, block, &storage)? {
             continue;
         }
-        if decimal::emit_hir_operation(statement, &mut builder, block, &storage)? {
+        if decimal::emit_hir_operation(statement, &mut builder, block, &storage, decimal_policy)? {
             continue;
         }
         let mut attributes = BTreeMap::new();

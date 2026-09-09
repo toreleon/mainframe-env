@@ -415,10 +415,10 @@ mod tests {
     use super::*;
     use mainframe_env_compiler_api::{CompileOptions, CompileTarget};
     use mainframe_env_ir::{
-        Attribute, CicsCondition, CicsEffectPlan, CicsOperandName, CicsOperandValue,
-        CicsOutputName, CicsPlanLimits, CicsPlanOperation, CodecLimits, DecimalPlanLimits, Effect,
-        StorageId, decode_binary, decode_cics_effect_plan, decode_decimal_assignment_plan,
-        encode_binary,
+        Attribute, CICS_EXECUTABLE_DESCRIPTORS, CicsCondition, CicsEffectPlan, CicsOperandName,
+        CicsOperandValue, CicsOutputName, CicsPlanLimits, CicsPlanOperation, CodecLimits,
+        DecimalExecutionPolicy, DecimalPlanLimits, StorageId, cics_executable_descriptor,
+        decode_binary, decode_cics_effect_plan, decode_decimal_assignment_plan, encode_binary,
     };
     use mainframe_env_source::{
         LogicalPath, SourceEncoding, SourceFile, SourceFormat, SourceLibrary, SourceLimits,
@@ -541,9 +541,9 @@ mod tests {
 
     #[test]
     fn arithmetic_mode_is_embedded_in_manifest_and_executable_payload() {
-        let source = format!("PROCESS ARITH(COMPAT)\n{HELLO}");
+        let source = "PROCESS ARITH(COMPAT)\nIDENTIFICATION DIVISION. PROGRAM-ID. COMPAT. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 99 VALUE 1. 01 B PIC 99 VALUE 2. PROCEDURE DIVISION. ADD A TO B. STOP RUN.";
         let result = CobolCompiler::default()
-            .compile(request(&source, CompilationMode::Executable))
+            .compile(request(source, CompilationMode::Executable))
             .unwrap();
         let CompilerResult::Published { artifact, .. } = result else {
             panic!("ARITH(COMPAT) did not publish: {result:?}");
@@ -569,6 +569,18 @@ mod tests {
             config.attributes.get("arithmetic_mode"),
             Some(&Attribute::Text("compatible".into()))
         );
+        let assignment = module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .find(|operation| operation.identity.namespace() == "mainframe.decimal")
+            .expect("typed decimal operation");
+        let Attribute::Bytes(bytes) = &assignment.attributes["assignment_plan"] else {
+            panic!("typed decimal plan bytes")
+        };
+        let plan = decode_decimal_assignment_plan(bytes, DecimalPlanLimits::default()).unwrap();
+        assert_eq!(plan.policy, DecimalExecutionPolicy::decimal18_v1());
     }
     #[test]
     fn display_sign_is_embedded_in_manifest_and_executable_payload() {
@@ -1240,6 +1252,7 @@ mod tests {
                     "cobol.add@1"
                 }
             );
+            assert_eq!(plan.policy, DecimalExecutionPolicy::decimal34_v1());
             assert_eq!(
                 plan.assignments.len(),
                 if operation.identity.name() == "compute" {
@@ -1267,7 +1280,7 @@ mod tests {
             artifact.manifest().dialect_contracts,
             BTreeSet::from([
                 "mainframe.core.cobol@1".into(),
-                "mainframe.decimal@1".into(),
+                "mainframe.decimal@2".into(),
             ])
         );
         let module = decode_binary(artifact.payload(), CodecLimits::default()).unwrap();
@@ -1279,7 +1292,7 @@ mod tests {
             .filter(|operation| {
                 operation.identity.namespace() == "mainframe.decimal"
                     && operation.identity.name() == "assign"
-                    && operation.identity.major() == 1
+                    && operation.identity.major() == 2
             })
             .collect::<Vec<_>>();
         assert_eq!(assignments.len(), 3);
@@ -1303,6 +1316,7 @@ mod tests {
                 plan.semantic_origin.as_str(),
                 "cobol.add@1" | "cobol.compute@1"
             ));
+            assert_eq!(plan.policy, DecimalExecutionPolicy::decimal34_v1());
             assert_eq!(
                 plan.assignments.len(),
                 if plan.semantic_origin == "cobol.compute@1" {
@@ -1611,11 +1625,10 @@ mod tests {
                     operation.identity.name()
                 ))
                 .collect::<BTreeSet<_>>(),
-            BTreeSet::from([
-                "cics.file@1.read".into(),
-                "cics.file@1.rewrite".into(),
-                "cics.recovery@1.syncpoint".into(),
-            ])
+            CICS_EXECUTABLE_DESCRIPTORS
+                .iter()
+                .map(|descriptor| descriptor.identity().to_string())
+                .collect()
         );
         let catalog = crate::core_mir_catalog();
         for operation in operations {
@@ -1660,33 +1673,17 @@ mod tests {
                     reference.length
                 );
             }
-            let (expected_namespace, expected_name, source_operation) = match plan.operation {
-                CicsPlanOperation::Read => ("cics.file", "read", crate::HirCicsOperation::Read),
-                CicsPlanOperation::Rewrite => {
-                    ("cics.file", "rewrite", crate::HirCicsOperation::Rewrite)
-                }
-                CicsPlanOperation::Syncpoint => (
-                    "cics.recovery",
-                    "syncpoint",
-                    crate::HirCicsOperation::Syncpoint,
-                ),
-            };
-            assert_eq!(operation.identity.namespace(), expected_namespace);
-            assert_eq!(operation.identity.name(), expected_name);
-            assert_eq!(operation.identity.major(), 1);
-            assert_eq!(
-                operation.effects,
-                crate::hir::cics::operation_effects(source_operation)
-            );
+            let descriptor = cics_executable_descriptor(plan.operation);
+            assert_eq!(operation.identity, descriptor.identity());
+            assert_eq!(operation.effects, descriptor.effects);
             let schema = catalog.get(&operation.identity).expect("typed CICS schema");
-            assert_eq!(schema.runtime_import.as_deref(), Some("host.cics"));
+            assert_eq!(
+                schema.runtime_import.as_deref(),
+                Some(descriptor.runtime_import)
+            );
             assert_eq!(
                 schema.allowed_effects,
-                operation
-                    .effects
-                    .iter()
-                    .copied()
-                    .collect::<BTreeSet<Effect>>()
+                operation.effects.iter().copied().collect::<BTreeSet<_>>()
             );
             for forbidden in cics_grammar_tokens() {
                 assert!(

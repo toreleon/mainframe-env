@@ -219,6 +219,7 @@ fn assert_artifact_invariants(store: &dyn PlatformStore, prefix: &str) {
         media_type: "application/octet-stream".into(),
         payload_digest: hash.into(),
         payload,
+        executable: None,
     };
     let mut hostile = valid.clone();
     hostile.payload_digest = [9; 32];
