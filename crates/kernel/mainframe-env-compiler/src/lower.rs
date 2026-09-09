@@ -1,16 +1,15 @@
 use crate::service::VerifiedCobolHir;
 use crate::{CobolHir, ControlEdgeKind, ControlRole, ControlScope, DataCategory, StatementKind};
 use mainframe_env_ir::{
-    Attribute, Effect, IrLimits, LegalityProfile, Module, ModuleBuilder, OperationCatalog,
-    OperationIdentity, OperationSchema, StorageReference,
+    Attribute, COBOL_MAX_UNBOUNDED_OCCURRENCES, COBOL_MAX_UNBOUNDED_STORAGE_BYTES, Effect,
+    IrLimits, LegalityProfile, Module, ModuleBuilder, OperationCatalog, OperationIdentity,
+    OperationSchema, StorageReference, cobol_layout_definition_schema,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const CORE_NAMESPACE: &str = "mainframe.core.cobol";
 const SIZE_ERROR_BRANCH: i64 = 1;
 const NOT_SIZE_ERROR_BRANCH: i64 = 2;
-pub const MAX_UNBOUNDED_OCCURRENCES: usize = 4096;
-pub const MAX_UNBOUNDED_STORAGE_BYTES: usize = 16 * 1024 * 1024;
 pub const PUBLISHABLE_LAYOUT_CATEGORIES: &[&str] = &[
     "alphabetic",
     "alphanumeric",
@@ -42,6 +41,7 @@ pub(crate) fn lower_to_core(
     verified: &VerifiedCobolHir<'_>,
     arithmetic_mode: &str,
     display_sign: &str,
+    address_mode: u8,
     declaratives: &[(String, Vec<String>)],
     limits: IrLimits,
 ) -> Result<Module, LowerProblem> {
@@ -67,7 +67,9 @@ pub(crate) fn lower_to_core(
     let storage_bytes = hir
         .layouts
         .iter()
-        .filter(|layout| !layout.dynamic && unbounded_ancestor(layout, &hir.layouts).is_none())
+        .filter(|layout| {
+            !layout.typedef && !layout.dynamic && unbounded_ancestor(layout, &hir.layouts).is_none()
+        })
         .map(|layout| layout.offset.saturating_add(layout.length))
         .max()
         .unwrap_or(0);
@@ -75,11 +77,9 @@ pub(crate) fn lower_to_core(
         .then(|| builder.add_storage("__program_storage", storage_bytes as u64, None))
         .transpose()
         .map_err(|_| LowerProblem::InvalidLayout)?;
-    for layout in hir
-        .layouts
-        .iter()
-        .filter(|layout| layout.length > 0 || layout.dynamic || layout.unbounded)
-    {
+    for layout in hir.layouts.iter().filter(|layout| {
+        !layout.typedef && (layout.length > 0 || layout.dynamic || layout.unbounded)
+    }) {
         let unbounded_parent = unbounded_ancestor(layout, &hir.layouts);
         let storage_length = if layout.dynamic {
             layout.dynamic_limit.ok_or(LowerProblem::InvalidLayout)?
@@ -133,6 +133,10 @@ pub(crate) fn lower_to_core(
                 ),
                 ("display_sign".into(), Attribute::Text(display_sign.into())),
                 (
+                    "address_mode".into(),
+                    Attribute::Text(address_mode.to_string()),
+                ),
+                (
                     "program_lifecycle".into(),
                     Attribute::Text(hir.program_lifecycle.clone()),
                 ),
@@ -157,7 +161,7 @@ pub(crate) fn lower_to_core(
             None,
         )
         .map_err(|_| LowerProblem::LimitExceeded)?;
-    for layout in &hir.layouts {
+    for layout in hir.layouts.iter().filter(|layout| !layout.typedef) {
         let attributes = BTreeMap::from([
             (
                 "name".into(),
@@ -166,7 +170,7 @@ pub(crate) fn lower_to_core(
             ("simple_name".into(), Attribute::Text(layout.name.clone())),
             (
                 "category".into(),
-                Attribute::Text(category_slug(layout.category).into()),
+                Attribute::Text(layout.category.executable_name().into()),
             ),
             (
                 "picture".into(),
@@ -214,6 +218,10 @@ pub(crate) fn lower_to_core(
             (
                 "element_length".into(),
                 Attribute::Integer(layout.element_length as i64),
+            ),
+            (
+                "byte_length".into(),
+                Attribute::Integer(layout.byte_length.unwrap_or_default() as i64),
             ),
             (
                 "occurs".into(),
@@ -271,6 +279,10 @@ pub(crate) fn lower_to_core(
             (
                 "alias_of".into(),
                 Attribute::Text(layout.alias_of.clone().unwrap_or_default()),
+            ),
+            (
+                "rename_through".into(),
+                Attribute::Text(layout.rename_through.clone().unwrap_or_default()),
             ),
             (
                 "condition_values".into(),
@@ -581,9 +593,9 @@ fn unbounded_occurrences(layout: &crate::CobolLayout) -> Result<usize, LowerProb
     if !layout.unbounded || layout.element_length == 0 {
         return Err(LowerProblem::InvalidLayout);
     }
-    MAX_UNBOUNDED_OCCURRENCES
+    COBOL_MAX_UNBOUNDED_OCCURRENCES
         .min(
-            MAX_UNBOUNDED_STORAGE_BYTES
+            COBOL_MAX_UNBOUNDED_STORAGE_BYTES
                 .checked_div(layout.element_length)
                 .ok_or(LowerProblem::InvalidLayout)?,
         )
@@ -718,10 +730,9 @@ fn lower_statement(
         for argument in &arguments {
             let normalized = argument.trim_matches(['\'', '"']).to_ascii_uppercase();
             if seen.insert(normalized.clone())
-                && let Some(layout) = hir
-                    .layouts
-                    .iter()
-                    .find(|layout| layout.name == normalized && layout.length > 0)
+                && let Some(layout) = hir.layouts.iter().find(|layout| {
+                    !layout.typedef && layout.name == normalized && layout.length > 0
+                })
             {
                 let id = *storage
                     .get(&layout.qualified_name)
@@ -914,11 +925,7 @@ pub fn core_mir_catalog() -> OperationCatalog {
         ))
         .expect("unique config");
     catalog
-        .register(OperationSchema::pure(
-            core_identity("define").expect("static identity"),
-            0,
-            0,
-        ))
+        .register(cobol_layout_definition_schema())
         .expect("unique define");
     catalog
         .register(OperationSchema::pure(
@@ -995,35 +1002,6 @@ const fn edge_attribute(kind: ControlEdgeKind) -> &'static str {
         ControlEdgeKind::Call => "edge_call",
         ControlEdgeKind::Transfer => "edge_transfer",
         ControlEdgeKind::Return => "edge_return",
-    }
-}
-
-const fn category_slug(category: DataCategory) -> &'static str {
-    match category {
-        DataCategory::Alphabetic => "alphabetic",
-        DataCategory::Alphanumeric => "alphanumeric",
-        DataCategory::AlphanumericEdited => "alphanumeric_edited",
-        DataCategory::Dbcs => "dbcs",
-        DataCategory::National => "national",
-        DataCategory::NationalEdited => "national_edited",
-        DataCategory::Utf8 => "utf8",
-        DataCategory::NumericDisplay => "numeric_display",
-        DataCategory::NumericEdited => "numeric_edited",
-        DataCategory::PackedDecimal => "packed_decimal",
-        DataCategory::Binary => "binary",
-        DataCategory::FloatShort => "float_short",
-        DataCategory::FloatLong => "float_long",
-        DataCategory::Index => "index",
-        DataCategory::Pointer => "pointer",
-        DataCategory::Pointer32 => "pointer_32",
-        DataCategory::ProcedurePointer => "procedure_pointer",
-        DataCategory::FunctionPointer => "function_pointer",
-        DataCategory::ObjectReference => "object_reference",
-        DataCategory::Group => "group",
-        DataCategory::NationalGroup => "national_group",
-        DataCategory::Utf8Group => "utf8_group",
-        DataCategory::Condition => "condition",
-        DataCategory::Rename => "rename",
     }
 }
 

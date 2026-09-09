@@ -90,7 +90,7 @@
     },
     {
       "path": "crates/kernel/mainframe-env-compiler/src/semantic.rs",
-      "max_production_lines": 2938,
+      "max_production_lines": 2819,
       "responsibility": "Semantic analysis owns the cross-family model, name resolution, validation passes, and diagnostic assembly.",
       "split_boundary": "Separate model construction, symbol resolution, cross-reference validation, and diagnostics behind the semantic facade."
     },
@@ -108,7 +108,7 @@
     },
     {
       "path": "crates/kernel/mainframe-env-interpreter/src/machine.rs",
-      "max_production_lines": 13163,
+      "max_production_lines": 13149,
       "responsibility": "The deterministic COBOL machine executes all operations, control flow, calls, host effects, and conditions.",
       "split_boundary": "Extract operation handlers by control, numeric/data, call, file/host-effect, and condition families around one machine state."
     },

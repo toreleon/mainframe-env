@@ -5,6 +5,9 @@
 mod catalog;
 mod cics_descriptor;
 mod cics_plan;
+mod cobol_config;
+mod cobol_layout;
+mod cobol_reserved_words;
 mod codec;
 mod decimal_plan;
 mod model;
@@ -12,8 +15,10 @@ mod semantic_verify;
 mod verify;
 
 pub use catalog::{
+    COBOL_LAYOUT_DEFINITION_MAJOR, COBOL_LAYOUT_DEFINITION_NAME, COBOL_LAYOUT_DEFINITION_NAMESPACE,
     CatalogProblem, CicsOperationContract, DecimalConditionContract, DecimalOperationContract,
     LegalityProfile, OperationCatalog, OperationSchema, OperationSemanticContract,
+    cobol_layout_definition_identity, cobol_layout_definition_schema,
 };
 pub use cics_descriptor::{
     CICS_EXECUTABLE_DESCRIPTORS, CICS_RUNTIME_IMPORT, CicsExecutableDescriptor,
@@ -24,6 +29,19 @@ pub use cics_plan::{
     CicsOperandValue, CicsOutputBinding, CicsOutputName, CicsPlanCodecProblem, CicsPlanLimits,
     CicsPlanOperation, CicsPlanOption, CicsStorageSlot, decode_cics_effect_plan,
     encode_cics_effect_plan,
+};
+pub use cobol_config::{
+    COBOL_EFFECTIVE_ARITH_OPTION, COBOL_EFFECTIVE_DISPSIGN_OPTION, COBOL_EFFECTIVE_LP_OPTION,
+    COBOL_RUNTIME_CONFIG_MAJOR, COBOL_RUNTIME_CONFIG_NAME, COBOL_RUNTIME_CONFIG_NAMESPACE,
+    CobolAddressMode, CobolArithmeticMode, CobolDisplaySign, CobolRuntimeConfig,
+    CobolRuntimeConfigProblem, cobol_runtime_config,
+};
+pub use cobol_layout::{
+    COBOL_MAX_INDEX_NAMES, COBOL_MAX_TABLE_KEY_BYTES, COBOL_MAX_TABLE_KEYS,
+    COBOL_MAX_UNBOUNDED_OCCURRENCES, COBOL_MAX_UNBOUNDED_STORAGE_BYTES, cobol_index_name_is_valid,
+    cobol_layout_reference_matches, cobol_source_word_is_undefinable,
+    cobol_table_key_category_is_eligible, validate_cobol_condition_values,
+    validate_cobol_level78_value,
 };
 pub use codec::{CodecLimits, IrCodecProblem, decode_binary, encode_binary, parse_text, to_text};
 pub use decimal_plan::{

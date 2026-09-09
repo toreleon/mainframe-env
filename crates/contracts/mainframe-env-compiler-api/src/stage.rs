@@ -131,7 +131,8 @@ pub(crate) mod tests {
         DecimalOperationContract, DecimalPlanLimits, DecimalPlanWireVersion, DecimalReceiver,
         DecimalRoundingPolicy, DecimalStorageSlot, Effect, IrLimits, ModuleBuilder,
         OperationIdentity, OperationSchema, OperationSemanticContract, StorageReference,
-        encode_cics_effect_plan, encode_decimal_assignment_plan,
+        cobol_layout_definition_identity, cobol_layout_definition_schema, encode_cics_effect_plan,
+        encode_decimal_assignment_plan,
     };
     use mainframe_env_source::{
         LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
@@ -145,7 +146,10 @@ pub(crate) mod tests {
         Valid,
         Empty,
         WrongType,
+        Truncated,
         NonCanonical,
+        WrongVersion,
+        Oversized,
         OperationMismatch,
         MissingLayout,
         WrongLayoutExtent,
@@ -167,6 +171,7 @@ pub(crate) mod tests {
         MissingLayout,
         NonNumericLayout,
         WrongLayoutExtent,
+        WrongLayoutDigitsType,
         MissingConditionOwner,
         OrphanConditionBranch,
         InvalidFalseTarget,
@@ -197,12 +202,16 @@ pub(crate) mod tests {
     }
 
     pub(crate) fn cics_boundary_fixture(kind: CicsPlanFixture) -> CicsBoundaryFixture {
-        let mut builder = ModuleBuilder::new(IrLimits::default());
+        let mut ir_limits = IrLimits::default();
+        if matches!(kind, CicsPlanFixture::Oversized) {
+            ir_limits.max_attribute_bytes = CicsPlanLimits::default().max_encoded_bytes + 1;
+        }
+        let mut builder = ModuleBuilder::new(ir_limits);
         let key = builder.add_storage("KEY", 2, None).unwrap();
         let record = builder.add_storage("RECORD", 8, None).unwrap();
         let region = builder.add_region().unwrap();
         let block = builder.add_block(region).unwrap();
-        let define = OperationIdentity::new("mainframe.core.cobol", "define", 1).unwrap();
+        let define = cobol_layout_definition_identity();
         let read = OperationIdentity::new("cics.file", "read", 1).unwrap();
         let halt = OperationIdentity::new("test", "halt", 1).unwrap();
         let plan = match kind {
@@ -219,8 +228,20 @@ pub(crate) mod tests {
         let plan_attribute = match kind {
             CicsPlanFixture::Empty => Attribute::Bytes(Vec::new()),
             CicsPlanFixture::WrongType => Attribute::Text("not-plan-bytes".into()),
+            CicsPlanFixture::Truncated => {
+                plan_bytes.pop();
+                Attribute::Bytes(plan_bytes)
+            }
             CicsPlanFixture::NonCanonical => {
                 plan_bytes.push(0);
+                Attribute::Bytes(plan_bytes)
+            }
+            CicsPlanFixture::WrongVersion => {
+                plan_bytes[4..6].copy_from_slice(&2u16.to_be_bytes());
+                Attribute::Bytes(plan_bytes)
+            }
+            CicsPlanFixture::Oversized => {
+                plan_bytes.resize(CicsPlanLimits::default().max_encoded_bytes + 1, 0);
                 Attribute::Bytes(plan_bytes)
             }
             CicsPlanFixture::Valid
@@ -235,7 +256,9 @@ pub(crate) mod tests {
             define.clone(),
             "KEY",
             "alphanumeric",
+            "X(2)",
             2,
+            Attribute::Integer(0),
         );
         if !matches!(kind, CicsPlanFixture::MissingLayout) {
             add_layout(
@@ -248,11 +271,13 @@ pub(crate) mod tests {
                 } else {
                     "alphanumeric"
                 },
+                "X(8)",
                 if matches!(kind, CicsPlanFixture::WrongLayoutExtent) {
                     7
                 } else {
                     8
                 },
+                Attribute::Integer(0),
             );
         }
         let read_effects = cics_read_effects();
@@ -292,7 +317,7 @@ pub(crate) mod tests {
             )
             .unwrap();
 
-        let define_schema = OperationSchema::pure(define.clone(), 0, 0);
+        let define_schema = cobol_layout_definition_schema();
         let mut read_schema = OperationSchema::pure(read.clone(), 0, 0);
         read_schema.required_attributes = BTreeSet::from([CICS_PLAN_ATTRIBUTE.into()]);
         read_schema.allowed_effects = read_effects.into_iter().collect();
@@ -334,7 +359,7 @@ pub(crate) mod tests {
         let other = builder.add_storage("other", 3, None).unwrap();
         let region = builder.add_region().unwrap();
         let block = builder.add_block(region).unwrap();
-        let define = OperationIdentity::new("mainframe.core.cobol", "define", 1).unwrap();
+        let define = cobol_layout_definition_identity();
         let decimal = OperationIdentity::new(
             "mainframe.decimal",
             "assign",
@@ -358,10 +383,16 @@ pub(crate) mod tests {
                 } else {
                     "numeric_display"
                 },
+                "9(3)",
                 if matches!(kind, DecimalPlanFixture::WrongLayoutExtent) {
                     2
                 } else {
                     3
+                },
+                if matches!(kind, DecimalPlanFixture::WrongLayoutDigitsType) {
+                    Attribute::Text("not-an-integer".into())
+                } else {
+                    Attribute::Integer(3)
                 },
             );
         }
@@ -538,7 +569,7 @@ pub(crate) mod tests {
                     branch_polarity_attribute: POLARITY.into(),
                 }),
             });
-        let define_schema = OperationSchema::pure(define.clone(), 0, 0);
+        let define_schema = cobol_layout_definition_schema();
         let control_schema = OperationSchema::pure(control.clone(), 0, 0);
         let mut halt_schema = OperationSchema::pure(halt.clone(), 0, 0);
         halt_schema.terminator = true;
@@ -563,7 +594,9 @@ pub(crate) mod tests {
         identity: OperationIdentity,
         name: &str,
         category: &str,
+        picture: &str,
         length: i64,
+        digits: Attribute,
     ) {
         builder
             .add_operation(
@@ -578,8 +611,8 @@ pub(crate) mod tests {
                         Attribute::Text(name.rsplit('.').next().unwrap_or(name).into()),
                     ),
                     ("category".into(), Attribute::Text(category.into())),
-                    ("picture".into(), Attribute::Text(String::new())),
-                    ("digits".into(), Attribute::Integer(length)),
+                    ("picture".into(), Attribute::Text(picture.into())),
+                    ("digits".into(), digits),
                     ("scale".into(), Attribute::Integer(0)),
                     ("signed".into(), Attribute::Integer(0)),
                     ("sign_separate".into(), Attribute::Integer(0)),
@@ -641,10 +674,10 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn typed_cics_plan_is_proven_at_hir_and_mir_stage_boundaries() {
+    fn executable_cics_contract_is_proven_by_checked_module_and_mir_boundaries() {
         let valid = cics_boundary_fixture(CicsPlanFixture::Valid);
         let verified = VerifiedHir::verify(source_id(), valid.module.clone(), &valid.catalog)
-            .expect("canonical typed CICS HIR should verify");
+            .expect("canonical typed CICS checked module should verify");
         assert_eq!(verified.report().operation_count, 4);
         let legalized =
             LegalizedMir::legalize(verified.lower(valid.module), &valid.catalog, &valid.profile)
@@ -654,7 +687,10 @@ pub(crate) mod tests {
         for kind in [
             CicsPlanFixture::Empty,
             CicsPlanFixture::WrongType,
+            CicsPlanFixture::Truncated,
             CicsPlanFixture::NonCanonical,
+            CicsPlanFixture::WrongVersion,
+            CicsPlanFixture::Oversized,
             CicsPlanFixture::OperationMismatch,
             CicsPlanFixture::MissingLayout,
             CicsPlanFixture::WrongLayoutExtent,
@@ -667,7 +703,7 @@ pub(crate) mod tests {
                     Err(CompilerProblem::Verification(detail))
                         if detail.contains("SemanticMismatch")
                 ),
-                "{kind:?} must be rejected while constructing VerifiedHir"
+                "{kind:?} must be rejected at the checked-module boundary"
             );
 
             let valid = cics_boundary_fixture(CicsPlanFixture::Valid);
@@ -687,14 +723,14 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn typed_decimal_plan_is_proven_at_hir_and_mir_stage_boundaries() {
+    fn executable_decimal_contract_is_proven_by_checked_module_and_mir_boundaries() {
         for kind in [
             DecimalPlanFixture::Valid,
             DecimalPlanFixture::ValidCondition,
         ] {
             let valid = decimal_boundary_fixture(kind);
             let verified = VerifiedHir::verify(source_id(), valid.module.clone(), &valid.catalog)
-                .expect("canonical typed decimal HIR should verify");
+                .expect("canonical typed decimal checked module should verify");
             LegalizedMir::legalize(verified.lower(valid.module), &valid.catalog, &valid.profile)
                 .expect("canonical typed decimal MIR should legalize");
         }
@@ -711,6 +747,7 @@ pub(crate) mod tests {
             DecimalPlanFixture::MissingLayout,
             DecimalPlanFixture::NonNumericLayout,
             DecimalPlanFixture::WrongLayoutExtent,
+            DecimalPlanFixture::WrongLayoutDigitsType,
             DecimalPlanFixture::MissingConditionOwner,
             DecimalPlanFixture::OrphanConditionBranch,
             DecimalPlanFixture::InvalidFalseTarget,
@@ -724,7 +761,7 @@ pub(crate) mod tests {
                     Err(CompilerProblem::Verification(detail))
                         if detail.contains("SemanticMismatch")
                 ),
-                "{kind:?} must be rejected while constructing VerifiedHir"
+                "{kind:?} must be rejected at the checked-module boundary"
             );
 
             let valid = decimal_boundary_fixture(DecimalPlanFixture::Valid);

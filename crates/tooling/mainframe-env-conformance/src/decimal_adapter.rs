@@ -11,7 +11,8 @@ use mainframe_env_ir::{
     DecimalExecutionPolicy, DecimalExpression, DecimalOperationContract, DecimalPlanLimits,
     DecimalPlanWireVersion, DecimalReceiver, DecimalRoundingPolicy, DecimalStorageSlot, Effect,
     IrLimits, LegalityProfile, Module, ModuleBuilder, OperationCatalog, OperationIdentity,
-    OperationSchema, OperationSemanticContract, StorageId, StorageReference, encode_binary,
+    OperationSchema, OperationSemanticContract, StorageId, StorageReference,
+    cobol_layout_definition_identity, cobol_layout_definition_schema, encode_binary,
     encode_decimal_assignment_plan, verify_legal,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -83,7 +84,7 @@ pub fn verify_decimal_adapter(source: &str) -> Result<DecimalAdapterReceipt, Str
         other => return Err(format!("ledger formula did not complete: {other:?}")),
     }
     let result_bytes = machine
-        .variable(&formula.receiver_name)
+        .variable(&abi_name(&formula.receiver_name))
         .ok_or_else(|| "ledger result storage is unavailable".to_string())?
         .bytes()
         .to_vec();
@@ -202,23 +203,26 @@ fn lower_formula(
     transform_plan: impl FnOnce(Vec<u8>) -> Vec<u8>,
 ) -> Result<Module, String> {
     let mut builder = ModuleBuilder::new(IrLimits::default());
+    let left_name = abi_name(&formula.left.name);
+    let right_name = abi_name(&formula.right.name);
+    let receiver_name = abi_name(&formula.receiver_name);
     let left = builder
         .add_storage(
-            formula.left.name.to_ascii_lowercase(),
+            left_name.to_ascii_lowercase(),
             formula.left.digits as u64,
             None,
         )
         .map_err(|problem| problem.to_string())?;
     let right = builder
         .add_storage(
-            formula.right.name.to_ascii_lowercase(),
+            right_name.to_ascii_lowercase(),
             formula.right.digits as u64,
             None,
         )
         .map_err(|problem| problem.to_string())?;
     let receiver = builder
         .add_storage(
-            formula.receiver_name.to_ascii_lowercase(),
+            receiver_name.to_ascii_lowercase(),
             formula.receiver_digits as u64,
             None,
         )
@@ -229,16 +233,14 @@ fn lower_formula(
     let block = builder
         .add_block(region)
         .map_err(|problem| problem.to_string())?;
-    for (field, storage) in [(&formula.left, left), (&formula.right, right)] {
-        add_layout(&mut builder, block, &field.name, field.digits)?;
+    for (field, name, storage) in [
+        (&formula.left, &left_name, left),
+        (&formula.right, &right_name, right),
+    ] {
+        add_layout(&mut builder, block, name, field.digits)?;
         add_initial(&mut builder, block, storage, field.digits, field.value)?;
     }
-    add_layout(
-        &mut builder,
-        block,
-        &formula.receiver_name,
-        formula.receiver_digits,
-    )?;
+    add_layout(&mut builder, block, &receiver_name, formula.receiver_digits)?;
     add_initial(&mut builder, block, receiver, formula.receiver_digits, 0)?;
 
     let slot = |storage, name: &str| DecimalStorageSlot {
@@ -254,11 +256,11 @@ fn lower_formula(
         policy,
         assignments: vec![DecimalAssignment {
             expression: DecimalExpression::Add {
-                left: Box::new(DecimalExpression::Storage(slot(left, &formula.left.name))),
-                right: Box::new(DecimalExpression::Storage(slot(right, &formula.right.name))),
+                left: Box::new(DecimalExpression::Storage(slot(left, &left_name))),
+                right: Box::new(DecimalExpression::Storage(slot(right, &right_name))),
             },
             receiver: DecimalReceiver {
-                target: slot(receiver, &formula.receiver_name),
+                target: slot(receiver, &receiver_name),
                 rounding: DecimalRoundingPolicy::Truncation,
             },
         }],
@@ -331,7 +333,7 @@ fn add_layout(
                     Attribute::Text(name.rsplit('.').next().unwrap_or(name).into()),
                 ),
                 ("category".into(), Attribute::Text("numeric_display".into())),
-                ("picture".into(), Attribute::Text(String::new())),
+                ("picture".into(), Attribute::Text(format!("9({digits})"))),
                 ("digits".into(), Attribute::Integer(digits as i64)),
                 ("scale".into(), Attribute::Integer(0)),
                 ("signed".into(), Attribute::Integer(0)),
@@ -350,6 +352,10 @@ fn add_layout(
         )
         .map(|_| ())
         .map_err(|problem| problem.to_string())
+}
+
+fn abi_name(source_name: &str) -> String {
+    source_name.replace('.', "_")
 }
 
 fn add_initial(
@@ -382,7 +388,7 @@ fn add_initial(
 fn adapter_catalog() -> Result<OperationCatalog, String> {
     let mut catalog = OperationCatalog::default();
     catalog
-        .register(OperationSchema::pure(core_identity("define"), 0, 0))
+        .register(cobol_layout_definition_schema())
         .map_err(|problem| problem.to_string())?;
     let mut init = OperationSchema::pure(core_identity("init"), 0, 0);
     init.allowed_effects.insert(Effect::MemoryWrite);
@@ -410,7 +416,7 @@ fn adapter_catalog() -> Result<OperationCatalog, String> {
             plan_attribute: PLAN_ATTRIBUTE.into(),
             expected_plan_version: DecimalPlanWireVersion::PolicyV2,
             allowed_semantic_origins: BTreeSet::new(),
-            layout_definition_operation: Some(core_identity("define")),
+            layout_definition_operation: Some(cobol_layout_definition_identity()),
             condition: Some(DecimalConditionContract {
                 status: SIZE_ERROR_STATUS.into(),
                 status_attribute: CONDITION_STATUS_ATTRIBUTE.into(),

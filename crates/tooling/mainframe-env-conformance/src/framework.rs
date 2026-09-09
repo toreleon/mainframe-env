@@ -371,6 +371,15 @@ mod tests {
         let compiler: BTreeSet<_> = catalog.identities().cloned().collect();
         let interpreter = mainframe_env_interpreter::supported_operations();
         assert_eq!(compiler, interpreter.clone());
+        let layout_identity = mainframe_env_ir::cobol_layout_definition_identity();
+        let layout_schema = catalog
+            .get(&layout_identity)
+            .expect("compiler registers the executable COBOL layout ABI");
+        assert!(interpreter.contains(&layout_identity));
+        assert_eq!(
+            layout_schema.semantic_contract,
+            OperationSemanticContract::CobolLayoutDefinition
+        );
         for descriptor in CICS_EXECUTABLE_DESCRIPTORS {
             let identity = descriptor.identity();
             let schema = catalog

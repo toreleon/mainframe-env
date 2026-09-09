@@ -6,7 +6,10 @@ use mainframe_env_compiler_api::{
 };
 use mainframe_env_execution_api::{ArtifactRef, InvocationLimits};
 use mainframe_env_host_api::HostProblem;
-use mainframe_env_ir::CodecLimits;
+use mainframe_env_ir::{
+    COBOL_EFFECTIVE_ARITH_OPTION, COBOL_EFFECTIVE_DISPSIGN_OPTION, COBOL_EFFECTIVE_LP_OPTION,
+    CodecLimits,
+};
 use mainframe_env_store_api::{ArtifactRecord, ExecutableArtifactMetadata};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -25,15 +28,19 @@ fn supported_host_interfaces() -> BTreeSet<String> {
 fn supported_options(options: &BTreeMap<String, String>) -> bool {
     options.len() == 3
         && matches!(
-            options.get("cobol.effective-arith").map(String::as_str),
+            options
+                .get(COBOL_EFFECTIVE_ARITH_OPTION)
+                .map(String::as_str),
             Some("compatible" | "extended")
         )
         && matches!(
-            options.get("cobol.effective-dispsign").map(String::as_str),
+            options
+                .get(COBOL_EFFECTIVE_DISPSIGN_OPTION)
+                .map(String::as_str),
             Some("compatible" | "separate")
         )
         && matches!(
-            options.get("cobol.effective-lp").map(String::as_str),
+            options.get(COBOL_EFFECTIVE_LP_OPTION).map(String::as_str),
             Some("32" | "64")
         )
 }

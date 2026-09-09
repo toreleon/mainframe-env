@@ -1,8 +1,13 @@
 mod functions;
+mod layout_relations;
 mod layout_utils;
 mod structure;
 
-use layout_utils::hex_nibble;
+use layout_relations::{resolve_rename_range, validate_layout_relationships};
+use layout_utils::{
+    data_description_clause_boundary, hex_nibble, index_names, occurs_range,
+    validate_occurs_phrase_order, values_clause,
+};
 
 pub use functions::{
     CobolIntrinsicArgument, CobolIntrinsicCall, CobolSpecialRegisterReference, IntrinsicValueType,
@@ -15,6 +20,10 @@ pub use structure::{
 
 use crate::syntax::{SourceOrigin, SourceSpan};
 use crate::{IntrinsicFunctionKind, SpecialRegisterKind};
+use mainframe_env_ir::{
+    COBOL_MAX_INDEX_NAMES, COBOL_MAX_TABLE_KEYS, cobol_index_name_is_valid,
+    cobol_layout_reference_matches,
+};
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -43,6 +52,37 @@ pub enum DataCategory {
     Utf8Group,
     Condition,
     Rename,
+}
+
+impl DataCategory {
+    pub(crate) const fn executable_name(self) -> &'static str {
+        match self {
+            Self::Alphabetic => "alphabetic",
+            Self::Alphanumeric => "alphanumeric",
+            Self::AlphanumericEdited => "alphanumeric_edited",
+            Self::Dbcs => "dbcs",
+            Self::National => "national",
+            Self::NationalEdited => "national_edited",
+            Self::Utf8 => "utf8",
+            Self::NumericDisplay => "numeric_display",
+            Self::NumericEdited => "numeric_edited",
+            Self::PackedDecimal => "packed_decimal",
+            Self::Binary => "binary",
+            Self::FloatShort => "float_short",
+            Self::FloatLong => "float_long",
+            Self::Index => "index",
+            Self::Pointer => "pointer",
+            Self::Pointer32 => "pointer_32",
+            Self::ProcedurePointer => "procedure_pointer",
+            Self::FunctionPointer => "function_pointer",
+            Self::ObjectReference => "object_reference",
+            Self::Group => "group",
+            Self::NationalGroup => "national_group",
+            Self::Utf8Group => "utf8_group",
+            Self::Condition => "condition",
+            Self::Rename => "rename",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -104,6 +144,7 @@ pub struct CobolLayout {
     pub alignment: usize,
     pub initial: Vec<u8>,
     pub alias_of: Option<String>,
+    pub rename_through: Option<String>,
     pub occurs_clause: bool,
     pub occurs: usize,
     pub occurs_min: usize,
@@ -729,6 +770,7 @@ fn parse_specs(sentences: &[String], max_items: usize) -> Result<Vec<DataSpec>, 
                     })
             })
             .transpose()?;
+        validate_occurs_phrase_order(&words)?;
         let own_occurs = occurs_range(&words)?;
         let occurs = if words.iter().any(|word| word == "OCCURS") {
             own_occurs
@@ -739,11 +781,9 @@ fn parse_specs(sentences: &[String], max_items: usize) -> Result<Vec<DataSpec>, 
                 unbounded: specs[template].unbounded,
             })
         };
-        let indexes = values_after(&words, "INDEXED", "BY");
-        let indexes = if indexes.is_empty() {
-            type_template.map_or_else(Vec::new, |template| specs[template].indexes.clone())
-        } else {
-            indexes
+        let indexes = match index_names(&words)? {
+            Some(indexes) => indexes,
+            None => type_template.map_or_else(Vec::new, |template| specs[template].indexes.clone()),
         };
         let keys = table_keys(&words)?;
         let keys = if keys.is_empty() {
@@ -815,22 +855,7 @@ fn table_keys(words: &[String]) -> Result<Vec<CobolTableKey>, SemanticProblem> {
         cursor += 2 + usize::from(words.get(cursor + 2).is_some_and(|word| word == "IS"));
         let start = keys.len();
         while let Some(name) = words.get(cursor) {
-            if matches!(
-                name.as_str(),
-                "ASCENDING"
-                    | "DESCENDING"
-                    | "INDEXED"
-                    | "DEPENDING"
-                    | "PIC"
-                    | "PICTURE"
-                    | "VALUE"
-                    | "VALUES"
-                    | "REDEFINES"
-                    | "TYPE"
-                    | "TYPEDEF"
-                    | "USAGE"
-            ) || usage_word(name).is_some()
-            {
+            if data_description_clause_boundary(name) {
                 break;
             }
             if matches!(name.as_str(), "OF" | "IN") {
@@ -844,23 +869,7 @@ fn table_keys(words: &[String]) -> Result<Vec<CobolTableKey>, SemanticProblem> {
             {
                 let qualifier = words
                     .get(cursor + 1)
-                    .filter(|qualifier| {
-                        !matches!(
-                            qualifier.as_str(),
-                            "ASCENDING"
-                                | "DESCENDING"
-                                | "INDEXED"
-                                | "DEPENDING"
-                                | "PIC"
-                                | "PICTURE"
-                                | "VALUE"
-                                | "VALUES"
-                                | "REDEFINES"
-                                | "TYPE"
-                                | "TYPEDEF"
-                                | "USAGE"
-                        )
-                    })
+                    .filter(|qualifier| !data_description_clause_boundary(qualifier))
                     .ok_or(SemanticProblem::InvalidOccurs)?;
                 reference.push_str(" OF ");
                 reference.push_str(qualifier);
@@ -875,7 +884,16 @@ fn table_keys(words: &[String]) -> Result<Vec<CobolTableKey>, SemanticProblem> {
             return Err(SemanticProblem::InvalidOccurs);
         }
     }
-    if keys.len() > 12 {
+    if keys.len() > COBOL_MAX_TABLE_KEYS {
+        return Err(SemanticProblem::InvalidOccurs);
+    }
+    if keys
+        .iter()
+        .map(|key| (key.descending, key.name.to_ascii_uppercase()))
+        .collect::<BTreeSet<_>>()
+        .len()
+        != keys.len()
+    {
         return Err(SemanticProblem::InvalidOccurs);
     }
     Ok(keys)
@@ -1183,6 +1201,7 @@ fn layout_one(
         alignment,
         initial,
         alias_of: target.map(|(_, qualified)| qualified),
+        rename_through: None,
         occurs_clause: contains_word(&spec.words, "OCCURS")
             || contains_word(&description.words, "OCCURS"),
         occurs: spec.occurs_max,
@@ -1314,7 +1333,8 @@ fn validate_elementary_clauses(
     picture: &PictureSpec,
     is_group: bool,
 ) -> Result<(), SemanticProblem> {
-    if contains_word(words, "DYNAMIC")
+    let dynamic = contains_word(words, "DYNAMIC");
+    if dynamic
         && (is_group
             || !matches!(
                 picture.category,
@@ -1324,10 +1344,17 @@ fn validate_elementary_clauses(
                 .picture
                 .as_deref()
                 .is_none_or(|pic| !matches!(pic, "X" | "U"))
-            || spec.unbounded)
+            || spec.unbounded
+            || contains_word(words, "OCCURS")
+            || spec.occurs_min != 1
+            || spec.occurs_max != 1
+            || spec.depending_on.is_some()
+            || !spec.indexes.is_empty()
+            || !spec.keys.is_empty()
+            || spec.redefines.is_some())
     {
         return Err(SemanticProblem::InvalidUsage(
-            "DYNAMIC requires an elementary PIC X or PIC U item".into(),
+            "DYNAMIC requires a scalar, non-redefining elementary PIC X or PIC U item".into(),
         ));
     }
     if contains_sequence(words, &["BLANK", "WHEN"])
@@ -1447,6 +1474,7 @@ fn layout_specials(
                 alignment: 1,
                 initial: Vec::new(),
                 alias_of: Some(target.qualified_name.clone()),
+                rename_through: None,
                 occurs_clause: false,
                 occurs: 1,
                 occurs_min: 1,
@@ -1467,19 +1495,9 @@ fn layout_specials(
                 source: Vec::new(),
             });
         } else if spec.level == 66 {
-            let start_name = find_after_owned(&spec.words, "RENAMES")
-                .ok_or_else(|| SemanticProblem::InvalidDeclaration(spec.sentence.clone()))?;
-            let start = resolve_nearby_layout(&start_name, spec, specs, layouts)?;
-            let end = find_after_owned(&spec.words, "THRU")
-                .or_else(|| find_after_owned(&spec.words, "THROUGH"))
-                .map(|name| resolve_nearby_layout(&name, spec, specs, layouts))
-                .transpose()?
-                .unwrap_or(start);
-            if end.offset < start.offset
-                || end.offset.saturating_add(end.length) < start.offset.saturating_add(start.length)
-            {
-                return Err(SemanticProblem::InvalidRename);
-            }
+            let range = resolve_rename_range(spec, specs, layouts)?;
+            let start = range.start;
+            let end = range.end;
             let length = end
                 .offset
                 .checked_add(end.length)
@@ -1509,6 +1527,7 @@ fn layout_specials(
                 alignment: 1,
                 initial: Vec::new(),
                 alias_of: Some(start.qualified_name.clone()),
+                rename_through: range.through.map(|_| end.qualified_name.clone()),
                 occurs_clause: false,
                 occurs: 1,
                 occurs_min: 1,
@@ -1553,6 +1572,7 @@ fn layout_specials(
                 alignment: 1,
                 initial: Vec::new(),
                 alias_of: None,
+                rename_through: None,
                 occurs_clause: false,
                 occurs: 1,
                 occurs_min: 1,
@@ -1645,7 +1665,15 @@ fn has_occurs_through(mut index: usize, stop: Option<usize>, specs: &[DataSpec])
 
 fn validate_spec_constraints(specs: &[DataSpec]) -> Result<(), SemanticProblem> {
     for (index, spec) in specs.iter().enumerate() {
-        let has_occurs = spec.occurs_min != 1 || spec.occurs_max != 1 || spec.unbounded;
+        let mut occurrence_source = Some(index);
+        let mut has_occurs = false;
+        while let Some(source) = occurrence_source {
+            if contains_word(&specs[source].words, "OCCURS") {
+                has_occurs = true;
+                break;
+            }
+            occurrence_source = specs[source].type_template;
+        }
         if has_occurs {
             if matches!(spec.level, 1 | 66 | 77 | 78 | 88)
                 || (spec.redefines.is_some()
@@ -1665,31 +1693,25 @@ fn validate_spec_constraints(specs: &[DataSpec]) -> Result<(), SemanticProblem> 
                 parent = candidate.parent;
             }
             if dimensions > 7
-                || spec.indexes.len() > 12
+                || spec.indexes.len() > COBOL_MAX_INDEX_NAMES
                 || spec.indexes.iter().collect::<BTreeSet<_>>().len() != spec.indexes.len()
+                || spec
+                    .indexes
+                    .iter()
+                    .any(|name| !cobol_index_name_is_valid(name))
             {
                 return Err(SemanticProblem::InvalidOccurs);
             }
         } else if !spec.indexes.is_empty() || !spec.keys.is_empty() || spec.depending_on.is_some() {
             return Err(SemanticProblem::InvalidOccurs);
         }
-        if contains_word(&spec.words, "DYNAMIC") {
-            if spec.section == StorageSection::File && !matches!(spec.level, 1 | 77) {
-                return Err(SemanticProblem::InvalidUsage(
-                    "FILE SECTION dynamic item must be level 01 or 77".into(),
-                ));
-            }
-            let mut parent = spec.parent;
-            while let Some(ancestor) = parent {
-                if specs[ancestor].occurs_min != specs[ancestor].occurs_max
-                    || specs[ancestor].unbounded
-                {
-                    return Err(SemanticProblem::InvalidUsage(
-                        "dynamic item cannot be subordinate to a variable table".into(),
-                    ));
-                }
-                parent = specs[ancestor].parent;
-            }
+        if contains_word(&spec.words, "DYNAMIC")
+            && spec.section == StorageSection::File
+            && !matches!(spec.level, 1 | 77)
+        {
+            return Err(SemanticProblem::InvalidUsage(
+                "FILE SECTION dynamic item must be level 01 or 77".into(),
+            ));
         }
         if let Some(target_name) = &spec.redefines {
             if contains_word(&spec.words, "EXTERNAL")
@@ -1768,71 +1790,21 @@ fn attach_layout_sources(
     Ok(())
 }
 
-fn validate_layout_relationships(
-    specs: &[DataSpec],
-    layouts: &[CobolLayout],
-    cics_context: bool,
-) -> Result<(), SemanticProblem> {
-    for (index, spec) in specs.iter().enumerate() {
-        if let Some(name) = &layouts[index].depending_on
-            && !(cics_context && name.eq_ignore_ascii_case("EIBCALEN"))
-        {
-            let target = resolve_layout_name(name, spec, specs, layouts)?;
-            if !matches!(
-                target.category,
-                DataCategory::NumericDisplay | DataCategory::PackedDecimal | DataCategory::Binary
-            ) || target.scale != 0
-                || target.dynamic
-                || target
-                    .qualified_name
-                    .starts_with(&format!("{}.", spec.qualified))
-            {
-                return Err(SemanticProblem::InvalidOccurs);
-            }
-        }
-        for key in &layouts[index].keys {
-            let target = resolve_layout_name(&key.name, spec, specs, layouts)?;
-            if target.qualified_name != spec.qualified
-                && !target
-                    .qualified_name
-                    .starts_with(&format!("{}.", spec.qualified))
-            {
-                return Err(SemanticProblem::InvalidOccurs);
-            }
-        }
-        if let Some(alias) = &layouts[index].alias_of {
-            let target = layouts
-                .iter()
-                .find(|layout| layout.qualified_name == *alias)
-                .ok_or_else(|| SemanticProblem::UnknownRedefines(alias.clone()))?;
-            if target.external_name.is_some() && layouts[index].length > target.length {
-                return Err(SemanticProblem::InvalidRedefines(
-                    layouts[index].name.clone(),
-                ));
-            }
-        }
-    }
-    Ok(())
-}
-
 fn resolve_layout_name<'a>(
     name: &str,
     spec: &DataSpec,
     specs: &[DataSpec],
     layouts: &'a [CobolLayout],
 ) -> Result<&'a CobolLayout, SemanticProblem> {
-    let (normalized, explicitly_qualified) = normalize_data_reference(name)?;
-    if explicitly_qualified {
-        return specs
-            .iter()
-            .position(|candidate| candidate.qualified == normalized)
-            .and_then(|index| layouts.get(index))
-            .ok_or(SemanticProblem::InvalidReference(normalized));
-    }
+    let normalized = name.trim().to_ascii_uppercase();
     let candidates = specs
         .iter()
         .enumerate()
-        .filter(|(_, candidate)| candidate.name == normalized)
+        .filter(|(index, candidate)| {
+            layouts.get(*index).is_some_and(|layout| {
+                cobol_layout_reference_matches(&layout.qualified_name, &candidate.name, &normalized)
+            })
+        })
         .filter_map(|(index, candidate)| layouts.get(index).map(|layout| (candidate, layout)))
         .collect::<Vec<_>>();
     match candidates.as_slice() {
@@ -1862,33 +1834,6 @@ fn resolve_layout_name<'a>(
             }
         }
     }
-}
-
-fn normalize_data_reference(name: &str) -> Result<(String, bool), SemanticProblem> {
-    let upper = name.trim().to_ascii_uppercase();
-    if upper.contains('.') {
-        return Ok((upper, true));
-    }
-    let words = upper.split_whitespace().collect::<Vec<_>>();
-    let Some(simple) = words.first() else {
-        return Err(SemanticProblem::InvalidReference(upper));
-    };
-    if words.len() == 1 {
-        return Ok(((*simple).to_string(), false));
-    }
-    if words.len().is_multiple_of(2)
-        || !words
-            .iter()
-            .skip(1)
-            .step_by(2)
-            .all(|word| matches!(*word, "OF" | "IN"))
-    {
-        return Err(SemanticProblem::InvalidReference(upper));
-    }
-    let mut components = words.iter().skip(2).step_by(2).copied().collect::<Vec<_>>();
-    components.reverse();
-    components.push(simple);
-    Ok((components.join("."), true))
 }
 
 fn validate_file_layouts(
@@ -2161,63 +2106,6 @@ fn qualified_reference_after(words: &[String], sequence: &[&str]) -> Option<Stri
         cursor += 2;
     }
     Some(reference)
-}
-
-fn values_after(words: &[String], first: &str, second: &str) -> Vec<String> {
-    let Some(start) = words.windows(2).position(|window| {
-        window[0].eq_ignore_ascii_case(first) && window[1].eq_ignore_ascii_case(second)
-    }) else {
-        return Vec::new();
-    };
-    words[start + 2..]
-        .iter()
-        .take_while(|word| !matches!(word.as_str(), "VALUE" | "PIC" | "PICTURE"))
-        .cloned()
-        .collect()
-}
-
-fn occurs_range(words: &[String]) -> Result<OccursSpec, SemanticProblem> {
-    let Some(index) = words.iter().position(|word| word == "OCCURS") else {
-        return Ok(OccursSpec {
-            minimum: 1,
-            maximum: 1,
-            unbounded: false,
-        });
-    };
-    let (minimum, maximum_word) = if words.get(index + 1).is_some_and(|word| word == "UNBOUNDED") {
-        (1, words.get(index + 1))
-    } else {
-        let minimum = words
-            .get(index + 1)
-            .and_then(|value| value.parse::<usize>().ok())
-            .ok_or(SemanticProblem::InvalidOccurs)?;
-        let maximum = if words.get(index + 2).is_some_and(|word| word == "TO") {
-            words.get(index + 3)
-        } else {
-            words.get(index + 1)
-        };
-        (minimum, maximum)
-    };
-    let unbounded = maximum_word.is_some_and(|value| value == "UNBOUNDED");
-    let maximum = if unbounded {
-        0
-    } else {
-        maximum_word
-            .and_then(|value| value.parse::<usize>().ok())
-            .ok_or(SemanticProblem::InvalidOccurs)?
-    };
-    let variable = words.iter().any(|word| word == "DEPENDING");
-    if (!unbounded && (maximum == 0 || minimum > maximum || maximum > 1_000_000))
-        || (!variable && minimum == 0)
-        || (unbounded && !variable)
-    {
-        return Err(SemanticProblem::InvalidOccurs);
-    }
-    Ok(OccursSpec {
-        minimum,
-        maximum,
-        unbounded,
-    })
 }
 
 fn explicit_usage(words: &[String]) -> Result<Option<CobolUsage>, SemanticProblem> {
@@ -2907,13 +2795,6 @@ fn negative_overpunch(digit: u8) -> u8 {
         .unwrap_or(digit)
 }
 
-fn values_clause(words: &[String]) -> Vec<String> {
-    let start = words
-        .iter()
-        .position(|word| matches!(word.as_str(), "VALUE" | "VALUES"));
-    start.map_or_else(Vec::new, |index| words[index + 1..].to_vec())
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum SemanticProblem {
     MissingProgramId,
@@ -3034,7 +2915,7 @@ mod tests {
     #[test]
     fn fixed_occurs_can_redefine_an_exact_overlay_but_variable_occurs_cannot() {
         let fixed = program(
-            "01 ROOT. 05 RAW-DATA PIC X(20). 05 DATA-PART REDEFINES RAW-DATA OCCURS 10 TIMES PIC X(2) INDEXED BY PART-INDEX",
+            "01 ROOT. 05 RAW-DATA PIC X(20). 05 DATA-PART REDEFINES RAW-DATA OCCURS 10 TIMES INDEXED BY PART-INDEX PIC X(2)",
         );
         let model = SemanticModel::analyze(&fixed, 1024, 32).unwrap();
         let raw = model.layout("RAW-DATA").unwrap();
@@ -3087,7 +2968,7 @@ mod tests {
 
     #[test]
     fn levels_redefines_occurs_conditions_and_references_are_explicit() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. T. DATA DIVISION. WORKING-STORAGE SECTION. 01 ROOT. 05 COUNT-X PIC 9 VALUE 2. 05 TABLE-X OCCURS 1 TO 3 TIMES DEPENDING ON COUNT-X INDEXED BY IX. 10 ITEM-X PIC X(2) VALUE 'AB'. 05 RAW-X PIC X(4). 05 NUM-X REDEFINES RAW-X PIC 9(4). 88 NUM-VALID VALUE 1 THRU 9. 66 RANGE-X RENAMES COUNT-X THRU RAW-X. 77 SOLO-X PIC S9(4) COMP-3 VALUE -12. 88 SOLO-VALID VALUE 1 THRU 9. PROCEDURE DIVISION. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. T. DATA DIVISION. WORKING-STORAGE SECTION. 01 ROOT. 05 COUNT-X PIC 9 VALUE 2. 05 TABLE-X OCCURS 1 TO 3 TIMES DEPENDING ON COUNT-X INDEXED BY IX. 10 ITEM-X PIC X(2) VALUE 'AB'. 05 RAW-X PIC X(4). 05 NUM-X REDEFINES RAW-X PIC 9(4). 88 NUM-VALID VALUE 1 THRU 9. 66 RANGE-X RENAMES COUNT-X. 77 SOLO-X PIC S9(4) COMP-3 VALUE -12. 88 SOLO-VALID VALUE 1 THRU 9. PROCEDURE DIVISION. STOP RUN.";
         let model = SemanticModel::analyze(source, 1024, 64).unwrap();
         let table = model.layout("TABLE-X").unwrap();
         assert_eq!(
@@ -3206,7 +3087,7 @@ mod tests {
     #[test]
     fn occurs_dependencies_and_keys_resolve_in_the_owning_hierarchy() {
         let source = program(
-            "01 GROUP-A. 05 N PIC 9. 05 TABLE-A OCCURS 1 TO 3 TIMES DEPENDING ON N ASCENDING KEY IS KEY-X. 10 KEY-X PIC X. 01 GROUP-B. 05 N PIC 9. 05 KEY-X PIC X. 05 TABLE-B OCCURS 1 TO 3 TIMES DEPENDING ON N OF GROUP-B. 10 ITEM-B PIC X",
+            "01 GROUP-A. 05 N PIC 9. 05 TABLE-A OCCURS 1 TO 3 TIMES DEPENDING ON N ASCENDING KEY IS KEY-X. 10 KEY-X PIC X. 01 GROUP-B. 05 N PIC 9. 05 KEY-X PIC X. 05 TABLE-B OCCURS 1 TO 3 TIMES DEPENDING ON N OF GROUP-B. 10 ITEM-B PIC X. 05 TABLE-C OCCURS 2 TIMES DEPENDING ON N OF GROUP-B INDEXED BY IX-C PIC X",
         );
         let model = SemanticModel::analyze(&source, 4096, 128).unwrap();
         let table_a = model.layout("GROUP-A.TABLE-A").unwrap();
@@ -3214,6 +3095,130 @@ mod tests {
         assert_eq!(table_a.keys[0].name, "KEY-X");
         let table_b = model.layout("GROUP-B.TABLE-B").unwrap();
         assert_eq!(table_b.depending_on.as_deref(), Some("N OF GROUP-B"));
+        let table_c = model.layout("GROUP-B.TABLE-C").unwrap();
+        assert_eq!((table_c.occurs_min, table_c.occurs), (1, 2));
+        assert_eq!(table_c.indexes, ["IX-C"]);
+    }
+
+    #[test]
+    fn occurs_clause_boundaries_defaults_and_relationships_are_exact() {
+        let source = program(
+            "01 ROOT-X. 05 GROUP-X. 10 COUNT-X PIC 9 VALUE 2. 05 TABLE-X OCCURS 1 TIMES INDEXED BY IX_. 10 VALUE-X PIC X. 05 TABLE-Y OCCURS 2 TIMES ASCENDING KEY IS KEY-X OF KEY-G. 10 KEY-G. 15 KEY-X PIC X. 10 NEST-X OCCURS 2 TIMES. 15 VALUE-Y PIC X. 05 TABLE-Z OCCURS 2 TIMES DEPENDING ON COUNT-X OF GROUP-X. 10 VALUE-Z PIC X",
+        );
+        let model = SemanticModel::analyze(&source, 4096, 128).unwrap();
+        let table_x = model.layout("ROOT-X.TABLE-X").unwrap();
+        assert!(table_x.occurs_clause);
+        assert_eq!(table_x.indexes, ["IX_"]);
+        let table_y = model.layout("ROOT-X.TABLE-Y").unwrap();
+        assert_eq!(table_y.keys[0].name, "KEY-X OF KEY-G");
+        let table_z = model.layout("ROOT-X.TABLE-Z").unwrap();
+        assert_eq!((table_z.occurs_min, table_z.occurs), (1, 2));
+        assert_eq!(table_z.depending_on.as_deref(), Some("COUNT-X OF GROUP-X"));
+        let ordered = SemanticModel::analyze(
+            &program(
+                "01 ROOT. 05 TABLE-X OCCURS 2 TIMES ASCENDING KEY IS K1 DESCENDING KEY IS K2 INDEXED BY IX. 10 K1 PIC X. 10 K2 PIC X",
+            ),
+            4096,
+            128,
+        )
+        .unwrap();
+        let table = ordered.layout("ROOT.TABLE-X").unwrap();
+        assert_eq!(table.keys.len(), 2);
+        assert_eq!(table.indexes, ["IX"]);
+
+        let mut invalid = vec![
+            "01 ROOT. 05 TABLE-X OCCURS 2 TIMES ASCENDING KEY IS KEY-X. 10 KEY-X POINTER".to_string(),
+            "01 ROOT. 05 TABLE-X OCCURS 2 TIMES ASCENDING KEY IS KEY-X. 10 KEY-X OBJECT REFERENCE".to_string(),
+            "01 ROOT. 05 TABLE-X OCCURS 2 TIMES ASCENDING KEY IS KEY-X. 10 KEY-X INDEX".to_string(),
+            "01 ROOT. 05 TABLE-X OCCURS 2 TIMES ASCENDING KEY IS YES-X. 10 KEY-X PIC 9. 88 YES-X VALUE 1".to_string(),
+            "01 ROOT. 05 TABLE-X OCCURS 2 TIMES ASCENDING KEY IS FILLER. 10 FILLER PIC X".to_string(),
+            "01 N PIC 9. 01 TABLE-X OCCURS 2 TIMES ASCENDING KEY IS TABLE-X. 05 SUB-X OCCURS 1 TO 2 TIMES DEPENDING ON N PIC X".to_string(),
+            "01 TABLE-X OCCURS 2 TIMES ASCENDING KEY IS KEY-X. 05 NEST-X OCCURS 2 TIMES PIC X. 05 KEY-X PIC X".to_string(),
+            "01 ROOT. 05 BASE-X PIC X OCCURS 1 TIMES. 05 VIEW-X REDEFINES BASE-X PIC X".to_string(),
+            "01 ROOT. 05 COUNTS-X OCCURS 2 TIMES. 10 N PIC 9. 05 TABLE-X OCCURS 1 TO 2 TIMES DEPENDING ON N PIC X".to_string(),
+            "01 ROOT. 05 FILLER PIC 9. 05 TABLE-X OCCURS 1 TO 2 TIMES DEPENDING ON FILLER PIC X".to_string(),
+            "01 ROOT. 05 N PIC 9. 05 TABLE-A OCCURS 1 TO 2 TIMES DEPENDING ON N PIC X. 05 LATE-X PIC 9. 05 TABLE-B OCCURS 1 TO 2 TIMES DEPENDING ON LATE-X PIC X".to_string(),
+            "01 ROOT. 05 TABLE-X OCCURS 2 TIMES INDEXED BY IX OF TABLE-X. 10 VALUE-X PIC X".to_string(),
+            "01 ROOT. 05 TABLE-X OCCURS 2 TIMES INDEXED BY IS PIC X".to_string(),
+            "01 ROOT. 05 TABLE-X OCCURS 2 TIMES INDEXED BY WHEN PIC X".to_string(),
+            "01 ROOT. 05 TABLE-X OCCURS 2 TIMES INDEXED BY PIC X".to_string(),
+            "01 N PIC 9. 01 ROOT. 05 TABLE-X OCCURS 1 TO 2 TIMES ASCENDING KEY IS KEY-X DEPENDING ON N. 10 KEY-X PIC X".to_string(),
+            "01 ROOT. 05 TABLE-X OCCURS 2 TIMES INDEXED BY IX ASCENDING KEY IS KEY-X. 10 KEY-X PIC X".to_string(),
+            "01 ROOT. 05 TABLE-X OCCURS 2 TIMES ASCENDING KEY IS K1 INDEXED BY IX DESCENDING KEY IS K2. 10 K1 PIC X. 10 K2 PIC X".to_string(),
+            "01 ROOT. 05 TABLE-X INDEXED BY IX OCCURS 2 TIMES. 10 VALUE-X PIC X".to_string(),
+            "01 ROOT. 05 TABLE-X ASCENDING KEY IS VALUE-X OCCURS 2 TIMES. 10 VALUE-X PIC X".to_string(),
+            "01 N PIC 9. 01 ROOT. 05 TABLE-X DEPENDING ON N OCCURS 1 TO 2 TIMES PIC X".to_string(),
+            "01 N PIC 9. 01 ROOT. 05 TABLE-X OCCURS 1 TO 3 TIMES PIC X DEPENDING ON N".to_string(),
+            "01 ROOT. 05 TABLE-X OCCURS 2 TIMES PIC X INDEXED BY IX".to_string(),
+        ];
+        invalid.push(format!(
+            "01 ROOT. 05 TABLE-X OCCURS 2 TIMES INDEXED BY {}. 10 VALUE-X PIC X",
+            "I".repeat(31)
+        ));
+        for declarations in invalid {
+            assert!(
+                SemanticModel::analyze(&program(&declarations), 4096, 128).is_err(),
+                "accepted invalid OCCURS relationship: {declarations}"
+            );
+        }
+    }
+
+    #[test]
+    fn conditions_renames_and_typedef_occurs_objects_keep_distinct_roles() {
+        let model = SemanticModel::analyze(
+            &program(
+                "01 ROOT. 05 G. 10 A PIC X. 10 B PIC X. 66 AB RENAMES A THRU B. 01 DYN PIC X DYNAMIC LENGTH LIMIT IS 10. 88 DYN-EMPTY VALUE SPACE",
+            ),
+            4096,
+            128,
+        )
+        .unwrap();
+        assert_eq!(
+            model.layout("ROOT.AB").unwrap().category,
+            DataCategory::Rename
+        );
+        assert_eq!(
+            model.layout("DYN.DYN-EMPTY").unwrap().category,
+            DataCategory::Condition
+        );
+
+        let typedef_object = program(
+            "01 COUNT-T TYPEDEF PIC 9. 01 ROOT. 05 TABLE-X OCCURS 1 TO 2 TIMES DEPENDING ON COUNT-T PIC X",
+        );
+        assert_eq!(
+            SemanticModel::analyze(&typedef_object, 4096, 128),
+            Err(SemanticProblem::InvalidOccurs)
+        );
+
+        let allocated_object = program(
+            "01 COUNT-T TYPEDEF PIC 9. 01 COUNT-X TYPE COUNT-T VALUE 1. 01 ROOT. 05 TABLE-X OCCURS 1 TO 2 TIMES DEPENDING ON COUNT-X PIC X",
+        );
+        let model = SemanticModel::analyze(&allocated_object, 4096, 128).unwrap();
+        assert!(!model.layout("COUNT-X").unwrap().typedef);
+        assert!(model.layout("COUNT-X").unwrap().allocated);
+
+        let conditions = SemanticModel::analyze(
+            &program("01 N PIC 9. 88 ONE VALUE IS 1. 88 DIGIT VALUES ARE 1 THRU 9"),
+            4096,
+            128,
+        )
+        .unwrap();
+        assert_eq!(conditions.layout("N.ONE").unwrap().condition_values, ["1"]);
+        assert_eq!(
+            conditions.layout("N.DIGIT").unwrap().condition_values,
+            ["1", "THRU", "9"]
+        );
+
+        for invalid in [
+            "01 ROOT. 05 A PIC X. 66 R RENAMES A THRU A",
+            "01 N PIC 9. 01 ROOT. 05 A PIC X. 05 T OCCURS 1 TO 2 TIMES DEPENDING ON N PIC X. 05 B PIC X. 66 R RENAMES A THRU B",
+            "01 N PIC 9 VALUE 1. 88 BAD VALUE 'ABC'",
+            "01 N PIC 9. 88 BAD VALUE 9 THRU 1",
+            "01 N PIC 9. 88 BAD VALUE -1",
+            "01 P POINTER. 88 BAD VALUE NULL",
+        ] {
+            assert!(SemanticModel::analyze(&program(invalid), 4096, 128).is_err());
+        }
     }
 
     #[test]
@@ -3263,7 +3268,9 @@ mod tests {
             "01 BAD PIC X POINTER",
             "01 BAD PIC X(2) DYNAMIC",
             "01 BAD OCCURS 2 TIMES PIC X",
+            "01 COUNT-X PIC 9. 01 ROOT. 05 BAD OCCURS 2 TO 2 TIMES DEPENDING ON COUNT-X PIC X",
             "01 COUNT-X PIC X. 01 ROOT. 05 BAD OCCURS 1 TO 2 TIMES DEPENDING ON COUNT-X PIC X",
+            "01 ROOT. 05 TABLE-X OCCURS 2 TIMES ASCENDING KEY IS KEY-X. 10 KEY-X PIC X(257)",
             "01 ROOT GROUP-USAGE NATIONAL. 05 BAD PIC X DISPLAY",
             "01 BAD POINTER VALUE 1",
             "01 ROOT. 05 BASE PIC X VALUE 'A'. 05 BAD REDEFINES BASE PIC X VALUE 'B'",

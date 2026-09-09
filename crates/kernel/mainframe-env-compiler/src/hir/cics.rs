@@ -8,7 +8,8 @@ use mainframe_env_ir::{
     CicsNamedOperand, CicsOperandName, CicsOperandValue, CicsOperationContract, CicsOutputBinding,
     CicsOutputName, CicsPlanLimits, CicsPlanOperation, CicsPlanOption, CicsStorageSlot, Effect,
     ModuleBuilder, OperationCatalog, OperationIdentity, OperationSchema, OperationSemanticContract,
-    StorageId, StorageReference, cics_executable_descriptor, encode_cics_effect_plan,
+    StorageId, StorageReference, cics_executable_descriptor, cobol_layout_definition_identity,
+    encode_cics_effect_plan,
 };
 use std::collections::BTreeMap;
 
@@ -64,10 +65,7 @@ pub(crate) fn register_executable_operations(catalog: &mut OperationCatalog) {
         schema.semantic_contract = OperationSemanticContract::CicsEffect(CicsOperationContract {
             plan_attribute: CICS_PLAN_ATTRIBUTE.into(),
             expected_operation: Some(descriptor.operation),
-            layout_definition_operation: Some(
-                OperationIdentity::new("mainframe.core.cobol", "define", 1)
-                    .expect("static COBOL layout definition identity"),
-            ),
+            layout_definition_operation: Some(cobol_layout_definition_identity()),
         });
         catalog
             .register(schema)

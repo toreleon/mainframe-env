@@ -119,6 +119,59 @@ A specialized operation may compose shared decimal, storage, or control
 semantics. That reuse must not erase COBOL receiver rules, CICS conditions,
 Db2 transaction behavior, aliasing, provenance, or failure taxonomy.
 
+#### Executable COBOL layout ABI
+
+`mainframe.core.cobol@1.define` owns the executable COBOL layout vocabulary.
+Its `CobolLayoutDefinition` semantic contract checks every definition, including
+ones not referenced by a migrated plan, before MIR legalization or artifact
+admission. The contract validates the runtime-required field types and domains,
+numeric and nonnumeric PICTURE/category/representation widths, sign metadata,
+BYTE-LENGTH and object-class ownership, LP-dependent opaque widths, static
+occurrence extents, DYNAMIC limits, storage-view topology, and unique qualified
+definition names. Decimal and
+CICS contracts then add exact plan-slot-to-definition-to-storage binding and
+numeric/writable usage checks.
+
+The verifier builds one bounded layout index per module. It validates and caches
+each definition ABI once, then reuses that record for all decimal/CICS slots;
+PICTURE repetition is checked without expansion and is capped at the compiler's
+one-million-symbol boundary.
+
+The pinned IBM HTML cache is evidence input, not executable parser code.
+`extract_cobol_html_grammar.py` currently projects procedure-statement diagrams
+for a zero-credit comparison artifact, while `cargo xtask cobol-language`
+generates descriptors from the independently reviewed `language.json` catalog.
+The data-description scanners consume those generated descriptors for clause
+openers, but still implement clause operands and defaults in the frontend. For
+the affected OCCURS/KEY/INDEXED/DYNAMIC slice, source forms, scanner tests,
+resolved layout identities, and the executable ABI validator are therefore
+checked together. Extending HTML projection into a generated data-clause parser
+is later #130 work, not claimed by this remediation.
+
+`TYPEDEF` templates remain semantic-HIR declarations; lowering emits only their
+allocated `TYPE` instances as executable layout/storage identities. The current
+bounded qualifier ABI begins at the data-record root. FD/SD outer qualifiers and
+the high-to-low `::` spelling are rejected before publication until a later
+#130 slice carries that owner metadata explicitly.
+
+The same dialect layer validates the currently executable level-88 subset:
+canonical `VALUE [IS]`/`VALUES [ARE]` operands, numeric assignment fit,
+strictly increasing numeric ranges, and bounded quoted/figurative values for
+alphanumeric variables. It rejects incompatible pointer/index/object parents.
+Complete VALUE format 2 behavior (`WHEN SET TO FALSE`, `ALL`, symbolic
+characters, NATIONAL/DBCS/UTF-8 conversion and collation, edited/group cases,
+and an explicit versioned level-78 kind) remains a later #130 slice and is not
+silently interpreted by this one.
+
+The schema, identity, and bounded unbounded-table capacities are registered
+once in the IR dialect layer and are consumed by compiler and defensive VM
+admission without either importing the other. Historical `@2` artifact fields
+that predate `alias_of` and `occurs_clause` retain their documented absent-value
+defaults; the absent `occurs_clause` default is false and is accepted only for
+a scalar definition with no table metadata. HIR remains a storage-binding proof
+because executable `define` operations do not exist at that stage; full
+layout-ABI proof begins at executable MIR and artifact boundaries.
+
 #### Decimal assignment responsibility and policy
 
 `mainframe.decimal@2.assign` is a shared executable operation, not a universal
@@ -228,6 +281,13 @@ Publication derives the dialect set from the payload and rejects a stale,
 missing, or extra manifest entry. Operation identity includes dialect,
 operation name, and semantic major version.
 
+For COBOL payloads, publication and read admission also compare all three
+normalized semantic options with the immutable `mainframe.core.cobol@1.config`
+operation. Current `@3` payloads must carry arithmetic, display-sign, and
+address-mode markers. The retained `@2` path alone applies its documented
+compatible-sign and LP(32) defaults when those historical fields are absent;
+the admitted view changes, but the historical payload does not.
+
 Once published, an operation identity and major version are immutable semantic
 contracts. An incompatible operand shape or behavioral change uses a new
 operation identity or major version. A reader must either execute the exact
@@ -254,7 +314,7 @@ exact compatibility profile before installation, execution, or resume:
 | environment profile | `mainframe-env.cobol.reference@1` | Host compatibility is owned by the product environment, not deferred to a provider effect |
 | source artifact contract | `mainframe-env.artifact@2` or `mainframe-env.artifact@3` | `@2` is the retained pre-dialect-manifest reader; writers emit only `@3`; every other version is rejected |
 | compiler generation and target | exactly `mainframe-env-cobol-0.8.3` and `reference` | No cross-generation semantic compatibility is inferred |
-| normalized options | exactly `cobol.effective-arith` (`compatible` or `extended`), `cobol.effective-dispsign` (`compatible` or `separate`), and `cobol.effective-lp` (`32` or `64`) | Unknown or missing semantic options are rejected |
+| normalized options | exactly `cobol.effective-arith` (`compatible` or `extended`), `cobol.effective-dispsign` (`compatible` or `separate`), and `cobol.effective-lp` (`32` or `64`) | Unknown, missing, or payload-config-mismatched semantic options are rejected |
 | host ABI set | exactly `mainframe-env.host@1` and `mainframe-env.cics@1` | Capability and resource authorization still occur at dispatch |
 | IR envelope | exactly `mainframe-env.ir-envelope@1` | Canonical bytes and the registered executable profile are revalidated |
 
@@ -294,6 +354,8 @@ The current family routes and retirement conditions are intentionally bounded:
 | --- | --- | --- | --- |
 | COBOL `ADD` and `COMPUTE` with statically resolved numeric operands, receivers, and supported bounded expressions | Typed COBOL HIR to `mainframe.decimal@2.assign`; tests assert both operation selection and exact values/bytes | Runtime subscripts, special registers/intrinsics, and expressions beyond the current typed depth remain explicit `mainframe.core.cobol` operations | Model remaining dynamic references as typed deferred expressions with runtime bounds checks, verify their static shape, and land route-plus-result and mutation tests before removing the source-token route |
 | COBOL `ADD CORRESPONDING` with unmodified, unsubscripted eligible group operands | COBOL HIR resolves relative-qualified, bilaterally unique pairs and emits `mainframe.decimal@2.assign` | A valid selected table-group subscript uses the explicit core-COBOL route; missing required subscripts, reference modification, UTF-8 groups in this slice, and numeric national-byte pairs fail before publication rather than falling through | Add a versioned typed selected-group reference/offset contract, runtime bounds checks, qualification/exclusion tests on both routes, and exact byte evidence before retiring this compatibility route |
+| COBOL executable layout forms touched by typed plans | Scalar `PIC X`/`PIC U` DYNAMIC items and bounded fixed/ODO/unbounded tables retain the existing machine | DYNAMIC items with their own OCCURS, beneath any table, or participating in REDEFINES fail before HIR/publication because the current machine has neither per-occurrence dynamic buffers nor dynamic alias storage; omission of a DYNAMIC LIMIT remains an inherited unsupported frontend form | Add an explicit per-occurrence dynamic-storage and alias contract with execution/restart tests before admitting those combinations; separately materialize the baseline default limit before accepting omitted LIMIT |
+| COBOL level-88 values reached by current execution | Numeric DISPLAY/PACKED/BINARY literals and increasing ranges plus bounded alphanumeric literals/figuratives are normalized and validated in the frontend and executable ABI | NATIONAL/DBCS/UTF-8, edited/group, `WHEN SET TO FALSE`, `ALL`, symbolic-character, and collation-dependent ranges fail closed rather than using incomplete raw-token behavior | Add explicit literal class/encoding/collation policies and byte-exact SET/condition tests before admitting each deferred class |
 | Migrated CICS commands with statically resolved option direction and bindings | Typed CICS plan through the existing machine, coordinator, typed host request, and provider | Commands/options outside the declared pilot remain on their documented existing route; a malformed typed plan never falls back to token interpretation | Extend the authoritative descriptors and binding verifier with command-specific transition/recovery tests before moving each additional command family; do not infer completion of all CICS 0.9 work |
 | Published decimal operation/plan major `@1` | Read-only version-selected compatibility handler | Historical bytes and semantic identities remain immutable | Retain for the documented artifact range; removal requires an explicit compatibility/version decision and is independent of source-route cutover |
 

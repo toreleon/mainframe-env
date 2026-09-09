@@ -82,12 +82,43 @@ The HIR boundary intentionally uses storage-arena binding because executable
 COBOL layout-definition operations do not exist there yet. At MIR and artifact
 boundaries, each referenced slot must also have one exact
 `mainframe.core.cobol@1.define` binding with the same storage identity, qualified
-name, full extent, known category, and the required numeric/writable use. The
-same validation covers plan wire version versus operation major, operation
-identity, exact storage declarations, effects and runtime imports, and the
-registered arithmetic-condition topology. Current values, runtime subscripts,
-authorization, provider/resource generations, transaction state, and
-checkpoint context remain runtime checks.
+name, full extent, known category, and the required numeric/writable use.
+`OperationSemanticContract::CobolLayoutDefinition` additionally validates every
+executable definition's complete runtime-required ABI shape: required attribute
+types, canonical boolean and size domains, section/category values,
+PICTURE/digits/scale/sign coherence, numeric representation widths,
+character/group/pointer category shapes, BYTE-LENGTH and object-class ownership,
+LP-dependent pointer widths, OCCURS/static extent relationships, and bounded
+DYNAMIC metadata. This same
+dialect-owned schema is registered by compiler legalization, artifact admission,
+and defensive `ReferenceMachine` admission; the interpreter retains defensive
+decoding but is not a second static-rule authority. Each definition ABI is
+decoded once into the verifier's bounded module index and reused by every plan
+slot, so repeated references do not repeatedly parse PICTURE metadata. ODO
+objects and ordered keys resolve through the owner-relative qualification
+hierarchy before admission; key/index counts and statically known key extents
+are bounded. `TYPEDEF` templates remain semantic-HIR declarations and are not
+emitted as executable definitions or storage; only allocated `TYPE` instances
+can bind runtime plans or ODO objects. The validator distinguishes storage
+`REDEFINES`, level-66 `RENAMES` ranges, and level-88 condition associations
+instead of treating every `alias_of` relation as the same overlay rule. Parent,
+REDEFINES, and RENAMES definitions must resolve to the same declared storage
+backing and offsets; a metadata-only alias over independent storage is rejected.
+RENAMES preserves and verifies its range end and rejects an ODO within the
+range. The supported level-88 numeric/alphanumeric subset is checked for
+canonical operands, assignment class, extent, and increasing ranges by one
+dialect validator shared with the frontend. The same validation covers plan wire version versus operation
+major, operation identity, exact storage declarations, effects and runtime
+imports, and the registered arithmetic-condition topology. Current values,
+runtime subscripts, authorization, provider/resource generations, transaction
+state, and checkpoint context remain runtime checks.
+
+The bounded data-clause scanner resolves `OF`/`IN` qualification within the
+emitted data-record hierarchy. An outer FD/SD file-name qualifier and the
+high-to-low `::` spelling are not represented in the executable layout ABI;
+those spellings fail before publication rather than falling back to token
+interpretation. Carrying that owner metadata is a later #130 cutover, not part
+of #140-#144.
 
 Parsed and semantic construction is private to the compiler implementation.
 The executable proof chain consumes verified HIR into lowered MIR and then
@@ -99,6 +130,11 @@ The current writer is artifact contract `mainframe-env.artifact@3`. It preserves
 the separate semantic and content identities introduced by version 2 and adds
 an exact `dialect_contracts` manifest set derived from the executable payload.
 `mainframe-env.artifact@2` remains the historical pre-dialect-manifest contract.
+For COBOL, both publication and read admission bind the manifest's effective
+arithmetic, display-sign, and LP values to the immutable `config` operation in
+the payload. Version 3 requires all three markers. The retained version-2 reader
+applies only its documented LP(32)/compatible-sign defaults in the admitted
+view and never rewrites historical bytes.
 Its explicit reader validates the canonical binary envelope and executable
 profile before deriving an in-memory dialect manifest; it neither rewrites the
 payload nor fabricates a version-3 semantic identity. The release and current

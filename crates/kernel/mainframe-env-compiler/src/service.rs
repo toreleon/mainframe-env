@@ -11,7 +11,10 @@ use mainframe_env_diagnostics::{
     Completeness, Diagnostic, DiagnosticCode, DiagnosticLimits, FailureCategory, Phase, Redaction,
     Severity,
 };
-use mainframe_env_ir::{CodecLimits, IrLimits, to_text};
+use mainframe_env_ir::{
+    COBOL_EFFECTIVE_ARITH_OPTION, COBOL_EFFECTIVE_DISPSIGN_OPTION, COBOL_EFFECTIVE_LP_OPTION,
+    CodecLimits, IrLimits, to_text,
+};
 use mainframe_env_source::SourceBundle;
 use std::collections::BTreeSet;
 
@@ -288,6 +291,7 @@ impl CobolCompiler {
             &verified,
             effective_options.arithmetic_mode().as_str(),
             effective_options.display_sign().as_str(),
+            effective_options.lp(),
             &declaratives,
             self.limits.ir,
         )
@@ -311,15 +315,15 @@ impl CobolCompiler {
             .collect();
         let mut manifest_options = request.options.values().clone();
         manifest_options.insert(
-            "cobol.effective-lp".into(),
+            COBOL_EFFECTIVE_LP_OPTION.into(),
             effective_options.lp().to_string(),
         );
         manifest_options.insert(
-            "cobol.effective-arith".into(),
+            COBOL_EFFECTIVE_ARITH_OPTION.into(),
             effective_options.arithmetic_mode().as_str().into(),
         );
         manifest_options.insert(
-            "cobol.effective-dispsign".into(),
+            COBOL_EFFECTIVE_DISPSIGN_OPTION.into(),
             effective_options.display_sign().as_str().into(),
         );
         let manifest = ArtifactManifest {
@@ -774,6 +778,46 @@ mod tests {
     }
 
     #[test]
+    fn layout_abi_validation_preserves_national_dynamic_utf8_and_float_tables() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. LAYOUTABI. DATA DIVISION. WORKING-STORAGE SECTION. 01 NATIONAL-X PIC 9(3) USAGE NATIONAL. 01 DYNAMIC-U PIC U DYNAMIC LENGTH LIMIT IS 100 UTF-8. 01 FLOAT-TABLE. 05 FLOAT-X OCCURS 2 TIMES COMP-1. PROCEDURE DIVISION. STOP RUN.";
+        assert!(matches!(
+            CobolCompiler::default()
+                .compile(request(source, CompilationMode::Executable))
+                .unwrap(),
+            CompilerResult::Published { .. }
+        ));
+    }
+
+    #[test]
+    fn unsupported_dynamic_table_and_alias_forms_fail_before_publication() {
+        for declarations in [
+            "01 ROOT-X. 05 DYN-X PIC X OCCURS 2 TIMES INDEXED BY IX DYNAMIC LENGTH LIMIT IS 100.",
+            "01 ROOT-X. 05 DYN-X PIC X DYNAMIC LENGTH LIMIT IS 100 OCCURS 2 TIMES INDEXED BY IX.",
+            "01 ROOT-X OCCURS 2 TIMES. 05 DYN-X PIC X DYNAMIC LENGTH LIMIT IS 100.",
+            "01 BASE-X PIC X DYNAMIC LENGTH LIMIT IS 100. 01 VIEW-X REDEFINES BASE-X PIC X.",
+            "01 BASE-X PIC X. 01 DYN-X REDEFINES BASE-X PIC X DYNAMIC LENGTH LIMIT IS 100.",
+            "01 ROOT-X. 05 BASE-X. 10 DYN-X PIC X DYNAMIC LENGTH LIMIT IS 100. 05 VIEW-X REDEFINES BASE-X. 10 FIX-X PIC X.",
+            "01 ROOT-X. 05 BASE-X PIC X. 05 VIEW-X REDEFINES BASE-X. 10 DYN-X PIC X DYNAMIC LENGTH LIMIT IS 100.",
+            "01 ROOT-X. 05 BASE-X. 10 DYN-A PIC X DYNAMIC LENGTH LIMIT IS 100. 05 VIEW-X REDEFINES BASE-X. 10 DYN-B PIC X DYNAMIC LENGTH LIMIT IS 100.",
+            "01 ROOT-X. 05 DYN-X PIC X OCCURS 1 TIMES DYNAMIC LENGTH LIMIT IS 100.",
+            "01 ROOT-X. 05 TABLE-X OCCURS 1 TIMES. 10 DYN-X PIC X DYNAMIC LENGTH LIMIT IS 100.",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. DYNSCOPE. DATA DIVISION. WORKING-STORAGE SECTION. {declarations} PROCEDURE DIVISION. STOP RUN."
+            );
+            let analysis = CobolCompiler::default().analyze(&bundle(&source));
+            assert!(analysis.semantic.is_none());
+            assert!(analysis.hir.is_none());
+            assert!(matches!(
+                CobolCompiler::default()
+                    .compile(request(&source, CompilationMode::Executable))
+                    .unwrap(),
+                CompilerResult::Failed { .. }
+            ));
+        }
+    }
+
+    #[test]
     fn type_instances_retain_definition_and_instance_provenance() {
         let source = "IDENTIFICATION DIVISION.\nPROGRAM-ID. TYPES.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PART-T TYPEDEF.\n 05 CODE-X PIC X(2).\n 05 QTY-X PIC 9(3) COMP-3.\n01 PART TYPE PART-T.\nPROCEDURE DIVISION.\nSTOP RUN.\n";
         let analysis = CobolCompiler::default().analyze(&bundle(source));
@@ -788,6 +832,40 @@ mod tests {
             semantic
                 .layout("PART.CODE-X")
                 .is_some_and(|layout| layout.source.len() >= 2)
+        );
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(request(source, CompilationMode::Executable))
+            .unwrap()
+        else {
+            panic!("the allocated TYPE instance must publish");
+        };
+        let module = decode_binary(artifact.payload(), CodecLimits::default()).unwrap();
+        let definition_names = module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .filter(|operation| {
+                operation.identity.namespace() == "mainframe.core.cobol"
+                    && operation.identity.name() == "define"
+            })
+            .filter_map(|operation| match operation.attributes.get("name") {
+                Some(Attribute::Text(name)) => Some(name.as_str()),
+                _ => None,
+            })
+            .collect::<BTreeSet<_>>();
+        assert!(definition_names.contains("PART"));
+        assert!(definition_names.contains("PART.CODE-X"));
+        assert!(
+            definition_names
+                .iter()
+                .all(|name| !name.starts_with("PART-T"))
+        );
+        assert!(
+            module
+                .storage()
+                .iter()
+                .all(|region| !region.name.to_ascii_uppercase().starts_with("PART-T"))
         );
     }
 

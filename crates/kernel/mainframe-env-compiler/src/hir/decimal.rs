@@ -8,7 +8,7 @@ use mainframe_env_ir::{
     DecimalExecutionPolicy, DecimalExpression, DecimalOperationContract, DecimalPlanLimits,
     DecimalPlanWireVersion, DecimalReceiver, DecimalRoundingPolicy, DecimalStorageSlot, Effect,
     ModuleBuilder, OperationCatalog, OperationIdentity, OperationSchema, OperationSemanticContract,
-    StorageId, StorageReference, encode_decimal_assignment_plan,
+    StorageId, StorageReference, cobol_layout_definition_identity, encode_decimal_assignment_plan,
 };
 use std::collections::BTreeMap;
 
@@ -121,10 +121,7 @@ pub(crate) fn register_executable_operation(catalog: &mut OperationCatalog) {
                 plan_attribute: ASSIGNMENT_PLAN_ATTRIBUTE.into(),
                 expected_plan_version: version,
                 allowed_semantic_origins: origins,
-                layout_definition_operation: Some(
-                    OperationIdentity::new("mainframe.core.cobol", "define", 1)
-                        .expect("static COBOL layout definition identity"),
-                ),
+                layout_definition_operation: Some(cobol_layout_definition_identity()),
                 condition: Some(DecimalConditionContract {
                     status: SIZE_ERROR_STATUS.into(),
                     status_attribute: CONDITION_STATUS_ATTRIBUTE.into(),

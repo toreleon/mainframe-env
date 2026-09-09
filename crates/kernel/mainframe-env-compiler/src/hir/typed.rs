@@ -854,8 +854,13 @@ fn data_reference_at(
 }
 
 fn require_numeric(reference: &HirDataReference) -> Resolution<()> {
-    if is_numeric(reference.category) {
+    if is_numeric(reference.category) && reference.usage != CobolUsage::National {
         Ok(())
+    } else if is_numeric(reference.category) {
+        Err(ResolutionFailure::Invalid(format!(
+            "{} uses numeric USAGE NATIONAL storage not supported by the declared decimal ABI",
+            reference.qualified_name
+        )))
     } else {
         Err(ResolutionFailure::Invalid(format!(
             "{} is not numeric",
@@ -1673,6 +1678,28 @@ mod tests {
                 .iter()
                 .any(|diagnostic| diagnostic.public_message().contains("is not numeric"))
         );
+    }
+
+    #[test]
+    fn numeric_national_typed_slots_fail_at_hir_while_opaque_length_remains_valid() {
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. NATADD. DATA DIVISION. WORKING-STORAGE SECTION. 01 NATIONAL-X PIC 99 NATIONAL. PROCEDURE DIVISION. ADD 1 TO NATIONAL-X. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. NATRESP. DATA DIVISION. WORKING-STORAGE SECTION. 01 RESPONSE-X PIC 9(4) NATIONAL. PROCEDURE DIVISION. EXEC CICS SYNCPOINT RESP(RESPONSE-X) END-EXEC. STOP RUN.",
+        ] {
+            let analysis = analyze(source);
+            assert!(analysis.semantic.is_some());
+            assert!(analysis.hir.is_none());
+            assert!(analysis.diagnostics.iter().any(|diagnostic| {
+                diagnostic
+                    .public_message()
+                    .contains("numeric USAGE NATIONAL storage not supported")
+            }));
+        }
+
+        let length = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. NATLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 NATIONAL-X PIC 99 NATIONAL. 01 LENGTH-X PIC 9(4). PROCEDURE DIVISION. COMPUTE LENGTH-X = LENGTH OF NATIONAL-X. STOP RUN.",
+        );
+        assert!(length.hir.is_some());
     }
 
     #[test]

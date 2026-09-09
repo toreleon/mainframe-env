@@ -1,6 +1,27 @@
 use crate::{CicsPlanOperation, DecimalPlanWireVersion, Effect, OperationIdentity};
 use std::collections::{BTreeMap, BTreeSet};
 
+pub const COBOL_LAYOUT_DEFINITION_NAMESPACE: &str = "mainframe.core.cobol";
+pub const COBOL_LAYOUT_DEFINITION_NAME: &str = "define";
+pub const COBOL_LAYOUT_DEFINITION_MAJOR: u16 = 1;
+
+/// Return the authoritative identity of the executable COBOL layout ABI.
+pub fn cobol_layout_definition_identity() -> OperationIdentity {
+    OperationIdentity::new(
+        COBOL_LAYOUT_DEFINITION_NAMESPACE,
+        COBOL_LAYOUT_DEFINITION_NAME,
+        COBOL_LAYOUT_DEFINITION_MAJOR,
+    )
+    .expect("static COBOL layout-definition identity")
+}
+
+/// Build the dialect-owned schema for an executable COBOL layout definition.
+pub fn cobol_layout_definition_schema() -> OperationSchema {
+    let mut schema = OperationSchema::pure(cobol_layout_definition_identity(), 0, 0);
+    schema.semantic_contract = OperationSemanticContract::CobolLayoutDefinition;
+    schema
+}
+
 /// Static semantic contract attached to a typed operation schema.
 ///
 /// The contract selects a bounded validator implemented by the IR crate. It is
@@ -11,6 +32,13 @@ use std::collections::{BTreeMap, BTreeSet};
 pub enum OperationSemanticContract {
     /// Generic structural verification is sufficient for this operation.
     Structural,
+    /// Static ABI carried by a `mainframe.core.cobol@1.define` operation.
+    ///
+    /// This keeps the executable layout vocabulary owned by its dialect while
+    /// allowing checked-module/MIR verification, artifact admission, and
+    /// defensive VM admission to share one checker. Language HIR has no
+    /// executable layout definitions and retains its storage-only proof.
+    CobolLayoutDefinition,
     /// Decimal assignment plan encoded in one bytes attribute.
     DecimalAssignment(DecimalOperationContract),
     /// Typed CICS effect plan encoded in one bytes attribute.

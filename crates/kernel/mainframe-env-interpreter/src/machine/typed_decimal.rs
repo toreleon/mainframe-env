@@ -5,8 +5,9 @@ use mainframe_env_ir::{
     DecimalConditionPolicy, DecimalExpression, DecimalOperationContract, DecimalPlanLimits,
     DecimalPlanWireVersion, DecimalReceiver, DecimalReceiverUpdatePolicy, DecimalRoundingPolicy,
     DecimalStorageAbi, DecimalStorageSlot, Effect, Module, OperationCatalog, OperationSchema,
-    OperationSemanticContract, decimal_assignment_plan_wire_version,
-    decode_decimal_assignment_plan, verify_semantic_contracts,
+    OperationSemanticContract, cobol_layout_definition_identity,
+    decimal_assignment_plan_wire_version, decode_decimal_assignment_plan,
+    verify_semantic_contracts,
 };
 
 const NAMESPACE: &str = "mainframe.decimal";
@@ -54,10 +55,7 @@ pub(super) fn validate_module_operations(module: &Module) -> Result<(), MachineP
                 plan_attribute: PLAN_ATTRIBUTE.into(),
                 expected_plan_version,
                 allowed_semantic_origins,
-                layout_definition_operation: Some(
-                    OperationIdentity::new("mainframe.core.cobol", "define", 1)
-                        .expect("static COBOL layout definition identity"),
-                ),
+                layout_definition_operation: Some(cobol_layout_definition_identity()),
                 condition: Some(DecimalConditionContract {
                     status: SIZE_ERROR_STATUS.into(),
                     status_attribute: CONDITION_STATUS_ATTRIBUTE.into(),
@@ -1070,7 +1068,14 @@ mod tests {
                         ("name".into(), Attribute::Text(layout.name.into())),
                         ("simple_name".into(), Attribute::Text(layout.name.into())),
                         ("category".into(), Attribute::Text(layout.category.into())),
-                        ("picture".into(), Attribute::Text(String::new())),
+                        (
+                            "picture".into(),
+                            Attribute::Text(if layout.category == "numeric_display" {
+                                format!("9({})", layout.digits)
+                            } else {
+                                format!("X({})", layout.length)
+                            }),
+                        ),
                         ("digits".into(), Attribute::Integer(layout.digits as i64)),
                         ("scale".into(), Attribute::Integer(i64::from(layout.scale))),
                         ("signed".into(), Attribute::Integer(0)),
@@ -1752,7 +1757,7 @@ mod tests {
                     ("name".into(), Attribute::Text("B".into())),
                     ("simple_name".into(), Attribute::Text("B".into())),
                     ("category".into(), Attribute::Text("numeric_display".into())),
-                    ("picture".into(), Attribute::Text(String::new())),
+                    ("picture".into(), Attribute::Text("9(3)".into())),
                     ("digits".into(), Attribute::Integer(3)),
                     ("scale".into(), Attribute::Integer(0)),
                     ("signed".into(), Attribute::Integer(0)),

@@ -6506,6 +6506,10 @@ mod tests {
         PublishedArtifact, VersionedArtifactManifest,
     };
     use mainframe_env_db2::Db2TableDefinition;
+    use mainframe_env_ir::{
+        Attribute, CicsPlanOperation, IrLimits, ModuleBuilder, OperationIdentity,
+        cics_executable_descriptor,
+    };
     use mainframe_env_source::{
         LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
     };
@@ -6942,6 +6946,118 @@ mod tests {
         artifact
     }
 
+    fn malformed_layout_payload() -> Vec<u8> {
+        let mut builder = ModuleBuilder::new(IrLimits::default());
+        builder.add_storage("result", 3, None).unwrap();
+        let region = builder.add_region().unwrap();
+        let block = builder.add_block(region).unwrap();
+        builder
+            .add_operation(
+                block,
+                OperationIdentity::new("mainframe.core.cobol", "config", 1).unwrap(),
+                Vec::new(),
+                0,
+                BTreeMap::from([
+                    ("arithmetic_mode".into(), Attribute::Text("extended".into())),
+                    ("display_sign".into(), Attribute::Text("compatible".into())),
+                    ("address_mode".into(), Attribute::Text("32".into())),
+                ]),
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .unwrap();
+        builder
+            .add_operation(
+                block,
+                mainframe_env_ir::cobol_layout_definition_identity(),
+                Vec::new(),
+                0,
+                BTreeMap::from([
+                    ("name".into(), Attribute::Text("RESULT".into())),
+                    ("simple_name".into(), Attribute::Text("RESULT".into())),
+                    ("category".into(), Attribute::Text("numeric_display".into())),
+                    ("picture".into(), Attribute::Text("9(3)".into())),
+                    ("digits".into(), Attribute::Text("not-an-integer".into())),
+                    ("scale".into(), Attribute::Integer(0)),
+                    ("signed".into(), Attribute::Integer(0)),
+                    ("sign_separate".into(), Attribute::Integer(0)),
+                    ("section".into(), Attribute::Text("working".into())),
+                    ("offset".into(), Attribute::Integer(0)),
+                    ("length".into(), Attribute::Integer(3)),
+                    ("element_length".into(), Attribute::Integer(3)),
+                    ("occurs".into(), Attribute::Integer(1)),
+                    ("parent".into(), Attribute::Text(String::new())),
+                    ("condition_values".into(), Attribute::Text(String::new())),
+                ]),
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .unwrap();
+        builder
+            .add_operation(
+                block,
+                OperationIdentity::new("mainframe.core.cobol", "halt", 1).unwrap(),
+                Vec::new(),
+                0,
+                BTreeMap::new(),
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .unwrap();
+        mainframe_env_ir::encode_binary(&builder.finish().unwrap(), CodecLimits::default()).unwrap()
+    }
+
+    fn malformed_cics_plan_payload() -> Vec<u8> {
+        let mut builder = ModuleBuilder::new(IrLimits::default());
+        let region = builder.add_region().unwrap();
+        let block = builder.add_block(region).unwrap();
+        builder
+            .add_operation(
+                block,
+                OperationIdentity::new("mainframe.core.cobol", "config", 1).unwrap(),
+                Vec::new(),
+                0,
+                BTreeMap::from([
+                    ("arithmetic_mode".into(), Attribute::Text("extended".into())),
+                    ("display_sign".into(), Attribute::Text("compatible".into())),
+                    ("address_mode".into(), Attribute::Text("32".into())),
+                ]),
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .unwrap();
+        let descriptor = cics_executable_descriptor(CicsPlanOperation::Syncpoint);
+        builder
+            .add_operation(
+                block,
+                descriptor.identity(),
+                Vec::new(),
+                0,
+                BTreeMap::from([("cics_plan".into(), Attribute::Bytes(Vec::new()))]),
+                descriptor.effects.to_vec(),
+                Vec::new(),
+                None,
+            )
+            .unwrap();
+        builder
+            .add_operation(
+                block,
+                OperationIdentity::new("mainframe.core.cobol", "halt", 1).unwrap(),
+                Vec::new(),
+                0,
+                BTreeMap::new(),
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .unwrap();
+        mainframe_env_ir::encode_binary(&builder.finish().unwrap(), CodecLimits::default()).unwrap()
+    }
+
     #[test]
     fn product_install_rejects_manifest_and_payload_mismatches_before_catalog_mutation() {
         let server = ProductServer::memory(config()).unwrap();
@@ -7027,10 +7143,76 @@ mod tests {
             VersionedArtifactManifest::V3(unknown_option),
             artifact.payload().to_vec(),
         );
+        for (name, key, first, second) in [
+            (
+                "FLIPPEDARITH",
+                "cobol.effective-arith",
+                "extended",
+                "compatible",
+            ),
+            (
+                "FLIPPEDSIGN",
+                "cobol.effective-dispsign",
+                "compatible",
+                "separate",
+            ),
+            ("FLIPPEDLP", "cobol.effective-lp", "32", "64"),
+        ] {
+            let mut mismatch = artifact.manifest().clone();
+            let mut options = mismatch.options.values().clone();
+            let flipped = if options.get(key).is_some_and(|value| value == first) {
+                second
+            } else {
+                first
+            };
+            options.insert(key.into(), flipped.into());
+            mismatch.options = CompileOptions::new(options).unwrap();
+            assert_rejected(
+                name,
+                VersionedArtifactManifest::V3(mismatch),
+                artifact.payload().to_vec(),
+            );
+        }
         assert_rejected(
             "MALFORMED",
             VersionedArtifactManifest::V3(artifact.manifest().clone()),
             b"not canonical IR".to_vec(),
+        );
+        assert_eq!(
+            artifact.manifest().dialect_contracts,
+            BTreeSet::from(["mainframe.core.cobol@1".into()])
+        );
+        assert_rejected(
+            "BADLAYOUT",
+            VersionedArtifactManifest::V3(artifact.manifest().clone()),
+            malformed_layout_payload(),
+        );
+
+        let typed = published_fixture("TYPEDPLAN", "EXEC CICS SYNCPOINT END-EXEC.");
+        let payload = malformed_cics_plan_payload();
+        let digest: [u8; 32] = Sha256::digest(&payload).into();
+        let reference = ArtifactRef::new(
+            format!("sha256:{}", hex_digest(&digest)),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            server.install_batch_programs(vec![BatchProgramDefinition {
+                name: "BADTYPEDPLAN".into(),
+                artifact: reference.clone(),
+                payload,
+                manifest: VersionedArtifactManifest::V3(typed.manifest().clone()),
+                semantic_identity: typed.semantic_id().to_reference(),
+            }]),
+            Err(HostProblem::ProviderFailure)
+        );
+        assert!(server.artifacts.get_artifact(&reference).unwrap().is_none());
+        assert!(
+            server
+                .store
+                .get_provider_state("batch-program", "BADTYPEDPLAN")
+                .unwrap()
+                .is_none()
         );
 
         let mut wrong_identity = BatchProgramDefinition::current("WRONGIDENTITY", &artifact);
@@ -7210,6 +7392,39 @@ mod tests {
         );
         reject(
             |record| {
+                record
+                    .executable
+                    .as_mut()
+                    .unwrap()
+                    .options
+                    .insert("cobol.effective-arith".into(), "compatible".into());
+            },
+            true,
+        );
+        reject(
+            |record| {
+                record
+                    .executable
+                    .as_mut()
+                    .unwrap()
+                    .options
+                    .insert("cobol.effective-dispsign".into(), "separate".into());
+            },
+            true,
+        );
+        reject(
+            |record| {
+                record
+                    .executable
+                    .as_mut()
+                    .unwrap()
+                    .options
+                    .insert("cobol.effective-lp".into(), "64".into());
+            },
+            true,
+        );
+        reject(
+            |record| {
                 record.executable.as_mut().unwrap().semantic_identity =
                     format!("semantic-sha256:{:064x}", 9);
             },
@@ -7325,8 +7540,12 @@ mod tests {
             )])
             .unwrap();
         let mut record = artifacts.record.lock().unwrap();
-        record.executable.as_mut().unwrap().compiler_generation =
-            "mainframe-env-cobol-9.9.9".into();
+        record
+            .executable
+            .as_mut()
+            .unwrap()
+            .options
+            .insert("cobol.effective-arith".into(), "compatible".into());
         let payload_digest = record.payload_digest;
         let metadata = record.executable.as_mut().unwrap();
         metadata.manifest_payload_digest =

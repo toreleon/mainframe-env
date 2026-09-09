@@ -279,6 +279,8 @@ def check(root: Path) -> None:
     )
     require(
         "pub enum OperationSemanticContract" in ir_catalog
+        and "CobolLayoutDefinition" in ir_catalog
+        and "pub fn cobol_layout_definition_schema()" in ir_catalog
         and "DecimalAssignment(DecimalOperationContract)" in ir_catalog
         and "CicsEffect(CicsOperationContract)" in ir_catalog
         and "verify_semantic_contracts(module, catalog)" in ir_verify,

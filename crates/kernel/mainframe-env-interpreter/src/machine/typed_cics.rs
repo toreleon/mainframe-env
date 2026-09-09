@@ -4,7 +4,8 @@ use mainframe_env_ir::{
     CicsOperandName, CicsOperandValue, CicsOperationContract, CicsOutputName, CicsPlanLimits,
     CicsPlanOperation, CicsPlanOption, CicsStorageSlot, Effect, Module, OperationCatalog,
     OperationSchema, OperationSemanticContract, cics_executable_descriptor,
-    cics_executable_descriptor_for_identity, decode_cics_effect_plan, verify_semantic_contracts,
+    cics_executable_descriptor_for_identity, cobol_layout_definition_identity,
+    decode_cics_effect_plan, verify_semantic_contracts,
 };
 
 const PLAN_ATTRIBUTE: &str = "cics_plan";
@@ -45,10 +46,7 @@ fn operation_schema(descriptor: CicsExecutableDescriptor) -> OperationSchema {
     schema.semantic_contract = OperationSemanticContract::CicsEffect(CicsOperationContract {
         plan_attribute: PLAN_ATTRIBUTE.into(),
         expected_operation: Some(descriptor.operation),
-        layout_definition_operation: Some(
-            OperationIdentity::new("mainframe.core.cobol", "define", 1)
-                .expect("static COBOL layout definition identity"),
-        ),
+        layout_definition_operation: Some(cobol_layout_definition_identity()),
     });
     schema
 }

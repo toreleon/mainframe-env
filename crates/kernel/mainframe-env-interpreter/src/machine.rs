@@ -28,6 +28,8 @@ use std::sync::OnceLock;
 use typed_decimal::{decimal_add, decimal_divide, decimal_multiply, decimal_subtract};
 mod corresponding;
 mod decimal_commit;
+mod layout_admission;
+mod layout_resolution;
 mod typed_cics;
 mod typed_decimal;
 
@@ -8057,22 +8059,6 @@ impl ReferenceMachine {
         })
     }
 
-    fn active_occurs(&self, layout: &LayoutMetadata) -> Result<usize, MachineProblem> {
-        let Some(depending_on) = &layout.depending_on else {
-            return Ok(layout.occurs);
-        };
-        let value = self.decimal(depending_on)?;
-        if value.scale != 0 {
-            return Err(MachineProblem::DataException);
-        }
-        let occurs =
-            usize::try_from(value.coefficient).map_err(|_| MachineProblem::SubscriptError)?;
-        if occurs < layout.occurs_min || occurs > layout.occurs {
-            return Err(MachineProblem::SubscriptError);
-        }
-        Ok(occurs)
-    }
-
     fn layout_qualified(&self, tokens: &[String]) -> Option<&LayoutMetadata> {
         let simple = tokens.first()?.to_ascii_uppercase();
         if tokens.len() == 1 {
@@ -8321,6 +8307,7 @@ impl ReferenceMachine {
             _ => None,
         }
     }
+
     fn mq_descriptor_field(&self, descriptor: &str, simple_name: &str) -> Option<String> {
         let root = self.layout(descriptor)?.name.clone();
         self.simple_layouts
@@ -9290,8 +9277,7 @@ fn validate_module(module: &Module) -> Result<(), MachineProblem> {
             "illegal operation or terminator".into(),
         ));
     }
-    typed_cics::validate_module_operations(module)?;
-    typed_decimal::validate_module_operations(module)?;
+    layout_admission::validate(module)?;
     Ok(())
 }
 pub fn supported_operations() -> &'static BTreeSet<OperationIdentity> {

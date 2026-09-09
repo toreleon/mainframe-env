@@ -555,6 +555,14 @@ mod tests {
     }
 
     #[test]
+    fn qualified_occurs_dependency_selects_the_resolved_owner_relative_integer() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. QUALIFIED-ODO. DATA DIVISION. WORKING-STORAGE SECTION. 01 GROUP-A. 05 N PIC 9 VALUE 1. 01 GROUP-B. 05 N PIC 9 VALUE 2. 05 TABLE-B OCCURS 1 TO 3 TIMES DEPENDING ON N OF GROUP-B. 10 VALUE-B PIC X. PROCEDURE DIVISION. MOVE 'Z' TO VALUE-B(2). DISPLAY VALUE-B(2). STOP RUN.";
+        let (output, machine) = execute_without_effects(source).expect("qualified ODO runtime");
+        assert_eq!(output, b"Z\n");
+        assert_eq!(machine.variable("TABLE-B").unwrap().bytes()[1], b'Z');
+    }
+
+    #[test]
     fn reference_modification_and_ebcdic_collation_are_byte_exact() {
         let reference_source = "IDENTIFICATION DIVISION. PROGRAM-ID. REFMOD. DATA DIVISION. WORKING-STORAGE SECTION. 01 TEXT-X PIC X(5) VALUE 'ABCDE'. 01 OUT-X PIC X(3). PROCEDURE DIVISION. MOVE TEXT-X(2:3) TO OUT-X. MOVE 'Z' TO TEXT-X(3:1). DISPLAY OUT-X TEXT-X. STOP RUN.";
         let (output, _) =

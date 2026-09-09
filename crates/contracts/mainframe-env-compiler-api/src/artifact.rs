@@ -3,8 +3,9 @@ use crate::{
     LegalizedMir,
 };
 use mainframe_env_ir::{
-    CodecLimits, LegalModule, LegalityProfile, OperationCatalog, decode_binary, encode_binary,
-    verify_legal,
+    COBOL_EFFECTIVE_ARITH_OPTION, COBOL_EFFECTIVE_DISPSIGN_OPTION, COBOL_EFFECTIVE_LP_OPTION,
+    CobolDisplaySign, CodecLimits, LegalModule, LegalityProfile, OperationCatalog,
+    cobol_runtime_config, decode_binary, encode_binary, verify_legal,
 };
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -265,6 +266,7 @@ impl ValidatedArtifact {
         }
         let legal = verify_legal(module, catalog, profile)
             .map_err(|problem| CompilerProblem::Legality(problem.to_string()))?;
+        validate_cobol_manifest_binding(source_contract, manifest_options(&manifest), &legal)?;
         let payload_dialects = dialect_contracts(&legal);
         let manifest = match manifest {
             VersionedArtifactManifest::V2(legacy) => legacy.migrate(payload_dialects),
@@ -341,6 +343,7 @@ impl PublishedArtifact {
         if manifest.dialect_contracts != payload_dialects {
             return Err(CompilerProblem::InvalidGeneration);
         }
+        validate_cobol_manifest_binding(ARTIFACT_CONTRACT, manifest.options.values(), mir.legal())?;
         let payload = encode_binary(mir.legal().module(), codec_limits)
             .map_err(|problem| CompilerProblem::Legality(problem.to_string()))?;
         if payload.len() > limits.max_payload_bytes {
@@ -409,6 +412,53 @@ fn dialect_contracts(legal: &LegalModule) -> BTreeSet<String> {
         .collect()
 }
 
+fn manifest_options(
+    manifest: &VersionedArtifactManifest,
+) -> &std::collections::BTreeMap<String, String> {
+    match manifest {
+        VersionedArtifactManifest::V2(legacy) => legacy.options.values(),
+        VersionedArtifactManifest::V3(current) => current.options.values(),
+    }
+}
+
+fn validate_cobol_manifest_binding(
+    source_contract: &str,
+    options: &std::collections::BTreeMap<String, String>,
+    legal: &LegalModule,
+) -> Result<(), CompilerProblem> {
+    let config = cobol_runtime_config(legal.module())
+        .map_err(|problem| CompilerProblem::Legality(problem.to_string()))?;
+    let declared = [
+        options.get(COBOL_EFFECTIVE_ARITH_OPTION),
+        options.get(COBOL_EFFECTIVE_DISPSIGN_OPTION),
+        options.get(COBOL_EFFECTIVE_LP_OPTION),
+    ];
+    if config.is_none() && declared.iter().all(|value| value.is_none()) {
+        return Ok(());
+    }
+    let Some(config) = config else {
+        return Err(CompilerProblem::InvalidGeneration);
+    };
+    let [Some(arithmetic), Some(display_sign), Some(address_mode)] = declared else {
+        return Err(CompilerProblem::InvalidGeneration);
+    };
+    let legacy = source_contract == LEGACY_ARTIFACT_CONTRACT;
+    let payload_display_sign = config
+        .display_sign
+        .or(legacy.then_some(CobolDisplaySign::Compatible));
+    let payload_address_mode = config
+        .address_mode
+        .map(|mode| mode.as_str())
+        .or_else(|| (legacy && address_mode == "32").then_some("32"));
+    if arithmetic != config.arithmetic_mode.as_str()
+        || payload_display_sign.map(CobolDisplaySign::as_str) != Some(display_sign.as_str())
+        || payload_address_mode != Some(address_mode.as_str())
+    {
+        return Err(CompilerProblem::InvalidGeneration);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -416,8 +466,8 @@ mod tests {
         CicsPlanFixture, DecimalPlanFixture, cics_boundary_fixture, decimal_boundary_fixture,
     };
     use mainframe_env_ir::{
-        CodecLimits, DecimalPlanLimits, IrLimits, LegalityProfile, ModuleBuilder, OperationCatalog,
-        OperationIdentity, OperationSchema,
+        CicsPlanLimits, CodecLimits, DecimalPlanLimits, IrLimits, LegalityProfile, ModuleBuilder,
+        OperationCatalog, OperationIdentity, OperationSchema,
     };
     use mainframe_env_source::{
         LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
@@ -472,6 +522,103 @@ mod tests {
         LegalizedMir::legalize(hir.lower(module), &catalog, &profile).unwrap()
     }
 
+    fn cobol_catalog_and_profile() -> (OperationCatalog, LegalityProfile) {
+        let config = OperationIdentity::new("mainframe.core.cobol", "config", 1).unwrap();
+        let halt = OperationIdentity::new("mainframe.core.cobol", "halt", 1).unwrap();
+        let mut halt_schema = OperationSchema::pure(halt.clone(), 0, 0);
+        halt_schema.terminator = true;
+        let mut catalog = OperationCatalog::default();
+        catalog
+            .register(OperationSchema::pure(config.clone(), 0, 0))
+            .unwrap();
+        catalog.register(halt_schema).unwrap();
+        let profile = LegalityProfile {
+            allowed_operations: BTreeSet::from([config, halt]),
+            allowed_runtime_imports: BTreeSet::new(),
+        };
+        (catalog, profile)
+    }
+
+    fn cobol_legalized(address_mode: Option<&str>) -> LegalizedMir {
+        let limits = SourceLimits::default();
+        let path = LogicalPath::new("config.cbl", limits.max_path_bytes).unwrap();
+        let file = SourceFile::input(
+            "config.cbl",
+            b"x".to_vec(),
+            SourceFormat::Free,
+            SourceEncoding::Utf8,
+            limits,
+        )
+        .unwrap();
+        let source =
+            SourceBundle::new(&path, vec![file], BTreeMap::new(), Vec::new(), limits).unwrap();
+        let mut builder = ModuleBuilder::new(IrLimits::default());
+        let region = builder.add_region().unwrap();
+        let block = builder.add_block(region).unwrap();
+        let config = OperationIdentity::new("mainframe.core.cobol", "config", 1).unwrap();
+        let halt = OperationIdentity::new("mainframe.core.cobol", "halt", 1).unwrap();
+        let mut attributes = BTreeMap::from([
+            (
+                "arithmetic_mode".into(),
+                mainframe_env_ir::Attribute::Text("extended".into()),
+            ),
+            (
+                "display_sign".into(),
+                mainframe_env_ir::Attribute::Text("compatible".into()),
+            ),
+        ]);
+        if let Some(address_mode) = address_mode {
+            attributes.insert(
+                "address_mode".into(),
+                mainframe_env_ir::Attribute::Text(address_mode.into()),
+            );
+        }
+        builder
+            .add_operation(
+                block,
+                config,
+                Vec::new(),
+                0,
+                attributes,
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .unwrap();
+        builder
+            .add_operation(
+                block,
+                halt,
+                Vec::new(),
+                0,
+                BTreeMap::new(),
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .unwrap();
+        let module = builder.finish().unwrap();
+        let (catalog, profile) = cobol_catalog_and_profile();
+        let hir = crate::VerifiedHir::verify(source.id(), module.clone(), &catalog).unwrap();
+        LegalizedMir::legalize(hir.lower(module), &catalog, &profile).unwrap()
+    }
+
+    fn cobol_manifest() -> ArtifactManifest {
+        ArtifactManifest {
+            compiler_generation: "compiler-cobol-current".into(),
+            target: CompileTarget::new("reference").unwrap(),
+            options: CompileOptions::new(BTreeMap::from([
+                (COBOL_EFFECTIVE_ARITH_OPTION.into(), "extended".into()),
+                (COBOL_EFFECTIVE_DISPSIGN_OPTION.into(), "compatible".into()),
+                (COBOL_EFFECTIVE_LP_OPTION.into(), "32".into()),
+            ]))
+            .unwrap(),
+            host_interfaces: BTreeSet::new(),
+            ir_contract: mainframe_env_ir::IR_ENVELOPE_CONTRACT.into(),
+            dialect_contracts: BTreeSet::from(["mainframe.core.cobol@1".into()]),
+        }
+    }
+
     #[test]
     fn semantic_and_content_identities_are_unambiguous() {
         let manifest = ArtifactManifest {
@@ -511,6 +658,104 @@ mod tests {
                 .semantic_id()
                 .to_reference()
                 .starts_with("semantic-sha256:")
+        );
+    }
+
+    #[test]
+    fn current_cobol_manifest_is_bound_to_immutable_runtime_config() {
+        let artifact = PublishedArtifact::publish(
+            cobol_legalized(Some("32")),
+            cobol_manifest(),
+            CodecLimits::default(),
+            ArtifactLimits::default(),
+        )
+        .expect("matching current COBOL config must publish");
+        let (catalog, profile) = cobol_catalog_and_profile();
+        ValidatedArtifact::read(
+            VersionedArtifactManifest::V3(artifact.manifest().clone()),
+            artifact.payload(),
+            &catalog,
+            &profile,
+            CodecLimits::default(),
+            ArtifactLimits::default(),
+        )
+        .expect("matching current COBOL config must be readable");
+
+        for (key, flipped) in [
+            (COBOL_EFFECTIVE_ARITH_OPTION, "compatible"),
+            (COBOL_EFFECTIVE_DISPSIGN_OPTION, "separate"),
+            (COBOL_EFFECTIVE_LP_OPTION, "64"),
+        ] {
+            let mut mismatched = artifact.manifest().clone();
+            let mut options = mismatched.options.values().clone();
+            options.insert(key.into(), flipped.into());
+            mismatched.options = CompileOptions::new(options).unwrap();
+            assert_eq!(
+                ValidatedArtifact::read(
+                    VersionedArtifactManifest::V3(mismatched.clone()),
+                    artifact.payload(),
+                    &catalog,
+                    &profile,
+                    CodecLimits::default(),
+                    ArtifactLimits::default(),
+                ),
+                Err(CompilerProblem::InvalidGeneration),
+                "allowed {key} flip must not reinterpret immutable payload semantics"
+            );
+            assert_eq!(
+                PublishedArtifact::publish(
+                    cobol_legalized(Some("32")),
+                    mismatched,
+                    CodecLimits::default(),
+                    ArtifactLimits::default(),
+                ),
+                Err(CompilerProblem::InvalidGeneration),
+                "publication must reject mismatched {key}"
+            );
+        }
+    }
+
+    #[test]
+    fn historical_cobol_manifest_uses_explicit_v2_address_default_without_rewriting_payload() {
+        let mir = cobol_legalized(None);
+        let payload = encode_binary(mir.legal().module(), CodecLimits::default()).unwrap();
+        let current = cobol_manifest();
+        let legacy = ArtifactManifestV2 {
+            compiler_generation: "compiler-cobol-v2".into(),
+            target: current.target,
+            options: current.options,
+            host_interfaces: current.host_interfaces,
+            ir_contract: current.ir_contract,
+        };
+        let (catalog, profile) = cobol_catalog_and_profile();
+        let artifact = ValidatedArtifact::read(
+            VersionedArtifactManifest::V2(legacy.clone()),
+            &payload,
+            &catalog,
+            &profile,
+            CodecLimits::default(),
+            ArtifactLimits::default(),
+        )
+        .expect("historical LP(32) payload without an address marker remains supported");
+        assert_eq!(artifact.source_contract(), LEGACY_ARTIFACT_CONTRACT);
+        assert_eq!(artifact.payload(), payload);
+
+        let mut options = legacy.options.values().clone();
+        options.insert(COBOL_EFFECTIVE_LP_OPTION.into(), "64".into());
+        let mismatched = ArtifactManifestV2 {
+            options: CompileOptions::new(options).unwrap(),
+            ..legacy
+        };
+        assert_eq!(
+            ValidatedArtifact::read(
+                VersionedArtifactManifest::V2(mismatched),
+                &payload,
+                &catalog,
+                &profile,
+                CodecLimits::default(),
+                ArtifactLimits::default(),
+            ),
+            Err(CompilerProblem::InvalidGeneration)
         );
     }
 
@@ -717,17 +962,24 @@ mod tests {
         for kind in [
             CicsPlanFixture::Empty,
             CicsPlanFixture::WrongType,
+            CicsPlanFixture::Truncated,
             CicsPlanFixture::NonCanonical,
+            CicsPlanFixture::WrongVersion,
+            CicsPlanFixture::Oversized,
             CicsPlanFixture::OperationMismatch,
             CicsPlanFixture::MissingLayout,
             CicsPlanFixture::WrongLayoutExtent,
             CicsPlanFixture::ReadOnlyOutput,
         ] {
             let invalid = cics_boundary_fixture(kind);
-            let payload = encode_binary(&invalid.module, CodecLimits::default()).unwrap();
-            let decoded = decode_binary(&payload, CodecLimits::default()).unwrap();
+            let mut codec = CodecLimits::default();
+            if matches!(kind, CicsPlanFixture::Oversized) {
+                codec.ir.max_attribute_bytes = CicsPlanLimits::default().max_encoded_bytes + 1;
+            }
+            let payload = encode_binary(&invalid.module, codec).unwrap();
+            let decoded = decode_binary(&payload, codec).unwrap();
             assert_eq!(
-                encode_binary(&decoded, CodecLimits::default()).unwrap(),
+                encode_binary(&decoded, codec).unwrap(),
                 payload,
                 "{kind:?} fixture must retain a canonical outer IR envelope"
             );
@@ -738,7 +990,7 @@ mod tests {
                         &payload,
                         &invalid.catalog,
                         &invalid.profile,
-                        CodecLimits::default(),
+                        codec,
                         ArtifactLimits::default(),
                     ),
                     Err(CompilerProblem::Legality(detail)) if detail.contains("SemanticMismatch")
@@ -788,6 +1040,7 @@ mod tests {
             DecimalPlanFixture::MissingLayout,
             DecimalPlanFixture::NonNumericLayout,
             DecimalPlanFixture::WrongLayoutExtent,
+            DecimalPlanFixture::WrongLayoutDigitsType,
             DecimalPlanFixture::MissingConditionOwner,
             DecimalPlanFixture::OrphanConditionBranch,
             DecimalPlanFixture::InvalidFalseTarget,

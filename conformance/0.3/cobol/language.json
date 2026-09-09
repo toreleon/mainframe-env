@@ -303,8 +303,8 @@
     },
     {
       "forms": [
-        "OCCURS integer TIMES",
-        "OCCURS integer-1 TO integer-2 TIMES [DEPENDING ON data-name] [KEY IS data-name] [INDEXED BY index-name...]"
+        "OCCURS integer TIMES [ASCENDING|DESCENDING KEY [IS] data-name...] [INDEXED BY index-name...]",
+        "OCCURS [integer-1 TO] integer-2|UNBOUNDED TIMES DEPENDING ON data-name [ASCENDING|DESCENDING KEY [IS] data-name...] [INDEXED BY index-name...]"
       ],
       "id": "occurs",
       "label": "OCCURS clause",

@@ -39,9 +39,20 @@ All notable changes to mainframe-env are documented here.
   and rounding behavior. The exact `@1` compatibility route remains readable,
   while an independent `ledger.formula@1` adapter proves bounded reuse without
   importing COBOL HIR.
+- Made `mainframe.core.cobol@1.define` a dialect-owned semantic contract so
+  legalization, artifact admission, and defensive VM admission reject malformed
+  static layout ABI metadata before runtime construction.
+- Corrected omitted-minimum ODO parsing, clause boundaries and phrase ordering,
+  qualified ODO execution, and bounded key/index admission against the pinned
+  grammar authority. Unsupported DYNAMIC table/alias combinations and TYPEDEF
+  ODO objects now fail before publication; CONDITION and RENAMES associations
+  no longer inherit REDEFINES-only constraints. Executable admission also checks
+  nonnumeric category shapes, physical alias topology, RENAMES endpoints, and
+  the bounded level-88 value subset shared with the frontend.
 - Advanced artifact publication to `mainframe-env.artifact@3`; manifests now
   carry the exact dialect namespace/major set derived from their executable
-  payload while historical `@2` artifacts retain their original contract.
+  payload and bind COBOL arithmetic/display-sign/LP options to payload config,
+  while historical `@2` artifacts retain their original bytes and contract.
 - Updated the 0.9 CICS implementation plan to require the integrated 28-finding
   hardening baseline, bounded family slices, per-slice security/recovery,
   explicit backend validation, and early licensed-campaign planning.

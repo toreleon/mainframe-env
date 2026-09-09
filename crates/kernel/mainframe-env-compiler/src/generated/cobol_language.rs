@@ -3828,8 +3828,8 @@ pub static DATA_DESCRIPTION_CLAUSES: &[ClauseDescriptor<DataDescriptionClauseKin
         label: "OCCURS clause",
         source_locator: "topic:SS6SG3_6.5/lr/ref/rlddeoc1.html;topic-id:entry-occurs-clause;heading:OCCURS clause",
         forms: &[
-            "OCCURS integer TIMES",
-            "OCCURS integer-1 TO integer-2 TIMES [DEPENDING ON data-name] [KEY IS data-name] [INDEXED BY index-name...]",
+            "OCCURS integer TIMES [ASCENDING|DESCENDING KEY [IS] data-name...] [INDEXED BY index-name...]",
+            "OCCURS [integer-1 TO] integer-2|UNBOUNDED TIMES DEPENDING ON data-name [ASCENDING|DESCENDING KEY [IS] data-name...] [INDEXED BY index-name...]",
         ],
         placement: "data-entry",
     },
