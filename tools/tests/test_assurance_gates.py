@@ -124,7 +124,13 @@ class AssuranceGateTests(unittest.TestCase):
         assert ci_spec is not None and ci_spec.loader is not None
         ci = importlib.util.module_from_spec(ci_spec)
         ci_spec.loader.exec_module(ci)
-        expected = {"fuzz-smoke", "fuzz-periodic", "model-check", "coverage-baseline"}
+        expected = {
+            "fuzz-smoke",
+            "fuzz-periodic",
+            "model-check",
+            "coverage-baseline",
+            "archive-reproduction",
+        }
         self.assertTrue(expected <= set(ci.FULL))
         pipeline = (REPOSITORY / "Jenkinsfile").read_text()
         for gate in expected:

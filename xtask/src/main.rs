@@ -7033,14 +7033,67 @@ fn validate_public_version_truth(
 }
 
 fn require_release_candidate(root: &Path) -> TaskResult {
+    require(
+        release_candidate_mode(root)?,
+        "release artifacts require an explicit stable release-candidate promotion",
+    )
+}
+
+fn release_candidate_mode(root: &Path) -> TaskResult<bool> {
     let release: toml::Value = read(&root.join("release.toml"))?
         .parse()
         .map_err(|error| format!("release.toml: {error}"))?;
-    require(
-        release["product"]["state"].as_str() == Some("release-candidate")
-            && release["product"]["channel"].as_str() == Some("stable"),
-        "release artifacts require an explicit stable release-candidate promotion",
-    )
+    let product = release
+        .get("product")
+        .and_then(toml::Value::as_table)
+        .ok_or("release.toml product table is missing")?;
+    match (
+        product.get("state").and_then(toml::Value::as_str),
+        product.get("channel").and_then(toml::Value::as_str),
+    ) {
+        (Some("development"), Some("development")) => Ok(false),
+        (Some("release-candidate"), Some("stable")) => Ok(true),
+        _ => Err("release state and channel are inconsistent".into()),
+    }
+}
+
+fn release_command_retained_candidate(root: &Path) -> TaskResult<Option<String>> {
+    match release_candidate_mode(root) {
+        Ok(true) => Ok(None),
+        Ok(false) => {
+            Err("release artifacts require an explicit stable release-candidate promotion".into())
+        }
+        Err(configuration_error) => {
+            let Ok(version) = read(&root.join("VERSION")) else {
+                return Err(configuration_error);
+            };
+            let version = version.trim();
+            if version != "0.2.0" {
+                return Err(configuration_error);
+            }
+            let Some(accepted) = retained_accepted_release(root)? else {
+                return Err(configuration_error);
+            };
+            let head = command_text(root, "git", &["rev-parse", "HEAD"])?;
+            let tag = format!("refs/tags/mainframe-env-v{version}^{{commit}}");
+            let tagged = command_text(root, "git", &["rev-parse", "--verify", &tag])?;
+            require(
+                head == tagged,
+                "retained release validation requires the exact historical release tag",
+            )?;
+            Ok(Some(accepted))
+        }
+    }
+}
+
+fn check_certification_release_artifacts(root: &Path) -> TaskResult {
+    if !release_candidate_mode(root)? {
+        return Ok(());
+    }
+    if !validate_source_distribution_release(root)? {
+        check_release_artifacts(root, &host_target(root)?)?;
+    }
+    Ok(())
 }
 
 fn check_versions(root: &Path) -> TaskResult {
@@ -12623,9 +12676,7 @@ fn check_certification(root: &Path) -> TaskResult {
         workspace_tests.success(),
         "certification workspace tests failed",
     )?;
-    if !validate_source_distribution_release(root)? {
-        check_release_artifacts(root, &host_target(root)?)?;
-    }
+    check_certification_release_artifacts(root)?;
     Ok(())
 }
 
@@ -12988,7 +13039,7 @@ fn cargo_target_directory(root: &Path) -> PathBuf {
 }
 
 fn generate_release_artifacts(root: &Path, target: &str) -> TaskResult {
-    if retained_accepted_release(root)?.is_some() {
+    if release_command_retained_candidate(root)?.is_some() {
         return validate_retained_accepted_release(root, target);
     }
     require_release_candidate(root)?;
@@ -13019,7 +13070,7 @@ fn generate_release_artifacts(root: &Path, target: &str) -> TaskResult {
 }
 
 fn check_release_artifacts(root: &Path, target: &str) -> TaskResult {
-    if retained_accepted_release(root)?.is_some() {
+    if release_command_retained_candidate(root)?.is_some() {
         return validate_retained_accepted_release(root, target);
     }
     require_release_candidate(root)?;
@@ -14969,8 +15020,41 @@ mod tests {
             "[product]\nstate = \"development\"\nchannel = \"development\"\n",
         )
         .unwrap();
+        assert!(!release_candidate_mode(&root).unwrap());
+        check_certification_release_artifacts(&root).unwrap();
         let problem = require_release_candidate(&root).unwrap_err();
         assert!(problem.contains("release-candidate promotion"));
+        for problem in [
+            generate_release_artifacts(&root, "aarch64-apple-darwin").unwrap_err(),
+            check_release_artifacts(&root, "aarch64-apple-darwin").unwrap_err(),
+        ] {
+            assert!(problem.contains("release-candidate promotion"));
+        }
+
+        fs::write(
+            root.join("release.toml"),
+            "[product]\nstate = \"release-candidate\"\nchannel = \"stable\"\n",
+        )
+        .unwrap();
+        assert!(release_candidate_mode(&root).unwrap());
+        assert_eq!(release_command_retained_candidate(&root).unwrap(), None);
+        require_release_candidate(&root).unwrap();
+        assert!(check_certification_release_artifacts(&root).is_err());
+
+        fs::write(
+            root.join("release.toml"),
+            "[product]\nstate = \"development\"\nchannel = \"stable\"\n",
+        )
+        .unwrap();
+        assert!(release_candidate_mode(&root).is_err());
+        assert!(check_certification_release_artifacts(&root).is_err());
+
+        fs::write(
+            root.join("release.toml"),
+            "[product]\nstate = \"release-candidate\"\n",
+        )
+        .unwrap();
+        assert!(release_candidate_mode(&root).is_err());
         fs::remove_dir_all(root).unwrap();
     }
 

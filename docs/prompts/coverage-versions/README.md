@@ -51,6 +51,12 @@ completely before editing.
    where its prompt permits. It may not merge or advertise public behavior
    whose dependency gate has not passed.
 
+Dependency acceptance follows the
+[recorded licensed-pending dispositions](../../delivery/coverage-versions/README.md#recorded-licensed-pending-dispositions).
+An accepted implementation baseline is not a licensed differential pass or
+release authorization. Verify the actual consumed candidate and receipt; a
+historical branch base, merged PR, or version label alone is insufficient.
+
 ### Persistent program control
 
 Before broad implementation, maintain the concise human-readable
@@ -119,6 +125,90 @@ typed-registry extensions, explicitly version incompatible semantic changes,
 and keep accepted historical ledgers on the spec version that produced them.
 Do not add per-row/obligation committed verdict files, subsystem-local IRs,
 shell-in-spec, general formal languages, or generated tests for internal details.
+
+### Hardened slice acceptance
+
+For 0.9–0.17, bind each slice to the current accepted baseline and existing
+[execution/durability](../../architecture/EXECUTION-AND-DURABILITY.md),
+[security](../../architecture/PLUGIN-AND-SECURITY.md),
+[canonical effect](../../contracts/EFFECT-CANONICAL-V1.md),
+[object-row persistence](../../contracts/PROVIDER-ROW-PERSISTENCE-V1.md), and
+[durable storage](../../contracts/DURABLE-STORAGE-PROFILE.md) contracts.
+Preserve the accepted HIR/MIR, coordinator, host ABI and package topology; these
+releases extend their owners rather than introduce another universal IR,
+provider-private coordinator, store, security evaluator, or evidence framework.
+
+Before implementation, declare the slice's exact catalog rows and mandatory
+obligations, execution-context applicability, contract/module owners, affected
+public routes and backend matrix in the existing target status document. Review
+applicability against pinned sources before claiming a gate: a genuinely
+inapplicable gate needs a source-backed disposition, while a required but
+unsupported operation remains pending. Neither blanket six-gate requirements
+for non-behavioral rows nor retrospective exclusions may distort the denominator.
+Correct rejection of a forbidden context is a condition obligation, not proof
+of required execution in an allowed context.
+
+Each mutating slice must demonstrate its applicable guarantees before integration:
+
+- Typed SAF resource/intent decisions precede mutation; deny and failure paths
+  are audited. Audit/effect/lifecycle results commit atomically wherever they
+  share store authority; audit saturation and journal failure are explicit.
+- Canonical operation/content identities, bounded replay and idempotency,
+  finite deadlines, live cancellation, durable clocks, lease epochs and fencing
+  preserve the existing contract. Post-dispatch uncertainty remains an explicit
+  unknown outcome for service-specific fenced reconciliation, never automatic
+  mutation redispatch.
+- Versioned object rows, schema readers, migrations, rollback, restart and
+  backup/restore preserve retained checkpoint/artifact/audit/replay references.
+  Retention watermarks and idempotency lifetimes are declared and tested.
+- Independent expectations exercise the selected public product route and all
+  affected backend contracts. Direct handler tests supplement that proof;
+  memory-only tests earn no durable process-restart credit. A skipped required
+  environment test remains pending, not a pass.
+
+Declare bounded family slices and preserve the existing parent work-package IDs
+and sealing rules. The final family/integration milestone combines and stresses
+these guarantees; it is not their first implementation or test. Use the existing
+CI selectors, Conformance IR and generated coverage pipeline, not another ledger.
+Keep this acceptance rule here rather than copying competing versions into each
+provider. Architecture evolution proposals do not require a runtime rewrite
+before the next bounded delivery slice.
+
+### Early transaction participant contract
+
+Before dependent CICS, Db2, IMS or MQ participants integrate, the shared contract
+owner must freeze the minimum participant boundary and its executable tests:
+transaction/syncpoint owner; supported local/distributed modes and capabilities;
+prepare applicability; commit/rollback behavior; compensation limits; heuristic,
+in-doubt and unknown outcomes; idempotency scope/lifetime; lock/effect ordering;
+fencing; deadline/cancellation; and durable recovery/schema ownership.
+
+Review what the accepted coordinator already supplies and extend it additively.
+Declare the early contract slice under INT-1601 in the existing status mechanism;
+it is a prerequisite to dependent adapter integration, not a claim that all of
+0.16 has passed. Each participant supplies minimum mutation, failure, replay and
+restart evidence when its slice lands. Full mixed-resource combinations,
+operator resolution and coherent backup/restore close in 0.16. Do not require
+universal prepare, rollback, two-phase commit or exactly-once behavior where the
+pinned execution context does not support it.
+
+### Licensed-harness preparation
+
+Prepare CER-1701 environment/adapter inputs alongside each provider lane rather
+than first discovering oracle prerequisites at 0.17. Record pinned product and
+service levels, authorized access, capabilities, independent fixtures, capture,
+reviewed normalization, bounds and representative harness checks in existing
+status/spec/fixture authorities. Keep proprietary media, credentials and raw
+licensed outputs outside production and public release closure.
+
+Local fixtures validate harness plumbing only. Earlier licensed observations
+retain their original candidate/environment identities; they do not certify a
+later candidate. All per-version licensed completion requirements and the final
+0.17 campaigns remain binding. Missing environments stay explicit blockers to
+those gates, not fabricated passes or new blanket implementation exceptions.
+Source, spec, fixture, oracle or environment changes invalidate affected receipts
+under the existing candidate policy; any permitted reuse needs explicit identity
+and compatibility proof, never silent relabeling of an old receipt.
 
 ### Implementation discipline
 

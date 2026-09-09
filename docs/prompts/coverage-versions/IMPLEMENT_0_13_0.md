@@ -5,6 +5,10 @@ Completion dependencies: 0.12.0
 
 Use this prompt from the repository root. The
 [common execution contract](README.md#common-execution-contract) is normative.
+Apply its [hardened slice acceptance](README.md#hardened-slice-acceptance),
+[early participant contract](README.md#early-transaction-participant-contract),
+and [licensed-harness preparation](README.md#licensed-harness-preparation)
+requirements alongside the version-specific boundaries below.
 
 ---
 
@@ -25,12 +29,30 @@ frozen before adding advanced semantics.
    diagnostic, condition and execution handler.
 2. Implement **DB2-1302** advanced query, recursive/analytic, temporal,
    XML/LOB/array, sequence/generated/identity and advanced object semantics.
-3. Implement **DB2-1303** routines, triggers, transition data, modules, global
+3. Implement **DB2-1303** routines, triggers, transition data, global
    variables, dependencies and atomic invalidation.
 4. Implement **DB2-1304/DB2-1305** packages/plans and bind lifecycle, privilege
    chains, isolation, locks/deadlocks, savepoints, logging, restart and recovery.
 5. Implement **DB2-1306** pinned distributed behavior, scale, malformed/limit,
    concurrency, compatibility and complete licensed differential suites.
+
+## Pinned platform and advanced-obligation closure
+
+DB2-1301 consumes the frozen 0.12 common/deferred obligation map and closes the
+remaining obligations in the same 174-row catalog (158 SQL headings and 16 SQL
+PL rows). Any correction requires reviewed source provenance; do not import Db2
+LUW features merely because they share a product name. SQL module objects are
+not a delivery requirement without an exact pinned Db2 for z/OS source row and
+reviewed scope decision. They are distinct from database request modules (DBRMs)
+and must not be confused with static package/bind metadata.
+
+Split DB2-1302–DB2-1306 acceptance by advanced value representation and bounds,
+object lifecycle, privilege/package behavior, isolation, dependency invalidation
+and distributed outcome. Prove concurrent catalog changes, trigger/routine
+failure, invalidation, rollback and restart at the owned transaction boundary.
+XML/LOB/array/temporal support is not one happy-path feature flag. Preserve the
+single accepted catalog, dependency graph, owned AST/IR and execution authority;
+the existing external-substrate semantic-gap rules continue to apply.
 
 ## Reuse and architecture guardrails
 
@@ -43,7 +65,7 @@ frozen before adding advanced semantics.
   third-party syntax or execution remains explicit and cannot be counted from
   parser acceptance or generic engine success.
 - Reuse one owned dependency/cycle/invalidation graph for routines, triggers,
-  modules, views, packages/plans, aliases, privileges, and schema objects. A
+  views, packages/plans, aliases, privileges, and schema objects. A
   graph library may implement algorithms internally but cannot define durable
   identifiers, ordering, or error semantics.
 - Temporal, XML, LOB, array, analytic, isolation, lock, log, recovery, and

@@ -5,6 +5,10 @@ Completion dependencies: 0.8.0, 0.10.0, 0.13.0, 0.14.0, 0.15.0
 
 Use this prompt from the repository root. The
 [common execution contract](README.md#common-execution-contract) is normative.
+Apply its [hardened slice acceptance](README.md#hardened-slice-acceptance),
+[early participant contract](README.md#early-transaction-participant-contract),
+and [licensed-harness preparation](README.md#licensed-harness-preparation)
+requirements alongside the version-specific boundaries below.
 
 ---
 
@@ -24,9 +28,10 @@ public mixed-state model cannot complete on partial or substituted providers.
 
 ## Implement in this order
 
-1. Freeze **INT-1601** one common effect/UOW protocol and coordinator with
-   prepare, commit, rollback, compensation, in-doubt, heuristic and unknown
-   outcomes plus durable log/state/migration schemas.
+1. Complete **INT-1601** on the accepted common effect/UOW coordinator. Verify
+   the early-frozen participant contracts, then close prepare, commit, rollback,
+   compensation, in-doubt, heuristic and unknown outcomes with compatible
+   durable log/state/migration schemas; do not create another coordinator.
 2. Implement **INT-1602/INT-1603** principal/delegation, authorization decision,
    correlation/causality, deadlines, cancellation, idempotency, retry,
    backpressure, overload and audit propagation.
@@ -36,6 +41,23 @@ public mixed-state model cannot complete on partial or substituted providers.
    compatibility and rollback.
 5. Implement **INT-1606** exhaustive mixed-resource commit/failure matrix, soak,
    chaos, concurrency, 2x overload, restart and differential journeys.
+
+## Early participant handoff and coherent restore
+
+The common early participant-contract rule applies before dependent provider
+adapters integrate. INT-1601 reviews and completes that accepted boundary; 0.16
+is not the first time CICS, Db2, IMS and MQ agree on transaction ownership,
+capabilities, prepare applicability, compensation limits, fencing, idempotency,
+lock order or recovery ownership. Record early slices under the existing parent;
+they neither complete 0.16 nor expose unfinished mixed-resource behavior.
+
+INT-1605 must restore a coherent mixed-resource recovery boundary, with compatible
+provider/schema generations and valid journal, checkpoint, artifact, replay and
+retention references. Independent successful provider restores are insufficient.
+Inject partial backup/restore, provider lag/loss and restart around that boundary;
+reject inconsistent sets or retain explicit recoverable/in-doubt/unknown states.
+INT-1606 proves all required capability combinations and failure obligations on
+one candidate without claiming universal atomicity or exactly-once behavior.
 
 ## Reuse and architecture guardrails
 

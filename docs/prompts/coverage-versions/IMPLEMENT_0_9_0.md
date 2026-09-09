@@ -6,6 +6,10 @@ Implementation prerequisite: accepted post-review hardening candidate (R-01–R-
 
 Use this prompt from the repository root. The
 [common execution contract](README.md#common-execution-contract) is normative.
+Apply its [hardened slice acceptance](README.md#hardened-slice-acceptance),
+[early participant contract](README.md#early-transaction-participant-contract),
+and [licensed-harness preparation](README.md#licensed-harness-preparation)
+requirements alongside the version-specific boundaries below.
 
 ---
 
@@ -48,8 +52,16 @@ references in the status document. Issue closure or separate green branches
 alone do not establish the entry gate. The existing 0.4/0.5/0.6 dependency
 receipts remain required; the hardening candidate is an additional prerequisite.
 
-Retest the accepted file/UOW pilot against the hardened execution and storage
-contracts. Its twelve obligation credits do not imply twelve complete commands
+PR [#131](https://github.com/toreleon/mainframe-env/pull/131) merged as
+`8b7459ab9d9c23e3b872314323d3e30020e13f31`. First reconcile its existing fix and
+regression mappings with the live status and integrated CI receipts; do not
+restart all 28 remediations merely because the status is stale. Verification
+is tracked in [#137](https://github.com/toreleon/mainframe-env/issues/137).
+Retain valid exact-candidate receipts under existing policy and run missing or
+invalidated entry checks. The merged SHA is not automatically the accepted SHA.
+
+Verify the accepted file/UOW pilot evidence against the hardened execution and
+storage contracts; rerun checks only when their evidence is missing or invalidated. Its twelve obligation credits do not imply twelve complete commands
 or completion of any of the six broad work packages.
 
 During entry planning, record the licensed runner availability, exact product
@@ -95,6 +107,19 @@ until its declared scope and integrated gates pass. Slice completion grants
 only its explicit obligation/gate coverage. Keep unfinished new capabilities
 unreachable from the public profile while preserving the accepted pilot and
 prior released behavior.
+
+## Execution-context and selected-route proof
+
+CIC-901 must freeze command/option applicability by execution context, including
+local tasks and DPL server programs. CIC-905 binds the pinned restricted DPL
+API, syncpoint ownership, `SYNCONRETURN`, return and failure behavior to explicit
+obligations; transport success cannot prove transaction semantics.
+
+Each command-family slice requires at least one independent end-to-end proof
+through compiled COBOL, the accepted host ABI, durable coordinator and selected
+CICS provider route, plus its focused command/condition obligations. A direct
+handler call, mocked host result or the pilot's twelve scoped credits cannot
+substitute for this route proof or complete a whole family.
 
 ## Reuse and architecture guardrails
 

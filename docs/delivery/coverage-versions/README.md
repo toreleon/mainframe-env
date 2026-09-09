@@ -54,8 +54,12 @@ not new native binaries; the exact compatibility limits are in the
 [0.8 release notes](../../releases/0.8.md). Later changes on `main` remain
 unreleased and do not retroactively change the 0.8.2 tag or its evidence.
 
-The current workspace is `0.8.3` development. It owns the pre-0.9 hardening
-backlog and is not a release, tag, or compatibility claim.
+The current workspace is `0.8.3` development. PR
+[#131](https://github.com/toreleon/mainframe-env/pull/131) merged the hardening
+changes; integrated entry acceptance remains tracked in
+[status/0.9.0.md](status/0.9.0.md) and
+[#137](https://github.com/toreleon/mainframe-env/issues/137).
+Neither the merge nor this planning amendment is a release or compatibility claim.
 
 See [Parallel implementation plan](PARALLEL-IMPLEMENTATION.md) for the work DAG,
 safe concurrency lanes, merge discipline, and critical path.
@@ -106,11 +110,52 @@ All versions inherit these invariants:
 9. A licensed IBM environment is required for a `differential=pass` result.
 10. Remote release actions require separate authorization.
 
-The user-approved 2026-09-01 policy makes one scoped completion exception for
-0.5: RACF/SAF may exit as `pass-with-licensed-differential-pending` with its
-licensed numerator fixed at 0/48. This does not weaken invariant 9 or create a
-differential pass; the real 48-row receipt is a hard gate at 0.17
-`release-certify`.
+All 0.9–0.17 dossiers also inherit the shared
+[hardened slice acceptance](../../prompts/coverage-versions/README.md#hardened-slice-acceptance),
+[early participant contract](../../prompts/coverage-versions/README.md#early-transaction-participant-contract),
+and [licensed-harness preparation](../../prompts/coverage-versions/README.md#licensed-harness-preparation).
+Gate applicability is source-backed and obligation-specific. Every mandatory
+obligation must pass its applicable gates; unsupported required execution is
+not completed by a successful rejection or a reduced denominator.
+
+### Recorded licensed-pending dispositions
+
+Implementation acceptance, licensed differential completion, and release
+promotion are separate decisions. The following are already-recorded scoped
+handoffs, not new exceptions created by this amendment:
+
+| Implementation | Recorded approval/disposition source | Licensed handoff | Mandatory closure |
+|---|---|---|---|
+| 0.4 COBOL | [Historical status, explicit 2026-09-02 approval](status/0.4.0.md) | 0/153 pending | CER-1702 and 0.17 release-certify |
+| 0.5 RACF/SAF | [Historical status](status/0.5.0.md); user-approved 2026-09-01 scoped policy | 0/48 pending | CER-1702 and 0.17 release-certify |
+| 0.6 dataset/VSAM/AMS | [Historical status, approved 2026-09-01 policy](status/0.6.0.md) | 0/36 pending | CER-1702 and 0.17 release-certify |
+| 0.8 JES2 | [Historical status, recorded approved completion policy](status/0.8.0.md) | 0/16 pending | CER-1702 and 0.17 release-certify |
+
+The linked records preserve the historical implementation and receipt context;
+they are not a fresh attestation of the current tree. At dependency consumption,
+record the accepted candidate SHA/tree, receipt and approval references, affected
+regressions and still-pending obligations in the target status. A starting branch
+or dependency SHA in an old status is not automatically that version's accepted
+candidate. Missing identity or approval evidence remains unresolved until verified.
+
+These dispositions never grant IBM credit to local models, GnuCOBOL, Hercules,
+CardDemo or historical observations. The licensed numerators remain pending
+until real pinned receipts pass. No blanket extension to 0.9–0.15 is authorized:
+their current licensed exit requirements remain unchanged. In particular, the
+0.9 hardening entry gate is additional to its 0.4/0.5/0.6 dependency acceptance.
+
+## Post-131 amendment tracking
+
+[#132](https://github.com/toreleon/mainframe-env/issues/132) tracks the paired
+prompt/dossier update: shared contracts
+[#133](https://github.com/toreleon/mainframe-env/issues/133), CICS/z/OSMF
+[#134](https://github.com/toreleon/mainframe-env/issues/134), Db2
+[#135](https://github.com/toreleon/mainframe-env/issues/135), and IMS/MQ/integration/
+certification [#136](https://github.com/toreleon/mainframe-env/issues/136).
+The real entry-evidence verification in
+[#137](https://github.com/toreleon/mainframe-env/issues/137) is separate and must
+not be closed by a documentation-only PR. Existing release epics remain the
+implementation trackers; this amendment changes neither coverage nor acceptance.
 
 ## Common evidence package
 
