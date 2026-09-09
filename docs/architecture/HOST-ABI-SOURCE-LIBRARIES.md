@@ -1,6 +1,9 @@
 # Subsystem-owned host ABI source libraries
 
 Status: **Frozen for mainframe-env 0.2.0**
+Owner: **host-contract and provider maintainers**
+Scope: **subsystem-owned host ABI source libraries**
+Applies from: **mainframe-env 0.2.0**
 
 The COBOL compiler owns language processing only. It receives exact source
 bytes and ordered `SourceLibrary` values through `SourceBundle`; it contains no

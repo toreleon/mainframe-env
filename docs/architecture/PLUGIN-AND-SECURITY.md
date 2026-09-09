@@ -1,6 +1,9 @@
 # 0.1 Security and Capability Architecture
 
 Status: **Accepted by repository owner**
+Owner: **security and architecture maintainers**
+Scope: **capability, provider, plugin, secret, and transport boundaries**
+Applies from: **mainframe-env 0.1.0**
 
 ## 0.1 boundary
 
@@ -25,6 +28,15 @@ RACF/SAF is the authoritative 0.1 security provider. Policy errors and missing
 profiles fail closed. No authorization result is inferred from HTTP routing,
 possession of a Rust handle, or successful capability lookup.
 
+Db2, IMS, and MQ add a second, typed decision inside the provider boundary.
+`EnterpriseResource` closes the supported SAF classes (`DB2TABLE`, `DB2PLAN`,
+`DB2UOW`, `IMSPSB`, `IMSDB`, `IMSUOW`, `MQQUEUE`, and `MQUOW`) and pairs a
+bounded `ResourceName` with `AccessIntent`. The provider resolves cursor,
+session, handle, and pending-UOW state to the underlying table, PSB/database,
+or queue while holding its state fence, calls the mandatory production
+authorizer, and only then clones or mutates state. A broad host capability is a
+routing grant and never substitutes for this resource decision.
+
 ## Capability grants
 
 An invocation receives only grants needed by its selected workload, for
@@ -44,6 +56,12 @@ host.audit
 Capabilities identify permission families and interface versions. They do not
 contain provider references, credentials, filesystem paths, or mutable global
 state.
+
+Batch grants are derived from the immutable parsed JCL plan and the durable
+installed-program registry. Comments and inline records cannot add a grant.
+Installed COBOL programs receive the bounded host-interface routing set because
+their verified MIR may call those interfaces dynamically; the provider-level
+SAF decision still limits every concrete enterprise resource.
 
 ## Scoped service handles
 
@@ -83,11 +101,29 @@ failure.
   values.
 - Providers resolve a secret only inside an authorized operation scope.
 - Diagnostics, logs, events, HTTP responses, spool, and evidence classify and
-  redact secret fields before serialization.
+redact secret fields before serialization.
+- Catalog and discovery operations authorize each returned resource, not only
+  the caller-supplied wildcard. Pagination metadata is derived from visible
+  resources so denied object names remain undisclosed.
 - Compatibility tests compare exact isolated values before publication-time
   redaction when equality is necessary.
 - Long-lived credentials are never copied into compiler artifacts, machine
   checkpoints, or terminal state.
+- Ephemeral request secrets live in a bounded zeroizing scope that removes its
+  resolver entry on every return path. Password creation and change share one
+  policy and use a fresh CSPRNG salt; retained Argon2 verifiers enforce history
+  without deterministic salts.
+- HTTP bearer credentials are returned once and stored only through a
+  domain-separated digest. Version 3 sessions have absolute and idle expiry,
+  a per-user cap enforced through one durable CAS index across server
+  instances, and a non-reusable authentication epoch derived from the account's
+  randomly salted verifier and state version. Every use revalidates active
+  principal state and epoch, advances idle expiry by CAS, and removes expired
+  or revoked state. Deleting and recreating the same user cannot revive an old
+  session. Bearer authentication rotates the credential atomically while
+  preserving the absolute lifetime, so the previous token is immediately
+  invalid. Legacy raw-token rows are revoked and deleted during startup rather
+  than recovered.
 
 ## Transport security
 

@@ -1,6 +1,9 @@
 # mainframe-env Rewrite Charter
 
 Status: **Accepted by repository owner**
+Owner: **repository owner**
+Scope: **product charter, initial boundary, and governance invariants**
+Applies from: **mainframe-env 0.1.0**
 Program identity: **mainframe-env**
 Initial release line: **0.1**
 Delivery mode: **Greenfield rewrite with executable-oracle compatibility**

@@ -3,14 +3,28 @@ profile = "core-server"
 listen = "0.0.0.0:10443"
 store_profile = "postgres"
 sqlite_url = "sqlite://mainframe-env.db?mode=rwc"
-postgres_url_reference = "secret://mainframe-env/postgres-url"
+artifact_profile = "shared"
+postgres_url_reference = "env-base64:MAINFRAME_ENV_SECRET_POSTGRES_URL"
 artifact_root = "mainframe-env-artifacts"
 max_body_bytes = 4194304
 max_concurrency = 256
 timeout_millis = 30000
 shutdown_millis = 30000
 
+[retention]
+lifecycle_ticks = 604800000
+idempotency_ticks = 86400000
+audit_ticks = 7776000000
+archive_ticks = 31536000000
+low_watermark_percent = 70
+high_watermark_percent = 85
+max_batch = 1024
+
 [tls]
 enabled = true
 certificate_path = "config/tls/server.crt"
-private_key_reference = "secret://mainframe-env/tls-private-key"
+private_key_reference = "env-base64:MAINFRAME_ENV_SECRET_TLS_PRIVATE_KEY"
+
+[bootstrap]
+administrator = "ADMIN"
+secret_reference = "env-base64:MAINFRAME_ENV_SECRET_BOOTSTRAP_ADMIN"

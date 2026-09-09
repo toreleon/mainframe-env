@@ -1,6 +1,9 @@
 # Versioning, Phase Commits, and Release Gates
 
 Status: **Accepted by repository owner**
+Owner: **release maintainers**
+Scope: **version authorities, release gates, artifacts, and publication**
+Applies from: **mainframe-env 0.1.0**
 Initial release line: **mainframe-env 0.1**
 
 ## 1. Version inventory
@@ -87,7 +90,8 @@ A `0.1.0-alpha.N` release may be prepared only when:
   typed CICS vertical path work through public services;
 - no old implementation is linked;
 - selected fixtures and hostile controls pass;
-- packages build on the pinned toolchain; and
+- the full workspace, all targets, and all features check on both the pinned
+  toolchain and declared MSRV; and
 - known incomplete JCL/JES/z/OSMF/durability work is explicitly documented.
 
 Alpha is for architecture and integration validation, not production use.
@@ -156,12 +160,27 @@ A release candidate/final release produces, as applicable:
 - SQL migration bundle and migration digest;
 - operation, capability, route, diagnostic, and compatibility catalogs;
 - public API and crate documentation;
-- license notices and SBOM;
-- checksums and build/source provenance;
+- complete license notices and an official-schema-validated CycloneDX SBOM of
+  the exact target production closure and dependency graph;
+- checksums and a verified Ed25519 DSSE envelope carrying an in-toto Statement
+  with SLSA Provenance v1 at the documented builder's honest Build Level 1;
 - compatibility/evidence summary and known limitations;
 - backup, restore, upgrade, rollback, and capacity runbooks; and
 - release manifest mapping every artifact to source commit, content digest,
   toolchain, target, features/profile, and dependency lock identity.
+
+Offline Cargo bundles additionally retain `SUPPLY-CHAIN/BUILD-INPUTS.json`,
+which binds the exact vendored tree, source revision, locked CI/controller
+inputs, and build-tool executable identities. CI input changes follow
+`docs/runbooks/CI-SUPPLY-CHAIN.md`.
+
+Release provenance is accepted only for the signer/builder pair in
+`config/release-attestation-policy.json`. Verification authenticates the DSSE
+payload before parsing, requires a run-unique invocation URI, binds both binary
+subjects plus manifest/SBOM/build-input/license byproducts, and re-derives the
+SBOM from the CLI/server target-filtered normal closure. The local Jenkins trust
+boundary and deliberate Build Level 1 limit are documented in
+`docs/architecture/RELEASE-BUILDER.md`.
 
 Raw credentials, local absolute paths, uncontrolled raw evidence, temporary
 files, oracle binaries, test datasets, and current OpenMainframe implementation
@@ -202,6 +221,14 @@ For `0.1.x`, use:
 6. changelog/release-note/version update;
 7. release commit and annotated tag; and
 8. publish only after artifact/provenance verification.
+
+The supported offline Cargo archive is produced only by
+`tools/package_offline_cargo_bundle.sh`. Its archive helper uses the locked
+Linux/amd64 GNU-tar image, perturbs and normalizes two clean copies, and accepts
+the output only when both SHA-256 digests match. Publication downloads any
+same-named GitHub asset and skips it only when the bytes match. A different
+remote digest or a concurrent name collision stops publication; release assets
+are never uploaded with overwrite semantics.
 
 Patch releases may add backward-compatible optional behavior or fix defects.
 They may not remove or silently redefine supported 0.1 behavior.

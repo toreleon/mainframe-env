@@ -3,8 +3,9 @@ use crate::command::{RacrouteRequestType, racroute_descriptors};
 use crate::model::{
     AccessCondition, AccessLevel, Acee, AceeState, AuditFieldValue, AuditPolicy, DecisionOutcome,
     DecisionReason, PrincipalState, RaclistCache, ResourceProfile, SafDecision, SafStatus,
-    SecurityAuditRecord, SecurityDatabaseSnapshot, SecurityToken, SecurityTransaction,
-    SignonSession, SignonSessionState, TokenKind, TokenState, TransactionState, profile_key,
+    SecurityAuditRecord, SecurityDatabaseSnapshot, SecurityRequestDigestFormat, SecurityToken,
+    SecurityTransaction, SignonSession, SignonSessionState, TokenKind, TokenState,
+    TransactionState, profile_key,
 };
 use argon2::Argon2;
 use argon2::password_hash::{PasswordVerifier, phc::PasswordHash};
@@ -417,7 +418,12 @@ pub(crate) fn execute(
     if preflight.is_none() && !initial.principals.contains_key(context.caller().as_str()) {
         preflight = Some(DecisionReason::PrincipalNotFound);
     }
-    if descriptor.mutating() && initial.transactions.contains_key(context.idempotency_key()) {
+    if descriptor.mutating()
+        && service
+            .database
+            .transaction_for_replay(&initial, context.idempotency_key())?
+            .is_some()
+    {
         return execute_existing_transaction(
             service,
             context,
@@ -471,9 +477,19 @@ pub(crate) fn execute(
     };
     let ((execution, mut states), generation) = service.database.mutate_retry(|snapshot| {
         let mut states = vec![RacrouteState::Received, RacrouteState::Validated];
-        if descriptor.mutating()
-            && let Some(existing) = snapshot.transactions.get(context.idempotency_key())
-        {
+        let existing = descriptor
+            .mutating()
+            .then(|| {
+                service
+                    .database
+                    .transaction_for_replay(snapshot, context.idempotency_key())
+            })
+            .transpose()?
+            .flatten();
+        if let Some(existing) = existing.as_ref() {
+            if existing.request_digest_format != SecurityRequestDigestFormat::RacrouteCanonicalV1 {
+                return Ok(((SafExecution::UnknownOutcome, states), false));
+            }
             if existing.request_digest != request_digest {
                 let status = status_for_reason(DecisionReason::MalformedRequest);
                 let _ = append_audit(
@@ -649,6 +665,59 @@ pub(crate) fn execute(
     }
 }
 
+pub(crate) fn reconcile_legacy_replay(
+    service: &RacfService,
+    context: &SafRequestContext,
+    expected_scrubbed_digest: &str,
+    request: &RacrouteRequest,
+) -> Result<(), HostProblem> {
+    normalized_digest(expected_scrubbed_digest).map_err(|_| HostProblem::Malformed)?;
+    let descriptor = racroute_descriptors()
+        .iter()
+        .copied()
+        .find(|descriptor| descriptor.request_type() == request.request_type())
+        .filter(|descriptor| descriptor.mutating())
+        .ok_or(HostProblem::Unsupported)?;
+    validate_request_shape(request).map_err(|_| HostProblem::Malformed)?;
+    let canonical = request_digest(context, request);
+    service
+        .database
+        .mutate_if_changed(|snapshot| {
+            let transaction = snapshot
+                .transactions
+                .get_mut(context.idempotency_key())
+                .ok_or(HostProblem::NotFound)?;
+            if transaction.actor != context.caller().as_str()
+                || transaction.operation != format!("RACROUTE-{}", descriptor.keyword())
+            {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            match transaction.request_digest_format {
+                SecurityRequestDigestFormat::RacrouteCanonicalV1 => {
+                    if transaction.request_digest == canonical {
+                        Ok(((), false))
+                    } else {
+                        Err(HostProblem::IdempotencyConflict)
+                    }
+                }
+                SecurityRequestDigestFormat::LegacyScrubbedV0 => {
+                    if transaction.request_digest != expected_scrubbed_digest {
+                        return Err(HostProblem::IdempotencyConflict);
+                    }
+                    transaction.request_digest_format =
+                        SecurityRequestDigestFormat::RacrouteCanonicalV1;
+                    transaction.request_digest = canonical.clone();
+                    Ok(((), true))
+                }
+                SecurityRequestDigestFormat::LegacyUnversioned => Err(HostProblem::UnknownOutcome),
+                SecurityRequestDigestFormat::RacfCommandCanonicalV1 => {
+                    Err(HostProblem::IdempotencyConflict)
+                }
+            }
+        })
+        .map(|_| ())
+}
+
 fn is_authentication_request(request: &RacrouteRequest) -> bool {
     matches!(
         request,
@@ -695,16 +764,19 @@ fn execute_existing_transaction(
     request_digest: &str,
 ) -> Result<RacrouteOutcome, HostProblem> {
     let (execution, generation) = service.database.mutate_retry(|snapshot| {
-        let existing = snapshot
-            .transactions
-            .get(context.idempotency_key())
+        let existing = service
+            .database
+            .transaction_for_replay(snapshot, context.idempotency_key())?
             .ok_or(HostProblem::UnknownOutcome)?;
+        if existing.request_digest_format != SecurityRequestDigestFormat::RacrouteCanonicalV1 {
+            return Ok((SafExecution::UnknownOutcome, false));
+        }
         if existing.request_digest != request_digest {
             let status = status_for_reason(DecisionReason::MalformedRequest);
             let _ = append_audit(snapshot, context, keyword, status, request_digest)?;
             return Ok((SafExecution::Conflict, true));
         }
-        Ok((replay_execution(existing)?, false))
+        Ok((replay_execution(&existing)?, false))
     })?;
     match execution {
         SafExecution::Terminal {
@@ -769,6 +841,9 @@ fn append_racroute_transaction(
     if terminal_result.len() > 65_536 {
         return Err(HostProblem::ResourceExhausted);
     }
+    let terminal_tick = snapshot
+        .observe_retention_tick(context.tick())
+        .ok_or(HostProblem::ResourceExhausted)?;
     snapshot.transactions.insert(
         context.idempotency_key().into(),
         SecurityTransaction {
@@ -776,6 +851,7 @@ fn append_racroute_transaction(
             idempotency_key: context.idempotency_key().into(),
             actor: context.caller().as_str().into(),
             operation: format!("RACROUTE-{keyword}"),
+            request_digest_format: SecurityRequestDigestFormat::RacrouteCanonicalV1,
             request_digest: request_digest.into(),
             state,
             base_generation: snapshot.generation,
@@ -787,6 +863,7 @@ fn append_racroute_transaction(
             ),
             status: terminal.status,
             terminal_result: Some(terminal_result),
+            terminal_tick: Some(terminal_tick),
         },
     );
     Ok(())
@@ -952,6 +1029,9 @@ fn apply_request(
             let status = status_for_reason(DecisionReason::Granted);
             let id = next_id("AUDIT", snapshot.generation, snapshot.audits.len());
             let fields = crate::audit::redact_fields(fields.clone());
+            let tick = snapshot
+                .observe_retention_tick(context.tick())
+                .ok_or(DecisionReason::ResourceExhausted)?;
             snapshot.audits.push(SecurityAuditRecord {
                 id: id.clone(),
                 correlation: context.correlation().into(),
@@ -962,7 +1042,8 @@ fn apply_request(
                 decision: *decision,
                 status,
                 fields,
-                tick: context.tick(),
+                tick,
+                retention_observed_tick: Some(tick),
             });
             Ok((status, RacrouteResult::Audit { audit_id: id }))
         }
@@ -1854,6 +1935,9 @@ fn append_audit(
     if snapshot.audits.len() >= 65_536 {
         return Err(HostProblem::ResourceExhausted);
     }
+    let tick = snapshot
+        .observe_retention_tick(context.tick())
+        .ok_or(HostProblem::ResourceExhausted)?;
     let id = next_id("AUDIT", snapshot.generation, snapshot.audits.len());
     snapshot.audits.push(SecurityAuditRecord {
         id: id.clone(),
@@ -1868,13 +1952,24 @@ fn append_audit(
             DecisionOutcome::Deny
         },
         status,
-        fields: crate::audit::redact_fields(BTreeMap::from([(
-            "ACEE".into(),
-            context.acee_id().map_or(AuditFieldValue::Redacted, |id| {
-                AuditFieldValue::Reference(format!("acee:{id}"))
-            }),
-        )])),
-        tick: context.tick(),
+        fields: crate::audit::redact_fields(BTreeMap::from([
+            (
+                "ACEE".into(),
+                context.acee_id().map_or(AuditFieldValue::Redacted, |id| {
+                    AuditFieldValue::Reference(format!("acee:{id}"))
+                }),
+            ),
+            (
+                "REQUEST_DIGEST_FORMAT".into(),
+                AuditFieldValue::Text(
+                    SecurityRequestDigestFormat::RacrouteCanonicalV1
+                        .as_str()
+                        .into(),
+                ),
+            ),
+        ])),
+        tick,
+        retention_observed_tick: Some(tick),
     });
     Ok(id)
 }
@@ -2025,7 +2120,7 @@ fn request_digest(context: &SafRequestContext, request: &RacrouteRequest) -> Str
     digest_saf_field(&mut digest, context.caller().as_str().as_bytes());
     digest_saf_optional(&mut digest, context.acee_id());
     digest_saf_optional(&mut digest, context.delegated_by().map(PrincipalId::as_str));
-    digest_saf_debug(&mut digest, &request.request_type());
+    digest_saf_tag(&mut digest, racroute_request_tag(request.request_type()));
     match request {
         RacrouteRequest::Audit {
             action,
@@ -2035,13 +2130,12 @@ fn request_digest(context: &SafRequestContext, request: &RacrouteRequest) -> Str
         } => {
             digest_saf_field(&mut digest, action.as_bytes());
             digest_saf_field(&mut digest, resource_digest.as_bytes());
-            digest_saf_debug(&mut digest, decision);
-            for (name, value) in fields {
+            digest_saf_tag(&mut digest, decision_tag(*decision));
+            let fields = crate::audit::redact_fields(fields.clone());
+            digest_saf_len(&mut digest, fields.len());
+            for (name, value) in &fields {
                 digest_saf_field(&mut digest, name.as_bytes());
-                digest_saf_field(
-                    &mut digest,
-                    &serde_json::to_vec(value).unwrap_or_else(|_| b"invalid-audit-field".to_vec()),
-                );
+                digest_audit_field(&mut digest, value);
             }
         }
         RacrouteRequest::Auth {
@@ -2058,7 +2152,7 @@ fn request_digest(context: &SafRequestContext, request: &RacrouteRequest) -> Str
         } => {
             digest_saf_field(&mut digest, class.as_bytes());
             digest_saf_field(&mut digest, resource.as_bytes());
-            digest_saf_debug(&mut digest, access);
+            digest_saf_tag(&mut digest, access_tag(*access));
             digest_access_environment(&mut digest, environment);
         }
         RacrouteRequest::Define {
@@ -2069,16 +2163,16 @@ fn request_digest(context: &SafRequestContext, request: &RacrouteRequest) -> Str
             uacc,
             generic,
         } => {
-            digest_saf_debug(&mut digest, action);
+            digest_saf_tag(&mut digest, define_action_tag(*action));
             digest_saf_field(&mut digest, class.as_bytes());
             digest_saf_field(&mut digest, resource.as_bytes());
             digest_saf_field(&mut digest, owner.as_bytes());
-            digest_saf_debug(&mut digest, uacc);
+            digest_saf_tag(&mut digest, access_tag(*uacc));
             digest.update([u8::from(*generic)]);
         }
         RacrouteRequest::Dirauth { node } => digest_saf_field(&mut digest, node.as_bytes()),
         RacrouteRequest::Extract { kind, class, name } => {
-            digest_saf_debug(&mut digest, kind);
+            digest_saf_tag(&mut digest, extract_kind_tag(*kind));
             digest_saf_optional(&mut digest, class.as_deref());
             digest_saf_field(&mut digest, name.as_bytes());
         }
@@ -2107,9 +2201,10 @@ fn request_digest(context: &SafRequestContext, request: &RacrouteRequest) -> Str
             expires_tick,
         } => {
             digest_saf_field(&mut digest, owner.as_str().as_bytes());
-            digest_saf_debug(&mut digest, kind);
+            digest_saf_tag(&mut digest, token_kind_tag(*kind));
             digest_saf_field(&mut digest, token_reference.as_bytes());
             digest_saf_field(&mut digest, token_digest.as_bytes());
+            digest_saf_len(&mut digest, scopes.len());
             for scope in scopes {
                 digest_saf_field(&mut digest, scope.as_bytes());
             }
@@ -2129,7 +2224,7 @@ fn request_digest(context: &SafRequestContext, request: &RacrouteRequest) -> Str
         } => {
             digest_saf_field(&mut digest, user.as_str().as_bytes());
             digest_saf_field(&mut digest, credential_reference.as_str().as_bytes());
-            digest_saf_debug(&mut digest, action);
+            digest_saf_tag(&mut digest, verify_action_tag(*action));
             digest_saf_optional(&mut digest, acee_id.as_deref());
         }
         RacrouteRequest::Verifyx {
@@ -2143,12 +2238,103 @@ fn request_digest(context: &SafRequestContext, request: &RacrouteRequest) -> Str
             digest_saf_field(&mut digest, user.as_str().as_bytes());
             digest_saf_field(&mut digest, credential_reference.as_str().as_bytes());
             digest_saf_optional(&mut digest, mfa_reference.as_ref().map(SecretRef::as_str));
-            digest_saf_debug(&mut digest, action);
+            digest_saf_tag(&mut digest, verify_action_tag(*action));
             digest_saf_optional(&mut digest, acee_id.as_deref());
             digest_saf_optional(&mut digest, parent_acee.as_deref());
         }
     }
     format!("sha256:{:x}", digest.finalize())
+}
+
+const fn racroute_request_tag(value: RacrouteRequestType) -> u8 {
+    match value {
+        RacrouteRequestType::Audit => 1,
+        RacrouteRequestType::Auth => 2,
+        RacrouteRequestType::Define => 3,
+        RacrouteRequestType::Dirauth => 4,
+        RacrouteRequestType::Extract => 5,
+        RacrouteRequestType::Fastauth => 6,
+        RacrouteRequestType::List => 7,
+        RacrouteRequestType::Signon => 8,
+        RacrouteRequestType::Stat => 9,
+        RacrouteRequestType::Tokenbld => 10,
+        RacrouteRequestType::Tokenmap => 11,
+        RacrouteRequestType::Tokenxtr => 12,
+        RacrouteRequestType::Verify => 13,
+        RacrouteRequestType::Verifyx => 14,
+    }
+}
+
+const fn decision_tag(value: DecisionOutcome) -> u8 {
+    match value {
+        DecisionOutcome::Allow => 1,
+        DecisionOutcome::Deny => 2,
+        DecisionOutcome::NoDecision => 3,
+    }
+}
+
+const fn access_tag(value: AccessLevel) -> u8 {
+    match value {
+        AccessLevel::None => 1,
+        AccessLevel::Execute => 2,
+        AccessLevel::Read => 3,
+        AccessLevel::Update => 4,
+        AccessLevel::Control => 5,
+        AccessLevel::Alter => 6,
+    }
+}
+
+const fn define_action_tag(value: SafDefineAction) -> u8 {
+    match value {
+        SafDefineAction::Add => 1,
+        SafDefineAction::Alter => 2,
+        SafDefineAction::Delete => 3,
+    }
+}
+
+const fn extract_kind_tag(value: SafExtractKind) -> u8 {
+    match value {
+        SafExtractKind::User => 1,
+        SafExtractKind::Group => 2,
+        SafExtractKind::Profile => 3,
+        SafExtractKind::Acee => 4,
+        SafExtractKind::Token => 5,
+    }
+}
+
+const fn token_kind_tag(value: TokenKind) -> u8 {
+    match value {
+        TokenKind::SafIdentity => 1,
+        TokenKind::PassTicket => 2,
+        TokenKind::JwtReference => 3,
+        TokenKind::Custom => 4,
+    }
+}
+
+const fn verify_action_tag(value: SafVerifyAction) -> u8 {
+    match value {
+        SafVerifyAction::AuthenticateOnly => 1,
+        SafVerifyAction::CreateAcee => 2,
+        SafVerifyAction::DeleteAcee => 3,
+    }
+}
+
+fn digest_audit_field(digest: &mut Sha256, value: &AuditFieldValue) {
+    match value {
+        AuditFieldValue::Text(value) => {
+            digest_saf_tag(digest, 1);
+            digest_saf_field(digest, value.as_bytes());
+        }
+        AuditFieldValue::Redacted => digest_saf_tag(digest, 2),
+        AuditFieldValue::Digest(value) => {
+            digest_saf_tag(digest, 3);
+            digest_saf_field(digest, value.as_bytes());
+        }
+        AuditFieldValue::Reference(value) => {
+            digest_saf_tag(digest, 4);
+            digest_saf_field(digest, value.as_bytes());
+        }
+    }
 }
 
 fn digest_access_environment(digest: &mut Sha256, environment: &AccessEnvironment) {
@@ -2159,8 +2345,12 @@ fn digest_access_environment(digest: &mut Sha256, environment: &AccessEnvironmen
     digest.update(environment.tick.to_be_bytes());
 }
 
-fn digest_saf_debug(digest: &mut Sha256, value: &impl std::fmt::Debug) {
-    digest_saf_field(digest, format!("{value:?}").as_bytes());
+fn digest_saf_tag(digest: &mut Sha256, value: u8) {
+    digest.update([value]);
+}
+
+fn digest_saf_len(digest: &mut Sha256, value: usize) {
+    digest.update(u64::try_from(value).unwrap_or(u64::MAX).to_be_bytes());
 }
 
 fn digest_saf_optional(digest: &mut Sha256, value: Option<&str>) {
@@ -2386,6 +2576,149 @@ mod tests {
                 acee: None,
             })
         ));
+    }
+
+    #[test]
+    fn racroute_canonical_digest_has_a_stable_golden_identity() {
+        let admin = PrincipalId::new("RACFADM", InvocationLimits::default()).unwrap();
+        let context = saf_context(&admin, Some("ACEE0001"), "DIGEST-GOLDEN", 17);
+        let request = RacrouteRequest::Auth {
+            class: "FACILITY".into(),
+            resource: "APP.ONE".into(),
+            access: AccessLevel::Read,
+            environment: AccessEnvironment {
+                terminal: Some("LUTERM1".into()),
+                console: None,
+                system: Some("SYS1".into()),
+                application: Some("APPL1".into()),
+                tick: 19,
+            },
+        };
+        assert_eq!(
+            request_digest(&context, &request),
+            "sha256:f12a7fce354c0f3c1a42b54376597d9230b956d729186932208c9f519824f503"
+        );
+        let changed = RacrouteRequest::Auth {
+            class: "FACILITY".into(),
+            resource: "APP.ONE".into(),
+            access: AccessLevel::Update,
+            environment: AccessEnvironment {
+                terminal: Some("LUTERM1".into()),
+                console: None,
+                system: Some("SYS1".into()),
+                application: Some("APPL1".into()),
+                tick: 19,
+            },
+        };
+        assert_ne!(
+            request_digest(&context, &changed),
+            "sha256:f12a7fce354c0f3c1a42b54376597d9230b956d729186932208c9f519824f503"
+        );
+        let audit = |secret: &str| RacrouteRequest::Audit {
+            action: "SIGNON".into(),
+            resource_digest: format!("sha256:{}", "1".repeat(64)),
+            decision: DecisionOutcome::Deny,
+            fields: BTreeMap::from([("PASSWORD".into(), AuditFieldValue::Text(secret.into()))]),
+        };
+        assert_eq!(
+            request_digest(&context, &audit("FIRST-SECRET")),
+            request_digest(&context, &audit("SECOND-SECRET"))
+        );
+    }
+
+    #[test]
+    fn legacy_racroute_replay_requires_attested_migration_without_redispatch() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let resolver = Arc::new(MemorySecretResolver::default());
+        resolver.insert("secret:admin", b"ADMIN-PASSWORD".to_vec());
+        let service =
+            RacfService::open(store.clone(), resolver.clone(), Default::default()).unwrap();
+        service
+            .bootstrap_administrator(
+                "RACFADM",
+                &SecretRef::new("secret:admin", Default::default()).unwrap(),
+            )
+            .unwrap();
+        let admin = PrincipalId::new("RACFADM", InvocationLimits::default()).unwrap();
+        let context = saf_context(&admin, None, "LEGACY-RACROUTE", 21);
+        let request = RacrouteRequest::Audit {
+            action: "LEGACY.TEST".into(),
+            resource_digest: format!("sha256:{}", "1".repeat(64)),
+            decision: DecisionOutcome::Allow,
+            fields: BTreeMap::new(),
+        };
+        let original = service.racroute(&context, request.clone()).unwrap();
+        let audit_count = service.audits().len();
+        let legacy_digest = format!("sha256:{}", "a".repeat(64));
+        service
+            .database
+            .mutate(|snapshot| {
+                let transaction = snapshot
+                    .transactions
+                    .get(context.idempotency_key())
+                    .cloned()
+                    .ok_or(HostProblem::NotFound)?;
+                let mut encoded =
+                    serde_json::to_value(transaction).map_err(|_| HostProblem::Malformed)?;
+                let encoded = encoded.as_object_mut().ok_or(HostProblem::Malformed)?;
+                encoded.remove("request_digest_format");
+                encoded.insert(
+                    "request_digest".into(),
+                    serde_json::Value::String(legacy_digest.clone()),
+                );
+                let transaction: SecurityTransaction =
+                    serde_json::from_value(encoded.clone().into())
+                        .map_err(|_| HostProblem::Malformed)?;
+                assert_eq!(
+                    transaction.request_digest_format,
+                    SecurityRequestDigestFormat::LegacyUnversioned
+                );
+                snapshot
+                    .transactions
+                    .insert(context.idempotency_key().into(), transaction);
+                Ok(())
+            })
+            .unwrap();
+        drop(service);
+
+        let reopened =
+            RacfService::open(store.clone(), resolver.clone(), Default::default()).unwrap();
+        let scrubbed_digest = {
+            let snapshot = reopened.database.read().unwrap();
+            let transaction = &snapshot.transactions[context.idempotency_key()];
+            assert_eq!(
+                transaction.request_digest_format,
+                SecurityRequestDigestFormat::LegacyScrubbedV0
+            );
+            assert_ne!(transaction.request_digest, legacy_digest);
+            transaction.request_digest.clone()
+        };
+        assert_eq!(
+            reopened.racroute(&context, request.clone()),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(reopened.audits().len(), audit_count);
+        assert_eq!(
+            reopened.reconcile_legacy_racroute(
+                &context,
+                &format!("sha256:{}", "b".repeat(64)),
+                &request,
+            ),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        reopened
+            .reconcile_legacy_racroute(&context, &scrubbed_digest, &request)
+            .unwrap();
+        assert_eq!(
+            reopened.racroute(&context, request.clone()),
+            Ok(original.clone())
+        );
+        assert_eq!(reopened.audits().len(), audit_count);
+        drop(reopened);
+
+        let restarted = RacfService::open(store, resolver, Default::default()).unwrap();
+        assert_eq!(restarted.racroute(&context, request), Ok(original));
+        assert_eq!(restarted.audits().len(), audit_count);
     }
 
     #[test]
@@ -3080,11 +3413,9 @@ mod tests {
             service
                 .database
                 .mutate(|snapshot| {
-                    snapshot
-                        .transactions
-                        .get_mut("UNKNOWN-TOKEN")
-                        .unwrap()
-                        .state = TransactionState::UnknownOutcome;
+                    let transaction = snapshot.transactions.get_mut("UNKNOWN-TOKEN").unwrap();
+                    transaction.state = TransactionState::UnknownOutcome;
+                    transaction.terminal_tick = None;
                     Ok(())
                 })
                 .unwrap();

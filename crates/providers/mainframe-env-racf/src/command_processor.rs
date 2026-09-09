@@ -1,7 +1,8 @@
 use crate::RacfService;
+use crate::authority::{CredentialPolicyProblem, trim_credential_history};
 use crate::command::{
     CommandDiagnostic, CommandDiagnosticCode, CommandFamily, CommandLanguageLimits, ParsedCommand,
-    ParsedOperand, diagnostic, parse_command,
+    ParsedOperand, diagnostic, diagnostic_with_host_problem, parse_command,
 };
 use crate::model::{
     AccessCondition, AccessControlEntry, AccessLevel, AssociationState, AuditFieldValue,
@@ -10,9 +11,10 @@ use crate::model::{
     IdentityMapping, KeyReference, KeyRing, MfaFactor, MfaFactorKind, PrincipalKind,
     PrincipalProfile, PrincipalState, ProfileSegment, ProfileTemplate, RaclistCache,
     ResourceProfile, RrsfNode, RrsfNodeState, SafStatus, SecurityAuditRecord,
-    SecurityDatabaseSnapshot, SecurityPolicyOptions, SecurityTransaction, SegmentFieldKind,
-    SegmentFieldSchema, SegmentTemplate, SegmentValue, SignonSessionState, TransactionState,
-    UserAssociation, connection_key, keyring_key, profile_key,
+    SecurityDatabaseSnapshot, SecurityPolicyOptions, SecurityRequestDigestFormat,
+    SecurityTransaction, SegmentFieldKind, SegmentFieldSchema, SegmentTemplate, SegmentValue,
+    SignonSessionState, TransactionState, UserAssociation, connection_key, keyring_key,
+    profile_key,
 };
 use argon2::Argon2;
 use argon2::password_hash::{PasswordVerifier, phc::PasswordHash};
@@ -220,6 +222,8 @@ enum ExecutionOutcome {
     Failure(SemanticProblem),
 }
 
+const RACF_COMMAND_DIGEST_DOMAIN: &[u8] = b"mainframe-env.racf-command@1\0";
+
 pub(crate) fn execute(
     service: &RacfService,
     context: &CommandContext,
@@ -232,14 +236,22 @@ pub(crate) fn execute(
     ) {
         return Err(diagnostic(CommandDiagnosticCode::UnsupportedFamily, 0));
     }
-    let request_digest = format!("sha256:{:x}", Sha256::digest(input.as_bytes()));
+    let request_digest = command_request_digest(&parsed);
     let family = parsed.descriptor.family();
     let ((outcome, replayed, status), generation) = service
         .database
         .mutate_retry(|snapshot| {
-            if parsed.descriptor.mutating()
-                && let Some(existing) = snapshot.transactions.get(context.idempotency_key())
-            {
+            let existing = parsed
+                .descriptor
+                .mutating()
+                .then(|| {
+                    service
+                        .database
+                        .transaction_for_replay(snapshot, context.idempotency_key())
+                })
+                .transpose()?
+                .flatten();
+            if let Some(existing) = existing.as_ref() {
                 if existing.actor != context.actor().as_str()
                     || require_active(snapshot, context).is_err()
                 {
@@ -261,7 +273,17 @@ pub(crate) fn execute(
                         true,
                     ));
                 }
-                if existing.request_digest != request_digest {
+                if matches!(
+                    existing.request_digest_format,
+                    SecurityRequestDigestFormat::LegacyUnversioned
+                        | SecurityRequestDigestFormat::LegacyScrubbedV0
+                ) {
+                    return Err(HostProblem::UnknownOutcome);
+                }
+                if existing.request_digest_format
+                    != SecurityRequestDigestFormat::RacfCommandCanonicalV1
+                    || existing.request_digest != request_digest
+                {
                     append_audit(
                         snapshot,
                         context,
@@ -352,6 +374,109 @@ pub(crate) fn execute(
         }),
         ExecutionOutcome::Failure(problem) => Err(semantic_diagnostic(problem)),
     }
+}
+
+fn command_request_digest(command: &ParsedCommand) -> String {
+    let mut digest = Sha256::new();
+    digest.update(RACF_COMMAND_DIGEST_DOMAIN);
+    digest_command_field(&mut digest, command.descriptor.keyword().as_bytes());
+    digest_command_len(&mut digest, command.positionals.len());
+    for positional in &command.positionals {
+        digest_command_field(&mut digest, positional.as_bytes());
+    }
+    digest_command_len(&mut digest, command.operands.len());
+    for operand in &command.operands {
+        digest_command_field(&mut digest, operand.name.as_bytes());
+        digest_command_len(&mut digest, operand.values.len());
+        let credential = credential_operand(command, &operand.name);
+        for value in &operand.values {
+            digest.update([u8::from(credential)]);
+            if !credential {
+                digest_command_field(&mut digest, value.as_bytes());
+            }
+        }
+    }
+    format!("sha256:{:x}", digest.finalize())
+}
+
+fn credential_operand(command: &ParsedCommand, operand: &str) -> bool {
+    matches!(
+        command.descriptor.keyword(),
+        "ADDUSER" | "ALTUSER" | "PASSWORD"
+    ) && matches!(operand, "PASSWORD" | "PHRASE")
+}
+
+fn digest_command_len(digest: &mut Sha256, value: usize) {
+    digest.update(u64::try_from(value).unwrap_or(u64::MAX).to_be_bytes());
+}
+
+fn digest_command_field(digest: &mut Sha256, value: &[u8]) {
+    digest_command_len(digest, value.len());
+    digest.update(value);
+}
+
+pub(crate) fn reconcile_legacy_replay(
+    service: &RacfService,
+    context: &CommandContext,
+    expected_scrubbed_digest: &str,
+    input: &str,
+) -> Result<(), HostProblem> {
+    if !valid_sha256(expected_scrubbed_digest) {
+        return Err(HostProblem::Malformed);
+    }
+    let parsed = parse_command(input, CommandLanguageLimits::default())
+        .map_err(|_| HostProblem::Malformed)?;
+    if !parsed.descriptor.mutating()
+        || !matches!(
+            parsed.descriptor.work_package(),
+            "SEC-502" | "SEC-503" | "SEC-505"
+        )
+    {
+        return Err(HostProblem::Unsupported);
+    }
+    let canonical = command_request_digest(&parsed);
+    service
+        .database
+        .mutate_if_changed(|snapshot| {
+            let transaction = snapshot
+                .transactions
+                .get_mut(context.idempotency_key())
+                .ok_or(HostProblem::NotFound)?;
+            if transaction.actor != context.actor().as_str()
+                || transaction.operation != parsed.descriptor.keyword()
+            {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            match transaction.request_digest_format {
+                SecurityRequestDigestFormat::RacfCommandCanonicalV1 => {
+                    if transaction.request_digest == canonical {
+                        Ok(((), false))
+                    } else {
+                        Err(HostProblem::IdempotencyConflict)
+                    }
+                }
+                SecurityRequestDigestFormat::LegacyScrubbedV0 => {
+                    if transaction.request_digest != expected_scrubbed_digest {
+                        return Err(HostProblem::IdempotencyConflict);
+                    }
+                    transaction.request_digest_format =
+                        SecurityRequestDigestFormat::RacfCommandCanonicalV1;
+                    transaction.request_digest = canonical.clone();
+                    Ok(((), true))
+                }
+                SecurityRequestDigestFormat::LegacyUnversioned => Err(HostProblem::UnknownOutcome),
+                SecurityRequestDigestFormat::RacrouteCanonicalV1 => {
+                    Err(HostProblem::IdempotencyConflict)
+                }
+            }
+        })
+        .map(|_| ())
+}
+
+fn valid_sha256(value: &str) -> bool {
+    value.len() == 71
+        && value.starts_with("sha256:")
+        && value[7..].bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 fn apply_mutation(
@@ -494,42 +619,21 @@ fn replace_credential(
     offset: usize,
     tick: u64,
 ) -> Result<CredentialVerifier, SemanticProblem> {
-    let minimum = if phrase {
-        snapshot.policy.phrase_minimum
-    } else {
-        snapshot.policy.password_minimum
-    };
-    if secret.len() < minimum || secret.len() > snapshot.policy.password_maximum {
-        return Err(SemanticProblem::Invalid(offset));
-    }
-    let replacement = service
-        .password_principal_from_bytes(user, secret.as_bytes())
-        .map_err(|_| SemanticProblem::Invalid(offset))?;
-    let new_credential = replacement
-        .credential
-        .ok_or(SemanticProblem::Invalid(offset))?;
-    let new_digest = verifier_digest(&new_credential.encoded_verifier);
-    if current.is_some_and(|credential| {
-        credential.encoded_verifier == new_credential.encoded_verifier
-            || credential.history_digests.contains(&new_digest)
-    }) {
-        return Err(SemanticProblem::Conflict);
-    }
-    let mut history =
-        current.map_or_else(Vec::new, |credential| credential.history_digests.clone());
-    if let Some(credential) = current {
-        history.push(verifier_digest(&credential.encoded_verifier));
-    }
-    let retain = snapshot.policy.password_history;
-    if history.len() > retain {
-        history.drain(..history.len() - retain);
-    }
-    Ok(CredentialVerifier {
-        algorithm: new_credential.algorithm,
-        encoded_verifier: new_credential.encoded_verifier,
-        changed_tick: tick,
-        history_digests: history,
-    })
+    service
+        .credential_from_bytes(
+            &snapshot.policy,
+            user,
+            current,
+            secret.as_bytes(),
+            phrase,
+            tick,
+        )
+        .map_err(|problem| match problem {
+            CredentialPolicyProblem::Invalid | CredentialPolicyProblem::Infrastructure => {
+                SemanticProblem::Invalid(offset)
+            }
+            CredentialPolicyProblem::Reused => SemanticProblem::Conflict,
+        })
 }
 
 fn racdcert(
@@ -1260,6 +1364,17 @@ fn setropts(
         || snapshot.policy.password_history > 128
     {
         return Err(SemanticProblem::Invalid(0));
+    }
+    for credential in snapshot
+        .principals
+        .values_mut()
+        .filter_map(|principal| principal.credential.as_mut())
+    {
+        trim_credential_history(
+            &mut credential.history_digests,
+            &mut credential.history_verifiers,
+            snapshot.policy.password_history,
+        );
     }
     let consumed = [
         "ADDCREATOR",
@@ -2447,6 +2562,9 @@ fn append_transaction(
     if snapshot.transactions.len() >= 65_536 {
         return Err(HostProblem::ResourceExhausted);
     }
+    let terminal_tick = snapshot
+        .observe_retention_tick(context.tick())
+        .ok_or(HostProblem::ResourceExhausted)?;
     snapshot.transactions.insert(
         context.idempotency_key().into(),
         SecurityTransaction {
@@ -2454,6 +2572,7 @@ fn append_transaction(
             idempotency_key: context.idempotency_key().into(),
             actor: context.actor().as_str().into(),
             operation: command.descriptor.keyword().into(),
+            request_digest_format: SecurityRequestDigestFormat::RacfCommandCanonicalV1,
             request_digest: request_digest.into(),
             state,
             base_generation: snapshot.generation,
@@ -2465,6 +2584,7 @@ fn append_transaction(
             ),
             status,
             terminal_result: None,
+            terminal_tick: Some(terminal_tick),
         },
     );
     Ok(())
@@ -2481,6 +2601,9 @@ fn append_audit(
     if snapshot.audits.len() >= 65_536 {
         return Err(HostProblem::ResourceExhausted);
     }
+    let tick = snapshot
+        .observe_retention_tick(context.tick())
+        .ok_or(HostProblem::ResourceExhausted)?;
     let id = format!(
         "AUDIT{:020}{:06}",
         snapshot.generation,
@@ -2504,8 +2627,17 @@ fn append_audit(
                 "OFFICIAL_ROW".into(),
                 AuditFieldValue::Text(command.descriptor.row_id().into()),
             ),
+            (
+                "REQUEST_DIGEST_FORMAT".into(),
+                AuditFieldValue::Text(
+                    SecurityRequestDigestFormat::RacfCommandCanonicalV1
+                        .as_str()
+                        .into(),
+                ),
+            ),
         ])),
-        tick: context.tick(),
+        tick,
+        retention_observed_tick: Some(tick),
     });
     Ok(())
 }
@@ -2871,10 +3003,6 @@ fn operand_text(operand: &ParsedOperand) -> String {
     }
 }
 
-fn verifier_digest(value: &str) -> String {
-    format!("sha256:{:x}", Sha256::digest(value.as_bytes()))
-}
-
 fn normalized_digest(value: &str) -> Result<String, SemanticProblem> {
     if value.len() == 71
         && value.starts_with("sha256:")
@@ -3194,14 +3322,14 @@ fn semantic_diagnostic(problem: SemanticProblem) -> CommandDiagnostic {
 }
 
 fn host_diagnostic(problem: HostProblem) -> CommandDiagnostic {
-    let code = match problem {
+    let code = match &problem {
         HostProblem::Unauthorized => CommandDiagnosticCode::Unauthorized,
         HostProblem::NotFound => CommandDiagnosticCode::NotFound,
         HostProblem::IdempotencyConflict => CommandDiagnosticCode::Conflict,
         HostProblem::ResourceExhausted => CommandDiagnosticCode::ResourceExhausted,
         _ => CommandDiagnosticCode::ProviderFailure,
     };
-    diagnostic(code, 0)
+    diagnostic_with_host_problem(code, 0, problem)
 }
 
 #[cfg(test)]
@@ -3235,6 +3363,25 @@ mod tests {
 
         fn arm(&self) {
             self.fail_after_next_put.store(true, Ordering::SeqCst);
+        }
+    }
+
+    impl mainframe_env_store_api::AuditSink for UnknownOutcomeStore {
+        fn record_audit(
+            &self,
+            record: mainframe_env_execution_api::AuditRecord,
+        ) -> Result<(), StoreError> {
+            self.inner.record_audit(record)
+        }
+
+        fn audit_records(
+            &self,
+            execution_id: &mainframe_env_execution_api::ExecutionId,
+            start_effect_sequence: u64,
+            max: usize,
+        ) -> Result<Vec<mainframe_env_execution_api::AuditRecord>, StoreError> {
+            self.inner
+                .audit_records(execution_id, start_effect_sequence, max)
         }
     }
 
@@ -3334,6 +3481,165 @@ mod tests {
             context.tick() + 1,
         )
         .unwrap()
+    }
+
+    #[test]
+    fn command_digest_is_golden_and_redacts_credential_values_before_storage() {
+        let input = "ADDUSER USER1 PASSWORD('THIS-SECRET-MUST-NOT-BE-HASHED') OWNER(RACFADM)";
+        let parsed = parse_command(input, Default::default()).unwrap();
+        let digest = command_request_digest(&parsed);
+        let alternate = command_request_digest(
+            &parse_command(
+                "ADDUSER USER1 PASSWORD('A-DIFFERENT-SECRET') OWNER(RACFADM)",
+                Default::default(),
+            )
+            .unwrap(),
+        );
+        let changed_request = command_request_digest(
+            &parse_command(
+                "ADDUSER USER2 PASSWORD('THIS-SECRET-MUST-NOT-BE-HASHED') OWNER(RACFADM)",
+                Default::default(),
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            digest,
+            "sha256:5b150c202f1af2c3d1f63a24875153e7055dcc894d28daa90de9f3eb5356035e"
+        );
+        assert_eq!(digest, alternate);
+        assert_ne!(digest, changed_request);
+        assert_ne!(
+            digest,
+            format!("sha256:{:x}", Sha256::digest(input.as_bytes()))
+        );
+
+        let (service, context) = setup();
+        service.execute_command(&context, input).unwrap();
+        let snapshot = service.database.read().unwrap();
+        let transaction = &snapshot.transactions[context.idempotency_key()];
+        assert_eq!(
+            transaction.request_digest_format,
+            SecurityRequestDigestFormat::RacfCommandCanonicalV1
+        );
+        assert_eq!(transaction.request_digest, digest);
+        let audit = snapshot.audits.last().unwrap();
+        assert_eq!(audit.resource_digest.as_deref(), Some(digest.as_str()));
+        assert_eq!(
+            audit.fields["REQUEST_DIGEST_FORMAT"],
+            AuditFieldValue::Text(
+                SecurityRequestDigestFormat::RacfCommandCanonicalV1
+                    .as_str()
+                    .into()
+            )
+        );
+        let durable = serde_json::to_string(&snapshot).unwrap();
+        assert!(!durable.contains("THIS-SECRET-MUST-NOT-BE-HASHED"));
+        assert!(!durable.contains(&format!("{:x}", Sha256::digest(input.as_bytes()))));
+    }
+
+    #[test]
+    fn legacy_command_digests_are_scrubbed_then_require_reviewed_reconciliation() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let secrets = Arc::new(MemorySecretResolver::default());
+        secrets.insert("secret:admin", b"ADMIN-PASSWORD".to_vec());
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let service =
+            RacfService::open(provider_store, secrets.clone(), Default::default()).unwrap();
+        service
+            .bootstrap_administrator(
+                "RACFADM",
+                &SecretRef::new("secret:admin", Default::default()).unwrap(),
+            )
+            .unwrap();
+        let context = CommandContext::new(
+            PrincipalId::new("RACFADM", InvocationLimits::default()).unwrap(),
+            "LEGACY-COMMAND",
+            "LEGACY-COMMAND",
+            3,
+        )
+        .unwrap();
+        let input = "ADDUSER USER1 PASSWORD('LEGACY-RAW-SECRET')";
+        service.execute_command(&context, input).unwrap();
+        let legacy_digest = format!("sha256:{:x}", Sha256::digest(input.as_bytes()));
+        service
+            .database
+            .mutate(|snapshot| {
+                let transaction = snapshot.transactions[context.idempotency_key()].clone();
+                let mut encoded =
+                    serde_json::to_value(transaction).map_err(|_| HostProblem::Malformed)?;
+                let encoded = encoded.as_object_mut().ok_or(HostProblem::Malformed)?;
+                encoded.remove("request_digest_format");
+                encoded.insert(
+                    "request_digest".into(),
+                    serde_json::Value::String(legacy_digest.clone()),
+                );
+                let transaction: SecurityTransaction =
+                    serde_json::from_value(serde_json::Value::Object(encoded.clone()))
+                        .map_err(|_| HostProblem::Malformed)?;
+                assert_eq!(
+                    transaction.request_digest_format,
+                    SecurityRequestDigestFormat::LegacyUnversioned
+                );
+                snapshot
+                    .transactions
+                    .insert(context.idempotency_key().into(), transaction);
+                let audit = snapshot.audits.last_mut().ok_or(HostProblem::NotFound)?;
+                audit.resource_digest = Some(legacy_digest.clone());
+                audit.fields.remove("REQUEST_DIGEST_FORMAT");
+                Ok(())
+            })
+            .unwrap();
+        drop(service);
+
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let reopened =
+            RacfService::open(provider_store, secrets.clone(), Default::default()).unwrap();
+        let snapshot = reopened.database.read().unwrap();
+        let transaction = &snapshot.transactions[context.idempotency_key()];
+        assert_eq!(
+            transaction.request_digest_format,
+            SecurityRequestDigestFormat::LegacyScrubbedV0
+        );
+        assert_ne!(transaction.request_digest, legacy_digest);
+        let scrubbed_digest = transaction.request_digest.clone();
+        let audit = snapshot.audits.last().unwrap();
+        assert_ne!(
+            audit.resource_digest.as_deref(),
+            Some(legacy_digest.as_str())
+        );
+        assert_eq!(
+            audit.fields["REQUEST_DIGEST_FORMAT"],
+            AuditFieldValue::Text(
+                SecurityRequestDigestFormat::LegacyScrubbedV0
+                    .as_str()
+                    .into()
+            )
+        );
+        drop(snapshot);
+
+        let problem = reopened.execute_command(&context, input).unwrap_err();
+        assert_eq!(problem.code, CommandDiagnosticCode::ProviderFailure);
+        assert_eq!(problem.host_problem(), Some(&HostProblem::UnknownOutcome));
+        assert_eq!(
+            reopened.reconcile_legacy_command(
+                &context,
+                &format!("sha256:{}", "b".repeat(64)),
+                input,
+            ),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        reopened
+            .reconcile_legacy_command(&context, &scrubbed_digest, input)
+            .unwrap();
+        let replay = reopened.execute_command(&context, input).unwrap();
+        assert!(replay.replayed);
+        assert_eq!(reopened.database.read().unwrap().principals.len(), 2);
+        drop(reopened);
+
+        let provider_store: Arc<dyn ProviderStateStore> = store;
+        let restarted = RacfService::open(provider_store, secrets, Default::default()).unwrap();
+        assert!(restarted.execute_command(&context, input).unwrap().replayed);
+        assert_eq!(restarted.database.read().unwrap().principals.len(), 2);
     }
 
     #[test]
@@ -3763,7 +4069,7 @@ mod tests {
             .credential
             .clone()
             .unwrap();
-        assert_eq!(credential.history_digests.len(), 1);
+        assert_eq!(credential.history_verifiers.len(), 1);
         drop(service);
 
         let reopened = RacfService::open(store, secrets, Default::default()).unwrap();

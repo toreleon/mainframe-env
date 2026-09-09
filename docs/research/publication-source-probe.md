@@ -834,14 +834,14 @@ were argued from.
 
 - **"nothing validates parameters" (AMS) is false.**
   `ams_operand_allowed` at
-  `crates/apps/mainframe-env-batch/src/service.rs:6169<!--f:ams.allowlist_line-->`
+  `crates/apps/mainframe-env-batch/src/service.rs:6232<!--f:ams.allowlist_line-->`
   is a per-command allowlist of **126<!--f:ams.allowlist_names--> distinct
   operand names**, 84<!--f:ams.allowlist_base_names--> of them the
   base set shared by `ALLOCATE`, `DEFINE CLUSTER`, `DEFINE NONVSAM`, `DEFINE
   ALTERNATEINDEX` and `ALTER` and the rest declared per command.
-  `unimplemented_ams_operand` at `:6047<!--f:ams.unimplemented_line-->` scans
+  `unimplemented_ams_operand` at `:6110<!--f:ams.unimplemented_line-->` scans
   every top-level term and its caller at
-  `:2925<!--f:ams.unimplemented_caller_line-->` raises `UnsupportedCapability` on
+  `:2995<!--f:ams.unimplemented_caller_line-->` raises `UnsupportedCapability` on
   capability `ams-operand` before any
   effect runs. The ruling — that `grammar.json` stays a recognition inventory and
   should not grow a parameter field — is *strengthened* by this, not weakened:
@@ -884,7 +884,7 @@ were argued from.
 |---|---|
 | Db2 | 832<!--f:pins.topics.db2--> topics pinned and all 174<!--f:catalog.rows.db2--> rows resolve. No syntax reader; statement syntax is published as the same DITA railroad markup COBOL uses, so the COBOL reader is the nearest starting point. |
 | z/OSMF | REST families rather than a command language. All 216<!--f:catalog.rows.zosmf--> rows resolve; a syntax projection does not apply without a different comparison model. |
-| CICS, IMS, MQ | All three pin topics and all three reproduce. The locator audit resolves every `html-table:` and `html-link:` identity exactly: 571<!--f:catalog.rows.cics--> CICS rows, 25<!--f:catalog.rows.ims--> IMS rows and 26<!--f:catalog.rows.mq--> MQ rows. None has a syntax reader. CICS remains the largest and the one most often assumed to be done: its rows cite the EIBFN function-code table in `dfha8mf.html`, which proves the inventory and still says nothing about each command's syntax. There is no `conformance/0.9` directory and no CICS syntax reader in the tree; 0.9.0 remains proposed and this audit does not implement it. |
+| CICS, IMS, MQ | All three pin topics and all three reproduce. The locator audit resolves every `html-table:` and `html-link:` identity exactly: 571<!--f:catalog.rows.cics--> CICS rows, 25<!--f:catalog.rows.ims--> IMS rows and 26<!--f:catalog.rows.mq--> MQ rows. IMS and MQ have no syntax reader. CICS now has a bounded accepted file/UOW pilot under `conformance/0.9`, but it is not a reader or implementation for the complete 263-command application API. The CICS rows cite the EIBFN function-code table in `dfha8mf.html`, which proves the inventory and still says nothing about each command's complete syntax. 0.9.0 remains proposed. |
 
 The remaining publication-analysis gaps, in order of size:
 

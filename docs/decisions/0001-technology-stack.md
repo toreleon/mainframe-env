@@ -1,6 +1,9 @@
 # ADR-0001: 0.1 Technology Stack
 
 Status: **Accepted by repository owner**
+Owner: **repository owner**
+Scope: **technology stack and deferred framework boundaries**
+Applies from: **mainframe-env 0.1.0**
 Decision scope: **mainframe-env 0.1**
 
 ## Context

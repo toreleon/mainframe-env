@@ -1,6 +1,9 @@
 # 0.1 Package Map
 
-Status: **Accepted by repository owner, with the V0 consolidation below**
+Status: **Accepted; current topology governed by ADR-0009**
+Owner: **architecture maintainers**
+Scope: **current package ownership, dependency layers, and split boundaries**
+Applies from: **mainframe-env 0.8.3 development**
 
 ## Scope rule
 
@@ -16,6 +19,13 @@ future plugin stub.
 A crate exists only when it enforces dependency direction, a versioned public
 contract, an independently selected provider, or an application boundary.
 Readability alone is handled with modules.
+
+Module readability is governed by
+[ADR-0010](../decisions/0010-rust-module-review-budgets.md) and the
+[machine budget inventory](../../conformance/0.9/inventory/module-budgets.json).
+New/non-exempt Rust modules have a hard 1,200-production-line maximum; an
+oversized legacy module must retain its exact non-growing ceiling and split at
+the recorded stable reason to change rather than creating an unjustified crate.
 
 ## Proposed 0.1 workspace
 
@@ -75,9 +85,27 @@ The exact count may shrink when two proposed packages do not enforce a real
 dependency boundary. It may grow only through an ADR demonstrating an in-scope
 0.1 requirement.
 
-## Accepted V0 consolidation
+## Current governed topology
 
-The machine package inventory consolidates the proposed map to 20 packages.
+ADR-0005 described a 20-package consolidation target. The exact accepted 0.1
+machine inventory ultimately contains 24 workspace packages: the 20 boundary
+packages in that target plus the server and CLI entry applications and the
+conformance and xtask tooling packages. Later versioned additions introduced
+`mainframe-env-coverage` (0.2) and `mainframe-env-spool` (0.8), so the current
+workspace contains 26 packages.
+
+The non-publishing `fuzz/` Cargo workspace is an isolated test driver rather
+than a main-workspace package. Its nightly/libFuzzer dependencies, lockfile,
+corpora, and generated artifacts do not enter a product package or release
+closure; ADR-0008 records that boundary.
+
+`conformance/0.1/inventory/packages.json` plus the versioned
+`package-additions.json` files are the current machine authority. ADR-0005 is a
+historical decision whose original count must not be used as current workspace
+truth. [ADR-0009](../decisions/0009-current-package-topology.md) governs the
+current topology and requires a new superseding decision for any package
+addition, removal, layer move, or boundary-changing normal dependency.
+
 IR codecs remain with `mainframe-env-ir`; CICS contracts remain with
 `mainframe-env-host-api`; execution coordination remains with the interpreter
 kernel; COBOL syntax, semantics, HIR, and lowering remain private modules of the
@@ -85,7 +113,8 @@ compiler kernel; JCL and JES share the batch state authority; and
 memory/SQL/artifact adapters share the store package. These units do not require
 independent 0.1 publication or provider selection boundaries. ADR 0005 records
 the decision, and the exact accepted mapping and justification is
-`conformance/0.1/inventory/packages.json`.
+`conformance/0.1/inventory/packages.json`, its versioned additions, and
+ADR-0009.
 
 ## Foundation packages
 

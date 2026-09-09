@@ -1,13 +1,23 @@
 use crate::codec::{Entry, MemberGeneration, decode, encode, encode_definition_digest_v3};
 use crate::dependency::{DependencyGraph, DependencyLimits};
+use crate::retention::{
+    CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
+    CICS_OUTER_EFFECT_ORIGIN_BINDING, CICS_OUTER_EFFECT_ORIGIN_SCHEMA, DatasetReplayCodecVersion,
+    DatasetReplayDependencyState, DatasetReplayOwnerKind, DatasetReplayResultState,
+    DatasetReplayRetentionState, DatasetReplayRowDescriptor, DatasetReplayValidationError,
+    ReplayRetentionMetadata, dataset_replay_binding_digest, decode_replay_envelope,
+    encode_replay_envelope,
+};
 use mainframe_env_execution_api::{CapabilityId, Invocation, InvocationLimits};
 use mainframe_env_host_api::{
     CapabilityDescriptor, DatasetMemberGenerationSnapshot, DatasetMemberSnapshot, DatasetName,
     DatasetRelativeRecordSnapshot, DatasetRequest, DatasetResult, DatasetSnapshot, EffectRequest,
     EffectResult, HostProblem, HostProvider, HostRequest, HostResult, MemberName,
+    canonical_result_digest,
 };
 use mainframe_env_store_api::{
-    ProviderStateMutation, ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
+    EffectDigestFormat, EffectRecord, EffectState, ProviderStateMutation, ProviderStateRecord,
+    ProviderStateStore, ProviderStateWrite, StoreError,
 };
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -144,10 +154,8 @@ impl DatasetService {
                 let result = DatasetResult::Locks {
                     locks: vec![receipt.clone()],
                 };
-                let replay = Replay {
-                    request_digest: request_digest(request)?,
-                    result: Some(result.clone()),
-                };
+                let replay =
+                    resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
                 let mut mutations = state
                     .locks
                     .values()
@@ -199,10 +207,8 @@ impl DatasetService {
                 let result = DatasetResult::Mutated {
                     version: lock.version.saturating_add(1),
                 };
-                let replay = Replay {
-                    request_digest: request_digest(request)?,
-                    result: Some(result.clone()),
-                };
+                let replay =
+                    resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
                 self.commit_catalog_mutations(
                     vec![
                         ProviderStateMutation::Delete {
@@ -238,10 +244,8 @@ impl DatasetService {
                     version: 1,
                 };
                 let result = DatasetResult::Tvs(tvs_receipt(transaction, &unit)?);
-                let replay = Replay {
-                    request_digest: request_digest(request)?,
-                    result: Some(result.clone()),
-                };
+                let replay =
+                    resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
                 self.commit_catalog_mutations(
                     vec![
                         ProviderStateMutation::Put(ProviderStateWrite {
@@ -340,10 +344,8 @@ impl DatasetService {
                     .checked_add(1)
                     .ok_or(HostProblem::ResourceExhausted)?;
                 let result = DatasetResult::Tvs(tvs_receipt(transaction, &next)?);
-                let replay = Replay {
-                    request_digest: request_digest(request)?,
-                    result: Some(result.clone()),
-                };
+                let replay =
+                    resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
                 let mut mutations = vec![ProviderStateMutation::Put(ProviderStateWrite {
                     record: ProviderStateRecord {
                         namespace: "dataset-tvs".into(),
@@ -457,10 +459,7 @@ impl DatasetService {
         }
         let projected = project_tvs_entries(state, &current.operations, self.limits)?;
         let result = DatasetResult::Tvs(tvs_receipt(transaction, &next)?);
-        let replay = Replay {
-            request_digest: request_digest(request)?,
-            result: Some(result.clone()),
-        };
+        let replay = resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
         let mut mutations = Vec::new();
         let mut updated_entries = Vec::new();
         for (name, mut entry) in projected {
@@ -580,10 +579,7 @@ impl DatasetService {
         next: TvsUnitOfWork,
     ) -> Result<DatasetResult, HostProblem> {
         let result = DatasetResult::Tvs(tvs_receipt(transaction, &next)?);
-        let replay = Replay {
-            request_digest: request_digest(request)?,
-            result: Some(result.clone()),
-        };
+        let replay = resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
         let mut mutations = vec![ProviderStateMutation::Put(ProviderStateWrite {
             record: ProviderStateRecord {
                 namespace: "dataset-tvs".into(),
@@ -620,6 +616,27 @@ impl DatasetService {
 struct Replay {
     request_digest: [u8; 32],
     result: Option<DatasetResult>,
+    metadata: Option<ReplayRetentionMetadata>,
+}
+
+fn resolved_replay(
+    state: &State,
+    mutation: &mainframe_env_host_api::Mutation,
+    request_digest: [u8; 32],
+    result: DatasetResult,
+) -> Result<Replay, HostProblem> {
+    let pending = state
+        .replay
+        .get(mutation.idempotency_key.as_str())
+        .ok_or(HostProblem::InfrastructureFailure)?;
+    if pending.request_digest != request_digest || pending.result.is_some() {
+        return Err(HostProblem::IdempotencyConflict);
+    }
+    Ok(Replay {
+        request_digest,
+        result: Some(result),
+        metadata: pending.metadata.clone(),
+    })
 }
 type BrowseIdentity = (Vec<u8>, Vec<u8>);
 type SequentialRecord = (Vec<u8>, Vec<u8>);
@@ -698,15 +715,61 @@ struct State {
     replay: BTreeMap<String, Replay>,
     dependencies: DependencyGraph,
 }
+
+fn load_replay_index(
+    store: &dyn ProviderStateStore,
+    limits: DatasetLimits,
+) -> Result<BTreeMap<String, Replay>, HostProblem> {
+    let rows = store
+        .list_provider_state("dataset-replay", limits.max_idempotency)
+        .map_err(store_error)?;
+    let mut replay = BTreeMap::new();
+    for row in rows {
+        describe_dataset_replay_row_with_limits(&row, limits)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let decoded =
+            decode_replay(&row.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
+        if replay.insert(row.key, decoded).is_some() {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+    }
+    Ok(replay)
+}
+
 pub struct DatasetService {
     store: Arc<dyn ProviderStateStore>,
     limits: DatasetLimits,
     state: Mutex<State>,
+    replay_clock: Option<Arc<dyn DatasetReplayClock>>,
 }
+
+/// Trusted durable logical-time source used after a replay result is persisted.
+pub trait DatasetReplayClock: Send + Sync {
+    /// Observe the current nonzero durable logical tick.
+    fn now_tick(&self) -> Result<u64, HostProblem>;
+}
+
 impl DatasetService {
     pub fn open(
         store: Arc<dyn ProviderStateStore>,
         limits: DatasetLimits,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_inner(store, limits, None)
+    }
+
+    /// Open with a trusted durable clock so current replay rows can become terminal.
+    pub fn open_with_replay_clock(
+        store: Arc<dyn ProviderStateStore>,
+        limits: DatasetLimits,
+        replay_clock: Arc<dyn DatasetReplayClock>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_inner(store, limits, Some(replay_clock))
+    }
+
+    fn open_inner(
+        store: Arc<dyn ProviderStateStore>,
+        limits: DatasetLimits,
+        replay_clock: Option<Arc<dyn DatasetReplayClock>>,
     ) -> Result<Arc<Self>, HostProblem> {
         let mut entries = BTreeMap::new();
         for row in store
@@ -734,16 +797,7 @@ impl DatasetService {
             }
             entries.insert(row.key, entry);
         }
-        let mut replay = BTreeMap::new();
-        for row in store
-            .list_provider_state("dataset-replay", limits.max_idempotency)
-            .map_err(store_error)?
-        {
-            replay.insert(
-                row.key,
-                decode_replay(&row.payload).map_err(|_| HostProblem::InfrastructureFailure)?,
-            );
-        }
+        let replay = load_replay_index(&*store, limits)?;
         let mut alternate_indexes = BTreeMap::new();
         for row in store
             .list_provider_state("dataset-aix", limits.max_datasets)
@@ -1028,6 +1082,7 @@ impl DatasetService {
         Ok(Arc::new(Self {
             store,
             limits,
+            replay_clock,
             state: Mutex::new(State {
                 entries,
                 alternate_indexes,
@@ -1265,43 +1320,102 @@ impl DatasetService {
     }
 
     pub fn invoke(&self, request: DatasetRequest) -> Result<DatasetResult, HostProblem> {
-        self.invoke_checked(None, request)
+        self.invoke_checked(None, None, request)
+    }
+
+    /// Reload the live replay index after an external atomic retention prune.
+    ///
+    /// The service mutex is held across the provider-state scan, so a local
+    /// mutation cannot be lost while the in-memory map is replaced. Every row
+    /// is fully validated before publication; corruption leaves the old map
+    /// unchanged and fails closed.
+    pub fn refresh_replay_index(&self) -> Result<usize, HostProblem> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let replay = load_replay_index(&*self.store, self.limits)?;
+        let count = replay.len();
+        state.replay = replay;
+        Ok(count)
     }
 
     fn invoke_checked(
         &self,
         principal: Option<&mainframe_env_execution_api::PrincipalId>,
+        mut trusted_metadata: Option<ReplayRetentionMetadata>,
         request: DatasetRequest,
     ) -> Result<DatasetResult, HostProblem> {
+        self.refresh_replay_index()?;
         HostRequest::Dataset(request.clone()).validate(mainframe_env_host_api::HostLimits {
             max_record_bytes: self.limits.max_record_bytes,
             max_records: self.limits.max_records,
             ..Default::default()
         })?;
         let mutation = mutation(&request);
+        if trusted_metadata.as_ref().is_some_and(|metadata| {
+            mutation.is_none_or(|mutation| metadata.effect_key != mutation.idempotency_key.as_str())
+        }) {
+            return Err(HostProblem::IdempotencyConflict);
+        }
         let mut state = self
             .state
             .lock()
             .map_err(|_| HostProblem::InfrastructureFailure)?;
+        state.replay = load_replay_index(&*self.store, self.limits)?;
         if let Some(principal) = principal {
             authorize_principal(&state, principal, &request)?;
         }
         let digest = request_digest(&request)?;
         if let Some(key) = mutation.map(|value| value.idempotency_key.as_str())
-            && let Some(replay) = state.replay.get(key)
+            && let Some(replay) = state.replay.get(key).cloned()
         {
             if replay.request_digest != digest
                 && !(replay.request_digest == legacy_request_digest(&request)?
-                    && legacy_creation_date_replay_matches(&state, &request, replay))
+                    && legacy_creation_date_replay_matches(&state, &request, &replay))
             {
                 return Err(HostProblem::IdempotencyConflict);
             }
-            if let Some(result) = &replay.result {
-                return Ok(result.clone());
+            if let Some(result) = replay.result.clone() {
+                let should_finalize = match (&replay.metadata, &trusted_metadata) {
+                    (Some(original), Some(retry)) if original.owner_kind.is_some() => {
+                        validate_dataset_retry_metadata(original, retry)?;
+                        original.resolution_tick.is_none()
+                    }
+                    (Some(original), None) if original.owner_kind.is_some() => {
+                        return Err(HostProblem::IdempotencyConflict);
+                    }
+                    _ => false,
+                };
+                if should_finalize {
+                    self.finalize_replay_metadata(
+                        &mut state,
+                        key,
+                        replay
+                            .metadata
+                            .as_ref()
+                            .map(|metadata| metadata.deadline_tick)
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                    )
+                    .map_err(|_| HostProblem::UnknownOutcome)?;
+                }
+                return Ok(result);
             }
             if !atomic_dataset_request(&request) {
                 return Err(HostProblem::UnknownOutcome);
             }
+            trusted_metadata = match (replay.metadata.clone(), trusted_metadata) {
+                (Some(original), Some(retry)) if original.owner_kind.is_some() => {
+                    validate_dataset_retry_metadata(&original, &retry)?;
+                    Some(original)
+                }
+                (Some(original), _) if original.owner_kind.is_none() => {
+                    let _ = original;
+                    None
+                }
+                (None, _) => None,
+                _ => return Err(HostProblem::IdempotencyConflict),
+            };
             self.store
                 .delete_provider_state("dataset-replay", key, 1)
                 .map_err(store_error)?;
@@ -1314,6 +1428,7 @@ impl DatasetService {
             let replay = Replay {
                 request_digest: digest,
                 result: None,
+                metadata: trusted_metadata.take(),
             };
             self.store
                 .put_provider_state(
@@ -1354,10 +1469,7 @@ impl DatasetService {
             {
                 return Ok(result);
             }
-            let replay = Replay {
-                request_digest: digest,
-                result: Some(result.clone()),
-            };
+            let replay = resolved_replay(&state, meta, digest, result.clone())?;
             self.store
                 .put_provider_state(
                     ProviderStateRecord {
@@ -1371,17 +1483,122 @@ impl DatasetService {
                 .map_err(|_| HostProblem::UnknownOutcome)?;
             state
                 .replay
-                .insert(meta.idempotency_key.as_str().into(), replay);
+                .insert(meta.idempotency_key.as_str().into(), replay.clone());
+            if let Some(metadata) = &replay.metadata {
+                self.finalize_replay_metadata(
+                    &mut state,
+                    meta.idempotency_key.as_str(),
+                    metadata.deadline_tick,
+                )
+                .map_err(|_| HostProblem::UnknownOutcome)?;
+            }
         }
         Ok(result)
     }
 
+    fn finalize_replay_metadata(
+        &self,
+        state: &mut State,
+        key: &str,
+        resolution_lower_bound: u64,
+    ) -> Result<(), HostProblem> {
+        let Some(clock) = &self.replay_clock else {
+            return Ok(());
+        };
+        let current = state
+            .replay
+            .get(key)
+            .cloned()
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let Some(metadata) = current.metadata.as_ref() else {
+            return Ok(());
+        };
+        if metadata.owner_kind.is_none() || metadata.resolution_tick.is_some() {
+            return Ok(());
+        }
+        if current.result.is_none() {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let observed_tick = clock.now_tick()?;
+        if observed_tick == 0 {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let record = self
+            .store
+            .get_provider_state("dataset-replay", key)
+            .map_err(store_error)?
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let descriptor =
+            describe_dataset_replay_row(&record).map_err(|_| HostProblem::InfrastructureFailure)?;
+        if descriptor.retention != DatasetReplayRetentionState::PendingProtected {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let mut next = current;
+        let metadata = next
+            .metadata
+            .as_mut()
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        metadata.resolution_tick = Some(
+            observed_tick
+                .max(resolution_lower_bound)
+                .max(metadata.deadline_tick),
+        );
+        let next_version = record
+            .version
+            .checked_add(1)
+            .filter(|version| *version <= i64::MAX as u64)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "dataset-replay".into(),
+                    key: key.into(),
+                    version: next_version,
+                    payload: encode_replay(&next)?,
+                },
+                Some(record.version),
+            )
+            .map_err(store_error)?;
+        state.replay.insert(key.into(), next);
+        Ok(())
+    }
+
+    fn invoke_for_invocation(
+        &self,
+        invocation: &Invocation,
+        deadline_tick: u64,
+        request: DatasetRequest,
+    ) -> Result<DatasetResult, HostProblem> {
+        if deadline_tick == 0 {
+            return Err(HostProblem::Malformed);
+        }
+        let metadata = mutation(&request)
+            .map(|mutation| {
+                let (owner_kind, outer_effect_key) = dataset_replay_origin(invocation, mutation)?;
+                Ok(ReplayRetentionMetadata {
+                    effect_key: mutation.idempotency_key.as_str().into(),
+                    owner_execution: invocation.execution_id.as_str().into(),
+                    owner_run_unit: invocation.run_unit_id.as_str().into(),
+                    owner_kind: Some(owner_kind),
+                    outer_effect_key,
+                    sequence: mutation.sequence,
+                    deadline_tick,
+                    resolution_tick: None,
+                    result_sha256: [0; 32],
+                    binding_sha256: [0; 32],
+                })
+            })
+            .transpose()?;
+        self.invoke_checked(Some(invocation.principal.id()), metadata, request)
+    }
+
+    #[cfg(test)]
     fn invoke_for_principal(
         &self,
         principal: &mainframe_env_execution_api::PrincipalId,
         request: DatasetRequest,
     ) -> Result<DatasetResult, HostProblem> {
-        self.invoke_checked(Some(principal), request)
+        self.invoke_checked(Some(principal), None, request)
     }
 
     fn apply(
@@ -2201,10 +2418,8 @@ impl DatasetService {
                     dependencies.add_node(dataset.as_str(), dependency_limits(self.limits))?;
                 }
                 let result = DatasetResult::Created { version: 1 };
-                let replay = Replay {
-                    request_digest: request_digest(request)?,
-                    result: Some(result.clone()),
-                };
+                let replay =
+                    resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
                 self.commit_catalog_writes(
                     vec![
                         ProviderStateWrite {
@@ -2380,10 +2595,8 @@ impl DatasetService {
                 let result = DatasetResult::Mutated {
                     version: next.version,
                 };
-                let replay = Replay {
-                    request_digest: request_digest(request)?,
-                    result: Some(result.clone()),
-                };
+                let replay =
+                    resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
                 self.commit_catalog_writes(
                     vec![
                         ProviderStateWrite {
@@ -2539,10 +2752,8 @@ impl DatasetService {
                         &result,
                     )?;
                 } else {
-                    let replay = Replay {
-                        request_digest: request_digest(request)?,
-                        result: Some(result.clone()),
-                    };
+                    let replay =
+                        resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
                     self.commit_catalog_writes(
                         vec![
                             ProviderStateWrite {
@@ -2600,10 +2811,8 @@ impl DatasetService {
                     version: 1,
                 };
                 let result = DatasetResult::Created { version: 1 };
-                let replay = Replay {
-                    request_digest: request_digest(request)?,
-                    result: Some(result.clone()),
-                };
+                let replay =
+                    resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
                 let mut dependencies = state.dependencies.clone();
                 if *kind == mainframe_env_host_api::CatalogKind::User {
                     if let Some((master, _)) = state.catalogs.iter().find(|(_, catalog)| {
@@ -2686,10 +2895,8 @@ impl DatasetService {
                 let result = DatasetResult::Mutated {
                     version: next.version,
                 };
-                let replay = Replay {
-                    request_digest: request_digest(request)?,
-                    result: Some(result.clone()),
-                };
+                let replay =
+                    resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
                 self.commit_catalog_writes(
                     vec![
                         ProviderStateWrite {
@@ -2744,10 +2951,8 @@ impl DatasetService {
                     dependency_limits(self.limits),
                 )?;
                 let result = DatasetResult::Created { version: 1 };
-                let replay = Replay {
-                    request_digest: request_digest(request)?,
-                    result: Some(result.clone()),
-                };
+                let replay =
+                    resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
                 self.commit_catalog_writes(
                     vec![
                         ProviderStateWrite {
@@ -3463,10 +3668,8 @@ impl DatasetService {
                     dependency_limits(self.limits),
                 )?;
                 let result = DatasetResult::Created { version: 1 };
-                let replay = Replay {
-                    request_digest: request_digest(request)?,
-                    result: Some(result.clone()),
-                };
+                let replay =
+                    resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
                 let writes = vec![
                     ProviderStateWrite {
                         record: ProviderStateRecord {
@@ -3551,10 +3754,8 @@ impl DatasetService {
                     .map(|(_, _, next)| next.version)
                     .ok_or(HostProblem::InfrastructureFailure)?;
                 let result = DatasetResult::Mutated { version };
-                let replay = Replay {
-                    request_digest: request_digest(request)?,
-                    result: Some(result.clone()),
-                };
+                let replay =
+                    resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
                 let mut mutations = updates
                     .iter()
                     .map(|(name, expected, next)| {
@@ -3607,10 +3808,8 @@ impl DatasetService {
                     dependency_limits(self.limits),
                 )?;
                 let result = DatasetResult::Created { version: 1 };
-                let replay = Replay {
-                    request_digest: request_digest(request)?,
-                    result: Some(result.clone()),
-                };
+                let replay =
+                    resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
                 self.commit_catalog_writes(
                     vec![
                         ProviderStateWrite {
@@ -3678,10 +3877,8 @@ impl DatasetService {
                 let mut dependencies = state.dependencies.clone();
                 dependencies.add_node(base.as_str(), dependency_limits(self.limits))?;
                 let result = DatasetResult::Created { version: 1 };
-                let replay = Replay {
-                    request_digest: request_digest(request)?,
-                    result: Some(result.clone()),
-                };
+                let replay =
+                    resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
                 let writes = vec![
                     ProviderStateWrite {
                         record: ProviderStateRecord {
@@ -3796,10 +3993,8 @@ impl DatasetService {
                     absolute_generation: absolute,
                     version: next.version,
                 };
-                let replay = Replay {
-                    request_digest: request_digest(request)?,
-                    result: Some(result.clone()),
-                };
+                let replay =
+                    resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
                 let writes = vec![
                     ProviderStateWrite {
                         record: ProviderStateRecord {
@@ -3990,10 +4185,8 @@ impl DatasetService {
                     version: moved.version,
                 };
                 let mutation = mutation(request).ok_or(HostProblem::MissingIdempotency)?;
-                let replay = Replay {
-                    request_digest: request_digest(request)?,
-                    result: Some(result.clone()),
-                };
+                let replay =
+                    resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
                 let mut mutations = vec![ProviderStateMutation::Move {
                     record: ProviderStateRecord {
                         namespace: "dataset".into(),
@@ -4078,10 +4271,8 @@ impl DatasetService {
                         version: alias.version.saturating_add(1),
                     };
                     let mutation = mutation(request).ok_or(HostProblem::MissingIdempotency)?;
-                    let replay = Replay {
-                        request_digest: request_digest(request)?,
-                        result: Some(result.clone()),
-                    };
+                    let replay =
+                        resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
                     self.commit_catalog_mutations(
                         vec![
                             ProviderStateMutation::Delete {
@@ -4119,10 +4310,8 @@ impl DatasetService {
                         version: catalog.version.saturating_add(1),
                     };
                     let mutation = mutation(request).ok_or(HostProblem::MissingIdempotency)?;
-                    let replay = Replay {
-                        request_digest: request_digest(request)?,
-                        result: Some(result.clone()),
-                    };
+                    let replay =
+                        resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
                     self.commit_catalog_mutations(
                         vec![
                             ProviderStateMutation::Delete {
@@ -4155,10 +4344,8 @@ impl DatasetService {
                         version: group.version.saturating_add(1),
                     };
                     let mutation = mutation(request).ok_or(HostProblem::MissingIdempotency)?;
-                    let replay = Replay {
-                        request_digest: request_digest(request)?,
-                        result: Some(result.clone()),
-                    };
+                    let replay =
+                        resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
                     self.commit_catalog_mutations(
                         vec![
                             ProviderStateMutation::Delete {
@@ -4196,10 +4383,8 @@ impl DatasetService {
                         version: index.version.saturating_add(1),
                     };
                     let mutation = mutation(request).ok_or(HostProblem::MissingIdempotency)?;
-                    let replay = Replay {
-                        request_digest: request_digest(request)?,
-                        result: Some(result.clone()),
-                    };
+                    let replay =
+                        resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
                     self.commit_catalog_mutations(
                         vec![
                             ProviderStateMutation::Delete {
@@ -4312,10 +4497,8 @@ impl DatasetService {
                         version: current.version.saturating_add(1),
                     };
                     let mutation = mutation(request).ok_or(HostProblem::MissingIdempotency)?;
-                    let replay = Replay {
-                        request_digest: request_digest(request)?,
-                        result: Some(result.clone()),
-                    };
+                    let replay =
+                        resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
                     let mut mutations = indexes
                         .iter()
                         .map(|(name, version)| ProviderStateMutation::Delete {
@@ -4563,10 +4746,7 @@ impl DatasetService {
                 .ok_or(HostProblem::ResourceExhausted)?;
             updated_indexes.push((name.clone(), index.version, updated));
         }
-        let replay = Replay {
-            request_digest,
-            result: Some(result.clone()),
-        };
+        let replay = resolved_replay(state, mutation, request_digest, result.clone())?;
         let mut writes = Vec::with_capacity(2 + updated_indexes.len());
         writes.push(ProviderStateWrite {
             record: ProviderStateRecord {
@@ -8605,7 +8785,26 @@ fn encode_replay(replay: &Replay) -> Result<Vec<u8>, HostProblem> {
         }
         Some(_) => return Err(HostProblem::InfrastructureFailure),
     }
-    Ok(payload)
+    match &replay.metadata {
+        Some(metadata) if metadata.owner_kind.is_some() => {
+            let mut metadata = metadata.clone();
+            metadata.result_sha256 = replay
+                .result
+                .as_ref()
+                .map(|result| {
+                    canonical_result_digest(&Ok(HostResult::Dataset(result.clone())))
+                        .map_err(|_| HostProblem::InfrastructureFailure)
+                })
+                .transpose()?
+                .unwrap_or([0; 32]);
+            metadata.binding_sha256 =
+                dataset_replay_binding_digest(&metadata, replay.request_digest);
+            encode_replay_envelope(&payload, &metadata)
+                .map_err(|_| HostProblem::InfrastructureFailure)
+        }
+        Some(_) => Ok(payload),
+        None => Ok(payload),
+    }
 }
 
 fn replay_mutation(
@@ -8624,6 +8823,8 @@ fn replay_mutation(
 }
 
 fn decode_replay(payload: &[u8]) -> Result<Replay, ()> {
+    let envelope = decode_replay_envelope(payload).map_err(|_| ())?;
+    let payload = envelope.core;
     if payload.len() < 38 || payload.get(..5) != Some(b"MEDR1") {
         return Err(());
     }
@@ -8765,7 +8966,387 @@ fn decode_replay(payload: &[u8]) -> Result<Replay, ()> {
     Ok(Replay {
         request_digest,
         result,
+        metadata: envelope.metadata,
     })
+}
+
+/// Decode and fully validate one `dataset-replay` provider-state row.
+///
+/// A successful descriptor is not automatically retention-eligible. Callers
+/// must honor `dependency`: pending and legacy rows remain protected, while an
+/// owned terminal row still depends on the owning effect and execution.
+pub fn describe_dataset_replay_row(
+    row: &ProviderStateRecord,
+) -> Result<DatasetReplayRowDescriptor, DatasetReplayValidationError> {
+    describe_dataset_replay_row_with_limits(row, DatasetLimits::default())
+}
+
+/// Decode and validate a replay row with the configured provider bounds.
+pub fn describe_dataset_replay_row_with_limits(
+    row: &ProviderStateRecord,
+    limits: DatasetLimits,
+) -> Result<DatasetReplayRowDescriptor, DatasetReplayValidationError> {
+    if row.namespace != "dataset-replay" {
+        return Err(DatasetReplayValidationError::WrongNamespace);
+    }
+    if row.key.is_empty() || row.version == 0 || row.version > i64::MAX as u64 {
+        return Err(DatasetReplayValidationError::InvalidIdentity);
+    }
+    if row.payload.len() > limits.max_total_bytes {
+        return Err(DatasetReplayValidationError::CorruptPayload);
+    }
+    mainframe_env_execution_api::IdempotencyKey::new(row.key.clone(), InvocationLimits::default())
+        .map_err(|_| DatasetReplayValidationError::InvalidIdentity)?;
+    let envelope = decode_replay_envelope(&row.payload)?;
+    if envelope
+        .metadata
+        .as_ref()
+        .is_some_and(|metadata| metadata.effect_key != row.key)
+    {
+        return Err(DatasetReplayValidationError::InvalidIdentity);
+    }
+    let replay =
+        decode_replay(&row.payload).map_err(|_| DatasetReplayValidationError::CorruptPayload)?;
+    let result_state = if replay.result.is_some() {
+        DatasetReplayResultState::Resolved
+    } else {
+        DatasetReplayResultState::Pending
+    };
+    match (envelope.codec, result_state, envelope.metadata.as_ref()) {
+        (DatasetReplayCodecVersion::LegacyV1, DatasetReplayResultState::Pending, None)
+            if row.version == 1 => {}
+        (DatasetReplayCodecVersion::LegacyV1, DatasetReplayResultState::Resolved, None)
+            if row.version >= 2 => {}
+        (DatasetReplayCodecVersion::RetentionV2, _, Some(_)) if row.version > 0 => {}
+        (
+            DatasetReplayCodecVersion::RetentionV3,
+            DatasetReplayResultState::Pending,
+            Some(metadata),
+        ) if row.version == 1
+            && metadata.resolution_tick.is_none()
+            && metadata.result_sha256 == [0; 32] => {}
+        (
+            DatasetReplayCodecVersion::RetentionV3,
+            DatasetReplayResultState::Resolved,
+            Some(metadata),
+        ) if row.version == 2 && metadata.resolution_tick.is_none() => {}
+        (
+            DatasetReplayCodecVersion::RetentionV3,
+            DatasetReplayResultState::Resolved,
+            Some(metadata),
+        ) if row.version == 3 && metadata.resolution_tick.is_some() => {}
+        _ => return Err(DatasetReplayValidationError::CorruptPayload),
+    }
+    let result_digest = replay
+        .result
+        .as_ref()
+        .map(|result| {
+            HostResult::Dataset(result.clone())
+                .validate(mainframe_env_host_api::HostLimits {
+                    max_record_bytes: limits.max_record_bytes,
+                    max_records: limits.max_records,
+                    max_state_bytes: limits.max_total_bytes,
+                    ..mainframe_env_host_api::HostLimits::default()
+                })
+                .map_err(|_| DatasetReplayValidationError::CorruptPayload)?;
+            canonical_result_digest(&Ok(HostResult::Dataset(result.clone())))
+                .map_err(|_| DatasetReplayValidationError::CorruptPayload)
+        })
+        .transpose()?
+        .unwrap_or([0; 32]);
+    let current = envelope.codec == DatasetReplayCodecVersion::RetentionV3;
+    if current {
+        let metadata = envelope
+            .metadata
+            .as_ref()
+            .ok_or(DatasetReplayValidationError::CorruptPayload)?;
+        if metadata.result_sha256 != result_digest
+            || metadata.binding_sha256
+                != dataset_replay_binding_digest(metadata, replay.request_digest)
+        {
+            return Err(DatasetReplayValidationError::CorruptPayload);
+        }
+        mainframe_env_execution_api::ExecutionId::new(
+            &metadata.owner_execution,
+            InvocationLimits::default(),
+        )
+        .map_err(|_| DatasetReplayValidationError::CorruptPayload)?;
+        mainframe_env_execution_api::RunUnitId::new(
+            &metadata.owner_run_unit,
+            InvocationLimits::default(),
+        )
+        .map_err(|_| DatasetReplayValidationError::CorruptPayload)?;
+        if metadata.owner_kind == Some(DatasetReplayOwnerKind::CicsNested) {
+            let (run_unit, sequence) = parse_cics_replay_key(&row.key)
+                .ok_or(DatasetReplayValidationError::CorruptPayload)?;
+            if run_unit != metadata.owner_run_unit || sequence != metadata.sequence {
+                return Err(DatasetReplayValidationError::CorruptPayload);
+            }
+        }
+    }
+    let dependency = match (current, result_state, envelope.metadata.as_ref()) {
+        (false, DatasetReplayResultState::Pending, _) => {
+            DatasetReplayDependencyState::PendingResult
+        }
+        (false, DatasetReplayResultState::Resolved, _) => {
+            DatasetReplayDependencyState::TerminalEffectRequired
+        }
+        (true, _, Some(metadata)) => match metadata.owner_kind {
+            Some(DatasetReplayOwnerKind::CoreEffect) => DatasetReplayDependencyState::CoreEffect,
+            Some(DatasetReplayOwnerKind::CicsNested) => {
+                let (run_unit, sequence) = parse_cics_replay_key(&row.key)
+                    .ok_or(DatasetReplayValidationError::CorruptPayload)?;
+                DatasetReplayDependencyState::CicsNested {
+                    run_unit,
+                    sequence,
+                    outer_effect_key: metadata
+                        .outer_effect_key
+                        .clone()
+                        .ok_or(DatasetReplayValidationError::CorruptPayload)?,
+                }
+            }
+            None => return Err(DatasetReplayValidationError::CorruptPayload),
+        },
+        _ => return Err(DatasetReplayValidationError::CorruptPayload),
+    };
+    let owner_execution = envelope
+        .metadata
+        .as_ref()
+        .map(|metadata| metadata.owner_execution.clone());
+    let owner_run_unit = envelope
+        .metadata
+        .as_ref()
+        .map(|metadata| metadata.owner_run_unit.clone());
+    let deadline_tick = envelope
+        .metadata
+        .as_ref()
+        .map(|metadata| metadata.deadline_tick);
+    let resolution_tick = envelope
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.resolution_tick);
+    let terminal_tick = envelope.metadata.as_ref().and_then(|metadata| {
+        metadata
+            .resolution_tick
+            .map(|resolution_tick| metadata.deadline_tick.max(resolution_tick))
+    });
+    let retention = if !current {
+        DatasetReplayRetentionState::LegacyProtected
+    } else if result_state == DatasetReplayResultState::Resolved && resolution_tick.is_some() {
+        DatasetReplayRetentionState::Terminal
+    } else {
+        DatasetReplayRetentionState::PendingProtected
+    };
+    Ok(DatasetReplayRowDescriptor {
+        namespace: row.namespace.clone(),
+        key: row.key.clone(),
+        row_version: row.version,
+        payload_digest: Sha256::digest(&row.payload).into(),
+        codec: envelope.codec,
+        result_state,
+        retention,
+        owner_kind: envelope
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.owner_kind),
+        outer_effect_key: envelope
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.outer_effect_key.clone()),
+        owner_execution,
+        owner_run_unit,
+        sequence: envelope
+            .metadata
+            .as_ref()
+            .filter(|_| current)
+            .map(|metadata| metadata.sequence),
+        deadline_tick,
+        resolution_tick,
+        terminal_tick,
+        request_digest: replay.request_digest,
+        result_digest,
+        dependency,
+    })
+}
+
+/// Verify that a resolved replay row belongs to one exact completed effect.
+///
+/// This validates the provider-state key, execution and run-unit ownership,
+/// request digest, canonical result digest, and terminal effect state. For a
+/// legacy row it supplies evidence for an explicit reconciliation; it never
+/// mutates or silently attributes the row.
+pub fn validate_dataset_replay_effect(
+    row: &ProviderStateRecord,
+    effect: &EffectRecord,
+) -> Result<(), DatasetReplayValidationError> {
+    let descriptor = describe_dataset_replay_row(row)?;
+    if descriptor.result_state != DatasetReplayResultState::Resolved
+        || descriptor.retention == DatasetReplayRetentionState::PendingProtected
+        || matches!(
+            descriptor.dependency,
+            DatasetReplayDependencyState::CicsNested { .. }
+        )
+    {
+        return Err(DatasetReplayValidationError::EffectNotTerminal);
+    }
+    if effect.key.as_str() != row.key
+        || effect.execution_id != effect.intent.owner
+        || descriptor
+            .owner_execution
+            .as_deref()
+            .is_some_and(|owner| owner != effect.execution_id.as_str())
+        || descriptor
+            .owner_run_unit
+            .as_deref()
+            .is_some_and(|owner| owner != effect.run_unit_id.as_str())
+        || descriptor
+            .sequence
+            .is_some_and(|sequence| sequence != effect.sequence)
+    {
+        return Err(DatasetReplayValidationError::EffectMismatch);
+    }
+    if effect.state != EffectState::Completed
+        || effect.digest_format != EffectDigestFormat::CanonicalHostV1
+        || effect.result_digest.is_none()
+    {
+        return Err(DatasetReplayValidationError::EffectNotTerminal);
+    }
+    let replay =
+        decode_replay(&row.payload).map_err(|_| DatasetReplayValidationError::CorruptPayload)?;
+    if effect.request_digest != replay.request_digest {
+        return Err(DatasetReplayValidationError::EffectMismatch);
+    }
+    let result = replay
+        .result
+        .ok_or(DatasetReplayValidationError::EffectNotTerminal)?;
+    let expected_result = canonical_result_digest(&Ok(HostResult::Dataset(result)))
+        .map_err(|_| DatasetReplayValidationError::CorruptPayload)?;
+    if effect.result_digest != Some(expected_result) {
+        return Err(DatasetReplayValidationError::EffectMismatch);
+    }
+    Ok(())
+}
+
+/// Build a CAS-ready metadata upgrade for a legacy resolved replay row.
+///
+/// Ownership is never inferred from the replay alone. The supplied effect must
+/// use the same idempotency key and request digest, name its execution as the
+/// intent owner, be canonically completed, and carry the exact persisted result
+/// digest. The returned row is not written; an integrator can include it in the
+/// same guarded operator transaction as its reconciliation evidence.
+pub fn reconcile_dataset_replay_row(
+    row: &ProviderStateRecord,
+    effect: &EffectRecord,
+    resolution_tick: u64,
+) -> Result<ProviderStateRecord, DatasetReplayValidationError> {
+    let descriptor = describe_dataset_replay_row(row)?;
+    if descriptor.dependency != DatasetReplayDependencyState::TerminalEffectRequired
+        || descriptor.result_state != DatasetReplayResultState::Resolved
+        || resolution_tick == 0
+    {
+        return Err(DatasetReplayValidationError::EffectNotTerminal);
+    }
+    validate_dataset_replay_effect(row, effect)?;
+    if effect.intent.recovery_after_tick == 0 {
+        return Err(DatasetReplayValidationError::EffectMismatch);
+    }
+    let envelope = decode_replay_envelope(&row.payload)?;
+    let replay =
+        decode_replay(&row.payload).map_err(|_| DatasetReplayValidationError::CorruptPayload)?;
+    let version = row
+        .version
+        .checked_add(1)
+        .filter(|version| *version <= i64::MAX as u64)
+        .ok_or(DatasetReplayValidationError::VersionExhausted)?;
+    let mut metadata = ReplayRetentionMetadata {
+        effect_key: row.key.clone(),
+        owner_execution: effect.execution_id.as_str().into(),
+        owner_run_unit: effect.run_unit_id.as_str().into(),
+        owner_kind: Some(DatasetReplayOwnerKind::CoreEffect),
+        outer_effect_key: None,
+        sequence: effect.sequence,
+        deadline_tick: effect.intent.recovery_after_tick,
+        resolution_tick: Some(resolution_tick.max(effect.intent.recovery_after_tick)),
+        result_sha256: effect
+            .result_digest
+            .ok_or(DatasetReplayValidationError::EffectNotTerminal)?,
+        binding_sha256: [0; 32],
+    };
+    metadata.binding_sha256 = dataset_replay_binding_digest(&metadata, replay.request_digest);
+    let payload = encode_replay_envelope(envelope.core, &metadata)?;
+    Ok(ProviderStateRecord {
+        namespace: row.namespace.clone(),
+        key: row.key.clone(),
+        version,
+        payload,
+    })
+}
+
+fn validate_dataset_retry_metadata(
+    original: &ReplayRetentionMetadata,
+    retry: &ReplayRetentionMetadata,
+) -> Result<(), HostProblem> {
+    if original.effect_key != retry.effect_key
+        || original.owner_execution != retry.owner_execution
+        || original.owner_run_unit != retry.owner_run_unit
+        || original.owner_kind != retry.owner_kind
+        || original.outer_effect_key != retry.outer_effect_key
+        || original.sequence != retry.sequence
+    {
+        Err(HostProblem::IdempotencyConflict)
+    } else {
+        Ok(())
+    }
+}
+
+fn dataset_replay_origin(
+    invocation: &Invocation,
+    mutation: &mainframe_env_host_api::Mutation,
+) -> Result<(DatasetReplayOwnerKind, Option<String>), HostProblem> {
+    let nested = invocation.bindings.get(CICS_NESTED_EFFECT_ORIGIN_BINDING);
+    let outer = invocation.bindings.get(CICS_OUTER_EFFECT_ORIGIN_BINDING);
+    let Some(binding) = nested else {
+        return if outer.is_none() {
+            Ok((DatasetReplayOwnerKind::CoreEffect, None))
+        } else {
+            Err(HostProblem::Malformed)
+        };
+    };
+    if binding.schema() != CICS_NESTED_EFFECT_ORIGIN_SCHEMA
+        || binding.bytes() != mutation.idempotency_key.as_str().as_bytes()
+    {
+        return Err(HostProblem::Malformed);
+    }
+    let (run_unit, sequence) =
+        parse_cics_replay_key(mutation.idempotency_key.as_str()).ok_or(HostProblem::Malformed)?;
+    if run_unit != invocation.run_unit_id.as_str() || sequence != mutation.sequence {
+        return Err(HostProblem::Malformed);
+    }
+    let outer = outer.ok_or(HostProblem::Malformed)?;
+    if outer.schema() != CICS_OUTER_EFFECT_ORIGIN_SCHEMA {
+        return Err(HostProblem::Malformed);
+    }
+    let outer_effect_key =
+        std::str::from_utf8(outer.bytes()).map_err(|_| HostProblem::Malformed)?;
+    mainframe_env_execution_api::IdempotencyKey::new(outer_effect_key, InvocationLimits::default())
+        .map_err(|_| HostProblem::Malformed)?;
+    Ok((
+        DatasetReplayOwnerKind::CicsNested,
+        Some(outer_effect_key.into()),
+    ))
+}
+
+fn parse_cics_replay_key(key: &str) -> Option<(String, u64)> {
+    let (run_unit, encoded_sequence) = key.strip_prefix("cics:")?.rsplit_once(':')?;
+    let sequence = encoded_sequence.parse::<u64>().ok()?;
+    if sequence == 0
+        || sequence.to_string() != encoded_sequence
+        || mainframe_env_execution_api::RunUnitId::new(run_unit, InvocationLimits::default())
+            .is_err()
+    {
+        return None;
+    }
+    Some((run_unit.into(), sequence))
 }
 
 struct Provider {
@@ -8778,11 +9359,28 @@ impl HostProvider for Provider {
     }
     fn invoke(&self, invocation: &Invocation, request: EffectRequest) -> EffectResult {
         let sequence = request.sequence;
+        if request.run_unit != invocation.run_unit_id || sequence == 0 {
+            return EffectResult {
+                sequence,
+                outcome: Err(HostProblem::Malformed),
+            };
+        }
+        let deadline_tick = request.deadline_tick.max(invocation.deadline_tick);
+        let effect_key = request.idempotency_key.clone();
         let outcome = match request.request {
-            HostRequest::Dataset(request) => self
-                .service
-                .invoke_for_principal(invocation.principal.id(), request)
-                .map(HostResult::Dataset),
+            HostRequest::Dataset(request) => {
+                let mutation = mutation(&request);
+                if mutation.is_some_and(|mutation| {
+                    effect_key.as_ref() != Some(&mutation.idempotency_key)
+                        || sequence != mutation.sequence
+                }) {
+                    Err(HostProblem::IdempotencyConflict)
+                } else {
+                    self.service
+                        .invoke_for_invocation(invocation, deadline_tick, request)
+                        .map(HostResult::Dataset)
+                }
+            }
             _ => Err(HostProblem::Malformed),
         };
         EffectResult { sequence, outcome }
@@ -8816,15 +9414,39 @@ pub fn dataset_providers(
 mod tests {
     use super::*;
     use mainframe_env_execution_api::{
-        ArtifactRef, ExecutionId, IdempotencyKey, Principal, RequestId, ResourceLimits, RunUnitId,
-        Selector, ServiceClass, TraceId,
+        ArtifactRef, BoundedPayload, ExecutionId, IdempotencyKey, Principal, RequestId,
+        ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
     };
     use mainframe_env_host_api::{
         DatasetAttributes, DatasetOrganization, HostLimits, Mutation, RecordFormat,
     };
     use mainframe_env_store::{MemoryStore, SqliteStateStore, StoreLimits};
     use std::sync::Barrier;
-    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+
+    struct TestReplayClock {
+        tick: AtomicU64,
+        fail_next: AtomicBool,
+    }
+
+    impl TestReplayClock {
+        fn fixed(tick: u64) -> Self {
+            Self {
+                tick: AtomicU64::new(tick),
+                fail_next: AtomicBool::new(false),
+            }
+        }
+    }
+
+    impl DatasetReplayClock for TestReplayClock {
+        fn now_tick(&self) -> Result<u64, HostProblem> {
+            if self.fail_next.swap(false, Ordering::SeqCst) {
+                Err(HostProblem::InfrastructureFailure)
+            } else {
+                Ok(self.tick.load(Ordering::SeqCst))
+            }
+        }
+    }
     fn mutation(n: u64) -> Mutation {
         Mutation {
             sequence: n,
@@ -8912,6 +9534,7 @@ mod tests {
         inner: MemoryStore,
         fail_next: AtomicBool,
         fail_next_tvs_put: AtomicBool,
+        fail_replay_metadata_put: AtomicBool,
     }
 
     impl FailAtomicOnceStore {
@@ -8920,6 +9543,7 @@ mod tests {
                 inner: MemoryStore::new(Default::default()),
                 fail_next: AtomicBool::new(false),
                 fail_next_tvs_put: AtomicBool::new(false),
+                fail_replay_metadata_put: AtomicBool::new(false),
             }
         }
 
@@ -8932,8 +9556,31 @@ mod tests {
             self.fail_next_tvs_put.store(true, Ordering::SeqCst);
         }
 
+        fn arm_replay_metadata_failure(&self) {
+            self.fail_replay_metadata_put.store(true, Ordering::SeqCst);
+        }
+
         fn fail_now(&self) -> bool {
             self.fail_next.swap(false, Ordering::SeqCst)
+        }
+    }
+
+    impl mainframe_env_store_api::AuditSink for FailAtomicOnceStore {
+        fn record_audit(
+            &self,
+            record: mainframe_env_execution_api::AuditRecord,
+        ) -> Result<(), StoreError> {
+            self.inner.record_audit(record)
+        }
+
+        fn audit_records(
+            &self,
+            execution_id: &mainframe_env_execution_api::ExecutionId,
+            start_effect_sequence: u64,
+            max: usize,
+        ) -> Result<Vec<mainframe_env_execution_api::AuditRecord>, StoreError> {
+            self.inner
+                .audit_records(execution_id, start_effect_sequence, max)
         }
     }
 
@@ -8959,7 +9606,14 @@ mod tests {
             record: ProviderStateRecord,
             expected_version: Option<u64>,
         ) -> Result<(), StoreError> {
-            if record.namespace == "dataset-tvs"
+            if record.namespace == "dataset-replay"
+                && expected_version == Some(2)
+                && self.fail_replay_metadata_put.swap(false, Ordering::SeqCst)
+            {
+                Err(StoreError::Infrastructure(
+                    "injected-replay-metadata-failure".into(),
+                ))
+            } else if record.namespace == "dataset-tvs"
                 && self.fail_next_tvs_put.swap(false, Ordering::SeqCst)
             {
                 Err(StoreError::Infrastructure(
@@ -10547,6 +11201,7 @@ mod tests {
                     payload: encode_replay(&Replay {
                         request_digest: legacy_digest,
                         result: Some(DatasetResult::Created { version: 1 }),
+                        metadata: None,
                     })
                     .unwrap(),
                 },
@@ -10819,6 +11474,7 @@ mod tests {
                     payload: encode_replay(&Replay {
                         request_digest: request_digest(&retry_request).unwrap(),
                         result: None,
+                        metadata: None,
                     })
                     .unwrap(),
                 },
@@ -14250,5 +14906,562 @@ mod tests {
             }),
             Err(HostProblem::Condition { ref name, response: 13, .. }) if name == "NOTFND"
         ));
+    }
+
+    #[test]
+    fn attributed_replay_is_atomic_restart_safe_and_keeps_its_original_owner() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let initial = service(store.clone());
+        let provider = dataset_providers(initial.clone(), InvocationLimits::default())
+            .into_iter()
+            .find(|provider| provider.descriptor().capability.as_str() == "host.dataset.write")
+            .unwrap();
+        let mut first_invocation = invocation_for("OWNER1");
+        first_invocation.deadline_tick = 900;
+        let request = DatasetRequest::Create {
+            dataset: DatasetName::new("USER.REPLAY.OWNER", 128).unwrap(),
+            attributes: attrs(DatasetOrganization::Sequential),
+            mutation: mutation(30_600),
+        };
+        let call = |invocation: &Invocation| EffectRequest {
+            run_unit: invocation.run_unit_id.clone(),
+            sequence: 30_600,
+            deadline_tick: 800,
+            idempotency_key: Some(mutation(30_600).idempotency_key),
+            request: HostRequest::Dataset(request.clone()),
+        };
+        assert_eq!(
+            provider
+                .invoke(&first_invocation, call(&first_invocation))
+                .outcome,
+            Ok(HostResult::Dataset(DatasetResult::Created { version: 1 }))
+        );
+        let original = store
+            .get_provider_state("dataset-replay", "id-30600")
+            .unwrap()
+            .unwrap();
+        let descriptor = describe_dataset_replay_row(&original).unwrap();
+        assert_eq!(descriptor.codec, DatasetReplayCodecVersion::RetentionV3);
+        assert_eq!(descriptor.row_version, 2);
+        assert_eq!(
+            descriptor.owner_execution.as_deref(),
+            Some(first_invocation.execution_id.as_str())
+        );
+        assert_eq!(
+            descriptor.owner_run_unit.as_deref(),
+            Some(first_invocation.run_unit_id.as_str())
+        );
+        assert_eq!(descriptor.deadline_tick, Some(900));
+        assert_eq!(descriptor.resolution_tick, None);
+        assert_eq!(descriptor.terminal_tick, None);
+        assert_eq!(
+            descriptor.retention,
+            DatasetReplayRetentionState::PendingProtected
+        );
+        assert_eq!(
+            descriptor.dependency,
+            DatasetReplayDependencyState::CoreEffect
+        );
+
+        drop(provider);
+        drop(initial);
+        let restarted = service(store.clone());
+        let replaying_provider = dataset_providers(restarted, InvocationLimits::default())
+            .into_iter()
+            .find(|provider| provider.descriptor().capability.as_str() == "host.dataset.write")
+            .unwrap();
+        let limits = InvocationLimits::default();
+        let mut retry_invocation = first_invocation.clone();
+        retry_invocation.execution_id = ExecutionId::new("different-execution", limits).unwrap();
+        retry_invocation.run_unit_id = RunUnitId::new("different-run", limits).unwrap();
+        retry_invocation.deadline_tick = 700;
+        assert_eq!(
+            replaying_provider
+                .invoke(&retry_invocation, call(&retry_invocation))
+                .outcome,
+            Err(HostProblem::IdempotencyConflict)
+        );
+        let unchanged = store
+            .get_provider_state("dataset-replay", "id-30600")
+            .unwrap()
+            .unwrap();
+        assert_eq!(unchanged, original);
+
+        let mut copied_to_wrong_key = unchanged.clone();
+        copied_to_wrong_key.key = "id-30601".into();
+        assert_eq!(
+            describe_dataset_replay_row(&copied_to_wrong_key),
+            Err(DatasetReplayValidationError::InvalidIdentity)
+        );
+        let mut trailing = unchanged;
+        trailing.payload.push(0);
+        assert_eq!(
+            describe_dataset_replay_row(&trailing),
+            Err(DatasetReplayValidationError::CorruptPayload)
+        );
+    }
+
+    #[test]
+    fn delayed_pending_replay_advances_age_without_stealing_original_ownership() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let request = DatasetRequest::Define {
+            dataset: DatasetName::new("USER.REPLAY.DELAYED", 128).unwrap(),
+            definition: Box::new(mainframe_env_host_api::DatasetDefinition::compatibility(
+                attrs(DatasetOrganization::Sequential),
+            )),
+            mutation: mutation(30_605),
+        };
+        let pending = Replay {
+            request_digest: request_digest(&request).unwrap(),
+            result: None,
+            metadata: Some(ReplayRetentionMetadata {
+                effect_key: "id-30605".into(),
+                owner_execution: "original-inflight-execution".into(),
+                owner_run_unit: "original-inflight-run".into(),
+                owner_kind: Some(DatasetReplayOwnerKind::CoreEffect),
+                outer_effect_key: None,
+                sequence: 30_605,
+                deadline_tick: 100,
+                resolution_tick: None,
+                result_sha256: [0; 32],
+                binding_sha256: [0; 32],
+            }),
+        };
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "dataset-replay".into(),
+                    key: "id-30605".into(),
+                    version: 1,
+                    payload: encode_replay(&pending).unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        let dataset = service(store.clone());
+        let provider = dataset_providers(dataset, InvocationLimits::default())
+            .into_iter()
+            .find(|provider| provider.descriptor().capability.as_str() == "host.dataset.write")
+            .unwrap();
+        let mut retry = invocation_for("OWNER1");
+        retry.execution_id =
+            ExecutionId::new("later-retry-execution", InvocationLimits::default()).unwrap();
+        retry.run_unit_id = RunUnitId::new("later-retry-run", InvocationLimits::default()).unwrap();
+        retry.deadline_tick = 600;
+        assert!(matches!(
+            provider
+                .invoke(
+                    &retry,
+                    EffectRequest {
+                        run_unit: retry.run_unit_id.clone(),
+                        sequence: 30_605,
+                        deadline_tick: 500,
+                        idempotency_key: Some(mutation(30_605).idempotency_key),
+                        request: HostRequest::Dataset(request),
+                    },
+                )
+                .outcome,
+            Err(HostProblem::IdempotencyConflict)
+        ));
+        let row = store
+            .get_provider_state("dataset-replay", "id-30605")
+            .unwrap()
+            .unwrap();
+        let descriptor = describe_dataset_replay_row(&row).unwrap();
+        assert_eq!(
+            descriptor.owner_execution.as_deref(),
+            Some("original-inflight-execution")
+        );
+        assert_eq!(
+            descriptor.owner_run_unit.as_deref(),
+            Some("original-inflight-run")
+        );
+        assert_eq!(descriptor.deadline_tick, Some(100));
+        assert_eq!(descriptor.resolution_tick, None);
+        assert_eq!(descriptor.terminal_tick, None);
+    }
+
+    #[test]
+    fn legacy_replay_upgrade_requires_the_exact_completed_effect() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let dataset = service(store.clone());
+        let request = DatasetRequest::Create {
+            dataset: DatasetName::new("USER.REPLAY.LEGACY", 128).unwrap(),
+            attributes: attrs(DatasetOrganization::Sequential),
+            mutation: mutation(30_610),
+        };
+        let result = dataset.invoke(request.clone()).unwrap();
+        let legacy = store
+            .get_provider_state("dataset-replay", "id-30610")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            describe_dataset_replay_row(&legacy).unwrap().dependency,
+            DatasetReplayDependencyState::TerminalEffectRequired
+        );
+        let invocation = invocation_for("OWNER1");
+        let result_digest = canonical_result_digest(&Ok(HostResult::Dataset(result))).unwrap();
+        let mut effect = EffectRecord {
+            execution_id: invocation.execution_id.clone(),
+            run_unit_id: invocation.run_unit_id.clone(),
+            sequence: 30_610,
+            key: mutation(30_610).idempotency_key,
+            digest_format: EffectDigestFormat::CanonicalHostV1,
+            request_digest: request_digest(&request).unwrap(),
+            intent: mainframe_env_store_api::EffectIntentMetadata {
+                owner: invocation.execution_id.clone(),
+                attempt: 1,
+                capability: None,
+                audit_resource: None,
+                audit_invocation_key: None,
+                created_tick: 10,
+                recovery_after_tick: 100,
+                epoch: 1,
+                recovery_lease: None,
+            },
+            state: EffectState::Completed,
+            result_digest: Some(result_digest),
+            resolved_tick: Some(100),
+        };
+        let wrong_owner = ExecutionId::new("wrong-owner", InvocationLimits::default()).unwrap();
+        effect.intent.owner = wrong_owner;
+        assert_eq!(
+            reconcile_dataset_replay_row(&legacy, &effect, 250),
+            Err(DatasetReplayValidationError::EffectMismatch)
+        );
+        effect.intent.owner = effect.execution_id.clone();
+        effect.state = EffectState::Intent;
+        assert_eq!(
+            reconcile_dataset_replay_row(&legacy, &effect, 250),
+            Err(DatasetReplayValidationError::EffectNotTerminal)
+        );
+        effect.state = EffectState::Completed;
+        let upgraded = reconcile_dataset_replay_row(&legacy, &effect, 250).unwrap();
+        let upgraded = describe_dataset_replay_row(&upgraded).unwrap();
+        assert_eq!(
+            upgraded.owner_execution.as_deref(),
+            Some(effect.execution_id.as_str())
+        );
+        assert_eq!(
+            upgraded.owner_run_unit.as_deref(),
+            Some(effect.run_unit_id.as_str())
+        );
+        assert_eq!(upgraded.deadline_tick, Some(100));
+        assert_eq!(upgraded.resolution_tick, Some(250));
+        assert_eq!(upgraded.terminal_tick, Some(250));
+        assert_eq!(
+            upgraded.dependency,
+            DatasetReplayDependencyState::CoreEffect
+        );
+    }
+
+    fn replay_call(invocation: &Invocation, request: DatasetRequest) -> EffectRequest {
+        let mutation = super::mutation(&request).unwrap();
+        EffectRequest {
+            run_unit: invocation.run_unit_id.clone(),
+            sequence: mutation.sequence,
+            deadline_tick: 90,
+            idempotency_key: Some(mutation.idempotency_key.clone()),
+            request: HostRequest::Dataset(request),
+        }
+    }
+
+    #[test]
+    fn clock_failure_leaves_pending_and_exact_retry_resolves_without_sliding() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let clock = Arc::new(TestReplayClock::fixed(250));
+        clock.fail_next.store(true, Ordering::SeqCst);
+        let service = DatasetService::open_with_replay_clock(
+            store.clone(),
+            DatasetLimits::default(),
+            clock.clone(),
+        )
+        .unwrap();
+        let provider = dataset_providers(service, InvocationLimits::default())
+            .into_iter()
+            .find(|provider| provider.descriptor().capability.as_str() == "host.dataset.write")
+            .unwrap();
+        let mut invocation = invocation_for("CLOCK");
+        invocation.deadline_tick = 100;
+        let request = DatasetRequest::Create {
+            dataset: DatasetName::new("USER.REPLAY.CLOCK", 128).unwrap(),
+            attributes: attrs(DatasetOrganization::Sequential),
+            mutation: mutation(30_700),
+        };
+        assert_eq!(
+            provider
+                .invoke(&invocation, replay_call(&invocation, request.clone()))
+                .outcome,
+            Err(HostProblem::UnknownOutcome)
+        );
+        let pending = store
+            .get_provider_state("dataset-replay", "id-30700")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            describe_dataset_replay_row(&pending).unwrap().retention,
+            DatasetReplayRetentionState::PendingProtected
+        );
+        assert!(matches!(
+            provider
+                .invoke(&invocation, replay_call(&invocation, request.clone()))
+                .outcome,
+            Ok(HostResult::Dataset(DatasetResult::Created { version: 1 }))
+        ));
+        let terminal = store
+            .get_provider_state("dataset-replay", "id-30700")
+            .unwrap()
+            .unwrap();
+        let descriptor = describe_dataset_replay_row(&terminal).unwrap();
+        assert_eq!(descriptor.retention, DatasetReplayRetentionState::Terminal);
+        assert_eq!(descriptor.resolution_tick, Some(250));
+        clock.tick.store(900, Ordering::SeqCst);
+        assert!(
+            provider
+                .invoke(&invocation, replay_call(&invocation, request))
+                .outcome
+                .is_ok()
+        );
+        assert_eq!(
+            store
+                .get_provider_state("dataset-replay", "id-30700")
+                .unwrap()
+                .unwrap(),
+            terminal
+        );
+    }
+
+    #[test]
+    fn replay_metadata_cas_failure_is_unknown_and_retry_recovers() {
+        let store = Arc::new(FailAtomicOnceStore::new());
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let service = DatasetService::open_with_replay_clock(
+            provider_store,
+            DatasetLimits::default(),
+            Arc::new(TestReplayClock::fixed(300)),
+        )
+        .unwrap();
+        let provider = dataset_providers(service, InvocationLimits::default())
+            .into_iter()
+            .find(|provider| provider.descriptor().capability.as_str() == "host.dataset.write")
+            .unwrap();
+        let mut invocation = invocation_for("CAS");
+        invocation.deadline_tick = 100;
+        let request = DatasetRequest::Create {
+            dataset: DatasetName::new("USER.REPLAY.CAS", 128).unwrap(),
+            attributes: attrs(DatasetOrganization::Sequential),
+            mutation: mutation(30_701),
+        };
+        store.arm_replay_metadata_failure();
+        assert_eq!(
+            provider
+                .invoke(&invocation, replay_call(&invocation, request.clone()))
+                .outcome,
+            Err(HostProblem::UnknownOutcome)
+        );
+        let pending = store
+            .get_provider_state("dataset-replay", "id-30701")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            describe_dataset_replay_row(&pending).unwrap().retention,
+            DatasetReplayRetentionState::PendingProtected
+        );
+        assert!(
+            provider
+                .invoke(&invocation, replay_call(&invocation, request))
+                .outcome
+                .is_ok()
+        );
+        assert_eq!(
+            describe_dataset_replay_row(
+                &store
+                    .get_provider_state("dataset-replay", "id-30701")
+                    .unwrap()
+                    .unwrap()
+            )
+            .unwrap()
+            .resolution_tick,
+            Some(300)
+        );
+    }
+
+    #[test]
+    fn explicit_cics_origin_binds_nested_key_outer_effect_and_full_payload() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = DatasetService::open_with_replay_clock(
+            store.clone(),
+            DatasetLimits::default(),
+            Arc::new(TestReplayClock::fixed(400)),
+        )
+        .unwrap();
+        let provider = dataset_providers(service, InvocationLimits::default())
+            .into_iter()
+            .find(|provider| provider.descriptor().capability.as_str() == "host.dataset.write")
+            .unwrap();
+        let limits = InvocationLimits::default();
+        let mut invocation = invocation_for("NESTED");
+        invocation.run_unit_id = RunUnitId::new("cics-run", limits).unwrap();
+        let key = IdempotencyKey::new("cics:cics-run:77", limits).unwrap();
+        invocation.bindings.insert(
+            CICS_NESTED_EFFECT_ORIGIN_BINDING.into(),
+            BoundedPayload::new(
+                CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
+                key.as_str().as_bytes().to_vec(),
+                limits,
+            )
+            .unwrap(),
+        );
+        invocation.bindings.insert(
+            CICS_OUTER_EFFECT_ORIGIN_BINDING.into(),
+            BoundedPayload::new(
+                CICS_OUTER_EFFECT_ORIGIN_SCHEMA,
+                b"outer-77".to_vec(),
+                limits,
+            )
+            .unwrap(),
+        );
+        let request = DatasetRequest::Create {
+            dataset: DatasetName::new("USER.REPLAY.NESTED", 128).unwrap(),
+            attributes: attrs(DatasetOrganization::Sequential),
+            mutation: Mutation {
+                sequence: 77,
+                idempotency_key: key.clone(),
+                transaction: None,
+            },
+        };
+        assert!(
+            provider
+                .invoke(&invocation, replay_call(&invocation, request))
+                .outcome
+                .is_ok()
+        );
+        let row = store
+            .get_provider_state("dataset-replay", key.as_str())
+            .unwrap()
+            .unwrap();
+        let descriptor = describe_dataset_replay_row(&row).unwrap();
+        assert_eq!(
+            descriptor.dependency,
+            DatasetReplayDependencyState::CicsNested {
+                run_unit: "cics-run".into(),
+                sequence: 77,
+                outer_effect_key: "outer-77".into(),
+            }
+        );
+        let mut direct = invocation.clone();
+        direct.bindings.clear();
+        assert_eq!(
+            dataset_replay_origin(
+                &direct,
+                &Mutation {
+                    sequence: 77,
+                    idempotency_key: key.clone(),
+                    transaction: None,
+                },
+            ),
+            Ok((DatasetReplayOwnerKind::CoreEffect, None))
+        );
+        let mut copied = row.clone();
+        copied.key = "cics:cics-run:78".into();
+        assert_eq!(
+            describe_dataset_replay_row(&copied),
+            Err(DatasetReplayValidationError::InvalidIdentity)
+        );
+        let mut trailing = row.clone();
+        trailing.payload.push(0);
+        assert_eq!(
+            describe_dataset_replay_row(&trailing),
+            Err(DatasetReplayValidationError::CorruptPayload)
+        );
+        let mut forged_owner = row.clone();
+        let owner_at = forged_owner
+            .payload
+            .windows(b"dataset-review-nested-execution".len())
+            .position(|window| window == b"dataset-review-nested-execution")
+            .unwrap();
+        forged_owner.payload[owner_at] = b'e';
+        assert_eq!(
+            describe_dataset_replay_row(&forged_owner),
+            Err(DatasetReplayValidationError::CorruptPayload)
+        );
+        let mut forged_outer = row.clone();
+        let outer_at = forged_outer
+            .payload
+            .windows(b"outer-77".len())
+            .position(|window| window == b"outer-77")
+            .unwrap();
+        forged_outer.payload[outer_at + 5] = b' ';
+        assert_eq!(
+            describe_dataset_replay_row(&forged_outer),
+            Err(DatasetReplayValidationError::CorruptPayload)
+        );
+        let mut forged_request = row.clone();
+        let core_at = forged_request
+            .payload
+            .windows(b"MEDR1".len())
+            .position(|window| window == b"MEDR1")
+            .unwrap();
+        forged_request.payload[core_at + b"MEDR1".len()] ^= 1;
+        assert_eq!(
+            describe_dataset_replay_row(&forged_request),
+            Err(DatasetReplayValidationError::CorruptPayload)
+        );
+        let mut forged_result = row.clone();
+        let last = forged_result.payload.len() - 1;
+        forged_result.payload[last] ^= 1;
+        assert_eq!(
+            describe_dataset_replay_row(&forged_result),
+            Err(DatasetReplayValidationError::CorruptPayload)
+        );
+        assert_eq!(
+            describe_dataset_replay_row_with_limits(
+                &row,
+                DatasetLimits {
+                    max_total_bytes: row.payload.len() - 1,
+                    ..DatasetLimits::default()
+                }
+            ),
+            Err(DatasetReplayValidationError::CorruptPayload)
+        );
+    }
+
+    #[test]
+    fn refresh_replay_index_releases_capacity_after_external_prune() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let limits = DatasetLimits {
+            max_idempotency: 1,
+            ..DatasetLimits::default()
+        };
+        let dataset = DatasetService::open(store.clone(), limits).unwrap();
+        let first_request = DatasetRequest::Create {
+            dataset: DatasetName::new("USER.REPLAY.ONE", 128).unwrap(),
+            attributes: attrs(DatasetOrganization::Sequential),
+            mutation: mutation(30_620),
+        };
+        dataset.invoke(first_request.clone()).unwrap();
+        let second_service = DatasetService::open(store.clone(), limits).unwrap();
+        store
+            .delete_provider_state("dataset-replay", "id-30620", 2)
+            .unwrap();
+        assert!(matches!(
+            second_service.invoke(first_request),
+            Err(HostProblem::Condition { ref name, .. }) if name == "DUPREC"
+        ));
+        let second = DatasetRequest::Create {
+            dataset: DatasetName::new("USER.REPLAY.TWO", 128).unwrap(),
+            attributes: attrs(DatasetOrganization::Sequential),
+            mutation: mutation(30_621),
+        };
+        assert_eq!(
+            second_service.invoke(second.clone()),
+            Ok(DatasetResult::Created { version: 1 })
+        );
+        assert_eq!(second_service.refresh_replay_index(), Ok(1));
+        assert_eq!(
+            second_service.invoke(second),
+            Ok(DatasetResult::Created { version: 1 })
+        );
+        assert_eq!(dataset.refresh_replay_index(), Ok(1));
     }
 }

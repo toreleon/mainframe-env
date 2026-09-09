@@ -1,12 +1,13 @@
 use crate::{CompileOptions, CompileTarget, CompilerProblem, LegalizedMir};
+use mainframe_env_ir::{CodecLimits, encode_binary};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::fmt;
 
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct ArtifactId([u8; 32]);
+pub struct ArtifactContentId([u8; 32]);
 
-impl ArtifactId {
+impl ArtifactContentId {
     #[must_use]
     pub const fn as_bytes(&self) -> &[u8; 32] {
         &self.0
@@ -15,12 +16,46 @@ impl ArtifactId {
     pub fn to_hex(self) -> String {
         self.0.iter().map(|byte| format!("{byte:02x}")).collect()
     }
+
+    #[must_use]
+    pub fn to_reference(self) -> String {
+        format!("sha256:{}", self.to_hex())
+    }
 }
 
-impl fmt::Debug for ArtifactId {
+impl fmt::Debug for ArtifactContentId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_tuple("ArtifactId")
+            .debug_tuple("ArtifactContentId")
+            .field(&self.to_hex())
+            .finish()
+    }
+}
+
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct SemanticArtifactId([u8; 32]);
+
+impl SemanticArtifactId {
+    #[must_use]
+    pub const fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn to_hex(self) -> String {
+        self.0.iter().map(|byte| format!("{byte:02x}")).collect()
+    }
+
+    #[must_use]
+    pub fn to_reference(self) -> String {
+        format!("semantic-sha256:{}", self.to_hex())
+    }
+}
+
+impl fmt::Debug for SemanticArtifactId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_tuple("SemanticArtifactId")
             .field(&self.to_hex())
             .finish()
     }
@@ -72,26 +107,38 @@ impl ArtifactManifest {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PublishedArtifact {
-    id: ArtifactId,
-    payload_digest: [u8; 32],
+    content_id: ArtifactContentId,
+    semantic_id: SemanticArtifactId,
     manifest: ArtifactManifest,
     payload: Vec<u8>,
 }
 
 impl PublishedArtifact {
+    /// Encodes a consumed legal MIR stage and publishes its two typed identities.
+    ///
+    /// Arbitrary payload bytes are deliberately not accepted.
+    ///
+    /// ```compile_fail
+    /// # use mainframe_env_compiler_api::{ArtifactLimits, ArtifactManifest, LegalizedMir, PublishedArtifact};
+    /// # fn fabricate(mir: LegalizedMir, manifest: ArtifactManifest) {
+    /// let _ = PublishedArtifact::publish(mir, manifest, b"unverified".to_vec(), ArtifactLimits::default());
+    /// # }
+    /// ```
     pub fn publish(
-        mir: &LegalizedMir,
+        mir: LegalizedMir,
         manifest: ArtifactManifest,
-        payload: Vec<u8>,
+        codec_limits: CodecLimits,
         limits: ArtifactLimits,
     ) -> Result<Self, CompilerProblem> {
         manifest.validate(limits)?;
+        let payload = encode_binary(mir.legal().module(), codec_limits)
+            .map_err(|problem| CompilerProblem::Legality(problem.to_string()))?;
         if payload.len() > limits.max_payload_bytes {
             return Err(CompilerProblem::ArtifactLimitExceeded);
         }
         let payload_digest: [u8; 32] = Sha256::digest(&payload).into();
         let mut semantic = Sha256::new();
-        field(&mut semantic, b"mainframe-env.artifact@1");
+        field(&mut semantic, b"mainframe-env.semantic-artifact@2");
         field(&mut semantic, mir.source().as_bytes());
         field(&mut semantic, manifest.compiler_generation.as_bytes());
         field(&mut semantic, manifest.target.as_str().as_bytes());
@@ -103,22 +150,22 @@ impl PublishedArtifact {
         for interface in &manifest.host_interfaces {
             field(&mut semantic, interface.as_bytes());
         }
-        let id = ArtifactId(semantic.finalize().into());
+        let semantic_id = SemanticArtifactId(semantic.finalize().into());
         Ok(Self {
-            id,
-            payload_digest,
+            content_id: ArtifactContentId(payload_digest),
+            semantic_id,
             manifest,
             payload,
         })
     }
 
     #[must_use]
-    pub const fn id(&self) -> ArtifactId {
-        self.id
+    pub const fn content_id(&self) -> ArtifactContentId {
+        self.content_id
     }
     #[must_use]
-    pub const fn payload_digest(&self) -> &[u8; 32] {
-        &self.payload_digest
+    pub const fn semantic_id(&self) -> SemanticArtifactId {
+        self.semantic_id
     }
     #[must_use]
     pub fn manifest(&self) -> &ArtifactManifest {
@@ -138,10 +185,8 @@ fn field(digest: &mut Sha256, bytes: &[u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ParsedProgram, SemanticProgram};
-    use mainframe_env_diagnostics::Completeness;
     use mainframe_env_ir::{
-        IrLimits, LegalityProfile, ModuleBuilder, OperationCatalog, OperationIdentity,
+        CodecLimits, IrLimits, LegalityProfile, ModuleBuilder, OperationCatalog, OperationIdentity,
         OperationSchema,
     };
     use mainframe_env_source::{
@@ -162,11 +207,6 @@ mod tests {
         .unwrap();
         let source =
             SourceBundle::new(&path, vec![file], BTreeMap::new(), Vec::new(), limits).unwrap();
-        let parsed =
-            ParsedProgram::validated(source.id(), Vec::new(), Completeness::Complete, 4).unwrap();
-        let semantic =
-            SemanticProgram::validated(parsed, [1; 32], Vec::new(), Completeness::Complete, 4)
-                .unwrap();
         let mut builder = ModuleBuilder::new(IrLimits::default());
         let region = builder.add_region().unwrap();
         let block = builder.add_block(region).unwrap();
@@ -188,10 +228,9 @@ mod tests {
         schema.terminator = true;
         let mut catalog = OperationCatalog::default();
         catalog.register(schema).unwrap();
-        let _hir = crate::VerifiedHir::verify(&semantic, module.clone(), &catalog).unwrap();
+        let hir = crate::VerifiedHir::verify(source.id(), module.clone(), &catalog).unwrap();
         LegalizedMir::legalize(
-            source.id(),
-            module,
+            hir.lower(module),
             &catalog,
             &LegalityProfile {
                 allowed_operations: BTreeSet::from([identity]),
@@ -202,8 +241,7 @@ mod tests {
     }
 
     #[test]
-    fn semantic_identity_is_independent_of_payload_codec() {
-        let mir = legalized();
+    fn semantic_and_content_identities_are_unambiguous() {
         let manifest = ArtifactManifest {
             compiler_generation: "compiler-1".into(),
             target: CompileTarget::new("reference").unwrap(),
@@ -212,17 +250,34 @@ mod tests {
             ir_contract: "mainframe-env.ir@1".into(),
         };
         let first = PublishedArtifact::publish(
-            &mir,
+            legalized(),
             manifest.clone(),
-            b"one".to_vec(),
+            CodecLimits::default(),
             ArtifactLimits::default(),
         )
         .unwrap();
-        let second =
-            PublishedArtifact::publish(&mir, manifest, b"two".to_vec(), ArtifactLimits::default())
-                .unwrap();
-        assert_eq!(first.id(), second.id());
-        assert_ne!(first.payload_digest(), second.payload_digest());
+        let mut second_manifest = manifest;
+        second_manifest.compiler_generation = "compiler-2".into();
+        let second = PublishedArtifact::publish(
+            legalized(),
+            second_manifest,
+            CodecLimits::default(),
+            ArtifactLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(first.content_id(), second.content_id());
+        assert_ne!(first.semantic_id(), second.semantic_id());
+        assert_eq!(
+            first.content_id().as_bytes(),
+            &<[u8; 32]>::from(Sha256::digest(first.payload()))
+        );
+        assert!(first.content_id().to_reference().starts_with("sha256:"));
+        assert!(
+            first
+                .semantic_id()
+                .to_reference()
+                .starts_with("semantic-sha256:")
+        );
     }
 
     #[test]
@@ -239,7 +294,7 @@ mod tests {
             ir_contract: "mainframe-env.ir@1".into(),
         };
         assert_eq!(
-            PublishedArtifact::publish(&legalized(), manifest, vec![1, 2], limits),
+            PublishedArtifact::publish(legalized(), manifest, CodecLimits::default(), limits),
             Err(CompilerProblem::ArtifactLimitExceeded)
         );
     }

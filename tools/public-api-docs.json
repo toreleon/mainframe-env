@@ -1,0 +1,10 @@
+{
+  "schema_version": "mainframe-env.public-api-doc-ratchet@1",
+  "packages": {
+    "mainframe-env-compiler-api": 70,
+    "mainframe-env-coverage": 386,
+    "mainframe-env-execution-api": 176,
+    "mainframe-env-host-api": 1130,
+    "mainframe-env-store-api": 95
+  }
+}

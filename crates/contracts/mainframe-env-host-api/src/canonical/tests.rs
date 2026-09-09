@@ -32,6 +32,105 @@ fn golden_request_and_unknown_result_are_versioned_and_domain_separated() {
         digest(&request, RESULT_DIGEST_DOMAIN).unwrap()
     );
 }
+
+#[test]
+fn audit_resource_digest_is_versioned_deterministic_and_distinguishes_resources() {
+    let one = HostRequest::State(StateRequest::Get { key: "one".into() });
+    let two = HostRequest::State(StateRequest::Get { key: "two".into() });
+    assert_eq!(
+        canonical_audit_resource_digest(&one),
+        canonical_audit_resource_digest(&one)
+    );
+    assert_ne!(
+        canonical_audit_resource_digest(&one),
+        canonical_audit_resource_digest(&two)
+    );
+    assert_ne!(
+        canonical_audit_resource_digest(&one).value,
+        canonical_request_digest(&one).unwrap(),
+        "audit and replay identities use separate canonical domains"
+    );
+}
+
+#[test]
+fn provider_replay_digests_share_the_host_journal_encoding_and_have_golden_identities() {
+    let limits = mainframe_env_execution_api::InvocationLimits::default();
+    let mutation = |key: &str, sequence| Mutation {
+        sequence,
+        idempotency_key: IdempotencyKey::new(key, limits).unwrap(),
+        transaction: Some("UNIT-OF-WORK".into()),
+    };
+    let db2 = Db2Request {
+        operation: Db2Operation::Insert,
+        statement: "INSERT INTO T VALUES (:ID)".into(),
+        cursor: None,
+        inputs: BTreeMap::from([(
+            "ID".into(),
+            Db2HostVariable {
+                value: vec![0, 1, 255],
+                indicator: Some(-1),
+            },
+        )]),
+        outputs: vec!["ID".into()],
+        max_rows: 17,
+        mutation: Some(mutation("db2-golden", 3)),
+    };
+    let ims = ImsRequest {
+        operation: ImsOperation::Replace,
+        psb: Some("AUTHPSB".into()),
+        pcb: 2,
+        segments: vec!["CUSTOMER".into(), "ORDER".into()],
+        data: vec![0, 10, 255],
+        qualifiers: vec![ImsQualifier {
+            segment: "CUSTOMER".into(),
+            field: "ID".into(),
+            value: b"00017".to_vec(),
+        }],
+        checkpoint_id: Some("CHK00017".into()),
+        max_segments: 19,
+        mutation: Some(mutation("ims-golden", 5)),
+    };
+    let mq = MqRequest {
+        operation: MqOperation::PutOne,
+        queue: Some("APP.REQUEST".into()),
+        handle: Some(23),
+        options: -7,
+        message: vec![0, 10, 255],
+        message_id: Some(vec![1; 24]),
+        correlation_id: Some(vec![2; 24]),
+        wait_ticks: 29,
+        max_message_bytes: 31,
+        mutation: Some(mutation("mq-golden", 7)),
+    };
+
+    let db2_digest = canonical_db2_request_digest(&db2).unwrap();
+    let ims_digest = canonical_ims_request_digest(&ims).unwrap();
+    let mq_digest = canonical_mq_request_digest(&mq).unwrap();
+    assert_eq!(
+        db2_digest,
+        canonical_request_digest(&HostRequest::Db2(db2)).unwrap()
+    );
+    assert_eq!(
+        ims_digest,
+        canonical_request_digest(&HostRequest::Ims(ims)).unwrap()
+    );
+    assert_eq!(
+        mq_digest,
+        canonical_request_digest(&HostRequest::Mq(mq)).unwrap()
+    );
+    assert_eq!(
+        hex(&db2_digest),
+        "73deaa15e0e23619ee059776d818b7aa0b39805f4dc350f46cb013d3242cb4ad"
+    );
+    assert_eq!(
+        hex(&ims_digest),
+        "0be6adcc52e9699a9c1ae6976b0eba69e3b53d1de56b296a6c8a4e7a8621d872"
+    );
+    assert_eq!(
+        hex(&mq_digest),
+        "15290c92f51c0823f3a65fbe5f4ff0a96efad4561394b0b8ba7f1225b85a313b"
+    );
+}
 #[test]
 fn ordered_maps_ignore_insertion_order_but_not_key_or_value() {
     let a = BTreeMap::from([

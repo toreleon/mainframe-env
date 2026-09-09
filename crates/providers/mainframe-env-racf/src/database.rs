@@ -3,27 +3,38 @@ use crate::model::{
     CredentialVerifier, DecisionOutcome, DecisionReason, GroupAuthority, GroupConnection,
     GroupProfile, MigrationState, PrincipalKind, PrincipalProfile, PrincipalState, ProfileTemplate,
     RecoveryRecord, RecoveryState, ResourceProfile, SafStatus, SecurityAuditRecord,
-    SecurityDatabaseLimits, SecurityDatabaseSnapshot, SecurityMigration, SecuritySchemaProblem,
+    SecurityDatabaseLimits, SecurityDatabaseSnapshot, SecurityMigration,
+    SecurityMigrationSourceRow, SecurityRequestDigestFormat, SecuritySchemaProblem,
     TransactionState, connection_key, profile_key,
 };
 use mainframe_env_host_api::HostProblem;
-use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
+use mainframe_env_store_api::{
+    ProviderStateMutation, ProviderStateRecord, ProviderStateStore, ProviderStateWrite,
+    RetentionLegacyRow, RetentionTarget, StoreError,
+};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
+use std::time::{SystemTime, UNIX_EPOCH};
 
-const DATABASE_NAMESPACE: &str = "racf-database-v2";
-const DATABASE_KEY: &str = "authority";
+pub(crate) const DATABASE_NAMESPACE: &str = "racf-database-v2";
+pub(crate) const DATABASE_KEY: &str = "authority";
 const DATABASE_ENVELOPE: &[u8] = b"MERACF2\0";
 const LEGACY_MIGRATION_ID: &str = "RACF-V1-TO-V2";
 const LEGACY_USER_NAMESPACE: &str = "racf-user";
 const LEGACY_GROUP_NAMESPACE: &str = "racf-group";
 const LEGACY_PROFILE_NAMESPACE: &str = "racf-profile";
 const LEGACY_AUDIT_NAMESPACE: &str = "racf-audit";
+const LEGACY_REPLAY_SCRUB_DOMAIN: &[u8] = b"mainframe-env.racf-legacy-replay-scrub@1\0";
+const LEGACY_AUDIT_SCRUB_DOMAIN: &[u8] = b"mainframe-env.racf-legacy-audit-scrub@1\0";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SecurityDatabaseSummary {
     pub generation: u64,
+    /// Latest committed provider-local retention clock value.
+    pub retention_tick: u64,
+    /// CAS version of the paired durable RACF archive, or zero before creation.
+    pub retention_archive_version: u64,
     pub principals: usize,
     pub groups: usize,
     pub connections: usize,
@@ -54,12 +65,57 @@ pub struct SecuritySemanticProjection {
 }
 
 pub struct SecurityDatabase {
-    store: Arc<dyn ProviderStateStore>,
-    limits: SecurityDatabaseLimits,
-    writer: Mutex<()>,
+    pub(crate) store: Arc<dyn ProviderStateStore>,
+    pub(crate) limits: SecurityDatabaseLimits,
+    pub(crate) writer: Mutex<()>,
 }
 
 impl SecurityDatabase {
+    /// Open only an existing v2 authority for retention inspection.
+    ///
+    /// Unlike [`Self::open`], this does not initialize an empty database, advance the provider
+    /// clock, scrub legacy digests, migrate v1 rows, or reconcile incomplete transactions.
+    pub fn open_existing_for_retention(
+        store: Arc<dyn ProviderStateStore>,
+        limits: SecurityDatabaseLimits,
+    ) -> Result<Option<Arc<Self>>, HostProblem> {
+        let Some(record) = store
+            .get_provider_state(DATABASE_NAMESPACE, DATABASE_KEY)
+            .map_err(store_problem)?
+        else {
+            LegacySnapshot::read(&*store, limits)?;
+            return Ok(None);
+        };
+        decode_snapshot(&record, limits)?;
+        Ok(Some(Arc::new(Self {
+            store,
+            limits,
+            writer: Mutex::new(()),
+        })))
+    }
+
+    /// Fully decode and list exact legacy RACF rows without migrating them.
+    pub fn legacy_rows_for_retention(
+        store: &dyn ProviderStateStore,
+        limits: SecurityDatabaseLimits,
+        max: usize,
+    ) -> Result<Vec<RetentionLegacyRow>, HostProblem> {
+        if max == 0 || max > mainframe_env_store_api::MAX_PROVIDER_STATE_SCAN {
+            return Err(HostProblem::Malformed);
+        }
+        Ok(LegacySnapshot::read(store, limits)?
+            .rows
+            .into_iter()
+            .take(max)
+            .map(|row| RetentionLegacyRow {
+                target: RetentionTarget::RacfEvidence,
+                namespace: row.namespace,
+                key: row.key,
+                source_version: row.version,
+            })
+            .collect())
+    }
+
     pub fn open(
         store: Arc<dyn ProviderStateStore>,
         limits: SecurityDatabaseLimits,
@@ -71,13 +127,73 @@ impl SecurityDatabase {
         });
         database.initialize()?;
         database.read()?;
+        database.initialize_retention_clock()?;
+        database.scrub_legacy_replay_digests()?;
         Ok(database)
+    }
+
+    fn initialize_retention_clock(&self) -> Result<(), HostProblem> {
+        self.mutate_if_changed(|snapshot| {
+            let observed = snapshot.max_record_retention_tick();
+            if snapshot.retention_tick == 0 && observed != 0 {
+                snapshot.retention_tick = observed;
+                Ok(((), true))
+            } else {
+                Ok(((), false))
+            }
+        })
+        .map(|_| ())
+    }
+
+    fn scrub_legacy_replay_digests(&self) -> Result<usize, HostProblem> {
+        self.mutate_retry(|snapshot| {
+            let mut scrubbed = 0usize;
+            for transaction in snapshot.transactions.values_mut().filter(|transaction| {
+                transaction.request_digest_format == SecurityRequestDigestFormat::LegacyUnversioned
+            }) {
+                transaction.request_digest = scrubbed_transaction_digest(transaction);
+                transaction.request_digest_format = SecurityRequestDigestFormat::LegacyScrubbedV0;
+                scrubbed = scrubbed
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?;
+            }
+            let racroute_actions = crate::command::racroute_descriptors()
+                .iter()
+                .map(|descriptor| descriptor.keyword())
+                .collect::<std::collections::BTreeSet<_>>();
+            for audit in &mut snapshot.audits {
+                let generated_command = audit.fields.contains_key("COMMAND_FAMILY")
+                    && audit.fields.contains_key("OFFICIAL_ROW");
+                let generated_racroute = audit.fields.contains_key("ACEE")
+                    && racroute_actions.contains(audit.action.as_str());
+                if (generated_command || generated_racroute)
+                    && !audit.fields.contains_key("REQUEST_DIGEST_FORMAT")
+                {
+                    audit.resource_digest = Some(scrubbed_audit_digest(audit));
+                    audit.fields.insert(
+                        "REQUEST_DIGEST_FORMAT".into(),
+                        AuditFieldValue::Text(
+                            SecurityRequestDigestFormat::LegacyScrubbedV0
+                                .as_str()
+                                .into(),
+                        ),
+                    );
+                    scrubbed = scrubbed
+                        .checked_add(1)
+                        .ok_or(HostProblem::ResourceExhausted)?;
+                }
+            }
+            Ok((scrubbed, scrubbed != 0))
+        })
+        .map(|(scrubbed, _)| scrubbed)
     }
 
     pub fn summary(&self) -> Result<SecurityDatabaseSummary, HostProblem> {
         let snapshot = self.read()?;
         Ok(SecurityDatabaseSummary {
             generation: snapshot.generation,
+            retention_tick: snapshot.retention_tick,
+            retention_archive_version: snapshot.retention_archive_version,
             principals: snapshot.principals.len(),
             groups: snapshot.groups.len(),
             connections: snapshot.connections.len(),
@@ -183,17 +299,46 @@ impl SecurityDatabase {
     pub(crate) fn migrate_legacy_records(&self) -> Result<bool, HostProblem> {
         let legacy = LegacySnapshot::read(&*self.store, self.limits)?;
         if legacy.is_empty() {
-            return Ok(false);
+            return self
+                .mutate_if_changed(|snapshot| {
+                    let Some(index) = snapshot
+                        .migrations
+                        .iter()
+                        .position(|migration| migration.id == LEGACY_MIGRATION_ID)
+                    else {
+                        return Ok((false, false));
+                    };
+                    if snapshot.migrations[index].baseline_finalized {
+                        return Ok((false, false));
+                    }
+                    let result_digest = snapshot_content_digest(snapshot)?;
+                    snapshot.migrations[index].result_digest = Some(result_digest);
+                    snapshot.migrations[index].baseline_finalized = true;
+                    Ok((false, true))
+                })
+                .map(|(migrated, _)| migrated);
         }
         let source_digest = legacy.digest();
-        self.mutate_if_changed(|snapshot| {
-            if let Some(migration) = snapshot
+        let (migrated, _) = self.mutate_if_changed(|snapshot| {
+            if let Some(index) = snapshot
                 .migrations
                 .iter()
-                .find(|migration| migration.id == LEGACY_MIGRATION_ID)
+                .position(|migration| migration.id == LEGACY_MIGRATION_ID)
             {
+                let migration = &mut snapshot.migrations[index];
                 return match migration.state {
-                    MigrationState::Applied | MigrationState::RolledBack => Ok((false, false)),
+                    MigrationState::Applied | MigrationState::RolledBack => {
+                        if migration.source_digest != source_digest {
+                            return Err(HostProblem::IdempotencyConflict);
+                        }
+                        if migration.source_rows.is_empty() {
+                            migration.source_rows = legacy.backup_rows();
+                            migration.baseline_finalized = true;
+                            Ok((false, true))
+                        } else {
+                            Ok((false, false))
+                        }
+                    }
                     MigrationState::Planned => Err(HostProblem::IdempotencyConflict),
                 };
             }
@@ -234,6 +379,7 @@ impl SecurityDatabase {
                             encoded_verifier: user.hash.clone(),
                             changed_tick: 0,
                             history_digests: Vec::new(),
+                            history_verifiers: Vec::new(),
                         }),
                         profile_template: None,
                         segments: BTreeMap::new(),
@@ -311,6 +457,7 @@ impl SecurityDatabase {
                     status: legacy_status(reason),
                     fields: audit.fields.clone(),
                     tick: 0,
+                    retention_observed_tick: None,
                 });
             }
             let result_digest = snapshot_content_digest(snapshot)?;
@@ -321,10 +468,28 @@ impl SecurityDatabase {
                 state: MigrationState::Applied,
                 source_digest: source_digest.clone(),
                 result_digest: Some(result_digest),
+                baseline_finalized: true,
+                source_rows: legacy.backup_rows(),
             });
             Ok((true, true))
-        })
-        .map(|(migrated, _)| migrated)
+        })?;
+        let remaining = LegacySnapshot::read(&*self.store, self.limits)?;
+        if !remaining.is_empty() {
+            self.store
+                .mutate_provider_states_atomic(
+                    remaining
+                        .rows
+                        .iter()
+                        .map(|row| ProviderStateMutation::Delete {
+                            namespace: row.namespace.clone(),
+                            key: row.key.clone(),
+                            expected_version: row.version,
+                        })
+                        .collect(),
+                )
+                .map_err(store_problem)?;
+        }
+        Ok(migrated)
     }
 
     pub fn rollback_legacy_migration(&self) -> Result<bool, HostProblem> {
@@ -357,7 +522,28 @@ impl SecurityDatabase {
         .map(|(rolled_back, _)| rolled_back)
     }
 
+    /// Return the exact pre-upgrade provider rows retained inside the migration record.
+    pub fn legacy_migration_source_rows(&self) -> Result<Vec<ProviderStateRecord>, HostProblem> {
+        let snapshot = self.read()?;
+        let migration = snapshot
+            .migrations
+            .iter()
+            .find(|migration| migration.id == LEGACY_MIGRATION_ID)
+            .ok_or(HostProblem::NotFound)?;
+        Ok(migration
+            .source_rows
+            .iter()
+            .map(|row| ProviderStateRecord {
+                namespace: row.namespace.clone(),
+                key: row.key.clone(),
+                version: row.version,
+                payload: row.payload.clone(),
+            })
+            .collect())
+    }
+
     pub(crate) fn reconcile_incomplete_transactions(&self) -> Result<usize, HostProblem> {
+        let observed_tick = self.retention_observation_tick(0)?;
         self.mutate_if_changed(|snapshot| {
             let pending = snapshot
                 .transactions
@@ -375,15 +561,19 @@ impl SecurityDatabase {
             for (transaction_id, state, final_generation) in &pending {
                 let committed = *state == TransactionState::UnknownOutcome
                     && final_generation.is_some_and(|generation| generation <= snapshot.generation);
-                snapshot
+                let transaction_tick = snapshot
+                    .observe_retention_tick(observed_tick)
+                    .ok_or(HostProblem::ResourceExhausted)?;
+                let transaction = snapshot
                     .transactions
                     .get_mut(transaction_id)
-                    .ok_or(HostProblem::NotFound)?
-                    .state = if committed {
+                    .ok_or(HostProblem::NotFound)?;
+                transaction.state = if committed {
                     TransactionState::Committed
                 } else {
                     TransactionState::RolledBack
                 };
+                transaction.terminal_tick = Some(transaction_tick);
                 let recovery_id = recovery_id(transaction_id);
                 let (attempt, version) =
                     snapshot
@@ -401,6 +591,9 @@ impl SecurityDatabase {
                                     .ok_or(HostProblem::ResourceExhausted)?,
                             ))
                         })?;
+                let recovery_tick = snapshot
+                    .observe_retention_tick(observed_tick)
+                    .ok_or(HostProblem::ResourceExhausted)?;
                 snapshot.recovery.insert(
                     recovery_id.clone(),
                     RecoveryRecord {
@@ -410,6 +603,7 @@ impl SecurityDatabase {
                         attempt,
                         last_error: None,
                         version,
+                        terminal_tick: Some(recovery_tick),
                     },
                 );
             }
@@ -514,6 +708,26 @@ impl SecurityDatabase {
         Err(HostProblem::IdempotencyConflict)
     }
 
+    /// Resolve a duration-based observation tick without advancing time per request.
+    pub(crate) fn retention_observation_tick(
+        &self,
+        supplied_tick: u64,
+    ) -> Result<u64, HostProblem> {
+        let floor = if supplied_tick == 0 {
+            retention_wall_tick()?
+        } else {
+            supplied_tick
+        };
+        match self.store.advance_logical_clock(floor) {
+            Ok(tick) => Ok(tick.max(floor)),
+            // Provider-state test doubles and older embedding adapters may not expose the
+            // dedicated clock yet. A caller-supplied logical tick remains authoritative; a
+            // direct route falls back to the sampled duration clock rather than call count.
+            Err(StoreError::InvalidTransition) => Ok(floor),
+            Err(problem) => Err(store_problem(problem)),
+        }
+    }
+
     fn initialize(&self) -> Result<(), HostProblem> {
         if self
             .store
@@ -523,15 +737,42 @@ impl SecurityDatabase {
         {
             return Ok(());
         }
-        let snapshot = SecurityDatabaseSnapshot::default();
+        let legacy = LegacySnapshot::read(&*self.store, self.limits)?;
+        let snapshot = if legacy.is_empty() {
+            SecurityDatabaseSnapshot::default()
+        } else {
+            legacy.migrated_snapshot(self.limits)?
+        };
         let record = ProviderStateRecord {
             namespace: DATABASE_NAMESPACE.into(),
             key: DATABASE_KEY.into(),
             version: snapshot.generation,
             payload: encode_snapshot(&snapshot, self.limits)?,
         };
-        match self.store.put_provider_state(record, None) {
-            Ok(()) | Err(StoreError::Conflict | StoreError::AlreadyExists) => Ok(()),
+        if legacy.is_empty() {
+            return match self.store.put_provider_state(record, None) {
+                Ok(()) | Err(StoreError::Conflict | StoreError::AlreadyExists) => Ok(()),
+                Err(problem) => Err(store_problem(problem)),
+            };
+        }
+        let mut mutations = Vec::with_capacity(legacy.rows.len().saturating_add(1));
+        mutations.push(ProviderStateMutation::Put(ProviderStateWrite {
+            record,
+            expected_version: None,
+        }));
+        mutations.extend(legacy.rows.iter().map(|row| ProviderStateMutation::Delete {
+            namespace: row.namespace.clone(),
+            key: row.key.clone(),
+            expected_version: row.version,
+        }));
+        match self.store.mutate_provider_states_atomic(mutations) {
+            Ok(()) => Ok(()),
+            Err(StoreError::Conflict | StoreError::AlreadyExists) => self
+                .store
+                .get_provider_state(DATABASE_NAMESPACE, DATABASE_KEY)
+                .map_err(store_problem)?
+                .ok_or(HostProblem::IdempotencyConflict)
+                .and_then(|record| decode_snapshot(&record, self.limits).map(|_| ())),
             Err(problem) => Err(store_problem(problem)),
         }
     }
@@ -687,6 +928,145 @@ impl LegacySnapshot {
             digest_part(&mut digest, &row.payload);
         }
         format!("sha256:{:x}", digest.finalize())
+    }
+
+    fn migrated_snapshot(
+        &self,
+        limits: SecurityDatabaseLimits,
+    ) -> Result<SecurityDatabaseSnapshot, HostProblem> {
+        let mut snapshot = SecurityDatabaseSnapshot::default();
+        for group in self.groups.values() {
+            snapshot.groups.insert(
+                group.name.clone(),
+                GroupProfile {
+                    name: group.name.clone(),
+                    owner: group.name.clone(),
+                    superior_group: None,
+                    universal: false,
+                    profile_template: None,
+                    segments: BTreeMap::new(),
+                    version: group.version,
+                },
+            );
+        }
+        for user in self.users.values() {
+            let default_group = user.groups.iter().next().cloned();
+            snapshot.principals.insert(
+                user.name.clone(),
+                PrincipalProfile {
+                    id: user.name.clone(),
+                    kind: PrincipalKind::User,
+                    owner: user.name.clone(),
+                    default_group,
+                    state: user.state(),
+                    credential: Some(CredentialVerifier {
+                        algorithm: "argon2id".into(),
+                        encoded_verifier: user.hash.clone(),
+                        changed_tick: 0,
+                        history_digests: Vec::new(),
+                        history_verifiers: Vec::new(),
+                    }),
+                    profile_template: None,
+                    segments: BTreeMap::new(),
+                    security_level: 0,
+                    security_label: None,
+                    categories: Default::default(),
+                    attributes: Default::default(),
+                    version: user.version,
+                },
+            );
+            for group in &user.groups {
+                snapshot.connections.insert(
+                    connection_key(&user.name, group),
+                    GroupConnection {
+                        user: user.name.clone(),
+                        group: group.clone(),
+                        authority: GroupAuthority::Use,
+                        special: false,
+                        operations: false,
+                        auditor: false,
+                        revoked: false,
+                        version: user.version,
+                    },
+                );
+            }
+        }
+        for profile in self.profiles.values() {
+            crate::authority::install_resource_schema(
+                &mut snapshot,
+                &profile.class,
+                limits.max_name_bytes,
+            )?;
+            snapshot.profiles.insert(
+                profile_key(&profile.class, &profile.name),
+                ResourceProfile {
+                    class: profile.class.clone(),
+                    name: profile.name.clone(),
+                    generic: profile.name.bytes().any(|byte| matches!(byte, b'*' | b'%')),
+                    owner: profile.owner.clone(),
+                    uacc: profile.uacc,
+                    audit: AuditPolicy::None,
+                    security_level: 0,
+                    security_label: None,
+                    categories: Default::default(),
+                    access_list: profile
+                        .permissions
+                        .iter()
+                        .map(|(principal, access)| AccessControlEntry {
+                            principal: principal.clone(),
+                            access: *access,
+                            when: None,
+                            audit: AuditPolicy::None,
+                        })
+                        .collect(),
+                    segments: BTreeMap::new(),
+                    version: profile.version,
+                },
+            );
+        }
+        for (index, audit) in self.audits.values().enumerate() {
+            let reason = match audit.decision {
+                DecisionOutcome::Allow => DecisionReason::Granted,
+                DecisionOutcome::Deny | DecisionOutcome::NoDecision => DecisionReason::DefaultDeny,
+            };
+            snapshot.audits.push(SecurityAuditRecord {
+                id: format!("MIGAUDIT{index:020}"),
+                correlation: "LEGACY-MIGRATION".into(),
+                actor: "SYSTEM".into(),
+                action: audit.action.clone(),
+                class: None,
+                resource_digest: Some(audit.resource.clone()),
+                decision: audit.decision,
+                status: legacy_status(reason),
+                fields: audit.fields.clone(),
+                tick: 0,
+                retention_observed_tick: None,
+            });
+        }
+        let result_digest = snapshot_content_digest(&snapshot)?;
+        snapshot.migrations.push(SecurityMigration {
+            id: LEGACY_MIGRATION_ID.into(),
+            from_schema: "mainframe-env.racf-records@1".into(),
+            to_schema: crate::SECURITY_DATABASE_SCHEMA.into(),
+            state: MigrationState::Applied,
+            source_digest: self.digest(),
+            result_digest: Some(result_digest),
+            baseline_finalized: false,
+            source_rows: self.backup_rows(),
+        });
+        Ok(snapshot)
+    }
+
+    fn backup_rows(&self) -> Vec<SecurityMigrationSourceRow> {
+        self.rows
+            .iter()
+            .map(|row| SecurityMigrationSourceRow {
+                namespace: row.namespace.clone(),
+                key: row.key.clone(),
+                version: row.version,
+                payload: row.payload.clone(),
+            })
+            .collect()
     }
 }
 
@@ -905,6 +1285,43 @@ fn recovery_id(transaction_id: &str) -> String {
     format!("RECOVERY{:X}", Sha256::digest(transaction_id.as_bytes()))
 }
 
+fn scrubbed_transaction_digest(transaction: &crate::SecurityTransaction) -> String {
+    let mut digest = Sha256::new();
+    digest.update(LEGACY_REPLAY_SCRUB_DOMAIN);
+    for value in [
+        transaction.id.as_bytes(),
+        transaction.idempotency_key.as_bytes(),
+        transaction.actor.as_bytes(),
+        transaction.operation.as_bytes(),
+    ] {
+        digest_part(&mut digest, value);
+    }
+    digest.update(transaction.base_generation.to_be_bytes());
+    match transaction.final_generation {
+        Some(generation) => {
+            digest.update([1]);
+            digest.update(generation.to_be_bytes());
+        }
+        None => digest.update([0]),
+    }
+    format!("sha256:{:x}", digest.finalize())
+}
+
+fn scrubbed_audit_digest(audit: &SecurityAuditRecord) -> String {
+    let mut digest = Sha256::new();
+    digest.update(LEGACY_AUDIT_SCRUB_DOMAIN);
+    for value in [
+        audit.id.as_bytes(),
+        audit.correlation.as_bytes(),
+        audit.actor.as_bytes(),
+        audit.action.as_bytes(),
+    ] {
+        digest_part(&mut digest, value);
+    }
+    digest.update(audit.tick.to_be_bytes());
+    format!("sha256:{:x}", digest.finalize())
+}
+
 fn digest_part(digest: &mut Sha256, value: &[u8]) {
     digest.update(u64::try_from(value.len()).unwrap_or(u64::MAX).to_be_bytes());
     digest.update(value);
@@ -923,7 +1340,7 @@ fn unique<T>(
     Ok(result)
 }
 
-fn encode_snapshot(
+pub(crate) fn encode_snapshot(
     snapshot: &SecurityDatabaseSnapshot,
     limits: SecurityDatabaseLimits,
 ) -> Result<Vec<u8>, HostProblem> {
@@ -942,7 +1359,7 @@ fn encode_snapshot(
     Ok(payload)
 }
 
-fn decode_snapshot(
+pub(crate) fn decode_snapshot(
     record: &ProviderStateRecord,
     limits: SecurityDatabaseLimits,
 ) -> Result<SecurityDatabaseSnapshot, HostProblem> {
@@ -988,6 +1405,17 @@ pub(crate) fn store_problem(problem: StoreError) -> HostProblem {
     }
 }
 
+fn retention_wall_tick() -> Result<u64, HostProblem> {
+    let millis = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| HostProblem::InfrastructureFailure)?
+        .as_millis();
+    let tick = u64::try_from(millis).map_err(|_| HostProblem::ResourceExhausted)?;
+    (tick != 0)
+        .then_some(tick)
+        .ok_or(HostProblem::InfrastructureFailure)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -996,7 +1424,7 @@ mod tests {
     use argon2::Argon2;
     use argon2::password_hash::PasswordHasher;
     use mainframe_env_execution_api::{InvocationLimits, PrincipalId};
-    use mainframe_env_host_api::{AccessIntent, ResourceName, SecretRef, SecurityDecision};
+    use mainframe_env_host_api::{SecretRef, SecurityDecision};
     use mainframe_env_store::{MemoryStore, SqliteStateStore, StoreLimits};
     use std::collections::BTreeSet;
 
@@ -1033,6 +1461,57 @@ mod tests {
                 version: 1,
             },
         )
+    }
+
+    #[test]
+    fn retention_open_is_read_only_and_does_not_initialize_an_empty_authority() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(StoreLimits::default()));
+        let before = store.provider_state_retention_epoch().unwrap();
+        assert!(
+            SecurityDatabase::open_existing_for_retention(store.clone(), Default::default())
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(store.provider_state_retention_epoch().unwrap(), before);
+        assert!(
+            store
+                .get_provider_state(DATABASE_NAMESPACE, DATABASE_KEY)
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(store.advance_logical_clock(1).unwrap(), 1);
+    }
+
+    #[test]
+    fn retention_open_reports_legacy_rows_without_migrating_them() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(StoreLimits::default()));
+        let legacy = legacy_record("racf-user", 1);
+        store.put_provider_state(legacy.clone(), None).unwrap();
+        let before = store.provider_state_retention_epoch().unwrap();
+        assert!(
+            SecurityDatabase::open_existing_for_retention(store.clone(), Default::default())
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            SecurityDatabase::legacy_rows_for_retention(store.as_ref(), Default::default(), 1,)
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(store.provider_state_retention_epoch().unwrap(), before);
+        assert_eq!(
+            store
+                .get_provider_state(&legacy.namespace, &legacy.key)
+                .unwrap(),
+            Some(legacy)
+        );
+        assert!(
+            store
+                .get_provider_state(DATABASE_NAMESPACE, DATABASE_KEY)
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]
@@ -1107,7 +1586,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_records_migrate_atomically_retain_source_and_support_rollback() {
+    fn legacy_records_migrate_atomically_retain_backup_and_support_rollback() {
         let store = Arc::new(MemoryStore::new(StoreLimits {
             max_blob_bytes: 32 * 1024 * 1024,
             ..StoreLimits::default()
@@ -1169,17 +1648,6 @@ mod tests {
                 .unwrap(),
             SecurityDecision::Allow
         );
-        assert_eq!(
-            service
-                .authorize(
-                    &user,
-                    "DATASET",
-                    &ResourceName::new("USER1.DATA", 246).unwrap(),
-                    AccessIntent::Read,
-                )
-                .unwrap(),
-            SecurityDecision::Allow
-        );
         let projected = service.smf_type80_records(0, 10).unwrap();
         assert_eq!(projected[0].record_type, 80);
         assert_eq!(projected[0].fields["PASSWORD"], AuditFieldValue::Redacted);
@@ -1196,11 +1664,19 @@ mod tests {
             ),
             (0, 0, 0, 0, 1)
         );
+        assert_eq!(
+            service
+                .database()
+                .legacy_migration_source_rows()
+                .unwrap()
+                .len(),
+            4
+        );
         assert!(
             store
                 .get_provider_state(LEGACY_USER_NAMESPACE, "USER1")
                 .unwrap()
-                .is_some()
+                .is_none()
         );
         let provider_store: Arc<dyn ProviderStateStore> = store;
         let reopened = RacfService::open(
@@ -1210,6 +1686,70 @@ mod tests {
         )
         .unwrap();
         assert_eq!(reopened.database().summary().unwrap().principals, 0);
+    }
+
+    #[test]
+    fn exact_full_legacy_rows_bootstrap_v2_without_live_quota_headroom() {
+        let store = Arc::new(MemoryStore::new(StoreLimits {
+            max_provider_state: 4,
+            max_blob_bytes: 32 * 1024 * 1024,
+            ..StoreLimits::default()
+        }));
+        let hash = Argon2::default()
+            .hash_password_with_salt(b"USER-PASSWORD", b"mainframe-env:USER1")
+            .unwrap()
+            .to_string();
+        let legacy = [
+            ProviderStateRecord {
+                namespace: LEGACY_GROUP_NAMESPACE.into(),
+                key: "GROUP1".into(),
+                version: 1,
+                payload: Vec::new(),
+            },
+            ProviderStateRecord {
+                namespace: LEGACY_USER_NAMESPACE.into(),
+                key: "USER1".into(),
+                version: 1,
+                payload: legacy_user_payload(&hash, &["GROUP1"]),
+            },
+            ProviderStateRecord {
+                namespace: LEGACY_PROFILE_NAMESPACE.into(),
+                key: "DATASET:USER1.**".into(),
+                version: 1,
+                payload: legacy_profile_payload("DATASET", "USER1.**", "USER1", 0, &[]),
+            },
+            ProviderStateRecord {
+                namespace: LEGACY_AUDIT_NAMESPACE.into(),
+                key: "00000000000000000001".into(),
+                version: 1,
+                payload: legacy_audit_payload("SIGNON", "sha256:legacy-resource", "DENY", &[]),
+            },
+        ];
+        for row in legacy {
+            store.put_provider_state(row, None).unwrap();
+        }
+        assert_eq!(
+            store.list_provider_state_prefix("racf-", 8).unwrap().len(),
+            4
+        );
+        let provider: Arc<dyn ProviderStateStore> = store.clone();
+        let database = SecurityDatabase::open(provider, Default::default()).unwrap();
+        let summary = database.summary().unwrap();
+        assert_eq!(
+            (summary.principals, summary.groups, summary.profiles),
+            (1, 1, 1)
+        );
+        assert_eq!(database.legacy_migration_source_rows().unwrap().len(), 4);
+        assert_eq!(
+            store.list_provider_state_prefix("racf-", 8).unwrap().len(),
+            1
+        );
+        let provider: Arc<dyn ProviderStateStore> = store;
+        assert!(
+            SecurityDatabase::open_existing_for_retention(provider, Default::default())
+                .unwrap()
+                .is_some()
+        );
     }
 
     #[test]
@@ -1249,12 +1789,16 @@ mod tests {
             ),
             Err(HostProblem::InfrastructureFailure)
         ));
-        let provider_store: Arc<dyn ProviderStateStore> = store;
-        let database = SecurityDatabase::open(provider_store, Default::default()).unwrap();
-        let summary = database.summary().unwrap();
-        assert_eq!(
-            (summary.principals, summary.groups, summary.migrations),
-            (0, 0, 0)
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        assert!(matches!(
+            SecurityDatabase::open(provider_store, Default::default()),
+            Err(HostProblem::InfrastructureFailure)
+        ));
+        assert!(
+            store
+                .get_provider_state(DATABASE_NAMESPACE, DATABASE_KEY)
+                .unwrap()
+                .is_none()
         );
     }
 
@@ -1293,17 +1837,15 @@ mod tests {
                 "legacy namespace {namespace} was silently truncated"
             );
             let provider_store: Arc<dyn ProviderStateStore> = store.clone();
-            let database = SecurityDatabase::open(provider_store, limits).unwrap();
-            let summary = database.summary().unwrap();
-            assert_eq!(
-                (
-                    summary.principals,
-                    summary.groups,
-                    summary.profiles,
-                    summary.audits,
-                    summary.migrations
-                ),
-                (0, 0, 0, 0, 0),
+            assert!(matches!(
+                SecurityDatabase::open(provider_store, limits),
+                Err(HostProblem::ResourceExhausted)
+            ));
+            assert!(
+                store
+                    .get_provider_state(DATABASE_NAMESPACE, DATABASE_KEY)
+                    .unwrap()
+                    .is_none(),
                 "legacy namespace {namespace} published partial v2 state"
             );
 
@@ -1335,12 +1877,15 @@ mod tests {
                             idempotency_key: id.into(),
                             actor: "SYSTEM".into(),
                             operation: "RECOVERY".into(),
+                            request_digest_format:
+                                crate::SecurityRequestDigestFormat::RacfCommandCanonicalV1,
                             request_digest: format!("sha256:{}", "a".repeat(64)),
                             state,
                             base_generation,
                             final_generation: Some(base_generation + 1),
                             status: legacy_status(DecisionReason::RecoveryRequired),
                             terminal_result: None,
+                            terminal_tick: None,
                         },
                     );
                 }
@@ -1364,12 +1909,18 @@ mod tests {
             TransactionState::Committed
         );
         assert_eq!(snapshot.recovery.len(), 2);
+        assert!(snapshot.recovery.values().all(|record| {
+            record.state == RecoveryState::Reconciled
+                && record.attempt == 1
+                && record.terminal_tick.is_some()
+        }));
         assert!(
             snapshot
-                .recovery
+                .transactions
                 .values()
-                .all(|record| record.state == RecoveryState::Reconciled && record.attempt == 1)
+                .all(|transaction| transaction.terminal_tick.is_some())
         );
+        assert!(snapshot.retention_tick > 0);
         let generation = snapshot.generation;
         drop(service);
         let reopened = RacfService::open(

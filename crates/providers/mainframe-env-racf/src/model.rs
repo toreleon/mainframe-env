@@ -1,9 +1,10 @@
+use argon2::password_hash::phc::PasswordHash;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const SECURITY_DATABASE_SCHEMA: &str = "mainframe-env.racf-database@2";
 pub const SECURITY_PROFILE_SCHEMA: &str = "mainframe-env.racf-profile@2";
-pub const SECURITY_TRANSACTION_SCHEMA: &str = "mainframe-env.racf-transaction@1";
+pub const SECURITY_TRANSACTION_SCHEMA: &str = "mainframe-env.racf-transaction@2";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SecurityDatabaseLimits {
@@ -141,7 +142,10 @@ pub(crate) struct CredentialVerifier {
     pub algorithm: String,
     pub encoded_verifier: String,
     pub changed_tick: u64,
+    #[serde(default)]
     pub history_digests: Vec<String>,
+    #[serde(default)]
+    pub history_verifiers: Vec<String>,
 }
 
 #[derive(Clone, Deserialize, Eq, PartialEq, Serialize)]
@@ -698,7 +702,11 @@ pub struct SecurityAuditRecord {
     pub decision: DecisionOutcome,
     pub status: SafStatus,
     pub fields: BTreeMap<String, AuditFieldValue>,
+    /// Original event tick, retained unchanged for evidence and projections.
     pub tick: u64,
+    /// Provider-clock observation used only when a legacy event has `tick == 0`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retention_observed_tick: Option<u64>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -710,6 +718,31 @@ pub enum TransactionState {
     UnknownOutcome,
 }
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub enum SecurityRequestDigestFormat {
+    #[default]
+    #[serde(rename = "legacy-unversioned@0")]
+    LegacyUnversioned,
+    #[serde(rename = "mainframe-env.legacy-replay-redacted@0")]
+    LegacyScrubbedV0,
+    #[serde(rename = "mainframe-env.racf-command@1")]
+    RacfCommandCanonicalV1,
+    #[serde(rename = "mainframe-env.racroute-request@1")]
+    RacrouteCanonicalV1,
+}
+
+impl SecurityRequestDigestFormat {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::LegacyUnversioned => "legacy-unversioned@0",
+            Self::LegacyScrubbedV0 => "mainframe-env.legacy-replay-redacted@0",
+            Self::RacfCommandCanonicalV1 => "mainframe-env.racf-command@1",
+            Self::RacrouteCanonicalV1 => "mainframe-env.racroute-request@1",
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SecurityTransaction {
@@ -717,6 +750,8 @@ pub struct SecurityTransaction {
     pub idempotency_key: String,
     pub actor: String,
     pub operation: String,
+    #[serde(default)]
+    pub request_digest_format: SecurityRequestDigestFormat,
     pub request_digest: String,
     pub state: TransactionState,
     pub base_generation: u64,
@@ -724,6 +759,12 @@ pub struct SecurityTransaction {
     pub status: SafStatus,
     #[serde(default)]
     pub terminal_result: Option<String>,
+    /// Logical tick at which a terminal state was observed by a trusted caller.
+    ///
+    /// Legacy terminal rows retain `None` until an explicit conservative
+    /// observation and are never interpreted as having occurred at tick zero.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terminal_tick: Option<u64>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -744,6 +785,12 @@ pub struct RecoveryRecord {
     pub attempt: u32,
     pub last_error: Option<DecisionReason>,
     pub version: u64,
+    /// Logical tick at which a terminal recovery state was observed.
+    ///
+    /// `None` is the conservative representation for legacy records whose age
+    /// has not yet been observed in the provider clock domain.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terminal_tick: Option<u64>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -752,6 +799,20 @@ pub enum MigrationState {
     Planned,
     Applied,
     RolledBack,
+}
+
+/// Exact bounded legacy provider row retained inside the v2 migration record for downgrade review.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SecurityMigrationSourceRow {
+    /// Original provider namespace.
+    pub namespace: String,
+    /// Original provider key.
+    pub key: String,
+    /// Original positive CAS version.
+    pub version: u64,
+    /// Exact original payload bytes.
+    pub payload: Vec<u8>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -763,6 +824,12 @@ pub struct SecurityMigration {
     pub state: MigrationState,
     pub source_digest: String,
     pub result_digest: Option<String>,
+    /// Whether post-bootstrap schema installation has been included in `result_digest`.
+    #[serde(default)]
+    pub baseline_finalized: bool,
+    /// Exact pre-upgrade rows retained without consuming live provider-row capacity.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub source_rows: Vec<SecurityMigrationSourceRow>,
 }
 
 #[derive(Clone, Deserialize, Eq, PartialEq, Serialize)]
@@ -770,6 +837,12 @@ pub struct SecurityMigration {
 pub(crate) struct SecurityDatabaseSnapshot {
     pub schema_version: String,
     pub generation: u64,
+    /// Provider-local monotonic clock shared by every retainable RACF record.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub retention_tick: u64,
+    /// CAS version of the atomically paired retention archive, or zero before creation.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub retention_archive_version: u64,
     pub classes: BTreeMap<String, ClassDescriptor>,
     pub templates: BTreeMap<String, ProfileTemplate>,
     pub principals: BTreeMap<String, PrincipalProfile>,
@@ -810,6 +883,8 @@ impl Default for SecurityDatabaseSnapshot {
         Self {
             schema_version: SECURITY_DATABASE_SCHEMA.to_string(),
             generation: 1,
+            retention_tick: 0,
+            retention_archive_version: 0,
             classes: BTreeMap::new(),
             templates: BTreeMap::new(),
             principals: BTreeMap::new(),
@@ -850,9 +925,36 @@ pub enum SecuritySchemaProblem {
 }
 
 impl SecurityDatabaseSnapshot {
+    pub(crate) fn observe_retention_tick(&mut self, supplied_tick: u64) -> Option<u64> {
+        let tick = self.retention_tick.max(supplied_tick);
+        self.retention_tick = tick;
+        Some(tick)
+    }
+
+    pub(crate) fn max_record_retention_tick(&self) -> u64 {
+        self.audits
+            .iter()
+            .map(|audit| audit.retention_observed_tick.unwrap_or(audit.tick))
+            .chain(
+                self.transactions
+                    .values()
+                    .filter_map(|transaction| transaction.terminal_tick),
+            )
+            .chain(
+                self.recovery
+                    .values()
+                    .filter_map(|recovery| recovery.terminal_tick),
+            )
+            .max()
+            .unwrap_or(0)
+    }
+
     pub fn validate(&self, limits: SecurityDatabaseLimits) -> Result<(), SecuritySchemaProblem> {
         if self.schema_version != SECURITY_DATABASE_SCHEMA || self.generation == 0 {
             return Err(SecuritySchemaProblem::IncompatibleVersion);
+        }
+        if self.retention_tick != 0 && self.max_record_retention_tick() > self.retention_tick {
+            return Err(SecuritySchemaProblem::Malformed);
         }
         for (len, max) in [
             (self.principals.len(), limits.max_principals),
@@ -948,8 +1050,22 @@ impl SecurityDatabaseSnapshot {
             if let Some(credential) = &principal.credential {
                 bounded(&credential.algorithm, 64)?;
                 bounded(&credential.encoded_verifier, limits.max_value_bytes)?;
+                if credential
+                    .history_digests
+                    .len()
+                    .saturating_add(credential.history_verifiers.len())
+                    > 128
+                {
+                    return Err(SecuritySchemaProblem::LimitExceeded);
+                }
                 for digest in &credential.history_digests {
                     digest_sha256(digest)?;
+                }
+                for verifier in &credential.history_verifiers {
+                    bounded(verifier, limits.max_value_bytes)?;
+                    if PasswordHash::new(verifier).is_err() {
+                        return Err(SecuritySchemaProblem::Malformed);
+                    }
                 }
             }
             self.validate_profile_segments(
@@ -1300,6 +1416,14 @@ impl SecurityDatabaseSnapshot {
             if !audit_ids.insert(audit.id.as_str()) {
                 return Err(SecuritySchemaProblem::Duplicate);
             }
+            if audit.retention_observed_tick == Some(0)
+                || (audit.tick != 0
+                    && audit
+                        .retention_observed_tick
+                        .is_some_and(|observed| observed != audit.tick))
+            {
+                return Err(SecuritySchemaProblem::Malformed);
+            }
             principal_name(&audit.actor)?;
             bounded(&audit.correlation, limits.max_value_bytes)?;
             bounded(&audit.action, limits.max_value_bytes)?;
@@ -1332,9 +1456,15 @@ impl SecurityDatabaseSnapshot {
             identifier(&transaction.idempotency_key, limits.max_name_bytes)?;
             principal_name(&transaction.actor)?;
             identifier(&transaction.operation, limits.max_name_bytes)?;
+            let terminal = matches!(
+                transaction.state,
+                TransactionState::Committed | TransactionState::RolledBack
+            );
             if transaction.id != *id
                 || transaction.idempotency_key != *id
                 || transaction.base_generation == 0
+                || transaction.terminal_tick == Some(0)
+                || (!terminal && transaction.terminal_tick.is_some())
                 || transaction
                     .final_generation
                     .is_some_and(|generation| generation <= transaction.base_generation)
@@ -1342,6 +1472,14 @@ impl SecurityDatabaseSnapshot {
                 return Err(SecuritySchemaProblem::Malformed);
             }
             digest_sha256(&transaction.request_digest)?;
+            let racroute = transaction.operation.starts_with("RACROUTE-");
+            if matches!(
+                (racroute, transaction.request_digest_format),
+                (true, SecurityRequestDigestFormat::RacfCommandCanonicalV1)
+                    | (false, SecurityRequestDigestFormat::RacrouteCanonicalV1)
+            ) {
+                return Err(SecuritySchemaProblem::Malformed);
+            }
             if let Some(result) = &transaction.terminal_result {
                 bounded(result, 65_536)?;
                 if crate::audit::sensitive_value(result) {
@@ -1351,6 +1489,14 @@ impl SecurityDatabaseSnapshot {
         }
         for (id, recovery) in &self.recovery {
             identifier(id, limits.max_name_bytes)?;
+            let terminal = matches!(
+                recovery.state,
+                RecoveryState::Reconciled | RecoveryState::Failed
+            );
+            if recovery.terminal_tick == Some(0) || (!terminal && recovery.terminal_tick.is_some())
+            {
+                return Err(SecuritySchemaProblem::Malformed);
+            }
             if recovery.id != *id
                 || recovery.version == 0
                 || !self.transactions.contains_key(&recovery.transaction_id)
@@ -1369,6 +1515,27 @@ impl SecurityDatabaseSnapshot {
             digest_sha256(&migration.source_digest)?;
             if let Some(result) = &migration.result_digest {
                 digest_sha256(result)?;
+            }
+            let max_sources = limits
+                .max_principals
+                .checked_add(limits.max_groups)
+                .and_then(|value| value.checked_add(limits.max_profiles))
+                .and_then(|value| value.checked_add(limits.max_audits))
+                .ok_or(SecuritySchemaProblem::LimitExceeded)?;
+            if migration.source_rows.len() > max_sources {
+                return Err(SecuritySchemaProblem::LimitExceeded);
+            }
+            for row in &migration.source_rows {
+                if !matches!(
+                    row.namespace.as_str(),
+                    "racf-user" | "racf-group" | "racf-profile" | "racf-audit"
+                ) || row.key.is_empty()
+                    || row.key.len() > 1_024
+                    || row.version == 0
+                    || row.payload.len() > limits.max_database_bytes
+                {
+                    return Err(SecuritySchemaProblem::Malformed);
+                }
             }
         }
         Ok(())
@@ -1422,6 +1589,10 @@ impl SecurityDatabaseSnapshot {
 
 const fn default_true() -> bool {
     true
+}
+
+const fn is_zero(value: &u64) -> bool {
+    *value == 0
 }
 
 const fn default_password_minimum() -> usize {
@@ -1666,6 +1837,59 @@ mod tests {
         assert_eq!(
             snapshot.validate(SecurityDatabaseLimits::default()),
             Err(SecuritySchemaProblem::Cycle)
+        );
+    }
+
+    #[test]
+    fn nonterminal_transaction_and_recovery_cannot_carry_forged_retention_age() {
+        let mut snapshot = SecurityDatabaseSnapshot {
+            retention_tick: 1,
+            ..SecurityDatabaseSnapshot::default()
+        };
+        snapshot.transactions.insert(
+            "ACTIVE-TX".into(),
+            SecurityTransaction {
+                id: "ACTIVE-TX".into(),
+                idempotency_key: "ACTIVE-TX".into(),
+                actor: "SYSTEM".into(),
+                operation: "RECOVERY".into(),
+                request_digest_format: SecurityRequestDigestFormat::RacfCommandCanonicalV1,
+                request_digest: format!("sha256:{}", "a".repeat(64)),
+                state: TransactionState::Intent,
+                base_generation: 1,
+                final_generation: Some(2),
+                status: SafStatus {
+                    saf_return_code: 8,
+                    racf_return_code: 8,
+                    racf_reason_code: 4,
+                    reason: DecisionReason::RecoveryRequired,
+                },
+                terminal_result: None,
+                terminal_tick: Some(1),
+            },
+        );
+        assert_eq!(
+            snapshot.validate(Default::default()),
+            Err(SecuritySchemaProblem::Malformed)
+        );
+
+        let transaction = snapshot.transactions.get_mut("ACTIVE-TX").unwrap();
+        transaction.state = TransactionState::Committed;
+        snapshot.recovery.insert(
+            "ACTIVE-RECOVERY".into(),
+            RecoveryRecord {
+                id: "ACTIVE-RECOVERY".into(),
+                transaction_id: "ACTIVE-TX".into(),
+                state: RecoveryState::Replaying,
+                attempt: 1,
+                last_error: None,
+                version: 1,
+                terminal_tick: Some(1),
+            },
+        );
+        assert_eq!(
+            snapshot.validate(Default::default()),
+            Err(SecuritySchemaProblem::Malformed)
         );
     }
 

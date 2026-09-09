@@ -27,12 +27,10 @@ use mainframe_env_source::{
     LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLibrary,
     SourceLimits, materialize_host_abi_libraries,
 };
-use mainframe_env_store::LocalArtifactStore;
 use mainframe_env_store_api::{
     ArtifactStore, PlatformStore, ProviderStateRecord, ProviderStateWrite,
 };
 use std::collections::BTreeMap;
-use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
@@ -81,7 +79,7 @@ impl DefaultProgramRouter {
         &self,
         host: Arc<ScopedHostService>,
         store: Arc<dyn PlatformStore>,
-        artifact_root: &Path,
+        artifacts: Arc<dyn ArtifactStore>,
     ) -> Result<(), HostProblem> {
         self.cobol
             .host
@@ -93,10 +91,7 @@ impl DefaultProgramRouter {
             .map_err(|_| HostProblem::IdempotencyConflict)?;
         self.cobol
             .artifacts
-            .set(
-                LocalArtifactStore::open(artifact_root, 64 * 1024 * 1024)
-                    .map_err(|_| HostProblem::InfrastructureFailure)?,
-            )
+            .set(artifacts)
             .map_err(|_| HostProblem::IdempotencyConflict)
     }
 }
@@ -252,7 +247,7 @@ fn persist_batch_file_cursors(
 struct CobolProgram {
     host: OnceLock<Arc<ScopedHostService>>,
     store: OnceLock<Arc<dyn PlatformStore>>,
-    artifacts: OnceLock<LocalArtifactStore>,
+    artifacts: OnceLock<Arc<dyn ArtifactStore>>,
     sequence: AtomicU64,
     control: OnceLock<Arc<dyn ProgramExecutionControl>>,
     clock_start: Instant,
@@ -292,7 +287,7 @@ impl CobolProgram {
                 cancellation_requested: false,
             }
         };
-        observation.cancellation_requested |= invocation.cancellation.is_some();
+        observation.cancellation_requested |= invocation.cancellation_requested();
         if let Some(binding) = invocation.bindings.get("jes.work-id") {
             if binding.schema() != "mainframe-env.jes-work@1" {
                 return Err(ExecutionControlError::Unavailable);
@@ -358,6 +353,7 @@ impl CobolProgram {
         let limits = InvocationLimits::default();
         let sequence = identity;
         let mut bindings = parent.bindings.clone();
+        replay::bind_protocol_owner(parent, &mut bindings)?;
         bindings.insert("cobol.call.arguments".into(), payload.clone());
         let invocation = Invocation::new(
             RequestId::new(format!("online-call-request-{sequence}"), limits)
@@ -537,6 +533,7 @@ impl CobolProgram {
         let limits = InvocationLimits::default();
         let sequence = identity;
         let mut bindings = parent.bindings.clone();
+        replay::bind_protocol_owner(parent, &mut bindings)?;
         for dd in &input.dds {
             if let Some(dataset) = &dd.dataset {
                 bindings.insert(
@@ -730,7 +727,7 @@ impl Program for CobolProgram {
             .map_err(|_| HostProblem::InfrastructureFailure)?,
             Some(parent.execution_id.clone()),
             Selector::new("program:COBOL", limits).map_err(|_| HostProblem::Malformed)?,
-            ArtifactRef::new(format!("sha256:{}", artifact.id().to_hex()), limits)
+            ArtifactRef::new(artifact.content_id().to_reference(), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
             Principal::new(
                 parent.principal.id().clone(),
@@ -781,9 +778,7 @@ impl Program for CobolProgram {
                 Arc::clone(store),
                 CoordinatorLimits::default(),
             ),
-            (Some(host), None) => {
-                ExecutionCoordinator::with_host(Arc::clone(host), CoordinatorLimits::default())
-            }
+            (Some(_), None) => return Err(HostProblem::InfrastructureFailure),
             (None, _) => ExecutionCoordinator::local(CoordinatorLimits::default()),
         };
         match coordinator.execute_with_control(&mut machine, &invocation, || {
@@ -1509,5 +1504,7 @@ mod tests {
 mod hardening;
 
 mod replay;
+#[allow(dead_code, reason = "R-11 product integration seam")]
+pub(crate) mod retention;
 
 mod instance;

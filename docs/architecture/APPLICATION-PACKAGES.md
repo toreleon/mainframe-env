@@ -1,6 +1,9 @@
 # Application package generation contract
 
 Status: **Frozen for mainframe-env 0.2.0**
+Owner: **application-package maintainers**
+Scope: **application package generation and installation contract**
+Applies from: **mainframe-env 0.2.0**
 
 Version 2 of the application-package envelope is additive to the accepted 0.1.1
 reader. It binds the version 1 content-addressed manifest, a positive monotonic

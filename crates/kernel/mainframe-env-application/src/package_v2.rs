@@ -1315,7 +1315,7 @@ fn digest_optional(digest: &mut Sha256, value: Option<&str>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sha256;
+    use crate::package_v1::sha256;
     use crate::{ApplicationManifest, EntryKind, PackageEntry};
 
     struct TestVerifier;

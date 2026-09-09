@@ -1,6 +1,16 @@
 # ADR 0005: Enforce 0.1 boundaries with twenty packages
 
-Status: **Accepted by repository owner**
+Status: **Superseded by ADR-0009 for current topology**
+Owner: **repository owner**
+Scope: **historical 0.1 package consolidation and split criteria**
+Applies from: **mainframe-env 0.1.0**
+
+Historical scope note: this ADR records the original consolidation target. The
+accepted 0.1 machine inventory later contained 24 workspace packages, and
+versioned additions in 0.2 and 0.8 bring the current workspace to 26. See the
+[package map](../architecture/PACKAGE-MAP.md) and machine inventories for
+current composition. [ADR-0009](0009-current-package-topology.md) supersedes
+this decision for the current package count and topology.
 
 ## Context
 

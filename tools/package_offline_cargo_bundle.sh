@@ -3,6 +3,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+python_bin="${MAINFRAME_ENV_PYTHON:-$("$root/tools/jenkins/select-python.sh")}"
 out="$root/dist"
 tag=""
 
@@ -26,6 +27,9 @@ head="$(git -C "$root" rev-parse HEAD)"
 tag_commit="$(git -C "$root" rev-parse --verify "refs/tags/$tag^{commit}")"
 [[ "$head" == "$tag_commit" ]] \
   || { echo "release bundle requires HEAD at $tag ($tag_commit), got $head" >&2; exit 1; }
+[[ -z "$(git -C "$root" status --porcelain --untracked-files=normal)" ]] \
+  || { echo "release bundle requires a clean tagged source tree" >&2; exit 1; }
+"$python_bin" -B "$root/tools/supply_chain.py" check --runtime offline
 
 target_root="${CARGO_TARGET_DIR:-$root/target}"
 mkdir -p "$target_root" "$out"
@@ -42,6 +46,19 @@ grep -q '^directory = "vendor"$' "$sdk/.cargo/config.toml" \
   || { echo "could not make the vendor path relocatable" >&2; exit 1; }
 cp "$root/Cargo.lock" "$sdk/Cargo.lock"
 cp "$root/Cargo.toml" "$sdk/Cargo.toml"
+cp "$root/LICENSE" "$sdk/LICENSE"
+cp "$root/NOTICE" "$sdk/NOTICE"
+mkdir -p "$sdk/LICENSES"
+cp "$root/LICENSES/ICU.txt" "$sdk/LICENSES/ICU.txt"
+mkdir -p "$sdk/SUPPLY-CHAIN"
+cp "$root/tools/ci-inputs.lock.json" "$sdk/SUPPLY-CHAIN/ci-inputs.lock.json"
+cp "$root/tools/jenkins/controller-plugins.lock.json" \
+  "$sdk/SUPPLY-CHAIN/jenkins-controller-plugins.lock.json"
+
+"$python_bin" -B "$root/tools/supply_chain.py" record-offline \
+  --vendor "$sdk/vendor" --output "$sdk/SUPPLY-CHAIN/BUILD-INPUTS.json"
+"$python_bin" -B "$root/tools/supply_chain.py" verify-offline \
+  --vendor "$sdk/vendor" --record "$sdk/SUPPLY-CHAIN/BUILD-INPUTS.json"
 
 cat > "$sdk/README.md" <<'EOF'
 # mainframe-env offline Cargo dependency bundle
@@ -52,6 +69,16 @@ contains the exact crates selected by `Cargo.lock`; build and test with
 `cargo test --workspace --all-features --locked --offline`.
 
 The Rust compiler and source checkout are not included.
+
+The mainframe-env Apache-2.0 license, project NOTICE, and the complete retained
+ICU text for the locked decNumber dependency are included at the archive root.
+Each vendored crate retains its own complete license and notice files.
+
+`SUPPLY-CHAIN/BUILD-INPUTS.json` binds the source revision, locked input files,
+vendored tree, and exact tool executables used to assemble this archive. The
+reviewed controller/plugin and CI input locks are retained beside it. The final
+archive is reproduced from two clean staging copies in the digest-pinned GNU
+tar environment before its immutable local path is accepted.
 EOF
 
 echo "==> verifying a clean checkout with networking disabled in Cargo"
@@ -67,15 +94,6 @@ CARGO_NET_OFFLINE=true CARGO_TARGET_DIR="$stage/verify-target" \
 
 archive="$out/mainframe-env-${version}-cargo-vendor.tar.gz"
 echo "==> packaging $archive"
-if tar --version 2>/dev/null | grep -qi 'gnu tar'; then
-  tar_flags=(--format=ustar --numeric-owner --owner=0 --group=0 --mtime=@0 --sort=name)
-else
-  tar_flags=(--format=ustar --numeric-owner --uid 0 --gid 0 --uname '' --gname '')
-fi
-tar "${tar_flags[@]}" -C "$sdk" -cf - . | gzip -9 -n > "$archive"
-if command -v sha256sum >/dev/null 2>&1; then
-  sha256sum "$archive" | sed 's|  .*/|  |' > "$archive.sha256"
-else
-  shasum -a 256 "$archive" | sed 's|  .*/|  |' > "$archive.sha256"
-fi
+"$python_bin" -B "$root/tools/reproducible_archive.py" \
+  --source "$sdk" --output "$archive"
 printf 'bundle: %s\n' "$archive"

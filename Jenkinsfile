@@ -83,9 +83,26 @@ pipeline {
                       required_paths=(
                         Jenkinsfile
                         tools/ci_assurance.py
+                        tools/supply_chain.py
+                        tools/ci-inputs.lock.json
+                        tools/jenkins/controller-plugins.lock.json
+                        config/release-attestation-policy.json
+                        conformance/standards/cyclonedx/1.6/README.md
+                        conformance/standards/cyclonedx/1.6/bom-1.6.schema.json.gz.b64
+                        conformance/standards/cyclonedx/1.6/jsf-0.82.schema.json.gz.b64
+                        conformance/standards/cyclonedx/1.6/spdx.schema.json.gz.b64
+                        docs/architecture/RELEASE-BUILDER.md
+                        docs/contracts/RELEASE-BUILD-V1.md
                         tools/dataset_mutations.py
                         tools/jenkins/disk_guard.py
                         tools/jenkins/postgres_parity.sh
+                        tools/assurance-gates.json
+                        tools/assurance_gates.py
+                        tools/run_coverage_baseline.sh
+                        tools/run_fuzz_assurance.sh
+                        tools/run_model_assurance.sh
+                        tools/run_tooling_tests.py
+                        fuzz/Cargo.toml
                         tools/package_offline_cargo_bundle.sh
                       )
                       for required_path in "${required_paths[@]}"; do
@@ -130,6 +147,15 @@ pipeline {
                     }
                     grep -Eq '^clippy(-|$)' <<<"$components" || {
                       echo "clippy is missing from installed toolchain $required" >&2
+                      exit 1
+                    }
+                    command -v cargo-deny >/dev/null || {
+                      echo 'cargo-deny is required on the Jenkins node' >&2
+                      exit 1
+                    }
+                    cargo deny --version
+                    grep -Eq '^llvm-tools(-|$)' <<<"$components" || {
+                      echo "llvm-tools-preview is missing from installed toolchain $required" >&2
                       exit 1
                     }
                 '''
@@ -234,9 +260,27 @@ pipeline {
                     env.CI_EVIDENCE = selector('evidence')
                     env.CI_MUTATION = selector('mutation')
                     env.CI_FULL = selector('full')
+                    env.CI_DOCS = selector('docs')
                     env.CI_TARGETS = selector('targets')
                     env.CI_DOCUMENTATION = selector('documentation')
                 }
+            }
+        }
+
+        stage('Dependency and license policy') {
+            steps {
+                sh '''#!/bin/bash
+                    set -euo pipefail
+                    out="$CARGO_TARGET_DIR/ci-assurance"
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record \
+                      --output "$out" --gate supply-chain -- \
+                      "$MAINFRAME_ENV_PYTHON" -B tools/supply_chain.py check \
+                        --runtime ci --jenkins-home "$JENKINS_HOME"
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record \
+                      --output "$out" --gate cargo-deny -- cargo deny check
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record \
+                      --output "$out" --gate license-notices -- cargo xtask license-notices --check
+                '''
             }
         }
 
@@ -249,6 +293,8 @@ pipeline {
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate fmt -- cargo fmt --all -- --check
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate spec -- cargo xtask spec --check
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate cobol -- cargo xtask cobol-exit --check
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate python-tooling-tests --expect-tests -- "$MAINFRAME_ENV_PYTHON" -B tools/run_tooling_tests.py
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate api-docs -- "$MAINFRAME_ENV_PYTHON" -B tools/check_public_api_docs.py
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate tests --expect-tests -- cargo test --workspace --all-features --locked --no-fail-fast
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate clippy -- cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
                 '''
@@ -260,12 +306,16 @@ pipeline {
                 anyOf {
                     expression { env.CI_TARGETS == 'true' }
                     expression { env.CI_DOCUMENTATION == 'true' }
+                    expression { env.CI_DOCS == 'true' }
                 }
             }
             steps {
                 sh '''#!/bin/bash
                     set -euo pipefail
                     out="$CARGO_TARGET_DIR/ci-assurance"
+                    if [[ "$CI_DOCS" == true ]]; then
+                      "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate docs -- cargo xtask docs --check
+                    fi
                     if [[ "$CI_TARGETS" == true ]]; then
                       "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate targets -- cargo check --workspace --all-targets --all-features --locked
                     fi
@@ -311,11 +361,15 @@ pipeline {
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate certification -- cargo xtask certification
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate evidence-seal -- cargo xtask evidence seal --check
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate runtime-architecture -- cargo xtask runtime-architecture --check
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate model-check --expect-tests -- tools/run_model_assurance.sh
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate fuzz-smoke -- tools/run_fuzz_assurance.sh smoke
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate fuzz-periodic -- tools/run_fuzz_assurance.sh periodic
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate coverage-baseline -- tools/run_coverage_baseline.sh
                 '''
             }
         }
 
-        stage('Contract MSRV') {
+        stage('MSRV') {
             when { expression { env.CI_MSRV_REQUIRED == 'true' } }
             steps {
                 sh '''#!/bin/bash
@@ -324,15 +378,9 @@ pipeline {
                       echo 'Rust 1.95.0 is required; install it on the Jenkins node before running CI.' >&2
                       exit 1
                     }
-                    cargo +1.95.0 check --locked \
-                      -p mainframe-env-source \
-                      -p mainframe-env-diagnostics \
-                      -p mainframe-env-encoding \
-                      -p mainframe-env-ir \
-                      -p mainframe-env-compiler-api \
-                      -p mainframe-env-execution-api \
-                      -p mainframe-env-host-api \
-                      -p mainframe-env-store-api
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record \
+                      --output "$CARGO_TARGET_DIR/ci-assurance" --gate msrv -- \
+                      cargo +1.95.0 check --workspace --all-targets --all-features --locked
                 '''
             }
         }
@@ -347,33 +395,37 @@ pipeline {
         stage('Release verification and offline Cargo bundle') {
             when { expression { env.MAINFRAME_ENV_CI_EVENT == 'tag' } }
             steps {
-                sh '''#!/bin/bash
-                    set -euo pipefail
-                    tag="${MAINFRAME_ENV_RELEASE_TAG:-}"
-                    [[ "$tag" =~ ^mainframe-env-v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$ ]] || {
-                      echo "release mode requires an existing mainframe-env-vX.Y.Z tag" >&2
-                      exit 1
-                    }
-                    version="${tag#mainframe-env-v}"
-                    [[ "$(tr -d '[:space:]' < VERSION)" == "$version" ]] || {
-                      echo "VERSION does not match $tag" >&2
-                      exit 1
-                    }
-                    [[ "$(git rev-parse HEAD)" == "$(git rev-parse --verify "refs/tags/$tag^{commit}")" ]] || {
-                      echo "HEAD is not the release tag commit" >&2
-                      exit 1
-                    }
-                    target="$RELEASE_TARGET"
-                    [[ -n "$target" ]] || target="$(rustc -vV | awk '/^host: /{print $2}')"
-                    case "$target" in
-                      aarch64-apple-darwin|x86_64-unknown-linux-gnu) ;;
-                      *) echo "unsupported release target: $target" >&2; exit 1 ;;
-                    esac
-                    cargo xtask release --target "$target"
-                    git diff --exit-code -- "release/$version/targets/$target"
-                    cargo xtask release --check --target "$target"
-                    tools/package_offline_cargo_bundle.sh --tag "$tag" --out "$CARGO_TARGET_DIR/jenkins-artifacts"
-                '''
+                withCredentials([file(credentialsId: 'mainframe-env-release-ed25519-pkcs8', variable: 'MAINFRAME_ENV_RELEASE_SIGNING_KEY')]) {
+                    sh '''#!/bin/bash
+                        set -euo pipefail
+                        tag="${MAINFRAME_ENV_RELEASE_TAG:-}"
+                        [[ "$tag" =~ ^mainframe-env-v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$ ]] || {
+                          echo "release mode requires an existing mainframe-env-vX.Y.Z tag" >&2
+                          exit 1
+                        }
+                        version="${tag#mainframe-env-v}"
+                        [[ "$(tr -d '[:space:]' < VERSION)" == "$version" ]] || {
+                          echo "VERSION does not match $tag" >&2
+                          exit 1
+                        }
+                        [[ "$(git rev-parse HEAD)" == "$(git rev-parse --verify "refs/tags/$tag^{commit}")" ]] || {
+                          echo "HEAD is not the release tag commit" >&2
+                          exit 1
+                        }
+                        target="$RELEASE_TARGET"
+                        [[ -n "$target" ]] || target="$(rustc -vV | awk '/^host: /{print $2}')"
+                        case "$target" in
+                          aarch64-apple-darwin|x86_64-unknown-linux-gnu) ;;
+                          *) echo "unsupported release target: $target" >&2; exit 1 ;;
+                        esac
+                        export MAINFRAME_ENV_RELEASE_INVOCATION_ID="${BUILD_URL:?Jenkins BUILD_URL is required for signed provenance}"
+                        "$MAINFRAME_ENV_PYTHON" -B tools/supply_chain.py check --runtime release
+                        cargo xtask release --target "$target"
+                        git diff --exit-code -- "release/$version/targets/$target"
+                        cargo xtask release --check --target "$target"
+                        tools/package_offline_cargo_bundle.sh --tag "$tag" --out "$CARGO_TARGET_DIR/jenkins-artifacts"
+                    '''
+                }
             }
         }
 
@@ -395,7 +447,8 @@ pipeline {
                         if ! gh release view "$tag" >/dev/null 2>&1; then
                           gh release create "$tag" --verify-tag --title "mainframe-env $version" --generate-notes
                         fi
-                        gh release upload "$tag" "$archive" "$archive.sha256" --clobber
+                        "$MAINFRAME_ENV_PYTHON" -B tools/publish_release_assets.py \
+                          --tag "$tag" "$archive" "$archive.sha256"
                     '''
                 }
             }
@@ -425,14 +478,14 @@ pipeline {
                 fi
                 backend="$CARGO_TARGET_DIR/ci-backend"
                 if [[ -f "$backend/plan.json" ]]; then
-                  gates=(postgres-move)
-                  [[ -f "$backend/postgres-effect.json" ]] && gates+=(postgres-effect)
+                  gates=()
+                  while IFS= read -r gate; do gates+=("$gate"); done < <(tools/jenkins/postgres_parity.sh list)
                   "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py summary --plan "$backend/plan.json" \
                     --directory "$backend" --output "$backend/summary.json" \
                     --gates "${gates[@]}"
                 fi
             ''')
-            archiveArtifacts artifacts: 'target/ci-assurance/**/*,target/ci-backend/**/*,target/jenkins-artifacts/**/*,.postgres/postgres.log,release/*/targets/**/*',
+            archiveArtifacts artifacts: 'target/ci-assurance/**/*,target/ci-backend/**/*,target/coverage/**/*,target/fuzz-artifacts-*/*,target/jenkins-artifacts/**/*,.postgres/postgres.log,release/*/targets/**/*',
                              allowEmptyArchive: true, fingerprint: false
             script {
                 if (env.CARGO_TARGET_DIR) {

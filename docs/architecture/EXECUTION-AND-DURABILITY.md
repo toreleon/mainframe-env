@@ -1,6 +1,9 @@
 # Execution and Durability Architecture
 
 Status: **Accepted by repository owner**
+Owner: **execution and store maintainers**
+Scope: **execution lifecycle, effects, work, checkpoints, and durability**
+Applies from: **mainframe-env 0.1.0**
 
 ## Design outcome
 
@@ -80,7 +83,9 @@ For a mutating effect:
 
 1. Validate request, capability, principal, bounds, transaction, and deadline.
 2. Allocate a monotonic effect sequence in the run unit.
-3. Persist the effect intent and idempotency key.
+3. Persist the effect intent, idempotency key, typed capability, dispatch
+   owner/attempt, durable creation and recovery-not-before ticks, and
+   execution-event epoch.
 4. Invoke the provider.
 5. Persist success, condition, failure, or unknown outcome.
 6. Feed the typed result into the machine.
@@ -88,6 +93,14 @@ For a mutating effect:
 
 Infrastructure retry never assumes that an external mutation did not occur.
 Unknown outcomes remain explicit and require service-specific reconciliation.
+If result persistence fails after a mutating provider was dispatched, the
+caller receives `UnknownOutcome` even when the provider returned a usable
+success. A bounded recovery worker enumerates only sufficiently old intents,
+claims each under an expiring owner/attempt/epoch fence, and asks a
+service-specific resolver to consult the provider's durable idempotency ledger.
+It records the observed result under the original canonical digest domain and
+never redispatches the mutation. A late dispatch owner is fenced once recovery
+has claimed the intent.
 
 CICS syncpoint uses this same rule. A durable commit or rollback intent is
 written before its final decision. Replay returns the recorded final decision;
@@ -96,10 +109,44 @@ the CICS authority reconciles it. Pseudo-conversational COMMAREA continuations
 and transient-data queue records use provider-state compare-and-swap identities
 rather than worker memory.
 
+Installed online CICS programs use the durable execution coordinator, not the
+host-only driver. The product persists one bounded exchange record containing
+the exact execution, run-unit, principal, artifact, grant, transaction,
+COMMAREA, and idempotency identities before driving the machine. A process
+restart reconstructs volatile CICS run state from that record and resumes the
+same non-terminal execution. Previously completed effects may be replayed only
+through the original provider idempotency identity and only when the returned
+canonical digest matches the journaled result. `Intent` and `UnknownOutcome`
+records stop before provider dispatch. When the CICS replay ledger proves an
+outer result, reconciliation changes the effect to `Completed` before machine
+execution resumes.
+
+CICS also retains the exact bounded outer response for every mutating file,
+transient-queue, program-link, and syncpoint request. The replay key is checked
+against the canonical request digest. New replay envelopes also retain the
+owning execution and conservative effect deadline; legacy envelopes remain
+replayable but are not retention-eligible. A crash after the provider mutation
+but before the caller observes the response therefore cannot apply that
+mutation twice. An unresolved result remains an explicit HTTP 409
+`unknown_outcome`; it is never translated to a normal CICS condition or the
+generic `conflict` code.
+
+When a terminal RECEIVE suspends a machine, the product first commits its own
+session continuation and then atomically moves the interpreter execution from
+`Suspended` to terminal `Completed` with `HandoffCompleted`. Only after that
+handoff does it delete the redundant interpreter checkpoint and finish the
+volatile COBOL/CICS run. A restart in the cleanup gap recognizes the handoff
+event, preserves the product continuation, completes the remaining cleanup,
+and admits the next terminal task under a new execution identity. Other stale
+terminal exchanges discard both continuations and retain their conservative
+`Cancelled`, `TimedOut`, or provider-failure outcome; terminal journal rows are
+never passed back to resumable execution.
+
 Keyed dataset insert, rewrite, and delete commit the base cluster, every
 upgradable alternate-index generation, and the idempotency result as one atomic
-provider-state write. A restart that observes only the preceding intent can
-safely retry; a final result replays without applying the record twice.
+provider-state write. A restart that observes only the preceding intent queries
+that provider ledger through stale-intent reconciliation; a final result
+replays without applying the record twice.
 
 Application seed generations retain verified source-object identities and a
 provider-neutral dataset snapshot. Install, compatible upgrade, and rollback
@@ -121,6 +168,13 @@ The single-node scheduler provides bounded lanes:
 Every lane has a bounded queue, concurrency semaphore, admission policy,
 deadline behavior, and saturation metrics. Work is accounted until terminal
 state or durable suspension, not only until an HTTP response is returned.
+
+The z/OSMF adapter places synchronous composition calls on a dedicated bounded
+OS-thread lane. Request cancellation is a live shared probe on the invocation,
+not merely cancellation of the HTTP future, and the absolute gateway deadline
+replaces unbounded invocation deadlines. A timed-out call keeps its worker
+capacity until it cooperatively exits, while Tokio remains free to return the
+timeout and serve unrelated work.
 
 Suspended sessions own bounded serialized state but no dedicated CPU worker or
 OS thread.
@@ -167,8 +221,8 @@ Work claims use row state containing:
 
 ```text
 work ID and execution ID
-required selector and generation
-lease ID and worker ID
+required selector and generation, plus scheduling priority
+lease ID, worker ID, and monotonic fencing epoch
 lease expiry and heartbeat
 monotonic attempt
 deadline and cancellation
@@ -180,6 +234,16 @@ terminal/dead-letter policy
 `FOR UPDATE SKIP LOCKED` may be used to select queue-like candidates, but the
 lease columns and state machine define ownership. A database row lock is not a
 durable lease and is not held while program code or user input waits.
+Queued work at or beyond its deadline is moved directly to dead letter and is
+never returned to a worker. Every heartbeat, release, completion, and explicit
+dead-letter transition supplies the observed clock and fencing epoch; the
+store's compare-and-swap transaction rejects expired, superseded, or
+clock-regressed owners. Lease expiry is clamped to the work deadline.
+
+Durable work schema 3 adds the explicit scheduling priority used by the JES
+worker pool. Schema 1/2 rows remain readable with priority zero and are
+rewritten as schema 3 on their next lease mutation; their existing
+attempt-derived or explicit fencing epoch remains authoritative.
 
 State transition, current projection, effect record, and outbox notification
 are committed in one transaction where they share an authority boundary.
@@ -222,6 +286,8 @@ function; it is never silently coerced.
 - Dispatch is at least once.
 - A work item has at most one valid, unexpired owner lease according to the
   durable state machine.
+- A stale fencing epoch cannot heartbeat, release, complete, or dead-letter a
+  later claim, even when the same worker name is reused.
 - Lease expiry does not prove a side effect did not occur.
 - Mutating host services provide idempotency, a transaction, or an explicit
   non-retryable/unknown-outcome policy.

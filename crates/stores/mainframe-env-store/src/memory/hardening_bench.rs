@@ -19,6 +19,7 @@ fn execution(key: &str) -> ExecutionRecord {
         version: 1,
         owner_lease: None,
         lease_expiry_tick: None,
+        terminal_tick: None,
     }
 }
 fn event(record: &ExecutionRecord, sequence: u64) -> LifecycleEvent {
@@ -40,6 +41,7 @@ fn notification(record: &ExecutionRecord, sequence: u64) -> OutboxRecord {
         payload: vec![1],
         attempt: 0,
         delivered: false,
+        delivered_tick: None,
         version: 1,
     }
 }
@@ -191,6 +193,7 @@ fn memory_store_scaling() {
                                                         1,
                                                         None,
                                                         e,
+                                                        None,
                                                         None,
                                                         None,
                                                         n,

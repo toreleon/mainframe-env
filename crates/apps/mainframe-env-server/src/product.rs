@@ -1,5 +1,15 @@
 use crate::cobol::bind_compatible_runtime_services;
-use crate::{DefaultProgramRouter, ServerConfig, default_program_router};
+use crate::console_retention::{decode_console_log_rows, encode_console_log};
+use crate::jes_worker::{
+    DurableJesClock, JES_HEARTBEAT_MILLIS, JES_IDLE_MILLIS, JES_LEASE_TICKS,
+    JES_WORK_DEADLINE_TICKS, JES_WORK_GENERATION, JES_WORKER_COUNT, JES_WORKER_FRESHNESS_MILLIS,
+    JesClock, JesWorkPayload,
+};
+use crate::retention_maintenance::provider::RetentionPlanner;
+use crate::{
+    ArtifactProfile, DefaultProgramRouter, EnvironmentSecretResolver, ServerConfig,
+    default_program_router,
+};
 use axum::http::StatusCode;
 use base64::Engine;
 use mainframe_env_application::{
@@ -11,42 +21,51 @@ use mainframe_env_application::{
 use mainframe_env_batch::{
     BATCH_CONTROLLER_REGISTRY_CONTRACT, BatchControllerDefinition, BatchControllerGeneration,
     BatchControllerInstallReceipt, BatchControllerPlan, BatchControllerProgram,
-    BatchControllerSelector, BatchService, JclBundle,
+    BatchControllerSelector, BatchLimits, BatchService, JclBundle,
 };
 use mainframe_env_cics::{
-    BmsMapDefinition, CicsService, CicsTerminalSnapshot, CicsTraceEntry, cics_provider,
+    BmsMapDefinition, CicsReplayClock, CicsService, CicsTerminalExecution, CicsTerminalSnapshot,
+    CicsTraceEntry, cics_provider,
 };
-use mainframe_env_dataset::{DatasetService, dataset_providers};
+use mainframe_env_dataset::{DatasetReplayClock, DatasetService, dataset_providers};
 use mainframe_env_db2::{
-    Db2CatalogGeneration, Db2Limits, Db2SeedRow, Db2Service, db2_providers,
+    Db2CatalogGeneration, Db2Limits, Db2ReplayClock, Db2SeedRow, Db2Service, db2_providers,
     decode_table_definitions_bounded,
 };
 use mainframe_env_encoding::CodePage;
 use mainframe_env_execution_api::{
-    ArtifactRef, BoundedPayload, CapabilityId, ExecutionId, ExecutionOutcome, IdempotencyKey,
-    Invocation, InvocationLimits, Machine, Principal, PrincipalId, RequestId, ResourceLimits,
-    RunUnitId, Selector, ServiceClass, TraceId,
+    ArtifactRef, BoundedPayload, Cancellation, CancellationId, CapabilityId, ExecutionId,
+    ExecutionOutcome, IdempotencyKey, Invocation, InvocationLimits, LifecycleEventKind, Machine,
+    Principal, PrincipalId, RequestId, ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
 };
 use mainframe_env_host_api::{
     AccessIntent, CapabilityDescriptor, CicsOperation, ClockRequest, DatasetAttributes,
     DatasetName, DatasetOrganization, DatasetRequest, DatasetResult, EffectRequest, EffectResult,
-    HostLimits, HostProblem, HostProvider, HostRequest, HostResult, MemberName, Mutation,
-    RecordFormat, RegistrySnapshot, ResourceName, ScopedHostService, SecretRef, SecurityDecision,
-    SessionId, TerminalRequest,
+    EnterpriseAuthorizer, HostLimits, HostProblem, HostProvider, HostRequest, HostResult,
+    MemberName, Mutation, RecordFormat, RegistrySnapshot, ResourceName, ScopedHostService,
+    SecretRef, SecurityDecision, SessionId, TerminalRequest,
 };
-use mainframe_env_ims::{ImsService, ims_providers};
+use mainframe_env_ims::{ImsReplayClock, ImsService, ims_providers};
 use mainframe_env_interpreter::{CoordinatorLimits, ExecutionCoordinator, ReferenceMachine};
 use mainframe_env_ir::CodecLimits;
-use mainframe_env_mq::{MqService, mq_providers};
-use mainframe_env_racf::{MemorySecretResolver, RacfService, SecretResolver, racf_providers};
-use mainframe_env_spool::{SpoolService, spool_providers};
+use mainframe_env_mq::{MqReplayClock, MqService, mq_providers};
+use mainframe_env_racf::{
+    MemorySecretResolver, PrincipalAuthenticationEpoch, RacfService, ResolvedSecret,
+    SecretResolver, racf_providers,
+};
+use mainframe_env_spool::{SpoolRetentionClock, SpoolService, spool_providers};
 use mainframe_env_store::{LocalArtifactStore, MemoryStore};
 use mainframe_env_store_api::{
-    ArtifactRecord, ArtifactStore, CheckpointStore, PlatformStore, ProviderStateRecord,
-    ProviderStateStore, ProviderStateWrite, StoreError, WorkRecord, WorkState,
+    ArtifactRecord, ArtifactStore, ArtifactStoreHealth, CheckpointStore, EffectDigestFormat,
+    EffectState, ExecutionState, PlatformStore, ProviderStateMutation, ProviderStateRecord,
+    ProviderStateStore, ProviderStateWrite, RetentionAgeReconciliation, RetentionArchive,
+    RetentionArchivePruneOutcome, RetentionArchivePruneRequest, RetentionForecast,
+    RetentionLegacyRow, RetentionReceipt, RetentionReconciliationReceipt, RetentionTarget,
+    SaturationLevel, StoreError, WorkRecord, WorkState,
 };
 use mainframe_env_zosmf::{
-    Authentication, GatewayProblem, GatewayRequest, GatewayResponse, ZosmfBackend, ZosmfLimits,
+    Authentication, GatewayCallContext, GatewayProblem, GatewayRequest, GatewayResponse,
+    ZosmfBackend, ZosmfLimits,
 };
 use ring::hmac;
 use ring::rand::{SecureRandom, SystemRandom};
@@ -54,11 +73,14 @@ use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
+use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::sync::{Arc, Mutex, Weak};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio_rustls::TlsAcceptor;
+use zeroize::Zeroizing;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ProductMetrics {
@@ -67,8 +89,72 @@ pub struct ProductMetrics {
     pub active: usize,
     pub sessions: usize,
     pub console_messages: usize,
+    pub jes_workers: usize,
+    /// JES workers that completed a durable queue operation within the freshness deadline.
+    pub jes_worker_healthy: usize,
+    /// Successful JES queue polls, lease heartbeats, and terminal writes.
+    pub jes_worker_progress: u64,
+    /// Failed JES queue polls, lease heartbeats, joins, and terminal writes.
+    pub jes_worker_failures: u64,
+    pub jes_active: usize,
     pub outbox_pending: usize,
     pub outbox_delivered: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+pub struct ProductReadiness {
+    pub accepting: bool,
+    pub writable_store: bool,
+    pub retention_capacity: ProductCapacityStatus,
+    pub retention_warning: bool,
+    pub bootstrap_identity: bool,
+    pub host_capabilities: bool,
+    pub artifact_store: bool,
+    pub jes_workers: bool,
+}
+
+impl ProductReadiness {
+    #[must_use]
+    pub const fn ready(self) -> bool {
+        self.accepting
+            && self.writable_store
+            && self.retention_capacity.accepts_traffic()
+            && self.bootstrap_identity
+            && self.host_capabilities
+            && self.artifact_store
+            && self.jes_workers
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ProductCapacityStatus {
+    Healthy,
+    LowWatermark,
+    HighWatermark,
+    Full,
+    Unavailable,
+}
+
+impl ProductCapacityStatus {
+    const fn accepts_traffic(self) -> bool {
+        matches!(self, Self::Healthy | Self::LowWatermark)
+    }
+
+    const fn warning(self) -> bool {
+        matches!(self, Self::LowWatermark | Self::HighWatermark | Self::Full)
+    }
+}
+
+impl From<SaturationLevel> for ProductCapacityStatus {
+    fn from(value: SaturationLevel) -> Self {
+        match value {
+            SaturationLevel::Healthy => Self::Healthy,
+            SaturationLevel::LowWatermark => Self::LowWatermark,
+            SaturationLevel::HighWatermark => Self::HighWatermark,
+            SaturationLevel::Full => Self::Full,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -158,9 +244,77 @@ struct OnlineMachineContinuation {
     version: u64,
 }
 
-struct AuthSession {
-    user: String,
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TerminalExchangeRecovery {
+    Completed,
+    HandoffCompleted,
+    Cancelled,
+    TimedOut,
+    Failed,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct OnlineExchangeState {
+    schema_version: String,
+    program: String,
+    request_id: String,
+    execution_id: String,
+    run_unit_id: String,
+    selector: String,
+    artifact: String,
+    principal: String,
+    grants: BTreeSet<String>,
+    provider_generations: BTreeMap<String, String>,
+    priority: u8,
+    deadline_tick: u64,
+    trace_id: String,
+    idempotency_key: String,
+    attempt: u32,
+    audit_correlation: String,
+    transaction: String,
+    commarea: Vec<u8>,
+    aid: u8,
+    blocking_effect: Option<String>,
+    #[serde(skip)]
     version: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct AuthSession {
+    schema_version: String,
+    user: String,
+    issued_tick: u64,
+    last_used_tick: u64,
+    absolute_expires_tick: u64,
+    idle_expires_tick: u64,
+    principal_epoch: String,
+    version: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct AuthSessionIndex {
+    schema_version: String,
+    sessions: BTreeMap<String, String>,
+    version: u64,
+}
+
+#[derive(Clone)]
+struct VerifiedAuthentication {
+    user: String,
+    principal_epoch: PrincipalAuthenticationEpoch,
+}
+
+impl AuthSession {
+    fn expired(&self, now_tick: u64) -> bool {
+        now_tick >= self.absolute_expires_tick || now_tick >= self.idle_expires_tick
+    }
+
+    fn clock_regressed(&self, now_tick: u64) -> bool {
+        now_tick < self.issued_tick || now_tick < self.last_used_tick
+    }
 }
 
 struct ConsoleMessage {
@@ -174,6 +328,51 @@ struct SequenceState {
     version: Option<u64>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum JesWorkOutcome {
+    Completed,
+    Cancelled,
+    Deferred,
+}
+
+struct EnterpriseReplayClock(Arc<dyn JesClock>);
+
+impl Db2ReplayClock for EnterpriseReplayClock {
+    fn now_tick(&self) -> Result<u64, HostProblem> {
+        self.0.now_tick().map_err(store_error)
+    }
+}
+
+impl ImsReplayClock for EnterpriseReplayClock {
+    fn now_tick(&self) -> Result<u64, HostProblem> {
+        self.0.now_tick().map_err(store_error)
+    }
+}
+
+impl MqReplayClock for EnterpriseReplayClock {
+    fn now_tick(&self) -> Result<u64, HostProblem> {
+        self.0.now_tick().map_err(store_error)
+    }
+}
+
+impl DatasetReplayClock for EnterpriseReplayClock {
+    fn now_tick(&self) -> Result<u64, HostProblem> {
+        self.0.now_tick().map_err(store_error)
+    }
+}
+
+impl CicsReplayClock for EnterpriseReplayClock {
+    fn now_tick(&self) -> Result<u64, HostProblem> {
+        self.0.now_tick().map_err(store_error)
+    }
+}
+
+impl SpoolRetentionClock for EnterpriseReplayClock {
+    fn now_tick(&self) -> Result<u64, HostProblem> {
+        self.0.now_tick().map_err(store_error)
+    }
+}
+
 pub struct ProductServer {
     config: ServerConfig,
     store: Arc<dyn PlatformStore>,
@@ -184,19 +383,31 @@ pub struct ProductServer {
     db2: Arc<Db2Service>,
     ims: Arc<ImsService>,
     mq: Arc<MqService>,
+    spool: Arc<SpoolService>,
     batch: Arc<BatchService>,
-    artifacts: Arc<LocalArtifactStore>,
+    artifacts: Arc<ProductArtifactStore>,
     host: Arc<ScopedHostService>,
     program: Arc<DefaultProgramRouter>,
     applications: ApplicationInstaller,
     applications_v2: Mutex<DurableApplicationsV2>,
     application_publication: Mutex<()>,
+    job_submission: Mutex<()>,
     online_programs: Mutex<BTreeMap<String, ArtifactRef>>,
     online_transactions: Mutex<BTreeMap<String, String>>,
     online_traces: Mutex<BTreeMap<String, Vec<CicsTraceEntry>>>,
     sessions: Mutex<BTreeMap<String, AuthSession>>,
     console: Mutex<Vec<ConsoleMessage>>,
     sequence: Mutex<SequenceState>,
+    jes_clock: Arc<dyn JesClock>,
+    jes_workers_started: AtomicBool,
+    jes_workers_stopping: AtomicBool,
+    jes_worker_notify: tokio::sync::Notify,
+    jes_worker_handles: Mutex<Vec<tokio::task::JoinHandle<()>>>,
+    jes_worker_active: AtomicUsize,
+    jes_worker_last_progress: Mutex<Vec<Option<Instant>>>,
+    jes_worker_progress: AtomicU64,
+    jes_worker_failures: AtomicU64,
+    outbox_delivery: Mutex<()>,
     accepting: AtomicBool,
     requests: AtomicU64,
     failures: AtomicU64,
@@ -204,10 +415,105 @@ pub struct ProductServer {
     outbox_delivered: AtomicU64,
 }
 
+enum ProductArtifactStore {
+    Local(LocalArtifactStore),
+    Shared(Arc<dyn ArtifactStore>),
+}
+
+impl ProductArtifactStore {
+    fn is_ready(&self) -> bool {
+        self.health().is_ok_and(ArtifactStoreHealth::ready)
+    }
+}
+
+impl ArtifactStore for ProductArtifactStore {
+    fn health(&self) -> Result<ArtifactStoreHealth, StoreError> {
+        match self {
+            Self::Local(store) => store.health(),
+            Self::Shared(store) => store.health(),
+        }
+    }
+
+    fn put_artifact(&self, record: ArtifactRecord) -> Result<(), StoreError> {
+        match self {
+            Self::Local(store) => store.put_artifact(record),
+            Self::Shared(store) => store.put_artifact(record),
+        }
+    }
+
+    fn get_artifact(&self, id: &ArtifactRef) -> Result<Option<ArtifactRecord>, StoreError> {
+        match self {
+            Self::Local(store) => store.get_artifact(id),
+            Self::Shared(store) => store.get_artifact(id),
+        }
+    }
+
+    fn delete_artifact(&self, id: &ArtifactRef) -> Result<(), StoreError> {
+        match self {
+            Self::Local(store) => store.delete_artifact(id),
+            Self::Shared(store) => store.delete_artifact(id),
+        }
+    }
+}
+
 const APPLICATION_V2_STATE_NAMESPACE: &str = "application-package-v2";
 const APPLICATION_V2_STATE_KEY: &str = "registry";
 const APPLICATION_PUBLICATION_NAMESPACE: &str = "application-publication-v2";
 const APPLICATION_PUBLICATION_CONTRACT: &str = "mainframe-env.application-publication@1";
+const AUTH_SESSION_NAMESPACE: &str = "auth-session-v2";
+const AUTH_SESSION_INDEX_NAMESPACE: &str = "auth-session-index-v2";
+const AUTH_SESSION_INDEX_KEY: &str = "global";
+const LEGACY_AUTH_SESSION_NAMESPACE: &str = "auth-session";
+const AUTH_SESSION_CONTRACT: &str = "mainframe-env.auth-session@3";
+const AUTH_SESSION_INDEX_CONTRACT: &str = "mainframe-env.auth-session-index@2";
+const ONLINE_EXCHANGE_NAMESPACE: &str = "online-exchange-v1";
+const ONLINE_EXCHANGE_CONTRACT: &str = "mainframe-env.online-exchange@1";
+const MAX_AUTH_SESSIONS: usize = 65_536;
+const MAX_AUTH_SESSIONS_PER_USER: usize = 8;
+const AUTH_SESSION_ABSOLUTE_TTL_MILLIS: u64 = 8 * 60 * 60 * 1000;
+const AUTH_SESSION_IDLE_TTL_MILLIS: u64 = 30 * 60 * 1000;
+static NEXT_JES_WORKER_POOL: AtomicU64 = AtomicU64::new(1);
+const JES_ALLOWED_WORK_CAPABILITIES: [&str; 15] = [
+    "host.cics.execute",
+    "host.clock",
+    "host.dataset.read",
+    "host.dataset.write",
+    "host.db2.read",
+    "host.db2.write",
+    "host.ims.read",
+    "host.ims.write",
+    "host.mq.read",
+    "host.mq.write",
+    "host.program.invoke",
+    "host.security.authorize",
+    "host.spool.read",
+    "host.spool.write",
+    "host.terminal",
+];
+const BOOTSTRAP_NAMESPACE: &str = "server-bootstrap";
+const BOOTSTRAP_CLAIM_KEY: &str = "first-administrator-claim";
+const BOOTSTRAP_KEY: &str = "first-administrator";
+const BOOTSTRAP_CAS_ATTEMPTS: usize = 16;
+
+thread_local! {
+    static GATEWAY_CALL_CONTEXT: RefCell<Option<GatewayCallContext>> = const { RefCell::new(None) };
+}
+
+struct GatewayCallContextScope(Option<GatewayCallContext>);
+
+impl GatewayCallContextScope {
+    fn enter(context: GatewayCallContext) -> Self {
+        Self(GATEWAY_CALL_CONTEXT.with(|current| current.replace(Some(context))))
+    }
+}
+
+impl Drop for GatewayCallContextScope {
+    fn drop(&mut self) {
+        GATEWAY_CALL_CONTEXT.with(|current| {
+            current.replace(self.0.take());
+        });
+    }
+}
 
 struct DurableApplicationsV2 {
     installer: ApplicationInstallerV2,
@@ -250,7 +556,7 @@ impl HmacSha256PackageTrust {
         let references = encoded
             .into_iter()
             .map(|(key_id, reference)| {
-                SecretRef::new(reference, HostLimits::default())
+                EnvironmentSecretResolver::parse_reference(&reference)
                     .map(|reference| (key_id, reference))
             })
             .collect::<Result<BTreeMap<_, _>, _>>()?;
@@ -316,21 +622,110 @@ impl ProductServer {
         program: Arc<DefaultProgramRouter>,
         package_trust: Arc<dyn PackageSignatureVerifier>,
     ) -> Result<Arc<Self>, HostProblem> {
-        config.validate()?;
-        let artifacts = Arc::new(
+        if config.artifact_profile != ArtifactProfile::Local {
+            return Err(HostProblem::Malformed);
+        }
+        let artifacts = Arc::new(ProductArtifactStore::Local(
             LocalArtifactStore::open(&config.artifact_root, 64 * 1024 * 1024)
                 .map_err(store_error)?,
-        );
+        ));
+        Self::open_configured(
+            config,
+            store,
+            secrets,
+            program,
+            package_trust,
+            artifacts,
+            None,
+        )
+    }
+
+    pub fn open_with_package_trust_and_artifact_store(
+        config: ServerConfig,
+        store: Arc<dyn PlatformStore>,
+        secrets: Arc<MemorySecretResolver>,
+        program: Arc<DefaultProgramRouter>,
+        package_trust: Arc<dyn PackageSignatureVerifier>,
+        artifacts: Arc<dyn ArtifactStore>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        if config.artifact_profile != ArtifactProfile::Shared {
+            return Err(HostProblem::Malformed);
+        }
+        Self::open_configured(
+            config,
+            store,
+            secrets,
+            program,
+            package_trust,
+            Arc::new(ProductArtifactStore::Shared(artifacts)),
+            None,
+        )
+    }
+
+    pub fn open_with_artifact_store(
+        config: ServerConfig,
+        store: Arc<dyn PlatformStore>,
+        secrets: Arc<MemorySecretResolver>,
+        program: Arc<DefaultProgramRouter>,
+        artifacts: Arc<dyn ArtifactStore>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_with_package_trust_and_artifact_store(
+            config,
+            store,
+            secrets,
+            program,
+            Arc::new(RejectPackageTrust),
+            artifacts,
+        )
+    }
+
+    fn open_configured(
+        config: ServerConfig,
+        store: Arc<dyn PlatformStore>,
+        secrets: Arc<MemorySecretResolver>,
+        program: Arc<DefaultProgramRouter>,
+        package_trust: Arc<dyn PackageSignatureVerifier>,
+        artifacts: Arc<ProductArtifactStore>,
+        jes_clock: Option<Arc<dyn JesClock>>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        config.validate()?;
+        let jes_clock: Arc<dyn JesClock> = match jes_clock {
+            Some(clock) => clock,
+            None => Arc::new(DurableJesClock::new(store.clone()).map_err(store_error)?),
+        };
+        let enterprise_replay_clock = Arc::new(EnterpriseReplayClock(jes_clock.clone()));
         let provider_store: Arc<dyn ProviderStateStore> = store.clone();
         let racf = RacfService::open(provider_store.clone(), secrets.clone(), Default::default())?;
-        let dataset = DatasetService::open(provider_store.clone(), Default::default())?;
-        let db2 = Db2Service::open(provider_store.clone(), Default::default())?;
-        let ims = ImsService::open(provider_store.clone(), Default::default())?;
-        let mq = MqService::open(provider_store.clone(), Default::default())?;
-        let spool = SpoolService::open(
+        let dataset = DatasetService::open_with_replay_clock(
             provider_store.clone(),
-            artifacts.clone(),
             Default::default(),
+            enterprise_replay_clock.clone(),
+        )?;
+        let enterprise_authorizer: Arc<dyn EnterpriseAuthorizer> = racf.clone();
+        let db2 = Db2Service::open_authorized_with_replay_clock(
+            provider_store.clone(),
+            Default::default(),
+            enterprise_authorizer.clone(),
+            enterprise_replay_clock.clone(),
+        )?;
+        let ims = ImsService::open_authorized_with_replay_clock(
+            provider_store.clone(),
+            Default::default(),
+            enterprise_authorizer.clone(),
+            enterprise_replay_clock.clone(),
+        )?;
+        let mq = MqService::open_authorized_with_replay_clock(
+            provider_store.clone(),
+            Default::default(),
+            enterprise_authorizer,
+            enterprise_replay_clock.clone(),
+        )?;
+        let spool_artifacts: Arc<dyn ArtifactStore> = artifacts.clone();
+        let spool = SpoolService::open_with_retention_clock(
+            provider_store.clone(),
+            spool_artifacts,
+            Default::default(),
+            enterprise_replay_clock.clone(),
         )?;
         let mut enterprise_providers = db2_providers(db2.clone(), InvocationLimits::default());
         enterprise_providers.extend(ims_providers(ims.clone(), InvocationLimits::default()));
@@ -344,12 +739,17 @@ impl ProductServer {
             false,
             None,
         )?;
-        let cics = CicsService::open(inner, provider_store.clone(), Default::default())?;
+        let cics = CicsService::open_with_replay_clock(
+            inner,
+            provider_store.clone(),
+            Default::default(),
+            enterprise_replay_clock,
+        )?;
         let program_provider: Arc<dyn HostProvider> = program.clone();
         let mut enterprise_providers = db2_providers(db2.clone(), InvocationLimits::default());
         enterprise_providers.extend(ims_providers(ims.clone(), InvocationLimits::default()));
         enterprise_providers.extend(mq_providers(mq.clone(), InvocationLimits::default()));
-        enterprise_providers.extend(spool_providers(spool, InvocationLimits::default()));
+        enterprise_providers.extend(spool_providers(spool.clone(), InvocationLimits::default()));
         let host = scoped_host(
             &racf,
             &dataset,
@@ -358,14 +758,18 @@ impl ProductServer {
             true,
             Some(cics_provider(cics.clone(), InvocationLimits::default())),
         )?;
-        program.bind_runtime(host.clone(), store.clone(), &config.artifact_root)?;
+        let program_artifacts: Arc<dyn ArtifactStore> = artifacts.clone();
+        program.bind_runtime(host.clone(), store.clone(), program_artifacts)?;
         let checkpoint_store: Arc<dyn CheckpointStore> = store.clone();
         let batch = BatchService::open_with_checkpoint_store(
             host.clone(),
             provider_store,
             checkpoint_store,
             Default::default(),
-            Default::default(),
+            BatchLimits {
+                max_active: JES_WORKER_COUNT,
+                ..BatchLimits::default()
+            },
         )?;
         let (application_store_version, applications_v2) = match store
             .get_provider_state(APPLICATION_V2_STATE_NAMESPACE, APPLICATION_V2_STATE_KEY)
@@ -390,40 +794,49 @@ impl ProductServer {
                 ),
             ),
         };
+        for row in store
+            .list_provider_state(LEGACY_AUTH_SESSION_NAMESPACE, MAX_AUTH_SESSIONS)
+            .map_err(store_error)?
+        {
+            store
+                .delete_provider_state(LEGACY_AUTH_SESSION_NAMESPACE, &row.key, row.version)
+                .map_err(store_error)?;
+        }
         let mut sessions = BTreeMap::new();
-        for row in store
-            .list_provider_state("auth-session", 65536)
-            .map_err(store_error)?
-        {
-            let user =
-                String::from_utf8(row.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
-            sessions.insert(
-                row.key,
-                AuthSession {
-                    user,
-                    version: row.version,
-                },
-            );
+        let now_tick = session_tick()?;
+        let active_principals = racf.active_principal_epochs()?;
+        let stored_sessions = store
+            .list_provider_state(AUTH_SESSION_NAMESPACE, MAX_AUTH_SESSIONS)
+            .map_err(store_error)?;
+        for row in stored_sessions {
+            let session = decode_auth_session(&row)?;
+            let valid_principal = active_principals
+                .get(&session.user)
+                .is_some_and(|epoch| epoch.as_str() == session.principal_epoch.as_str());
+            if session.expired(now_tick) || session.clock_regressed(now_tick) || !valid_principal {
+                store
+                    .delete_provider_state(AUTH_SESSION_NAMESPACE, &row.key, row.version)
+                    .map_err(store_error)?;
+            } else if sessions.insert(row.key, session).is_some() {
+                return Err(HostProblem::InfrastructureFailure);
+            }
         }
-        let mut console = Vec::new();
-        for row in store
-            .list_provider_state("console-log", 65536)
-            .map_err(store_error)?
-        {
-            let separator = row
-                .payload
-                .iter()
-                .position(|byte| *byte == 0)
-                .ok_or(HostProblem::InfrastructureFailure)?;
-            let (name, tail) = row.payload.split_at(separator);
-            let text = tail.get(1..).ok_or(HostProblem::InfrastructureFailure)?;
-            console.push(ConsoleMessage {
-                key: row.key,
-                console: String::from_utf8(name.to_vec())
-                    .map_err(|_| HostProblem::InfrastructureFailure)?,
-                text: text.to_vec(),
-            });
+        reconcile_auth_session_index(&*store)?;
+        let console_rows = store
+            .list_provider_state("console-log", 65_537)
+            .map_err(store_error)?;
+        if console_rows.len() > 65_536 {
+            return Err(HostProblem::ResourceExhausted);
         }
+        let console = decode_console_log_rows(&console_rows)
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .into_iter()
+            .map(|entry| ConsoleMessage {
+                key: entry.key,
+                console: entry.console,
+                text: entry.text,
+            })
+            .collect();
         let mut online_programs = BTreeMap::new();
         for row in store
             .list_provider_state("online-program", 4096)
@@ -508,6 +921,7 @@ impl ProductServer {
             db2,
             ims,
             mq,
+            spool,
             batch,
             artifacts,
             host,
@@ -519,12 +933,23 @@ impl ProductServer {
                 verifier: package_trust,
             }),
             application_publication: Mutex::new(()),
+            job_submission: Mutex::new(()),
             online_programs: Mutex::new(online_programs),
             online_transactions: Mutex::new(online_transactions),
             online_traces: Mutex::new(BTreeMap::new()),
             sessions: Mutex::new(sessions),
             console: Mutex::new(console),
             sequence: Mutex::new(sequence),
+            jes_clock,
+            jes_workers_started: AtomicBool::new(false),
+            jes_workers_stopping: AtomicBool::new(false),
+            jes_worker_notify: tokio::sync::Notify::new(),
+            jes_worker_handles: Mutex::new(Vec::new()),
+            jes_worker_active: AtomicUsize::new(0),
+            jes_worker_last_progress: Mutex::new(vec![None; JES_WORKER_COUNT]),
+            jes_worker_progress: AtomicU64::new(0),
+            jes_worker_failures: AtomicU64::new(0),
+            outbox_delivery: Mutex::new(()),
             accepting: AtomicBool::new(true),
             requests: AtomicU64::new(0),
             failures: AtomicU64::new(0),
@@ -1352,6 +1777,237 @@ impl ProductServer {
         Ok(selected)
     }
 
+    fn online_exchange(
+        &self,
+        session: &SessionId,
+    ) -> Result<Option<OnlineExchangeState>, HostProblem> {
+        self.store
+            .get_provider_state(ONLINE_EXCHANGE_NAMESPACE, session.as_str())
+            .map_err(store_error)?
+            .map(|record| decode_online_exchange(&record))
+            .transpose()
+    }
+
+    fn begin_online_exchange(
+        &self,
+        session: &SessionId,
+        program: &str,
+        context: &CicsTerminalExecution,
+    ) -> Result<OnlineExchangeState, HostProblem> {
+        let state = OnlineExchangeState {
+            schema_version: ONLINE_EXCHANGE_CONTRACT.into(),
+            program: normalize_online_name(program, 128)?,
+            request_id: context.invocation.request_id.as_str().into(),
+            execution_id: context.invocation.execution_id.as_str().into(),
+            run_unit_id: context.invocation.run_unit_id.as_str().into(),
+            selector: context.invocation.selector.as_str().into(),
+            artifact: context.invocation.artifact.as_str().into(),
+            principal: context.invocation.principal.id().as_str().into(),
+            grants: context
+                .invocation
+                .principal
+                .grants()
+                .iter()
+                .map(|capability| capability.as_str().to_string())
+                .collect(),
+            provider_generations: context
+                .invocation
+                .provider_generations
+                .iter()
+                .map(|(capability, generation)| {
+                    (capability.as_str().to_string(), generation.clone())
+                })
+                .collect(),
+            priority: context.invocation.priority,
+            deadline_tick: context.invocation.deadline_tick,
+            trace_id: context.invocation.trace_id.as_str().into(),
+            idempotency_key: context.invocation.idempotency_key.as_str().into(),
+            attempt: context.invocation.attempt,
+            audit_correlation: context.invocation.audit_correlation.clone(),
+            transaction: normalize_online_name(&context.transaction, 16)?,
+            commarea: context.commarea.clone(),
+            aid: context.aid,
+            blocking_effect: None,
+            version: 1,
+        };
+        validate_online_exchange(&state)?;
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: ONLINE_EXCHANGE_NAMESPACE.into(),
+                    key: session.as_str().into(),
+                    version: state.version,
+                    payload: encode_online_exchange(&state)?,
+                },
+                None,
+            )
+            .map_err(store_error)?;
+        Ok(state)
+    }
+
+    fn persist_online_exchange(
+        &self,
+        session: &SessionId,
+        state: &mut OnlineExchangeState,
+    ) -> Result<(), HostProblem> {
+        let previous = state.version;
+        state.version = previous
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        if let Err(error) = self.store.put_provider_state(
+            ProviderStateRecord {
+                namespace: ONLINE_EXCHANGE_NAMESPACE.into(),
+                key: session.as_str().into(),
+                version: state.version,
+                payload: encode_online_exchange(state)?,
+            },
+            Some(previous),
+        ) {
+            state.version = previous;
+            return Err(store_error(error));
+        }
+        Ok(())
+    }
+
+    fn clear_online_exchange(
+        &self,
+        session: &SessionId,
+        state: &OnlineExchangeState,
+    ) -> Result<(), HostProblem> {
+        self.store
+            .delete_provider_state(ONLINE_EXCHANGE_NAMESPACE, session.as_str(), state.version)
+            .map_err(store_error)
+    }
+
+    fn online_exchange_invocation(
+        &self,
+        state: &OnlineExchangeState,
+    ) -> Result<Invocation, HostProblem> {
+        validate_online_exchange(state)?;
+        let limits = InvocationLimits::default();
+        let grants = state
+            .grants
+            .iter()
+            .map(|capability| {
+                CapabilityId::new(capability, limits)
+                    .map_err(|_| HostProblem::InfrastructureFailure)
+            })
+            .collect::<Result<BTreeSet<_>, _>>()?;
+        let generations = state
+            .provider_generations
+            .iter()
+            .map(|(capability, generation)| {
+                Ok((
+                    CapabilityId::new(capability, limits)
+                        .map_err(|_| HostProblem::InfrastructureFailure)?,
+                    generation.clone(),
+                ))
+            })
+            .collect::<Result<BTreeMap<_, _>, HostProblem>>()?;
+        let deadline_tick = current_gateway_call_context()
+            .map_or(state.deadline_tick, |context| context.deadline_tick());
+        let mut invocation = Invocation::new(
+            RequestId::new(&state.request_id, limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            ExecutionId::new(&state.execution_id, limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            RunUnitId::new(&state.run_unit_id, limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            None,
+            Selector::new(&state.selector, limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            ArtifactRef::new(&state.artifact, limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            Principal::new(
+                PrincipalId::new(&state.principal, limits)
+                    .map_err(|_| HostProblem::InfrastructureFailure)?,
+                grants,
+                limits,
+            )
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+            ServiceClass::Interactive,
+            state.priority,
+            deadline_tick,
+            TraceId::new(&state.trace_id, limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            IdempotencyKey::new(&state.idempotency_key, limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            state.attempt,
+            ResourceLimits::default(),
+            BTreeMap::new(),
+            limits,
+        )
+        .and_then(|invocation| invocation.with_provider_generations(generations, limits))
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+        invocation
+            .audit_correlation
+            .clone_from(&state.audit_correlation);
+        if let Some(context) = current_gateway_call_context() {
+            invocation = invocation.with_cancellation_probe(context.cancellation_probe());
+        }
+        Ok(invocation)
+    }
+
+    fn online_exchange_blocked(&self, state: &OnlineExchangeState) -> Result<bool, HostProblem> {
+        let Some(key) = state.blocking_effect.as_deref() else {
+            return Ok(false);
+        };
+        let key = IdempotencyKey::new(key, InvocationLimits::default())
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let effect = self
+            .store
+            .effect(&key)
+            .map_err(store_error)?
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        Ok(matches!(
+            effect.state,
+            EffectState::Intent | EffectState::UnknownOutcome
+        ))
+    }
+
+    fn reconcile_online_exchange(
+        &self,
+        session: &SessionId,
+        state: &mut OnlineExchangeState,
+    ) -> Result<bool, HostProblem> {
+        let Some(key) = state.blocking_effect.as_deref() else {
+            return Ok(true);
+        };
+        let key = IdempotencyKey::new(key, InvocationLimits::default())
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let effect = self
+            .store
+            .effect(&key)
+            .map_err(store_error)?
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        if effect.execution_id.as_str() != state.execution_id
+            || effect.run_unit_id.as_str() != state.run_unit_id
+            || effect.digest_format != EffectDigestFormat::CanonicalHostV1
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        match effect.state {
+            EffectState::Completed => {}
+            EffectState::UnknownOutcome => {
+                let result_digest = self
+                    .cics
+                    .reconciled_effect_result_digest(&key, effect.request_digest)?;
+                self.store
+                    .reconcile_unknown_versioned(
+                        &key,
+                        EffectState::Completed,
+                        EffectDigestFormat::CanonicalHostV1,
+                        result_digest,
+                    )
+                    .map_err(store_error)?;
+            }
+            EffectState::Intent | EffectState::Failed => return Ok(false),
+        }
+        state.blocking_effect = None;
+        self.persist_online_exchange(session, state)?;
+        Ok(true)
+    }
+
     fn online_machine_continuation(
         &self,
         session: &SessionId,
@@ -1418,6 +2074,131 @@ impl ProductServer {
             .complete_terminal_run(session, principal, now_tick)
     }
 
+    fn discard_online_machine_run_if_present(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        now_tick: u64,
+    ) -> Result<(), HostProblem> {
+        let trace = self
+            .cics
+            .discard_terminal_run_if_present(session, principal, now_tick)?;
+        self.online_traces
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .entry(session.as_str().into())
+            .or_default()
+            .extend(trace);
+        Ok(())
+    }
+
+    fn clear_execution_checkpoint(&self, execution_id: &ExecutionId) -> Result<(), HostProblem> {
+        match self.store.delete_checkpoint(execution_id) {
+            Ok(()) | Err(StoreError::NotFound) => Ok(()),
+            Err(problem) => Err(store_error(problem)),
+        }
+    }
+
+    /// Recover the gap between execution terminalization and product/CICS
+    /// cleanup. A handoff completion retains the product-owned continuation;
+    /// every other terminal outcome discards it before a fresh task may start.
+    fn recover_terminal_online_exchange(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        exchange: &OnlineExchangeState,
+        now_tick: u64,
+    ) -> Result<Option<TerminalExchangeRecovery>, HostProblem> {
+        let invocation = self.online_exchange_invocation(exchange)?;
+        let Some(execution) = self
+            .store
+            .get_execution(&invocation.execution_id)
+            .map_err(store_error)?
+        else {
+            // The exchange is persisted before coordinator admission. A crash
+            // in that narrow gap is safe to resume under the same identity.
+            return Ok(None);
+        };
+        if !execution.state.terminal() {
+            return Ok(None);
+        }
+        let last = self
+            .store
+            .events(&invocation.execution_id, execution.version, 1)
+            .map_err(store_error)?
+            .into_iter()
+            .next()
+            .filter(|event| event.sequence == execution.version)
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let preserve_handoff = matches!(last.kind, LifecycleEventKind::HandoffCompleted);
+        let recovered = match execution.state {
+            ExecutionState::Completed if preserve_handoff => {
+                TerminalExchangeRecovery::HandoffCompleted
+            }
+            ExecutionState::Completed => TerminalExchangeRecovery::Completed,
+            ExecutionState::Cancelled => TerminalExchangeRecovery::Cancelled,
+            ExecutionState::TimedOut => TerminalExchangeRecovery::TimedOut,
+            ExecutionState::Failed | ExecutionState::DeadLetter => TerminalExchangeRecovery::Failed,
+            ExecutionState::Admitted
+            | ExecutionState::Queued
+            | ExecutionState::Running
+            | ExecutionState::Suspended
+            | ExecutionState::Completing => return Err(HostProblem::InfrastructureFailure),
+        };
+        let saved = self.online_machine_continuation(session)?;
+        let missing_handoff = preserve_handoff && saved.is_none();
+
+        // Evaluate every cleanup before propagating the first failure. This
+        // prevents a recoverable stale row from repeatedly blocking a session.
+        let program_result = self.program.finish_run_unit(&invocation);
+        let continuation_result = if preserve_handoff {
+            Ok(())
+        } else {
+            self.clear_online_machine_continuation(
+                session,
+                saved.as_ref().map(|continuation| continuation.version),
+            )
+        };
+        let checkpoint_result = self.clear_execution_checkpoint(&invocation.execution_id);
+        let cics_result = self.discard_online_machine_run_if_present(session, principal, now_tick);
+        let exchange_result = self.clear_online_exchange(session, exchange);
+        for result in [
+            program_result,
+            continuation_result,
+            checkpoint_result,
+            cics_result,
+            exchange_result,
+        ] {
+            result?;
+        }
+        if missing_handoff {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        Ok(Some(recovered))
+    }
+
+    fn finish_known_online_failure(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        invocation: &Invocation,
+        now_tick: u64,
+        saved_version: Option<u64>,
+        exchange: &OnlineExchangeState,
+    ) -> Result<(), HostProblem> {
+        let results = [
+            self.program.finish_run_unit(invocation),
+            self.clear_online_machine_continuation(session, saved_version),
+            self.clear_execution_checkpoint(&invocation.execution_id),
+            self.finish_online_machine_run(session, principal, now_tick),
+            self.clear_online_exchange(session, exchange),
+        ];
+        for result in results {
+            result?;
+        }
+        Ok(())
+    }
+
     fn run_online_exchange(
         &self,
         session: &SessionId,
@@ -1425,7 +2206,63 @@ impl ProductServer {
         program: &str,
         now_tick: u64,
     ) -> Result<(), HostProblem> {
-        let context = self.cics.terminal_execution(session, principal, now_tick)?;
+        let mut exchange = self.online_exchange(session)?;
+        if let Some(state) = exchange.as_ref() {
+            if state.principal != principal.as_str()
+                || state.program != normalize_online_name(program, 128)?
+            {
+                return Err(HostProblem::Unauthorized);
+            }
+            if let Some(recovered) =
+                self.recover_terminal_online_exchange(session, principal, state, now_tick)?
+            {
+                return match recovered {
+                    TerminalExchangeRecovery::Completed
+                    | TerminalExchangeRecovery::HandoffCompleted => Ok(()),
+                    TerminalExchangeRecovery::Cancelled => Err(HostProblem::Cancelled),
+                    TerminalExchangeRecovery::TimedOut => Err(HostProblem::TimedOut),
+                    TerminalExchangeRecovery::Failed => Err(HostProblem::ProviderFailure),
+                };
+            }
+        }
+        let blocked = exchange
+            .as_ref()
+            .map(|state| self.online_exchange_blocked(state))
+            .transpose()?
+            .unwrap_or(false);
+        if blocked
+            && !self.reconcile_online_exchange(
+                session,
+                exchange
+                    .as_mut()
+                    .ok_or(HostProblem::InfrastructureFailure)?,
+            )?
+        {
+            return Err(HostProblem::UnknownOutcome);
+        }
+        let context = match exchange.as_ref() {
+            Some(state) => {
+                let invocation = self.online_exchange_invocation(state)?;
+                self.cics.restore_terminal_run(
+                    invocation.clone(),
+                    session,
+                    &state.transaction,
+                    state.commarea.clone(),
+                    now_tick,
+                )?;
+                CicsTerminalExecution {
+                    invocation,
+                    transaction: state.transaction.clone(),
+                    commarea: state.commarea.clone(),
+                    aid: state.aid,
+                }
+            }
+            None => {
+                let context = self.cics.terminal_execution(session, principal, now_tick)?;
+                exchange = Some(self.begin_online_exchange(session, program, &context)?);
+                context
+            }
+        };
         let mut invocation = context.invocation;
         invocation.bindings.insert(
             "cics.commarea".into(),
@@ -1498,20 +2335,27 @@ impl ProductServer {
                     .restore_checkpoint(&checkpoint)
                     .map_err(|_| HostProblem::InfrastructureFailure)?;
             }
-            let coordinator = ExecutionCoordinator::with_host(
+            let coordinator = ExecutionCoordinator::durable(
                 self.host.clone(),
+                self.store.clone(),
                 CoordinatorLimits {
                     max_quanta: 100,
                     ..CoordinatorLimits::default()
                 },
             );
-            match coordinator.execute_with_control(&mut machine, &invocation, || {
+            match coordinator.execute_resumable_with_control(&mut machine, &invocation, || {
                 self.program.observe_execution_control(&invocation)
             }) {
                 ExecutionOutcome::Completed(_) => {
                     self.program.finish_run_unit(&invocation)?;
                     self.clear_online_machine_continuation(session, saved_version)?;
                     self.finish_online_machine_run(session, principal, now_tick)?;
+                    self.clear_online_exchange(
+                        session,
+                        exchange
+                            .as_ref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                    )?;
                     return Ok(());
                 }
                 ExecutionOutcome::Suspended(_) => {
@@ -1522,7 +2366,21 @@ impl ProductServer {
                         &checkpoint,
                         saved_version,
                     )?;
+                    let control = self
+                        .program
+                        .observe_execution_control(&invocation)
+                        .map_err(|_| HostProblem::InfrastructureFailure)?;
+                    coordinator
+                        .complete_suspended_handoff(&invocation, control.now_tick)
+                        .map_err(store_error)?;
+                    self.program.finish_run_unit(&invocation)?;
                     self.finish_online_machine_run(session, principal, now_tick)?;
+                    self.clear_online_exchange(
+                        session,
+                        exchange
+                            .as_ref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                    )?;
                     return Ok(());
                 }
                 ExecutionOutcome::Transfer(transfer) if transfer.replace_frame => {
@@ -1552,6 +2410,16 @@ impl ProductServer {
                     );
                 }
                 ExecutionOutcome::Condition(condition) => {
+                    self.finish_known_online_failure(
+                        session,
+                        principal,
+                        &invocation,
+                        now_tick,
+                        saved_version,
+                        exchange
+                            .as_ref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                    )?;
                     return Err(HostProblem::Condition {
                         name: condition.name,
                         response: condition.response,
@@ -1559,15 +2427,59 @@ impl ProductServer {
                     });
                 }
                 ExecutionOutcome::Abend(abend) => {
+                    self.finish_known_online_failure(
+                        session,
+                        principal,
+                        &invocation,
+                        now_tick,
+                        saved_version,
+                        exchange
+                            .as_ref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                    )?;
                     return Err(HostProblem::Condition {
                         name: abend.code,
                         response: -1,
                         response2: 0,
                     });
                 }
-                ExecutionOutcome::TimedOut => return Err(HostProblem::TimedOut),
-                ExecutionOutcome::Cancelled => return Err(HostProblem::Cancelled),
+                ExecutionOutcome::TimedOut => {
+                    self.finish_known_online_failure(
+                        session,
+                        principal,
+                        &invocation,
+                        now_tick,
+                        saved_version,
+                        exchange
+                            .as_ref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                    )?;
+                    return Err(HostProblem::TimedOut);
+                }
+                ExecutionOutcome::Cancelled => {
+                    self.finish_known_online_failure(
+                        session,
+                        principal,
+                        &invocation,
+                        now_tick,
+                        saved_version,
+                        exchange
+                            .as_ref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                    )?;
+                    return Err(HostProblem::Cancelled);
+                }
                 ExecutionOutcome::ResourceExhausted(problem) => {
+                    self.finish_known_online_failure(
+                        session,
+                        principal,
+                        &invocation,
+                        now_tick,
+                        saved_version,
+                        exchange
+                            .as_ref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                    )?;
                     return Err(HostProblem::Condition {
                         name: format!(
                             "{} at {}",
@@ -1579,6 +2491,43 @@ impl ProductServer {
                     });
                 }
                 ExecutionOutcome::ProviderFailure(problem) => {
+                    if problem.has_unknown_outcome() {
+                        let key = IdempotencyKey::new(
+                            format!(
+                                "{}:{}",
+                                invocation.idempotency_key,
+                                machine.effect_sequence()
+                            ),
+                            InvocationLimits::default(),
+                        )
+                        .map_err(|_| HostProblem::InfrastructureFailure)?;
+                        if self
+                            .store
+                            .effect(&key)
+                            .map_err(store_error)?
+                            .is_some_and(|effect| {
+                                matches!(
+                                    effect.state,
+                                    EffectState::Intent | EffectState::UnknownOutcome
+                                )
+                            })
+                            && let Some(state) = exchange.as_mut()
+                        {
+                            state.blocking_effect = Some(key.as_str().into());
+                            let _ = self.persist_online_exchange(session, state);
+                        }
+                        return Err(HostProblem::UnknownOutcome);
+                    }
+                    self.finish_known_online_failure(
+                        session,
+                        principal,
+                        &invocation,
+                        now_tick,
+                        saved_version,
+                        exchange
+                            .as_ref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                    )?;
                     return Err(HostProblem::Condition {
                         name: problem.public_message,
                         response: -4,
@@ -1589,6 +2538,16 @@ impl ProductServer {
                     return Err(HostProblem::InfrastructureFailure);
                 }
                 ExecutionOutcome::Rejected(problem) => {
+                    self.finish_known_online_failure(
+                        session,
+                        principal,
+                        &invocation,
+                        now_tick,
+                        saved_version,
+                        exchange
+                            .as_ref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                    )?;
                     return Err(HostProblem::Condition {
                         name: format!(
                             "{} at {}",
@@ -1600,6 +2559,16 @@ impl ProductServer {
                     });
                 }
                 ExecutionOutcome::Invoke(_) | ExecutionOutcome::Transfer(_) => {
+                    self.finish_known_online_failure(
+                        session,
+                        principal,
+                        &invocation,
+                        now_tick,
+                        saved_version,
+                        exchange
+                            .as_ref()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                    )?;
                     return Err(HostProblem::Unsupported);
                 }
             }
@@ -1609,6 +2578,156 @@ impl ProductServer {
 
     pub fn bootstrap_user(&self, user: &str, secret: &[u8]) -> Result<(), HostProblem> {
         self.bootstrap_identity(user, secret)?;
+        self.grant_bootstrap_profiles(user)
+    }
+
+    /// Create the first administrator from caller-owned secret bytes.
+    ///
+    /// Committed and recoverable partial bootstraps do not read these bytes.
+    /// A durable claim prevents concurrent starters from selecting different
+    /// first administrators.
+    pub fn bootstrap_administrator(&self, user: &str, secret: &[u8]) -> Result<(), HostProblem> {
+        self.bootstrap_administrator_with(user, || ResolvedSecret::new(secret.to_vec()))
+    }
+
+    /// Create the first administrator through a lazily resolved secret reference.
+    ///
+    /// The resolver is called only when no committed or recoverable partial
+    /// bootstrap exists. This permits operators to remove one-time bootstrap
+    /// material after the durable receipt has committed.
+    pub fn bootstrap_administrator_from_reference(
+        &self,
+        user: &str,
+        reference: &SecretRef,
+        resolver: &dyn SecretResolver,
+    ) -> Result<(), HostProblem> {
+        self.bootstrap_administrator_with(user, || resolver.resolve(reference))
+    }
+
+    fn bootstrap_administrator_with(
+        &self,
+        user: &str,
+        resolve: impl FnOnce() -> Result<ResolvedSecret, HostProblem>,
+    ) -> Result<(), HostProblem> {
+        let principal = PrincipalId::new(user.to_ascii_uppercase(), InvocationLimits::default())
+            .map_err(|_| HostProblem::Malformed)?;
+        if let Some(marker) = self.bootstrap_record(BOOTSTRAP_KEY)? {
+            self.validate_bootstrap_record(&marker, BOOTSTRAP_KEY, &principal)?;
+            if let Some(claim) = self.bootstrap_record(BOOTSTRAP_CLAIM_KEY)? {
+                self.validate_bootstrap_record(&claim, BOOTSTRAP_CLAIM_KEY, &principal)?;
+            }
+            return self.require_bootstrap_administrator(&principal);
+        }
+        self.acquire_bootstrap_claim(&principal)?;
+        if !self.racf.bootstrap_administrator_ready(&principal)? {
+            let secret = resolve()?;
+            let reference = SecretRef::new(
+                format!(
+                    "bootstrap-administrator:{}:{}",
+                    principal.as_str(),
+                    self.next_sequence()?
+                ),
+                HostLimits::default(),
+            )?;
+            let _scope = self.secrets.scoped(&reference, secret.to_vec())?;
+            if let Err(problem) = self
+                .racf
+                .bootstrap_administrator(principal.as_str(), &reference)
+                && (!matches!(
+                    problem,
+                    HostProblem::Unauthorized | HostProblem::IdempotencyConflict
+                ) || !self.racf.bootstrap_administrator_ready(&principal)?)
+            {
+                return Err(problem);
+            }
+        }
+        self.grant_bootstrap_profiles(principal.as_str())?;
+        self.commit_bootstrap_marker(&principal)
+    }
+
+    fn bootstrap_record(&self, key: &str) -> Result<Option<ProviderStateRecord>, HostProblem> {
+        self.store
+            .get_provider_state(BOOTSTRAP_NAMESPACE, key)
+            .map_err(store_error)
+    }
+
+    fn validate_bootstrap_record(
+        &self,
+        record: &ProviderStateRecord,
+        key: &str,
+        principal: &PrincipalId,
+    ) -> Result<(), HostProblem> {
+        if record.namespace != BOOTSTRAP_NAMESPACE || record.key != key || record.version != 1 {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let recorded =
+            std::str::from_utf8(&record.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
+        if recorded != principal.as_str() {
+            return Err(HostProblem::Unauthorized);
+        }
+        Ok(())
+    }
+
+    fn acquire_bootstrap_claim(&self, principal: &PrincipalId) -> Result<(), HostProblem> {
+        for _ in 0..BOOTSTRAP_CAS_ATTEMPTS {
+            if let Some(claim) = self.bootstrap_record(BOOTSTRAP_CLAIM_KEY)? {
+                return self.validate_bootstrap_record(&claim, BOOTSTRAP_CLAIM_KEY, principal);
+            }
+            let active = self.racf.active_principal_epochs()?;
+            let recoverable_partial = active.len() == 1
+                && active.contains_key(principal.as_str())
+                && self.racf.bootstrap_administrator_ready(principal)?;
+            if !active.is_empty() && !recoverable_partial {
+                return Err(HostProblem::Unauthorized);
+            }
+            match self.store.put_provider_state(
+                ProviderStateRecord {
+                    namespace: BOOTSTRAP_NAMESPACE.into(),
+                    key: BOOTSTRAP_CLAIM_KEY.into(),
+                    version: 1,
+                    payload: principal.as_str().as_bytes().to_vec(),
+                },
+                None,
+            ) {
+                Ok(()) => return Ok(()),
+                Err(StoreError::Conflict | StoreError::AlreadyExists) => continue,
+                Err(problem) => return Err(store_error(problem)),
+            }
+        }
+        Err(HostProblem::IdempotencyConflict)
+    }
+
+    fn commit_bootstrap_marker(&self, principal: &PrincipalId) -> Result<(), HostProblem> {
+        for _ in 0..BOOTSTRAP_CAS_ATTEMPTS {
+            if let Some(marker) = self.bootstrap_record(BOOTSTRAP_KEY)? {
+                return self.validate_bootstrap_record(&marker, BOOTSTRAP_KEY, principal);
+            }
+            match self.store.put_provider_state(
+                ProviderStateRecord {
+                    namespace: BOOTSTRAP_NAMESPACE.into(),
+                    key: BOOTSTRAP_KEY.into(),
+                    version: 1,
+                    payload: principal.as_str().as_bytes().to_vec(),
+                },
+                None,
+            ) {
+                Ok(()) => return Ok(()),
+                Err(StoreError::Conflict | StoreError::AlreadyExists) => continue,
+                Err(problem) => return Err(store_error(problem)),
+            }
+        }
+        Err(HostProblem::IdempotencyConflict)
+    }
+
+    fn require_bootstrap_administrator(&self, principal: &PrincipalId) -> Result<(), HostProblem> {
+        if self.racf.bootstrap_administrator_ready(principal)? {
+            Ok(())
+        } else {
+            Err(HostProblem::Unauthorized)
+        }
+    }
+
+    fn grant_bootstrap_profiles(&self, user: &str) -> Result<(), HostProblem> {
         for (class, pattern, access) in [
             (
                 "DATASET",
@@ -1618,30 +2737,467 @@ impl ProductServer {
             ("JESJOBS", "JOB.**".into(), AccessIntent::Alter),
             ("FACILITY", "CONSOLE.**".into(), AccessIntent::Alter),
             ("TCICSTRN", "CICS.**".into(), AccessIntent::Execute),
+            ("DB2TABLE", "**".into(), AccessIntent::Alter),
+            ("DB2PLAN", "**".into(), AccessIntent::Control),
+            ("DB2UOW", "**".into(), AccessIntent::Control),
+            ("IMSPSB", "**".into(), AccessIntent::Execute),
+            ("IMSDB", "**".into(), AccessIntent::Alter),
+            ("IMSUOW", "**".into(), AccessIntent::Control),
+            ("MQQUEUE", "**".into(), AccessIntent::Alter),
+            ("MQUOW", "**".into(), AccessIntent::Control),
         ] {
-            self.racf.define_profile(class, &pattern, user, None)?;
-            self.racf.permit(class, &pattern, user, access)?;
+            let mut granted = false;
+            for _ in 0..BOOTSTRAP_CAS_ATTEMPTS {
+                match self.racf.define_profile(class, &pattern, user, None) {
+                    Ok(()) | Err(HostProblem::IdempotencyConflict) => {}
+                    Err(problem) => return Err(problem),
+                }
+                match self.racf.permit(class, &pattern, user, access) {
+                    Ok(()) => {
+                        granted = true;
+                        break;
+                    }
+                    Err(HostProblem::IdempotencyConflict | HostProblem::NotFound) => continue,
+                    Err(problem) => return Err(problem),
+                }
+            }
+            if !granted {
+                return Err(HostProblem::IdempotencyConflict);
+            }
         }
         Ok(())
     }
 
     pub fn bootstrap_identity(&self, user: &str, secret: &[u8]) -> Result<(), HostProblem> {
-        let reference = format!("bootstrap:{user}");
-        self.secrets.insert(&reference, secret.to_vec());
-        let result = self.racf.add_user(
-            user,
-            &SecretRef::new(reference.clone(), HostLimits::default())?,
-        );
-        self.secrets.remove(&reference);
-        result
+        let principal = PrincipalId::new(user.to_ascii_uppercase(), InvocationLimits::default())
+            .map_err(|_| HostProblem::Malformed)?;
+        let reference = SecretRef::new(
+            format!("bootstrap:{}:{}", principal.as_str(), self.next_sequence()?),
+            HostLimits::default(),
+        )?;
+        let _scope = self.secrets.scoped(&reference, secret.to_vec())?;
+        self.racf.add_user(principal.as_str(), &reference)
+    }
+
+    pub fn start_background_workers(self: &Arc<Self>) -> Result<(), HostProblem> {
+        if self.jes_workers_stopping.load(Ordering::SeqCst) {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        if self
+            .jes_workers_started
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
+            return Ok(());
+        }
+        let runtime = tokio::runtime::Handle::try_current().map_err(|_| {
+            self.jes_workers_started.store(false, Ordering::SeqCst);
+            HostProblem::InfrastructureFailure
+        })?;
+        let pool = NEXT_JES_WORKER_POOL.fetch_add(1, Ordering::Relaxed);
+        let mut handles = self
+            .jes_worker_handles
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        handles.reserve(JES_WORKER_COUNT);
+        for ordinal in 0..JES_WORKER_COUNT {
+            let server = Arc::downgrade(self);
+            let worker = format!("jes-worker-{pool}-{ordinal}");
+            handles.push(runtime.spawn(Self::jes_worker_loop(server, worker, ordinal)));
+        }
+        Ok(())
+    }
+
+    async fn jes_worker_loop(server: Weak<Self>, worker: String, ordinal: usize) {
+        loop {
+            let Some(product) = server.upgrade() else {
+                return;
+            };
+            if product.jes_workers_stopping.load(Ordering::SeqCst) {
+                product.clear_jes_worker_progress(ordinal);
+                return;
+            }
+            let claim_product = product.clone();
+            let claim_worker = worker.clone();
+            let claimed =
+                tokio::task::spawn_blocking(move || claim_product.claim_jes_work(&claim_worker))
+                    .await;
+            let claimed = match claimed {
+                Ok(Ok(value)) => {
+                    product.record_jes_worker_progress(ordinal);
+                    value
+                }
+                Ok(Err(_)) | Err(_) => {
+                    product.record_jes_worker_failure(ordinal);
+                    tokio::time::sleep(Duration::from_millis(JES_IDLE_MILLIS)).await;
+                    continue;
+                }
+            };
+            let Some(work) = claimed else {
+                tokio::select! {
+                    () = product.jes_worker_notify.notified() => {},
+                    () = tokio::time::sleep(Duration::from_millis(JES_IDLE_MILLIS)) => {},
+                }
+                continue;
+            };
+
+            product.jes_worker_active.fetch_add(1, Ordering::SeqCst);
+            let execute_product = product.clone();
+            let execute_work = work.clone();
+            let mut execution = tokio::task::spawn_blocking(move || {
+                execute_product.process_claimed_jes_work(&execute_work)
+            });
+            let mut lease_current = true;
+            let joined = loop {
+                tokio::select! {
+                    result = &mut execution => break result,
+                    () = tokio::time::sleep(Duration::from_millis(JES_HEARTBEAT_MILLIS)) => {
+                        let heartbeat_product = product.clone();
+                        let heartbeat_work = work.clone();
+                        match tokio::task::spawn_blocking(move || {
+                            heartbeat_product.heartbeat_jes_work(&heartbeat_work)
+                        }).await {
+                            Ok(Ok(())) => product.record_jes_worker_progress(ordinal),
+                            Ok(Err(_)) | Err(_) => {
+                                product.record_jes_worker_failure(ordinal);
+                                lease_current = false;
+                                break execution.await;
+                            }
+                        }
+                    }
+                }
+            };
+            product.jes_worker_active.fetch_sub(1, Ordering::SeqCst);
+            if lease_current {
+                if let Ok(outcome) = joined {
+                    let finish_product = product.clone();
+                    let finish_work = work.clone();
+                    match tokio::task::spawn_blocking(move || {
+                        finish_product.finish_claimed_jes_work(&finish_work, outcome)
+                    })
+                    .await
+                    {
+                        Ok(Ok(())) => product.record_jes_worker_progress(ordinal),
+                        Ok(Err(_)) | Err(_) => product.record_jes_worker_failure(ordinal),
+                    }
+                } else {
+                    product.record_jes_worker_failure(ordinal);
+                }
+            }
+        }
+    }
+
+    fn record_jes_worker_progress(&self, ordinal: usize) {
+        if let Ok(mut progress) = self.jes_worker_last_progress.lock()
+            && let Some(slot) = progress.get_mut(ordinal)
+        {
+            *slot = Some(Instant::now());
+        }
+        self.jes_worker_progress.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn record_jes_worker_failure(&self, ordinal: usize) {
+        self.clear_jes_worker_progress(ordinal);
+        self.jes_worker_failures.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn clear_jes_worker_progress(&self, ordinal: usize) {
+        if let Ok(mut progress) = self.jes_worker_last_progress.lock()
+            && let Some(slot) = progress.get_mut(ordinal)
+        {
+            *slot = None;
+        }
+    }
+
+    fn fresh_jes_workers_at(&self, now: Instant) -> usize {
+        self.jes_worker_last_progress.lock().map_or(0, |progress| {
+            progress
+                .iter()
+                .filter(|last| {
+                    last.is_some_and(|last| {
+                        now.saturating_duration_since(last)
+                            <= Duration::from_millis(JES_WORKER_FRESHNESS_MILLIS)
+                    })
+                })
+                .count()
+        })
+    }
+
+    fn claim_jes_work(&self, worker: &str) -> Result<Option<WorkRecord>, HostProblem> {
+        let now_tick = self.jes_tick()?;
+        self.store
+            .claim(worker, Some(JES_WORK_GENERATION), now_tick, JES_LEASE_TICKS)
+            .map_err(store_error)
+    }
+
+    fn heartbeat_jes_work(&self, work: &WorkRecord) -> Result<(), HostProblem> {
+        let lease = work
+            .lease_id
+            .as_deref()
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let now_tick = self.jes_tick()?;
+        self.store
+            .heartbeat(
+                &work.work_id,
+                lease,
+                work.lease_epoch,
+                now_tick,
+                JES_LEASE_TICKS,
+            )
+            .map(|_| ())
+            .map_err(store_error)
+    }
+
+    fn process_claimed_jes_work(&self, work: &WorkRecord) -> Result<JesWorkOutcome, HostProblem> {
+        if work.state != WorkState::Claimed
+            || work.required_generation != JES_WORK_GENERATION
+            || work.required_selector.as_str() != "zosmf:job-submit"
+            || work.artifact.as_str() != "artifact:none"
+            || work.max_attempts != 3
+            || work.lease_epoch == 0
+            || work.lease_id.is_none()
+            || work.work_id.strip_prefix("jes:").is_none()
+        {
+            return Err(HostProblem::Malformed);
+        }
+        let payload = JesWorkPayload::decode(&work.payload).map_err(store_error)?;
+        if work.work_id != format!("jes:{}", payload.job_id)
+            || payload
+                .capabilities
+                .iter()
+                .any(|capability| !JES_ALLOWED_WORK_CAPABILITIES.contains(&capability.as_str()))
+        {
+            return Err(HostProblem::Malformed);
+        }
+        loop {
+            let job = self.batch.get(&payload.job_id)?;
+            if job.owner != payload.owner {
+                return Err(HostProblem::Unauthorized);
+            }
+            if job.priority != work.priority {
+                return Err(HostProblem::Malformed);
+            }
+            match job.state {
+                mainframe_env_batch::JobState::Completed
+                | mainframe_env_batch::JobState::Failed => return Ok(JesWorkOutcome::Completed),
+                mainframe_env_batch::JobState::Cancelled => {
+                    return Ok(JesWorkOutcome::Cancelled);
+                }
+                mainframe_env_batch::JobState::Held => return Ok(JesWorkOutcome::Deferred),
+                mainframe_env_batch::JobState::Submitted
+                | mainframe_env_batch::JobState::Output => {
+                    return Err(HostProblem::InfrastructureFailure);
+                }
+                mainframe_env_batch::JobState::Queued
+                | mainframe_env_batch::JobState::Selected
+                | mainframe_env_batch::JobState::Running => {}
+            }
+            let current = self
+                .store
+                .get_work(&work.work_id)
+                .map_err(store_error)?
+                .ok_or(HostProblem::NotFound)?;
+            if current.lease_id != work.lease_id || current.lease_epoch != work.lease_epoch {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            let invocation =
+                self.jes_work_invocation(work, &payload, current.cancellation_requested)?;
+            if current.cancellation_requested {
+                match self.batch.cancel(&invocation, &payload.job_id) {
+                    Ok(_) => return Ok(JesWorkOutcome::Cancelled),
+                    Err(HostProblem::Condition { .. })
+                        if self.batch.get(&payload.job_id)?.state
+                            == mainframe_env_batch::JobState::Cancelled =>
+                    {
+                        return Ok(JesWorkOutcome::Cancelled);
+                    }
+                    Err(problem) => return Err(problem),
+                }
+            }
+            match self
+                .batch
+                .run_claimed(&invocation, &payload.job_id, "INIT0001", false)?
+            {
+                Some(job) if job.state == mainframe_env_batch::JobState::Cancelled => {
+                    return Ok(JesWorkOutcome::Cancelled);
+                }
+                Some(_) => return Ok(JesWorkOutcome::Completed),
+                None if self.jes_workers_stopping.load(Ordering::SeqCst) => {
+                    return Ok(JesWorkOutcome::Deferred);
+                }
+                None => std::thread::sleep(Duration::from_millis(JES_IDLE_MILLIS)),
+            }
+        }
+    }
+
+    fn finish_claimed_jes_work(
+        &self,
+        work: &WorkRecord,
+        outcome: Result<JesWorkOutcome, HostProblem>,
+    ) -> Result<(), HostProblem> {
+        let lease = work
+            .lease_id
+            .as_deref()
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let now_tick = self.jes_tick()?;
+        self.recover_local_wakeups()?;
+        match outcome {
+            Ok(JesWorkOutcome::Completed) => self
+                .store
+                .complete(&work.work_id, lease, work.lease_epoch, now_tick)
+                .map_err(store_error),
+            Ok(JesWorkOutcome::Cancelled) => {
+                self.store
+                    .request_cancellation(&work.work_id)
+                    .map_err(store_error)?;
+                self.store
+                    .release(&work.work_id, lease, work.lease_epoch, now_tick, now_tick)
+                    .map(|_| ())
+                    .map_err(store_error)
+            }
+            Ok(JesWorkOutcome::Deferred) => self
+                .store
+                .release(
+                    &work.work_id,
+                    lease,
+                    work.lease_epoch,
+                    now_tick,
+                    now_tick
+                        .checked_add(JES_IDLE_MILLIS)
+                        .ok_or(HostProblem::ResourceExhausted)?,
+                )
+                .map(|_| ())
+                .map_err(store_error),
+            Err(_) => self
+                .store
+                .dead_letter(&work.work_id, lease, work.lease_epoch, now_tick)
+                .map(|_| ())
+                .map_err(store_error),
+        }
+    }
+
+    fn jes_work_invocation(
+        &self,
+        work: &WorkRecord,
+        payload: &JesWorkPayload,
+        cancelled: bool,
+    ) -> Result<Invocation, HostProblem> {
+        let limits = InvocationLimits::default();
+        let grants = payload
+            .capabilities
+            .iter()
+            .map(|capability| {
+                CapabilityId::new(capability, limits)
+                    .map_err(|_| HostProblem::InfrastructureFailure)
+            })
+            .collect::<Result<BTreeSet<_>, _>>()?;
+        let generations = grants
+            .iter()
+            .cloned()
+            .map(|capability| (capability, "1".to_string()))
+            .collect();
+        let bindings = BTreeMap::from([(
+            "jes.work-id".into(),
+            BoundedPayload::new(
+                "mainframe-env.jes-work@1",
+                work.work_id.as_bytes().to_vec(),
+                limits,
+            )
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+        )]);
+        let identity = format!("{}-{}", payload.job_id, work.lease_epoch);
+        let mut invocation = Invocation::new(
+            RequestId::new(format!("jes-request-{identity}"), limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            work.execution_id.clone(),
+            RunUnitId::new(format!("jes-run-{identity}"), limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            None,
+            work.required_selector.clone(),
+            work.artifact.clone(),
+            Principal::new(
+                PrincipalId::new(&payload.owner, limits).map_err(|_| HostProblem::Unauthorized)?,
+                grants,
+                limits,
+            )
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+            ServiceClass::Batch,
+            0,
+            work.deadline_tick,
+            TraceId::new(format!("jes-trace-{identity}"), limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            IdempotencyKey::new(format!("jes-work-{}", payload.job_id), limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            work.attempt,
+            ResourceLimits::default(),
+            bindings,
+            limits,
+        )
+        .map_err(|_| HostProblem::InfrastructureFailure)?
+        .with_provider_generations(generations, limits)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+        if cancelled {
+            invocation = invocation.with_cancellation(
+                Cancellation::new(
+                    CancellationId::new(format!("jes-cancel-{identity}"), limits)
+                        .map_err(|_| HostProblem::InfrastructureFailure)?,
+                    "durable JES work cancellation",
+                    self.jes_tick()?,
+                    limits,
+                )
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            );
+        }
+        Ok(invocation)
+    }
+
+    fn jes_tick(&self) -> Result<u64, HostProblem> {
+        self.jes_clock.now_tick().map_err(store_error)
+    }
+
+    #[cfg(test)]
+    fn open_with_clock(
+        config: ServerConfig,
+        store: Arc<dyn PlatformStore>,
+        clock: Arc<dyn JesClock>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        if config.artifact_profile != ArtifactProfile::Local {
+            return Err(HostProblem::Malformed);
+        }
+        let artifacts = Arc::new(ProductArtifactStore::Local(
+            LocalArtifactStore::open(&config.artifact_root, 64 * 1024 * 1024)
+                .map_err(store_error)?,
+        ));
+        Self::open_configured(
+            config,
+            store,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+            Arc::new(RejectPackageTrust),
+            artifacts,
+            Some(clock),
+        )
+    }
+
+    #[cfg(test)]
+    fn run_jes_worker_once(&self, worker: &str) -> Result<Option<String>, HostProblem> {
+        let Some(work) = self.claim_jes_work(worker)? else {
+            return Ok(None);
+        };
+        let work_id = work.work_id.clone();
+        let outcome = self.process_claimed_jes_work(&work);
+        self.finish_claimed_jes_work(&work, outcome)?;
+        Ok(Some(work_id))
     }
 
     pub fn router(self: &Arc<Self>) -> axum::Router {
+        let _ = self.start_background_workers();
         mainframe_env_zosmf::router(
             self.clone(),
             ZosmfLimits {
                 max_body_bytes: self.config.max_body_bytes,
                 max_concurrency: self.config.max_concurrency,
+                max_blocking: self.config.max_concurrency.min(4),
                 timeout: Duration::from_millis(self.config.timeout_millis),
                 max_page_items: 1000,
             },
@@ -1649,17 +3205,94 @@ impl ProductServer {
     }
 
     #[must_use]
+    pub const fn live(&self) -> bool {
+        true
+    }
+
+    #[must_use]
     pub fn ready(&self) -> bool {
-        self.accepting.load(Ordering::SeqCst)
-            && self.store.get_provider_state("jes-meta", "next-id").is_ok()
-            && self.host.capability_ready("host.cics.execute")
-            && self.host.capability_ready("host.db2.read")
-            && self.host.capability_ready("host.db2.write")
-            && self.host.capability_ready("host.ims.read")
-            && self.host.capability_ready("host.ims.write")
-            && self.host.capability_ready("host.mq.read")
-            && self.host.capability_ready("host.mq.write")
-            && self.artifacts.is_ready()
+        self.readiness().ready()
+    }
+
+    #[must_use]
+    pub fn readiness(&self) -> ProductReadiness {
+        let capacity = self
+            .config
+            .retention
+            .policy()
+            .ok()
+            .and_then(|policy| self.store.retention_capacity_health(policy).ok());
+        let retention_capacity = capacity
+            .as_ref()
+            .map_or(ProductCapacityStatus::Unavailable, |health| {
+                health.saturation.into()
+            });
+        ProductReadiness {
+            accepting: self.accepting.load(Ordering::SeqCst),
+            writable_store: capacity.is_some(),
+            retention_capacity,
+            retention_warning: retention_capacity.warning(),
+            bootstrap_identity: self.bootstrap_principal_ready(),
+            host_capabilities: [
+                "host.cics.execute",
+                "host.db2.read",
+                "host.db2.write",
+                "host.ims.read",
+                "host.ims.write",
+                "host.mq.read",
+                "host.mq.write",
+            ]
+            .into_iter()
+            .all(|capability| self.host.capability_ready(capability)),
+            artifact_store: self.artifacts.is_ready(),
+            jes_workers: self.jes_workers_ready(),
+        }
+    }
+
+    fn bootstrap_principal_ready(&self) -> bool {
+        let marker = match self
+            .store
+            .get_provider_state(BOOTSTRAP_NAMESPACE, BOOTSTRAP_KEY)
+        {
+            Ok(Some(marker)) if marker.version == 1 => marker,
+            _ => return false,
+        };
+        let administrator = std::str::from_utf8(&marker.payload)
+            .ok()
+            .and_then(|administrator| {
+                PrincipalId::new(administrator, InvocationLimits::default()).ok()
+            });
+        let Some(administrator) = administrator else {
+            return false;
+        };
+        match self.bootstrap_record(BOOTSTRAP_CLAIM_KEY) {
+            Ok(Some(claim))
+                if self
+                    .validate_bootstrap_record(&claim, BOOTSTRAP_CLAIM_KEY, &administrator)
+                    .is_err() =>
+            {
+                return false;
+            }
+            Ok(_) => {}
+            Err(_) => return false,
+        }
+        self.racf
+            .bootstrap_administrator_ready(&administrator)
+            .unwrap_or(false)
+    }
+
+    fn jes_workers_ready(&self) -> bool {
+        self.jes_workers_ready_at(Instant::now())
+    }
+
+    fn jes_workers_ready_at(&self, now: Instant) -> bool {
+        self.jes_workers_started.load(Ordering::SeqCst)
+            && !self.jes_workers_stopping.load(Ordering::SeqCst)
+            && self.fresh_jes_workers_at(now) == JES_WORKER_COUNT
+            && self.jes_worker_handles.lock().is_ok_and(|handles| {
+                handles.len() == JES_WORKER_COUNT
+                    && handles.iter().all(|handle| !handle.is_finished())
+            })
     }
 
     #[must_use]
@@ -1670,6 +3303,14 @@ impl ProductServer {
             active: self.active.load(Ordering::Relaxed),
             sessions: self.sessions.lock().map_or(0, |sessions| sessions.len()),
             console_messages: self.console.lock().map_or(0, |messages| messages.len()),
+            jes_workers: usize::from(
+                self.jes_workers_started.load(Ordering::Relaxed)
+                    && !self.jes_workers_stopping.load(Ordering::Relaxed),
+            ) * JES_WORKER_COUNT,
+            jes_worker_healthy: self.fresh_jes_workers_at(Instant::now()),
+            jes_worker_progress: self.jes_worker_progress.load(Ordering::Relaxed),
+            jes_worker_failures: self.jes_worker_failures.load(Ordering::Relaxed),
+            jes_active: self.jes_worker_active.load(Ordering::Relaxed),
             outbox_pending: self
                 .store
                 .pending_notifications(4096)
@@ -1678,8 +3319,100 @@ impl ProductServer {
         }
     }
 
+    fn retention_planner(&self) -> Result<RetentionPlanner, HostProblem> {
+        RetentionPlanner::from_existing(
+            self.store.clone(),
+            self.config.retention.policy()?,
+            Some(self.racf.database().clone()),
+        )
+    }
+
+    /// Forecast eligibility and capacity for one retained record family.
+    pub fn operator_retention_forecast(
+        &self,
+        target: RetentionTarget,
+        observed_growth_per_tick: u64,
+    ) -> Result<RetentionForecast, HostProblem> {
+        self.retention_planner()?
+            .forecast(target, self.jes_tick()?, observed_growth_per_tick)
+    }
+    /// Atomically archive and prune at most `max_records` eligible source rows.
+    pub fn operator_archive_and_prune(
+        &self,
+        target: RetentionTarget,
+        max_records: usize,
+    ) -> Result<RetentionReceipt, HostProblem> {
+        let receipt =
+            self.retention_planner()?
+                .archive_and_prune(target, self.jes_tick()?, max_records)?;
+        if receipt.pruned != 0 {
+            match target {
+                RetentionTarget::DatasetReplay => {
+                    self.dataset.refresh_replay_index()?;
+                }
+                RetentionTarget::SpoolJobs => self.spool.refresh_after_external_retention()?,
+                RetentionTarget::ConsoleLog => self.refresh_console_cache()?,
+                _ => {}
+            }
+        }
+        Ok(receipt)
+    }
+
+    /// Read whole verified archives containing at most `max` source rows in total.
+    pub fn operator_retention_archives(
+        &self,
+        target: RetentionTarget,
+        max: usize,
+    ) -> Result<Vec<RetentionArchive>, HostProblem> {
+        let policy = self.config.retention.policy()?;
+        if max == 0 || max > policy.max_batch {
+            return Err(HostProblem::Malformed);
+        }
+        self.store
+            .retention_archives(target, max)
+            .map_err(store_error)
+    }
+
+    /// Permanently delete whole archive batches containing at most `max` source rows.
+    pub fn operator_prune_retention_archives(&self, max: usize) -> Result<usize, HostProblem> {
+        self.store
+            .prune_retention_archives(self.config.retention.policy()?, self.jes_tick()?, max)
+            .map_err(store_error)
+    }
+
+    /// Permanently delete expired archives, requiring an exact identity for an oversized batch.
+    pub fn operator_prune_retention_archives_authorized(
+        &self,
+        mut request: RetentionArchivePruneRequest,
+    ) -> Result<RetentionArchivePruneOutcome, HostProblem> {
+        request.now_tick = self.jes_tick()?;
+        self.store
+            .prune_retention_archives_authorized(self.config.retention.policy()?, request)
+            .map_err(store_error)
+    }
+
+    /// Add conservative owner/age metadata to one operator-inspected legacy row.
+    pub fn operator_reconcile_retention_age(
+        &self,
+        request: RetentionAgeReconciliation,
+    ) -> Result<RetentionReconciliationReceipt, HostProblem> {
+        self.retention_planner()?
+            .reconcile(request, self.jes_tick()?)
+    }
+
+    /// List protected legacy rows and their exact reconciliation CAS tokens.
+    pub fn operator_retention_legacy_rows(
+        &self,
+        target: RetentionTarget,
+        max: usize,
+    ) -> Result<Vec<RetentionLegacyRow>, HostProblem> {
+        self.retention_planner()?.legacy_rows(target, max)
+    }
+
     pub async fn graceful_shutdown(&self) -> bool {
         self.accepting.store(false, Ordering::SeqCst);
+        self.jes_workers_stopping.store(true, Ordering::SeqCst);
+        self.jes_worker_notify.notify_waiters();
         let deadline =
             tokio::time::Instant::now() + Duration::from_millis(self.config.shutdown_millis);
         while self.active.load(Ordering::SeqCst) != 0 {
@@ -1687,6 +3420,27 @@ impl ProductServer {
                 return false;
             }
             tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        let handles = match self.jes_worker_handles.lock() {
+            Ok(mut handles) => std::mem::take(&mut *handles),
+            Err(_) => return false,
+        };
+        for mut handle in handles {
+            let Some(remaining) = deadline.checked_duration_since(tokio::time::Instant::now())
+            else {
+                handle.abort();
+                return false;
+            };
+            if tokio::time::timeout(remaining, &mut handle).await.is_err() {
+                handle.abort();
+                return false;
+            }
+        }
+        if self.jes_worker_active.load(Ordering::SeqCst) != 0 {
+            return false;
+        }
+        if let Ok(mut progress) = self.jes_worker_last_progress.lock() {
+            progress.fill(None);
         }
         true
     }
@@ -1729,14 +3483,33 @@ impl ProductServer {
         result
     }
 
+    fn handle_with_context(
+        &self,
+        authentication: Authentication,
+        request: GatewayRequest,
+        context: GatewayCallContext,
+    ) -> Result<GatewayResponse, GatewayProblem> {
+        let _scope = GatewayCallContextScope::enter(context);
+        self.handle(authentication, request)
+    }
+
     fn recover_local_wakeups(&self) -> Result<(), HostProblem> {
+        let _delivery = self
+            .outbox_delivery
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
         for notification in self
             .store
             .pending_notifications(4096)
             .map_err(store_error)?
         {
+            let delivered_tick = self.jes_tick()?;
             self.store
-                .mark_notification_delivered(&notification.notification_id, notification.version)
+                .mark_notification_delivered(
+                    &notification.notification_id,
+                    notification.version,
+                    delivered_tick,
+                )
                 .map_err(store_error)?;
             self.outbox_delivered.fetch_add(1, Ordering::Relaxed);
         }
@@ -1748,33 +3521,52 @@ impl ProductServer {
         authentication: Authentication,
         request: GatewayRequest,
     ) -> Result<GatewayResponse, GatewayProblem> {
+        if let Some(context) = current_gateway_call_context() {
+            if context.cancellation_requested() {
+                return Err(gateway_problem(HostProblem::Cancelled));
+            }
+            if context.deadline_elapsed() {
+                return Err(gateway_problem(HostProblem::TimedOut));
+            }
+        }
         if matches!(request, GatewayRequest::Info) {
+            let readiness = self.readiness();
+            let listen = self
+                .config
+                .listen
+                .parse::<SocketAddr>()
+                .map_err(|_| gateway_problem(HostProblem::InfrastructureFailure))?;
             return Ok(GatewayResponse::json(
                 StatusCode::OK,
                 json!({
                     "zos_version":"mainframe-env 0.1",
-                    "zosmf_port":"10443",
+                    "zosmf_port":listen.port().to_string(),
+                    "listen":self.config.listen.as_str(),
                     "zosmf_version":"mainframe-env.zosmf@1",
                     "api_version":"1",
                     "product_version":env!("CARGO_PKG_VERSION"),
-                    "ready":self.ready(),
+                    "live":self.live(),
+                    "ready":readiness.ready(),
+                    "readiness":readiness,
                     "capabilities":["datasets","jobs","security","console"]
                 }),
             ));
         }
         if matches!(request, GatewayRequest::Authenticate) {
-            let Authentication::Basic {
-                ref user,
-                ref secret,
-            } = authentication
-            else {
-                return Err(unauthenticated());
+            let (user, token) = match &authentication {
+                Authentication::Basic { user, secret } => {
+                    let verified = self.verify(user, secret).map_err(|_| unauthenticated())?;
+                    let token = self.create_session(&verified).map_err(gateway_problem)?;
+                    (verified.user, token)
+                }
+                Authentication::Bearer(token) => {
+                    self.rotate_session(token).map_err(gateway_problem)?
+                }
+                Authentication::Anonymous => return Err(unauthenticated()),
             };
-            self.verify(user, secret).map_err(|_| unauthenticated())?;
-            let token = self.create_session(user).map_err(gateway_problem)?;
             return Ok(GatewayResponse::json(
                 StatusCode::OK,
-                json!({"user":user.to_ascii_uppercase(),"token":token}),
+                json!({"user":user,"token":token}),
             ));
         }
         if matches!(request, GatewayRequest::Logout) {
@@ -1799,23 +3591,11 @@ impl ProductServer {
                 attributes,
                 max,
             } => {
-                let result = self.dataset_call(
-                    &principal,
-                    DatasetRequest::List {
-                        pattern,
-                        start: start
-                            .map(|value| {
-                                DatasetName::new(value, 128).map_err(|_| HostProblem::Malformed)
-                            })
-                            .transpose()
-                            .map_err(gateway_problem)?,
-                        max_items: u32::try_from(max)
-                            .map_err(|_| gateway_problem(HostProblem::ResourceExhausted))?,
-                    },
-                )?;
-                let DatasetResult::Listed { names, more } = result else {
-                    return Err(gateway_problem(HostProblem::ProviderFailure));
-                };
+                let start = start
+                    .map(|value| DatasetName::new(value, 128).map_err(|_| HostProblem::Malformed))
+                    .transpose()
+                    .map_err(gateway_problem)?;
+                let (names, more) = self.visible_dataset_names(&principal, pattern, start, max)?;
                 let mut items = Vec::with_capacity(names.len());
                 for name in names {
                     let mut item = json!({"dsname":name.as_str()});
@@ -2062,8 +3842,17 @@ impl ProductServer {
                 Ok(GatewayResponse::json(StatusCode::OK, Value::Array(items)))
             }
             GatewayRequest::JobSubmit { jcl } => {
-                let capabilities = job_capabilities(&jcl);
+                // This single-node composition owns one JES worker identity and the store exposes
+                // FIFO rather than claim-by-id. Keep submit -> claim -> completion together so a
+                // slower mandatory audit cannot let one request steal another request's work.
+                let _submission = self
+                    .job_submission
+                    .lock()
+                    .map_err(|_| gateway_problem(HostProblem::InfrastructureFailure))?;
                 let bundle = self.jcl_bundle(&principal, jcl)?;
+                let plan = self.batch.plan(&bundle).map_err(gateway_problem)?;
+                let capabilities =
+                    job_capabilities(self.store.as_ref(), &plan).map_err(gateway_problem)?;
                 let invocation = self
                     .invocation(
                         &principal,
@@ -2072,6 +3861,10 @@ impl ProductServer {
                         &capabilities,
                     )
                     .map_err(gateway_problem)?;
+                let now_tick = self.jes_tick().map_err(gateway_problem)?;
+                let deadline_tick = now_tick
+                    .checked_add(JES_WORK_DEADLINE_TICKS)
+                    .ok_or_else(|| gateway_problem(HostProblem::ResourceExhausted))?;
                 let snapshot = self
                     .batch
                     .submit(
@@ -2082,73 +3875,41 @@ impl ProductServer {
                     )
                     .map_err(gateway_problem)?;
                 let work_id = format!("jes:{}", snapshot.id);
-                self.store
-                    .enqueue(WorkRecord {
-                        work_id: work_id.clone(),
-                        execution_id: invocation.execution_id.clone(),
-                        required_selector: invocation.selector.clone(),
-                        required_generation: "mainframe-env-batch@1".into(),
-                        artifact: invocation.artifact.clone(),
-                        state: WorkState::Queued,
-                        attempt: 0,
-                        max_attempts: 3,
-                        available_tick: 1,
-                        deadline_tick: invocation.deadline_tick,
-                        cancellation_requested: false,
-                        worker_id: None,
-                        lease_id: None,
-                        lease_expiry_tick: None,
-                        heartbeat_tick: None,
-                        checkpoint_id: None,
-                        effect_sequence: 0,
-                        payload: snapshot.id.as_bytes().to_vec(),
-                    })
-                    .map_err(store_error)
-                    .map_err(gateway_problem)?;
-                let claimed = self
-                    .store
-                    .claim("jes-worker-0", 1, 10)
-                    .map_err(store_error)
-                    .map_err(gateway_problem)?
-                    .ok_or_else(|| gateway_problem(HostProblem::InfrastructureFailure))?;
-                if claimed.work_id != work_id {
-                    let lease = claimed
-                        .lease_id
-                        .as_deref()
-                        .ok_or_else(|| gateway_problem(HostProblem::InfrastructureFailure))?;
-                    let _ = self.store.release(&claimed.work_id, lease, 2);
-                    return Err(gateway_problem(HostProblem::InfrastructureFailure));
+                let payload =
+                    JesWorkPayload::new(&snapshot.id, &principal, capabilities.iter().copied())
+                        .and_then(|payload| payload.encode())
+                        .map_err(store_error)
+                        .map_err(gateway_problem)?;
+                if let Err(error) = self.store.enqueue(WorkRecord {
+                    work_id: work_id.clone(),
+                    execution_id: invocation.execution_id.clone(),
+                    required_selector: invocation.selector.clone(),
+                    required_generation: JES_WORK_GENERATION.into(),
+                    artifact: invocation.artifact.clone(),
+                    state: WorkState::Queued,
+                    priority: snapshot.priority,
+                    attempt: 0,
+                    max_attempts: 3,
+                    available_tick: now_tick,
+                    deadline_tick,
+                    cancellation_requested: false,
+                    worker_id: None,
+                    lease_id: None,
+                    lease_epoch: 0,
+                    lease_expiry_tick: None,
+                    heartbeat_tick: None,
+                    terminal_tick: None,
+                    checkpoint_id: None,
+                    effect_sequence: 0,
+                    payload,
+                }) {
+                    let _ = self.batch.cancel(&invocation, &snapshot.id);
+                    return Err(gateway_problem(store_error(error)));
                 }
-                let lease = claimed
-                    .lease_id
-                    .clone()
-                    .ok_or_else(|| gateway_problem(HostProblem::InfrastructureFailure))?;
-                self.store
-                    .heartbeat(&work_id, &lease, 2, 10)
-                    .map_err(store_error)
-                    .map_err(gateway_problem)?;
-                match self.batch.run_next(&invocation, false) {
-                    Ok(result) => {
-                        self.store
-                            .complete(&work_id, &lease)
-                            .map_err(store_error)
-                            .map_err(gateway_problem)?;
-                        if result.is_none() {
-                            return Err(gateway_problem(HostProblem::InfrastructureFailure));
-                        }
-                    }
-                    Err(problem) => {
-                        let _ = self.store.dead_letter(&work_id, &lease);
-                        return Err(gateway_problem(problem));
-                    }
-                }
-                self.batch
-                    .drain_queued(&invocation)
-                    .map_err(gateway_problem)?;
-                let completed = self.batch.get(&snapshot.id).map_err(gateway_problem)?;
+                self.jes_worker_notify.notify_one();
                 Ok(GatewayResponse::json(
                     StatusCode::CREATED,
-                    job_json(completed),
+                    job_json(snapshot),
                 ))
             }
             GatewayRequest::JobStatus { jobname, jobid } => {
@@ -2417,19 +4178,62 @@ impl ProductServer {
             } => {
                 let session = terminal_session_id(&session)?;
                 let principal_id = terminal_principal(&principal)?;
-                let snapshot = self
-                    .cics
-                    .terminal_snapshot(&session, &principal_id, current_tick()?)
-                    .map_err(gateway_problem)?;
-                let invocation = self.cics_invocation(&principal, &snapshot.transaction, None)?;
-                let resumed = self
-                    .cics
-                    .resume_terminal(invocation, &session, &csrf_token, current_tick()?)
-                    .map_err(gateway_problem)?;
-                let online = self.online_transaction(&resumed.transaction)?;
-                if let Some((program, _)) = online {
-                    self.run_online_exchange(&session, &principal_id, &program, current_tick()?)
+                let snapshot = self.online_exchange(&session).map_err(gateway_problem)?;
+                let mut start_fresh_task = snapshot.is_none();
+                if let Some(exchange) = snapshot {
+                    let tick = current_tick()?;
+                    self.cics
+                        .validate_terminal_resume(&session, &principal_id, &csrf_token, tick)
                         .map_err(gateway_problem)?;
+                    match self
+                        .recover_terminal_online_exchange(&session, &principal_id, &exchange, tick)
+                        .map_err(gateway_problem)?
+                    {
+                        Some(TerminalExchangeRecovery::HandoffCompleted) => {
+                            start_fresh_task = true;
+                        }
+                        Some(TerminalExchangeRecovery::Completed) => {}
+                        Some(TerminalExchangeRecovery::Cancelled) => {
+                            return Err(gateway_problem(HostProblem::Cancelled));
+                        }
+                        Some(TerminalExchangeRecovery::TimedOut) => {
+                            return Err(gateway_problem(HostProblem::TimedOut));
+                        }
+                        Some(TerminalExchangeRecovery::Failed) => {
+                            return Err(gateway_problem(HostProblem::ProviderFailure));
+                        }
+                        None => {
+                            self.run_online_exchange(
+                                &session,
+                                &principal_id,
+                                &exchange.program,
+                                tick,
+                            )
+                            .map_err(gateway_problem)?;
+                        }
+                    }
+                }
+                if start_fresh_task {
+                    let snapshot = self
+                        .cics
+                        .terminal_snapshot(&session, &principal_id, current_tick()?)
+                        .map_err(gateway_problem)?;
+                    let invocation =
+                        self.cics_invocation(&principal, &snapshot.transaction, None)?;
+                    let resumed = self
+                        .cics
+                        .resume_terminal(invocation, &session, &csrf_token, current_tick()?)
+                        .map_err(gateway_problem)?;
+                    let online = self.online_transaction(&resumed.transaction)?;
+                    if let Some((program, _)) = online {
+                        self.run_online_exchange(
+                            &session,
+                            &principal_id,
+                            &program,
+                            current_tick()?,
+                        )
+                        .map_err(gateway_problem)?;
+                    }
                 }
                 let snapshot = self
                     .cics
@@ -2460,18 +4264,20 @@ impl ProductServer {
         }
     }
 
-    fn verify(&self, user: &str, secret: &[u8]) -> Result<(), HostProblem> {
+    fn verify(&self, user: &str, secret: &[u8]) -> Result<VerifiedAuthentication, HostProblem> {
+        let principal = PrincipalId::new(user.to_ascii_uppercase(), InvocationLimits::default())
+            .map_err(|_| HostProblem::Unauthorized)?;
         let sequence = self.next_sequence()?;
         let reference = format!("request:{sequence}");
-        self.secrets.insert(&reference, secret.to_vec());
-        let result = self.racf.authenticate(
-            &PrincipalId::new(user.to_ascii_uppercase(), InvocationLimits::default())
-                .map_err(|_| HostProblem::Unauthorized)?,
-            &SecretRef::new(reference.clone(), HostLimits::default())?,
-        );
-        self.secrets.remove(&reference);
-        match result? {
-            SecurityDecision::Allow => Ok(()),
+        let reference = SecretRef::new(reference, HostLimits::default())?;
+        let _scope = self.secrets.scoped(&reference, secret.to_vec())?;
+        let (decision, principal_epoch) =
+            self.racf.authenticate_with_epoch(&principal, &reference)?;
+        match (decision, principal_epoch) {
+            (SecurityDecision::Allow, Some(principal_epoch)) => Ok(VerifiedAuthentication {
+                user: principal.as_str().into(),
+                principal_epoch,
+            }),
             _ => Err(HostProblem::Unauthorized),
         }
     }
@@ -2479,61 +4285,349 @@ impl ProductServer {
     fn principal(&self, authentication: Authentication) -> Result<String, HostProblem> {
         match &authentication {
             Authentication::Basic { user, secret } => {
-                self.verify(user, secret)?;
-                Ok(user.to_ascii_uppercase())
+                self.verify(user, secret).map(|verified| verified.user)
             }
-            Authentication::Bearer(token) => self
-                .sessions
-                .lock()
-                .map_err(|_| HostProblem::InfrastructureFailure)?
-                .get(token)
-                .map(|session| session.user.clone())
-                .ok_or(HostProblem::Unauthorized),
+            Authentication::Bearer(token) => self.use_session(token),
             Authentication::Anonymous => Err(HostProblem::Unauthorized),
         }
     }
 
-    fn create_session(&self, user: &str) -> Result<String, HostProblem> {
-        let token = secure_random_token("session")?;
-        let mut sessions = self
+    fn cleanup_auth_sessions(&self, now_tick: u64) -> Result<(), HostProblem> {
+        let active_principals = self.racf.active_principal_epochs()?;
+        let rows = self
+            .store
+            .list_provider_state(AUTH_SESSION_NAMESPACE, MAX_AUTH_SESSIONS)
+            .map_err(store_error)?;
+        let mut retained = BTreeMap::new();
+        let mut stale = Vec::new();
+        for row in rows {
+            let session = decode_auth_session(&row)?;
+            if session.expired(now_tick)
+                || session.clock_regressed(now_tick)
+                || active_principals
+                    .get(&session.user)
+                    .is_none_or(|epoch| epoch.as_str() != session.principal_epoch.as_str())
+            {
+                stale.push(row.key);
+            } else {
+                retained.insert(row.key, session);
+            }
+        }
+        for key in stale {
+            self.revoke_session_key(&key)?;
+        }
+        *self
             .sessions
             .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        if sessions.len() >= 65536 {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        self.store
-            .put_provider_state(
-                ProviderStateRecord {
-                    namespace: "auth-session".into(),
-                    key: token.clone(),
-                    version: 1,
-                    payload: user.to_ascii_uppercase().into_bytes(),
+            .map_err(|_| HostProblem::InfrastructureFailure)? = retained;
+        Ok(())
+    }
+
+    fn revoke_session_key(&self, key: &str) -> Result<bool, HostProblem> {
+        const MAX_ATTEMPTS: usize = 4;
+        for _ in 0..MAX_ATTEMPTS {
+            let Some(record) = self
+                .store
+                .get_provider_state(AUTH_SESSION_NAMESPACE, key)
+                .map_err(store_error)?
+            else {
+                if let Ok(mut sessions) = self.sessions.lock() {
+                    sessions.remove(key);
+                }
+                return Ok(false);
+            };
+            let mut index = load_auth_session_index(&*self.store)?;
+            if index.sessions.remove(key).is_none() {
+                reconcile_auth_session_index(&*self.store)?;
+                continue;
+            }
+            let previous_index_version = index.version;
+            index.version = index
+                .version
+                .checked_add(1)
+                .ok_or(HostProblem::ResourceExhausted)?;
+            let mutations = vec![
+                ProviderStateMutation::Delete {
+                    namespace: AUTH_SESSION_NAMESPACE.into(),
+                    key: key.into(),
+                    expected_version: record.version,
                 },
-                None,
-            )
-            .map_err(store_error)?;
-        sessions.insert(
-            token.clone(),
-            AuthSession {
-                user: user.to_ascii_uppercase(),
+                ProviderStateMutation::Put(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: AUTH_SESSION_INDEX_NAMESPACE.into(),
+                        key: AUTH_SESSION_INDEX_KEY.into(),
+                        version: index.version,
+                        payload: encode_auth_session_index(&index)?,
+                    },
+                    expected_version: Some(previous_index_version),
+                }),
+            ];
+            match self.store.mutate_provider_states_atomic(mutations) {
+                Ok(()) => {
+                    if let Ok(mut sessions) = self.sessions.lock() {
+                        sessions.remove(key);
+                    }
+                    return Ok(true);
+                }
+                Err(StoreError::Conflict | StoreError::NotFound) => continue,
+                Err(problem) => return Err(store_error(problem)),
+            }
+        }
+        Err(HostProblem::InfrastructureFailure)
+    }
+
+    fn use_session(&self, token: &str) -> Result<String, HostProblem> {
+        let key = auth_session_key(token);
+        const MAX_ATTEMPTS: usize = 4;
+        for _ in 0..MAX_ATTEMPTS {
+            let Some(record) = self
+                .store
+                .get_provider_state(AUTH_SESSION_NAMESPACE, &key)
+                .map_err(store_error)?
+            else {
+                return Err(HostProblem::Unauthorized);
+            };
+            let mut session = decode_auth_session(&record)?;
+            let index = load_auth_session_index(&*self.store)?;
+            if index.sessions.get(&key) != Some(&session.user) {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            let now_tick = session_tick()?;
+            let principal = PrincipalId::new(&session.user, InvocationLimits::default())
+                .map_err(|_| HostProblem::Unauthorized)?;
+            let valid_principal = self
+                .racf
+                .active_principal_epoch(&principal)?
+                .is_some_and(|epoch| epoch.as_str() == session.principal_epoch.as_str());
+            if session.expired(now_tick) || !valid_principal {
+                self.revoke_session_key(&key)?;
+                return Err(HostProblem::Unauthorized);
+            }
+            if session.clock_regressed(now_tick) {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            let previous_version = session.version;
+            session.last_used_tick = now_tick;
+            session.idle_expires_tick = now_tick
+                .checked_add(AUTH_SESSION_IDLE_TTL_MILLIS)
+                .ok_or(HostProblem::ResourceExhausted)?
+                .min(session.absolute_expires_tick);
+            session.version = session
+                .version
+                .checked_add(1)
+                .ok_or(HostProblem::ResourceExhausted)?;
+            match self.store.put_provider_state(
+                ProviderStateRecord {
+                    namespace: AUTH_SESSION_NAMESPACE.into(),
+                    key: key.clone(),
+                    version: session.version,
+                    payload: encode_auth_session(&session)?,
+                },
+                Some(previous_version),
+            ) {
+                Ok(()) => {
+                    let user = session.user.clone();
+                    self.sessions
+                        .lock()
+                        .map_err(|_| HostProblem::InfrastructureFailure)?
+                        .insert(key, session);
+                    return Ok(user);
+                }
+                Err(StoreError::Conflict) => continue,
+                Err(problem) => return Err(store_error(problem)),
+            }
+        }
+        Err(HostProblem::InfrastructureFailure)
+    }
+
+    fn create_session(&self, verified: &VerifiedAuthentication) -> Result<String, HostProblem> {
+        let now_tick = session_tick()?;
+        self.cleanup_auth_sessions(now_tick)?;
+        const MAX_ATTEMPTS: usize = 4;
+        for _ in 0..MAX_ATTEMPTS {
+            let principal = PrincipalId::new(&verified.user, InvocationLimits::default())
+                .map_err(|_| HostProblem::Unauthorized)?;
+            if self.racf.active_principal_epoch(&principal)?.as_ref()
+                != Some(&verified.principal_epoch)
+            {
+                return Err(HostProblem::Unauthorized);
+            }
+            let mut index = load_auth_session_index(&*self.store)?;
+            if index.sessions.len() >= MAX_AUTH_SESSIONS
+                || index
+                    .sessions
+                    .values()
+                    .filter(|user| *user == &verified.user)
+                    .count()
+                    >= MAX_AUTH_SESSIONS_PER_USER
+            {
+                return Err(HostProblem::ResourceExhausted);
+            }
+            let token = Zeroizing::new(secure_random_token("session")?);
+            let key = auth_session_key(&token);
+            if index.sessions.contains_key(&key) {
+                continue;
+            }
+            let session = AuthSession {
+                schema_version: AUTH_SESSION_CONTRACT.into(),
+                user: verified.user.clone(),
+                issued_tick: now_tick,
+                last_used_tick: now_tick,
+                absolute_expires_tick: now_tick
+                    .checked_add(AUTH_SESSION_ABSOLUTE_TTL_MILLIS)
+                    .ok_or(HostProblem::ResourceExhausted)?,
+                idle_expires_tick: now_tick
+                    .checked_add(AUTH_SESSION_IDLE_TTL_MILLIS)
+                    .ok_or(HostProblem::ResourceExhausted)?,
+                principal_epoch: verified.principal_epoch.as_str().into(),
                 version: 1,
-            },
-        );
-        Ok(token)
+            };
+            let previous_index_version = index.version;
+            index.sessions.insert(key.clone(), verified.user.clone());
+            index.version = index
+                .version
+                .checked_add(1)
+                .ok_or(HostProblem::ResourceExhausted)?;
+            let mutations = vec![
+                ProviderStateMutation::Put(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: AUTH_SESSION_NAMESPACE.into(),
+                        key: key.clone(),
+                        version: 1,
+                        payload: encode_auth_session(&session)?,
+                    },
+                    expected_version: None,
+                }),
+                ProviderStateMutation::Put(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: AUTH_SESSION_INDEX_NAMESPACE.into(),
+                        key: AUTH_SESSION_INDEX_KEY.into(),
+                        version: index.version,
+                        payload: encode_auth_session_index(&index)?,
+                    },
+                    expected_version: Some(previous_index_version),
+                }),
+            ];
+            match self.store.mutate_provider_states_atomic(mutations) {
+                Ok(()) => {
+                    self.sessions
+                        .lock()
+                        .map_err(|_| HostProblem::InfrastructureFailure)?
+                        .insert(key, session);
+                    return Ok(token.to_string());
+                }
+                Err(StoreError::Conflict | StoreError::AlreadyExists) => continue,
+                Err(problem) => return Err(store_error(problem)),
+            }
+        }
+        Err(HostProblem::InfrastructureFailure)
+    }
+
+    fn rotate_session(&self, token: &str) -> Result<(String, String), HostProblem> {
+        let old_key = auth_session_key(token);
+        const MAX_ATTEMPTS: usize = 4;
+        for _ in 0..MAX_ATTEMPTS {
+            let old_record = self
+                .store
+                .get_provider_state(AUTH_SESSION_NAMESPACE, &old_key)
+                .map_err(store_error)?
+                .ok_or(HostProblem::Unauthorized)?;
+            let old_session = decode_auth_session(&old_record)?;
+            let mut index = load_auth_session_index(&*self.store)?;
+            if index.sessions.get(&old_key) != Some(&old_session.user) {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            let now_tick = session_tick()?;
+            let principal = PrincipalId::new(&old_session.user, InvocationLimits::default())
+                .map_err(|_| HostProblem::Unauthorized)?;
+            if old_session.expired(now_tick)
+                || self
+                    .racf
+                    .active_principal_epoch(&principal)?
+                    .is_none_or(|epoch| epoch.as_str() != old_session.principal_epoch.as_str())
+            {
+                self.revoke_session_key(&old_key)?;
+                return Err(HostProblem::Unauthorized);
+            }
+            if old_session.clock_regressed(now_tick) {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            let new_token = Zeroizing::new(secure_random_token("session")?);
+            let new_key = auth_session_key(&new_token);
+            if index.sessions.contains_key(&new_key) {
+                continue;
+            }
+            let new_session = AuthSession {
+                schema_version: AUTH_SESSION_CONTRACT.into(),
+                user: old_session.user.clone(),
+                issued_tick: old_session.issued_tick,
+                last_used_tick: now_tick,
+                absolute_expires_tick: old_session.absolute_expires_tick,
+                idle_expires_tick: now_tick
+                    .checked_add(AUTH_SESSION_IDLE_TTL_MILLIS)
+                    .ok_or(HostProblem::ResourceExhausted)?
+                    .min(old_session.absolute_expires_tick),
+                principal_epoch: old_session.principal_epoch,
+                version: 1,
+            };
+            index.sessions.remove(&old_key);
+            index
+                .sessions
+                .insert(new_key.clone(), new_session.user.clone());
+            let previous_index_version = index.version;
+            index.version = index
+                .version
+                .checked_add(1)
+                .ok_or(HostProblem::ResourceExhausted)?;
+            let mutations = vec![
+                ProviderStateMutation::Delete {
+                    namespace: AUTH_SESSION_NAMESPACE.into(),
+                    key: old_key.clone(),
+                    expected_version: old_record.version,
+                },
+                ProviderStateMutation::Put(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: AUTH_SESSION_NAMESPACE.into(),
+                        key: new_key.clone(),
+                        version: new_session.version,
+                        payload: encode_auth_session(&new_session)?,
+                    },
+                    expected_version: None,
+                }),
+                ProviderStateMutation::Put(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: AUTH_SESSION_INDEX_NAMESPACE.into(),
+                        key: AUTH_SESSION_INDEX_KEY.into(),
+                        version: index.version,
+                        payload: encode_auth_session_index(&index)?,
+                    },
+                    expected_version: Some(previous_index_version),
+                }),
+            ];
+            match self.store.mutate_provider_states_atomic(mutations) {
+                Ok(()) => {
+                    let mut sessions = self
+                        .sessions
+                        .lock()
+                        .map_err(|_| HostProblem::InfrastructureFailure)?;
+                    sessions.remove(&old_key);
+                    sessions.insert(new_key, new_session.clone());
+                    return Ok((new_session.user, new_token.to_string()));
+                }
+                Err(StoreError::Conflict | StoreError::NotFound | StoreError::AlreadyExists) => {
+                    continue;
+                }
+                Err(problem) => return Err(store_error(problem)),
+            }
+        }
+        Err(HostProblem::InfrastructureFailure)
     }
 
     fn logout_token(&self, token: &str) -> Result<(), HostProblem> {
-        let mut sessions = self
-            .sessions
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let version = sessions.get(token).ok_or(HostProblem::NotFound)?.version;
-        self.store
-            .delete_provider_state("auth-session", token, version)
-            .map_err(store_error)?;
-        sessions.remove(token);
-        Ok(())
+        let key = auth_session_key(token);
+        self.revoke_session_key(&key)?
+            .then_some(())
+            .ok_or(HostProblem::NotFound)
     }
 
     fn dataset_call(
@@ -2574,9 +4668,8 @@ impl ProductServer {
             | DatasetRequest::BeginTvs { .. }
             | DatasetRequest::CompleteTvs { .. }
             | DatasetRequest::ReconcileTvs { .. } => None,
-            DatasetRequest::List { pattern, .. } | DatasetRequest::ListCatalog { pattern, .. } => {
-                Some(pattern.as_str())
-            }
+            DatasetRequest::List { .. } => None,
+            DatasetRequest::ListCatalog { pattern, .. } => Some(pattern.as_str()),
             DatasetRequest::ListVolumes { .. } => Some("VOLUME.**"),
             DatasetRequest::ReadConcatenation { .. } => None,
             DatasetRequest::Rename { from, .. } => Some(from.as_str()),
@@ -2685,19 +4778,22 @@ impl ProductServer {
         let sequence = self.next_sequence().map_err(gateway_problem)?;
         let mutation = dataset_mutation(&request);
         let idempotency_key = mutation.map(|mutation| mutation.idempotency_key.clone());
-        let result = self.host.invoke(
-            &invocation,
-            1,
-            false,
-            EffectRequest {
-                run_unit: invocation.run_unit_id.clone(),
-                sequence: mutation.map_or(sequence, |mutation| mutation.sequence),
-                deadline_tick: invocation.deadline_tick,
-                idempotency_key,
-                request: HostRequest::Dataset(request),
-            },
-        );
-        match result.effect.outcome.map_err(gateway_problem)? {
+        let result = self
+            .host
+            .invoke(
+                &invocation,
+                self.jes_tick().map_err(gateway_problem)?,
+                invocation.cancellation_requested(),
+                EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence: mutation.map_or(sequence, |mutation| mutation.sequence),
+                    deadline_tick: invocation.deadline_tick,
+                    idempotency_key,
+                    request: HostRequest::Dataset(request),
+                },
+            )
+            .persist_with(|audit| self.store.record_audit(audit).map_err(store_error));
+        match result.outcome.map_err(gateway_problem)? {
             HostResult::Dataset(result) => Ok(result),
             _ => Err(gateway_problem(HostProblem::ProviderFailure)),
         }
@@ -2784,6 +4880,19 @@ impl ProductServer {
         resource: &str,
         intent: AccessIntent,
     ) -> Result<(), GatewayProblem> {
+        match self.resource_decision(principal, class, resource, intent)? {
+            SecurityDecision::Allow => Ok(()),
+            _ => Err(gateway_problem(HostProblem::Unauthorized)),
+        }
+    }
+
+    fn resource_decision(
+        &self,
+        principal: &str,
+        class: &str,
+        resource: &str,
+        intent: AccessIntent,
+    ) -> Result<SecurityDecision, GatewayProblem> {
         let invocation = self
             .invocation(
                 principal,
@@ -2792,30 +4901,98 @@ impl ProductServer {
                 &["host.security.authorize"],
             )
             .map_err(gateway_problem)?;
-        let result = self.host.invoke(
-            &invocation,
-            1,
-            false,
-            EffectRequest {
-                run_unit: invocation.run_unit_id.clone(),
-                sequence: 1,
-                deadline_tick: invocation.deadline_tick,
-                idempotency_key: None,
-                request: HostRequest::Security(
-                    mainframe_env_host_api::SecurityRequest::Authorize {
-                        principal: invocation.principal.id().clone(),
-                        class: class.into(),
-                        resource: ResourceName::new(resource, 246)
-                            .map_err(|_| gateway_problem(HostProblem::Malformed))?,
-                        intent,
-                    },
-                ),
-            },
-        );
-        match result.effect.outcome.map_err(gateway_problem)? {
-            HostResult::Security(SecurityDecision::Allow) => Ok(()),
-            HostResult::Security(_) => Err(gateway_problem(HostProblem::Unauthorized)),
+        let result = self
+            .host
+            .invoke(
+                &invocation,
+                self.jes_tick().map_err(gateway_problem)?,
+                invocation.cancellation_requested(),
+                EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence: 1,
+                    deadline_tick: invocation.deadline_tick,
+                    idempotency_key: None,
+                    request: HostRequest::Security(
+                        mainframe_env_host_api::SecurityRequest::Authorize {
+                            principal: invocation.principal.id().clone(),
+                            class: class.into(),
+                            resource: ResourceName::new(resource, 246)
+                                .map_err(|_| gateway_problem(HostProblem::Malformed))?,
+                            intent,
+                        },
+                    ),
+                },
+            )
+            .persist_with(|audit| self.store.record_audit(audit).map_err(store_error));
+        match result.outcome.map_err(gateway_problem)? {
+            HostResult::Security(decision) => Ok(decision),
             _ => Err(gateway_problem(HostProblem::ProviderFailure)),
+        }
+    }
+
+    fn visible_dataset_names(
+        &self,
+        principal: &str,
+        pattern: String,
+        start: Option<DatasetName>,
+        max: usize,
+    ) -> Result<(Vec<DatasetName>, bool), GatewayProblem> {
+        const SCAN_PAGE_ITEMS: u32 = 256;
+        const MAX_SCANNED_NAMES: usize = 262_144;
+        if max == 0 {
+            return Err(gateway_problem(HostProblem::Malformed));
+        }
+        let mut cursor = start;
+        let mut continuation = false;
+        let mut scanned = 0usize;
+        let mut visible = Vec::with_capacity(max.saturating_add(1));
+        loop {
+            let DatasetResult::Listed { names, more } = self.dataset_call(
+                principal,
+                DatasetRequest::List {
+                    pattern: pattern.clone(),
+                    start: cursor.clone(),
+                    max_items: SCAN_PAGE_ITEMS,
+                },
+            )?
+            else {
+                return Err(gateway_problem(HostProblem::ProviderFailure));
+            };
+            let previous = cursor.as_ref().map(|name| name.as_str().to_owned());
+            let mut progressed = false;
+            for name in names {
+                if continuation && previous.as_deref() == Some(name.as_str()) {
+                    continue;
+                }
+                progressed = true;
+                scanned = scanned
+                    .checked_add(1)
+                    .ok_or_else(|| gateway_problem(HostProblem::ResourceExhausted))?;
+                if scanned > MAX_SCANNED_NAMES {
+                    return Err(gateway_problem(HostProblem::ResourceExhausted));
+                }
+                cursor = Some(name.clone());
+                if self.resource_decision(
+                    principal,
+                    "DATASET",
+                    name.as_str(),
+                    AccessIntent::Read,
+                )? == SecurityDecision::Allow
+                {
+                    visible.push(name);
+                    if visible.len() > max {
+                        visible.pop();
+                        return Ok((visible, true));
+                    }
+                }
+            }
+            if !more {
+                return Ok((visible, false));
+            }
+            if !progressed {
+                return Err(gateway_problem(HostProblem::InfrastructureFailure));
+            }
+            continuation = true;
         }
     }
 
@@ -2870,7 +5047,12 @@ impl ProductServer {
             .cloned()
             .map(|capability| (capability, "1".to_string()))
             .collect();
-        Invocation::new(
+        let context = current_gateway_call_context();
+        let deadline_tick = self
+            .jes_tick()?
+            .checked_add(self.config.timeout_millis)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        let invocation = Invocation::new(
             RequestId::new(format!("request-{sequence}"), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
             ExecutionId::new(format!("execution-{sequence}"), limits)
@@ -2889,7 +5071,7 @@ impl ProductServer {
             .map_err(|_| HostProblem::InfrastructureFailure)?,
             service_class,
             0,
-            u64::MAX,
+            deadline_tick,
             TraceId::new(format!("trace-{sequence}"), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
             IdempotencyKey::new(format!("request-{sequence}"), limits)
@@ -2900,7 +5082,12 @@ impl ProductServer {
             limits,
         )
         .and_then(|invocation| invocation.with_provider_generations(generations, limits))
-        .map_err(|_| HostProblem::InfrastructureFailure)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+        Ok(if let Some(context) = context {
+            invocation.with_cancellation_probe(context.cancellation_probe())
+        } else {
+            invocation
+        })
     }
 
     fn mutation(&self) -> Result<Mutation, HostProblem> {
@@ -2996,17 +5183,12 @@ impl ProductServer {
             .ok_or_else(|| gateway_problem(HostProblem::Malformed))?;
         match command.as_str() {
             "LISTCAT" => {
-                let result = self.dataset_call(
+                let (names, more) = self.visible_dataset_names(
                     principal,
-                    DatasetRequest::List {
-                        pattern: format!("{}.**", principal.to_ascii_uppercase()),
-                        start: None,
-                        max_items: 1000,
-                    },
+                    format!("{}.**", principal.to_ascii_uppercase()),
+                    None,
+                    1000,
                 )?;
-                let DatasetResult::Listed { names, more } = result else {
-                    return Err(gateway_problem(HostProblem::ProviderFailure));
-                };
                 Ok(GatewayResponse::json(
                     StatusCode::OK,
                     json!({"entries":names.into_iter().map(|name|name.as_str().to_string()).collect::<Vec<_>>(),"more":more}),
@@ -3101,6 +5283,30 @@ impl ProductServer {
         }
     }
 
+    fn refresh_console_cache(&self) -> Result<(), HostProblem> {
+        let rows = self
+            .store
+            .list_provider_state("console-log", 65_537)
+            .map_err(store_error)?;
+        if rows.len() > 65_536 {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let decoded = decode_console_log_rows(&rows)
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .into_iter()
+            .map(|entry| ConsoleMessage {
+                key: entry.key,
+                console: entry.console,
+                text: entry.text,
+            })
+            .collect();
+        *self
+            .console
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)? = decoded;
+        Ok(())
+    }
+
     fn console_issue(
         &self,
         principal: &str,
@@ -3122,6 +5328,7 @@ impl ProductServer {
             "D U,ALL" => b"IEE457I UNIT STATUS AVAILABLE".to_vec(),
             _ => return Err(gateway_problem(HostProblem::Unsupported)),
         };
+        self.refresh_console_cache().map_err(gateway_problem)?;
         let mut messages = self
             .console
             .lock()
@@ -3130,9 +5337,16 @@ impl ProductServer {
             return Err(gateway_problem(HostProblem::ResourceExhausted));
         }
         let key = format!("{:016}", self.next_sequence().map_err(gateway_problem)?);
-        let mut payload = name.to_ascii_uppercase().into_bytes();
-        payload.push(0);
-        payload.extend_from_slice(&text);
+        let observed_tick = self.jes_tick().map_err(gateway_problem)?;
+        let payload = encode_console_log(
+            &key,
+            &name.to_ascii_uppercase(),
+            &text,
+            principal,
+            "direct-console",
+            observed_tick,
+        )
+        .map_err(|_| gateway_problem(HostProblem::InfrastructureFailure))?;
         self.store
             .put_provider_state(
                 ProviderStateRecord {
@@ -3162,6 +5376,7 @@ impl ProductServer {
         name: &str,
         key: &str,
     ) -> Result<GatewayResponse, GatewayProblem> {
+        self.refresh_console_cache().map_err(gateway_problem)?;
         self.authorize_resource(
             principal,
             "FACILITY",
@@ -3183,6 +5398,7 @@ impl ProductServer {
     }
 
     fn console_logs(&self, principal: &str) -> Result<GatewayResponse, GatewayProblem> {
+        self.refresh_console_cache().map_err(gateway_problem)?;
         self.authorize_resource(principal, "FACILITY", "CONSOLE.LOG", AccessIntent::Read)?;
         let messages = self
             .console
@@ -3200,8 +5416,9 @@ impl ZosmfBackend for ProductServer {
         &self,
         authentication: Authentication,
         request: GatewayRequest,
+        context: GatewayCallContext,
     ) -> Result<GatewayResponse, GatewayProblem> {
-        self.handle(authentication, request)
+        self.handle_with_context(authentication, request, context)
     }
 }
 
@@ -3386,6 +5603,197 @@ fn current_tick() -> Result<u64, GatewayProblem> {
             .as_millis(),
     )
     .map_err(|_| gateway_problem(HostProblem::ResourceExhausted))
+}
+
+fn current_gateway_call_context() -> Option<GatewayCallContext> {
+    GATEWAY_CALL_CONTEXT.with(|current| current.borrow().clone())
+}
+
+fn session_tick() -> Result<u64, HostProblem> {
+    u64::try_from(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .as_millis(),
+    )
+    .map_err(|_| HostProblem::ResourceExhausted)
+}
+
+fn auth_session_key(token: &str) -> String {
+    let mut digest = Sha256::new();
+    digest.update(b"mainframe-env.auth-session-token@2\0");
+    digest.update((token.len() as u64).to_be_bytes());
+    digest.update(token.as_bytes());
+    hex_digest(&digest.finalize())
+}
+
+fn encode_auth_session(session: &AuthSession) -> Result<Vec<u8>, HostProblem> {
+    serde_json::to_vec(session).map_err(|_| HostProblem::InfrastructureFailure)
+}
+
+fn decode_auth_session(record: &ProviderStateRecord) -> Result<AuthSession, HostProblem> {
+    if record.namespace != AUTH_SESSION_NAMESPACE
+        || record.key.len() != 64
+        || !record
+            .key
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let session: AuthSession =
+        serde_json::from_slice(&record.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
+    PrincipalId::new(&session.user, InvocationLimits::default())
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    if session.schema_version != AUTH_SESSION_CONTRACT
+        || session.version != record.version
+        || session.principal_epoch.len() != 71
+        || !session.principal_epoch.starts_with("sha256:")
+        || !session.principal_epoch[7..]
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        || session.issued_tick > session.last_used_tick
+        || session.last_used_tick >= session.idle_expires_tick
+        || session.idle_expires_tick > session.absolute_expires_tick
+        || session
+            .absolute_expires_tick
+            .checked_sub(session.issued_tick)
+            .is_none_or(|lifetime| lifetime == 0 || lifetime > AUTH_SESSION_ABSOLUTE_TTL_MILLIS)
+        || session
+            .idle_expires_tick
+            .checked_sub(session.last_used_tick)
+            .is_none_or(|lifetime| lifetime == 0 || lifetime > AUTH_SESSION_IDLE_TTL_MILLIS)
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(session)
+}
+
+fn encode_auth_session_index(index: &AuthSessionIndex) -> Result<Vec<u8>, HostProblem> {
+    serde_json::to_vec(index).map_err(|_| HostProblem::InfrastructureFailure)
+}
+
+fn decode_auth_session_index(
+    record: &ProviderStateRecord,
+) -> Result<AuthSessionIndex, HostProblem> {
+    if record.namespace != AUTH_SESSION_INDEX_NAMESPACE || record.key != AUTH_SESSION_INDEX_KEY {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let index: AuthSessionIndex =
+        serde_json::from_slice(&record.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
+    if index.schema_version != AUTH_SESSION_INDEX_CONTRACT
+        || index.version != record.version
+        || index.version == 0
+        || index.sessions.len() > MAX_AUTH_SESSIONS
+        || index.sessions.iter().any(|(key, user)| {
+            key.len() != 64
+                || !key
+                    .bytes()
+                    .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+                || PrincipalId::new(user, InvocationLimits::default()).is_err()
+        })
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(index)
+}
+
+fn stored_auth_session_entries(
+    store: &dyn PlatformStore,
+) -> Result<BTreeMap<String, String>, HostProblem> {
+    let rows = store
+        .list_provider_state(AUTH_SESSION_NAMESPACE, MAX_AUTH_SESSIONS)
+        .map_err(store_error)?;
+    rows.into_iter()
+        .map(|row| {
+            let session = decode_auth_session(&row)?;
+            Ok((row.key, session.user))
+        })
+        .collect()
+}
+
+fn reconcile_auth_session_index(store: &dyn PlatformStore) -> Result<(), HostProblem> {
+    reconcile_auth_session_index_with_scan_hook(store, || {})
+}
+
+fn reconcile_auth_session_index_with_scan_hook(
+    store: &dyn PlatformStore,
+    mut after_scan: impl FnMut(),
+) -> Result<(), HostProblem> {
+    const MAX_ATTEMPTS: usize = 4;
+    for _ in 0..MAX_ATTEMPTS {
+        let before = store
+            .get_provider_state(AUTH_SESSION_INDEX_NAMESPACE, AUTH_SESSION_INDEX_KEY)
+            .map_err(store_error)?;
+        let mut sessions = stored_auth_session_entries(store)?;
+        after_scan();
+        let current = store
+            .get_provider_state(AUTH_SESSION_INDEX_NAMESPACE, AUTH_SESSION_INDEX_KEY)
+            .map_err(store_error)?;
+        if before != current {
+            continue;
+        }
+        let (version, expected_version) = match &current {
+            Some(record) => {
+                let index = decode_auth_session_index(record)?;
+                for (key, indexed_user) in &index.sessions {
+                    if sessions.contains_key(key) {
+                        continue;
+                    }
+                    if let Some(session_record) = store
+                        .get_provider_state(AUTH_SESSION_NAMESPACE, key)
+                        .map_err(store_error)?
+                    {
+                        let session = decode_auth_session(&session_record)?;
+                        if &session.user != indexed_user {
+                            return Err(HostProblem::InfrastructureFailure);
+                        }
+                        sessions.insert(key.clone(), session.user);
+                    }
+                }
+                if index.sessions == sessions {
+                    return Ok(());
+                }
+                (
+                    index
+                        .version
+                        .checked_add(1)
+                        .ok_or(HostProblem::ResourceExhausted)?,
+                    Some(index.version),
+                )
+            }
+            None => (1, None),
+        };
+        let index = AuthSessionIndex {
+            schema_version: AUTH_SESSION_INDEX_CONTRACT.into(),
+            sessions,
+            version,
+        };
+        match store.put_provider_state(
+            ProviderStateRecord {
+                namespace: AUTH_SESSION_INDEX_NAMESPACE.into(),
+                key: AUTH_SESSION_INDEX_KEY.into(),
+                version,
+                payload: encode_auth_session_index(&index)?,
+            },
+            expected_version,
+        ) {
+            Ok(()) => return Ok(()),
+            Err(StoreError::Conflict | StoreError::AlreadyExists) => continue,
+            Err(problem) => return Err(store_error(problem)),
+        }
+    }
+    Err(HostProblem::InfrastructureFailure)
+}
+
+fn load_auth_session_index(store: &dyn PlatformStore) -> Result<AuthSessionIndex, HostProblem> {
+    store
+        .get_provider_state(AUTH_SESSION_INDEX_NAMESPACE, AUTH_SESSION_INDEX_KEY)
+        .map_err(store_error)?
+        .as_ref()
+        .map(decode_auth_session_index)
+        .transpose()?
+        .ok_or(HostProblem::InfrastructureFailure)
 }
 
 fn terminal_json(snapshot: &CicsTerminalSnapshot) -> Value {
@@ -3686,6 +6094,66 @@ fn decode_online_machine_continuation(
     })
 }
 
+fn encode_online_exchange(state: &OnlineExchangeState) -> Result<Vec<u8>, HostProblem> {
+    validate_online_exchange(state)?;
+    serde_json::to_vec(state).map_err(|_| HostProblem::InfrastructureFailure)
+}
+
+fn decode_online_exchange(
+    record: &ProviderStateRecord,
+) -> Result<OnlineExchangeState, HostProblem> {
+    let mut state: OnlineExchangeState =
+        serde_json::from_slice(&record.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
+    state.version = record.version;
+    validate_online_exchange(&state)?;
+    Ok(state)
+}
+
+fn validate_online_exchange(state: &OnlineExchangeState) -> Result<(), HostProblem> {
+    let limits = InvocationLimits::default();
+    if state.schema_version != ONLINE_EXCHANGE_CONTRACT
+        || state.version == 0
+        || normalize_online_name(&state.program, 128)? != state.program
+        || normalize_online_name(&state.transaction, 16)? != state.transaction
+        || state.deadline_tick == 0
+        || state.attempt == 0
+        || state.grants.is_empty()
+        || state.grants.len() > limits.max_capabilities
+        || state.provider_generations.len() > limits.max_capabilities
+        || state.commarea.len() > limits.max_payload_bytes
+        || state.audit_correlation.is_empty()
+        || state.audit_correlation.len() > limits.max_identity_bytes
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    RequestId::new(&state.request_id, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
+    ExecutionId::new(&state.execution_id, limits)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    RunUnitId::new(&state.run_unit_id, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
+    Selector::new(&state.selector, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
+    ArtifactRef::new(&state.artifact, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
+    PrincipalId::new(&state.principal, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
+    TraceId::new(&state.trace_id, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
+    IdempotencyKey::new(&state.idempotency_key, limits)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    for grant in &state.grants {
+        CapabilityId::new(grant, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
+    }
+    for (capability, generation) in &state.provider_generations {
+        if !state.grants.contains(capability)
+            || generation.is_empty()
+            || generation.len() > limits.max_identity_bytes
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        CapabilityId::new(capability, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
+    }
+    if let Some(key) = &state.blocking_effect {
+        IdempotencyKey::new(key, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
+    }
+    Ok(())
+}
+
 fn digest_online_field(digest: &mut Sha256, bytes: &[u8]) {
     digest.update((bytes.len() as u64).to_be_bytes());
     digest.update(bytes);
@@ -3860,33 +6328,65 @@ fn wildcard(pattern: &str, value: &str) -> bool {
             .is_some_and(|prefix| value.starts_with(prefix))
 }
 
-fn job_capabilities(jcl: &[u8]) -> Vec<&'static str> {
-    let source = String::from_utf8_lossy(jcl).to_ascii_uppercase();
-    let mut capabilities = vec![
+fn job_capabilities(
+    store: &dyn ProviderStateStore,
+    plan: &mainframe_env_batch::JobPlan,
+) -> Result<Vec<&'static str>, HostProblem> {
+    let mut capabilities = BTreeSet::from([
         "host.security.authorize",
         "host.program.invoke",
         "host.spool.read",
         "host.spool.write",
-    ];
-    if source.contains("DSN=") || source.contains("DISP=") || source.contains("PGM=IDCAMS") {
+    ]);
+    if plan
+        .steps
+        .iter()
+        .flat_map(|step| &step.dds)
+        .any(|dd| dd.dataset.is_some())
+    {
         capabilities.extend(["host.dataset.read", "host.dataset.write"]);
     }
-    if source.contains("EXEC CICS") || source.contains("PGM=SDSF") {
-        capabilities.push("host.cics.execute");
+    for step in &plan.steps {
+        match step.program.as_str() {
+            "IDCAMS" => capabilities.extend(["host.dataset.read", "host.dataset.write"]),
+            "SDSF" => {
+                capabilities.extend([
+                    "host.cics.execute",
+                    "host.dataset.read",
+                    "host.dataset.write",
+                ]);
+            }
+            "IKJEFT01" => capabilities.extend(["host.db2.read", "host.db2.write"]),
+            "DFSRRC00" => capabilities.extend(["host.ims.read", "host.ims.write"]),
+            "COBOL" => extend_cobol_capabilities(&mut capabilities),
+            program => {
+                if store
+                    .get_provider_state("batch-program", program)
+                    .map_err(store_error)?
+                    .is_some()
+                {
+                    extend_cobol_capabilities(&mut capabilities);
+                }
+            }
+        }
     }
-    if source.contains("EXEC SQL") || source.contains("PGM=IKJEFT01") {
-        capabilities.extend(["host.db2.read", "host.db2.write"]);
-    }
-    if source.contains("EXEC DLI") || source.contains("PGM=DFSRRC00") {
-        capabilities.extend(["host.ims.read", "host.ims.write"]);
-    }
-    if source.contains("ASKTIME") || source.contains("FORMATTIME") {
-        capabilities.push("host.clock");
-    }
-    if source.contains("ACCEPT ") || source.contains("SYSIN") {
-        capabilities.push("host.terminal");
-    }
-    capabilities
+    Ok(capabilities.into_iter().collect())
+}
+
+fn extend_cobol_capabilities(capabilities: &mut BTreeSet<&'static str>) {
+    capabilities.extend([
+        "host.cics.execute",
+        "host.clock",
+        "host.dataset.read",
+        "host.dataset.write",
+        "host.db2.read",
+        "host.db2.write",
+        "host.ims.read",
+        "host.ims.write",
+        "host.mq.read",
+        "host.mq.write",
+        "host.terminal",
+    ]);
 }
 
 fn jcl_library_names(source: &str) -> Result<Vec<String>, HostProblem> {
@@ -3982,9 +6482,8 @@ fn gateway_problem(problem: HostProblem) -> GatewayProblem {
         HostProblem::Cancelled => (StatusCode::CONFLICT, "cancelled"),
         HostProblem::TimedOut => (StatusCode::REQUEST_TIMEOUT, "timed_out"),
         HostProblem::ResourceExhausted => (StatusCode::TOO_MANY_REQUESTS, "resource_exhausted"),
-        HostProblem::IdempotencyConflict | HostProblem::UnknownOutcome => {
-            (StatusCode::CONFLICT, "conflict")
-        }
+        HostProblem::IdempotencyConflict => (StatusCode::CONFLICT, "conflict"),
+        HostProblem::UnknownOutcome => (StatusCode::CONFLICT, "unknown_outcome"),
         HostProblem::Condition { .. } => (StatusCode::CONFLICT, "condition"),
         HostProblem::ProviderFailure | HostProblem::InfrastructureFailure => {
             (StatusCode::SERVICE_UNAVAILABLE, "infrastructure_failure")
@@ -4070,6 +6569,7 @@ fn install_publication_state(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::jes_worker::ManualJesClock;
     use axum::body::{Body, to_bytes};
     use axum::http::{Method, Request};
     use base64::Engine;
@@ -4083,6 +6583,8 @@ mod tests {
         LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
     };
     use mainframe_env_store::SqliteStateStore;
+    use mainframe_env_store_api::{RetentionRequest, RetentionStore, WorkStore};
+    use std::sync::Barrier;
     use tower::ServiceExt;
 
     #[test]
@@ -4100,6 +6602,365 @@ mod tests {
         assert!(time.bytes().all(|byte| byte.is_ascii_digit()));
     }
 
+    #[test]
+    fn authentication_scopes_do_not_leak_invalid_request_secrets() {
+        let server = ProductServer::memory(config()).unwrap();
+        let invalid = "X".repeat(InvocationLimits::default().max_binding_bytes + 1);
+        assert!(matches!(
+            server.verify(&invalid, b"secret-that-must-not-remain"),
+            Err(HostProblem::Unauthorized)
+        ));
+        assert_eq!(server.secrets.entry_count(), 0);
+    }
+
+    #[test]
+    fn restored_session_ttls_are_bounded_and_clock_rollback_fails_closed() {
+        let mut session = AuthSession {
+            schema_version: AUTH_SESSION_CONTRACT.into(),
+            user: "IBMUSER".into(),
+            issued_tick: 10,
+            last_used_tick: 10,
+            absolute_expires_tick: 10 + AUTH_SESSION_ABSOLUTE_TTL_MILLIS,
+            idle_expires_tick: 10 + AUTH_SESSION_IDLE_TTL_MILLIS,
+            principal_epoch: format!("sha256:{:064x}", 1),
+            version: 1,
+        };
+        let record = |session: &AuthSession| ProviderStateRecord {
+            namespace: AUTH_SESSION_NAMESPACE.into(),
+            key: "a".repeat(64),
+            version: session.version,
+            payload: encode_auth_session(session).unwrap(),
+        };
+        assert_eq!(decode_auth_session(&record(&session)).unwrap(), session);
+        assert!(session.clock_regressed(9));
+        session.absolute_expires_tick += 1;
+        assert_eq!(
+            decode_auth_session(&record(&session)),
+            Err(HostProblem::InfrastructureFailure)
+        );
+    }
+
+    #[test]
+    fn bearer_sessions_store_only_hashes_expire_and_follow_principal_epoch() {
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_identity("IBMUSER", b"TESTPASS").unwrap();
+        let verified = server.verify("IBMUSER", b"TESTPASS").unwrap();
+        let token = server.create_session(&verified).unwrap();
+        let key = auth_session_key(&token);
+        assert_ne!(key, token);
+        let rows = server
+            .store
+            .list_provider_state(AUTH_SESSION_NAMESPACE, MAX_AUTH_SESSIONS)
+            .unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].key, key);
+        assert!(!String::from_utf8_lossy(&rows[0].payload).contains(&token));
+        assert_eq!(
+            server
+                .principal(Authentication::Bearer(token.clone()))
+                .unwrap(),
+            "IBMUSER"
+        );
+        let (rotated_user, rotated) = server.rotate_session(&token).unwrap();
+        assert_eq!(rotated_user, "IBMUSER");
+        assert_ne!(rotated, token);
+        assert_eq!(
+            server.principal(Authentication::Bearer(token)),
+            Err(HostProblem::Unauthorized)
+        );
+        assert_eq!(
+            server
+                .principal(Authentication::Bearer(rotated.clone()))
+                .unwrap(),
+            "IBMUSER"
+        );
+
+        server
+            .racf
+            .set_user_state("IBMUSER", false, true, false)
+            .unwrap();
+        assert_eq!(
+            server.principal(Authentication::Bearer(rotated)),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(
+            server
+                .store
+                .list_provider_state(AUTH_SESSION_NAMESPACE, MAX_AUTH_SESSIONS)
+                .unwrap()
+                .is_empty()
+        );
+
+        server
+            .racf
+            .set_user_state("IBMUSER", false, false, false)
+            .unwrap();
+        let stale_verified = server.verify("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .racf
+            .set_user_state("IBMUSER", false, false, true)
+            .unwrap();
+        server
+            .racf
+            .set_user_state("IBMUSER", false, false, false)
+            .unwrap();
+        assert_eq!(
+            server.create_session(&stale_verified),
+            Err(HostProblem::Unauthorized)
+        );
+        let verified = server.verify("IBMUSER", b"TESTPASS").unwrap();
+        let expired = server.create_session(&verified).unwrap();
+        let expired_key = auth_session_key(&expired);
+        let mut expired_session = server.sessions.lock().unwrap()[&expired_key].clone();
+        let previous_version = expired_session.version;
+        expired_session.issued_tick = 0;
+        expired_session.last_used_tick = 0;
+        expired_session.idle_expires_tick = 1;
+        expired_session.absolute_expires_tick = 2;
+        expired_session.version += 1;
+        server
+            .store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: AUTH_SESSION_NAMESPACE.into(),
+                    key: expired_key,
+                    version: expired_session.version,
+                    payload: encode_auth_session(&expired_session).unwrap(),
+                },
+                Some(previous_version),
+            )
+            .unwrap();
+        assert_eq!(
+            server.principal(Authentication::Bearer(expired)),
+            Err(HostProblem::Unauthorized)
+        );
+    }
+
+    #[test]
+    fn deleted_and_recreated_principal_cannot_reuse_an_authentication_epoch() {
+        use mainframe_env_racf::CommandContext;
+
+        let server = ProductServer::memory(config()).unwrap();
+        let admin_reference = SecretRef::new("test:epoch-admin", HostLimits::default()).unwrap();
+        let _admin_secret = server
+            .secrets
+            .scoped(&admin_reference, b"ADMIN-PASS1".to_vec())
+            .unwrap();
+        server
+            .racf
+            .bootstrap_administrator("RACFADM", &admin_reference)
+            .unwrap();
+        let admin = PrincipalId::new("RACFADM", InvocationLimits::default()).unwrap();
+        let command = |id, tick| CommandContext::new(admin.clone(), id, "EPOCH-ABA", tick).unwrap();
+        server
+            .racf
+            .execute_command(
+                &command("EPOCH-ADD-1", 2),
+                "ADDUSER USER1 PASSWORD('VALID-PASS1')",
+            )
+            .unwrap();
+
+        let stale_verified = server.verify("USER1", b"VALID-PASS1").unwrap();
+        let stale_token = server.create_session(&stale_verified).unwrap();
+        server
+            .racf
+            .execute_command(&command("EPOCH-DELETE", 3), "DELUSER USER1")
+            .unwrap();
+        server
+            .racf
+            .execute_command(
+                &command("EPOCH-ADD-2", 4),
+                "ADDUSER USER1 PASSWORD('VALID-PASS1')",
+            )
+            .unwrap();
+
+        assert_eq!(
+            server.principal(Authentication::Bearer(stale_token)),
+            Err(HostProblem::Unauthorized)
+        );
+        assert_eq!(
+            server.create_session(&stale_verified),
+            Err(HostProblem::Unauthorized)
+        );
+        let fresh_verified = server.verify("USER1", b"VALID-PASS1").unwrap();
+        assert_ne!(
+            stale_verified.principal_epoch,
+            fresh_verified.principal_epoch
+        );
+        assert!(server.create_session(&fresh_verified).is_ok());
+    }
+
+    #[test]
+    fn sessions_are_per_user_bounded_and_legacy_raw_tokens_are_revoked_on_open() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: LEGACY_AUTH_SESSION_NAMESPACE.into(),
+                    key: "raw-legacy-bearer".into(),
+                    version: 1,
+                    payload: b"IBMUSER".to_vec(),
+                },
+                None,
+            )
+            .unwrap();
+        let server = ProductServer::open(
+            config(),
+            store.clone(),
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+        )
+        .unwrap();
+        assert!(
+            store
+                .list_provider_state(LEGACY_AUTH_SESSION_NAMESPACE, MAX_AUTH_SESSIONS)
+                .unwrap()
+                .is_empty()
+        );
+        server.bootstrap_identity("IBMUSER", b"TESTPASS").unwrap();
+        let verified = server.verify("IBMUSER", b"TESTPASS").unwrap();
+        let tokens = (0..MAX_AUTH_SESSIONS_PER_USER)
+            .map(|_| server.create_session(&verified).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            server.create_session(&verified),
+            Err(HostProblem::ResourceExhausted)
+        );
+        let expired_key = auth_session_key(tokens.last().unwrap());
+        let mut expired = server.sessions.lock().unwrap()[&expired_key].clone();
+        let previous_version = expired.version;
+        expired.issued_tick = 0;
+        expired.last_used_tick = 0;
+        expired.idle_expires_tick = 1;
+        expired.absolute_expires_tick = 2;
+        expired.version += 1;
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: AUTH_SESSION_NAMESPACE.into(),
+                    key: expired_key,
+                    version: expired.version,
+                    payload: encode_auth_session(&expired).unwrap(),
+                },
+                Some(previous_version),
+            )
+            .unwrap();
+        drop(server);
+        let reopened = ProductServer::open(
+            config(),
+            store,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+        )
+        .unwrap();
+        assert_eq!(
+            reopened
+                .principal(Authentication::Bearer(tokens[0].clone()))
+                .unwrap(),
+            "IBMUSER"
+        );
+        assert_eq!(
+            reopened.principal(Authentication::Bearer(tokens.last().unwrap().clone())),
+            Err(HostProblem::Unauthorized)
+        );
+    }
+
+    #[test]
+    fn shared_store_session_quota_is_atomically_fenced_across_servers() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let first = ProductServer::open(
+            config(),
+            store.clone(),
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+        )
+        .unwrap();
+        first.bootstrap_identity("IBMUSER", b"TESTPASS").unwrap();
+        let second = ProductServer::open(
+            config(),
+            store,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+        )
+        .unwrap();
+        let first_verified = first.verify("IBMUSER", b"TESTPASS").unwrap();
+        let second_verified = first_verified.clone();
+        for _ in 0..(MAX_AUTH_SESSIONS_PER_USER - 1) {
+            first.create_session(&first_verified).unwrap();
+        }
+        let barrier = Arc::new(std::sync::Barrier::new(3));
+        let first_worker = {
+            let server = first.clone();
+            let barrier = barrier.clone();
+            let verified = first_verified.clone();
+            std::thread::spawn(move || {
+                barrier.wait();
+                server.create_session(&verified)
+            })
+        };
+        let second_worker = {
+            let server = second.clone();
+            let barrier = barrier.clone();
+            let verified = second_verified;
+            std::thread::spawn(move || {
+                barrier.wait();
+                server.create_session(&verified)
+            })
+        };
+        barrier.wait();
+        let results = [first_worker.join().unwrap(), second_worker.join().unwrap()];
+        assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+        assert_eq!(
+            results
+                .iter()
+                .filter(|result| { result.as_ref().err() == Some(&HostProblem::ResourceExhausted) })
+                .count(),
+            1
+        );
+        let index = load_auth_session_index(&*first.store).unwrap();
+        assert_eq!(index.sessions.len(), MAX_AUTH_SESSIONS_PER_USER);
+    }
+
+    #[test]
+    fn session_index_reconciliation_retries_a_concurrent_create_snapshot() {
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_identity("IBMUSER", b"TESTPASS").unwrap();
+        let verified = server.verify("IBMUSER", b"TESTPASS").unwrap();
+        let scanned = Arc::new(std::sync::Barrier::new(2));
+        let resume = Arc::new(std::sync::Barrier::new(2));
+        let worker = {
+            let store = server.store.clone();
+            let scanned = scanned.clone();
+            let resume = resume.clone();
+            std::thread::spawn(move || {
+                let mut pause = true;
+                reconcile_auth_session_index_with_scan_hook(&*store, || {
+                    if pause {
+                        pause = false;
+                        scanned.wait();
+                        resume.wait();
+                    }
+                })
+            })
+        };
+
+        scanned.wait();
+        let token = server.create_session(&verified).unwrap();
+        let key = auth_session_key(&token);
+        resume.wait();
+        worker.join().unwrap().unwrap();
+
+        let index = load_auth_session_index(&*server.store).unwrap();
+        assert_eq!(
+            index.sessions.get(&key).map(String::as_str),
+            Some("IBMUSER")
+        );
+        assert_eq!(
+            server.principal(Authentication::Bearer(token)).unwrap(),
+            "IBMUSER"
+        );
+    }
+
     fn config() -> ServerConfig {
         ServerConfig {
             store_profile: crate::StoreProfile::Memory,
@@ -4115,6 +6976,906 @@ mod tests {
             )),
             ..ServerConfig::default()
         }
+    }
+
+    #[test]
+    fn job_grants_come_from_the_verified_plan_not_comments_or_inline_data() {
+        let server = ProductServer::memory(config()).unwrap();
+        let inert = server
+            .batch
+            .plan(&JclBundle {
+                primary: "//SAFEJOB JOB CLASS=A\n//* PGM=DFSRRC00 EXEC SQL MQPUT\n//STEP1 EXEC PGM=IEFBR14\n//SYSIN DD *\nEXEC SQL DELETE FROM SECRET.TABLE; MQPUT\n/*\n".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        let grants = job_capabilities(server.store.as_ref(), &inert).unwrap();
+        for forbidden in [
+            "host.db2.read",
+            "host.db2.write",
+            "host.ims.read",
+            "host.ims.write",
+            "host.mq.read",
+            "host.mq.write",
+            "host.cics.execute",
+        ] {
+            assert!(!grants.contains(&forbidden), "unexpected grant {forbidden}");
+        }
+
+        let db2 = server
+            .batch
+            .plan(&JclBundle {
+                primary: "//DB2JOB JOB CLASS=A\n//STEP1 EXEC PGM=IKJEFT01\n".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        let grants = job_capabilities(server.store.as_ref(), &db2).unwrap();
+        assert!(grants.contains(&"host.db2.read"));
+        assert!(grants.contains(&"host.db2.write"));
+    }
+
+    fn worker_test_server(
+        tick: u64,
+    ) -> (Arc<ProductServer>, Arc<MemoryStore>, Arc<ManualJesClock>) {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let clock = Arc::new(ManualJesClock::new(tick));
+        let platform: Arc<dyn PlatformStore> = store.clone();
+        let server = ProductServer::open_with_clock(config(), platform, clock.clone()).unwrap();
+        (server, store, clock)
+    }
+
+    async fn wait_for_worker_health(server: &ProductServer, expected: usize) {
+        for _ in 0..4_000 {
+            if server.metrics().jes_worker_healthy == expected {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        panic!(
+            "JES worker health did not reach {expected}: {:?}",
+            server.metrics()
+        );
+    }
+
+    struct ToggleJesClock {
+        tick: AtomicU64,
+        failing: AtomicBool,
+    }
+
+    impl ToggleJesClock {
+        fn new(tick: u64) -> Self {
+            Self {
+                tick: AtomicU64::new(tick),
+                failing: AtomicBool::new(false),
+            }
+        }
+    }
+
+    impl JesClock for ToggleJesClock {
+        fn now_tick(&self) -> Result<u64, StoreError> {
+            if self.failing.load(Ordering::SeqCst) {
+                Err(StoreError::Infrastructure(
+                    "injected JES clock failure".into(),
+                ))
+            } else {
+                Ok(self.tick.fetch_add(1, Ordering::SeqCst))
+            }
+        }
+    }
+
+    struct HealthOnlyArtifactStore {
+        health: Result<ArtifactStoreHealth, StoreError>,
+    }
+
+    impl ArtifactStore for HealthOnlyArtifactStore {
+        fn health(&self) -> Result<ArtifactStoreHealth, StoreError> {
+            self.health.clone()
+        }
+
+        fn put_artifact(&self, _: ArtifactRecord) -> Result<(), StoreError> {
+            Err(StoreError::Infrastructure(
+                "health-only artifact store".into(),
+            ))
+        }
+
+        fn get_artifact(&self, _: &ArtifactRef) -> Result<Option<ArtifactRecord>, StoreError> {
+            Err(StoreError::Infrastructure(
+                "health-only artifact store".into(),
+            ))
+        }
+
+        fn delete_artifact(&self, _: &ArtifactRef) -> Result<(), StoreError> {
+            Err(StoreError::Infrastructure(
+                "health-only artifact store".into(),
+            ))
+        }
+    }
+
+    fn server_with_artifact_health(
+        health: Result<ArtifactStoreHealth, StoreError>,
+    ) -> Arc<ProductServer> {
+        let mut server_config = config();
+        server_config.store_profile = crate::StoreProfile::Postgres;
+        server_config.artifact_profile = ArtifactProfile::Shared;
+        server_config.postgres_url_reference =
+            Some("env-base64:MAINFRAME_ENV_SECRET_POSTGRES_URL".into());
+        let store: Arc<dyn PlatformStore> = Arc::new(MemoryStore::new(Default::default()));
+        ProductServer::open_with_artifact_store(
+            server_config,
+            store,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+            Arc::new(HealthOnlyArtifactStore { health }),
+        )
+        .unwrap()
+    }
+
+    fn submit_direct(server: &ProductServer, user: &str, secret: &[u8], name: &str) -> Value {
+        let response = server
+            .handle(
+                Authentication::Basic {
+                    user: user.into(),
+                    secret: secret.to_vec(),
+                },
+                GatewayRequest::JobSubmit {
+                    jcl: format!("//{name} JOB CLASS=A\n//STEP1 EXEC PGM=IEFBR14\n").into_bytes(),
+                },
+            )
+            .unwrap();
+        assert_eq!(response.status, StatusCode::CREATED);
+        let mainframe_env_zosmf::GatewayBody::Json(job) = response.body else {
+            panic!("job submission did not return JSON")
+        };
+        assert_eq!(job["status"], "ACTIVE");
+        job
+    }
+
+    async fn wait_for_terminal_job(
+        server: &ProductServer,
+        id: &str,
+    ) -> mainframe_env_batch::JobSnapshot {
+        for _ in 0..2_000 {
+            let job = server.batch.get(id).unwrap();
+            let work_terminal = server
+                .store
+                .get_work(&format!("jes:{id}"))
+                .unwrap()
+                .is_some_and(|work| {
+                    matches!(
+                        work.state,
+                        WorkState::Completed | WorkState::Cancelled | WorkState::DeadLetter
+                    )
+                });
+            if job.state.terminal() && work_terminal {
+                return job;
+            }
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        panic!("job {id} did not reach a terminal state")
+    }
+
+    #[test]
+    fn jes_worker_is_fifo_fair_and_preserves_multi_user_identity() {
+        let (server, store, _) = worker_test_server(100);
+        server.bootstrap_user("ALICE", b"ALICEPASS").unwrap();
+        server.bootstrap_user("BOB", b"BOBPASSWORD").unwrap();
+        let first = submit_direct(&server, "ALICE", b"ALICEPASS", "ALICEA");
+        let second = submit_direct(&server, "BOB", b"BOBPASSWORD", "BOBJOB");
+        let third = submit_direct(&server, "ALICE", b"ALICEPASS", "ALICEB");
+        let ids = [&first, &second, &third].map(|job| job["jobid"].as_str().unwrap().to_string());
+
+        for (ordinal, expected) in ids.iter().enumerate() {
+            assert_eq!(
+                server
+                    .run_jes_worker_once(&format!("fair-worker-{ordinal}"))
+                    .unwrap(),
+                Some(format!("jes:{expected}"))
+            );
+        }
+        assert!(
+            server
+                .run_jes_worker_once("fair-worker-done")
+                .unwrap()
+                .is_none()
+        );
+        for (id, owner) in ids.iter().zip(["ALICE", "BOB", "ALICE"]) {
+            assert_eq!(server.batch.get(id).unwrap().owner, owner);
+            assert_eq!(
+                store.get_work(&format!("jes:{id}")).unwrap().unwrap().state,
+                WorkState::Completed
+            );
+        }
+    }
+
+    #[test]
+    fn expired_crashed_jes_lease_is_reclaimed_and_stale_epoch_is_fenced() {
+        let (server, store, clock) = worker_test_server(200);
+        server.bootstrap_user("ALICE", b"ALICEPASS").unwrap();
+        let job = submit_direct(&server, "ALICE", b"ALICEPASS", "RECOVER");
+        let id = job["jobid"].as_str().unwrap();
+        let work_id = format!("jes:{id}");
+        let crashed = store
+            .claim("crashed-worker", Some(JES_WORK_GENERATION), 200, 10)
+            .unwrap()
+            .unwrap();
+        assert_eq!(crashed.lease_epoch, 1);
+        clock.advance(10);
+
+        assert_eq!(
+            server.run_jes_worker_once("recovery-worker").unwrap(),
+            Some(work_id.clone())
+        );
+        let recovered = store.get_work(&work_id).unwrap().unwrap();
+        assert_eq!(
+            (recovered.state, recovered.attempt, recovered.lease_epoch),
+            (WorkState::Completed, 2, 2)
+        );
+        assert_eq!(
+            server.batch.get(id).unwrap().state,
+            mainframe_env_batch::JobState::Completed
+        );
+        assert_eq!(
+            store.complete(
+                &work_id,
+                crashed.lease_id.as_deref().unwrap(),
+                crashed.lease_epoch,
+                210,
+            ),
+            Err(StoreError::LeaseConflict)
+        );
+    }
+
+    #[test]
+    fn sqlite_restart_reclaims_crashed_jes_work_with_a_new_epoch() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-jes-worker-restart-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let mut server_config = config();
+        server_config.store_profile = crate::StoreProfile::Sqlite;
+        server_config.sqlite_url = url.clone();
+        server_config.artifact_root = directory.join("artifacts");
+
+        let first_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let first_platform: Arc<dyn PlatformStore> = first_store.clone();
+        let first = ProductServer::open_with_clock(
+            server_config.clone(),
+            first_platform,
+            Arc::new(ManualJesClock::new(500)),
+        )
+        .unwrap();
+        first.bootstrap_user("ALICE", b"ALICEPASS").unwrap();
+        let job = submit_direct(&first, "ALICE", b"ALICEPASS", "RESTART");
+        let id = job["jobid"].as_str().unwrap().to_string();
+        let work_id = format!("jes:{id}");
+        let stale = first_store
+            .claim("crashed-process", Some(JES_WORK_GENERATION), 500, 10)
+            .unwrap()
+            .unwrap();
+        drop((first, first_store));
+
+        let second_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let second_platform: Arc<dyn PlatformStore> = second_store.clone();
+        let second = ProductServer::open_with_clock(
+            server_config,
+            second_platform,
+            Arc::new(ManualJesClock::new(510)),
+        )
+        .unwrap();
+        assert_eq!(
+            second.run_jes_worker_once("restarted-process").unwrap(),
+            Some(work_id.clone())
+        );
+        let work = second_store.get_work(&work_id).unwrap().unwrap();
+        assert_eq!((work.state, work.lease_epoch), (WorkState::Completed, 2));
+        assert_eq!(
+            second.batch.get(&id).unwrap().state,
+            mainframe_env_batch::JobState::Completed
+        );
+        assert_eq!(
+            second_store.complete(
+                &work_id,
+                stale.lease_id.as_deref().unwrap(),
+                stale.lease_epoch,
+                510,
+            ),
+            Err(StoreError::LeaseConflict)
+        );
+        drop((second, second_store));
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn cancellation_of_claimed_jes_work_wins_before_worker_completion() {
+        let (server, store, _) = worker_test_server(300);
+        server.bootstrap_user("ALICE", b"ALICEPASS").unwrap();
+        let job = submit_direct(&server, "ALICE", b"ALICEPASS", "CANCEL");
+        let id = job["jobid"].as_str().unwrap();
+        let work_id = format!("jes:{id}");
+        let claimed = store
+            .claim("cancel-worker", Some(JES_WORK_GENERATION), 300, 20)
+            .unwrap()
+            .unwrap();
+        let payload = JesWorkPayload::decode(&claimed.payload).unwrap();
+        let invocation = server
+            .jes_work_invocation(&claimed, &payload, false)
+            .unwrap();
+        assert_eq!(
+            invocation.bindings["jes.work-id"].bytes(),
+            work_id.as_bytes()
+        );
+        let response = server
+            .handle(
+                Authentication::Basic {
+                    user: "ALICE".into(),
+                    secret: b"ALICEPASS".to_vec(),
+                },
+                GatewayRequest::JobCancel {
+                    jobname: "CANCEL".into(),
+                    jobid: id.into(),
+                },
+            )
+            .unwrap();
+        assert_eq!(response.status, StatusCode::NO_CONTENT);
+        let outcome = server.process_claimed_jes_work(&claimed);
+        assert_eq!(outcome, Ok(JesWorkOutcome::Cancelled));
+        server.finish_claimed_jes_work(&claimed, outcome).unwrap();
+        assert_eq!(
+            store.get_work(&work_id).unwrap().unwrap().state,
+            WorkState::Cancelled
+        );
+        assert_eq!(
+            server.batch.get(id).unwrap().state,
+            mainframe_env_batch::JobState::Cancelled
+        );
+    }
+
+    #[test]
+    fn jes_worker_rejects_cross_user_payload_substitution() {
+        let (server, store, _) = worker_test_server(350);
+        server.bootstrap_user("ALICE", b"ALICEPASS").unwrap();
+        server.bootstrap_user("BOB", b"BOBPASSWORD").unwrap();
+        let job = submit_direct(&server, "ALICE", b"ALICEPASS", "ISOLATE");
+        let id = job["jobid"].as_str().unwrap();
+        let claimed = store
+            .claim("isolation-worker", Some(JES_WORK_GENERATION), 350, 20)
+            .unwrap()
+            .unwrap();
+        let mut forged = claimed.clone();
+        let mut payload = JesWorkPayload::decode(&forged.payload).unwrap();
+        payload.owner = "BOB".into();
+        forged.payload = payload.encode().unwrap();
+        assert_eq!(
+            server.process_claimed_jes_work(&forged),
+            Err(HostProblem::Unauthorized)
+        );
+        assert_eq!(
+            server.batch.get(id).unwrap().state,
+            mainframe_env_batch::JobState::Queued
+        );
+    }
+
+    #[tokio::test]
+    async fn bounded_worker_pool_starts_once_and_joins_on_shutdown() {
+        let (server, _, _) = worker_test_server(400);
+        server
+            .bootstrap_administrator("ADMIN", b"TESTPASS")
+            .unwrap();
+        server.start_background_workers().unwrap();
+        server.start_background_workers().unwrap();
+        assert_eq!(
+            server.jes_worker_handles.lock().unwrap().len(),
+            JES_WORKER_COUNT
+        );
+        assert_eq!(server.metrics().jes_workers, JES_WORKER_COUNT);
+        wait_for_worker_health(&server, JES_WORKER_COUNT).await;
+        assert!(server.ready());
+        assert!(server.graceful_shutdown().await);
+        assert!(server.jes_worker_handles.lock().unwrap().is_empty());
+        assert_eq!(server.jes_worker_active.load(Ordering::SeqCst), 0);
+        assert_eq!(server.metrics().jes_workers, 0);
+        assert!(!server.ready());
+    }
+
+    #[tokio::test]
+    async fn background_workers_process_multiple_users_without_request_coupling() {
+        let (server, store, _) = worker_test_server(700);
+        server.bootstrap_user("ALICE", b"ALICEPASS").unwrap();
+        server.bootstrap_user("BOB", b"BOBPASSWORD").unwrap();
+        server.start_background_workers().unwrap();
+        let alice = submit_direct(&server, "ALICE", b"ALICEPASS", "ALICEBG");
+        let bob = submit_direct(&server, "BOB", b"BOBPASSWORD", "BOBBG");
+        let alice_id = alice["jobid"].as_str().unwrap();
+        let bob_id = bob["jobid"].as_str().unwrap();
+        let (alice_job, bob_job) = tokio::join!(
+            wait_for_terminal_job(&server, alice_id),
+            wait_for_terminal_job(&server, bob_id)
+        );
+        assert_eq!(
+            (alice_job.owner.as_str(), bob_job.owner.as_str()),
+            ("ALICE", "BOB")
+        );
+        for id in [alice_id, bob_id] {
+            assert_eq!(
+                store.get_work(&format!("jes:{id}")).unwrap().unwrap().state,
+                WorkState::Completed
+            );
+        }
+        assert!(server.graceful_shutdown().await);
+    }
+
+    #[tokio::test]
+    async fn worker_readiness_tracks_queue_progress_and_persistent_failures() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let clock = Arc::new(ToggleJesClock::new(900));
+        let platform: Arc<dyn PlatformStore> = store;
+        let server = ProductServer::open_with_clock(config(), platform, clock.clone()).unwrap();
+        server
+            .bootstrap_administrator("ADMIN", b"TESTPASS")
+            .unwrap();
+        server.start_background_workers().unwrap();
+        wait_for_worker_health(&server, JES_WORKER_COUNT).await;
+        let before = server.metrics();
+        assert!(before.jes_worker_progress >= JES_WORKER_COUNT as u64);
+        assert!(server.readiness().jes_workers);
+
+        clock.failing.store(true, Ordering::SeqCst);
+        server.jes_worker_notify.notify_waiters();
+        for _ in 0..4_000 {
+            let metrics = server.metrics();
+            if metrics.jes_worker_failures >= JES_WORKER_COUNT as u64
+                && metrics.jes_worker_healthy == 0
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        let failed = server.metrics();
+        assert!(failed.jes_worker_failures >= JES_WORKER_COUNT as u64);
+        assert_eq!(failed.jes_worker_healthy, 0);
+        assert!(
+            server
+                .jes_worker_handles
+                .lock()
+                .unwrap()
+                .iter()
+                .all(|handle| !handle.is_finished())
+        );
+        assert!(!server.readiness().jes_workers);
+        assert!(server.graceful_shutdown().await);
+    }
+
+    #[tokio::test]
+    async fn worker_readiness_expires_when_progress_stalls_without_a_reported_failure() {
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("ADMIN", b"TESTPASS")
+            .unwrap();
+        server.start_background_workers().unwrap();
+        wait_for_worker_health(&server, JES_WORKER_COUNT).await;
+        assert!(server.jes_workers_ready_at(Instant::now()));
+        let failures = server.metrics().jes_worker_failures;
+
+        let stalled_observation =
+            Instant::now() + Duration::from_millis(JES_WORKER_FRESHNESS_MILLIS.saturating_mul(2));
+        assert!(!server.jes_workers_ready_at(stalled_observation));
+        assert_eq!(server.metrics().jes_worker_failures, failures);
+        assert!(
+            server
+                .jes_worker_handles
+                .lock()
+                .unwrap()
+                .iter()
+                .all(|handle| !handle.is_finished())
+        );
+        assert!(server.graceful_shutdown().await);
+    }
+
+    #[test]
+    fn artifact_readiness_rejects_write_denial_and_reported_saturation() {
+        let denied = server_with_artifact_health(Err(StoreError::Infrastructure(
+            "injected write denial".into(),
+        )));
+        assert!(!denied.readiness().artifact_store);
+
+        for health in [
+            ArtifactStoreHealth {
+                readable: true,
+                writable: true,
+                used_objects: Some(8),
+                max_objects: Some(8),
+                used_bytes: None,
+                max_bytes: None,
+            },
+            ArtifactStoreHealth {
+                readable: true,
+                writable: true,
+                used_objects: None,
+                max_objects: None,
+                used_bytes: Some(4096),
+                max_bytes: Some(4096),
+            },
+        ] {
+            assert!(
+                !server_with_artifact_health(Ok(health))
+                    .readiness()
+                    .artifact_store
+            );
+        }
+    }
+
+    #[test]
+    fn committed_bootstrap_restart_does_not_resolve_removed_secret() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let reference = SecretRef::new("test:one-time-admin", HostLimits::default()).unwrap();
+        let external = Arc::new(MemorySecretResolver::default());
+        external.insert(reference.as_str(), b"TESTPASS".to_vec());
+        let first_platform: Arc<dyn PlatformStore> = store.clone();
+        let first = ProductServer::open(
+            config(),
+            first_platform,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+        )
+        .unwrap();
+        first
+            .bootstrap_administrator_from_reference("ADMIN", &reference, external.as_ref())
+            .unwrap();
+        drop(first);
+        external.remove(reference.as_str());
+
+        let second_platform: Arc<dyn PlatformStore> = store;
+        let second = ProductServer::open(
+            config(),
+            second_platform,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+        )
+        .unwrap();
+        second
+            .bootstrap_administrator_from_reference("ADMIN", &reference, external.as_ref())
+            .unwrap();
+        assert!(second.verify("ADMIN", b"TESTPASS").is_ok());
+    }
+
+    #[test]
+    fn pending_bootstrap_claim_survives_missing_secret_and_rejects_replacement() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let reference = SecretRef::new("test:pending-admin", HostLimits::default()).unwrap();
+        let external = Arc::new(MemorySecretResolver::default());
+        let first_platform: Arc<dyn PlatformStore> = store.clone();
+        let first = ProductServer::open(
+            config(),
+            first_platform,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+        )
+        .unwrap();
+        assert_eq!(
+            first.bootstrap_administrator_from_reference("ADMIN", &reference, external.as_ref()),
+            Err(HostProblem::NotFound)
+        );
+        assert_eq!(
+            first
+                .bootstrap_record(BOOTSTRAP_CLAIM_KEY)
+                .unwrap()
+                .unwrap()
+                .payload,
+            b"ADMIN"
+        );
+        drop(first);
+
+        external.insert(reference.as_str(), b"TESTPASS".to_vec());
+        let second_platform: Arc<dyn PlatformStore> = store;
+        let second = ProductServer::open(
+            config(),
+            second_platform,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+        )
+        .unwrap();
+        assert_eq!(
+            second.bootstrap_administrator_from_reference("OTHER", &reference, external.as_ref()),
+            Err(HostProblem::Unauthorized)
+        );
+        second
+            .bootstrap_administrator_from_reference("ADMIN", &reference, external.as_ref())
+            .unwrap();
+        assert!(second.verify("ADMIN", b"TESTPASS").is_ok());
+        assert_eq!(second.racf.active_principal_epochs().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn bootstrap_rejects_ordinary_existing_user_and_mismatched_marker_before_mutation() {
+        let ordinary = ProductServer::memory(config()).unwrap();
+        ordinary.bootstrap_identity("ADMIN", b"TESTPASS").unwrap();
+        assert_eq!(
+            ordinary.bootstrap_administrator("ADMIN", b"TESTPASS"),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(
+            ordinary
+                .bootstrap_record(BOOTSTRAP_CLAIM_KEY)
+                .unwrap()
+                .is_none()
+        );
+        let principal = PrincipalId::new("ADMIN", InvocationLimits::default()).unwrap();
+        assert!(
+            !ordinary
+                .racf
+                .bootstrap_administrator_ready(&principal)
+                .unwrap()
+        );
+
+        let mismatch = ProductServer::memory(config()).unwrap();
+        mismatch
+            .store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: BOOTSTRAP_NAMESPACE.into(),
+                    key: BOOTSTRAP_KEY.into(),
+                    version: 1,
+                    payload: b"OTHER".to_vec(),
+                },
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            mismatch.bootstrap_administrator("ADMIN", b"TESTPASS"),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(mismatch.racf.active_principal_epochs().unwrap().is_empty());
+        assert!(
+            mismatch
+                .bootstrap_record(BOOTSTRAP_CLAIM_KEY)
+                .unwrap()
+                .is_none()
+        );
+
+        let claim_mismatch = ProductServer::memory(config()).unwrap();
+        claim_mismatch
+            .store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: BOOTSTRAP_NAMESPACE.into(),
+                    key: BOOTSTRAP_CLAIM_KEY.into(),
+                    version: 1,
+                    payload: b"OTHER".to_vec(),
+                },
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            claim_mismatch.bootstrap_administrator("ADMIN", b"TESTPASS"),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(
+            claim_mismatch
+                .racf
+                .active_principal_epochs()
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn bootstrap_recovers_proven_partial_administrator_without_reading_secret() {
+        let server = ProductServer::memory(config()).unwrap();
+        let reference = SecretRef::new("test:partial-admin", HostLimits::default()).unwrap();
+        let scope = server
+            .secrets
+            .scoped(&reference, b"TESTPASS".to_vec())
+            .unwrap();
+        server
+            .racf
+            .bootstrap_administrator("ADMIN", &reference)
+            .unwrap();
+        drop(scope);
+        assert!(server.bootstrap_record(BOOTSTRAP_KEY).unwrap().is_none());
+        server.bootstrap_administrator("ADMIN", b"").unwrap();
+        assert!(server.bootstrap_principal_ready());
+        assert!(server.verify("ADMIN", b"TESTPASS").is_ok());
+    }
+
+    #[test]
+    fn concurrent_bootstrap_claim_allows_exactly_one_principal() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let open = |store: Arc<MemoryStore>| {
+            let platform: Arc<dyn PlatformStore> = store;
+            ProductServer::open(
+                config(),
+                platform,
+                Arc::new(MemorySecretResolver::default()),
+                default_program_router(),
+            )
+            .unwrap()
+        };
+        let left = open(store.clone());
+        let right = open(store);
+        let barrier = Arc::new(Barrier::new(3));
+        let spawn = |server: Arc<ProductServer>, user: &'static str, barrier: Arc<Barrier>| {
+            std::thread::spawn(move || {
+                barrier.wait();
+                (user, server.bootstrap_administrator(user, b"TESTPASS"))
+            })
+        };
+        let left_worker = spawn(left.clone(), "ADMINA", barrier.clone());
+        let right_worker = spawn(right.clone(), "ADMINB", barrier.clone());
+        barrier.wait();
+        let outcomes = [left_worker.join().unwrap(), right_worker.join().unwrap()];
+        assert_eq!(
+            outcomes.iter().filter(|(_, result)| result.is_ok()).count(),
+            1
+        );
+        assert_eq!(
+            outcomes
+                .iter()
+                .filter(|(_, result)| *result == Err(HostProblem::Unauthorized))
+                .count(),
+            1
+        );
+        let winner = outcomes
+            .iter()
+            .find_map(|(user, result)| result.is_ok().then_some(*user))
+            .unwrap();
+        assert_eq!(
+            left.bootstrap_record(BOOTSTRAP_KEY)
+                .unwrap()
+                .unwrap()
+                .payload,
+            winner.as_bytes()
+        );
+        assert_eq!(left.racf.active_principal_epochs().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn info_reports_the_validated_configured_listener() {
+        let mut server_config = config();
+        server_config.listen = "127.0.0.1:20443".into();
+        let server = ProductServer::memory(server_config).unwrap();
+        let before_epoch = server.store.provider_state_retention_epoch().unwrap();
+        let before_capacity = server
+            .store
+            .retention_capacity_health(server.config.retention.policy().unwrap())
+            .unwrap();
+        let response = server
+            .handle(Authentication::Anonymous, GatewayRequest::Info)
+            .unwrap();
+        let mainframe_env_zosmf::GatewayBody::Json(info) = response.body else {
+            panic!("information response was not JSON")
+        };
+        assert_eq!(info["listen"], "127.0.0.1:20443");
+        assert_eq!(info["zosmf_port"], "20443");
+        assert_eq!(info["readiness"]["retention_capacity"], "healthy");
+        assert_eq!(info["readiness"]["retention_warning"], false);
+        let second = server
+            .handle(Authentication::Anonymous, GatewayRequest::Info)
+            .unwrap();
+        assert_eq!(second.status, StatusCode::OK);
+        assert_eq!(
+            server.store.provider_state_retention_epoch().unwrap(),
+            before_epoch
+        );
+        assert_eq!(
+            server
+                .store
+                .retention_capacity_health(server.config.retention.policy().unwrap())
+                .unwrap(),
+            before_capacity
+        );
+    }
+
+    #[test]
+    fn readiness_warns_at_low_capacity_and_rejects_high_and_full_capacity() {
+        let store = Arc::new(MemoryStore::new(mainframe_env_store::StoreLimits {
+            max_provider_state: 100,
+            ..Default::default()
+        }));
+        let platform: Arc<dyn PlatformStore> = store.clone();
+        let server = ProductServer::open(
+            config(),
+            platform,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+        )
+        .unwrap();
+        let policy = server.config.retention.policy().unwrap();
+        let provider_usage = |store: &MemoryStore| {
+            store
+                .retention_capacity_health(policy)
+                .unwrap()
+                .targets
+                .into_iter()
+                .find(|entry| entry.target == RetentionTarget::Db2Replay)
+                .unwrap()
+                .used
+        };
+        let fill_to = |target: usize| {
+            let used = provider_usage(&store);
+            assert!(used <= target);
+            for ordinal in used..target {
+                store
+                    .put_provider_state(
+                        ProviderStateRecord {
+                            namespace: "readiness-capacity-test".into(),
+                            key: format!("row-{ordinal:03}"),
+                            version: 1,
+                            payload: Vec::new(),
+                        },
+                        None,
+                    )
+                    .unwrap();
+            }
+        };
+
+        assert_eq!(
+            server.readiness().retention_capacity,
+            ProductCapacityStatus::Healthy
+        );
+        fill_to(70);
+        let low = server.readiness();
+        assert!(low.writable_store);
+        assert_eq!(low.retention_capacity, ProductCapacityStatus::LowWatermark);
+        assert!(low.retention_warning);
+        assert!(low.retention_capacity.accepts_traffic());
+        assert!(!low.ready());
+
+        fill_to(85);
+        let high = server.readiness();
+        assert!(high.writable_store);
+        assert_eq!(
+            high.retention_capacity,
+            ProductCapacityStatus::HighWatermark
+        );
+        assert!(high.retention_warning);
+        assert!(!high.retention_capacity.accepts_traffic());
+        assert!(!high.ready());
+
+        fill_to(100);
+        let full = server.readiness();
+        assert!(full.writable_store);
+        assert_eq!(full.retention_capacity, ProductCapacityStatus::Full);
+        assert!(full.retention_warning);
+        assert!(!full.retention_capacity.accepts_traffic());
+        assert!(!full.ready());
+    }
+
+    #[tokio::test]
+    async fn first_administrator_gates_readiness_and_bootstrap_is_fail_closed() {
+        let server = ProductServer::memory(config()).unwrap();
+        assert!(server.live());
+        assert!(!server.ready());
+        let initial = server.readiness();
+        assert!(initial.accepting && initial.writable_store && initial.artifact_store);
+        assert_eq!(initial.retention_capacity, ProductCapacityStatus::Healthy);
+        assert!(!initial.retention_warning);
+        assert!(!initial.bootstrap_identity);
+        assert!(!initial.jes_workers);
+
+        server
+            .bootstrap_administrator("ADMIN", b"TESTPASS")
+            .unwrap();
+        assert!(!server.ready());
+        server.start_background_workers().unwrap();
+        wait_for_worker_health(&server, JES_WORKER_COUNT).await;
+        let ready = server.readiness();
+        assert!(ready.ready() && ready.host_capabilities && ready.jes_workers);
+        assert!(server.verify("ADMIN", b"TESTPASS").is_ok());
+
+        // Declarative replay never replaces the established credential.
+        server
+            .bootstrap_administrator("ADMIN", b"DIFFERENT1")
+            .unwrap();
+        assert!(server.verify("ADMIN", b"TESTPASS").is_ok());
+        assert_eq!(
+            server.bootstrap_administrator("OTHER", b"OTHERPASS1"),
+            Err(HostProblem::Unauthorized)
+        );
+        assert!(server.graceful_shutdown().await);
     }
 
     const TEST_PACKAGE_KEY: &[u8] = b"test-production-package-trust-key";
@@ -4174,6 +7935,18 @@ mod tests {
         let empty = HmacSha256PackageTrust::from_environment(&environment, resolver).unwrap();
         assert!(!empty.verify("key-1", "hmac-sha256@1", &identity, &second));
         assert!(!format!("{reference:?}").contains("rotated-production-package-key"));
+
+        let unsupported = BTreeMap::from([(
+            "MAINFRAME_ENV_PACKAGE_HMAC_KEY_REFS".into(),
+            r#"{"key-1":"secret://unsupported/package-key"}"#.into(),
+        )]);
+        assert!(matches!(
+            HmacSha256PackageTrust::from_environment(
+                &unsupported,
+                Arc::new(MemorySecretResolver::default())
+            ),
+            Err(HostProblem::Malformed)
+        ));
     }
 
     fn signed_controller_package(
@@ -4638,6 +8411,78 @@ mod tests {
             .unwrap()
     }
 
+    #[test]
+    fn dataset_catalog_listing_filters_each_name_without_hidden_pagination_hints() {
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_identity("IBMUSER", b"TESTPASS").unwrap();
+        server.bootstrap_identity("OTHER", b"OTHERPASS1").unwrap();
+        server
+            .racf
+            .define_profile("DATASET", "CATALOG.**", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit("DATASET", "CATALOG.**", "IBMUSER", AccessIntent::Alter)
+            .unwrap();
+        server
+            .racf
+            .define_profile("DATASET", "CATALOG.HIDDEN", "OTHER", None)
+            .unwrap();
+        server
+            .racf
+            .permit("DATASET", "CATALOG.HIDDEN", "OTHER", AccessIntent::Alter)
+            .unwrap();
+        let attributes = json!({"dsorg":"PS","recfm":"V","lrecl":80});
+        server
+            .handle(
+                Authentication::Basic {
+                    user: "OTHER".into(),
+                    secret: b"OTHERPASS1".to_vec(),
+                },
+                GatewayRequest::DatasetCreate {
+                    dataset: "CATALOG.HIDDEN".into(),
+                    attributes: attributes.clone(),
+                },
+            )
+            .unwrap();
+        server
+            .handle(
+                Authentication::Basic {
+                    user: "IBMUSER".into(),
+                    secret: b"TESTPASS".to_vec(),
+                },
+                GatewayRequest::DatasetCreate {
+                    dataset: "CATALOG.PUBLIC".into(),
+                    attributes,
+                },
+            )
+            .unwrap();
+
+        let response = server
+            .handle(
+                Authentication::Basic {
+                    user: "IBMUSER".into(),
+                    secret: b"TESTPASS".to_vec(),
+                },
+                GatewayRequest::DatasetList {
+                    pattern: "CATALOG.**".into(),
+                    start: None,
+                    attributes: false,
+                    max: 1,
+                },
+            )
+            .unwrap();
+        assert_eq!(response.status, StatusCode::OK);
+        assert_eq!(response.headers["X-IBM-Response-Rows"], "1");
+        let mainframe_env_zosmf::GatewayBody::Json(body) = response.body else {
+            panic!("dataset list did not return JSON")
+        };
+        assert_eq!(body["returnedRows"], 1);
+        assert_eq!(body["moreRows"], false);
+        assert_eq!(body["items"][0]["dsname"], "CATALOG.PUBLIC");
+        assert!(!body.to_string().contains("CATALOG.HIDDEN"));
+    }
+
     #[tokio::test]
     async fn composed_dataset_routes_match_selected_zosmf_contract() {
         let server = ProductServer::memory(config()).unwrap();
@@ -4746,7 +8591,9 @@ mod tests {
     #[tokio::test]
     async fn composed_job_auth_console_and_shutdown_routes_pass() {
         let server = ProductServer::memory(config()).unwrap();
-        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
         let app = server.router();
         let response = call(
             &app,
@@ -4759,8 +8606,13 @@ mod tests {
         let job: Value =
             serde_json::from_slice(&to_bytes(response.into_body(), 65536).await.unwrap()).unwrap();
         assert_eq!(job["jobname"], "TESTJOB");
-        assert_eq!(job["status"], "OUTPUT");
-        let id = job["jobid"].as_str().unwrap();
+        assert_eq!(job["status"], "ACTIVE");
+        assert_eq!(job["retcode"], Value::Null);
+        assert_eq!(server.metrics().active, 0);
+        let id = job["jobid"].as_str().unwrap().to_string();
+        let completed = wait_for_terminal_job(&server, &id).await;
+        assert_eq!(completed.state, mainframe_env_batch::JobState::Completed);
+        assert_eq!(completed.return_code, Some(0));
         let files = call(
             &app,
             Method::GET,
@@ -4802,8 +8654,54 @@ mod tests {
         let session: Value =
             serde_json::from_slice(&to_bytes(authenticated.into_body(), 65536).await.unwrap())
                 .unwrap();
-        assert!(session["token"].as_str().unwrap().starts_with("session-"));
+        let original_token = session["token"].as_str().unwrap();
+        assert!(original_token.starts_with("session-"));
+        let rotated = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/zosmf/services/authenticate")
+                    .header("authorization", format!("Bearer {original_token}"))
+                    .header("x-csrf-zosmf-header", "true")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(rotated.status(), StatusCode::OK);
+        let rotated: Value =
+            serde_json::from_slice(&to_bytes(rotated.into_body(), 65536).await.unwrap()).unwrap();
+        let rotated_token = rotated["token"].as_str().unwrap();
+        assert_ne!(rotated_token, original_token);
+        let old = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(Method::GET)
+                    .uri("/zosmf/restjobs/jobs?owner=*")
+                    .header("authorization", format!("Bearer {original_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(old.status(), StatusCode::UNAUTHORIZED);
+        let renewed = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(Method::GET)
+                    .uri("/zosmf/restjobs/jobs?owner=*")
+                    .header("authorization", format!("Bearer {rotated_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(renewed.status(), StatusCode::OK);
         assert!(server.metrics().requests >= 4);
+        wait_for_worker_health(&server, JES_WORKER_COUNT).await;
         assert!(server.ready());
         assert!(server.graceful_shutdown().await);
         assert!(!server.ready());
@@ -4824,7 +8722,9 @@ mod tests {
         assert_eq!(response.status(), StatusCode::CREATED);
         let job: Value =
             serde_json::from_slice(&to_bytes(response.into_body(), 65536).await.unwrap()).unwrap();
-        assert_eq!(job["retcode"], "CC 0000");
+        assert_eq!(job["status"], "ACTIVE");
+        let completed = wait_for_terminal_job(&server, job["jobid"].as_str().unwrap()).await;
+        assert_eq!(completed.return_code, Some(0));
         assert!(server.metrics().outbox_delivered >= 5);
     }
 
@@ -4987,6 +8887,609 @@ mod tests {
                 .unwrap(),
             b"HELLO"
         );
+        let run_unit = body["terminal"]["run_unit"].as_str().unwrap();
+        let execution_id = ExecutionId::new(
+            format!("execution-{}", run_unit.strip_prefix("run-").unwrap()),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            server
+                .store
+                .get_execution(&execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Completed,
+            "online execution did not reach a durable terminal state"
+        );
+        assert!(
+            server
+                .store
+                .events(&execution_id, 1, 32)
+                .unwrap()
+                .iter()
+                .any(|event| matches!(
+                    event.kind,
+                    mainframe_env_execution_api::LifecycleEventKind::EffectIntent { .. }
+                )),
+            "online host effects bypassed the durable journal"
+        );
+    }
+
+    #[test]
+    fn online_pseudo_conversations_handoff_without_leaking_suspended_executions() {
+        fn assert_handoff(server: &ProductServer, execution_id: &ExecutionId) {
+            let execution = server.store.get_execution(execution_id).unwrap().unwrap();
+            assert_eq!(execution.state, ExecutionState::Completed);
+            assert!(server.store.get_checkpoint(execution_id).unwrap().is_none());
+            assert!(matches!(
+                server
+                    .store
+                    .events(execution_id, execution.version, 1)
+                    .unwrap()
+                    .as_slice(),
+                [event] if matches!(event.kind, LifecycleEventKind::HandoffCompleted)
+            ));
+        }
+
+        let limits = SourceLimits::default();
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. PSEUDO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MSG PIC X(5) VALUE 'HELLO'.\nPROCEDURE DIVISION.\nEXEC CICS SEND MAP('PSEUDO') MAPSET('PSEUDO') END-EXEC.\nEXEC CICS RECEIVE MAP('PSEUDO') MAPSET('PSEUDO') END-EXEC.\nEXEC CICS SEND TEXT FROM(MSG) END-EXEC.\nEXEC CICS RETURN TRANSID('PS00') END-EXEC.\n";
+        let path = LogicalPath::new("PSEUDO.cbl", limits.max_path_bytes).unwrap();
+        let bundle = SourceBundle::new(
+            &path,
+            vec![
+                SourceFile::input(
+                    "PSEUDO.cbl",
+                    source.to_vec(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("pseudo-conversation fixture did not publish");
+        };
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "PSEUDO".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                }],
+                transactions: BTreeMap::from([("PS00".into(), "PSEUDO".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "PSEUDO".into(),
+                    map: "PSEUDO".into(),
+                    rows: 24,
+                    columns: 80,
+                    fields: vec![mainframe_env_cics::BmsFieldDefinition {
+                        name: "INPUT".into(),
+                        row: 1,
+                        column: 1,
+                        length: 8,
+                        initial: Vec::new(),
+                        color: None,
+                        highlight: None,
+                        protected: false,
+                        secret: false,
+                        fset: false,
+                        justify_right: false,
+                        fill_zero: false,
+                        output_offset: None,
+                        attribute_offset: None,
+                    }],
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("r03-pseudo-session", 64).unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let launch = server
+            .cics_invocation("IBMUSER", "PS00", Some(artifact_ref.clone()))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                launch,
+                &session,
+                "PS00",
+                24,
+                80,
+                "r03-pseudo-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let first_context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        let first_exchange = server
+            .begin_online_exchange(&session, "PSEUDO", &first_context)
+            .unwrap();
+        assert_eq!(
+            server.run_online_exchange(&session, &principal, "PSEUDO", 2),
+            Ok(())
+        );
+        assert_handoff(&server, &first_context.invocation.execution_id);
+        assert!(
+            server
+                .online_machine_continuation(&session)
+                .unwrap()
+                .is_some()
+        );
+        assert!(server.online_exchange(&session).unwrap().is_none());
+
+        // Recreate the exact crash gap after the handoff event but before CICS
+        // and exchange cleanup. Recovery must retain the product checkpoint.
+        server
+            .store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: ONLINE_EXCHANGE_NAMESPACE.into(),
+                    key: session.as_str().into(),
+                    version: first_exchange.version,
+                    payload: encode_online_exchange(&first_exchange).unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        server
+            .cics
+            .restore_terminal_run(
+                first_context.invocation.clone(),
+                &session,
+                &first_context.transaction,
+                first_context.commarea.clone(),
+                3,
+            )
+            .unwrap();
+        assert_eq!(
+            server
+                .recover_terminal_online_exchange(&session, &principal, &first_exchange, 3)
+                .unwrap(),
+            Some(TerminalExchangeRecovery::HandoffCompleted)
+        );
+        assert!(
+            server
+                .online_machine_continuation(&session)
+                .unwrap()
+                .is_some()
+        );
+        assert!(server.online_exchange(&session).unwrap().is_none());
+        assert!(matches!(
+            server.cics.terminal_execution(&session, &principal, 3),
+            Err(HostProblem::NotFound)
+        ));
+
+        server
+            .cics
+            .submit_terminal_input(
+                &session,
+                &principal,
+                "r03-pseudo-csrf",
+                0x7d,
+                &BTreeMap::from([("INPUT".into(), b"ONE".to_vec())]),
+                4,
+            )
+            .unwrap();
+        let resumed = server
+            .cics_invocation("IBMUSER", "PS00", Some(artifact_ref.clone()))
+            .unwrap();
+        server
+            .cics
+            .resume_terminal(resumed, &session, "r03-pseudo-csrf", 5)
+            .unwrap();
+        let completed_context = server
+            .cics
+            .terminal_execution(&session, &principal, 5)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "PSEUDO", 5)
+            .unwrap();
+        assert_eq!(
+            server
+                .store
+                .get_execution(&completed_context.invocation.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Completed
+        );
+        assert!(
+            server
+                .online_machine_continuation(&session)
+                .unwrap()
+                .is_none()
+        );
+
+        // The RETURN TRANSID starts another task. With no input it suspends
+        // again, but the old execution is terminalized through a second handoff.
+        let next = server
+            .cics_invocation("IBMUSER", "PS00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .resume_terminal(next, &session, "r03-pseudo-csrf", 6)
+            .unwrap();
+        let second_context = server
+            .cics
+            .terminal_execution(&session, &principal, 6)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "PSEUDO", 6)
+            .unwrap();
+        assert_handoff(&server, &second_context.invocation.execution_id);
+        assert!(
+            server
+                .online_machine_continuation(&session)
+                .unwrap()
+                .is_some()
+        );
+        assert!(server.online_exchange(&session).unwrap().is_none());
+    }
+
+    #[cfg(feature = "fault-injection")]
+    #[test]
+    fn online_unknown_reconciles_and_known_failure_does_not_strand_session() {
+        let limits = SourceLimits::default();
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. RECOVER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(4) VALUE 'AA11'.\nPROCEDURE DIVISION.\nEXEC CICS WRITE FILE('RECFILE') FROM(DATA-X) END-EXEC.\nSTOP RUN.\n";
+        let path = LogicalPath::new("RECOVER.cbl", limits.max_path_bytes).unwrap();
+        let bundle = SourceBundle::new(
+            &path,
+            vec![
+                SourceFile::input(
+                    "RECOVER.cbl",
+                    source.to_vec(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("recovery fixture did not publish");
+        };
+        let known_source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. KNOWNFAIL.\nPROCEDURE DIVISION.\nCALL 'MISSING-PROGRAM'.\nSTOP RUN.\n";
+        let known_path = LogicalPath::new("KNOWNFAIL.cbl", limits.max_path_bytes).unwrap();
+        let known_bundle = SourceBundle::new(
+            &known_path,
+            vec![
+                SourceFile::input(
+                    "KNOWNFAIL.cbl",
+                    known_source.to_vec(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let CompilerResult::Published {
+            artifact: known_artifact,
+            ..
+        } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: known_bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("known-failure fixture did not publish");
+        };
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-online-restart-{}-{:?}-{}",
+            std::process::id(),
+            std::thread::current().id(),
+            session_tick().unwrap()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let mut server_config = config();
+        server_config.store_profile = crate::StoreProfile::Sqlite;
+        server_config.sqlite_url = url.clone();
+        server_config.artifact_root = root.join("artifacts");
+        let first_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let first_platform: Arc<dyn PlatformStore> = first_store.clone();
+        let server = ProductServer::open(
+            server_config.clone(),
+            first_platform,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+        )
+        .unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .handle(
+                Authentication::Basic {
+                    user: "IBMUSER".into(),
+                    secret: b"TESTPASS".to_vec(),
+                },
+                GatewayRequest::DatasetCreate {
+                    dataset: "IBMUSER.RECOVERY".into(),
+                    attributes: json!({"dsorg":"PS","recfm":"V","lrecl":80}),
+                },
+            )
+            .unwrap();
+        server
+            .cics
+            .register_file_aliases(&BTreeMap::from([(
+                "RECFILE".into(),
+                DatasetName::new("IBMUSER.RECOVERY", 128).unwrap(),
+            )]))
+            .unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let known_artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(known_artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![
+                    OnlineProgramDefinition {
+                        name: "RECOVER".into(),
+                        artifact: artifact_ref.clone(),
+                        payload: artifact.payload().to_vec(),
+                    },
+                    OnlineProgramDefinition {
+                        name: "KNOWNFAIL".into(),
+                        artifact: known_artifact_ref.clone(),
+                        payload: known_artifact.payload().to_vec(),
+                    },
+                ],
+                transactions: BTreeMap::from([
+                    ("RCVY".into(), "RECOVER".into()),
+                    ("KFLR".into(), "KNOWNFAIL".into()),
+                ]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "RECOVER".into(),
+                    map: "RECOVER".into(),
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("r03-unknown-session", 64).unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "RCVY", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(invocation, &session, "RCVY", 24, 80, "r03-csrf", 1, 10_000)
+            .unwrap();
+        server
+            .cics
+            .inject_file_fault_once(
+                CicsOperation::Write,
+                "RECFILE",
+                mainframe_env_cics::CicsFileFaultPoint::AfterMutation,
+            )
+            .unwrap();
+        let problem = server
+            .run_online_exchange(&session, &principal, "RECOVER", 2)
+            .unwrap_err();
+        assert_eq!(problem, HostProblem::UnknownOutcome);
+        assert_eq!(gateway_problem(problem).code, "unknown_outcome");
+        let exchange = server.online_exchange(&session).unwrap().unwrap();
+        assert!(server.online_exchange_blocked(&exchange).unwrap());
+        let key = IdempotencyKey::new(
+            exchange.blocking_effect.as_deref().unwrap(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            server.store.effect(&key).unwrap().unwrap().state,
+            EffectState::UnknownOutcome
+        );
+        assert_eq!(
+            server
+                .store
+                .get_execution(
+                    &ExecutionId::new(&exchange.execution_id, InvocationLimits::default()).unwrap(),
+                )
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Running
+        );
+        drop(server);
+        drop(first_store);
+
+        let second_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let second_platform: Arc<dyn PlatformStore> = second_store.clone();
+        let server = ProductServer::open(
+            server_config,
+            second_platform,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+        )
+        .unwrap();
+        assert_eq!(
+            server.run_online_exchange(&session, &principal, "RECOVER", 3),
+            Ok(()),
+            "authoritatively reconciled session did not resume"
+        );
+        assert!(server.online_exchange(&session).unwrap().is_none());
+        assert_eq!(
+            server.store.effect(&key).unwrap().unwrap().state,
+            EffectState::Completed
+        );
+        assert_eq!(
+            server
+                .store
+                .get_execution(
+                    &ExecutionId::new(&exchange.execution_id, InvocationLimits::default()).unwrap(),
+                )
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Completed
+        );
+        let outer_audits = server
+            .store
+            .audit_records(
+                &ExecutionId::new(&exchange.execution_id, InvocationLimits::default()).unwrap(),
+                1,
+                32,
+            )
+            .unwrap()
+            .into_iter()
+            .filter(|record| record.capability.as_str() == "host.cics.execute")
+            .map(|record| record.decision)
+            .collect::<Vec<_>>();
+        assert!(outer_audits.contains(&mainframe_env_execution_api::AuditDecision::UnknownOutcome));
+        assert!(outer_audits.contains(&mainframe_env_execution_api::AuditDecision::Success));
+        let records = server
+            .dataset
+            .invoke(DatasetRequest::Read {
+                dataset: DatasetName::new("IBMUSER.RECOVERY", 128).unwrap(),
+                member: None,
+                key: None,
+                max_records: 8,
+                control: Default::default(),
+            })
+            .unwrap();
+        let DatasetResult::Records { records, .. } = records else {
+            panic!("recovery dataset did not return records")
+        };
+        assert_eq!(
+            records.len(),
+            1,
+            "reconciliation redispatched the committed write"
+        );
+
+        let known_session = SessionId::new("r03-known-session", 64).unwrap();
+        let known_invocation = server
+            .cics_invocation("IBMUSER", "KFLR", Some(known_artifact_ref.clone()))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                known_invocation,
+                &known_session,
+                "KFLR",
+                24,
+                80,
+                "r03-known-csrf",
+                4,
+                10_000,
+            )
+            .unwrap();
+        let known_context = server
+            .cics
+            .terminal_execution(&known_session, &principal, 5)
+            .unwrap();
+        let known_exchange = server
+            .begin_online_exchange(&known_session, "KNOWNFAIL", &known_context)
+            .unwrap();
+        let known_result = server.run_online_exchange(&known_session, &principal, "KNOWNFAIL", 5);
+        assert!(
+            matches!(
+                known_result,
+                Err(HostProblem::Condition { response: -4, .. })
+            ),
+            "known provider failure lost its CICS condition projection: {known_result:?}"
+        );
+        assert!(server.online_exchange(&known_session).unwrap().is_none());
+
+        // A crash after the Failed journal transition but before cleanup must
+        // not convert the known failure into success or feed a terminal row
+        // back through resumable execution.
+        server
+            .store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: ONLINE_EXCHANGE_NAMESPACE.into(),
+                    key: known_session.as_str().into(),
+                    version: known_exchange.version,
+                    payload: encode_online_exchange(&known_exchange).unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        server
+            .cics
+            .restore_terminal_run(
+                known_context.invocation.clone(),
+                &known_session,
+                &known_context.transaction,
+                known_context.commarea.clone(),
+                6,
+            )
+            .unwrap();
+        assert_eq!(
+            server
+                .recover_terminal_online_exchange(&known_session, &principal, &known_exchange, 6,)
+                .unwrap(),
+            Some(TerminalExchangeRecovery::Failed)
+        );
+        assert!(server.online_exchange(&known_session).unwrap().is_none());
+        let retry_invocation = server
+            .cics_invocation("IBMUSER", "KFLR", Some(known_artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .resume_terminal(retry_invocation, &known_session, "r03-known-csrf", 7)
+            .unwrap();
+        assert!(
+            matches!(
+                server.run_online_exchange(&known_session, &principal, "KNOWNFAIL", 8),
+                Err(HostProblem::Condition { response: -4, .. })
+            ),
+            "known terminal failure left a stale online exchange"
+        );
+        assert!(server.online_exchange(&known_session).unwrap().is_none());
+        drop((server, second_store));
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[tokio::test]
@@ -5045,8 +9548,9 @@ mod tests {
         assert_eq!(response.status(), StatusCode::CREATED);
         let job: Value =
             serde_json::from_slice(&to_bytes(response.into_body(), 65_536).await.unwrap()).unwrap();
-        assert_eq!(job["retcode"], "CC 0000");
-        assert_eq!(job["status"], "OUTPUT");
+        assert_eq!(job["status"], "ACTIVE");
+        let completed = wait_for_terminal_job(&server, job["jobid"].as_str().unwrap()).await;
+        assert_eq!(completed.return_code, Some(0));
 
         let abend_source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. ABENDER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 ABCODE PIC S9(9) COMP VALUE 999.\n01 TIMING PIC S9(9) COMP VALUE 0.\nPROCEDURE DIVISION.\nCALL 'CEE3ABD' USING ABCODE TIMING.\nSTOP RUN.\n";
         let path = LogicalPath::new("ABENDER.cbl", limits.max_path_bytes).unwrap();
@@ -5100,13 +9604,14 @@ mod tests {
         .await;
         let job: Value =
             serde_json::from_slice(&to_bytes(response.into_body(), 65_536).await.unwrap()).unwrap();
-        assert_eq!(job["retcode"], "ABEND U0999");
-        assert_eq!(job["status"], "OUTPUT");
+        assert_eq!(job["status"], "ACTIVE");
+        let completed = wait_for_terminal_job(&server, job["jobid"].as_str().unwrap()).await;
+        assert_eq!(completed.abend_code.as_deref(), Some("U0999"));
     }
 
     #[test]
     fn invocation_grants_are_selector_scoped_and_generation_pinned() {
-        let server = ProductServer::memory(config()).unwrap();
+        let (server, _, _) = worker_test_server(500);
         let invocation = server
             .invocation(
                 "IBMUSER",
@@ -5115,6 +9620,7 @@ mod tests {
                 &["host.dataset.read"],
             )
             .unwrap();
+        assert_eq!(invocation.deadline_tick, 500 + server.config.timeout_millis);
         assert_eq!(invocation.principal.grants().len(), 1);
         let capability =
             CapabilityId::new("host.dataset.read", InvocationLimits::default()).unwrap();
@@ -5125,6 +9631,160 @@ mod tests {
         assert!(!invocation.principal.has_grant(
             &CapabilityId::new("host.cics.execute", InvocationLimits::default()).unwrap()
         ));
+
+        let deadline = 1;
+        let context = GatewayCallContext::new(deadline).unwrap();
+        let cancellation = context.cancellation_probe();
+        let _scope = GatewayCallContextScope::enter(context);
+        let controlled = server
+            .invocation(
+                "IBMUSER",
+                "zosmf:dataset",
+                ServiceClass::System,
+                &["host.dataset.read"],
+            )
+            .unwrap();
+        assert_eq!(controlled.deadline_tick, 500 + server.config.timeout_millis);
+        assert!(!controlled.cancellation_requested());
+        cancellation.request();
+        assert!(controlled.cancellation_requested());
+    }
+
+    #[test]
+    fn direct_audit_age_uses_durable_clock_after_wall_clock_regression() {
+        let durable_tick = session_tick().unwrap().saturating_add(1_000_000);
+        let mut server_config = config();
+        server_config.retention.audit_ticks = 10;
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let platform: Arc<dyn PlatformStore> = store.clone();
+        let server = ProductServer::open_with_clock(
+            server_config,
+            platform,
+            Arc::new(ManualJesClock::new(durable_tick)),
+        )
+        .unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let _ = server.resource_decision(
+            "IBMUSER",
+            "FACILITY",
+            "RETENTION.CLOCK.TEST",
+            AccessIntent::Read,
+        );
+        let forecast = server
+            .operator_retention_forecast(RetentionTarget::Audit, 0)
+            .unwrap();
+        assert_eq!(forecast.active_records, 1);
+        assert_eq!(forecast.eligible_records, 0);
+    }
+
+    #[test]
+    fn legacy_console_sidecar_reconciles_and_reclaims_capacity() {
+        let mut server_config = config();
+        server_config.retention.lifecycle_ticks = 10;
+        server_config.retention.max_batch = 8;
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let clock = Arc::new(ManualJesClock::new(100));
+        let platform: Arc<dyn PlatformStore> = store.clone();
+        let server =
+            ProductServer::open_with_clock(server_config, platform, clock.clone()).unwrap();
+        let row = ProviderStateRecord {
+            namespace: "console-log".into(),
+            key: "0000000000000001".into(),
+            version: 1,
+            payload: b"OPER\0legacy console".to_vec(),
+        };
+        store.put_provider_state(row, None).unwrap();
+        assert!(
+            server
+                .retention_planner()
+                .unwrap()
+                .core_dependencies()
+                .unwrap()
+                .unowned
+        );
+
+        let legacy = server
+            .operator_retention_legacy_rows(RetentionTarget::ConsoleLog, 8)
+            .unwrap();
+        assert_eq!(legacy.len(), 1);
+        let receipt = server
+            .operator_reconcile_retention_age(RetentionAgeReconciliation {
+                target: RetentionTarget::ConsoleLog,
+                namespace: legacy[0].namespace.clone(),
+                key: legacy[0].key.clone(),
+                expected_version: legacy[0].source_version,
+                owner_execution: None,
+            })
+            .unwrap();
+        assert_eq!(receipt.reconciled_tick, 100);
+        assert!(
+            !server
+                .retention_planner()
+                .unwrap()
+                .core_dependencies()
+                .unwrap()
+                .unowned
+        );
+        clock.advance(9);
+        assert_eq!(
+            server
+                .operator_archive_and_prune(RetentionTarget::ConsoleLog, 8)
+                .unwrap()
+                .pruned,
+            0
+        );
+        clock.advance(1);
+        assert_eq!(
+            server
+                .operator_archive_and_prune(RetentionTarget::ConsoleLog, 8)
+                .unwrap()
+                .pruned,
+            1
+        );
+        assert!(
+            store
+                .get_provider_state("console-log", "0000000000000001")
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn core_retention_requires_a_current_provider_dependency_snapshot() {
+        let (server, store, _) = worker_test_server(100);
+        let request = RetentionRequest {
+            target: RetentionTarget::TerminalExecutions,
+            now_tick: 100,
+            max_records: 1,
+        };
+        assert_eq!(
+            store.archive_and_prune(server.config.retention.policy().unwrap(), request),
+            Err(StoreError::InvalidTransition)
+        );
+        let snapshot = server
+            .retention_planner()
+            .unwrap()
+            .core_dependencies()
+            .unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "snapshot-race".into(),
+                    key: "late-writer".into(),
+                    version: 1,
+                    payload: b"late".to_vec(),
+                },
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            store.archive_and_prune_with_dependencies(
+                server.config.retention.policy().unwrap(),
+                request,
+                &snapshot,
+            ),
+            Err(StoreError::Conflict)
+        );
     }
 
     #[test]
@@ -5140,6 +9800,7 @@ mod tests {
         let mut config = config();
         config.store_profile = crate::StoreProfile::Sqlite;
         config.sqlite_url = url.clone();
+        let token;
         {
             let store: Arc<dyn PlatformStore> =
                 Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 262144).unwrap());
@@ -5151,6 +9812,13 @@ mod tests {
             )
             .unwrap();
             server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+            let verified = server.verify("IBMUSER", b"TESTPASS").unwrap();
+            let original = server.create_session(&verified).unwrap();
+            token = server.rotate_session(&original).unwrap().1;
+            assert_eq!(
+                server.principal(Authentication::Bearer(original)),
+                Err(HostProblem::Unauthorized)
+            );
             server
                 .handle(
                     Authentication::Basic {
@@ -5188,10 +9856,7 @@ mod tests {
             .unwrap();
             let response = server
                 .handle(
-                    Authentication::Basic {
-                        user: "IBMUSER".into(),
-                        secret: b"TESTPASS".to_vec(),
-                    },
+                    Authentication::Bearer(token),
                     GatewayRequest::DatasetList {
                         pattern: "IBMUSER.**".into(),
                         start: None,

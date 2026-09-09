@@ -4,11 +4,14 @@
 
 mod canonical;
 pub use canonical::{
-    EFFECT_CANONICAL_SCHEMA, MAX_CANONICAL_EFFECT_BYTES, canonical_request_digest,
+    AUDIT_RESOURCE_DIGEST_DOMAIN, EFFECT_CANONICAL_SCHEMA, MAX_CANONICAL_EFFECT_BYTES,
+    PROVIDER_REPLAY_DIGEST_FORMAT, canonical_audit_resource_digest, canonical_db2_request_digest,
+    canonical_ims_request_digest, canonical_mq_request_digest, canonical_request_digest,
     canonical_request_size, canonical_result_digest, canonical_result_size,
 };
 
 mod dataset;
+mod enterprise;
 mod names;
 mod registry;
 mod request;
@@ -29,6 +32,7 @@ pub use dataset::{
     SmsClasses, SpaceUnit, TvsRecordOperation, TvsUnitOfWorkReceipt, TvsUnitOfWorkState,
     VolumeKind, VolumeSelection, VsamAccessMode, VsamAttributes,
 };
+pub use enterprise::{EnterpriseAuthorizer, EnterpriseResource, EnterpriseResourceClass};
 pub use names::{
     ClassName, DatasetName, HostNameProblem, JobName, MemberName, MethodName, ProgramName,
     ResourceName, RuntimeServiceName, SessionId,
@@ -53,7 +57,9 @@ pub use runtime_service::{
     RUNTIME_SERVICE_REGISTRY_CONTRACT, RuntimeServiceDescriptor, RuntimeServiceRegistry,
 };
 
+/// Stable identifier for the typed host-effect contract.
 pub const HOST_CONTRACT: &str = "mainframe-env.host@1";
+/// Stable identifier for the CICS request and response contract.
 pub const CICS_CONTRACT: &str = "mainframe-env.cics@1";
 
 pub use semantic::{

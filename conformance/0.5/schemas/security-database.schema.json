@@ -443,12 +443,13 @@
     },
     "transaction": {
       "type": "object", "additionalProperties": false,
-      "required": ["id", "idempotency_key", "actor", "operation", "request_digest", "state", "base_generation", "final_generation", "status", "terminal_result"],
+      "required": ["id", "idempotency_key", "actor", "operation", "request_digest_format", "request_digest", "state", "base_generation", "final_generation", "status", "terminal_result"],
       "properties": {
         "id": {"$ref": "#/$defs/name"},
         "idempotency_key": {"$ref": "#/$defs/name"},
         "actor": {"$ref": "#/$defs/principal_name"},
         "operation": {"$ref": "#/$defs/name"},
+        "request_digest_format": {"enum": ["legacy-unversioned@0", "mainframe-env.legacy-replay-redacted@0", "mainframe-env.racf-command@1", "mainframe-env.racroute-request@1"]},
         "request_digest": {"$ref": "#/$defs/digest"},
         "state": {"enum": ["intent", "committed", "rolled-back", "unknown-outcome"]},
         "base_generation": {"$ref": "#/$defs/version"},

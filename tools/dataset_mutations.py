@@ -21,7 +21,9 @@ import time
 from dataclasses import dataclass
 
 SOURCE = Path('crates/tooling/mainframe-env-conformance/src/dataset_reference.rs')
-CICS_SOURCE = Path('crates/providers/mainframe-env-cics/src/service.rs')
+CICS_FILE_SOURCE = Path('crates/providers/mainframe-env-cics/src/handlers/file_control.rs')
+CICS_RECOVERY_SOURCE = Path('crates/providers/mainframe-env-cics/src/handlers/recovery.rs')
+CICS_SOURCES = (CICS_FILE_SOURCE, CICS_RECOVERY_SOURCE)
 CICS_SCENARIOS = Path('crates/tooling/mainframe-env-conformance/src/cics_pilot.rs')
 COBOL_MOVE_SOURCE = Path('crates/kernel/mainframe-env-interpreter/src/machine.rs')
 COBOL_MOVE_SCENARIOS = Path('crates/tooling/mainframe-env-conformance/src/cobol_move_pilot.rs')
@@ -43,6 +45,7 @@ class Mutation:
     behavior: str
     old: str
     new: str
+    source: Path | None = None
 
 
 MUTATIONS = (
@@ -71,24 +74,27 @@ CICS_MUTATIONS = (
     Mutation(
         'cics-omit-rewrite',
         'Report a successful product REWRITE without invoking the dataset transition',
-        'let result = self\n            .nested(run, HostRequest::Dataset(host_request))',
+        'let result = service\n        .nested(run, HostRequest::Dataset(host_request))',
         'let result = if operation == CicsOperation::Rewrite {\n'
-        '            Ok(HostResult::Dataset(DatasetResult::Mutated { version: 1 }))\n'
-        '        } else {\n'
-        '            self.nested(run, HostRequest::Dataset(host_request))\n'
-        '        }',
+        '        Ok(HostResult::Dataset(DatasetResult::Mutated { version: 1 }))\n'
+        '    } else {\n'
+        '        service.nested(run, HostRequest::Dataset(host_request))\n'
+        '    }',
+        CICS_FILE_SOURCE,
     ),
     Mutation(
         'cics-rollback-noop',
         'Turn product rollback into a durable-undo discard',
-        'if outcome == CicsUnitOfWorkOutcome::RolledBack {\n            self.rollback_run(run)?;',
-        'if outcome == CicsUnitOfWorkOutcome::RolledBack {\n            self.clear_undo(run)?;',
+        'if outcome == CicsUnitOfWorkOutcome::RolledBack {\n        rollback_run(service, run)?;',
+        'if outcome == CicsUnitOfWorkOutcome::RolledBack {\n        service.clear_undo(run)?;',
+        CICS_RECOVERY_SOURCE,
     ),
     Mutation(
         'cics-bypass-read-update',
         'Allow a plain READ identity to establish REWRITE context',
-        'if request.arguments.contains_key("OPTION.UPDATE")\n                    && let Some(identity) = identities.first()',
+        'if request.arguments.contains_key("OPTION.UPDATE")\n                && let Some(identity) = identities.first()',
         'if let Some(identity) = identities.first()',
+        CICS_FILE_SOURCE,
     ),
 )
 
@@ -135,10 +141,10 @@ def digest(data: bytes) -> str:
 
 def apply_mutation(source: str, mutation: Mutation) -> str:
     implementation, marker, tests = source.partition('#[cfg(test)]')
-    if not marker or implementation.count(mutation.old) != 1 or mutation.old == mutation.new:
+    if implementation.count(mutation.old) != 1 or mutation.old == mutation.new:
         raise ValueError('mutation anchor must match exactly once in implementation, not tests')
     changed = implementation.replace(mutation.old, mutation.new, 1) + marker + tests
-    if changed.partition(marker)[2] != tests:
+    if marker and changed.partition(marker)[2] != tests:
         raise ValueError('mutation changed ordinary test code')
     return changed
 
@@ -192,9 +198,12 @@ def campaign(root: Path, output: Path, timeout: int) -> int:
     if len(archive) > 128 * 1024 * 1024:
         raise ValueError('source archive exceeds the bounded campaign limit')
     original = subprocess.check_output(['git', 'show', f'{candidate}:{SOURCE.as_posix()}'], cwd=root).decode()
-    cics_original = subprocess.check_output(
-        ['git', 'show', f'{candidate}:{CICS_SOURCE.as_posix()}'], cwd=root
-    ).decode()
+    cics_original = {
+        source: subprocess.check_output(
+            ['git', 'show', f'{candidate}:{source.as_posix()}'], cwd=root
+        ).decode()
+        for source in CICS_SOURCES
+    }
     cics_scenarios = subprocess.check_output(
         ['git', 'show', f'{candidate}:{CICS_SCENARIOS.as_posix()}'], cwd=root
     )
@@ -220,8 +229,11 @@ def campaign(root: Path, output: Path, timeout: int) -> int:
                    'scope': 'CICS file/UOW product code traversed by the unchanged normal pilot',
                    'product_mutation_credit': 1,
                    'licensed_differential_credit': 0,
-                   'source': CICS_SOURCE.as_posix(),
-                   'original_source_digest': digest(cics_original.encode()),
+                   'sources': [source.as_posix() for source in CICS_SOURCES],
+                   'original_source_digests': {
+                       source.as_posix(): digest(value.encode())
+                       for source, value in cics_original.items()
+                   },
                    'unchanged_scenarios': CICS_SCENARIOS.as_posix(),
                    'unchanged_scenarios_digest': digest(cics_scenarios),
                    'command': CICS_COMMAND,
@@ -286,12 +298,16 @@ def campaign(root: Path, output: Path, timeout: int) -> int:
         if product['baseline']['classification'] != 'survived':
             raise ValueError('unchanged CICS pilot did not pass; no product mutant receives credit')
         for mutation in CICS_MUTATIONS:
+            source = mutation.source
+            if source is None:
+                raise ValueError(f'CICS mutation {mutation.identity} has no source module')
+            original_source = cics_original[source]
             entry = {'id': mutation.identity, 'behavior': mutation.behavior,
-                     'old': mutation.old, 'new': mutation.new}
+                     'source': source.as_posix(), 'old': mutation.old, 'new': mutation.new}
             product['mutants'].append(entry)
             try:
-                changed = apply_mutation(cics_original, mutation)
-                (snapshot / CICS_SOURCE).write_text(changed)
+                changed = apply_mutation(original_source, mutation)
+                (snapshot / source).write_text(changed)
                 entry['mutated_source_digest'] = digest(changed.encode())
                 entry.update(execute(
                     snapshot, output / (mutation.identity + '.log'), timeout,
@@ -300,7 +316,7 @@ def campaign(root: Path, output: Path, timeout: int) -> int:
             except (ValueError, OSError) as error:
                 entry.update(classification='invalid', error=str(error), killing_tests=[])
             finally:
-                (snapshot / CICS_SOURCE).write_text(cics_original)
+                (snapshot / source).write_text(original_source)
                 save()
             print(f"{mutation.identity}: {entry['classification']}", flush=True)
         cobol = receipt['cobol_runtime']

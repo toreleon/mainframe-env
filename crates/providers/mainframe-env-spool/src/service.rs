@@ -11,8 +11,8 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-pub const SPOOL_STATE_CONTRACT: &str = "mainframe-env.spool-state@1";
-const STATE_NAMESPACE: &str = "jes-spool";
+use crate::retention::{JobState, Replay, SPOOL_STATE_CONTRACT, STATE_NAMESPACE, decode_job_state};
+
 const ARTIFACT_NAMESPACE: &str = "spool-artifact";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -49,42 +49,6 @@ struct Chunk {
     records: Vec<Vec<u8>>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-struct FileState {
-    artifacts: Vec<String>,
-    record_count: u64,
-    byte_count: u64,
-    sealed: bool,
-    version: u64,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-struct Replay {
-    request_digest: String,
-    result: SpoolResult,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-struct JobState {
-    schema_version: String,
-    files: BTreeMap<String, FileState>,
-    replay: BTreeMap<String, Replay>,
-    purge_pending: bool,
-    purged: bool,
-}
-
-impl Default for JobState {
-    fn default() -> Self {
-        Self {
-            schema_version: SPOOL_STATE_CONTRACT.into(),
-            files: BTreeMap::new(),
-            replay: BTreeMap::new(),
-            purge_pending: false,
-            purged: false,
-        }
-    }
-}
-
 struct DurableJob {
     version: u64,
     state: JobState,
@@ -95,6 +59,13 @@ pub struct SpoolService {
     artifacts: Arc<dyn ArtifactStore>,
     limits: SpoolLimits,
     jobs: Mutex<BTreeMap<String, DurableJob>>,
+    retention_clock: Option<Arc<dyn SpoolRetentionClock>>,
+}
+
+/// Trusted durable logical-time source sampled after physical purge.
+pub trait SpoolRetentionClock: Send + Sync {
+    /// Observe the current nonzero durable logical tick.
+    fn now_tick(&self) -> Result<u64, HostProblem>;
 }
 
 impl SpoolService {
@@ -103,43 +74,82 @@ impl SpoolService {
         artifacts: Arc<dyn ArtifactStore>,
         limits: SpoolLimits,
     ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_inner(store, artifacts, limits, None)
+    }
+
+    /// Open with the durable clock used to age physically purged jobs.
+    pub fn open_with_retention_clock(
+        store: Arc<dyn ProviderStateStore>,
+        artifacts: Arc<dyn ArtifactStore>,
+        limits: SpoolLimits,
+        retention_clock: Arc<dyn SpoolRetentionClock>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_inner(store, artifacts, limits, Some(retention_clock))
+    }
+
+    fn open_inner(
+        store: Arc<dyn ProviderStateStore>,
+        artifacts: Arc<dyn ArtifactStore>,
+        limits: SpoolLimits,
+        retention_clock: Option<Arc<dyn SpoolRetentionClock>>,
+    ) -> Result<Arc<Self>, HostProblem> {
         validate_limits(limits)?;
-        let mut jobs = BTreeMap::new();
-        for record in store
-            .list_provider_state(STATE_NAMESPACE, limits.max_jobs)
-            .map_err(store_problem)?
-        {
-            let state: JobState = serde_json::from_slice(&record.payload)
-                .map_err(|_| HostProblem::InfrastructureFailure)?;
-            validate_state(&state, limits)?;
-            validate_artifacts(&*artifacts, &record.key, &state, limits)?;
-            if jobs
-                .insert(
-                    record.key,
-                    DurableJob {
-                        version: record.version,
-                        state,
-                    },
-                )
-                .is_some()
-            {
-                return Err(HostProblem::InfrastructureFailure);
-            }
-        }
+        let jobs = load_jobs(&*store, &*artifacts, limits)?;
         Ok(Arc::new(Self {
             store,
             artifacts,
             limits,
             jobs: Mutex::new(jobs),
+            retention_clock,
         }))
     }
 
     pub fn invoke(&self, request: SpoolRequest) -> Result<SpoolResult, HostProblem> {
+        self.invoke_observed(request, None, None)
+    }
+
+    /// Invoke a spool request with a trusted, nonzero logical observation tick.
+    ///
+    /// The tick is recorded only when physical purge completes. Callers which
+    /// cannot supply the product's durable clock should use [`Self::invoke`];
+    /// those terminal rows remain protected from age-based retention.
+    #[cfg(test)]
+    fn invoke_at(
+        &self,
+        request: SpoolRequest,
+        observed_tick: u64,
+    ) -> Result<SpoolResult, HostProblem> {
+        if observed_tick == 0 {
+            return Err(HostProblem::Malformed);
+        }
+        self.invoke_observed(request, Some(observed_tick), Some(observed_tick))
+    }
+
+    fn invoke_with_boundary(
+        &self,
+        request: SpoolRequest,
+        purge_boundary_tick: u64,
+    ) -> Result<SpoolResult, HostProblem> {
+        if purge_boundary_tick == 0 {
+            return Err(HostProblem::Malformed);
+        }
+        self.invoke_observed(request, Some(purge_boundary_tick), None)
+    }
+
+    fn invoke_observed(
+        &self,
+        request: SpoolRequest,
+        purge_boundary_tick: Option<u64>,
+        test_observed_tick: Option<u64>,
+    ) -> Result<SpoolResult, HostProblem> {
         HostRequest::Spool(request.clone()).validate(mainframe_env_host_api::HostLimits {
             max_record_bytes: self.limits.max_record_bytes,
             max_records: self.limits.max_records_per_file,
             ..Default::default()
         })?;
+        // Provider rows can be pruned by another process. Never consult the
+        // in-memory index until it reflects the current durable authority.
+        self.refresh_after_external_retention()?;
         match request {
             SpoolRequest::Append {
                 job,
@@ -159,8 +169,24 @@ impl SpoolService {
                 file,
                 mutation,
             } => self.seal(job.as_str(), &file, mutation),
-            SpoolRequest::Purge { job, mutation } => self.purge(job.as_str(), mutation),
+            SpoolRequest::Purge { job, mutation } => self.purge(
+                job.as_str(),
+                mutation,
+                purge_boundary_tick,
+                test_observed_tick,
+            ),
         }
+    }
+
+    /// Reload the durable job index after externally coordinated retention.
+    ///
+    /// The replacement is all-or-nothing: corrupt or incomplete durable rows
+    /// leave the live cache untouched and fail closed.
+    pub fn refresh_after_external_retention(&self) -> Result<(), HostProblem> {
+        let mut jobs = self.lock()?;
+        let next = load_jobs(&*self.store, &*self.artifacts, self.limits)?;
+        *jobs = next;
+        Ok(())
     }
 
     fn append(
@@ -193,6 +219,7 @@ impl SpoolService {
         }
         let current = jobs.get(job);
         let mut next = current.map(|job| job.state.clone()).unwrap_or_default();
+        next.schema_version = SPOOL_STATE_CONTRACT.into();
         if next.purged || next.purge_pending || next.replay.len() >= self.limits.max_replays_per_job
         {
             return Err(HostProblem::Condition {
@@ -377,6 +404,7 @@ impl SpoolService {
             return replay_result(replay, &request_digest);
         }
         let mut next = durable.state.clone();
+        next.schema_version = SPOOL_STATE_CONTRACT.into();
         if next.replay.len() >= self.limits.max_replays_per_job {
             return Err(HostProblem::ResourceExhausted);
         }
@@ -410,6 +438,8 @@ impl SpoolService {
         &self,
         job: &str,
         mutation: mainframe_env_host_api::Mutation,
+        purge_boundary_tick: Option<u64>,
+        test_observed_tick: Option<u64>,
     ) -> Result<SpoolResult, HostProblem> {
         let request_digest = format!("purge:{job}");
         let mut jobs = self.lock()?;
@@ -418,7 +448,13 @@ impl SpoolService {
             return replay_result(replay, &request_digest);
         }
         let mut next = durable.state.clone();
+        next.schema_version = SPOOL_STATE_CONTRACT.into();
         next.purge_pending = true;
+        if let Some(tick) = purge_boundary_tick {
+            next.purge_boundary_tick =
+                Some(next.purge_boundary_tick.map_or(tick, |old| old.max(tick)));
+        }
+        next.purged_tick = None;
         let intent_version = durable.version.saturating_add(1);
         persist_job(
             &*self.store,
@@ -452,9 +488,36 @@ impl SpoolService {
                 });
             }
         }
+        let pending_state = next.clone();
         next.files.clear();
         next.purge_pending = false;
         next.purged = true;
+        let observed_tick = match test_observed_tick {
+            Some(tick) => Some(tick),
+            None => match &self.retention_clock {
+                Some(clock) => match clock.now_tick() {
+                    Ok(tick) if tick != 0 => Some(tick),
+                    _ => {
+                        jobs.insert(
+                            job.into(),
+                            DurableJob {
+                                version: intent_version,
+                                state: pending_state,
+                            },
+                        );
+                        return Err(HostProblem::UnknownOutcome);
+                    }
+                },
+                None => None,
+            },
+        };
+        if let Some(tick) = observed_tick {
+            let tick = next
+                .purge_boundary_tick
+                .map_or(tick, |boundary| boundary.max(tick));
+            next.purge_boundary_tick = Some(tick);
+            next.purged_tick = Some(tick);
+        }
         let result = SpoolResult::Mutated {
             version: intent_version.saturating_add(1),
             replayed: false,
@@ -467,7 +530,8 @@ impl SpoolService {
             },
         );
         let version = intent_version.saturating_add(1);
-        persist_job(&*self.store, job, version, Some(intent_version), &next)?;
+        persist_job(&*self.store, job, version, Some(intent_version), &next)
+            .map_err(|_| HostProblem::UnknownOutcome)?;
         jobs.insert(
             job.into(),
             DurableJob {
@@ -614,9 +678,15 @@ impl HostProvider for SpoolProvider {
         &self.descriptor
     }
 
-    fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
+    fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
+        // Product invocations derive both deadlines from the durable logical
+        // clock. The later boundary is conservative for age-based deletion.
+        let observed_tick = invocation.deadline_tick.max(effect.deadline_tick);
         let outcome = match effect.request {
-            HostRequest::Spool(request) => self.service.invoke(request).map(HostResult::Spool),
+            HostRequest::Spool(request) => self
+                .service
+                .invoke_with_boundary(request, observed_tick)
+                .map(HostResult::Spool),
             _ => Err(HostProblem::Malformed),
         };
         EffectResult {
@@ -641,34 +711,33 @@ fn validate_limits(limits: SpoolLimits) -> Result<(), HostProblem> {
     }
 }
 
-fn validate_state(state: &JobState, limits: SpoolLimits) -> Result<(), HostProblem> {
-    if state.schema_version != SPOOL_STATE_CONTRACT
-        || state.files.len() > limits.max_files_per_job
-        || state.replay.len() > limits.max_replays_per_job
-        || state.purge_pending && state.purged
+fn load_jobs(
+    store: &dyn ProviderStateStore,
+    artifacts: &dyn ArtifactStore,
+    limits: SpoolLimits,
+) -> Result<BTreeMap<String, DurableJob>, HostProblem> {
+    let mut jobs = BTreeMap::new();
+    for record in store
+        .list_provider_state(STATE_NAMESPACE, limits.max_jobs)
+        .map_err(store_problem)?
     {
-        return Err(HostProblem::InfrastructureFailure);
-    }
-    let mut total_bytes = 0u64;
-    for (name, file) in &state.files {
-        validate_identity("JOB00000", name)?;
-        if file.version == 0
-            || file.artifacts.len() > limits.max_artifacts_per_file
-            || usize::try_from(file.record_count)
-                .map_or(true, |count| count > limits.max_records_per_file)
-            || usize::try_from(file.byte_count)
-                .map_or(true, |bytes| bytes > limits.max_bytes_per_job)
+        let (state, _) =
+            decode_job_state(&record, limits).map_err(|_| HostProblem::InfrastructureFailure)?;
+        validate_artifacts(artifacts, &record.key, &state, limits)?;
+        if jobs
+            .insert(
+                record.key,
+                DurableJob {
+                    version: record.version,
+                    state,
+                },
+            )
+            .is_some()
         {
             return Err(HostProblem::InfrastructureFailure);
         }
-        total_bytes = total_bytes
-            .checked_add(file.byte_count)
-            .ok_or(HostProblem::InfrastructureFailure)?;
     }
-    if usize::try_from(total_bytes).map_or(true, |bytes| bytes > limits.max_bytes_per_job) {
-        return Err(HostProblem::InfrastructureFailure);
-    }
-    Ok(())
+    Ok(jobs)
 }
 
 fn validate_artifacts(
@@ -823,8 +892,78 @@ mod tests {
     use super::*;
     use mainframe_env_execution_api::{IdempotencyKey, InvocationLimits};
     use mainframe_env_host_api::{JobName, Mutation};
-    use mainframe_env_store::MemoryStore;
-    use std::sync::atomic::{AtomicBool, Ordering};
+    use mainframe_env_store::{MemoryStore, SqliteStateStore};
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+
+    static NEXT_TEST_ROOT: AtomicU64 = AtomicU64::new(1);
+
+    struct TestSpoolClock {
+        tick: AtomicU64,
+        fail_next: AtomicBool,
+    }
+
+    impl SpoolRetentionClock for TestSpoolClock {
+        fn now_tick(&self) -> Result<u64, HostProblem> {
+            if self.fail_next.swap(false, Ordering::SeqCst) {
+                Err(HostProblem::InfrastructureFailure)
+            } else {
+                Ok(self.tick.load(Ordering::SeqCst))
+            }
+        }
+    }
+
+    struct RacingSpoolClock {
+        store: Arc<MemoryStore>,
+        job: String,
+        race_next: AtomicBool,
+        tick: u64,
+    }
+
+    impl SpoolRetentionClock for RacingSpoolClock {
+        fn now_tick(&self) -> Result<u64, HostProblem> {
+            if self.race_next.swap(false, Ordering::SeqCst) {
+                let mut row = self
+                    .store
+                    .get_provider_state(STATE_NAMESPACE, &self.job)
+                    .map_err(store_problem)?
+                    .ok_or(HostProblem::InfrastructureFailure)?;
+                let expected = row.version;
+                row.version = row
+                    .version
+                    .checked_add(1)
+                    .ok_or(HostProblem::ResourceExhausted)?;
+                self.store
+                    .put_provider_state(row, Some(expected))
+                    .map_err(store_problem)?;
+            }
+            Ok(self.tick)
+        }
+    }
+
+    struct TestRoot(PathBuf);
+
+    impl TestRoot {
+        fn new() -> Self {
+            let path = std::env::temp_dir().join(format!(
+                "mainframe-spool-retention-{}-{}",
+                std::process::id(),
+                NEXT_TEST_ROOT.fetch_add(1, Ordering::Relaxed)
+            ));
+            std::fs::create_dir_all(&path).unwrap();
+            Self(path)
+        }
+
+        fn sqlite_url(&self) -> String {
+            format!("sqlite://{}?mode=rwc", self.0.join("state.db").display())
+        }
+    }
+
+    impl Drop for TestRoot {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
 
     struct FailDeleteOnceArtifactStore {
         inner: Arc<ProviderArtifactStore>,
@@ -846,6 +985,36 @@ mod tests {
             } else {
                 self.inner.delete_artifact(id)
             }
+        }
+    }
+
+    struct RaceStateOnPutArtifactStore {
+        inner: Arc<ProviderArtifactStore>,
+        state: Arc<MemoryStore>,
+        job: String,
+        race: AtomicBool,
+    }
+
+    impl ArtifactStore for RaceStateOnPutArtifactStore {
+        fn put_artifact(&self, record: ArtifactRecord) -> Result<(), StoreError> {
+            if self.race.swap(false, Ordering::SeqCst) {
+                let mut durable = self
+                    .state
+                    .get_provider_state(STATE_NAMESPACE, &self.job)?
+                    .ok_or(StoreError::NotFound)?;
+                let expected = durable.version;
+                durable.version = durable.version.checked_add(1).ok_or(StoreError::Conflict)?;
+                self.state.put_provider_state(durable, Some(expected))?;
+            }
+            self.inner.put_artifact(record)
+        }
+
+        fn get_artifact(&self, id: &ArtifactRef) -> Result<Option<ArtifactRecord>, StoreError> {
+            self.inner.get_artifact(id)
+        }
+
+        fn delete_artifact(&self, id: &ArtifactRef) -> Result<(), StoreError> {
+            self.inner.delete_artifact(id)
         }
     }
 
@@ -975,8 +1144,18 @@ mod tests {
     #[test]
     fn failed_append_persist_never_deletes_an_existing_content_addressed_chunk() {
         let store = Arc::new(MemoryStore::new(Default::default()));
-        let (spool, _) = service(store.clone());
         let job = JobName::new("JOB00004", 128).unwrap();
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let artifacts =
+            ProviderArtifactStore::new(provider_store.clone(), 4 * 1024 * 1024).unwrap();
+        let racing = Arc::new(RaceStateOnPutArtifactStore {
+            inner: artifacts,
+            state: store.clone(),
+            job: job.as_str().into(),
+            race: AtomicBool::new(false),
+        });
+        let spool =
+            SpoolService::open(provider_store, racing.clone(), SpoolLimits::default()).unwrap();
         spool
             .invoke(SpoolRequest::Append {
                 job: job.clone(),
@@ -986,15 +1165,10 @@ mod tests {
             })
             .unwrap();
 
-        // Force the service's next state write to lose its optimistic race.
-        // The second append deliberately addresses the same chunk as the
-        // committed first append (same job, file, sequence, and records).
-        let mut durable = store
-            .get_provider_state(STATE_NAMESPACE, job.as_str())
-            .unwrap()
-            .unwrap();
-        durable.version += 1;
-        store.put_provider_state(durable, Some(1)).unwrap();
+        // Race after the invocation's durable refresh, so the next state CAS
+        // still loses without making the content-addressed chunk disposable.
+        // The second append deliberately addresses the same committed chunk.
+        racing.race.store(true, Ordering::SeqCst);
         assert_eq!(
             spool.invoke(SpoolRequest::Append {
                 job: job.clone(),
@@ -1075,6 +1249,346 @@ mod tests {
                 .list_provider_state(ARTIFACT_NAMESPACE, 8)
                 .unwrap()
                 .is_empty()
+        );
+    }
+
+    #[test]
+    fn two_live_services_observe_external_retention_and_reuse_capacity() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let artifacts = ProviderArtifactStore::new(provider_store.clone(), 1024 * 1024).unwrap();
+        let limits = SpoolLimits {
+            max_jobs: 1,
+            ..Default::default()
+        };
+        let first = SpoolService::open(provider_store.clone(), artifacts.clone(), limits).unwrap();
+        let second = SpoolService::open(provider_store.clone(), artifacts.clone(), limits).unwrap();
+        let job = JobName::new("JOB00005", 128).unwrap();
+        let append = SpoolRequest::Append {
+            job: job.clone(),
+            file: "SYSOUT".into(),
+            records: vec![b"ONE".to_vec()],
+            mutation: mutation(1, "append-before-retention"),
+        };
+        assert!(matches!(
+            first.invoke(append.clone()),
+            Ok(SpoolResult::Mutated {
+                replayed: false,
+                ..
+            })
+        ));
+        assert!(matches!(
+            second.invoke(append.clone()),
+            Ok(SpoolResult::Mutated { replayed: true, .. })
+        ));
+        first
+            .invoke_at(
+                SpoolRequest::Purge {
+                    job: job.clone(),
+                    mutation: mutation(2, "purge-before-retention"),
+                },
+                100,
+            )
+            .unwrap();
+        let terminal = store
+            .get_provider_state(STATE_NAMESPACE, job.as_str())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            crate::describe_spool_retention_row(&terminal, limits)
+                .unwrap()
+                .terminal_tick,
+            Some(100)
+        );
+        store
+            .delete_provider_state(STATE_NAMESPACE, job.as_str(), terminal.version)
+            .unwrap();
+
+        // The second process was open before deletion. Its ordinary next call
+        // must not serve the expired replay from its old in-memory cache.
+        assert!(matches!(
+            second.invoke(append),
+            Ok(SpoolResult::Mutated {
+                replayed: false,
+                ..
+            })
+        ));
+        second
+            .invoke_at(
+                SpoolRequest::Purge {
+                    job: job.clone(),
+                    mutation: mutation(3, "purge-recreated"),
+                },
+                200,
+            )
+            .unwrap();
+        let recreated = store
+            .get_provider_state(STATE_NAMESPACE, job.as_str())
+            .unwrap()
+            .unwrap();
+        store
+            .delete_provider_state(STATE_NAMESPACE, job.as_str(), recreated.version)
+            .unwrap();
+
+        drop(first);
+        drop(second);
+        let restarted = SpoolService::open(provider_store, artifacts, limits).unwrap();
+        let next = JobName::new("JOB00006", 128).unwrap();
+        assert!(matches!(
+            restarted.invoke(SpoolRequest::Append {
+                job: next,
+                file: "SYSOUT".into(),
+                records: vec![b"TWO".to_vec()],
+                mutation: mutation(1, "capacity-reused"),
+            }),
+            Ok(SpoolResult::Mutated {
+                replayed: false,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn late_purge_recovery_advances_the_observation_boundary() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let artifacts = ProviderArtifactStore::new(provider_store.clone(), 1024 * 1024).unwrap();
+        let failing = Arc::new(FailDeleteOnceArtifactStore {
+            inner: artifacts,
+            fail: AtomicBool::new(true),
+        });
+        let spool = SpoolService::open(provider_store, failing, SpoolLimits::default()).unwrap();
+        let job = JobName::new("JOB00007", 128).unwrap();
+        spool
+            .invoke(SpoolRequest::Append {
+                job: job.clone(),
+                file: "SYSOUT".into(),
+                records: vec![b"ONE".to_vec()],
+                mutation: mutation(1, "append-before-late-purge"),
+            })
+            .unwrap();
+        assert!(matches!(
+            spool.invoke_at(
+                SpoolRequest::Purge {
+                    job: job.clone(),
+                    mutation: mutation(2, "late-purge"),
+                },
+                100,
+            ),
+            Ok(SpoolResult::PurgePending { .. })
+        ));
+        spool
+            .invoke_at(
+                SpoolRequest::Purge {
+                    job: job.clone(),
+                    mutation: mutation(2, "late-purge"),
+                },
+                250,
+            )
+            .unwrap();
+        let row = store
+            .get_provider_state(STATE_NAMESPACE, job.as_str())
+            .unwrap()
+            .unwrap();
+        let descriptor = crate::describe_spool_retention_row(&row, SpoolLimits::default()).unwrap();
+        assert_eq!(descriptor.purge_boundary_tick, Some(250));
+        assert_eq!(descriptor.terminal_tick, Some(250));
+    }
+
+    #[test]
+    fn sqlite_restart_preserves_terminal_age_and_reuses_pruned_job_capacity() {
+        let root = TestRoot::new();
+        let url = root.sqlite_url();
+        let limits = SpoolLimits {
+            max_jobs: 1,
+            ..Default::default()
+        };
+        let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 128).unwrap());
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let artifacts = ProviderArtifactStore::new(provider_store.clone(), 1024 * 1024).unwrap();
+        let spool = SpoolService::open(provider_store, artifacts, limits).unwrap();
+        let first = JobName::new("JOB00008", 128).unwrap();
+        spool
+            .invoke(SpoolRequest::Append {
+                job: first.clone(),
+                file: "SYSOUT".into(),
+                records: vec![b"ONE".to_vec()],
+                mutation: mutation(1, "sqlite-append"),
+            })
+            .unwrap();
+        spool
+            .invoke_at(
+                SpoolRequest::Purge {
+                    job: first.clone(),
+                    mutation: mutation(2, "sqlite-purge"),
+                },
+                700,
+            )
+            .unwrap();
+        drop(spool);
+        drop(store);
+
+        let reopened = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 128).unwrap());
+        let provider_store: Arc<dyn ProviderStateStore> = reopened.clone();
+        let artifacts = ProviderArtifactStore::new(provider_store.clone(), 1024 * 1024).unwrap();
+        let spool = SpoolService::open(provider_store, artifacts, limits).unwrap();
+        let terminal = reopened
+            .get_provider_state(STATE_NAMESPACE, first.as_str())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            crate::describe_spool_retention_row(&terminal, limits)
+                .unwrap()
+                .terminal_tick,
+            Some(700)
+        );
+        assert_eq!(
+            spool.invoke(SpoolRequest::Append {
+                job: JobName::new("JOB00009", 128).unwrap(),
+                file: "SYSOUT".into(),
+                records: vec![b"BLOCKED".to_vec()],
+                mutation: mutation(1, "before-prune"),
+            }),
+            Err(HostProblem::ResourceExhausted)
+        );
+        reopened
+            .delete_provider_state(STATE_NAMESPACE, first.as_str(), terminal.version)
+            .unwrap();
+        assert!(matches!(
+            spool.invoke(SpoolRequest::Append {
+                job: JobName::new("JOB00009", 128).unwrap(),
+                file: "SYSOUT".into(),
+                records: vec![b"REUSED".to_vec()],
+                mutation: mutation(1, "after-prune"),
+            }),
+            Ok(SpoolResult::Mutated {
+                replayed: false,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn clock_failure_after_physical_purge_leaves_pending_and_retry_resolves_once() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let artifacts = ProviderArtifactStore::new(provider_store.clone(), 1024 * 1024).unwrap();
+        let clock = Arc::new(TestSpoolClock {
+            tick: AtomicU64::new(250),
+            fail_next: AtomicBool::new(true),
+        });
+        let spool = SpoolService::open_with_retention_clock(
+            provider_store,
+            artifacts,
+            SpoolLimits::default(),
+            clock.clone(),
+        )
+        .unwrap();
+        let job = JobName::new("JOBCLOCK", 128).unwrap();
+        spool
+            .invoke(SpoolRequest::Append {
+                job: job.clone(),
+                file: "SYSOUT".into(),
+                records: vec![b"CLOCK".to_vec()],
+                mutation: mutation(1, "clock-append"),
+            })
+            .unwrap();
+        let purge = SpoolRequest::Purge {
+            job: job.clone(),
+            mutation: mutation(2, "clock-purge"),
+        };
+        assert_eq!(
+            spool.invoke(purge.clone()),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let pending = store
+            .get_provider_state(STATE_NAMESPACE, job.as_str())
+            .unwrap()
+            .unwrap();
+        let pending =
+            crate::describe_spool_retention_row(&pending, SpoolLimits::default()).unwrap();
+        assert_eq!(pending.retention, crate::SpoolRetentionState::PurgeRecovery);
+        spool.invoke(purge.clone()).unwrap();
+        let terminal = store
+            .get_provider_state(STATE_NAMESPACE, job.as_str())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            crate::describe_spool_retention_row(&terminal, SpoolLimits::default())
+                .unwrap()
+                .terminal_tick,
+            Some(250)
+        );
+        clock.tick.store(900, Ordering::SeqCst);
+        spool.invoke(purge).unwrap();
+        assert_eq!(
+            store
+                .get_provider_state(STATE_NAMESPACE, job.as_str())
+                .unwrap()
+                .unwrap(),
+            terminal
+        );
+    }
+
+    #[test]
+    fn terminal_state_cas_failure_is_unknown_and_pending_retry_recovers() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let artifacts = ProviderArtifactStore::new(provider_store.clone(), 1024 * 1024).unwrap();
+        let job = JobName::new("JOBCAS", 128).unwrap();
+        let clock = Arc::new(RacingSpoolClock {
+            store: store.clone(),
+            job: job.as_str().into(),
+            race_next: AtomicBool::new(true),
+            tick: 300,
+        });
+        let spool = SpoolService::open_with_retention_clock(
+            provider_store,
+            artifacts,
+            SpoolLimits::default(),
+            clock,
+        )
+        .unwrap();
+        spool
+            .invoke(SpoolRequest::Append {
+                job: job.clone(),
+                file: "SYSOUT".into(),
+                records: vec![b"CAS".to_vec()],
+                mutation: mutation(1, "cas-append"),
+            })
+            .unwrap();
+        let purge = SpoolRequest::Purge {
+            job: job.clone(),
+            mutation: mutation(2, "cas-purge"),
+        };
+        assert_eq!(
+            spool.invoke(purge.clone()),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(
+            crate::describe_spool_retention_row(
+                &store
+                    .get_provider_state(STATE_NAMESPACE, job.as_str())
+                    .unwrap()
+                    .unwrap(),
+                SpoolLimits::default(),
+            )
+            .unwrap()
+            .retention,
+            crate::SpoolRetentionState::PurgeRecovery
+        );
+        spool.invoke(purge).unwrap();
+        assert_eq!(
+            crate::describe_spool_retention_row(
+                &store
+                    .get_provider_state(STATE_NAMESPACE, job.as_str())
+                    .unwrap()
+                    .unwrap(),
+                SpoolLimits::default(),
+            )
+            .unwrap()
+            .terminal_tick,
+            Some(300)
         );
     }
 }

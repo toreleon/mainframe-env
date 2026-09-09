@@ -4,7 +4,7 @@ use super::*;
 use mainframe_env_batch::DdPlan;
 use mainframe_env_execution_api::{CapabilityId, PrincipalId, ResourceLimits, ServiceClass};
 use mainframe_env_host_api::{HostLimits, ProgramName, RegistrySnapshot};
-use mainframe_env_store::{MemoryStore, SqliteStateStore, StoreLimits};
+use mainframe_env_store::{LocalArtifactStore, MemoryStore, SqliteStateStore, StoreLimits};
 use mainframe_env_store_api::{ArtifactRecord, EffectState};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -215,8 +215,9 @@ impl Fixture {
             ),
             HostLimits::default(),
         ));
+        let artifacts = Arc::new(LocalArtifactStore::open(&root.0, 64 * 1024 * 1024).unwrap());
         router
-            .bind_runtime(host.clone(), store.clone(), &root.0)
+            .bind_runtime(host.clone(), store.clone(), artifacts)
             .unwrap();
         Self {
             store,
@@ -300,7 +301,11 @@ impl Fixture {
                     }),
                 },
             )
-            .effect
+            .persist_with(|audit| {
+                self.store
+                    .record_audit(audit)
+                    .map_err(|_| HostProblem::InfrastructureFailure)
+            })
     }
 
     fn batch(&self, program: &str, source: &str) -> EffectResult {
@@ -583,6 +588,7 @@ fn queued_control_work(inv: &Invocation, id: &str) -> mainframe_env_store_api::W
         required_generation: "test-control@1".into(),
         artifact: inv.artifact.clone(),
         state: mainframe_env_store_api::WorkState::Queued,
+        priority: 0,
         attempt: 0,
         max_attempts: 3,
         available_tick: 0,
@@ -590,8 +596,10 @@ fn queued_control_work(inv: &Invocation, id: &str) -> mainframe_env_store_api::W
         cancellation_requested: false,
         worker_id: None,
         lease_id: None,
+        lease_epoch: 0,
         lease_expiry_tick: None,
         heartbeat_tick: None,
+        terminal_tick: None,
         checkpoint_id: None,
         effect_sequence: 0,
         payload: vec![],

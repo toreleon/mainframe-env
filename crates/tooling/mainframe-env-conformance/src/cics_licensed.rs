@@ -8,6 +8,8 @@ use std::collections::{BTreeMap, BTreeSet};
 const MAX_CAPTURE_BYTES: usize = 1024 * 1024;
 const CAPTURE_CONTRACT: &str = "mainframe-env.cics-oracle-capture@1";
 const TRUSTED_AUTHORITY: &str = "ibm-cics-protected-runner";
+const CAPTURE_SCHEMA: &str =
+    include_str!("../../../../conformance/0.9/schemas/cics-oracle-capture.schema.json");
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -18,9 +20,18 @@ pub struct CicsOracleObservation {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CicsOracleOriginKind {
+    LicensedIbm,
+    Local,
+    Model,
+    Synthetic,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct CicsOracleOrigin {
-    pub kind: String,
+    pub kind: CicsOracleOriginKind,
     pub authority: String,
     pub run_job_id: String,
     pub signature: Option<String>,
@@ -80,8 +91,7 @@ pub fn import_cics_oracle_capture(
     if bytes.is_empty() || bytes.len() > MAX_CAPTURE_BYTES {
         return Err("CICS oracle capture is empty or exceeds its byte limit".into());
     }
-    let capture: CicsOracleCapture =
-        serde_json::from_slice(bytes).map_err(|error| format!("CICS oracle capture: {error}"))?;
+    let capture = parse_cics_oracle_capture(bytes)?;
     if capture.schema_version != CAPTURE_CONTRACT {
         return Err("CICS oracle capture contract is stale".into());
     }
@@ -151,7 +161,7 @@ pub fn import_cics_oracle_capture(
     if capture.origin.run_job_id.is_empty() || capture.origin.run_job_id.len() > 256 {
         return Err("CICS oracle run/job identity is missing or too large".into());
     }
-    if capture.origin.kind != "licensed-ibm" {
+    if capture.origin.kind != CicsOracleOriginKind::LicensedIbm {
         if capture.origin.signature.is_some() {
             return Err(
                 "non-IBM adapter fixture must not carry licensed signature metadata".into(),
@@ -180,6 +190,21 @@ pub fn import_cics_oracle_capture(
         run_job_id: capture.origin.run_job_id,
         receipt_digest: digest(bytes),
     })
+}
+
+fn parse_cics_oracle_capture(bytes: &[u8]) -> Result<CicsOracleCapture, String> {
+    let value: serde_json::Value =
+        serde_json::from_slice(bytes).map_err(|error| format!("CICS oracle capture: {error}"))?;
+    let schema: serde_json::Value = serde_json::from_str(CAPTURE_SCHEMA)
+        .map_err(|error| format!("CICS oracle capture schema: {error}"))?;
+    let validator = jsonschema::draft202012::options()
+        .offline()
+        .build(&schema)
+        .map_err(|error| format!("CICS oracle capture schema did not compile: {error}"))?;
+    validator
+        .validate(&value)
+        .map_err(|error| format!("CICS oracle capture violates its schema: {error}"))?;
+    serde_json::from_value(value).map_err(|error| format!("CICS oracle capture: {error}"))
 }
 
 fn signed_payload(capture: &CicsOracleCapture) -> Result<Vec<u8>, String> {
@@ -231,6 +256,13 @@ mod tests {
     }
 
     fn capture(kind: &str) -> CicsOracleCapture {
+        let origin_kind = match kind {
+            "licensed-ibm" => CicsOracleOriginKind::LicensedIbm,
+            "local" => CicsOracleOriginKind::Local,
+            "model" => CicsOracleOriginKind::Model,
+            "synthetic" => CicsOracleOriginKind::Synthetic,
+            _ => panic!("test origin kind must be part of the contract"),
+        };
         let observations = vec![
             CicsOracleObservation {
                 scenario_id: "plain-read".into(),
@@ -255,7 +287,7 @@ mod tests {
             raw_capture_digest,
             observations,
             origin: CicsOracleOrigin {
-                kind: kind.into(),
+                kind: origin_kind,
                 authority: if kind == "licensed-ibm" {
                     TRUSTED_AUTHORITY.into()
                 } else {
@@ -333,6 +365,42 @@ mod tests {
                 None,
             )
             .is_err()
+        );
+    }
+
+    #[test]
+    fn capture_schema_and_typed_parser_have_exact_parity() {
+        for kind in ["licensed-ibm", "local", "model", "synthetic"] {
+            let capture = capture(kind);
+            let bytes = serde_json::to_vec(&capture).unwrap();
+            assert_eq!(parse_cics_oracle_capture(&bytes).unwrap(), capture);
+        }
+
+        let mut missing_signature = serde_json::to_value(capture("local")).unwrap();
+        missing_signature["origin"]
+            .as_object_mut()
+            .unwrap()
+            .remove("signature");
+        assert!(
+            parse_cics_oracle_capture(&serde_json::to_vec(&missing_signature).unwrap())
+                .unwrap_err()
+                .contains("violates its schema")
+        );
+
+        let mut unknown_kind = serde_json::to_value(capture("local")).unwrap();
+        unknown_kind["origin"]["kind"] = serde_json::json!("future-unreviewed-kind");
+        assert!(
+            parse_cics_oracle_capture(&serde_json::to_vec(&unknown_kind).unwrap())
+                .unwrap_err()
+                .contains("violates its schema")
+        );
+
+        let mut extra = serde_json::to_value(capture("local")).unwrap();
+        extra["origin"]["unreviewed"] = serde_json::json!(true);
+        assert!(
+            parse_cics_oracle_capture(&serde_json::to_vec(&extra).unwrap())
+                .unwrap_err()
+                .contains("violates its schema")
         );
     }
 

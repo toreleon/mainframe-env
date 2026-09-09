@@ -1,6 +1,9 @@
 # Official coverage authority
 
 Status: **Frozen for mainframe-env 0.2.0**
+Owner: **coverage and conformance maintainers**
+Scope: **official coverage denominators, evidence, and credit policy**
+Applies from: **mainframe-env 0.2.0**
 
 ## Authority boundary
 

@@ -2,8 +2,14 @@
 
 #![forbid(unsafe_code)]
 
+mod retention;
 mod service;
 
+pub use retention::{
+    SPOOL_STATE_CONTRACT, SpoolRetentionDescriptor, SpoolRetentionState,
+    SpoolRetentionValidationError, SpoolRowCodecVersion, SpoolRowState,
+    describe_spool_retention_row,
+};
 pub use service::{
-    ProviderArtifactStore, SPOOL_STATE_CONTRACT, SpoolLimits, SpoolService, spool_providers,
+    ProviderArtifactStore, SpoolLimits, SpoolRetentionClock, SpoolService, spool_providers,
 };

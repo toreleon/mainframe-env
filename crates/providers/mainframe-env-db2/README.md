@@ -21,6 +21,10 @@ rollback restores adopted legacy state while removing only newer
 application-owned tables and dependents. Raw predicates and cursors compare
 exact bytes; only declared VARCHAR columns use strict length-prefix decoding.
 
+Tables, schemas, catalog generations, run-scoped units of work, cursors, and
+replay receipts persist independently under the
+[provider row contract](../../../docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md).
+
 The SQL route parses table, column, key, assignment, cursor, and DDL identities
 against the installed catalog. It contains no application table or host-variable
 dispatch. Non-goals are the complete Db2 13 SQL language, optimizer, utility,

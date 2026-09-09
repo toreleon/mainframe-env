@@ -1,6 +1,9 @@
 # Conformance IR and executable coverage
 
 Status: **Normative from 0.3.0**
+Owner: **conformance maintainers**
+Scope: **conformance catalog, binding, execution, and evidence authority**
+Applies from: **mainframe-env 0.3.0**
 
 ## Purpose
 
@@ -222,14 +225,14 @@ The 0.3 foundation provides these stable entry points:
 ```text
 cargo xtask spec --check
 cargo xtask conformance --subsystem <name> [--gate <gate>]
-cargo xtask release-certify
+cargo xtask certification --check
 ```
 
 - `spec --check` compiles catalogs, IR, registries, test bindings, and schemas
   without running product environments and should complete in seconds.
 - focused `conformance` runs only the selected subsystem/gates and emits verdict
   events plus a derived ledger.
-- `release-certify` runs global integration, recovery, release, and licensed
+- `certification --check` runs global integration, recovery, release, and licensed
   oracle gates according to the risk-tiered validation policy.
 
 Cases are deterministically sharded by subsystem, operation family, gate, and

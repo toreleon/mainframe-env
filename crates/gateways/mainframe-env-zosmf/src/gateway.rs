@@ -4,15 +4,20 @@ use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, HeaderName, HeaderValue, Response, StatusCode};
 use axum::response::IntoResponse;
 use base64::Engine;
+use mainframe_env_execution_api::CancellationProbe;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
-use std::sync::Arc;
-use std::time::Duration;
-use tower::limit::ConcurrencyLimitLayer;
+use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::sync::mpsc::{SyncSender, TrySendError, sync_channel};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tokio::sync::oneshot;
+use tower::limit::ConcurrencyLimit;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
+use zeroize::{Zeroize, Zeroizing};
 
 #[path = "generated/custom_routes.rs"]
 mod custom_routes;
@@ -27,8 +32,10 @@ pub enum Authentication {
 
 impl Drop for Authentication {
     fn drop(&mut self) {
-        if let Self::Basic { secret, .. } = self {
-            secret.fill(0);
+        match self {
+            Self::Basic { secret, .. } => secret.zeroize(),
+            Self::Bearer(token) => token.zeroize(),
+            Self::Anonymous => {}
         }
     }
 }
@@ -213,13 +220,165 @@ pub trait ZosmfBackend: Send + Sync {
         &self,
         authentication: Authentication,
         request: GatewayRequest,
+        context: GatewayCallContext,
     ) -> Result<GatewayResponse, GatewayProblem>;
+}
+
+#[derive(Clone, Debug)]
+pub struct GatewayCallContext {
+    deadline_tick: u64,
+    cancellation: CancellationProbe,
+}
+
+impl GatewayCallContext {
+    pub fn new(deadline_tick: u64) -> Result<Self, GatewayProblem> {
+        if deadline_tick == 0 {
+            return Err(backend_unavailable());
+        }
+        Ok(Self {
+            deadline_tick,
+            cancellation: CancellationProbe::new(),
+        })
+    }
+
+    fn for_timeout(timeout: Duration) -> Result<Self, GatewayProblem> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| backend_unavailable())?;
+        let now = u64::try_from(now.as_millis()).map_err(|_| backend_unavailable())?;
+        let timeout = u64::try_from(timeout.as_millis()).map_err(|_| backend_unavailable())?;
+        let deadline_tick = now.checked_add(timeout).ok_or_else(backend_unavailable)?;
+        Self::new(deadline_tick)
+    }
+
+    #[must_use]
+    pub const fn deadline_tick(&self) -> u64 {
+        self.deadline_tick
+    }
+
+    #[must_use]
+    pub fn cancellation_probe(&self) -> CancellationProbe {
+        self.cancellation.clone()
+    }
+
+    #[must_use]
+    pub fn cancellation_requested(&self) -> bool {
+        self.cancellation.is_requested()
+    }
+
+    #[must_use]
+    pub fn deadline_elapsed(&self) -> bool {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .ok()
+            .and_then(|duration| u64::try_from(duration.as_millis()).ok())
+            .is_none_or(|now| now >= self.deadline_tick)
+    }
+}
+
+struct CancelOnDrop {
+    cancellation: CancellationProbe,
+    completed: bool,
+}
+
+impl CancelOnDrop {
+    fn new(cancellation: CancellationProbe) -> Self {
+        Self {
+            cancellation,
+            completed: false,
+        }
+    }
+
+    fn complete(&mut self) {
+        self.completed = true;
+    }
+}
+
+impl Drop for CancelOnDrop {
+    fn drop(&mut self) {
+        if !self.completed {
+            self.cancellation.request();
+        }
+    }
+}
+
+struct BackendJob {
+    authentication: Authentication,
+    request: GatewayRequest,
+    context: GatewayCallContext,
+    response: oneshot::Sender<Result<GatewayResponse, GatewayProblem>>,
+}
+
+struct BlockingLane {
+    sender: SyncSender<BackendJob>,
+}
+
+impl BlockingLane {
+    fn new(backend: Arc<dyn ZosmfBackend>, workers: usize, queue: usize) -> Self {
+        let (sender, receiver) = sync_channel::<BackendJob>(queue.max(1));
+        let receiver = Arc::new(Mutex::new(receiver));
+        for index in 0..workers.max(1) {
+            let backend = backend.clone();
+            let receiver = receiver.clone();
+            let _ = std::thread::Builder::new()
+                .name(format!("zosmf-backend-{index}"))
+                .spawn(move || {
+                    loop {
+                        let job = {
+                            let Ok(receiver) = receiver.lock() else {
+                                return;
+                            };
+                            let Ok(job) = receiver.recv() else {
+                                return;
+                            };
+                            job
+                        };
+                        if job.context.cancellation_requested() || job.context.deadline_elapsed() {
+                            let _ = job.response.send(Err(GatewayProblem::new(
+                                StatusCode::REQUEST_TIMEOUT,
+                                "request_cancelled",
+                                "the request deadline elapsed before backend dispatch",
+                            )));
+                            continue;
+                        }
+                        let result = catch_unwind(AssertUnwindSafe(|| {
+                            backend.call(job.authentication, job.request, job.context)
+                        }))
+                        .unwrap_or_else(|_| Err(backend_unavailable()));
+                        let _ = job.response.send(result);
+                    }
+                });
+        }
+        Self { sender }
+    }
+
+    fn submit(
+        &self,
+        authentication: Authentication,
+        request: GatewayRequest,
+        context: GatewayCallContext,
+    ) -> Result<oneshot::Receiver<Result<GatewayResponse, GatewayProblem>>, GatewayProblem> {
+        let (response, receiver) = oneshot::channel();
+        let job = BackendJob {
+            authentication,
+            request,
+            context,
+            response,
+        };
+        match self.sender.try_send(job) {
+            Ok(()) => Ok(receiver),
+            Err(TrySendError::Full(_) | TrySendError::Disconnected(_)) => {
+                Err(backend_unavailable())
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ZosmfLimits {
     pub max_body_bytes: usize,
     pub max_concurrency: usize,
+    pub max_blocking: usize,
     pub timeout: Duration,
     pub max_page_items: usize,
 }
@@ -229,6 +388,7 @@ impl Default for ZosmfLimits {
         Self {
             max_body_bytes: 4 * 1024 * 1024,
             max_concurrency: 256,
+            max_blocking: 4,
             timeout: Duration::from_secs(30),
             max_page_items: 1000,
         }
@@ -237,21 +397,29 @@ impl Default for ZosmfLimits {
 
 #[derive(Clone)]
 struct GatewayState {
-    backend: Arc<dyn ZosmfBackend>,
     limits: ZosmfLimits,
+    blocking_lane: Arc<BlockingLane>,
 }
 
 pub fn router(backend: Arc<dyn ZosmfBackend>, limits: ZosmfLimits) -> Router {
-    let state = GatewayState { backend, limits };
+    let state = GatewayState {
+        limits,
+        blocking_lane: Arc::new(BlockingLane::new(
+            backend,
+            limits.max_blocking,
+            limits.max_concurrency,
+        )),
+    };
     let routes = official_routes::register(Router::<GatewayState>::new());
-    custom_routes::register(routes)
+    let routes = custom_routes::register(routes)
         .fallback(not_found)
         .with_state(state)
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
             limits.timeout,
-        ))
-        .layer(ConcurrencyLimitLayer::new(limits.max_concurrency))
+        ));
+    Router::new()
+        .fallback_service(ConcurrencyLimit::new(routes, limits.max_concurrency))
         .layer(RequestBodyLimitLayer::new(limits.max_body_bytes))
         .layer(TraceLayer::new_for_http())
 }
@@ -267,7 +435,7 @@ pub const fn custom_route_ids() -> &'static [&'static str] {
 }
 
 async fn info(State(state): State<GatewayState>) -> Response<Body> {
-    dispatch(&state, Authentication::Anonymous, GatewayRequest::Info)
+    dispatch(&state, Authentication::Anonymous, GatewayRequest::Info).await
 }
 
 async fn authenticate(State(state): State<GatewayState>, headers: HeaderMap) -> Response<Body> {
@@ -276,10 +444,11 @@ async fn authenticate(State(state): State<GatewayState>, headers: HeaderMap) -> 
         authentication(&headers),
         GatewayRequest::Authenticate,
     )
+    .await
 }
 
 async fn logout(State(state): State<GatewayState>, headers: HeaderMap) -> Response<Body> {
-    dispatch(&state, authentication(&headers), GatewayRequest::Logout)
+    dispatch(&state, authentication(&headers), GatewayRequest::Logout).await
 }
 
 #[derive(Deserialize)]
@@ -305,6 +474,7 @@ async fn dataset_list(
             max,
         },
     )
+    .await
 }
 
 #[derive(Deserialize, Default)]
@@ -324,6 +494,7 @@ async fn dataset_read(
         authentication(&headers),
         GatewayRequest::DatasetRead { dataset, member },
     )
+    .await
 }
 
 async fn dataset_write(
@@ -345,6 +516,7 @@ async fn dataset_write(
             bytes: bytes.to_vec(),
         },
     )
+    .await
 }
 
 async fn dataset_create(
@@ -365,6 +537,7 @@ async fn dataset_create(
             attributes,
         },
     )
+    .await
 }
 
 async fn dataset_delete(
@@ -381,6 +554,7 @@ async fn dataset_delete(
         authentication(&headers),
         GatewayRequest::DatasetDelete { dataset, member },
     )
+    .await
 }
 
 #[derive(Deserialize, Default)]
@@ -404,6 +578,7 @@ async fn member_list(
             max: query.max.unwrap_or(100).min(state.limits.max_page_items),
         },
     )
+    .await
 }
 
 #[derive(Deserialize)]
@@ -427,6 +602,7 @@ async fn dataset_search(
             max: query.max.unwrap_or(100).min(state.limits.max_page_items),
         },
     )
+    .await
 }
 
 async fn ams(
@@ -444,6 +620,7 @@ async fn ams(
             control: bytes.to_vec(),
         },
     )
+    .await
 }
 
 #[derive(Deserialize, Default)]
@@ -469,6 +646,7 @@ async fn job_list(
             max: query.max.unwrap_or(100).min(state.limits.max_page_items),
         },
     )
+    .await
 }
 
 async fn job_submit(
@@ -486,6 +664,7 @@ async fn job_submit(
             jcl: bytes.to_vec(),
         },
     )
+    .await
 }
 
 async fn job_status(
@@ -498,6 +677,7 @@ async fn job_status(
         authentication(&headers),
         GatewayRequest::JobStatus { jobname, jobid },
     )
+    .await
 }
 
 async fn job_cancel(
@@ -513,6 +693,7 @@ async fn job_cancel(
         authentication(&headers),
         GatewayRequest::JobCancel { jobname, jobid },
     )
+    .await
 }
 
 async fn job_purge(
@@ -528,6 +709,7 @@ async fn job_purge(
         authentication(&headers),
         GatewayRequest::JobPurge { jobname, jobid },
     )
+    .await
 }
 
 async fn spool_list(
@@ -540,6 +722,7 @@ async fn spool_list(
         authentication(&headers),
         GatewayRequest::SpoolList { jobname, jobid },
     )
+    .await
 }
 
 #[derive(Deserialize, Default)]
@@ -565,6 +748,7 @@ async fn spool_read(
             max: query.max.unwrap_or(1000).min(state.limits.max_page_items),
         },
     )
+    .await
 }
 
 async fn console_issue(
@@ -584,6 +768,7 @@ async fn console_issue(
             command: bytes.to_vec(),
         },
     )
+    .await
 }
 
 async fn console_solicited(
@@ -596,6 +781,7 @@ async fn console_solicited(
         authentication(&headers),
         GatewayRequest::ConsoleSolicited { name, key },
     )
+    .await
 }
 
 async fn console_detection(
@@ -608,6 +794,7 @@ async fn console_detection(
         authentication(&headers),
         GatewayRequest::ConsoleDetection { name, key },
     )
+    .await
 }
 
 async fn console_logs(State(state): State<GatewayState>, headers: HeaderMap) -> Response<Body> {
@@ -616,10 +803,11 @@ async fn console_logs(State(state): State<GatewayState>, headers: HeaderMap) -> 
         authentication(&headers),
         GatewayRequest::ConsoleLogs,
     )
+    .await
 }
 
 async fn console_log(State(state): State<GatewayState>, headers: HeaderMap) -> Response<Body> {
-    dispatch(&state, authentication(&headers), GatewayRequest::ConsoleLog)
+    dispatch(&state, authentication(&headers), GatewayRequest::ConsoleLog).await
 }
 
 #[derive(Deserialize)]
@@ -650,6 +838,7 @@ async fn cics_launch(
             columns: body.columns.unwrap_or(80),
         },
     )
+    .await
 }
 
 async fn cics_screen(
@@ -665,6 +854,7 @@ async fn cics_screen(
             tn3270: false,
         },
     )
+    .await
 }
 
 #[derive(Deserialize)]
@@ -703,6 +893,7 @@ async fn cics_input(
                 .collect(),
         },
     )
+    .await
 }
 
 async fn cics_resume(
@@ -724,6 +915,7 @@ async fn cics_resume(
             csrf_token,
         },
     )
+    .await
 }
 
 async fn cics_disconnect(
@@ -745,6 +937,7 @@ async fn cics_disconnect(
             csrf_token,
         },
     )
+    .await
 }
 
 async fn cics_tn3270_screen(
@@ -760,6 +953,7 @@ async fn cics_tn3270_screen(
             tn3270: true,
         },
     )
+    .await
 }
 
 async fn cics_tn3270_input(
@@ -783,6 +977,7 @@ async fn cics_tn3270_input(
             record: bytes.to_vec(),
         },
     )
+    .await
 }
 
 async fn not_found() -> Response<Body> {
@@ -793,15 +988,37 @@ async fn not_found() -> Response<Body> {
     ))
 }
 
-fn dispatch(
+async fn dispatch(
     state: &GatewayState,
     authentication: Authentication,
     request: GatewayRequest,
 ) -> Response<Body> {
-    match state.backend.call(authentication, request) {
+    let context = match GatewayCallContext::for_timeout(state.limits.timeout) {
+        Ok(context) => context,
+        Err(value) => return problem(value),
+    };
+    let mut cancellation = CancelOnDrop::new(context.cancellation_probe());
+    let receiver = match state.blocking_lane.submit(authentication, request, context) {
+        Ok(receiver) => receiver,
+        Err(value) => return problem(value),
+    };
+    let result = match receiver.await {
+        Ok(result) => result,
+        Err(_) => Err(backend_unavailable()),
+    };
+    cancellation.complete();
+    match result {
         Ok(result) => response(result),
         Err(problem_value) => problem(problem_value),
     }
+}
+
+fn backend_unavailable() -> GatewayProblem {
+    GatewayProblem::new(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "backend_unavailable",
+        "the bounded backend lane is unavailable",
+    )
 }
 
 fn response(value: GatewayResponse) -> Response<Body> {
@@ -847,12 +1064,14 @@ fn authentication(headers: &HeaderMap) -> Authentication {
     };
     if let Some(value) = value.strip_prefix("Basic ")
         && let Ok(decoded) = base64::engine::general_purpose::STANDARD.decode(value)
-        && let Some(separator) = decoded.iter().position(|byte| *byte == b':')
     {
-        return Authentication::Basic {
-            user: String::from_utf8_lossy(&decoded[..separator]).into_owned(),
-            secret: decoded[separator + 1..].to_vec(),
-        };
+        let decoded = Zeroizing::new(decoded);
+        if let Some(separator) = decoded.iter().position(|byte| *byte == b':') {
+            return Authentication::Basic {
+                user: String::from_utf8_lossy(&decoded[..separator]).into_owned(),
+                secret: decoded[separator + 1..].to_vec(),
+            };
+        }
     }
     value
         .strip_prefix("Bearer ")
@@ -913,7 +1132,7 @@ mod tests {
     use super::*;
     use axum::http::{Method, Request};
     use base64::Engine;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use tower::ServiceExt;
 
     struct Backend {
@@ -925,6 +1144,7 @@ mod tests {
             &self,
             authentication: Authentication,
             request: GatewayRequest,
+            _context: GatewayCallContext,
         ) -> Result<GatewayResponse, GatewayProblem> {
             if !matches!(request, GatewayRequest::Info)
                 && matches!(authentication, Authentication::Anonymous)
@@ -950,6 +1170,168 @@ mod tests {
                 _ => GatewayResponse::json(StatusCode::OK, json!({"ok":true})),
             })
         }
+    }
+
+    struct BlockingBackend {
+        calls: AtomicUsize,
+        completed: AtomicBool,
+        observed_cancellation: AtomicBool,
+    }
+
+    impl ZosmfBackend for BlockingBackend {
+        fn call(
+            &self,
+            _authentication: Authentication,
+            _request: GatewayRequest,
+            context: GatewayCallContext,
+        ) -> Result<GatewayResponse, GatewayProblem> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            std::thread::sleep(Duration::from_millis(150));
+            self.observed_cancellation
+                .store(context.cancellation_requested(), Ordering::SeqCst);
+            self.completed.store(true, Ordering::SeqCst);
+            Ok(GatewayResponse::json(StatusCode::OK, json!({"ok":true})))
+        }
+    }
+
+    struct MixedLoadBackend {
+        calls: AtomicUsize,
+        active: AtomicUsize,
+        peak_active: AtomicUsize,
+    }
+
+    impl ZosmfBackend for MixedLoadBackend {
+        fn call(
+            &self,
+            _authentication: Authentication,
+            request: GatewayRequest,
+            _context: GatewayCallContext,
+        ) -> Result<GatewayResponse, GatewayProblem> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            let active = self.active.fetch_add(1, Ordering::SeqCst) + 1;
+            self.peak_active.fetch_max(active, Ordering::SeqCst);
+            std::thread::sleep(Duration::from_millis(75));
+            self.active.fetch_sub(1, Ordering::SeqCst);
+            let status = if matches!(request, GatewayRequest::JobSubmit { .. }) {
+                StatusCode::CREATED
+            } else {
+                StatusCode::OK
+            };
+            Ok(GatewayResponse::json(status, json!({"ok":true})))
+        }
+    }
+
+    #[tokio::test]
+    async fn mixed_routes_share_one_global_concurrency_limit() {
+        let backend = Arc::new(MixedLoadBackend {
+            calls: AtomicUsize::new(0),
+            active: AtomicUsize::new(0),
+            peak_active: AtomicUsize::new(0),
+        });
+        let app = router(
+            backend.clone(),
+            ZosmfLimits {
+                max_concurrency: 8,
+                max_blocking: 4,
+                timeout: Duration::from_secs(2),
+                ..Default::default()
+            },
+        );
+        let mut tasks = Vec::new();
+        for index in 0..8 {
+            let route = app.clone();
+            tasks.push(tokio::spawn(async move {
+                route
+                    .oneshot(
+                        Request::builder()
+                            .uri("/zosmf/info")
+                            .body(Body::empty())
+                            .unwrap(),
+                    )
+                    .await
+                    .unwrap()
+                    .status()
+            }));
+            let route = app.clone();
+            tasks.push(tokio::spawn(async move {
+                route
+                    .oneshot(
+                        Request::builder()
+                            .method(Method::PUT)
+                            .uri("/zosmf/restjobs/jobs")
+                            .header("x-csrf-zosmf-header", "true")
+                            .body(Body::from(format!("//JOB{index} JOB\n")))
+                            .unwrap(),
+                    )
+                    .await
+                    .unwrap()
+                    .status()
+            }));
+        }
+        let mut ok = 0;
+        let mut created = 0;
+        for task in tasks {
+            match task.await.unwrap() {
+                StatusCode::OK => ok += 1,
+                StatusCode::CREATED => created += 1,
+                status => panic!("mixed-route admission returned {status}"),
+            }
+        }
+        assert_eq!((ok, created), (8, 8));
+        assert_eq!(backend.calls.load(Ordering::SeqCst), 16);
+        assert!(backend.peak_active.load(Ordering::SeqCst) <= 4);
+        assert_eq!(backend.active.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn timeout_preempts_blocking_backend_and_retains_the_bounded_lane() {
+        let backend = Arc::new(BlockingBackend {
+            calls: AtomicUsize::new(0),
+            completed: AtomicBool::new(false),
+            observed_cancellation: AtomicBool::new(false),
+        });
+        let app = router(
+            backend.clone(),
+            ZosmfLimits {
+                max_concurrency: 2,
+                max_blocking: 1,
+                timeout: Duration::from_millis(20),
+                ..Default::default()
+            },
+        );
+        let first = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/zosmf/info")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(first.status(), StatusCode::REQUEST_TIMEOUT);
+        assert!(!backend.completed.load(Ordering::SeqCst));
+
+        let second = app
+            .oneshot(
+                Request::builder()
+                    .uri("/zosmf/info")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(second.status(), StatusCode::REQUEST_TIMEOUT);
+        assert_eq!(backend.calls.load(Ordering::SeqCst), 1);
+
+        for _ in 0..50 {
+            if backend.completed.load(Ordering::SeqCst) {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        assert!(backend.completed.load(Ordering::SeqCst));
+        assert!(backend.observed_cancellation.load(Ordering::SeqCst));
     }
 
     fn basic() -> String {

@@ -1,6 +1,9 @@
 # Architecture Overview
 
 Status: **Accepted by repository owner**
+Owner: **architecture maintainers**
+Scope: **system layers, dependency direction, and maintainability rules**
+Applies from: **mainframe-env 0.1.0**
 
 ## Architectural style
 
@@ -94,8 +97,17 @@ SourceBundle
   -> PublishedArtifact
 ```
 
-Stage constructors are private. A later stage cannot be fabricated by calling a
-validator and ignoring its result.
+Frontend parsed and semantic stages remain compiler-private. The public proof
+chain consumes verified HIR into lowered MIR, legalized MIR, and finally an
+artifact whose bytes are encoded internally. A later stage cannot be
+fabricated by supplying completeness, an identity, an unrelated source, or
+arbitrary payload bytes.
+
+Artifact identity has two non-interchangeable forms: `SemanticArtifactId`
+describes source/compiler/manifest meaning and uses the
+`semantic-sha256:` namespace; `ArtifactContentId` is the SHA-256 of the exact
+published payload and is the only identity serialized as a runtime `sha256:`
+artifact reference.
 
 ## Conformance model
 
@@ -153,7 +165,14 @@ replacement.
   schema or catalog as its source.
 - Every crate README states ownership, non-goals, invariants, allowed
   dependencies, public surface, and verification entry points.
-- A soft module budget of roughly 800–1,200 lines triggers review, not automatic
-  splitting.
+- [ADR-0010](../decisions/0010-rust-module-review-budgets.md) enforces a hard
+  1,200-production-line limit for new/non-exempt Rust modules and exact,
+  non-growing ceilings with stable split boundaries for existing exceptions.
+- Generator-owned and test-only source handling, facade-only `lib.rs` files,
+  and the CICS descriptor/handler-family layout are checked mechanically by
+  `cargo xtask architecture-fast --check`.
+- The [CICS command-routing contract](CICS-COMMAND-ROUTING.md) freezes the
+  readable descriptor catalog and routes every typed operation through one of
+  seven reviewed semantic-family modules.
 - Architecture checks validate dependency direction and product-profile
   closures mechanically.

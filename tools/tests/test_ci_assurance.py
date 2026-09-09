@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import patch
 
 TOOL = Path(__file__).resolve().parents[1] / 'ci_assurance.py'
+ROOT = TOOL.parent.parent
 spec = importlib.util.spec_from_file_location('ci_assurance', TOOL)
 ci = importlib.util.module_from_spec(spec); spec.loader.exec_module(ci)
 
@@ -20,8 +21,8 @@ class SelectionTests(unittest.TestCase):
             'Jenkinsfile': ci.ALL,
             'tools/jenkins/disk_guard.py': ci.ALL,
             'conformance/0.8/evidence/receipt.json': ci.ALL,
-            'docs/contracts/effect-canonical-v1.md': ci.ALL,
-            'docs/architecture/RUNTIME.md': ci.ALL,
+            'docs/contracts/effect-canonical-v1.md': {ci.DOCS},
+            'docs/architecture/RUNTIME.md': {ci.DOCS},
         }.items():
             with self.subTest(path=path): self.assertTrue(required <= set(ci.obligations([path])))
     def test_shared_contracts_cannot_select_an_empty_or_partial_set(self):
@@ -40,20 +41,21 @@ class SelectionTests(unittest.TestCase):
             'crates/tooling/mainframe-env-conformance/src/cics_licensed.rs': {'architecture','evidence','runtime'},
             'crates/providers/mainframe-env-cics/src/service.rs': {'architecture','evidence','store','runtime','mutation'},
             'crates/contracts/mainframe-env-coverage/src/conformance.rs': ci.ALL,
-            'docs/architecture/CONFORMANCE-IR.md': ci.ALL,
+            'docs/architecture/CONFORMANCE-IR.md': {ci.DOCS},
         }.items():
             with self.subTest(path=path):
                 self.assertTrue(set(required) <= set(ci.obligations([path])))
-    def test_prose_is_cheap_but_mixed_changes_are_not(self):
+    def test_markdown_selects_only_the_bounded_docs_gate_but_mixed_changes_are_not(self):
         for path in ['README.md','docs/research/market.md','docs/runbooks/start.md','docs/delivery/hardening/notes.md']:
-            self.assertEqual(ci.obligations([path]), [])
+            self.assertEqual(ci.obligations([path]), [ci.DOCS])
             self.assertIn('runtime',ci.obligations([path,'crates/apps/server/src/main.rs']))
     def test_unknown_files_default_to_all_and_code_under_docs_is_not_prose(self):
-        for path in ['new-system/input.xyz','docs/runbooks/check.py','docs/new-normative/spec.md']:
+        for path in ['new-system/input.xyz','docs/runbooks/check.py']:
             self.assertEqual(set(ci.obligations([path])),ci.ALL)
+        self.assertEqual(ci.obligations(['docs/new-normative/spec.md']), [ci.DOCS])
     def test_renamed_or_deleted_normative_paths_still_trigger(self):
         # --no-renames supplies both paths. Deletions use the same obligation mapping.
-        self.assertEqual(set(ci.obligations(['docs/contracts/OLD.md','docs/research/new.md'])),ci.ALL)
+        self.assertEqual(ci.obligations(['docs/contracts/OLD.md','docs/research/new.md']), [ci.DOCS])
     def test_paths_cannot_escape_the_repository(self):
         for path in ['', '../Cargo.toml','/tmp/file','docs/../../x','x\x00y','docs\\x']:
             with self.assertRaises(ValueError): ci.obligations([path])
@@ -64,6 +66,72 @@ class SelectionTests(unittest.TestCase):
             self.assertTrue(p['full']);self.assertTrue(p['msrv']);self.assertTrue(p['store'])
             self.assertTrue(set(ci.FULL)<=set(p['primary_gates']))
             self.assertIn('certification',p['primary_gates'])
+            self.assertIn('supply-chain',p['primary_gates'])
+            self.assertIn('cargo-deny',p['primary_gates'])
+            self.assertIn('msrv',p['primary_gates'])
+            self.assertIn('python-tooling-tests',p['primary_gates'])
+            self.assertIn('api-docs',p['primary_gates'])
+
+    @patch.object(ci,'identity',return_value={'candidate':'a'*40,'tree':'b'*40})
+    def test_dependency_policy_blocks_even_a_prose_only_pull_request(self,_):
+        with patch.object(ci.subprocess,'check_output',return_value=b'README.md\0'):
+            plan=ci.make_plan(Path('.'),{},'pull_request','refs/pull/1/merge','c'*40)
+        self.assertFalse(plan['build'])
+        self.assertEqual(plan['primary_gates'],['supply-chain','cargo-deny','license-notices','docs'])
+
+    def test_jenkins_and_offline_release_bundle_enforce_license_distribution(self):
+        jenkins=(ROOT/'Jenkinsfile').read_text()
+        self.assertIn('--gate cargo-deny -- cargo deny check',jenkins)
+        self.assertIn('--gate license-notices -- cargo xtask license-notices --check',jenkins)
+        self.assertIn('--gate supply-chain',jenkins)
+        self.assertIn('--gate msrv',jenkins)
+        self.assertIn('cargo +1.95.0 check --workspace --all-targets --all-features --locked',jenkins)
+        self.assertIn("command -v cargo-deny",jenkins)
+        self.assertIn("mainframe-env-release-ed25519-pkcs8",jenkins)
+        self.assertIn('MAINFRAME_ENV_RELEASE_INVOCATION_ID="${BUILD_URL:',jenkins)
+        for required in [
+            'config/release-attestation-policy.json',
+            'conformance/standards/cyclonedx/1.6/bom-1.6.schema.json.gz.b64',
+            'docs/architecture/RELEASE-BUILDER.md',
+            'docs/contracts/RELEASE-BUILD-V1.md',
+        ]:
+            self.assertIn(required,jenkins)
+        bundle=(ROOT/'tools/package_offline_cargo_bundle.sh').read_text()
+        for required in ['LICENSE','NOTICE','LICENSES/ICU.txt']:
+            self.assertIn(f'"$root/{required}"',bundle)
+        policy=(ROOT/'deny.toml').read_text()
+        self.assertIn('crate = "decnumber-sys@=0.1.6"',policy)
+        self.assertIn('allow = ["ICU"]',policy)
+
+    def test_jenkins_records_discovered_tooling_and_all_postgres_gates(self):
+        root = Path(__file__).resolve().parents[2]
+        pipeline = (root / 'Jenkinsfile').read_text()
+        self.assertIn('--gate python-tooling-tests --expect-tests -- "$MAINFRAME_ENV_PYTHON" -B tools/run_tooling_tests.py', pipeline)
+        self.assertIn('--gate api-docs -- "$MAINFRAME_ENV_PYTHON" -B tools/check_public_api_docs.py', pipeline)
+        listed = subprocess.check_output(
+            [root / 'tools/jenkins/postgres_parity.sh', 'list'], text=True
+        ).splitlines()
+        self.assertEqual(listed, [
+            'postgres-move',
+            'postgres-effect',
+            'postgres-stale-effect-recovery',
+            'postgres-online-resume',
+            'postgres-atomic-invariants',
+            'postgres-work-leases',
+            'postgres-storage-profile',
+            'postgres-retention',
+            'postgres-durable',
+            'postgres-carddemo-restart',
+        ])
+        self.assertIn('postgres_parity.sh list', pipeline)
+
+    @patch.object(ci,'identity',return_value={'candidate':'a'*40,'tree':'b'*40})
+    @patch.object(ci.subprocess,'check_output',return_value=b'docs/README.md\0')
+    def test_markdown_only_plan_runs_docs_without_rust_build(self,_,__):
+        plan=ci.make_plan(Path('.'),{},'pull_request','refs/pull/1/merge','b'*40)
+        self.assertFalse(plan['build']);self.assertFalse(plan['msrv'])
+        self.assertTrue(plan['docs'])
+        self.assertEqual(plan['primary_gates'],['supply-chain','cargo-deny','license-notices','docs'])
 
     def test_jenkins_pull_request_context_uses_explicit_comparison_sha(self):
         context=ci.jenkins_context(Path('.'),{
@@ -102,6 +170,8 @@ class SelectionTests(unittest.TestCase):
         push=ci.make_plan(Path('.'),{'merge_commit':True},'push','refs/heads/main')
         full=ci.make_plan(Path('.'),{'merge_commit':True},'manual','refs/heads/main')
         self.assertFalse(push['msrv']);self.assertTrue(full['msrv'])
+        self.assertNotIn('msrv',push['primary_gates'])
+        self.assertIn('msrv',full['primary_gates'])
     @patch.object(ci,'identity',return_value={'candidate':'a'*40,'tree':'b'*40})
     def test_missing_diff_fails_closed_to_all_not_prose(self,_):
         p=ci.make_plan(Path('.'),{},'pull_request','refs/pull/1/merge')
@@ -140,6 +210,15 @@ class SelectionTests(unittest.TestCase):
             code=ci.record(Path('.'),Path(d),'empty-test',[sys.executable,'-c','print("running 0 tests\\ntest result: ok. 0 passed; 0 failed;")'],True)
             self.assertNotEqual(code,0)
             self.assertEqual(json.loads((Path(d)/'empty-test.json').read_text())['status'],'failed')
+
+    @patch.object(ci,'identity',return_value={'candidate':'a'*40,'tree':'b'*40})
+    @patch.object(ci.subprocess,'check_output',side_effect=lambda *args, **kw: '' if kw.get('text') else b'')
+    def test_tooling_runner_marker_receives_nonempty_test_credit(self,_,__):
+        with tempfile.TemporaryDirectory() as d:
+            code=ci.record(Path('.'),Path(d),'python-tooling-tests',[sys.executable,'-c',"print('tooling test result: ok. 7 executed; 1 skipped;')"],True)
+            self.assertEqual(code,0)
+            receipt=json.loads((Path(d)/'python-tooling-tests.json').read_text())
+            self.assertEqual(receipt['observed_passed_tests'],7)
 
     @patch.object(ci,'identity',return_value={'candidate':'a'*40,'tree':'b'*40})
     @patch.object(ci.subprocess,'check_output',side_effect=lambda *args, **kw: '' if kw.get('text') else b'')

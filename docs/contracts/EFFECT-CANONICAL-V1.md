@@ -1,5 +1,10 @@
 # Canonical host effect representation, version 1
 
+- Status: **Frozen contract; implementation deviations tracked before 0.9.0**
+- Owner: execution and host-contract maintainers
+- Scope: canonical persisted host request/result digest representation
+- Applies from: mainframe-env 0.8.2 hardening
+
 `mainframe-env.effect-canonical@1` is a frozen binary representation of the typed
 `HostRequest` and `Result<HostResult, HostProblem>` values. It is not Rust Debug,
 JSON text, a COBOL data layout, or a licensed mainframe representation.
@@ -58,7 +63,60 @@ Oversized requests fail before provider dispatch. A malformed/oversized successf
 mutation reply is UnknownOutcome after dispatch, not a retryable known rejection.
 An explicit UnknownOutcome remains unknown even if its provider also corrupts
 the sequence or declares an insufficient response budget. A journal encoding
-failure after dispatch leaves the intent for explicit reconciliation.
+or persistence failure after dispatch of a mutating request returns
+`UnknownOutcome` and leaves a discoverable intent for explicit reconciliation,
+including when the provider already returned known success. The intent records
+the typed capability, dispatch owner, execution attempt, durable creation and
+recovery-not-before ticks, and execution-event epoch.
+
+`stale_intents` applies both the persisted recovery-not-before tick and a
+positive minimum-age boundary in the execution's monotonic logical tick domain,
+and omits active recovery leases.
+`claim_stale_intent` installs an expiring recovery
+owner/attempt/epoch fence with compare-and-swap semantics. Once claimed, a late
+result from the original dispatcher conflicts rather than overwriting recovery.
+The bounded `StaleEffectRecoveryWorker` asks a service resolver to query an
+authoritative provider idempotency ledger and then uses
+`reconcile_stale_intent` to record a proven completion or failure under the
+original digest format. Pending or ambiguous observations are not redispatched;
+an expired recovery lease can be claimed only at a higher recovery attempt and
+epoch.
+
+## Provider replay and lifecycle outbox encodings
+
+Db2, IMS, and MQ replay receipts use the corresponding typed `HostRequest`
+encoding above and record digest format
+`mainframe-env.provider-replay-canonical@1`. A receipt without the format field
+is legacy Debug format and fails as `UnknownOutcome`; it is never redispatched.
+Provider-specific reconciliation requires the exact retained legacy digest and
+the matching typed request/idempotency key before replacing only its replay
+metadata.
+
+RACROUTE uses domain `mainframe-env.racroute-request@1` followed by a zero byte,
+explicit request/enum tags, framed strings and ordered fields. RACF command
+replay uses domain `mainframe-env.racf-command@1` followed by a zero byte and
+encodes the canonical command keyword, positionals, operand names, counts and
+values. Credential values in `PASSWORD` and `PHRASE` operands of `ADDUSER`,
+`ALTUSER`, and `PASSWORD` are replaced by typed redaction markers before
+hashing; their operand kind and value count remain part of the identity. Thus a
+credential retry must use the same idempotency key, while an intentional new
+credential operation must use a new key.
+
+On RACF database open, unversioned replay digests and generated command or
+RACROUTE audit digests are overwritten with metadata-only hashes marked
+`mainframe-env.legacy-replay-redacted@0`. This removes old raw-command and
+Debug-derived hash oracles. Scrubbed receipts fail closed until an explicit
+reconciliation binds the retained actor, operation and idempotency key to a
+reviewed command or RACROUTE request and the caller attests the exact scrubbed
+digest.
+
+Lifecycle notifications use topic `execution.lifecycle.v1`. Their payload
+begins with `mainframe-env.execution-lifecycle@1` and a zero byte, followed by
+an explicit one-byte event tag. Effect sequence numbers are big-endian u64 and
+completion return codes are big-endian i32. The encoder exhaustively matches
+all lifecycle variants, so adding a variant requires an explicit wire choice.
+Already-persisted `execution.lifecycle` rows retain their legacy topic and
+payload for legacy draining; they are never relabeled as version 1 bytes.
 
 ## Persisted identity and upgrades
 
@@ -73,18 +131,29 @@ format mismatch is rejected. The older reconciliation API remains available to
 existing callers, which are responsible for supplying a digest in the stored
 format; new callers should use the version-checked API.
 
-New records use schema 2, `digest_format: mainframe-env.effect-canonical@1`, and
-fields `request_canonical_v1` / `result_canonical_v1`. They intentionally omit
-legacy `request` / `result`: old decoders ignored schema numbers but required
-`request`, so a downgrade fails rather than silently treating canonical digests
-as Debug digests. Unsupported or internally mixed schema/format combinations
-fail closed. Recomputing old Debug digests under a new compiler is forbidden;
-there is no bulk rewrite or automatic deduplication-domain migration.
+New records use durable JSON schema 3,
+`digest_format: mainframe-env.effect-canonical@1`, fields
+`request_canonical_v1` / `result_canonical_v1`, and the fenced intent metadata.
+Schema-1 legacy and schema-2 canonical rows remain readable; missing metadata
+is conservatively projected as the retained execution owner, attempt 1, no
+typed capability, creation/recovery ticks 0, and effect sequence as its epoch,
+making a pre-upgrade orphan discoverable after restart. New records
+intentionally omit legacy `request` / `result`: old
+decoders ignored schema numbers but required `request`, so a downgrade fails
+rather than silently treating canonical digests as Debug digests. Unsupported
+or internally mixed schema/format combinations fail closed. Recomputing old
+Debug digests under a new compiler is forbidden; there is no bulk rewrite or
+automatic deduplication-domain migration.
+
+A migrated intent without a typed capability requires an operator-reviewed
+legacy resolver keyed by its retained effect identity. It is never guessed into
+a current provider route.
 
 Drain/reconcile active counter-era runs according to the installed-call replay
 and run-unit lifecycle upgrade rules. Completed cached replies from #55/#47 are
-not re-executed merely because journal encoding changes. This adds neither an
-automatic recovery algorithm nor an exactly-once guarantee.
+not re-executed merely because journal encoding changes. The recovery worker
+establishes no generic exactly-once guarantee: it can finalize an intent only
+from an authoritative service-specific observation.
 
 ## Golden digests
 
@@ -97,3 +166,12 @@ Err(HostProblem::UnknownOutcome): 83 preimage bytes,
 Tests also cover map insertion order, absent versus empty, embedded 00/ff/newline,
 length framing, exact provider budgets, and a value whose Debug implementation
 panics while its canonical implementation succeeds.
+
+Provider replay golden digests are:
+
+- Db2: `73deaa15e0e23619ee059776d818b7aa0b39805f4dc350f46cb013d3242cb4ad`.
+- IMS: `0be6adcc52e9699a9c1ae6976b0eba69e3b53d1de56b296a6c8a4e7a8621d872`.
+- MQ: `15290c92f51c0823f3a65fbe5f4ff0a96efad4561394b0b8ba7f1225b85a313b`.
+- RACROUTE: `f12a7fce354c0f3c1a42b54376597d9230b956d729186932208c9f519824f503`.
+- Credential-redacted RACF command:
+  `5b150c202f1af2c3d1f63a24875153e7055dcc894d28daa90de9f3eb5356035e`.

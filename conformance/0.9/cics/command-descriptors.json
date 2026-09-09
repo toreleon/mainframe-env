@@ -1,0 +1,70 @@
+{
+  "schema_version": "mainframe-env.cics-command-descriptors@1",
+  "target_version": "0.9.0",
+  "official_catalog": "conformance/0.2/catalogs/cics.json",
+  "command_count": 25,
+  "families": [
+    {
+      "id": "task-control",
+      "rust_variant": "TaskControl",
+      "responsibility": "Task context, condition and abend handlers, assignment, retrieval, and pseudo-conversation return."
+    },
+    {
+      "id": "time",
+      "rust_variant": "Time",
+      "responsibility": "Clock acquisition and deterministic CICS absolute-time formatting."
+    },
+    {
+      "id": "program-control",
+      "rust_variant": "ProgramControl",
+      "responsibility": "Program inquiry, LINK, and XCTL transfer semantics."
+    },
+    {
+      "id": "terminal-control",
+      "rust_variant": "TerminalControl",
+      "responsibility": "BMS and text send/receive terminal semantics."
+    },
+    {
+      "id": "file-control",
+      "rust_variant": "FileControl",
+      "responsibility": "File status, keyed record, and browse semantics."
+    },
+    {
+      "id": "queue-control",
+      "rust_variant": "QueueControl",
+      "responsibility": "Transient-data queue write semantics."
+    },
+    {
+      "id": "recovery",
+      "rust_variant": "Recovery",
+      "responsibility": "Unit-of-work commit, rollback, and reconciliation semantics."
+    }
+  ],
+  "commands": [
+    {"operation": "Abend", "syntax": "ABEND", "family": "task-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0001"},
+    {"operation": "Asktime", "syntax": "ASKTIME", "family": "time", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0009"},
+    {"operation": "Assign", "syntax": "ASSIGN", "family": "task-control", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0011"},
+    {"operation": "Delete", "syntax": "DELETE", "family": "file-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0040"},
+    {"operation": "EndBrowse", "syntax": "ENDBR", "family": "file-control", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0058"},
+    {"operation": "FormatTime", "syntax": "FORMATTIME", "family": "time", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0080"},
+    {"operation": "HandleAbend", "syntax": "HANDLE ABEND", "family": "task-control", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0097"},
+    {"operation": "HandleCondition", "syntax": "HANDLE CONDITION", "family": "task-control", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0099"},
+    {"operation": "Inquire", "syntax": "INQUIRE PROGRAM", "family": "program-control", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0155"},
+    {"operation": "Link", "syntax": "LINK", "family": "program-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0138"},
+    {"operation": "Read", "syntax": "READ", "family": "file-control", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0156"},
+    {"operation": "ReadNext", "syntax": "READNEXT", "family": "file-control", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0157"},
+    {"operation": "ReadPrev", "syntax": "READPREV", "family": "file-control", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0158"},
+    {"operation": "ReceiveMap", "syntax": "RECEIVE MAP", "family": "terminal-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0163"},
+    {"operation": "Retrieve", "syntax": "RETRIEVE", "family": "task-control", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0175"},
+    {"operation": "Return", "syntax": "RETURN", "family": "task-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0178"},
+    {"operation": "Rewrite", "syntax": "REWRITE", "family": "file-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0181"},
+    {"operation": "SendMap", "syntax": "SEND MAP", "family": "terminal-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0189"},
+    {"operation": "SendText", "syntax": "SEND TEXT", "family": "terminal-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0192"},
+    {"operation": "SetFileStatus", "syntax": "SET FILE", "family": "file-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0224"},
+    {"operation": "StartBrowse", "syntax": "STARTBR", "family": "file-control", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0208"},
+    {"operation": "Syncpoint", "syntax": "SYNCPOINT", "family": "recovery", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0218"},
+    {"operation": "Write", "syntax": "WRITE FILE", "family": "file-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0253"},
+    {"operation": "WriteTransientData", "syntax": "WRITEQ TD", "family": "queue-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0257"},
+    {"operation": "Xctl", "syntax": "XCTL", "family": "program-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0263"}
+  ]
+}

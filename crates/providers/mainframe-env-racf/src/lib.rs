@@ -8,12 +8,15 @@ mod command;
 mod command_processor;
 mod database;
 mod model;
+mod retention;
 mod saf;
 
 pub use audit::SmfType80Record;
 pub use authority::{
-    MemorySecretResolver, RacfInstallReceipt, RacfLimits, RacfManifest, RacfProfileDefinition,
-    RacfService, RacfUserDefinition, ResolvedSecret, SecretResolver, racf_providers,
+    EphemeralSecretScope, MemorySecretResolver, MemorySecretResolverLimits,
+    PrincipalAuthenticationEpoch, RacfInstallReceipt, RacfLimits, RacfManifest,
+    RacfProfileDefinition, RacfService, RacfUserDefinition, ResolvedSecret, SecretResolver,
+    racf_providers,
 };
 pub use command::{
     CommandDescriptor, CommandDiagnostic, CommandDiagnosticCode, CommandDomain, CommandFamily,
@@ -33,10 +36,14 @@ pub use model::{
     RacfDatabaseStatus, RacfSubsystemState, RaclistCache, RecoveryRecord, RecoveryState,
     ResourceProfile, RrsfNode, RrsfNodeState, SECURITY_DATABASE_SCHEMA, SECURITY_PROFILE_SCHEMA,
     SECURITY_TRANSACTION_SCHEMA, SafDecision, SafStatus, SecurityAuditRecord,
-    SecurityDatabaseLimits, SecurityMigration, SecurityPolicyOptions, SecuritySchemaProblem,
-    SecurityToken, SecurityTransaction, SegmentFieldKind, SegmentFieldSchema, SegmentTemplate,
-    SegmentValue, SignonSession, SignonSessionState, TokenKind, TokenState, TransactionState,
-    UserAssociation,
+    SecurityDatabaseLimits, SecurityMigration, SecurityMigrationSourceRow, SecurityPolicyOptions,
+    SecurityRequestDigestFormat, SecuritySchemaProblem, SecurityToken, SecurityTransaction,
+    SegmentFieldKind, SegmentFieldSchema, SegmentTemplate, SegmentValue, SignonSession,
+    SignonSessionState, TokenKind, TokenState, TransactionState, UserAssociation,
+};
+pub use retention::{
+    MAX_RACF_RETENTION_BATCH, RacfRetentionDescriptor, RacfRetentionForecast, RacfRetentionPolicy,
+    RacfRetentionPressure, RacfRetentionReceipt,
 };
 pub use saf::{
     AccessEnvironment, AceeSummary, ExtractedSecurityRecord, RacrouteOutcome, RacrouteRequest,

@@ -152,6 +152,16 @@ shell-in-spec, general formal languages, or generated tests for internal details
 
   Do not combine two named work packages in one completion commit. Focused
   repair commits are allowed but do not replace the completion commit.
+- A dossier may divide a large work package into bounded slices while retaining
+  its parent milestone. Declare each slice ID, parent, semantic scope,
+  dependencies and acceptance gates in the existing human-readable status
+  document before implementation. IDs such as `CIC-903.file-update` are accepted
+  by the shared sealer. Seal a passing slice with its own ID using the same
+  subject/trailers and exact changed-path allowlist above; never use the parent
+  ID to certify a partial slice. Keep the parent in progress until every slice
+  and its integrated gates pass, then create the parent's completion commit
+  with generated aggregate evidence. Slice bookkeeping does not change the
+  official coverage denominator or create a new evidence schema/ledger family.
 - Preserve user-owned changes and keep unrelated files out of the task diff.
 - Production behavior must be generic and selected through typed contracts.
   Do not add application-name, program-name, table-name, transaction-name,
@@ -256,6 +266,8 @@ Use these validation tiers:
 Unless a target is 0.16/0.17 or its dossier explicitly marks an environment as
 affected, references to “full validation” in an individual minor prompt mean
 tier-3 complete affected-scope validation, not tier-4 global certification.
+These tiers guide local validation; they do not waive unconditional policy
+checks or affected-environment gates selected by the repository CI plan.
 
 Maintain an explicit path/contract-to-gate map and fail closed when affected
 scope is ambiguous. Never skip the focused malformed, condition/status,
@@ -275,10 +287,12 @@ an earlier public profile. Do not weaken earlier released behavior, rewrite
 historical evidence, or silently change a durable/public contract.
 
 This managed implementation program authorizes implementation edits, local
-validation, the work-package commits above, pushing only the assigned isolated
-implementation branch, and opening one pull request against `main` after the
-entire minor exit gate passes. The pull request must list every work-package
-commit and evidence digest and must not claim the minor is released.
+validation, and bounded work-package commits. A large minor may use reviewable
+work-package pull requests when incomplete behavior remains unreachable from
+the public profile and each pull request preserves all prior gates. The final
+integration pull request against `main` must list every work package and
+evidence digest, pass the entire minor exit gate, and must not claim the minor
+is released.
 
 It does not authorize destructive migration, force-push, merge, tag,
 publication, deployment, production cutover, or a compatibility claim. Version

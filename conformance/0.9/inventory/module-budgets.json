@@ -1,0 +1,294 @@
+{
+  "schema_version": "mainframe-env.rust-module-budgets@1",
+  "default_max_production_lines": 1200,
+  "source_roots": [
+    "crates"
+  ],
+  "test_only_path_components": [
+    "tests",
+    "benches"
+  ],
+  "generated_path_component": "generated",
+  "oversized_modules": [
+    {
+      "path": "crates/apps/mainframe-env-batch/src/jcl_expand.rs",
+      "max_production_lines": 1468,
+      "responsibility": "JCL procedure, include, symbol, and override expansion currently share one ordered expansion pipeline.",
+      "split_boundary": "Extract symbol evaluation, procedure/include resolution, and override application behind the existing expanded-job model."
+    },
+    {
+      "path": "crates/apps/mainframe-env-batch/src/jcl_plan.rs",
+      "max_production_lines": 1791,
+      "responsibility": "Validated JCL statements are lowered into the immutable execution-plan contract and checked for plan invariants here.",
+      "split_boundary": "Separate plan records, statement lowering, and cross-step validation without changing the serialized plan identity."
+    },
+    {
+      "path": "crates/apps/mainframe-env-batch/src/service.rs",
+      "max_production_lines": 7432,
+      "responsibility": "The batch service coordinates submission, DD allocation, program execution, spool state, and recovery transitions.",
+      "split_boundary": "Split submission and routing, DD allocation, step execution, and completion/recovery into state-machine command families."
+    },
+    {
+      "path": "crates/apps/mainframe-env-server/src/cobol/hardening.rs",
+      "max_production_lines": 1411,
+      "responsibility": "Bounded COBOL runtime hardening helpers implement several unrelated LE-compatible service families.",
+      "split_boundary": "Separate date/time, numeric, character, and environment service families while retaining one bounded dispatcher."
+    },
+    {
+      "path": "crates/apps/mainframe-env-server/src/cobol.rs",
+      "max_production_lines": 1510,
+      "responsibility": "Server-side COBOL program routing, runtime service binding, and installed-program lifecycle helpers remain co-located.",
+      "split_boundary": "Separate runtime service binding, installed-program lookup, and program execution adapters around the existing router."
+    },
+    {
+      "path": "crates/apps/mainframe-env-server/src/product.rs",
+      "max_production_lines": 6568,
+      "responsibility": "Product construction, dependency assembly, application publication, JES control, and HTTP route behavior converge here.",
+      "split_boundary": "Extract bootstrap/construction, publication, JES operations, and route-family adapters around the Product state owner."
+    },
+    {
+      "path": "crates/contracts/mainframe-env-coverage/src/conformance.rs",
+      "max_production_lines": 2811,
+      "responsibility": "Coverage conformance catalogs, binding validation, evidence projection, and gate accounting share this contract module.",
+      "split_boundary": "Separate catalog decoding, binding validation, evidence ledger projection, and gate summary contracts."
+    },
+    {
+      "path": "crates/contracts/mainframe-env-host-api/src/canonical/generated.rs",
+      "max_production_lines": 3189,
+      "responsibility": "This frozen exhaustive host wire encoder keeps every request and result field explicit for protocol review.",
+      "split_boundary": "Partition exhaustive encoders by dataset, CICS, security, Db2, IMS, and MQ families under one canonical codec facade."
+    },
+    {
+      "path": "crates/contracts/mainframe-env-host-api/src/request.rs",
+      "max_production_lines": 2474,
+      "responsibility": "Owned host request and response records for all provider families are declared in one compatibility boundary.",
+      "split_boundary": "Move family-owned request records into dataset, CICS, security, Db2, IMS, and MQ contract modules with stable re-exports."
+    },
+    {
+      "path": "crates/kernel/mainframe-env-application/src/package_v2.rs",
+      "max_production_lines": 1314,
+      "responsibility": "Application package v2 validation, identity, signatures, generations, and installation transitions are co-located.",
+      "split_boundary": "Separate manifest validation and identity/signature verification from generation-selection and install-state transitions."
+    },
+    {
+      "path": "crates/kernel/mainframe-env-compiler/src/hir/statement_grammar.rs",
+      "max_production_lines": 3319,
+      "responsibility": "COBOL statement-family grammar recognition and operand extraction are implemented as one lowering grammar table.",
+      "split_boundary": "Split grammar recognizers by control, data, I/O, communication, and exception statement families."
+    },
+    {
+      "path": "crates/kernel/mainframe-env-compiler/src/hir.rs",
+      "max_production_lines": 1912,
+      "responsibility": "HIR declarations, builder state, and source-to-HIR integration remain combined at the compiler stage boundary.",
+      "split_boundary": "Separate HIR records and invariants from builder orchestration while keeping the stage-private public surface unchanged."
+    },
+    {
+      "path": "crates/kernel/mainframe-env-compiler/src/semantic/structure.rs",
+      "max_production_lines": 1251,
+      "responsibility": "Program-structure semantic validation covers nested divisions, sections, scopes, and declarative relationships.",
+      "split_boundary": "Extract scope construction and declarative validation from division/section structural checks."
+    },
+    {
+      "path": "crates/kernel/mainframe-env-compiler/src/semantic.rs",
+      "max_production_lines": 2938,
+      "responsibility": "Semantic analysis owns the cross-family model, name resolution, validation passes, and diagnostic assembly.",
+      "split_boundary": "Separate model construction, symbol resolution, cross-reference validation, and diagnostics behind the semantic facade."
+    },
+    {
+      "path": "crates/kernel/mainframe-env-compiler/src/syntax/directives.rs",
+      "max_production_lines": 2372,
+      "responsibility": "Compiler-directing statement parsing, replacement semantics, and directive validation share one syntax module.",
+      "split_boundary": "Split COPY/REPLACE processing, conditional directives, and source-control directives by grammar family."
+    },
+    {
+      "path": "crates/kernel/mainframe-env-compiler/src/syntax.rs",
+      "max_production_lines": 2265,
+      "responsibility": "The syntax stage combines token traversal, division parsing, statement collection, and syntax diagnostics.",
+      "split_boundary": "Separate token cursor and program-structure parsing from statement-family dispatch and diagnostic recovery."
+    },
+    {
+      "path": "crates/kernel/mainframe-env-interpreter/src/machine.rs",
+      "max_production_lines": 13523,
+      "responsibility": "The deterministic COBOL machine executes all operations, control flow, calls, host effects, and conditions.",
+      "split_boundary": "Extract operation handlers by control, numeric/data, call, file/host-effect, and condition families around one machine state."
+    },
+    {
+      "path": "crates/providers/mainframe-env-cics/src/service.rs",
+      "max_production_lines": 3921,
+      "responsibility": "The CICS pilot service owns session, BMS, file, queue, program, and unit-of-work semantics and persistence.",
+      "split_boundary": "Freeze this pilot and route future catalog descriptors through generated modules and semantics through handler-family modules."
+    },
+    {
+      "path": "crates/providers/mainframe-env-dataset/src/service.rs",
+      "max_production_lines": 9412,
+      "responsibility": "Dataset allocation, catalog state, sequential and VSAM I/O, AMS behavior, transactions, and replay meet here.",
+      "split_boundary": "Split catalog/allocation, record I/O, VSAM access, AMS commands, and persistence/recovery command families."
+    },
+    {
+      "path": "crates/providers/mainframe-env-db2/src/service.rs",
+      "max_production_lines": 3333,
+      "responsibility": "Db2 catalog resolution, SQL interpretation, DDL/DML effects, transaction state, and replay are co-located.",
+      "split_boundary": "Separate catalog/name resolution, DDL, DML/query, and unit-of-work/replay handlers behind the service."
+    },
+    {
+      "path": "crates/providers/mainframe-env-ims/src/service.rs",
+      "max_production_lines": 1959,
+      "responsibility": "IMS session, PSB/database resolution, DL/I operations, unit-of-work state, and replay share one service module.",
+      "split_boundary": "Separate session/PSB binding, database operation handlers, and unit-of-work persistence/replay."
+    },
+    {
+      "path": "crates/providers/mainframe-env-mq/src/service.rs",
+      "max_production_lines": 1340,
+      "responsibility": "MQ queue semantics, unit-of-work transitions, durable object rows, replay identity, and retention-clock finalization share one service authority.",
+      "split_boundary": "Extract replay envelopes and clock finalization from queue operations and durable object-row persistence behind the existing MQ service."
+    },
+    {
+      "path": "crates/providers/mainframe-env-racf/src/authority.rs",
+      "max_production_lines": 1482,
+      "responsibility": "RACF authority records, profile matching, access evaluation, and administrative transitions are implemented together.",
+      "split_boundary": "Separate profile selection/evaluation from administrative authority mutation and invariant validation."
+    },
+    {
+      "path": "crates/providers/mainframe-env-racf/src/command_processor.rs",
+      "max_production_lines": 3334,
+      "responsibility": "RACF command parsing, canonical replay identity, validation, dispatch, and result rendering share one processor.",
+      "split_boundary": "Split parser/canonicalization and command families for users, groups, datasets, resources, and SETROPTS."
+    },
+    {
+      "path": "crates/providers/mainframe-env-racf/src/database.rs",
+      "max_production_lines": 1418,
+      "responsibility": "The RACF database owns versioned authority snapshots, atomic recovery, legacy migration and rollback, and provider-local retention metadata.",
+      "split_boundary": "Extract legacy snapshot decoding and migration plus retention-clock helpers behind the database's atomic snapshot authority."
+    },
+    {
+      "path": "crates/providers/mainframe-env-racf/src/model.rs",
+      "max_production_lines": 1743,
+      "responsibility": "RACF persisted identities, groups, profiles, options, and model invariants occupy one state model.",
+      "split_boundary": "Separate identity/group, dataset/general-resource profile, and option/state invariant records."
+    },
+    {
+      "path": "crates/providers/mainframe-env-racf/src/saf.rs",
+      "max_production_lines": 2468,
+      "responsibility": "SAF request validation, resource mapping, decision evaluation, auditing, replay, and management calls converge here.",
+      "split_boundary": "Separate RACROUTE request decoding, decision evaluation, audit/replay, and administrative callable-service families."
+    },
+    {
+      "path": "crates/stores/mainframe-env-store/src/durable.rs",
+      "max_production_lines": 2298,
+      "responsibility": "Shared durable SQL helpers implement effect, event, work, checkpoint, session, replay, and provider-state domains.",
+      "split_boundary": "Partition SQL repositories by execution journal, work/session, replay/provider state, and maintenance/retention domains."
+    },
+    {
+      "path": "crates/stores/mainframe-env-store/src/memory.rs",
+      "max_production_lines": 4255,
+      "responsibility": "The deterministic in-memory adapter implements execution, work, session, replay, and provider-state contracts in one state owner.",
+      "split_boundary": "Separate domain-specific store trait implementations while retaining one bounded in-memory state and atomic lock authority."
+    },
+    {
+      "path": "crates/stores/mainframe-env-store/src/postgres.rs",
+      "max_production_lines": 2346,
+      "responsibility": "The PostgreSQL adapter owns provider-state CRUD, quotas, logical time, exact retention archives and observations, dependency validation, and atomic transactions.",
+      "split_boundary": "Extract PostgreSQL retention archive, observation, and dependency-validation repositories from core provider-state persistence while retaining one transaction authority."
+    },
+    {
+      "path": "crates/stores/mainframe-env-store/src/sqlite.rs",
+      "max_production_lines": 2173,
+      "responsibility": "The SQLite adapter owns provider-state CRUD, quotas, logical time, exact retention archives and observations, dependency validation, backup, and integrity checks.",
+      "split_boundary": "Extract SQLite retention archive, observation, and dependency-validation repositories from core provider-state persistence while retaining one transaction authority."
+    },
+    {
+      "path": "crates/tooling/mainframe-env-conformance/src/carddemo.rs",
+      "max_production_lines": 14250,
+      "responsibility": "CardDemo conformance provisions the full fixture, drives online and batch journeys, and checks persistence and failures.",
+      "split_boundary": "Separate fixture provisioning, online transactions, batch jobs, authorization, and durability/failure scenario families."
+    },
+    {
+      "path": "crates/tooling/mainframe-env-conformance/src/cics_pilot.rs",
+      "max_production_lines": 1359,
+      "responsibility": "The CICS pilot harness decodes fixtures, drives candidate behavior, and compares licensed and local evidence.",
+      "split_boundary": "Separate fixture decoding, local scenario execution, licensed capture adaptation, and evidence assertions."
+    },
+    {
+      "path": "crates/tooling/mainframe-env-conformance/src/dataset_reference.rs",
+      "max_production_lines": 1654,
+      "responsibility": "The independent dataset reference model implements allocation, sequential/VSAM transitions, and AMS expectations.",
+      "split_boundary": "Split allocation/catalog transitions, record-access models, and AMS command interpretation without product dependencies."
+    },
+    {
+      "path": "crates/tooling/mainframe-env-conformance/src/racf.rs",
+      "max_production_lines": 1709,
+      "responsibility": "RACF conformance binds catalogs and drives command, SAF, callable-service, recovery, and denial scenarios.",
+      "split_boundary": "Separate catalog binding from command, SAF/authorization, management-call, and recovery scenario families."
+    },
+    {
+      "path": "crates/tooling/mainframe-env-conformance/src/racf_reference.rs",
+      "max_production_lines": 1364,
+      "responsibility": "The independent RACF reference parses fixtures and models identity, profile, permission, and command outcomes.",
+      "split_boundary": "Separate fixture/catalog decoding, profile matching, command transitions, and RACROUTE decision projection."
+    }
+  ],
+  "generated_exemptions": [
+    {
+      "path": "crates/apps/mainframe-env-batch/src/generated/jcl_catalog.rs",
+      "max_generated_lines": 4532,
+      "generator": "cargo xtask jcl-catalog",
+      "authorities": [
+        "conformance/0.2/catalogs/jcl-jes2.json",
+        "conformance/0.7/catalogs/jcl-planner-semantics.json"
+      ]
+    },
+    {
+      "path": "crates/contracts/mainframe-env-host-api/src/generated/dataset_programming_surface.rs",
+      "max_generated_lines": 1316,
+      "generator": "cargo xtask dataset-contract",
+      "authorities": [
+        "conformance/0.6/inventory/dataset-programming-surface.json"
+      ]
+    },
+    {
+      "path": "crates/contracts/mainframe-env-host-api/src/generated/official_semantic_identities.rs",
+      "max_generated_lines": 10549,
+      "generator": "cargo xtask semantic-identities",
+      "authorities": [
+        "conformance/0.2/catalogs/index.json"
+      ]
+    },
+    {
+      "path": "crates/kernel/mainframe-env-compiler/src/generated/cobol_language.rs",
+      "max_generated_lines": 4126,
+      "generator": "cargo xtask cobol-language",
+      "authorities": [
+        "conformance/0.3/cobol/language.json"
+      ]
+    }
+  ],
+  "facade_exemptions": [
+    {
+      "path": "crates/contracts/mainframe-env-coverage/src/lib.rs",
+      "max_production_lines": 571,
+      "responsibility": "The original coverage contract root still contains its small ledger model in addition to facade declarations.",
+      "split_boundary": "Move the ledger records and implementation into a model module and leave only contract constants and public re-exports."
+    }
+  ],
+  "cics_family_layout": {
+    "provider_root": "crates/providers/mainframe-env-cics/src",
+    "frozen_service": "crates/providers/mainframe-env-cics/src/service.rs",
+    "existing_modules": [
+      "crates/providers/mainframe-env-cics/src/abi.rs",
+      "crates/providers/mainframe-env-cics/src/lib.rs",
+      "crates/providers/mainframe-env-cics/src/retention.rs",
+      "crates/providers/mainframe-env-cics/src/service.rs"
+    ],
+    "descriptor_directory": "crates/providers/mainframe-env-cics/src/generated",
+    "handler_directory": "crates/providers/mainframe-env-cics/src/handlers",
+    "handler_modules": [
+      "crates/providers/mainframe-env-cics/src/handlers/file_control.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/program_control.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/queue_control.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/recovery.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/task_control.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/terminal_control.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/time.rs"
+    ]
+  }
+}

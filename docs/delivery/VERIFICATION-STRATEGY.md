@@ -1,6 +1,9 @@
 # 0.1 Verification Strategy
 
 Status: **Accepted by repository owner**
+Owner: **verification maintainers**
+Scope: **verification layers, assurance tiers, and required evidence**
+Applies from: **mainframe-env 0.1.0**
 
 ## Objective
 
@@ -67,25 +70,58 @@ Use Proptest for:
 
 ### Fuzzing
 
-Persistent fuzz targets cover:
+The repository has persistent cargo-fuzz/libFuzzer targets for the bounded
+COBOL frontend and IR binary/text decoders. `fuzz-smoke` executes both targets
+against copied seed corpora with a small generated-input budget; the larger
+`fuzz-periodic` run is part of every full tier, including the weekly scheduled
+run. Corpora and crash artifacts are kept separate so CI cannot rewrite a
+committed seed while earning a clean-candidate receipt. Every discovered crash
+must become a minimized regression fixture.
 
-- COBOL and JCL lexers/parsers/preprocessors;
-- IR text/binary decoders;
+The remaining target state is to extend persistent fuzzing to:
+
+- JCL lexers/parsers/preprocessors;
 - z/OSMF JSON/path/query/multipart inputs;
 - dataset names, records, catalogs, and encoded data;
 - RACF/security request parsing and profile matching; and
 - checkpoint/configuration readers.
 
-Every discovered crash becomes a minimized regression fixture.
+The tracked assurance registry requires both current targets, nonempty corpora,
+positive input/run bounds, the pinned nightly, and the exact cargo-fuzz version.
+Removing a target or corpus therefore fails before fuzz execution rather than
+producing an empty green gate.
 
 ### Model and concurrency checking
 
-- Kani checks bounded pure validators, arithmetic, and selected state-machine
-  transitions where tractable.
-- Loom checks custom concurrency primitives and publication/permit behavior,
-  with its limitations documented.
-- TLA+/TLC models durable work claim, lease, attempt, effect intent/result,
-  cancellation, and recovery before multi-process durable promotion.
+The `model-check` gate uses Loom to enumerate schedules for version-fenced
+execution transitions and effect intent finalization. A deliberately unfenced
+lost-update mutant is required to fail under Loom, proving that the gate is
+exploring schedules rather than merely running an ordinary happy-path test.
+These bounded models use the production `ExecutionState::can_transition_to`
+and effect-state types; they do not claim to model PostgreSQL or the complete
+multi-process work queue.
+
+Kani remains a candidate for pure validators after an approved pinned verifier
+distribution can be installed on the capped Jenkins node. TLA+/TLC work-lease
+modeling remains blocked on R-18: the reviewed production lease transition is
+known to admit expired work, so formalizing it now would preserve the defect as
+the specification. TLC also needs a pinned, checksum-verified JVM artifact
+before it can enter this repository's offline assurance boundary. Neither tool
+is current evidence, and the implemented Loom scope must not be described as a
+substitute for those future proofs.
+
+### Source coverage visibility
+
+The full tier uses pinned `cargo-llvm-cov` and the pinned toolchain's
+`llvm-tools-preview` component to instrument the IR, COBOL compiler, store
+contract, and store implementation packages. It archives the machine-readable
+summary and records exact line/function totals. The validator requires nonzero
+covered code and the presence of every declared package, so an empty or
+mis-scoped report blocks the gate. Conservative absolute covered-line and
+function floors derived from the first measured baseline prevent the gate from
+becoming vacuous while leaving room for refactoring. No arbitrary percentage is
+treated as semantic evidence; the baseline is visibility and regression input,
+not release coverage credit.
 
 ### Failure and chaos testing
 
@@ -117,9 +153,12 @@ release-grade work on every event:
 - jobs run only for branches and changes configured in local Jenkins; the
   checked-out SHA is the execution authority;
 - concurrent runs of the same job are serialized to bound local disk use;
-- documentation-only changes do not start the Rust workflow;
-- pull requests run formatting, specification and COBOL exit checks, workspace
-  tests, Clippy, and the contract MSRV gate;
+- documentation-only changes skip the ordinary Rust suite but still run the
+  immutable supply-chain, locked dependency-policy, and full-notice checks;
+- pull requests run the supply-chain gate, `cargo deny check`, target-production license-notice
+  validation, formatting, specification and COBOL exit checks, workspace tests,
+  Clippy, the contract-crate `missing_docs` ratchet, and a Rust 1.95.0 check over
+  the full workspace, all targets, and all features;
 - the integrated `main` commit runs the complete workspace and documentation
   gates; the MSRV result is not repeated for a standard merge commit;
 - a manual `full` run adds complete conformance, certification, evidence, and
@@ -137,13 +176,21 @@ whose total capacity is at most 10 GiB. Selected backend parity uses a
 disposable PostgreSQL 18 cluster whose data, socket and log also stay in that
 workspace.
 
+The Jenkins WAR, complete plugin dependency closure, Rust compiler/Cargo
+commits, and separately installed tool versions are locked and checked before
+credit. Tracked actions require commit SHAs, tracked images require digests,
+and tracked package installation is forbidden. The reviewed inventory and
+update procedure are in `docs/runbooks/CI-SUPPLY-CHAIN.md`.
+
 ### Milestone gate
 
 - affected package suites;
 - profile build and test;
 - differential and property suites;
 - public API/schema compatibility check;
-- fuzz smoke corpus.
+- bounded parser/decoder fuzz smoke and nonempty corpus validation;
+- Loom schedule exploration for the registered durable-state models; and
+- instrumented coverage visibility for the registered critical packages.
 
 ### Release gate
 
@@ -152,7 +199,9 @@ workspace.
 - overload/backpressure and cancellation evidence;
 - database backup/restore and restart recovery;
 - release-binary SQLite startup, readiness, and shutdown smoke;
-- security/advisory/license checks;
+- immutable CI/controller inputs and full-workspace MSRV;
+- blocking `cargo deny check` plus deterministic full target-production license
+  notices;
 - compatibility and cutover rehearsal; and
 - reproducible artifacts and documentation.
 

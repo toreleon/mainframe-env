@@ -1,8 +1,10 @@
 [product]
 name = "mainframe-env"
-version = "0.8.2"
+version = "0.8.3"
+released_version = "0.8.2"
 release_line = "0.8"
-channel = "stable"
+channel = "development"
+state = "development"
 publish = false
 
 [rust]
@@ -21,7 +23,7 @@ ir_object = "mainframe-env.ir@1"
 ir_text = "mainframe-env.ir-text@1"
 ir_binary = "mainframe-env.ir-binary@1"
 ir_envelope = "mainframe-env.ir-envelope@1"
-artifact = "mainframe-env.artifact@1"
+artifact = "mainframe-env.artifact@2"
 execution = "mainframe-env.execution@1"
 host = "mainframe-env.host@1"
 cics = "mainframe-env.cics@1"
@@ -36,4 +38,5 @@ migration_head = "0001-durable-state"
 [artifacts]
 content_address = "sha256"
 sbom_format = "CycloneDX-1.6"
-provenance_format = "SLSA-v1"
+provenance_format = "in-toto-Statement-v1+SLSA-Provenance-v1+DSSE-Ed25519"
+slsa_build_level = 1

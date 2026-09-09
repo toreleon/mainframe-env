@@ -23,7 +23,7 @@ use mainframe_env_host_api::{
 use mainframe_env_interpreter::ReferenceMachine;
 use mainframe_env_ir::CodecLimits;
 use mainframe_env_store::{MemoryStore, SqliteStateStore, StoreLimits};
-use mainframe_env_store_api::ProviderStateStore;
+use mainframe_env_store_api::{AuditSink, ProviderStateStore};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -879,7 +879,7 @@ fn pilot_invocation(
         None,
         Selector::new(format!("program:COBOL:{program}"), limits)
             .map_err(|problem| problem.to_string())?,
-        ArtifactRef::new(format!("sha256:{}", artifact.id().to_hex()), limits)
+        ArtifactRef::new(artifact.content_id().to_reference(), limits)
             .map_err(|problem| problem.to_string())?,
         Principal::new(
             PrincipalId::new(principal, limits).map_err(|problem| problem.to_string())?,
@@ -916,19 +916,26 @@ fn drive_artifact(
     )
     .map_err(|problem| format!("{problem:?}"))?;
     let mut resume = MachineResume::Start;
+    let audit = MemoryStore::new(StoreLimits::default());
     loop {
         let quantum =
             Quantum::new(128, 4096).ok_or_else(|| "CICS pilot quantum is invalid".to_string())?;
         match machine.drive(resume, quantum) {
             MachineDrive::Continue => resume = MachineResume::Start,
             MachineDrive::HostCall(effect) => {
-                let result = host.invoke(
-                    &invocation,
-                    invocation.deadline_tick.saturating_sub(1),
-                    false,
-                    effect,
-                );
-                resume = MachineResume::HostResult(result.effect);
+                let result = host
+                    .invoke(
+                        &invocation,
+                        invocation.deadline_tick.saturating_sub(1),
+                        false,
+                        effect,
+                    )
+                    .persist_with(|record| {
+                        audit
+                            .record_audit(record)
+                            .map_err(|_| HostProblem::InfrastructureFailure)
+                    });
+                resume = MachineResume::HostResult(result);
             }
             MachineDrive::Completed(done) => {
                 return String::from_utf8(done.output.bytes().to_vec())

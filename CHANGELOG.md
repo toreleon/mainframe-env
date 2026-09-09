@@ -4,6 +4,130 @@ All notable changes to mainframe-env are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Added persistent bounded COBOL-parser and IR-decoder fuzzing, Loom schedule
+  models with a negative concurrency mutant, and instrumented critical-package
+  coverage reporting as receipt-backed full CI gates.
+- Added a generated documentation manifest and bounded documentation gate via
+  `cargo xtask docs --check` for navigation, normative metadata, links, anchors,
+  command examples, and public version truth.
+- Added ADR-0008 as the current authority for the 26-package workspace
+  topology, superseding ADR-0005's historical count.
+- Added a docs-driven CICS file/unit-of-work conformance pilot with reviewed
+  rules, exact per-obligation observations, memory/SQLite execution, restart
+  faults, and a fail-closed licensed-capture adapter.
+- Added a reviewed COBOL numeric `MOVE` pilot and corrected floating-insertion,
+  capacity, sign, and overflow behavior found by that review.
+- Added cost-aware local Jenkins assurance, exact-candidate command receipts,
+  PostgreSQL parity helpers, and bounded dataset mutation checks.
+
+### Changed
+
+- Updated the 0.9 CICS implementation plan to require the integrated 28-finding
+  hardening baseline, bounded family slices, per-slice security/recovery,
+  explicit backend validation, and early licensed-campaign planning.
+- Added a blocking `missing_docs` ratchet for every contract crate, reduced the
+  initial execution/store debt, and added runnable lifecycle/store examples.
+- Split Db2, IMS, and MQ durable state into independently versioned object,
+  index, cursor, unit-of-work, and replay rows with atomic legacy migration.
+- Assigned post-0.8.2 work the distinct `0.8.3` development identity and made
+  released versus development state explicit in every version authority.
+- Replaced the live GitHub Actions assurance path with the capped local Jenkins
+  workflow; hosted metadata remains historical rather than current evidence.
+- Moved official catalog extraction to pinned IBM topic markup and strengthened
+  locator, publication-byte, generated-registry, and source-review guards.
+- Versioned canonical host-effect digests and tightened installed-call replay,
+  live cancellation, deadline, provider-move, and DCOLLECT hardening after the
+  0.8.2 tag.
+
+### Fixed
+
+- Persisted bounded typed host audit decisions with versioned canonical resource
+  digests; made effect-result, lifecycle, outbox, and audit commits atomic; and
+  made ordinary RACF authorization auditing fail closed and survive recovery.
+- Derived batch host grants from the validated JCL plan and installed program
+  registry, and required typed table/PSB/database/queue SAF authorization
+  inside Db2, IMS, and MQ providers before any mutation.
+- Routed installed online CICS programs through the durable, resume-aware
+  execution journal. Per-session exchange identity now survives restart,
+  unresolved effects return the explicit `unknown_outcome` gateway code, and
+  file, transient-queue, program-link, and syncpoint replay is provider-ledger
+  fenced before a recovered machine can continue. Pseudo-conversation
+  checkpoints now close their old execution with an explicit durable handoff,
+  and restart cleanup preserves only that handed-off continuation while
+  retaining known terminal failure categories.
+- Added bounded, transactional retention archives and saturation forecasts for
+  lifecycle events, delivered outbox rows, resolved effects, and Db2/IMS/MQ
+  replay receipts while protecting checkpoints and unresolved recovery state.
+- Resolved PostgreSQL, TLS, bootstrap, and package secrets through one bounded
+  reference provider; added named CLI overrides, secure first-administrator
+  bootstrap with secret-free restart, and separate writable/auth/artifact/worker
+  readiness checks backed by rolled-back provider-state DML proof, retention
+  headroom, and per-worker queue-progress freshness.
+- Moved synchronous z/OSMF backend calls to a bounded four-worker lane and
+  propagated finite HTTP deadlines plus live cancellation into invocations.
+- Classified mutating-effect journal failures after dispatch as unknown outcomes
+  and added fenced, bounded stale-intent recovery across memory, SQLite, and
+  PostgreSQL without redispatching the original mutation.
+- Enforced PostgreSQL row/object quotas with transactional reservations, moved
+  the PostgreSQL product profile to a shared immutable artifact store, and made
+  local artifact publication no-replace and directory-durable.
+- Moved JES execution out of HTTP submission into a bounded two-worker pool
+  backed by a durable monotonic logical clock, generation-scoped FIFO claims,
+  preserved JES priority, owner-bound execution contexts, periodic heartbeats,
+  fenced lease recovery, and graceful worker shutdown.
+- Filtered dataset catalog listings through a discrete SAF decision per name
+  and derived pagination hints only from resources visible to the principal.
+- Fenced every work-lease transition by a monotonic epoch and observed clock,
+  clamped leases to deadlines, and prevented expired queued work from running.
+- Made the offline Cargo archive reproducible twice in one digest-pinned GNU
+  tar environment and made local and GitHub release assets immutable by digest.
+- Bounded and zeroized transient authentication secrets, randomized and
+  unified credential policy, and replaced durable raw bearer tokens with
+  hashed, rotating, expiring sessions with a durable cross-server user quota
+  and non-reusable principal-authentication-epoch revocation.
+- Made schema discovery cover every versioned conformance directory and made
+  CICS oracle imports validate the 0.9 schema before a closed typed origin is
+  parsed or credited.
+- Sealed the compiler's executable type-state chain and separated semantic
+  artifact identity from the exact payload SHA-256 used by runtime references;
+  the artifact contract is now `mainframe-env.artifact@2` and old compiler
+  outputs must be rebuilt before execution.
+- Replaced diagnostic provider replay identities and lifecycle outbox payloads
+  with versioned canonical encodings, including fail-closed legacy
+  reconciliation and credential-redacted RACF command digests.
+- Unified execution-journal, effect, checkpoint, and artifact invariants across
+  memory, SQLite, and PostgreSQL stores, with hostile-record rollback contracts.
+- Replaced release-wide Cargo inventory with official-schema-validated
+  CycloneDX 1.6 SBOMs for each exact target production closure, including the
+  dependency graph; replaced unauthenticated local provenance with a signed
+  DSSE in-toto Statement, SLSA Provenance v1 fields, a reviewed Jenkins builder
+  identity, unique invocation identity, and tamper-failing verification.
+- Expanded the Rust 1.95.0 gate to the complete workspace, all targets, and all
+  features; locked Jenkins and external CI inputs immutably; and embedded exact
+  supply-chain input identities in offline Cargo bundles.
+- Added the complete Apache-2.0 project license and ICU attribution, generated
+  deterministic full notices from each target production dependency closure,
+  and made dependency-license policy a blocking CI and release gate.
+- Made CI discover every shipped Python and shell tooling test, and expanded
+  isolated PostgreSQL parity to cover durable migration and CardDemo restart
+  suites.
+- Made the macOS release build retain its required `LC_UUID` and required the
+  exact target CLI and server binaries to pass launch, help, version, and
+  readiness probes before release receipts can be written.
+- Corrected RACF flat/nested syntax value handling and added generated-path
+  regressions.
+- Corrected Jenkins checkout/temp storage, tool selection, parameter handling,
+  shell portability, and release-target selection.
+
+### Known issues
+
+- These `0.8.3` development changes are not part of the published 0.8.2 tag. The
+  [pre-0.9 deep review](docs/reviews/PRE-0.9.0-DEEP-REVIEW.md) records the
+  release-truth, durability, security, CI, and documentation blockers that must
+  be resolved before 0.9.0 implementation and publication.
+
 ## [0.8.2] - 2026-09-06
 
 ### Fixed

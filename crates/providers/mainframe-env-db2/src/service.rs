@@ -2,20 +2,43 @@ use crate::catalog::{
     Db2CatalogGeneration, Db2ColumnDefinition, Db2ResultEncoding, Db2TableDefinition,
     input_for_column, normalize_identifier, value_for_column,
 };
-use mainframe_env_execution_api::{CapabilityId, Invocation, InvocationLimits, ServiceClass};
-use mainframe_env_host_api::{
-    CapabilityDescriptor, Db2HostVariable, Db2Operation, Db2Request, Db2Result, Db2Row,
-    EffectRequest, EffectResult, HostProblem, HostProvider, HostRequest, HostResult,
+use mainframe_env_execution_api::{
+    CapabilityId, IdempotencyKey, Invocation, InvocationLimits, ServiceClass,
 };
-use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore, StoreError};
+use mainframe_env_host_api::{
+    AccessIntent, CapabilityDescriptor, Db2HostVariable, Db2Operation, Db2Request, Db2Result,
+    Db2Row, EffectRequest, EffectResult, EnterpriseAuthorizer, EnterpriseResource,
+    EnterpriseResourceClass, HostProblem, HostProvider, HostRequest, HostResult,
+    canonical_db2_request_digest,
+};
+use mainframe_env_store_api::{
+    ProviderStateMutation, ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
+};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, MutexGuard};
 
+use crate::retention::{
+    Db2ReplayOwnerKind, db2_pending_replay_matches, prepare_db2_replay, resolve_db2_replay,
+    validate_db2_recorded_result,
+};
+
 const STATE_NAMESPACE: &str = "db2-state";
 const STATE_KEY: &str = "catalog";
+const ROW_STORE_SCHEMA: &str = "mainframe-env.db2-row-store@1";
+pub(crate) const OBJECT_ROW_SCHEMA: &str = "mainframe-env.db2-object-row@1";
+const TABLE_NAMESPACE: &str = "db2-v1-table";
+const SCHEMA_NAMESPACE: &str = "db2-v1-schema";
+const INSTALLATION_NAMESPACE: &str = "db2-v1-installation";
+const GENERATION_NAMESPACE: &str = "db2-v1-catalog-generation";
+const PROVENANCE_NAMESPACE: &str = "db2-v1-table-provenance";
+const LEGACY_SNAPSHOT_NAMESPACE: &str = "db2-v1-legacy-snapshot";
+const PENDING_NAMESPACE: &str = "db2-v1-unit-of-work";
+const CURSOR_NAMESPACE: &str = "db2-v1-cursor";
+const CURSOR_DECLARATION_NAMESPACE: &str = "db2-v1-cursor-declaration";
+pub(crate) const REPLAY_NAMESPACE: &str = "db2-v1-replay";
 const MAX_RETAINED_CATALOG_GENERATIONS: usize = 64;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -66,7 +89,9 @@ struct Table {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct PendingUnit {
     base_catalog_version: u64,
-    tables: BTreeMap<String, Table>,
+    #[serde(default)]
+    base_tables: BTreeMap<String, Arc<Table>>,
+    tables: BTreeMap<String, Arc<Table>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -75,20 +100,60 @@ struct Cursor {
     index: usize,
 }
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub(crate) enum ReplayDigestFormat {
+    #[default]
+    #[serde(rename = "legacy-debug@0")]
+    LegacyDebugV0,
+    #[serde(rename = "mainframe-env.provider-replay-canonical@1")]
+    CanonicalHostV1,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-struct RecordedResult {
-    request_sha256: [u8; 32],
-    sqlcode: i32,
-    sqlstate: String,
-    message: String,
-    rows: Vec<Vec<Vec<u8>>>,
-    affected_rows: u64,
+#[serde(deny_unknown_fields)]
+pub(crate) struct RecordedResult {
+    #[serde(default)]
+    pub(crate) request_digest_format: ReplayDigestFormat,
+    pub(crate) request_sha256: [u8; 32],
+    #[serde(default)]
+    pub(crate) recorded_deadline_tick: u64,
+    #[serde(default)]
+    pub(crate) owner_execution: Option<String>,
+    #[serde(default)]
+    pub(crate) owner_run_unit: Option<String>,
+    #[serde(default)]
+    pub(crate) recorded_sequence: u64,
+    #[serde(default)]
+    pub(crate) resolution_tick: u64,
+    #[serde(default)]
+    pub(crate) owner_kind: Option<Db2ReplayOwnerKind>,
+    #[serde(default)]
+    pub(crate) outer_effect_key: Option<String>,
+    #[serde(default)]
+    pub(crate) result_sha256: [u8; 32],
+    #[serde(default)]
+    pub(crate) retention_binding_sha256: [u8; 32],
+    pub(crate) sqlcode: i32,
+    pub(crate) sqlstate: String,
+    pub(crate) message: String,
+    pub(crate) rows: Vec<Vec<Vec<u8>>>,
+    pub(crate) affected_rows: u64,
 }
 
 impl From<&Db2Result> for RecordedResult {
     fn from(result: &Db2Result) -> Self {
         Self {
+            request_digest_format: ReplayDigestFormat::CanonicalHostV1,
             request_sha256: [0; 32],
+            recorded_deadline_tick: 0,
+            owner_execution: None,
+            owner_run_unit: None,
+            recorded_sequence: 0,
+            resolution_tick: 0,
+            owner_kind: None,
+            outer_effect_key: None,
+            result_sha256: [0; 32],
+            retention_binding_sha256: [0; 32],
             sqlcode: result.sqlcode,
             sqlstate: result.sqlstate.clone(),
             message: result.message.clone(),
@@ -99,7 +164,7 @@ impl From<&Db2Result> for RecordedResult {
 }
 
 impl RecordedResult {
-    fn result(&self) -> Db2Result {
+    pub(crate) fn result(&self) -> Db2Result {
         Db2Result {
             sqlcode: self.sqlcode,
             sqlstate: self.sqlstate.clone(),
@@ -118,22 +183,29 @@ impl RecordedResult {
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 struct State {
     catalog_version: u64,
-    tables: BTreeMap<String, Table>,
+    tables: BTreeMap<String, Arc<Table>>,
     #[serde(default)]
     schemas: BTreeMap<String, Db2TableDefinition>,
     #[serde(default)]
     installations: BTreeMap<String, CatalogInstallation>,
     #[serde(default)]
-    catalog_generations: BTreeMap<String, BTreeMap<u64, CatalogGenerationSnapshot>>,
+    catalog_generations: BTreeMap<String, BTreeMap<u64, Arc<CatalogGenerationSnapshot>>>,
     #[serde(default)]
     table_provenance: BTreeMap<String, TableProvenance>,
     #[serde(default)]
-    legacy_snapshots: BTreeMap<String, LegacyTableSnapshot>,
-    pending: BTreeMap<String, PendingUnit>,
-    cursors: BTreeMap<String, Cursor>,
+    legacy_snapshots: BTreeMap<String, Arc<LegacyTableSnapshot>>,
+    pending: BTreeMap<String, Arc<PendingUnit>>,
+    cursors: BTreeMap<String, Arc<Cursor>>,
     #[serde(default)]
     cursor_declarations: BTreeMap<String, String>,
-    replay: BTreeMap<String, RecordedResult>,
+    replay: BTreeMap<String, Arc<RecordedResult>>,
+}
+
+impl State {
+    /// Fork a transaction by sharing immutable object payloads until touched.
+    fn scoped_snapshot(&self) -> Self {
+        self.clone()
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -148,7 +220,7 @@ struct CatalogGenerationSnapshot {
     generation: u64,
     identity: String,
     schemas: BTreeMap<String, Db2TableDefinition>,
-    tables: BTreeMap<String, Table>,
+    tables: BTreeMap<String, Arc<Table>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -160,18 +232,49 @@ enum TableProvenance {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct LegacyTableSnapshot {
     schema: Db2TableDefinition,
-    table: Table,
+    table: Arc<Table>,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct RowStoreManifest {
+    schema_version: String,
+    catalog_version: u64,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ObjectRow<T> {
+    schema_version: String,
+    object_key: String,
+    value: T,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+struct CatalogGenerationRow {
+    application: String,
+    snapshot: Arc<CatalogGenerationSnapshot>,
+}
+
+type RowVersions = BTreeMap<(String, String), u64>;
+
 struct DurableState {
-    store_version: u64,
+    versions: RowVersions,
     state: State,
+}
+
+/// Trusted durable logical-time source used to age newly persisted replay rows.
+pub trait Db2ReplayClock: Send + Sync {
+    /// Observe the current nonzero durable logical tick.
+    fn now_tick(&self) -> Result<u64, HostProblem>;
 }
 
 pub struct Db2Service {
     store: Arc<dyn ProviderStateStore>,
     limits: Db2Limits,
     durable: Mutex<DurableState>,
+    authorizer: Option<Arc<dyn EnterpriseAuthorizer>>,
+    replay_clock: Option<Arc<dyn Db2ReplayClock>>,
 }
 
 impl Db2Service {
@@ -179,27 +282,49 @@ impl Db2Service {
         store: Arc<dyn ProviderStateStore>,
         limits: Db2Limits,
     ) -> Result<Arc<Self>, HostProblem> {
-        let (store_version, mut state) = match store
-            .get_provider_state(STATE_NAMESPACE, STATE_KEY)
-            .map_err(store_error)?
-        {
-            Some(record) => (
-                record.version,
-                serde_json::from_slice(&record.payload)
-                    .map_err(|_| HostProblem::InfrastructureFailure)?,
-            ),
-            None => (0, State::default()),
-        };
-        migrate_table_provenance(&mut state)?;
-        rekey_state(&mut state)?;
-        validate_state(&state, limits)?;
+        Self::open_inner(store, limits, None, None)
+    }
+
+    /// Open with a trusted durable clock so new replay rows become retention-eligible.
+    pub fn open_with_replay_clock(
+        store: Arc<dyn ProviderStateStore>,
+        limits: Db2Limits,
+        replay_clock: Arc<dyn Db2ReplayClock>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_inner(store, limits, None, Some(replay_clock))
+    }
+
+    pub fn open_authorized(
+        store: Arc<dyn ProviderStateStore>,
+        limits: Db2Limits,
+        authorizer: Arc<dyn EnterpriseAuthorizer>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_inner(store, limits, Some(authorizer), None)
+    }
+
+    /// Open with enterprise authorization and a trusted durable replay clock.
+    pub fn open_authorized_with_replay_clock(
+        store: Arc<dyn ProviderStateStore>,
+        limits: Db2Limits,
+        authorizer: Arc<dyn EnterpriseAuthorizer>,
+        replay_clock: Arc<dyn Db2ReplayClock>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_inner(store, limits, Some(authorizer), Some(replay_clock))
+    }
+
+    fn open_inner(
+        store: Arc<dyn ProviderStateStore>,
+        limits: Db2Limits,
+        authorizer: Option<Arc<dyn EnterpriseAuthorizer>>,
+        replay_clock: Option<Arc<dyn Db2ReplayClock>>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        let (state, versions) = load_or_migrate(&*store, limits)?;
         Ok(Arc::new(Self {
             store,
             limits,
-            durable: Mutex::new(DurableState {
-                store_version,
-                state,
-            }),
+            durable: Mutex::new(DurableState { versions, state }),
+            authorizer,
+            replay_clock,
         }))
     }
 
@@ -226,7 +351,7 @@ impl Db2Service {
                 return Err(HostProblem::IdempotencyConflict);
             }
         }
-        let mut next = durable.state.clone();
+        let mut next = durable.state.scoped_snapshot();
         apply_catalog_generation(&mut next, catalog, self.limits)?;
         validate_state(&next, self.limits)?;
         self.persist(&mut durable, next)
@@ -249,7 +374,7 @@ impl Db2Service {
             .and_then(|generations| generations.get(&generation))
             .cloned()
             .ok_or(HostProblem::NotFound)?;
-        let mut next = durable.state.clone();
+        let mut next = durable.state.scoped_snapshot();
         snapshot_selected_catalog(&mut next, &application)?;
         let current_tables = next
             .installations
@@ -265,8 +390,8 @@ impl Db2Service {
                         .get(name)
                         .cloned()
                         .ok_or(HostProblem::InfrastructureFailure)?;
-                    next.schemas.insert(name.clone(), legacy.schema);
-                    next.tables.insert(name.clone(), legacy.table);
+                    next.schemas.insert(name.clone(), legacy.schema.clone());
+                    next.tables.insert(name.clone(), legacy.table.clone());
                 }
                 Some(TableProvenance::Application { owner, .. }) if owner == application => {
                     next.schemas.remove(name);
@@ -298,7 +423,7 @@ impl Db2Service {
             application,
             CatalogInstallation {
                 generation: target.generation,
-                identity: target.identity,
+                identity: target.identity.clone(),
                 tables: target.schemas.keys().cloned().collect(),
             },
         );
@@ -316,22 +441,59 @@ impl Db2Service {
         invocation: &Invocation,
         request: &Db2Request,
     ) -> Result<Db2Result, HostProblem> {
+        self.execute_at(invocation, request, invocation.deadline_tick)
+    }
+
+    fn execute_at(
+        &self,
+        invocation: &Invocation,
+        request: &Db2Request,
+        resolution_lower_bound: u64,
+    ) -> Result<Db2Result, HostProblem> {
+        if resolution_lower_bound == 0 {
+            return Err(HostProblem::Malformed);
+        }
         let mut durable = self.lock()?;
-        let request_sha256 = request_digest(request);
+        refresh_replay(&*self.store, self.limits, &mut durable)?;
+        if let Some(authorizer) = &self.authorizer {
+            for resource in db2_resources(&durable.state, invocation, request, self.limits)? {
+                authorizer.authorize(invocation.principal.id(), &resource)?;
+            }
+        }
+        refresh_replay(&*self.store, self.limits, &mut durable)?;
+        let request_sha256 = request_digest(request)?;
         let replay_key = request
             .mutation
             .as_ref()
             .map(|mutation| mutation.idempotency_key.as_str());
+        let sequence = request.mutation.as_ref().map(|mutation| mutation.sequence);
         if let Some(key) = replay_key
             && let Some(recorded) = durable.state.replay.get(key)
         {
-            return if recorded.request_sha256 == request_sha256 {
-                Ok(recorded.result())
-            } else {
-                Err(HostProblem::IdempotencyConflict)
-            };
+            match recorded.request_digest_format {
+                ReplayDigestFormat::LegacyDebugV0 => return Err(HostProblem::UnknownOutcome),
+                ReplayDigestFormat::CanonicalHostV1
+                    if recorded.request_sha256 == request_sha256 =>
+                {
+                    let result = recorded.result();
+                    let pending = db2_pending_replay_matches(
+                        recorded,
+                        key,
+                        invocation,
+                        sequence.ok_or(HostProblem::MissingIdempotency)?,
+                    )?;
+                    if pending {
+                        self.finalize_replay_metadata(&mut durable, key, resolution_lower_bound)
+                            .map_err(|_| HostProblem::UnknownOutcome)?;
+                    }
+                    return Ok(result);
+                }
+                ReplayDigestFormat::CanonicalHostV1 => {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+            }
         }
-        let mut next = durable.state.clone();
+        let mut next = durable.state.scoped_snapshot();
         let result = apply_request(&mut next, invocation, request, self.limits)?;
         if request.operation.is_mutating() || request.operation == Db2Operation::DeclareCursor {
             if request.operation.is_mutating() {
@@ -341,12 +503,109 @@ impl Db2Service {
                 }
                 let mut recorded = RecordedResult::from(&result);
                 recorded.request_sha256 = request_sha256;
-                next.replay.insert(key.to_string(), recorded);
+                prepare_db2_replay(
+                    &mut recorded,
+                    key,
+                    invocation,
+                    sequence.ok_or(HostProblem::MissingIdempotency)?,
+                    self.limits,
+                )?;
+                next.replay.insert(key.to_string(), Arc::new(recorded));
             }
             validate_state(&next, self.limits)?;
             self.persist(&mut durable, next)?;
+            if request.operation.is_mutating() {
+                self.finalize_replay_metadata(
+                    &mut durable,
+                    replay_key.ok_or(HostProblem::MissingIdempotency)?,
+                    resolution_lower_bound,
+                )
+                .map_err(|_| HostProblem::UnknownOutcome)?;
+            }
         }
         Ok(result)
+    }
+
+    fn finalize_replay_metadata(
+        &self,
+        durable: &mut DurableState,
+        key: &str,
+        resolution_lower_bound: u64,
+    ) -> Result<(), HostProblem> {
+        let Some(clock) = &self.replay_clock else {
+            return Ok(());
+        };
+        let observed_tick = clock.now_tick()?;
+        if observed_tick == 0 {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let mut next = durable.state.scoped_snapshot();
+        let recorded = next
+            .replay
+            .get_mut(key)
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        resolve_db2_replay(
+            Arc::make_mut(recorded),
+            key,
+            observed_tick,
+            resolution_lower_bound,
+        )?;
+        validate_state(&next, self.limits)?;
+        self.persist(durable, next)
+    }
+
+    /// Bind a retained pre-canonical replay receipt to a reviewed typed request.
+    ///
+    /// Legacy receipts are never replayed or redispatched implicitly. The caller
+    /// must attest the exact retained digest before this metadata-only migration.
+    pub fn reconcile_legacy_replay(
+        &self,
+        key: &IdempotencyKey,
+        expected_legacy_digest: [u8; 32],
+        request: &Db2Request,
+    ) -> Result<(), HostProblem> {
+        if !request.operation.is_mutating()
+            || request
+                .mutation
+                .as_ref()
+                .map(|mutation| &mutation.idempotency_key)
+                != Some(key)
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        let canonical = request_digest(request)?;
+        let mut durable = self.lock()?;
+        refresh_replay(&*self.store, self.limits, &mut durable)?;
+        let retained = durable
+            .state
+            .replay
+            .get(key.as_str())
+            .ok_or(HostProblem::NotFound)?;
+        match retained.request_digest_format {
+            ReplayDigestFormat::CanonicalHostV1 => {
+                return if retained.request_sha256 == canonical {
+                    Ok(())
+                } else {
+                    Err(HostProblem::IdempotencyConflict)
+                };
+            }
+            ReplayDigestFormat::LegacyDebugV0
+                if retained.request_sha256 != expected_legacy_digest =>
+            {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            ReplayDigestFormat::LegacyDebugV0 => {}
+        }
+        let mut next = durable.state.scoped_snapshot();
+        let retained = next
+            .replay
+            .get_mut(key.as_str())
+            .ok_or(HostProblem::NotFound)?;
+        let retained = Arc::make_mut(retained);
+        retained.request_digest_format = ReplayDigestFormat::CanonicalHostV1;
+        retained.request_sha256 = canonical;
+        validate_state(&next, self.limits)?;
+        self.persist(&mut durable, next)
     }
 
     pub fn table_rows(&self, table: &str) -> Result<Vec<Vec<Vec<u8>>>, HostProblem> {
@@ -373,26 +632,14 @@ impl Db2Service {
     }
 
     fn persist(&self, durable: &mut DurableState, state: State) -> Result<(), HostProblem> {
-        let payload = serde_json::to_vec(&state).map_err(|_| HostProblem::ProviderFailure)?;
-        if payload.len() > self.limits.max_state_bytes {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        let version = durable
-            .store_version
-            .checked_add(1)
-            .ok_or(HostProblem::ResourceExhausted)?;
-        self.store
-            .put_provider_state(
-                ProviderStateRecord {
-                    namespace: STATE_NAMESPACE.into(),
-                    key: STATE_KEY.into(),
-                    version,
-                    payload,
-                },
-                (durable.store_version != 0).then_some(durable.store_version),
-            )
-            .map_err(store_error)?;
-        durable.store_version = version;
+        let changes = row_changes(
+            &durable.state,
+            &state,
+            &durable.versions,
+            self.limits,
+            false,
+        )?;
+        commit_row_changes(&*self.store, changes, &mut durable.versions)?;
         durable.state = state;
         Ok(())
     }
@@ -402,6 +649,605 @@ impl Db2Service {
             .lock()
             .map_err(|_| HostProblem::InfrastructureFailure)
     }
+}
+
+fn refresh_replay(
+    store: &dyn ProviderStateStore,
+    limits: Db2Limits,
+    durable: &mut DurableState,
+) -> Result<(), HostProblem> {
+    let mut replay_versions = RowVersions::new();
+    let replay: BTreeMap<String, Arc<RecordedResult>> = load_row_map(
+        store,
+        REPLAY_NAMESPACE,
+        limits.max_replays,
+        limits,
+        &mut replay_versions,
+    )?;
+    if replay
+        .iter()
+        .any(|(key, recorded)| validate_db2_recorded_result(key, recorded, limits).is_err())
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    durable
+        .versions
+        .retain(|(namespace, _), _| namespace != REPLAY_NAMESPACE);
+    durable.versions.extend(replay_versions);
+    durable.state.replay = replay;
+    Ok(())
+}
+
+struct RowChange {
+    namespace: String,
+    key: String,
+    next_version: Option<u64>,
+    mutation: ProviderStateMutation,
+}
+
+fn load_or_migrate(
+    store: &dyn ProviderStateStore,
+    limits: Db2Limits,
+) -> Result<(State, RowVersions), HostProblem> {
+    let Some(manifest_record) = store
+        .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+        .map_err(store_error)?
+    else {
+        ensure_row_namespaces_empty(store)?;
+        return Ok((State::default(), RowVersions::new()));
+    };
+    if manifest_record.namespace != STATE_NAMESPACE
+        || manifest_record.key != STATE_KEY
+        || manifest_record.version == 0
+        || manifest_record.payload.len() > limits.max_state_bytes
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    if let Ok(manifest) = serde_json::from_slice::<RowStoreManifest>(&manifest_record.payload) {
+        if manifest.schema_version != ROW_STORE_SCHEMA {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let mut versions = RowVersions::from([(
+            (STATE_NAMESPACE.into(), STATE_KEY.into()),
+            manifest_record.version,
+        )]);
+        let state = State {
+            catalog_version: manifest.catalog_version,
+            tables: load_row_map(
+                store,
+                TABLE_NAMESPACE,
+                limits.max_tables,
+                limits,
+                &mut versions,
+            )?,
+            schemas: load_row_map(
+                store,
+                SCHEMA_NAMESPACE,
+                limits.max_tables,
+                limits,
+                &mut versions,
+            )?,
+            installations: load_row_map(
+                store,
+                INSTALLATION_NAMESPACE,
+                limits.max_tables,
+                limits,
+                &mut versions,
+            )?,
+            catalog_generations: load_generation_rows(store, limits, &mut versions)?,
+            table_provenance: load_row_map(
+                store,
+                PROVENANCE_NAMESPACE,
+                limits.max_tables,
+                limits,
+                &mut versions,
+            )?,
+            legacy_snapshots: load_row_map(
+                store,
+                LEGACY_SNAPSHOT_NAMESPACE,
+                limits.max_tables,
+                limits,
+                &mut versions,
+            )?,
+            pending: load_row_map(
+                store,
+                PENDING_NAMESPACE,
+                limits.max_cursors,
+                limits,
+                &mut versions,
+            )?,
+            cursors: load_row_map(
+                store,
+                CURSOR_NAMESPACE,
+                limits.max_cursors,
+                limits,
+                &mut versions,
+            )?,
+            cursor_declarations: load_row_map(
+                store,
+                CURSOR_DECLARATION_NAMESPACE,
+                limits.max_cursors,
+                limits,
+                &mut versions,
+            )?,
+            replay: load_row_map(
+                store,
+                REPLAY_NAMESPACE,
+                limits.max_replays,
+                limits,
+                &mut versions,
+            )?,
+        };
+        validate_state(&state, limits)?;
+        return Ok((state, versions));
+    }
+
+    let mut legacy: State = serde_json::from_slice(&manifest_record.payload)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    migrate_table_provenance(&mut legacy)?;
+    rekey_state(&mut legacy)?;
+    migrate_pending_units(&mut legacy)?;
+    validate_state(&legacy, limits)?;
+    ensure_row_namespaces_empty(store)?;
+    let mut versions = RowVersions::from([(
+        (STATE_NAMESPACE.into(), STATE_KEY.into()),
+        manifest_record.version,
+    )]);
+    let changes = row_changes(&State::default(), &legacy, &versions, limits, true)?;
+    commit_row_changes(store, changes, &mut versions)?;
+    Ok((legacy, versions))
+}
+
+fn ensure_row_namespaces_empty(store: &dyn ProviderStateStore) -> Result<(), HostProblem> {
+    for namespace in [
+        TABLE_NAMESPACE,
+        SCHEMA_NAMESPACE,
+        INSTALLATION_NAMESPACE,
+        GENERATION_NAMESPACE,
+        PROVENANCE_NAMESPACE,
+        LEGACY_SNAPSHOT_NAMESPACE,
+        PENDING_NAMESPACE,
+        CURSOR_NAMESPACE,
+        CURSOR_DECLARATION_NAMESPACE,
+        REPLAY_NAMESPACE,
+    ] {
+        if !store
+            .list_provider_state(namespace, 1)
+            .map_err(store_error)?
+            .is_empty()
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+    }
+    Ok(())
+}
+
+fn load_row_map<T: DeserializeOwned>(
+    store: &dyn ProviderStateStore,
+    namespace: &str,
+    max: usize,
+    limits: Db2Limits,
+    versions: &mut RowVersions,
+) -> Result<BTreeMap<String, T>, HostProblem> {
+    let fetch = max.checked_add(1).ok_or(HostProblem::ResourceExhausted)?;
+    let records = store
+        .list_provider_state(namespace, fetch)
+        .map_err(store_error)?;
+    if records.len() > max {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let mut values = BTreeMap::new();
+    for record in records {
+        if record.namespace != namespace
+            || record.key.is_empty()
+            || record.version == 0
+            || record.payload.len() > limits.max_state_bytes
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let row: ObjectRow<T> = serde_json::from_slice(&record.payload)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        if row.schema_version != OBJECT_ROW_SCHEMA || row.object_key != record.key {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        versions.insert((namespace.into(), record.key.clone()), record.version);
+        if values.insert(record.key, row.value).is_some() {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+    }
+    Ok(values)
+}
+
+fn load_generation_rows(
+    store: &dyn ProviderStateStore,
+    limits: Db2Limits,
+    versions: &mut RowVersions,
+) -> Result<BTreeMap<String, BTreeMap<u64, Arc<CatalogGenerationSnapshot>>>, HostProblem> {
+    let max = limits
+        .max_tables
+        .checked_mul(MAX_RETAINED_CATALOG_GENERATIONS)
+        .ok_or(HostProblem::ResourceExhausted)?;
+    let rows: BTreeMap<String, CatalogGenerationRow> =
+        load_row_map(store, GENERATION_NAMESPACE, max, limits, versions)?;
+    let mut generations = BTreeMap::<String, BTreeMap<u64, Arc<CatalogGenerationSnapshot>>>::new();
+    for (key, row) in rows {
+        let expected_key = generation_key(&row.application, row.snapshot.generation);
+        if key != expected_key
+            || generations
+                .entry(row.application)
+                .or_default()
+                .insert(row.snapshot.generation, row.snapshot)
+                .is_some()
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+    }
+    Ok(generations)
+}
+
+fn generation_key(application: &str, generation: u64) -> String {
+    format!("{application}|{generation:020}")
+}
+
+fn row_changes(
+    current: &State,
+    next: &State,
+    versions: &RowVersions,
+    limits: Db2Limits,
+    force_manifest_write: bool,
+) -> Result<Vec<RowChange>, HostProblem> {
+    let mut changes = Vec::new();
+    let fenced_tables = db2_table_fences(current, next);
+    let no_forced_rows = BTreeSet::new();
+    let current_manifest = RowStoreManifest {
+        schema_version: ROW_STORE_SCHEMA.into(),
+        catalog_version: current.catalog_version,
+    };
+    let next_manifest = RowStoreManifest {
+        schema_version: ROW_STORE_SCHEMA.into(),
+        catalog_version: next.catalog_version,
+    };
+    if force_manifest_write
+        || current_manifest != next_manifest
+        || !versions.contains_key(&(STATE_NAMESPACE.into(), STATE_KEY.into()))
+    {
+        let payload =
+            serde_json::to_vec(&next_manifest).map_err(|_| HostProblem::InfrastructureFailure)?;
+        changes.push(put_row_change(
+            STATE_NAMESPACE,
+            STATE_KEY,
+            payload,
+            versions,
+            limits.max_state_bytes,
+        )?);
+    }
+    map_arc_row_changes(
+        TABLE_NAMESPACE,
+        &current.tables,
+        &next.tables,
+        &fenced_tables,
+        versions,
+        limits,
+        &mut changes,
+    )?;
+    map_row_changes(
+        SCHEMA_NAMESPACE,
+        &current.schemas,
+        &next.schemas,
+        &fenced_tables,
+        versions,
+        limits,
+        &mut changes,
+    )?;
+    map_row_changes(
+        INSTALLATION_NAMESPACE,
+        &current.installations,
+        &next.installations,
+        &no_forced_rows,
+        versions,
+        limits,
+        &mut changes,
+    )?;
+    generation_row_changes(
+        &current.catalog_generations,
+        &next.catalog_generations,
+        versions,
+        limits,
+        &mut changes,
+    )?;
+    map_row_changes(
+        PROVENANCE_NAMESPACE,
+        &current.table_provenance,
+        &next.table_provenance,
+        &no_forced_rows,
+        versions,
+        limits,
+        &mut changes,
+    )?;
+    map_arc_row_changes(
+        LEGACY_SNAPSHOT_NAMESPACE,
+        &current.legacy_snapshots,
+        &next.legacy_snapshots,
+        &no_forced_rows,
+        versions,
+        limits,
+        &mut changes,
+    )?;
+    map_arc_row_changes(
+        PENDING_NAMESPACE,
+        &current.pending,
+        &next.pending,
+        &no_forced_rows,
+        versions,
+        limits,
+        &mut changes,
+    )?;
+    map_arc_row_changes(
+        CURSOR_NAMESPACE,
+        &current.cursors,
+        &next.cursors,
+        &no_forced_rows,
+        versions,
+        limits,
+        &mut changes,
+    )?;
+    map_row_changes(
+        CURSOR_DECLARATION_NAMESPACE,
+        &current.cursor_declarations,
+        &next.cursor_declarations,
+        &no_forced_rows,
+        versions,
+        limits,
+        &mut changes,
+    )?;
+    map_arc_row_changes(
+        REPLAY_NAMESPACE,
+        &current.replay,
+        &next.replay,
+        &no_forced_rows,
+        versions,
+        limits,
+        &mut changes,
+    )?;
+    Ok(changes)
+}
+
+fn db2_table_fences(current: &State, next: &State) -> BTreeSet<String> {
+    let changed = current
+        .tables
+        .keys()
+        .chain(next.tables.keys())
+        .filter(
+            |name| match (current.tables.get(*name), next.tables.get(*name)) {
+                (Some(current), Some(next)) => !Arc::ptr_eq(current, next),
+                (None, None) => false,
+                _ => true,
+            },
+        )
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let schemas = current
+        .schemas
+        .iter()
+        .chain(&next.schemas)
+        .map(|(name, schema)| (name.clone(), schema))
+        .collect::<BTreeMap<_, _>>();
+    let mut fenced = changed.clone();
+    for name in &changed {
+        if let Some(schema) = schemas.get(name) {
+            fenced.extend(
+                schema
+                    .foreign_keys
+                    .iter()
+                    .map(|foreign_key| foreign_key.referenced_table.to_ascii_uppercase()),
+            );
+        }
+        fenced.extend(
+            schemas
+                .iter()
+                .filter(|(_, schema)| {
+                    schema.foreign_keys.iter().any(|foreign_key| {
+                        foreign_key.referenced_table.to_ascii_uppercase() == *name
+                    })
+                })
+                .map(|(candidate, _)| candidate.clone()),
+        );
+    }
+    fenced
+}
+
+fn generation_row_changes(
+    current: &BTreeMap<String, BTreeMap<u64, Arc<CatalogGenerationSnapshot>>>,
+    next: &BTreeMap<String, BTreeMap<u64, Arc<CatalogGenerationSnapshot>>>,
+    versions: &RowVersions,
+    limits: Db2Limits,
+    changes: &mut Vec<RowChange>,
+) -> Result<(), HostProblem> {
+    for (application, generations) in next {
+        for (generation, snapshot) in generations {
+            if !current
+                .get(application)
+                .and_then(|current| current.get(generation))
+                .is_some_and(|current| Arc::ptr_eq(current, snapshot))
+            {
+                let key = generation_key(application, *generation);
+                changes.push(put_row_change(
+                    GENERATION_NAMESPACE,
+                    &key,
+                    encode_object_row(
+                        &key,
+                        &CatalogGenerationRow {
+                            application: application.clone(),
+                            snapshot: snapshot.clone(),
+                        },
+                    )?,
+                    versions,
+                    limits.max_state_bytes,
+                )?);
+            }
+        }
+    }
+    for (application, generations) in current {
+        for generation in generations.keys().filter(|generation| {
+            next.get(application)
+                .and_then(|next| next.get(generation))
+                .is_none()
+        }) {
+            let key = generation_key(application, *generation);
+            changes.push(delete_row_change(GENERATION_NAMESPACE, &key, versions)?);
+        }
+    }
+    Ok(())
+}
+
+fn map_row_changes<T: Serialize + PartialEq>(
+    namespace: &str,
+    current: &BTreeMap<String, T>,
+    next: &BTreeMap<String, T>,
+    forced: &BTreeSet<String>,
+    versions: &RowVersions,
+    limits: Db2Limits,
+    changes: &mut Vec<RowChange>,
+) -> Result<(), HostProblem> {
+    for (key, value) in next {
+        if forced.contains(key) || current.get(key) != Some(value) {
+            changes.push(put_row_change(
+                namespace,
+                key,
+                encode_object_row(key, value)?,
+                versions,
+                limits.max_state_bytes,
+            )?);
+        }
+    }
+    for key in current.keys().filter(|key| !next.contains_key(*key)) {
+        changes.push(delete_row_change(namespace, key, versions)?);
+    }
+    Ok(())
+}
+
+fn map_arc_row_changes<T: Serialize>(
+    namespace: &str,
+    current: &BTreeMap<String, Arc<T>>,
+    next: &BTreeMap<String, Arc<T>>,
+    forced: &BTreeSet<String>,
+    versions: &RowVersions,
+    limits: Db2Limits,
+    changes: &mut Vec<RowChange>,
+) -> Result<(), HostProblem> {
+    for (key, value) in next {
+        if forced.contains(key)
+            || !current
+                .get(key)
+                .is_some_and(|current| Arc::ptr_eq(current, value))
+        {
+            changes.push(put_row_change(
+                namespace,
+                key,
+                encode_object_row(key, value)?,
+                versions,
+                limits.max_state_bytes,
+            )?);
+        }
+    }
+    for key in current.keys().filter(|key| !next.contains_key(*key)) {
+        changes.push(delete_row_change(namespace, key, versions)?);
+    }
+    Ok(())
+}
+
+fn encode_object_row<T: Serialize>(key: &str, value: &T) -> Result<Vec<u8>, HostProblem> {
+    serde_json::to_vec(&ObjectRow {
+        schema_version: OBJECT_ROW_SCHEMA.into(),
+        object_key: key.into(),
+        value,
+    })
+    .map_err(|_| HostProblem::InfrastructureFailure)
+}
+
+fn put_row_change(
+    namespace: &str,
+    key: &str,
+    payload: Vec<u8>,
+    versions: &RowVersions,
+    max_state_bytes: usize,
+) -> Result<RowChange, HostProblem> {
+    if payload.len() > max_state_bytes {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let current = versions.get(&(namespace.into(), key.into())).copied();
+    let next = current
+        .unwrap_or(0)
+        .checked_add(1)
+        .ok_or(HostProblem::ResourceExhausted)?;
+    Ok(RowChange {
+        namespace: namespace.into(),
+        key: key.into(),
+        next_version: Some(next),
+        mutation: ProviderStateMutation::Put(ProviderStateWrite {
+            record: ProviderStateRecord {
+                namespace: namespace.into(),
+                key: key.into(),
+                version: next,
+                payload,
+            },
+            expected_version: current,
+        }),
+    })
+}
+
+fn delete_row_change(
+    namespace: &str,
+    key: &str,
+    versions: &RowVersions,
+) -> Result<RowChange, HostProblem> {
+    let version = versions
+        .get(&(namespace.into(), key.into()))
+        .copied()
+        .ok_or(HostProblem::InfrastructureFailure)?;
+    Ok(RowChange {
+        namespace: namespace.into(),
+        key: key.into(),
+        next_version: None,
+        mutation: ProviderStateMutation::Delete {
+            namespace: namespace.into(),
+            key: key.into(),
+            expected_version: version,
+        },
+    })
+}
+
+fn commit_row_changes(
+    store: &dyn ProviderStateStore,
+    changes: Vec<RowChange>,
+    versions: &mut RowVersions,
+) -> Result<(), HostProblem> {
+    if changes.is_empty() {
+        return Ok(());
+    }
+    let applied = changes
+        .iter()
+        .map(|change| {
+            (
+                (change.namespace.clone(), change.key.clone()),
+                change.next_version,
+            )
+        })
+        .collect::<Vec<_>>();
+    store
+        .mutate_provider_states_atomic(changes.into_iter().map(|change| change.mutation).collect())
+        .map_err(store_error)?;
+    for (key, version) in applied {
+        match version {
+            Some(version) => {
+                versions.insert(key, version);
+            }
+            None => {
+                versions.remove(&key);
+            }
+        }
+    }
+    Ok(())
 }
 
 fn apply_catalog_generation(
@@ -468,9 +1314,10 @@ fn apply_catalog_generation(
                     .get(&name)
                     .cloned()
                     .ok_or(HostProblem::Malformed)?;
-                state
-                    .legacy_snapshots
-                    .insert(name.clone(), LegacyTableSnapshot { schema, table });
+                state.legacy_snapshots.insert(
+                    name.clone(),
+                    Arc::new(LegacyTableSnapshot { schema, table }),
+                );
             }
         } else if !state.tables.contains_key(&name) {
             state.table_provenance.insert(
@@ -495,9 +1342,11 @@ fn apply_catalog_generation(
             }
         }
         state.schemas.insert(name.clone(), definition.clone());
-        state.tables.entry(name).or_insert_with(|| Table {
-            columns: definition.columns.len(),
-            rows: BTreeMap::new(),
+        state.tables.entry(name).or_insert_with(|| {
+            Arc::new(Table {
+                columns: definition.columns.len(),
+                rows: BTreeMap::new(),
+            })
         });
     }
     for seed in &catalog.rows {
@@ -521,6 +1370,7 @@ fn apply_catalog_generation(
             .tables
             .get_mut(&table_name)
             .ok_or(HostProblem::Malformed)?;
+        let table = Arc::make_mut(table);
         if table.rows.len() >= limits.max_rows_per_table {
             return Err(HostProblem::ResourceExhausted);
         }
@@ -540,7 +1390,7 @@ fn apply_catalog_generation(
         .catalog_generations
         .entry(application.clone())
         .or_default()
-        .insert(catalog.generation, snapshot);
+        .insert(catalog.generation, Arc::new(snapshot));
     state.installations.insert(
         application,
         CatalogInstallation {
@@ -570,7 +1420,7 @@ fn snapshot_selected_catalog(state: &mut State, application: &str) -> Result<(),
         .catalog_generations
         .entry(application.to_string())
         .or_default()
-        .insert(selected.generation, snapshot);
+        .insert(selected.generation, Arc::new(snapshot));
     Ok(())
 }
 
@@ -647,6 +1497,97 @@ fn apply_request(
     }
 }
 
+fn db2_resources(
+    state: &State,
+    invocation: &Invocation,
+    request: &Db2Request,
+    limits: Db2Limits,
+) -> Result<Vec<EnterpriseResource>, HostProblem> {
+    let run = invocation.run_unit_id.as_str();
+    let intent = if request.operation.is_mutating() {
+        AccessIntent::Update
+    } else {
+        AccessIntent::Read
+    };
+    let mut tables = BTreeSet::new();
+    match request.operation {
+        Db2Operation::ExecuteScript => {
+            tables.extend(
+                parse_create_tables(&request.statement, limits)?
+                    .into_iter()
+                    .map(|definition| definition.normalized_name()),
+            );
+            let words = sql_words(&request.statement);
+            for pair in words.windows(2) {
+                if pair[0].eq_ignore_ascii_case("INTO") {
+                    tables.insert(pair[1].trim_matches('"').to_ascii_uppercase());
+                }
+            }
+        }
+        Db2Operation::FreePlans => {
+            return Ok(vec![EnterpriseResource::new(
+                EnterpriseResourceClass::Db2Plan,
+                "ALL",
+                AccessIntent::Control,
+            )?]);
+        }
+        Db2Operation::Select | Db2Operation::Count | Db2Operation::Extract => {
+            if request
+                .statement
+                .to_ascii_uppercase()
+                .split_whitespace()
+                .eq(["SELECT", "1"])
+            {
+                tables.insert("SYSIBM.SYSDUMMY1".into());
+            } else {
+                tables.insert(table_for_operation(&request.statement, "FROM")?);
+            }
+        }
+        Db2Operation::Insert => {
+            tables.insert(table_for_operation(&request.statement, "INTO")?);
+        }
+        Db2Operation::Update => {
+            tables.insert(table_for_operation(&request.statement, "UPDATE")?);
+        }
+        Db2Operation::Delete => {
+            tables.insert(table_for_operation(&request.statement, "FROM")?);
+        }
+        Db2Operation::DeclareCursor => {
+            tables.insert(table_for_operation(&request.statement, "FROM")?);
+        }
+        Db2Operation::OpenCursor | Db2Operation::FetchCursor | Db2Operation::CloseCursor => {
+            let statement = if request.statement.to_ascii_uppercase().contains(" FROM ") {
+                Some(request.statement.as_str())
+            } else {
+                request.cursor.as_deref().and_then(|cursor| {
+                    state
+                        .cursor_declarations
+                        .get(&cursor_key(run, cursor))
+                        .map(String::as_str)
+                })
+            }
+            .ok_or(HostProblem::Malformed)?;
+            tables.insert(table_for_operation(statement, "FROM")?);
+        }
+        Db2Operation::Commit | Db2Operation::Rollback => {
+            if let Some(pending) = state.pending.get(run) {
+                tables.extend(pending.tables.keys().cloned());
+            }
+        }
+    }
+    if tables.is_empty() {
+        return Ok(vec![EnterpriseResource::new(
+            EnterpriseResourceClass::Db2UnitOfWork,
+            "CURRENT",
+            AccessIntent::Update,
+        )?]);
+    }
+    tables
+        .into_iter()
+        .map(|table| EnterpriseResource::new(EnterpriseResourceClass::Db2Table, table, intent))
+        .collect()
+}
+
 fn execute_script(
     state: &mut State,
     statement: &str,
@@ -666,9 +1607,11 @@ fn execute_script(
             state.schemas.insert(name.clone(), definition.clone());
             changed = true;
         }
-        state.tables.entry(name).or_insert_with(|| Table {
-            columns: definition.columns.len(),
-            rows: BTreeMap::new(),
+        state.tables.entry(name).or_insert_with(|| {
+            Arc::new(Table {
+                columns: definition.columns.len(),
+                rows: BTreeMap::new(),
+            })
         });
         state
             .table_provenance
@@ -720,6 +1663,7 @@ fn execute_script(
                 .tables
                 .get_mut(&table_name)
                 .ok_or(HostProblem::NotFound)?;
+            let table = Arc::make_mut(table);
             if table.rows.len() >= limits.max_rows_per_table && !table.rows.contains_key(&key) {
                 return Err(HostProblem::ResourceExhausted);
             }
@@ -961,9 +1905,10 @@ fn open_cursor(
     if backward {
         rows.reverse();
     }
-    state
-        .cursors
-        .insert(cursor_key(run, cursor_name), Cursor { rows, index: 0 });
+    state.cursors.insert(
+        cursor_key(run, cursor_name),
+        Arc::new(Cursor { rows, index: 0 }),
+    );
     Ok(success(0, "CURSOR OPEN", Vec::new()))
 }
 
@@ -979,6 +1924,7 @@ fn fetch_cursor(
             request.cursor.as_deref().ok_or(HostProblem::Malformed)?,
         ))
         .ok_or(HostProblem::NotFound)?;
+    let cursor = Arc::make_mut(cursor);
     let Some(row) = cursor.rows.get(cursor.index).cloned() else {
         return Ok(sql_condition(100, "02000", "END OF CURSOR"));
     };
@@ -1007,12 +1953,18 @@ fn commit(state: &mut State, run: &str) -> Result<Db2Result, HostProblem> {
         clear_run_cursors(state, run);
         return Ok(sql_condition(-911, "40001", "SERIALIZATION CONFLICT"));
     }
-    state.tables = pending.tables;
+    if pending
+        .base_tables
+        .iter()
+        .any(|(name, base)| state.tables.get(name).is_none_or(|current| current != base))
+    {
+        clear_run_cursors(state, run);
+        return Ok(sql_condition(-911, "40001", "SERIALIZATION CONFLICT"));
+    }
+    for (name, table) in &pending.tables {
+        state.tables.insert(name.clone(), table.clone());
+    }
     validate_foreign_keys(state)?;
-    state.catalog_version = state
-        .catalog_version
-        .checked_add(1)
-        .ok_or(HostProblem::ResourceExhausted)?;
     clear_run_cursors(state, run);
     Ok(success(0, "COMMIT", Vec::new()))
 }
@@ -1079,9 +2031,9 @@ fn read_table<'a>(state: &'a State, run: &str, table: &str) -> Result<&'a Table,
     state
         .pending
         .get(run)
-        .map(|pending| &pending.tables)
-        .unwrap_or(&state.tables)
-        .get(table)
+        .and_then(|pending| pending.tables.get(table))
+        .or_else(|| state.tables.get(table))
+        .map(Arc::as_ref)
         .ok_or(HostProblem::NotFound)
 }
 
@@ -1090,14 +2042,29 @@ fn write_table<'a>(
     run: &str,
     table: &str,
 ) -> Result<&'a mut Table, HostProblem> {
-    let pending = state
-        .pending
-        .entry(run.into())
-        .or_insert_with(|| PendingUnit {
+    let original = state
+        .tables
+        .get(table)
+        .cloned()
+        .ok_or(HostProblem::NotFound)?;
+    let pending = state.pending.entry(run.into()).or_insert_with(|| {
+        Arc::new(PendingUnit {
             base_catalog_version: state.catalog_version,
-            tables: state.tables.clone(),
-        });
-    pending.tables.get_mut(table).ok_or(HostProblem::NotFound)
+            base_tables: BTreeMap::new(),
+            tables: BTreeMap::new(),
+        })
+    });
+    let pending = Arc::make_mut(pending);
+    pending
+        .base_tables
+        .entry(table.into())
+        .or_insert_with(|| original.clone());
+    pending.tables.entry(table.into()).or_insert(original);
+    pending
+        .tables
+        .get_mut(table)
+        .map(Arc::make_mut)
+        .ok_or(HostProblem::NotFound)
 }
 
 fn clear_run_cursors(state: &mut State, run: &str) {
@@ -1138,14 +2105,18 @@ fn key_component(value: &[u8]) -> String {
 fn rekey_state(state: &mut State) -> Result<(), HostProblem> {
     rekey_table_map(&mut state.tables, &state.schemas)?;
     for pending in state.pending.values_mut() {
+        let pending = Arc::make_mut(pending);
+        rekey_table_map(&mut pending.base_tables, &state.schemas)?;
         rekey_table_map(&mut pending.tables, &state.schemas)?;
     }
     for generations in state.catalog_generations.values_mut() {
         for snapshot in generations.values_mut() {
+            let snapshot = Arc::make_mut(snapshot);
             rekey_table_map(&mut snapshot.tables, &snapshot.schemas)?;
         }
     }
     for snapshot in state.legacy_snapshots.values_mut() {
+        let snapshot = Arc::make_mut(snapshot);
         let mut rows = BTreeMap::new();
         for row in snapshot.table.rows.values() {
             let key = row_key(&snapshot.schema, row)?;
@@ -1153,7 +2124,32 @@ fn rekey_state(state: &mut State) -> Result<(), HostProblem> {
                 return Err(HostProblem::InfrastructureFailure);
             }
         }
-        snapshot.table.rows = rows;
+        Arc::make_mut(&mut snapshot.table).rows = rows;
+    }
+    Ok(())
+}
+
+fn migrate_pending_units(state: &mut State) -> Result<(), HostProblem> {
+    for pending in state.pending.values_mut() {
+        let pending = Arc::make_mut(pending);
+        pending.tables.retain(|name, table| {
+            state
+                .tables
+                .get(name)
+                .is_none_or(|committed| committed != table)
+        });
+        pending.base_tables = pending
+            .tables
+            .keys()
+            .map(|name| {
+                state
+                    .tables
+                    .get(name)
+                    .cloned()
+                    .map(|table| (name.clone(), table))
+                    .ok_or(HostProblem::InfrastructureFailure)
+            })
+            .collect::<Result<_, _>>()?;
     }
     Ok(())
 }
@@ -1191,7 +2187,7 @@ fn migrate_table_provenance(state: &mut State) -> Result<(), HostProblem> {
 }
 
 fn rekey_table_map(
-    tables: &mut BTreeMap<String, Table>,
+    tables: &mut BTreeMap<String, Arc<Table>>,
     schemas: &BTreeMap<String, Db2TableDefinition>,
 ) -> Result<(), HostProblem> {
     for (name, table) in tables {
@@ -1205,7 +2201,7 @@ fn rekey_table_map(
                 return Err(HostProblem::InfrastructureFailure);
             }
         }
-        table.rows = rows;
+        Arc::make_mut(table).rows = rows;
     }
     Ok(())
 }
@@ -2172,15 +3168,37 @@ fn sql_condition(sqlcode: i32, sqlstate: &str, message: &str) -> Db2Result {
     }
 }
 
-fn request_digest(request: &Db2Request) -> [u8; 32] {
-    Sha256::digest(format!("{request:?}").as_bytes()).into()
+fn request_digest(request: &Db2Request) -> Result<[u8; 32], HostProblem> {
+    canonical_db2_request_digest(request)
 }
 
 fn validate_state(state: &State, limits: Db2Limits) -> Result<(), HostProblem> {
     if state.tables.len() > limits.max_tables
         || state.schemas.len() > limits.max_tables
+        || state.installations.len() > limits.max_tables
+        || state.catalog_generations.len() > limits.max_tables
+        || state.tables.keys().collect::<BTreeSet<_>>()
+            != state.schemas.keys().collect::<BTreeSet<_>>()
+        || state.pending.len() > limits.max_cursors
         || state.cursors.len() > limits.max_cursors
+        || state.cursor_declarations.len() > limits.max_cursors
         || state.replay.len() > limits.max_replays
+        || state.pending.keys().any(String::is_empty)
+        || state.cursors.keys().any(String::is_empty)
+        || state.cursor_declarations.keys().any(String::is_empty)
+        || state
+            .pending
+            .values()
+            .any(|pending| pending.base_catalog_version > state.catalog_version)
+        || state
+            .cursors
+            .values()
+            .any(|cursor| cursor.index > cursor.rows.len())
+        || state.replay.keys().any(String::is_empty)
+        || state
+            .replay
+            .iter()
+            .any(|(key, recorded)| validate_db2_recorded_result(key, recorded, limits).is_err())
         || state.table_provenance.keys().collect::<BTreeSet<_>>()
             != state.tables.keys().collect::<BTreeSet<_>>()
         || state.legacy_snapshots.len() > limits.max_tables
@@ -2196,10 +3214,12 @@ fn validate_state(state: &State, limits: Db2Limits) -> Result<(), HostProblem> {
                 )
         })
         || !table_map_is_valid(&state.tables, &state.schemas, limits)
-        || state
-            .pending
-            .values()
-            .any(|pending| !table_map_is_valid(&pending.tables, &state.schemas, limits))
+        || state.pending.values().any(|pending| {
+            pending.base_tables.keys().collect::<BTreeSet<_>>()
+                != pending.tables.keys().collect::<BTreeSet<_>>()
+                || !table_map_is_valid(&pending.base_tables, &state.schemas, limits)
+                || !table_map_is_valid(&pending.tables, &state.schemas, limits)
+        })
         || state.installations.values().any(|installation| {
             installation.generation == 0
                 || installation.identity.len() != 71
@@ -2229,7 +3249,7 @@ fn validate_state(state: &State, limits: Db2Limits) -> Result<(), HostProblem> {
 }
 
 fn table_map_is_valid(
-    tables: &BTreeMap<String, Table>,
+    tables: &BTreeMap<String, Arc<Table>>,
     schemas: &BTreeMap<String, Db2TableDefinition>,
     limits: Db2Limits,
 ) -> bool {
@@ -2274,10 +3294,11 @@ impl HostProvider for Db2Provider {
 
     fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
         let sequence = effect.sequence;
+        let resolution_tick = effect.deadline_tick.max(invocation.deadline_tick);
         let outcome = match effect.request {
             HostRequest::Db2(request) => self
                 .service
-                .execute(invocation, &request)
+                .execute_at(invocation, &request, resolution_tick)
                 .map(HostResult::Db2),
             _ => Err(HostProblem::Malformed),
         };
@@ -2318,8 +3339,119 @@ mod tests {
         ResourceLimits, RunUnitId, Selector, TraceId,
     };
     use mainframe_env_host_api::Mutation;
-    use mainframe_env_store::MemoryStore;
+    use mainframe_env_store::{MemoryStore, SqliteStateStore};
+    use mainframe_env_store_api::{
+        ExecutionRecord, ExecutionState, ExecutionStore, RetentionPolicy, RetentionRequest,
+        RetentionStore, RetentionTarget,
+    };
     use std::collections::BTreeSet;
+    use std::sync::atomic::{AtomicU8, Ordering as AtomicOrdering};
+
+    #[derive(Default)]
+    struct DenyEnterprise {
+        seen: Mutex<Vec<EnterpriseResource>>,
+    }
+
+    impl EnterpriseAuthorizer for DenyEnterprise {
+        fn authorize(
+            &self,
+            _: &PrincipalId,
+            resource: &EnterpriseResource,
+        ) -> Result<(), HostProblem> {
+            self.seen.lock().unwrap().push(resource.clone());
+            Err(HostProblem::Unauthorized)
+        }
+    }
+
+    fn finish_invocation(store: &MemoryStore, invocation: &Invocation) {
+        store
+            .create_execution(ExecutionRecord {
+                execution_id: invocation.execution_id.clone(),
+                run_unit_id: invocation.run_unit_id.clone(),
+                selector: invocation.selector.clone(),
+                artifact: invocation.artifact.clone(),
+                principal: invocation.principal.id().clone(),
+                state: ExecutionState::Admitted,
+                attempt: invocation.attempt,
+                version: 1,
+                owner_lease: None,
+                lease_expiry_tick: None,
+                terminal_tick: None,
+            })
+            .unwrap();
+        let queued = store
+            .transition_execution(&invocation.execution_id, 1, ExecutionState::Queued, 1)
+            .unwrap();
+        let running = store
+            .transition_execution(
+                &invocation.execution_id,
+                queued.version,
+                ExecutionState::Running,
+                2,
+            )
+            .unwrap();
+        let completing = store
+            .transition_execution(
+                &invocation.execution_id,
+                running.version,
+                ExecutionState::Completing,
+                3,
+            )
+            .unwrap();
+        store
+            .transition_execution(
+                &invocation.execution_id,
+                completing.version,
+                ExecutionState::Completed,
+                4,
+            )
+            .unwrap();
+    }
+
+    struct PersistAwareReplayClock {
+        store: Arc<dyn ProviderStateStore>,
+        key: String,
+        tick: u64,
+        fault_stage: AtomicU8,
+    }
+
+    impl Db2ReplayClock for PersistAwareReplayClock {
+        fn now_tick(&self) -> Result<u64, HostProblem> {
+            match self.fault_stage.load(AtomicOrdering::SeqCst) {
+                1 => {
+                    self.fault_stage.store(2, AtomicOrdering::SeqCst);
+                    return Err(HostProblem::InfrastructureFailure);
+                }
+                2 => {
+                    self.fault_stage.store(0, AtomicOrdering::SeqCst);
+                    let mut row = self
+                        .store
+                        .get_provider_state(REPLAY_NAMESPACE, &self.key)
+                        .map_err(store_error)?
+                        .ok_or(HostProblem::InfrastructureFailure)?;
+                    let expected = row.version;
+                    row.version = row
+                        .version
+                        .checked_add(1)
+                        .ok_or(HostProblem::ResourceExhausted)?;
+                    self.store
+                        .put_provider_state(row, Some(expected))
+                        .map_err(store_error)?;
+                }
+                _ => {}
+            }
+            let row = self
+                .store
+                .get_provider_state(REPLAY_NAMESPACE, &self.key)
+                .map_err(store_error)?
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            let value: serde_json::Value = serde_json::from_slice(&row.payload)
+                .map_err(|_| HostProblem::InfrastructureFailure)?;
+            assert_eq!(value["value"]["resolution_tick"], 0);
+            assert!(value["value"]["owner_execution"].is_string());
+            Ok(self.tick)
+        }
+    }
 
     fn invocation(run: &str) -> Invocation {
         let limits = InvocationLimits::default();
@@ -2376,6 +3508,224 @@ mod tests {
             max_rows: 64,
             mutation,
         }
+    }
+
+    #[test]
+    fn db2_table_denial_precedes_mutation() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let policy = Arc::new(DenyEnterprise::default());
+        let service =
+            Db2Service::open_authorized(store, Db2Limits::default(), policy.clone()).unwrap();
+        service.install_catalog(installed_catalog(1)).unwrap();
+        let denied = service.execute(
+            &invocation("deny-db2"),
+            &request(
+                Db2Operation::Insert,
+                700,
+                "INSERT INTO APP.CODE",
+                BTreeMap::from([
+                    ("CODE".into(), variable("70")),
+                    ("DESCRIPTION".into(), varchar_variable("DENIED")),
+                ]),
+            ),
+        );
+        assert_eq!(denied, Err(HostProblem::Unauthorized));
+        assert_eq!(service.table_rows("APP.CODE").unwrap().len(), 1);
+        assert_eq!(
+            policy.seen.lock().unwrap().as_slice(),
+            &[EnterpriseResource::new(
+                EnterpriseResourceClass::Db2Table,
+                "APP.CODE",
+                AccessIntent::Update,
+            )
+            .unwrap()]
+        );
+    }
+
+    fn retain_as_legacy_replay(
+        store: &dyn ProviderStateStore,
+        key: &IdempotencyKey,
+        digest: [u8; 32],
+    ) {
+        let row = store
+            .get_provider_state(REPLAY_NAMESPACE, key.as_str())
+            .unwrap()
+            .unwrap();
+        let mut state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        let replay = state["value"].as_object_mut().unwrap();
+        replay.remove("request_digest_format");
+        for field in [
+            "recorded_deadline_tick",
+            "owner_execution",
+            "owner_run_unit",
+            "recorded_sequence",
+            "resolution_tick",
+            "owner_kind",
+            "outer_effect_key",
+            "result_sha256",
+            "retention_binding_sha256",
+        ] {
+            replay.remove(field);
+        }
+        replay.insert("request_sha256".into(), serde_json::json!(digest));
+        let version = row.version;
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    version: version + 1,
+                    payload: serde_json::to_vec(&state).unwrap(),
+                    ..row
+                },
+                Some(version),
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn external_replay_prune_refreshes_live_cache_before_replay_and_capacity() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let limits = Db2Limits {
+            max_replays: 1,
+            ..Db2Limits::default()
+        };
+        let first = Db2Service::open(store.clone(), limits).unwrap();
+        first.install_catalog(installed_catalog(1)).unwrap();
+        let invocation = invocation("refresh-db2");
+        let old = request(
+            Db2Operation::Insert,
+            801,
+            "INSERT INTO APP.CODE",
+            BTreeMap::from([
+                ("CODE".into(), variable("81")),
+                ("DESCRIPTION".into(), varchar_variable("OLD")),
+            ]),
+        );
+        assert_eq!(first.execute(&invocation, &old).unwrap().sqlcode, 0);
+
+        let second = Db2Service::open(store.clone(), limits).unwrap();
+        let old_key = old.mutation.as_ref().unwrap().idempotency_key.as_str();
+        let old_row = store
+            .get_provider_state(REPLAY_NAMESPACE, old_key)
+            .unwrap()
+            .unwrap();
+        store
+            .delete_provider_state(REPLAY_NAMESPACE, old_key, old_row.version)
+            .unwrap();
+
+        let fresh = request(
+            Db2Operation::Insert,
+            802,
+            "INSERT INTO APP.CODE",
+            BTreeMap::from([
+                ("CODE".into(), variable("82")),
+                ("DESCRIPTION".into(), varchar_variable("FRESH")),
+            ]),
+        );
+        assert_eq!(second.execute(&invocation, &fresh).unwrap().sqlcode, 0);
+
+        let fresh_key = fresh.mutation.as_ref().unwrap().idempotency_key.as_str();
+        let fresh_row = store
+            .get_provider_state(REPLAY_NAMESPACE, fresh_key)
+            .unwrap()
+            .unwrap();
+        store
+            .delete_provider_state(REPLAY_NAMESPACE, fresh_key, fresh_row.version)
+            .unwrap();
+        let redispatched = second.execute(&invocation, &old).unwrap();
+        assert_eq!(redispatched.sqlcode, -803);
+        assert_eq!(redispatched.sqlstate, "23505");
+
+        assert_eq!(first.pending_units().unwrap(), 1);
+    }
+
+    #[test]
+    fn delayed_resolution_is_observed_after_protected_replay_persistence() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let invocation = invocation("delayed-db2");
+        let request = request(
+            Db2Operation::Insert,
+            803,
+            "INSERT INTO APP.CODE",
+            BTreeMap::from([
+                ("CODE".into(), variable("83")),
+                ("DESCRIPTION".into(), varchar_variable("DELAYED")),
+            ]),
+        );
+        let key = request
+            .mutation
+            .as_ref()
+            .unwrap()
+            .idempotency_key
+            .as_str()
+            .to_string();
+        let clock = Arc::new(PersistAwareReplayClock {
+            store: store.clone(),
+            key: key.clone(),
+            tick: 20_000,
+            fault_stage: AtomicU8::new(0),
+        });
+        let service =
+            Db2Service::open_with_replay_clock(store.clone(), Db2Limits::default(), clock).unwrap();
+        service.install_catalog(installed_catalog(1)).unwrap();
+        service.execute(&invocation, &request).unwrap();
+
+        let row = store
+            .get_provider_state(REPLAY_NAMESPACE, &key)
+            .unwrap()
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        assert_eq!(value["value"]["recorded_deadline_tick"], 10_000);
+        assert_eq!(value["value"]["resolution_tick"], 20_000);
+        assert_eq!(
+            value["value"]["owner_execution"],
+            invocation.execution_id.as_str()
+        );
+    }
+
+    #[test]
+    fn post_commit_clock_and_cas_failures_are_unknown_then_retry_recovers() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let invocation = invocation("fault-db2");
+        let request = request(
+            Db2Operation::Insert,
+            804,
+            "INSERT INTO APP.CODE",
+            BTreeMap::from([
+                ("CODE".into(), variable("84")),
+                ("DESCRIPTION".into(), varchar_variable("FAULT")),
+            ]),
+        );
+        let key = request
+            .mutation
+            .as_ref()
+            .unwrap()
+            .idempotency_key
+            .as_str()
+            .to_string();
+        let clock = Arc::new(PersistAwareReplayClock {
+            store: store.clone(),
+            key: key.clone(),
+            tick: 20_000,
+            fault_stage: AtomicU8::new(1),
+        });
+        let service =
+            Db2Service::open_with_replay_clock(store.clone(), Db2Limits::default(), clock).unwrap();
+        service.install_catalog(installed_catalog(1)).unwrap();
+        assert_eq!(
+            service.execute(&invocation, &request),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(
+            service.execute(&invocation, &request),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(service.execute(&invocation, &request).unwrap().sqlcode, 0);
+        let row = store
+            .get_provider_state(REPLAY_NAMESPACE, &key)
+            .unwrap()
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        assert_eq!(value["value"]["resolution_tick"], 20_000);
     }
 
     fn variable(value: &str) -> Db2HostVariable {
@@ -2478,6 +3828,33 @@ mod tests {
                 },
             ],
         }
+    }
+
+    fn catalog_with_independent_note(identity_byte: u8) -> Db2CatalogGeneration {
+        let mut catalog = installed_catalog(identity_byte);
+        catalog.tables.push(Db2TableDefinition {
+            name: "APP.NOTE".into(),
+            columns: vec![
+                Db2ColumnDefinition {
+                    name: "ID".into(),
+                    nullable: false,
+                    max_bytes: 2,
+                    result_encoding: Db2ResultEncoding::Raw,
+                    default_value: None,
+                },
+                Db2ColumnDefinition {
+                    name: "VALUE".into(),
+                    nullable: false,
+                    max_bytes: 8,
+                    result_encoding: Db2ResultEncoding::Raw,
+                    default_value: None,
+                },
+            ],
+            primary_key: vec!["ID".into()],
+            foreign_keys: Vec::new(),
+            extract: None,
+        });
+        catalog
     }
 
     fn binary_catalog() -> Db2CatalogGeneration {
@@ -3482,5 +4859,587 @@ mod tests {
                 .sqlcode,
             -532
         );
+    }
+
+    #[test]
+    fn legacy_replay_requires_attested_canonical_migration_without_redispatch() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = Db2Service::open(store.clone(), Db2Limits::default()).unwrap();
+        service.install_catalog(installed_catalog(71)).unwrap();
+        let invocation = invocation("legacy-replay");
+        let insert = request(
+            Db2Operation::Insert,
+            901,
+            "INSERT INTO APP.CODE",
+            BTreeMap::from([
+                ("CODE".into(), variable("71")),
+                ("DESCRIPTION".into(), varchar_variable("ONCE")),
+            ]),
+        );
+        let key = insert.mutation.as_ref().unwrap().idempotency_key.clone();
+        let original = service.execute(&invocation, &insert).unwrap();
+        service
+            .execute(
+                &invocation,
+                &request(Db2Operation::Commit, 902, "COMMIT", BTreeMap::new()),
+            )
+            .unwrap();
+        assert_eq!(service.table_rows("APP.CODE").unwrap().len(), 2);
+        drop(service);
+
+        retain_as_legacy_replay(store.as_ref(), &key, [0x33; 32]);
+        let reopened = Db2Service::open(store.clone(), Db2Limits::default()).unwrap();
+        assert_eq!(
+            reopened.execute(&invocation, &insert),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(reopened.table_rows("APP.CODE").unwrap().len(), 2);
+        assert_eq!(
+            reopened.reconcile_legacy_replay(&key, [0x44; 32], &insert),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        reopened
+            .reconcile_legacy_replay(&key, [0x33; 32], &insert)
+            .unwrap();
+        assert_eq!(reopened.execute(&invocation, &insert), Ok(original.clone()));
+        assert_eq!(reopened.table_rows("APP.CODE").unwrap().len(), 2);
+        drop(reopened);
+
+        let restarted = Db2Service::open(store, Db2Limits::default()).unwrap();
+        assert_eq!(restarted.execute(&invocation, &insert), Ok(original));
+        assert_eq!(restarted.table_rows("APP.CODE").unwrap().len(), 2);
+    }
+
+    #[test]
+    fn legacy_blob_migrates_atomically_to_versioned_scoped_rows_and_corruption_fails_closed() {
+        let limits = Db2Limits::default();
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let mut legacy = State::default();
+        apply_catalog_generation(&mut legacy, catalog_with_independent_note(91), limits).unwrap();
+        validate_state(&legacy, limits).unwrap();
+        let legacy_payload = serde_json::to_vec(&legacy).unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: STATE_NAMESPACE.into(),
+                    key: STATE_KEY.into(),
+                    version: 1,
+                    payload: legacy_payload.clone(),
+                },
+                None,
+            )
+            .unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: TABLE_NAMESPACE.into(),
+                    key: "ORPHAN".into(),
+                    version: 1,
+                    payload: encode_object_row(
+                        "ORPHAN",
+                        &Table {
+                            columns: 1,
+                            rows: BTreeMap::new(),
+                        },
+                    )
+                    .unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        assert!(matches!(
+            Db2Service::open(store.clone(), limits),
+            Err(HostProblem::InfrastructureFailure)
+        ));
+        assert_eq!(
+            store
+                .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+                .unwrap()
+                .unwrap()
+                .payload,
+            legacy_payload
+        );
+        store
+            .delete_provider_state(TABLE_NAMESPACE, "ORPHAN", 1)
+            .unwrap();
+
+        let service = Db2Service::open(store.clone(), limits).unwrap();
+        let manifest_before = store
+            .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+            .unwrap()
+            .unwrap();
+        let manifest: RowStoreManifest = serde_json::from_slice(&manifest_before.payload).unwrap();
+        assert_eq!(manifest.schema_version, ROW_STORE_SCHEMA);
+        assert_eq!(manifest_before.version, 2);
+        assert_eq!(
+            store.list_provider_state(TABLE_NAMESPACE, 4).unwrap().len(),
+            3
+        );
+        assert_eq!(
+            store
+                .list_provider_state(GENERATION_NAMESPACE, 3)
+                .unwrap()
+                .len(),
+            1
+        );
+        let note_before = store
+            .get_provider_state(TABLE_NAMESPACE, "APP.NOTE")
+            .unwrap()
+            .unwrap();
+        let code_version = store
+            .get_provider_state(TABLE_NAMESPACE, "APP.CODE")
+            .unwrap()
+            .unwrap()
+            .version;
+        let invocation = invocation("row-scope");
+        let insert = request(
+            Db2Operation::Insert,
+            501,
+            "INSERT INTO APP.CODE",
+            BTreeMap::from([
+                ("CODE".into(), variable("91")),
+                ("DESCRIPTION".into(), varchar_variable("SCOPED")),
+            ]),
+        );
+        service.execute(&invocation, &insert).unwrap();
+        assert!(
+            store
+                .get_provider_state(PENDING_NAMESPACE, invocation.run_unit_id.as_str())
+                .unwrap()
+                .is_some()
+        );
+        assert_eq!(
+            store
+                .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+                .unwrap()
+                .unwrap(),
+            manifest_before
+        );
+        service
+            .execute(
+                &invocation,
+                &request(Db2Operation::Commit, 502, "COMMIT", BTreeMap::new()),
+            )
+            .unwrap();
+        assert!(
+            store
+                .get_provider_state(PENDING_NAMESPACE, invocation.run_unit_id.as_str())
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            store
+                .get_provider_state(TABLE_NAMESPACE, "APP.NOTE")
+                .unwrap()
+                .unwrap(),
+            note_before
+        );
+        assert_eq!(
+            store
+                .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+                .unwrap()
+                .unwrap(),
+            manifest_before
+        );
+        assert_eq!(service.table_rows("APP.CODE").unwrap().len(), 2);
+        assert_eq!(
+            store
+                .get_provider_state(TABLE_NAMESPACE, "APP.CODE")
+                .unwrap()
+                .unwrap()
+                .version,
+            code_version + 1
+        );
+        drop(service);
+
+        let detail = store
+            .get_provider_state(TABLE_NAMESPACE, "APP.CODE_DETAIL")
+            .unwrap()
+            .unwrap();
+        let mut corrupt: serde_json::Value = serde_json::from_slice(&detail.payload).unwrap();
+        corrupt["schema_version"] = serde_json::json!("mainframe-env.db2-object-row@999");
+        let version = detail.version;
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    version: version + 1,
+                    payload: serde_json::to_vec(&corrupt).unwrap(),
+                    ..detail
+                },
+                Some(version),
+            )
+            .unwrap();
+        assert!(matches!(
+            Db2Service::open(store, limits),
+            Err(HostProblem::InfrastructureFailure)
+        ));
+    }
+
+    #[test]
+    fn empty_legacy_blob_is_always_replaced_by_a_versioned_manifest() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: STATE_NAMESPACE.into(),
+                    key: STATE_KEY.into(),
+                    version: 1,
+                    payload: serde_json::to_vec(&State::default()).unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+
+        drop(Db2Service::open(store.clone(), Default::default()).unwrap());
+        let manifest = store
+            .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+            .unwrap()
+            .unwrap();
+        assert_eq!(manifest.version, 2);
+        assert_eq!(
+            serde_json::from_slice::<RowStoreManifest>(&manifest.payload)
+                .unwrap()
+                .schema_version,
+            ROW_STORE_SCHEMA
+        );
+    }
+
+    #[test]
+    fn in_flight_legacy_unit_gains_scoped_conflict_baselines_during_migration() {
+        let limits = Db2Limits::default();
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let mut legacy = State::default();
+        apply_catalog_generation(&mut legacy, installed_catalog(109), limits).unwrap();
+        let invocation = invocation("legacy-pending");
+        apply_request(
+            &mut legacy,
+            &invocation,
+            &request(
+                Db2Operation::Insert,
+                971,
+                "INSERT INTO APP.CODE",
+                BTreeMap::from([
+                    ("CODE".into(), variable("97")),
+                    ("DESCRIPTION".into(), varchar_variable("MIGRATED")),
+                ]),
+            ),
+            limits,
+        )
+        .unwrap();
+        let mut legacy_payload = serde_json::to_value(&legacy).unwrap();
+        legacy_payload["pending"][invocation.run_unit_id.as_str()]
+            .as_object_mut()
+            .unwrap()
+            .remove("base_tables");
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: STATE_NAMESPACE.into(),
+                    key: STATE_KEY.into(),
+                    version: 1,
+                    payload: serde_json::to_vec(&legacy_payload).unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+
+        let service = Db2Service::open(store.clone(), limits).unwrap();
+        assert_eq!(service.pending_units().unwrap(), 1);
+        service
+            .execute(
+                &invocation,
+                &request(Db2Operation::Commit, 972, "COMMIT", BTreeMap::new()),
+            )
+            .unwrap();
+        drop(service);
+
+        let reopened = Db2Service::open(store, limits).unwrap();
+        assert_eq!(reopened.table_rows("APP.CODE").unwrap().len(), 2);
+        assert_eq!(reopened.pending_units().unwrap(), 0);
+    }
+
+    #[test]
+    fn independent_table_rows_commit_from_separate_service_instances_without_global_cas() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let installer = Db2Service::open(store.clone(), Default::default()).unwrap();
+        installer
+            .install_catalog(catalog_with_independent_note(111))
+            .unwrap();
+        drop(installer);
+        let manifest = store
+            .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+            .unwrap()
+            .unwrap();
+        let left = Db2Service::open(store.clone(), Default::default()).unwrap();
+        let right = Db2Service::open(store.clone(), Default::default()).unwrap();
+        let left_worker = std::thread::spawn(move || {
+            let invocation = invocation("left-table");
+            left.execute(
+                &invocation,
+                &request(
+                    Db2Operation::Insert,
+                    931,
+                    "INSERT INTO APP.CODE",
+                    BTreeMap::from([
+                        ("CODE".into(), variable("91")),
+                        ("DESCRIPTION".into(), varchar_variable("LEFT")),
+                    ]),
+                ),
+            )?;
+            left.execute(
+                &invocation,
+                &request(Db2Operation::Commit, 932, "COMMIT", BTreeMap::new()),
+            )
+        });
+        let right_worker = std::thread::spawn(move || {
+            let invocation = invocation("right-table");
+            right.execute(
+                &invocation,
+                &request(
+                    Db2Operation::Insert,
+                    941,
+                    "INSERT INTO APP.NOTE",
+                    BTreeMap::from([
+                        ("ID".into(), variable("01")),
+                        ("VALUE".into(), variable("RIGHT")),
+                    ]),
+                ),
+            )?;
+            right.execute(
+                &invocation,
+                &request(Db2Operation::Commit, 942, "COMMIT", BTreeMap::new()),
+            )
+        });
+        left_worker.join().unwrap().unwrap();
+        right_worker.join().unwrap().unwrap();
+
+        let reopened = Db2Service::open(store.clone(), Default::default()).unwrap();
+        assert_eq!(reopened.table_rows("APP.CODE").unwrap().len(), 2);
+        assert_eq!(reopened.table_rows("APP.NOTE").unwrap().len(), 1);
+        assert_eq!(
+            store
+                .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+                .unwrap()
+                .unwrap(),
+            manifest
+        );
+    }
+
+    #[test]
+    fn foreign_key_dependency_rows_fence_concurrent_related_commits() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let mut catalog = installed_catalog(112);
+        catalog.rows.push(crate::Db2SeedRow {
+            table: "APP.CODE".into(),
+            values: BTreeMap::from([
+                ("CODE".into(), b"02".to_vec()),
+                ("DESCRIPTION".into(), b"SECOND".to_vec()),
+            ]),
+        });
+        let installer = Db2Service::open(store.clone(), Default::default()).unwrap();
+        installer.install_catalog(catalog).unwrap();
+        drop(installer);
+
+        let left = Db2Service::open(store.clone(), Default::default()).unwrap();
+        let right = Db2Service::open(store.clone(), Default::default()).unwrap();
+        let left_invocation = invocation("delete-parent");
+        left.execute(
+            &left_invocation,
+            &request(
+                Db2Operation::Delete,
+                951,
+                "DELETE FROM APP.CODE",
+                BTreeMap::from([("CODE".into(), variable("02"))]),
+            ),
+        )
+        .unwrap();
+        let right_invocation = invocation("insert-child");
+        right
+            .execute(
+                &right_invocation,
+                &request(
+                    Db2Operation::Insert,
+                    961,
+                    "INSERT INTO APP.CODE_DETAIL",
+                    BTreeMap::from([
+                        ("CODE".into(), variable("02")),
+                        ("DETAIL".into(), variable("D2")),
+                    ]),
+                ),
+            )
+            .unwrap();
+        left.execute(
+            &left_invocation,
+            &request(Db2Operation::Commit, 952, "COMMIT", BTreeMap::new()),
+        )
+        .unwrap();
+        assert_eq!(
+            right.execute(
+                &right_invocation,
+                &request(Db2Operation::Commit, 962, "COMMIT", BTreeMap::new()),
+            ),
+            Err(HostProblem::IdempotencyConflict)
+        );
+
+        let reopened = Db2Service::open(store, Default::default()).unwrap();
+        assert_eq!(reopened.table_rows("APP.CODE").unwrap().len(), 1);
+        assert_eq!(reopened.table_rows("APP.CODE_DETAIL").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn sqlite_executes_and_reopens_the_versioned_row_layout() {
+        let store: Arc<dyn ProviderStateStore> =
+            Arc::new(SqliteStateStore::open("sqlite::memory:", 64 * 1024 * 1024, 262_144).unwrap());
+        let mut legacy = State::default();
+        apply_catalog_generation(&mut legacy, installed_catalog(101), Default::default()).unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: STATE_NAMESPACE.into(),
+                    key: STATE_KEY.into(),
+                    version: 1,
+                    payload: serde_json::to_vec(&legacy).unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        let service = Db2Service::open(store.clone(), Default::default()).unwrap();
+        let invocation = invocation("sqlite-row");
+        service
+            .execute(
+                &invocation,
+                &request(
+                    Db2Operation::Insert,
+                    801,
+                    "INSERT INTO APP.CODE",
+                    BTreeMap::from([
+                        ("CODE".into(), variable("81")),
+                        ("DESCRIPTION".into(), varchar_variable("SQLITE")),
+                    ]),
+                ),
+            )
+            .unwrap();
+        service
+            .execute(
+                &invocation,
+                &request(Db2Operation::Commit, 802, "COMMIT", BTreeMap::new()),
+            )
+            .unwrap();
+        drop(service);
+
+        let reopened = Db2Service::open(store.clone(), Default::default()).unwrap();
+        assert_eq!(reopened.table_rows("APP.CODE").unwrap().len(), 2);
+        assert_eq!(
+            store.list_provider_state(TABLE_NAMESPACE, 3).unwrap().len(),
+            2
+        );
+        assert!(
+            serde_json::from_slice::<RowStoreManifest>(
+                &store
+                    .get_provider_state(STATE_NAMESPACE, STATE_KEY)
+                    .unwrap()
+                    .unwrap()
+                    .payload
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn replay_retention_preserves_the_live_idempotency_window() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = Db2Service::open(
+            store.clone(),
+            Db2Limits {
+                max_replays: 2,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        service.install_catalog(installed_catalog(113)).unwrap();
+        let mut expired_invocation = invocation("expired-replay");
+        expired_invocation.deadline_tick = 10;
+        let expired = request(
+            Db2Operation::Insert,
+            981,
+            "INSERT INTO APP.CODE",
+            BTreeMap::from([
+                ("CODE".into(), variable("81")),
+                ("DESCRIPTION".into(), varchar_variable("EXPIRED")),
+            ]),
+        );
+        service.execute(&expired_invocation, &expired).unwrap();
+        let mut live_invocation = invocation("live-replay");
+        live_invocation.deadline_tick = 95;
+        let live = request(
+            Db2Operation::Insert,
+            982,
+            "INSERT INTO APP.CODE",
+            BTreeMap::from([
+                ("CODE".into(), variable("82")),
+                ("DESCRIPTION".into(), varchar_variable("LIVE")),
+            ]),
+        );
+        let live_result = service.execute(&live_invocation, &live).unwrap();
+        finish_invocation(store.as_ref(), &expired_invocation);
+        finish_invocation(store.as_ref(), &live_invocation);
+        let expired_key = expired.mutation.as_ref().unwrap().idempotency_key.clone();
+        let live_key = live.mutation.as_ref().unwrap().idempotency_key.clone();
+        let raw_retention = store.archive_and_prune(
+            retention_policy(),
+            RetentionRequest {
+                target: RetentionTarget::Db2Replay,
+                now_tick: 100,
+                max_records: 8,
+            },
+        );
+        assert_eq!(raw_retention, Err(StoreError::InvalidTransition));
+        if raw_retention.is_err() {
+            return;
+        }
+        assert!(
+            store
+                .get_provider_state(REPLAY_NAMESPACE, expired_key.as_str())
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            store
+                .get_provider_state(REPLAY_NAMESPACE, live_key.as_str())
+                .unwrap()
+                .is_some()
+        );
+        assert_eq!(service.execute(&live_invocation, &live), Ok(live_result));
+        let fresh = request(
+            Db2Operation::Insert,
+            983,
+            "INSERT INTO APP.CODE",
+            BTreeMap::from([
+                ("CODE".into(), variable("83")),
+                ("DESCRIPTION".into(), varchar_variable("FRESH")),
+            ]),
+        );
+        service
+            .execute(&invocation("fresh-replay"), &fresh)
+            .unwrap();
+        assert_eq!(
+            store
+                .list_provider_state(REPLAY_NAMESPACE, 3)
+                .unwrap()
+                .len(),
+            2
+        );
+    }
+
+    fn retention_policy() -> RetentionPolicy {
+        RetentionPolicy {
+            lifecycle_ticks: 10,
+            idempotency_ticks: 10,
+            audit_ticks: 20,
+            archive_ticks: 50,
+            low_watermark_percent: 70,
+            high_watermark_percent: 85,
+            max_batch: 8,
+        }
     }
 }

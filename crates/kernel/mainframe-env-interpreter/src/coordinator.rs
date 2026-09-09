@@ -2,20 +2,23 @@ use mainframe_env_diagnostics::{
     DiagnosticCode, DiagnosticLimits, ExecutionProblem, FailureCategory, Phase,
 };
 use mainframe_env_execution_api::{
-    ExecutionOutcome, Invocation, LifecycleEvent, LifecycleEventKind, Machine, MachineDrive,
-    MachineResume, Quantum,
+    AuditRecord, ExecutionOutcome, Invocation, InvocationLimits, LifecycleEvent,
+    LifecycleEventKind, Machine, MachineDrive, MachineResume, Quantum,
 };
 use mainframe_env_host_api::{
-    EffectRequest, EffectResult, HostProblem, ScopedHostService, canonical_request_digest,
-    canonical_result_digest,
+    EffectRequest, EffectResult, HostProblem, ScopedHostService, canonical_audit_resource_digest,
+    canonical_request_digest, canonical_result_digest,
 };
 use mainframe_env_store_api::{
-    CheckpointRecord, EffectDigestFormat, EffectRecord, EffectState, ExecutionRecord,
-    ExecutionState, OutboxRecord, PlatformStore, StoreError,
+    AuditSink, CheckpointRecord, EffectDigestFormat, EffectIntentMetadata, EffectRecord,
+    EffectState, ExecutionRecord, ExecutionState, OutboxRecord, PlatformStore, StoreError,
 };
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::sync::Arc;
+
+const LIFECYCLE_OUTBOX_TOPIC: &str = "execution.lifecycle.v1";
+const LIFECYCLE_OUTBOX_DOMAIN: &[u8] = b"mainframe-env.execution-lifecycle@1\0";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CoordinatorLimits {
@@ -51,7 +54,26 @@ pub enum ExecutionControlError {
 pub struct ExecutionCoordinator {
     host: Option<Arc<ScopedHostService>>,
     store: Option<Arc<dyn PlatformStore>>,
+    audit_sink: Option<Arc<dyn AuditSink>>,
     limits: CoordinatorLimits,
+}
+
+struct PlatformAuditSink(Arc<dyn PlatformStore>);
+
+impl AuditSink for PlatformAuditSink {
+    fn record_audit(&self, record: AuditRecord) -> Result<(), StoreError> {
+        self.0.record_audit(record)
+    }
+
+    fn audit_records(
+        &self,
+        execution_id: &mainframe_env_execution_api::ExecutionId,
+        start_effect_sequence: u64,
+        max: usize,
+    ) -> Result<Vec<AuditRecord>, StoreError> {
+        self.0
+            .audit_records(execution_id, start_effect_sequence, max)
+    }
 }
 
 impl ExecutionCoordinator {
@@ -60,17 +82,35 @@ impl ExecutionCoordinator {
         Self {
             host: None,
             store: None,
+            audit_sink: None,
             limits,
         }
     }
 
     #[must_use]
-    pub fn with_host(host: Arc<ScopedHostService>, limits: CoordinatorLimits) -> Self {
+    pub fn with_host(
+        host: Arc<ScopedHostService>,
+        audit_sink: Arc<dyn AuditSink>,
+        limits: CoordinatorLimits,
+    ) -> Self {
         Self {
             host: Some(host),
             store: None,
+            audit_sink: Some(audit_sink),
             limits,
         }
+    }
+
+    /// Execute without a lifecycle journal while retaining every host decision in a platform
+    /// store's typed audit sink. Callers that share execution authority with the store must use
+    /// [`Self::durable`] instead.
+    #[must_use]
+    pub fn with_host_audit_store(
+        host: Arc<ScopedHostService>,
+        store: Arc<dyn PlatformStore>,
+        limits: CoordinatorLimits,
+    ) -> Self {
+        Self::with_host(host, Arc::new(PlatformAuditSink(store)), limits)
     }
 
     #[must_use]
@@ -82,6 +122,7 @@ impl ExecutionCoordinator {
         Self {
             host: Some(host),
             store: Some(store),
+            audit_sink: None,
             limits,
         }
     }
@@ -105,23 +146,93 @@ impl ExecutionCoordinator {
         &self,
         machine: &mut M,
         invocation: &Invocation,
-        mut observe: F,
+        observe: F,
     ) -> ExecutionOutcome
     where
         M: Machine<Effect = EffectRequest, EffectResult = EffectResult>,
         F: FnMut() -> Result<ExecutionControl, ExecutionControlError>,
     {
+        self.execute_inner(machine, invocation, observe, false)
+    }
+
+    /// Resume a durably journaled execution after a process boundary.
+    ///
+    /// Only a matching non-terminal execution can be resumed. A previously
+    /// completed effect is dispatched solely through its original idempotency
+    /// identity and its replayed result must match the committed canonical
+    /// digest. An unresolved intent or unknown result is never redispatched.
+    pub fn execute_resumable_with_control<M, F>(
+        &self,
+        machine: &mut M,
+        invocation: &Invocation,
+        observe: F,
+    ) -> ExecutionOutcome
+    where
+        M: Machine<Effect = EffectRequest, EffectResult = EffectResult>,
+        F: FnMut() -> Result<ExecutionControl, ExecutionControlError>,
+    {
+        self.execute_inner(machine, invocation, observe, true)
+    }
+
+    /// Close a suspended execution after its checkpoint has been durably
+    /// transferred to a product-owned continuation.
+    ///
+    /// The state transition and its lifecycle event are committed atomically.
+    /// The now-redundant interpreter checkpoint is then removed; a caller may
+    /// safely retry that cleanup when recovering the terminal execution.
+    pub fn complete_suspended_handoff(
+        &self,
+        invocation: &Invocation,
+        tick: u64,
+    ) -> Result<(), StoreError> {
+        let store = self.store.as_ref().ok_or_else(|| {
+            StoreError::Infrastructure("handoff completion requires an execution store".into())
+        })?;
+        let (mut journal, state) = JournalCursor::open(Arc::clone(store), invocation, tick, true)?;
+        if state != Some(ExecutionState::Suspended) {
+            return Err(StoreError::InvalidTransition);
+        }
+        journal.record(
+            Some(ExecutionState::Completed),
+            LifecycleEventKind::HandoffCompleted,
+            None,
+            None,
+            None,
+        )?;
+        match store.delete_checkpoint(&invocation.execution_id) {
+            Ok(()) | Err(StoreError::NotFound) => Ok(()),
+            Err(problem) => Err(problem),
+        }
+    }
+
+    fn execute_inner<M, F>(
+        &self,
+        machine: &mut M,
+        invocation: &Invocation,
+        mut observe: F,
+        resumable: bool,
+    ) -> ExecutionOutcome
+    where
+        M: Machine<Effect = EffectRequest, EffectResult = EffectResult>,
+        F: FnMut() -> Result<ExecutionControl, ExecutionControlError>,
+    {
+        if resumable && self.store.is_none() {
+            return infrastructure_failure("durable resume requires an execution store");
+        }
         let mut control = match observe() {
             Ok(control) => control,
             Err(_) => return infrastructure_failure("execution controls unavailable at admission"),
         };
-        let mut journal = match self
+        let (mut journal, resumed_from) = match self
             .store
             .as_ref()
-            .map(|store| JournalCursor::admit(Arc::clone(store), invocation, control.now_tick))
+            .map(|store| {
+                JournalCursor::open(Arc::clone(store), invocation, control.now_tick, resumable)
+            })
             .transpose()
         {
-            Ok(journal) => journal,
+            Ok(Some((journal, resumed_from))) => (Some(journal), resumed_from),
+            Ok(None) => (None, None),
             Err(_) => return infrastructure_failure("execution admission persistence failed"),
         };
         if let Err(outcome) = check_control(
@@ -133,11 +244,36 @@ impl ExecutionCoordinator {
         ) {
             return outcome;
         }
-        for (state, event) in [
-            (ExecutionState::Queued, LifecycleEventKind::Queued),
-            (ExecutionState::Running, LifecycleEventKind::Started),
-        ] {
-            if record_step(&mut journal, Some(state), event, None, None).is_err() {
+        let dispatch = match resumed_from {
+            None => vec![
+                (Some(ExecutionState::Queued), LifecycleEventKind::Queued),
+                (Some(ExecutionState::Running), LifecycleEventKind::Started),
+            ],
+            Some(ExecutionState::Admitted) => vec![
+                (Some(ExecutionState::Queued), LifecycleEventKind::Resumed),
+                (Some(ExecutionState::Running), LifecycleEventKind::Started),
+            ],
+            Some(ExecutionState::Queued) => {
+                vec![(Some(ExecutionState::Running), LifecycleEventKind::Resumed)]
+            }
+            Some(ExecutionState::Running) => {
+                vec![(None, LifecycleEventKind::Resumed)]
+            }
+            Some(ExecutionState::Suspended) => vec![
+                (Some(ExecutionState::Queued), LifecycleEventKind::Resumed),
+                (Some(ExecutionState::Running), LifecycleEventKind::Started),
+            ],
+            Some(
+                ExecutionState::Completing
+                | ExecutionState::Completed
+                | ExecutionState::Failed
+                | ExecutionState::Cancelled
+                | ExecutionState::TimedOut
+                | ExecutionState::DeadLetter,
+            ) => return infrastructure_failure("terminal execution cannot be resumed"),
+        };
+        for (state, event) in dispatch {
+            if record_step(&mut journal, state, event, None, None).is_err() {
                 return infrastructure_failure("execution dispatch persistence failed");
             }
         }
@@ -184,6 +320,99 @@ impl ExecutionCoordinator {
                             ));
                         }
                     };
+                    let audit_resource = canonical_audit_resource_digest(&effect.request);
+                    let mutating = effect.request.is_mutating();
+                    let capability = effect
+                        .request
+                        .required_capability(InvocationLimits::default());
+                    if resumable && let Some(key) = effect.idempotency_key.as_ref() {
+                        let Some(replay_journal) = journal.as_ref() else {
+                            return infrastructure_failure("durable resume journal is unavailable");
+                        };
+                        let existing = match replay_journal.store.effect(key) {
+                            Ok(existing) => existing,
+                            Err(_) => {
+                                return infrastructure_failure(
+                                    "prior effect lookup failed during durable resume",
+                                );
+                            }
+                        };
+                        if let Some(existing) = existing {
+                            if existing.execution_id != invocation.execution_id
+                                || existing.run_unit_id != invocation.run_unit_id
+                                || existing.sequence != effect.sequence
+                                || existing.digest_format != EffectDigestFormat::CanonicalHostV1
+                                || existing.request_digest != request_digest
+                            {
+                                return failed_outcome(problem(
+                                    FailureCategory::UnknownOutcome,
+                                    "durable effect replay identity does not match",
+                                ));
+                            }
+                            if existing.state != EffectState::Completed {
+                                return failed_outcome(problem(
+                                    FailureCategory::UnknownOutcome,
+                                    "durable effect requires reconciliation before resume",
+                                ));
+                            }
+                            control = match observe_checked(
+                                &mut observe,
+                                control,
+                                invocation,
+                                invocation.deadline_tick.min(effect.deadline_tick),
+                                &mut journal,
+                            ) {
+                                Ok(control) => control,
+                                Err(outcome) => return outcome,
+                            };
+                            let effect_sequence = effect.sequence;
+                            let audited = host.invoke(
+                                invocation,
+                                control.now_tick,
+                                control.cancellation_requested,
+                                effect,
+                            );
+                            let (result, audit) = audited.into_transaction_parts();
+                            let replay_digest = match canonical_result_digest(&result.outcome) {
+                                Ok(digest) => digest,
+                                Err(_) => {
+                                    return failed_outcome(problem(
+                                        FailureCategory::UnknownOutcome,
+                                        "replayed host result cannot be encoded",
+                                    ));
+                                }
+                            };
+                            if existing.result_digest != Some(replay_digest) {
+                                return failed_outcome(problem(
+                                    FailureCategory::UnknownOutcome,
+                                    "replayed host result differs from the reconciled result",
+                                ));
+                            }
+                            if record_audited_step(
+                                &mut journal,
+                                self.audit_sink.as_deref(),
+                                None,
+                                LifecycleEventKind::EffectResult {
+                                    sequence: effect_sequence,
+                                },
+                                None,
+                                None,
+                                audit,
+                            )
+                            .is_err()
+                            {
+                                return infrastructure_failure(
+                                    "replayed host audit persistence failed",
+                                );
+                            }
+                            resume = MachineResume::HostResult(result);
+                            continue;
+                        }
+                    }
+                    let intent_epoch = journal
+                        .as_ref()
+                        .and_then(|journal| journal.sequence.checked_add(1))
+                        .unwrap_or(effect.sequence);
                     let intent = effect.idempotency_key.as_ref().map(|key| EffectRecord {
                         execution_id: invocation.execution_id.clone(),
                         run_unit_id: invocation.run_unit_id.clone(),
@@ -191,8 +420,20 @@ impl ExecutionCoordinator {
                         key: key.clone(),
                         digest_format: EffectDigestFormat::CanonicalHostV1,
                         request_digest,
+                        intent: EffectIntentMetadata {
+                            owner: invocation.execution_id.clone(),
+                            attempt: invocation.attempt,
+                            capability: Some(capability),
+                            audit_resource: Some(audit_resource),
+                            audit_invocation_key: Some(invocation.idempotency_key.clone()),
+                            created_tick: control.now_tick,
+                            recovery_after_tick: invocation.deadline_tick.min(effect.deadline_tick),
+                            epoch: intent_epoch,
+                            recovery_lease: None,
+                        },
                         state: EffectState::Intent,
                         result_digest: None,
+                        resolved_tick: None,
                     });
                     if record_step(
                         &mut journal,
@@ -217,14 +458,22 @@ impl ExecutionCoordinator {
                         Ok(control) => control,
                         Err(outcome) => return outcome,
                     };
-                    let result = host
-                        .invoke(
-                            invocation,
-                            control.now_tick,
-                            control.cancellation_requested,
-                            effect,
-                        )
-                        .effect;
+                    let dispatch_deadline = invocation.deadline_tick.min(effect.deadline_tick);
+                    let audited = host.invoke(
+                        invocation,
+                        control.now_tick,
+                        control.cancellation_requested,
+                        effect,
+                    );
+                    // Dispatch has already happened. Sample the clock again before recording
+                    // completion so a slow synchronous provider receives its full retention
+                    // lifetime. A failed or regressed observation must not discard the result or
+                    // manufacture an early age; the committed result remains conservatively
+                    // unaged and therefore ineligible for retention until reconciliation.
+                    let post_dispatch_control = observe()
+                        .ok()
+                        .filter(|observed| observed.now_tick >= control.now_tick);
+                    let (result, audit) = audited.into_transaction_parts();
                     let result_digest = match canonical_result_digest(&result.outcome) {
                         Ok(digest) => digest,
                         // Dispatch already happened; leave the durable intent for reconciliation.
@@ -242,23 +491,30 @@ impl ExecutionCoordinator {
                             Err(_) => EffectState::Failed,
                         };
                         record.result_digest = Some(result_digest);
+                        record.resolved_tick =
+                            matches!(record.state, EffectState::Completed | EffectState::Failed)
+                                .then(|| post_dispatch_control.map(|observed| observed.now_tick))
+                                .flatten()
+                                .filter(|tick| *tick != 0);
                         record
                     });
-                    if record_step(
+                    if record_audited_step(
                         &mut journal,
+                        self.audit_sink.as_deref(),
                         None,
                         LifecycleEventKind::EffectResult {
                             sequence: result.sequence,
                         },
                         result_record,
                         None,
+                        audit,
                     )
                     .is_err()
                     {
-                        if matches!(&result.outcome, Err(HostProblem::UnknownOutcome)) {
+                        if mutating || matches!(&result.outcome, Err(HostProblem::UnknownOutcome)) {
                             return failed_outcome(problem(
                                 FailureCategory::UnknownOutcome,
-                                "host outcome unknown; result persistence also failed",
+                                "host dispatch completed but result persistence failed; reconcile the intent",
                             ));
                         }
                         return infrastructure_failure("effect result persistence failed");
@@ -266,6 +522,21 @@ impl ExecutionCoordinator {
                     if matches!(&result.outcome, Err(HostProblem::UnknownOutcome)) {
                         // Never poll again or resume an ordinary exception handler
                         // before preserving this already-observed uncertainty.
+                        if !resumable {
+                            let _ = record_step(
+                                &mut journal,
+                                Some(ExecutionState::Failed),
+                                LifecycleEventKind::Failed,
+                                None,
+                                None,
+                            );
+                        }
+                        return failed_outcome(problem(
+                            FailureCategory::UnknownOutcome,
+                            "host outcome unknown",
+                        ));
+                    }
+                    let Some(observed) = post_dispatch_control else {
                         let _ = record_step(
                             &mut journal,
                             Some(ExecutionState::Failed),
@@ -273,10 +544,20 @@ impl ExecutionCoordinator {
                             None,
                             None,
                         );
-                        return failed_outcome(problem(
-                            FailureCategory::UnknownOutcome,
-                            "host outcome unknown",
-                        ));
+                        return infrastructure_failure(
+                            "post-dispatch execution clock unavailable or regressed",
+                        );
+                    };
+                    let previous_control = control;
+                    control = observed;
+                    if let Err(outcome) = check_control(
+                        control,
+                        Some(previous_control),
+                        invocation,
+                        dispatch_deadline,
+                        &mut journal,
+                    ) {
+                        return outcome;
                     }
                     resume = MachineResume::HostResult(result);
                 }
@@ -441,7 +722,7 @@ fn check_control(
     if let Some(journal) = journal.as_mut() {
         journal.tick = control.now_tick;
     }
-    let terminal = if control.cancellation_requested || invocation.cancellation.is_some() {
+    let terminal = if control.cancellation_requested || invocation.cancellation_requested() {
         Some((
             ExecutionState::Cancelled,
             LifecycleEventKind::Cancelled,
@@ -476,11 +757,46 @@ struct JournalCursor {
 }
 
 impl JournalCursor {
-    fn admit(
+    fn open(
         store: Arc<dyn PlatformStore>,
         invocation: &Invocation,
         tick: u64,
-    ) -> Result<Self, StoreError> {
+        resumable: bool,
+    ) -> Result<(Self, Option<ExecutionState>), StoreError> {
+        if let Some(execution) = store.get_execution(&invocation.execution_id)? {
+            if !resumable
+                || execution.run_unit_id != invocation.run_unit_id
+                || execution.principal != *invocation.principal.id()
+                || execution.attempt != invocation.attempt
+                || (execution.state != ExecutionState::Suspended
+                    && (execution.selector != invocation.selector
+                        || execution.artifact != invocation.artifact))
+            {
+                return Err(StoreError::Conflict);
+            }
+            let events = store.events(&invocation.execution_id, 1, 65_536)?;
+            let last = events.last().ok_or(StoreError::IncompatibleVersion)?;
+            if last.execution_id != invocation.execution_id
+                || last.run_unit_id != invocation.run_unit_id
+                || last.attempt != invocation.attempt
+                || last.sequence != execution.version
+            {
+                return Err(StoreError::IncompatibleVersion);
+            }
+            let state = execution.state;
+            return Ok((
+                Self {
+                    store,
+                    execution_id: invocation.execution_id.clone(),
+                    run_unit_id: invocation.run_unit_id.clone(),
+                    attempt: invocation.attempt,
+                    tick,
+                    version: execution.version,
+                    sequence: last.sequence,
+                },
+                Some(state),
+            ));
+        }
         let event = LifecycleEvent {
             execution_id: invocation.execution_id.clone(),
             run_unit_id: invocation.run_unit_id.clone(),
@@ -502,19 +818,23 @@ impl JournalCursor {
                 version: 1,
                 owner_lease: None,
                 lease_expiry_tick: None,
+                terminal_tick: None,
             },
             event,
             notification,
         )?;
-        Ok(Self {
-            store,
-            execution_id: invocation.execution_id.clone(),
-            run_unit_id: invocation.run_unit_id.clone(),
-            attempt: invocation.attempt,
-            tick,
-            version: 1,
-            sequence: 1,
-        })
+        Ok((
+            Self {
+                store,
+                execution_id: invocation.execution_id.clone(),
+                run_unit_id: invocation.run_unit_id.clone(),
+                attempt: invocation.attempt,
+                tick,
+                version: 1,
+                sequence: 1,
+            },
+            None,
+        ))
     }
 
     fn record(
@@ -523,6 +843,7 @@ impl JournalCursor {
         kind: LifecycleEventKind,
         effect: Option<EffectRecord>,
         checkpoint: Option<CheckpointRecord>,
+        audit: Option<AuditRecord>,
     ) -> Result<(), StoreError> {
         self.sequence = self
             .sequence
@@ -543,6 +864,7 @@ impl JournalCursor {
             next_state,
             event,
             effect,
+            audit,
             checkpoint,
             notification,
         )?;
@@ -556,12 +878,47 @@ fn notification(event: &LifecycleEvent) -> OutboxRecord {
         notification_id: format!("{}:{:020}", event.execution_id, event.sequence),
         execution_id: event.execution_id.clone(),
         sequence: event.sequence,
-        topic: "execution.lifecycle".into(),
-        payload: format!("{:?}", event.kind).into_bytes(),
+        topic: LIFECYCLE_OUTBOX_TOPIC.into(),
+        payload: lifecycle_payload(&event.kind),
         attempt: 0,
         delivered: false,
+        delivered_tick: None,
         version: 1,
     }
+}
+
+fn lifecycle_payload(kind: &LifecycleEventKind) -> Vec<u8> {
+    let mut payload = Vec::with_capacity(LIFECYCLE_OUTBOX_DOMAIN.len() + 9);
+    payload.extend_from_slice(LIFECYCLE_OUTBOX_DOMAIN);
+    match kind {
+        LifecycleEventKind::Admitted => payload.push(1),
+        LifecycleEventKind::Queued => payload.push(2),
+        LifecycleEventKind::Claimed => payload.push(3),
+        LifecycleEventKind::Started => payload.push(4),
+        LifecycleEventKind::Completing => payload.push(5),
+        LifecycleEventKind::EffectIntent { sequence } => {
+            payload.push(6);
+            payload.extend_from_slice(&sequence.to_be_bytes());
+        }
+        LifecycleEventKind::EffectResult { sequence } => {
+            payload.push(7);
+            payload.extend_from_slice(&sequence.to_be_bytes());
+        }
+        LifecycleEventKind::Suspended => payload.push(8),
+        LifecycleEventKind::HandoffCompleted => payload.push(17),
+        LifecycleEventKind::Resumed => payload.push(9),
+        LifecycleEventKind::CancellationRequested => payload.push(10),
+        LifecycleEventKind::Cancelled => payload.push(11),
+        LifecycleEventKind::TimedOut => payload.push(12),
+        LifecycleEventKind::Completed { return_code } => {
+            payload.push(13);
+            payload.extend_from_slice(&return_code.to_be_bytes());
+        }
+        LifecycleEventKind::Condition => payload.push(14),
+        LifecycleEventKind::Abend => payload.push(15),
+        LifecycleEventKind::Failed => payload.push(16),
+    }
+    payload
 }
 
 fn record_step(
@@ -572,9 +929,29 @@ fn record_step(
     checkpoint: Option<CheckpointRecord>,
 ) -> Result<(), StoreError> {
     if let Some(journal) = journal {
-        journal.record(next_state, event, effect, checkpoint)
+        journal.record(next_state, event, effect, checkpoint, None)
     } else {
         Ok(())
+    }
+}
+
+fn record_audited_step(
+    journal: &mut Option<JournalCursor>,
+    audit_sink: Option<&dyn AuditSink>,
+    next_state: Option<ExecutionState>,
+    event: LifecycleEventKind,
+    effect: Option<EffectRecord>,
+    checkpoint: Option<CheckpointRecord>,
+    audit: AuditRecord,
+) -> Result<(), StoreError> {
+    if let Some(journal) = journal {
+        journal.record(next_state, event, effect, checkpoint, Some(audit))
+    } else {
+        audit_sink
+            .ok_or(StoreError::Infrastructure(
+                "host execution requires an audit sink".into(),
+            ))?
+            .record_audit(audit)
     }
 }
 
@@ -665,10 +1042,16 @@ fn problem(category: FailureCategory, message: &str) -> ExecutionProblem {
 mod tests {
     use super::*;
     use mainframe_env_execution_api::{
-        ArtifactRef, Completion, ExecutionId, IdempotencyKey, InvocationLimits, Principal,
-        PrincipalId, RequestId, ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
+        ArtifactRef, AuditDecision, AuditRecord, CapabilityId, Completion, ExecutionId,
+        IdempotencyKey, InvocationLimits, Principal, PrincipalId, RequestId, ResourceLimits,
+        RunUnitId, Selector, ServiceClass, TraceId,
+    };
+    use mainframe_env_host_api::{
+        CapabilityDescriptor, HostLimits, HostProvider, HostRequest, HostResult, RegistrySnapshot,
+        StateRequest,
     };
     use std::collections::{BTreeMap, BTreeSet};
+    use std::sync::Mutex;
 
     struct CompleteMachine;
     impl Machine for CompleteMachine {
@@ -724,6 +1107,62 @@ mod tests {
             limits,
         )
         .unwrap()
+    }
+
+    fn hex(value: &[u8]) -> String {
+        value.iter().map(|byte| format!("{byte:02x}")).collect()
+    }
+
+    #[test]
+    fn lifecycle_outbox_payloads_are_versioned_unique_and_golden() {
+        let effect = lifecycle_payload(&LifecycleEventKind::EffectIntent {
+            sequence: 0x0102_0304_0506_0708,
+        });
+        let completed = lifecycle_payload(&LifecycleEventKind::Completed { return_code: -12 });
+        assert_eq!(
+            hex(&effect),
+            "6d61696e6672616d652d656e762e657865637574696f6e2d6c6966656379636c65403100060102030405060708"
+        );
+        assert_eq!(
+            hex(&completed),
+            "6d61696e6672616d652d656e762e657865637574696f6e2d6c6966656379636c654031000dfffffff4"
+        );
+
+        let invocation = invocation();
+        let record = notification(&LifecycleEvent {
+            execution_id: invocation.execution_id.clone(),
+            run_unit_id: invocation.run_unit_id.clone(),
+            sequence: 1,
+            attempt: 1,
+            tick: 0,
+            kind: LifecycleEventKind::Completed { return_code: -12 },
+        });
+        assert_eq!(record.topic, "execution.lifecycle.v1");
+        assert_eq!(record.payload, completed);
+
+        let payloads = [
+            LifecycleEventKind::Admitted,
+            LifecycleEventKind::Queued,
+            LifecycleEventKind::Claimed,
+            LifecycleEventKind::Started,
+            LifecycleEventKind::Completing,
+            LifecycleEventKind::EffectIntent { sequence: 1 },
+            LifecycleEventKind::EffectResult { sequence: 1 },
+            LifecycleEventKind::Suspended,
+            LifecycleEventKind::HandoffCompleted,
+            LifecycleEventKind::Resumed,
+            LifecycleEventKind::CancellationRequested,
+            LifecycleEventKind::Cancelled,
+            LifecycleEventKind::TimedOut,
+            LifecycleEventKind::Completed { return_code: 0 },
+            LifecycleEventKind::Condition,
+            LifecycleEventKind::Abend,
+            LifecycleEventKind::Failed,
+        ]
+        .into_iter()
+        .map(|kind| lifecycle_payload(&kind))
+        .collect::<BTreeSet<_>>();
+        assert_eq!(payloads.len(), 17);
     }
 
     #[test]
@@ -913,5 +1352,208 @@ mod tests {
             });
         // A host lookup would fail in this local-only coordinator. The stop wins first.
         assert_eq!(result, ExecutionOutcome::Cancelled);
+    }
+
+    struct FixedProvider {
+        descriptor: CapabilityDescriptor,
+        outcome: Result<HostResult, HostProblem>,
+    }
+
+    impl HostProvider for FixedProvider {
+        fn descriptor(&self) -> &CapabilityDescriptor {
+            &self.descriptor
+        }
+
+        fn invoke(&self, _: &Invocation, request: EffectRequest) -> EffectResult {
+            EffectResult {
+                sequence: request.sequence,
+                outcome: self.outcome.clone(),
+            }
+        }
+    }
+
+    struct OneHostCall(Option<EffectRequest>);
+
+    impl Machine for OneHostCall {
+        type Effect = EffectRequest;
+        type EffectResult = EffectResult;
+
+        fn drive(
+            &mut self,
+            resume: MachineResume<Self::EffectResult>,
+            _: Quantum,
+        ) -> MachineDrive<Self::Effect> {
+            match resume {
+                MachineResume::Start => MachineDrive::HostCall(self.0.take().unwrap()),
+                MachineResume::HostResult(_) => MachineDrive::Completed(Completion {
+                    return_code: 0,
+                    output: mainframe_env_execution_api::BoundedPayload::new(
+                        "test@1",
+                        Vec::new(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                }),
+                other => panic!("unexpected resume: {other:?}"),
+            }
+        }
+    }
+
+    struct RecordingAuditSink {
+        capacity: usize,
+        records: Mutex<Vec<AuditRecord>>,
+    }
+
+    impl RecordingAuditSink {
+        fn new(capacity: usize) -> Self {
+            Self {
+                capacity,
+                records: Mutex::new(Vec::new()),
+            }
+        }
+    }
+
+    impl AuditSink for RecordingAuditSink {
+        fn record_audit(&self, record: AuditRecord) -> Result<(), StoreError> {
+            let mut records = self.records.lock().map_err(|_| StoreError::Poisoned)?;
+            if records.len() >= self.capacity {
+                return Err(StoreError::CapacityExceeded);
+            }
+            records.push(record);
+            Ok(())
+        }
+
+        fn audit_records(
+            &self,
+            execution_id: &ExecutionId,
+            start_effect_sequence: u64,
+            max: usize,
+        ) -> Result<Vec<AuditRecord>, StoreError> {
+            Ok(self
+                .records
+                .lock()
+                .map_err(|_| StoreError::Poisoned)?
+                .iter()
+                .filter(|record| {
+                    &record.execution_id == execution_id
+                        && record.effect_sequence >= start_effect_sequence
+                })
+                .take(max)
+                .cloned()
+                .collect())
+        }
+    }
+
+    fn audited_host(outcome: Result<HostResult, HostProblem>) -> Arc<ScopedHostService> {
+        let limits = InvocationLimits::default();
+        let capability = CapabilityId::new("host.state.read", limits).unwrap();
+        let provider: Arc<dyn HostProvider> = Arc::new(FixedProvider {
+            descriptor: CapabilityDescriptor {
+                capability,
+                provider_id: "audit-test".into(),
+                generation: "audit-test@1".into(),
+                request_schema: "state-request@1".into(),
+                result_schema: "state-result@1".into(),
+                max_request_bytes: 4096,
+                max_result_bytes: 4096,
+                ready: true,
+            },
+            outcome,
+        });
+        Arc::new(ScopedHostService::new(
+            Arc::new(RegistrySnapshot::new(1, vec![provider], limits).unwrap()),
+            HostLimits::default(),
+        ))
+    }
+
+    fn audit_invocation(granted: bool) -> Invocation {
+        let limits = InvocationLimits::default();
+        let capability = CapabilityId::new("host.state.read", limits).unwrap();
+        let mut invocation = invocation();
+        invocation.principal = Principal::new(
+            PrincipalId::new("USER", limits).unwrap(),
+            granted.then_some(capability).into_iter().collect(),
+            limits,
+        )
+        .unwrap();
+        invocation
+    }
+
+    fn audit_request(invocation: &Invocation) -> EffectRequest {
+        EffectRequest {
+            run_unit: invocation.run_unit_id.clone(),
+            sequence: 1,
+            deadline_tick: 100,
+            idempotency_key: None,
+            request: HostRequest::State(StateRequest::Get { key: "one".into() }),
+        }
+    }
+
+    #[test]
+    fn mandatory_sink_persists_success_deny_cancellation_and_provider_failure() {
+        for (granted, outcome, expected) in [
+            (
+                true,
+                Ok(HostResult::State {
+                    value: Some(vec![1]),
+                    version: 1,
+                }),
+                AuditDecision::Success,
+            ),
+            (
+                false,
+                Ok(HostResult::State {
+                    value: Some(vec![1]),
+                    version: 1,
+                }),
+                AuditDecision::Deny,
+            ),
+            (
+                true,
+                Err(HostProblem::ProviderFailure),
+                AuditDecision::ProviderFailure,
+            ),
+            (true, Err(HostProblem::Cancelled), AuditDecision::Cancelled),
+        ] {
+            let invocation = audit_invocation(granted);
+            let sink = Arc::new(RecordingAuditSink::new(1));
+            let coordinator = ExecutionCoordinator::with_host(
+                audited_host(outcome),
+                sink.clone(),
+                CoordinatorLimits::default(),
+            );
+            let result = coordinator.execute(
+                &mut OneHostCall(Some(audit_request(&invocation))),
+                &invocation,
+                ExecutionControl::default(),
+            );
+            assert!(matches!(result, ExecutionOutcome::Completed(_)));
+            let records = sink.audit_records(&invocation.execution_id, 1, 8).unwrap();
+            assert_eq!(records.len(), 1);
+            assert_eq!(records[0].decision, expected);
+            assert_eq!(records[0].principal, *invocation.principal.id());
+            assert_eq!(records[0].capability.as_str(), "host.state.read");
+        }
+    }
+
+    #[test]
+    fn audit_capacity_saturation_blocks_non_durable_host_result() {
+        let invocation = audit_invocation(true);
+        let coordinator = ExecutionCoordinator::with_host(
+            audited_host(Ok(HostResult::State {
+                value: None,
+                version: 1,
+            })),
+            Arc::new(RecordingAuditSink::new(0)),
+            CoordinatorLimits::default(),
+        );
+        assert!(matches!(
+            coordinator.execute(
+                &mut OneHostCall(Some(audit_request(&invocation))),
+                &invocation,
+                ExecutionControl::default(),
+            ),
+            ExecutionOutcome::InfrastructureFailure(_)
+        ));
     }
 }

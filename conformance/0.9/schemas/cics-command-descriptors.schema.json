@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/cics-command-descriptors-v1.json",
+  "title": "mainframe-env CICS command descriptor catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_version", "official_catalog", "command_count", "families", "commands"],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.cics-command-descriptors@1"},
+    "target_version": {"const": "0.9.0"},
+    "official_catalog": {"const": "conformance/0.2/catalogs/cics.json"},
+    "command_count": {"const": 25},
+    "families": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "rust_variant", "responsibility"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"},
+          "rust_variant": {"type": "string", "pattern": "^[A-Z][A-Za-z0-9]*$"},
+          "responsibility": {"type": "string", "minLength": 16}
+        }
+      }
+    },
+    "commands": {
+      "type": "array",
+      "minItems": 25,
+      "maxItems": 25,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["operation", "syntax", "family", "mutating", "official_row"],
+        "properties": {
+          "operation": {"type": "string", "pattern": "^[A-Z][A-Za-z0-9]*$"},
+          "syntax": {"type": "string", "minLength": 2},
+          "family": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"},
+          "mutating": {"type": "boolean"},
+          "official_row": {"type": "string", "pattern": "^ibm-cics-ts-6x-2026-08-31:"}
+        }
+      }
+    }
+  }
+}

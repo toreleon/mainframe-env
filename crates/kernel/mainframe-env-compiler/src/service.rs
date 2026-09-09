@@ -5,8 +5,7 @@ use crate::semantic::{SemanticModel, SemanticProblem};
 use crate::syntax::{LosslessSyntax, SyntaxLimits, SyntaxProblem, decode_and_lex};
 use mainframe_env_compiler_api::{
     ArtifactLimits, ArtifactManifest, CompilationMode, CompileOptions, CompilerProblem,
-    CompilerRequest, CompilerResult, CompilerService, LegalizedMir, ParsedProgram,
-    PublishedArtifact, SemanticProgram, VerifiedHir,
+    CompilerRequest, CompilerResult, CompilerService, LegalizedMir, PublishedArtifact, VerifiedHir,
 };
 use mainframe_env_diagnostics::{
     Completeness, Diagnostic, DiagnosticCode, DiagnosticLimits, FailureCategory, Phase, Redaction,
@@ -203,25 +202,12 @@ impl CobolCompiler {
         if analysis.completeness != Completeness::Complete {
             return Err(CompilerProblem::IncompleteStage);
         }
-        let parsed = ParsedProgram::validated(
-            source.id(),
-            Vec::new(),
-            Completeness::Complete,
-            self.limits.max_diagnostics,
-        )?;
-        let semantic = SemanticProgram::validated(
-            parsed,
-            *source.id().as_bytes(),
-            Vec::new(),
-            Completeness::Complete,
-            self.limits.max_diagnostics,
-        )?;
         let hir = analysis
             .hir
             .as_ref()
             .ok_or(CompilerProblem::IncompleteStage)?;
         let stage =
-            VerifiedHir::verify(&semantic, hir.module.clone(), &crate::cobol_hir_catalog())?;
+            VerifiedHir::verify(source.id(), hir.module.clone(), &crate::cobol_hir_catalog())?;
         Ok(VerifiedCobolHir { hir, stage })
     }
 }
@@ -306,15 +292,8 @@ impl CobolCompiler {
             self.limits.ir,
         )
         .map_err(lower_problem)?;
-        let legalized = LegalizedMir::legalize(
-            request.source.id(),
-            mir,
-            &core_mir_catalog(),
-            &core_mir_profile(),
-        )?;
-        let payload =
-            mainframe_env_ir::encode_binary(legalized.legal().module(), self.limits.codec)
-                .map_err(|problem| CompilerProblem::Legality(problem.to_string()))?;
+        let lowered = verified.stage.lower(mir);
+        let legalized = LegalizedMir::legalize(lowered, &core_mir_catalog(), &core_mir_profile())?;
         let mut manifest_options = request.options.values().clone();
         manifest_options.insert(
             "cobol.effective-lp".into(),
@@ -338,8 +317,12 @@ impl CobolCompiler {
             ]),
             ir_contract: mainframe_env_ir::IR_ENVELOPE_CONTRACT.to_string(),
         };
-        let artifact =
-            PublishedArtifact::publish(&legalized, manifest, payload, self.limits.artifact)?;
+        let artifact = PublishedArtifact::publish(
+            legalized,
+            manifest,
+            self.limits.codec,
+            self.limits.artifact,
+        )?;
         Ok(CompilerResult::Published {
             artifact,
             diagnostics: Vec::new(),

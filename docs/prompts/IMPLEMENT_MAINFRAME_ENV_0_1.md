@@ -314,7 +314,10 @@ non-retryable/unknown-outcome policy.
 - Scenario suites live outside production implementation modules.
 - Every crate README states ownership, non-goals, invariants, allowed
   dependencies, public surface, and verification commands.
-- A soft 800–1,200 line module size triggers review; do not split blindly.
+- [ADR-0010](../decisions/0010-rust-module-review-budgets.md) sets a hard
+  1,200-production-line maximum for new/non-exempt Rust modules. Existing
+  exceptions use exact non-growing ceilings and split only at stable reasons to
+  change recorded in the machine budget inventory.
 - Production code contains no `r0`, `r1`, `r2`, `r2a`, `wave`, `carddemo`, or
   other migration-program names as architectural boundaries.
 
@@ -936,7 +939,8 @@ git diff --check                  # when the repository is under Git
 
 Also verify:
 
-- Rust MSRV 1.95 contract crates and pinned Rust 1.98 full workspace;
+- Rust MSRV 1.95 and pinned Rust 1.98 across the full workspace, all targets,
+  and all features;
 - core-server and conformance closures separately;
 - release builds on advertised operating systems;
 - SQLite local and PostgreSQL production profiles;

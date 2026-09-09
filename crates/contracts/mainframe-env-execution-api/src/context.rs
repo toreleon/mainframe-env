@@ -4,6 +4,8 @@ use crate::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct InvocationLimits {
@@ -145,6 +147,42 @@ pub struct Cancellation {
     pub requested_at_tick: u64,
 }
 
+#[derive(Clone, Default)]
+pub struct CancellationProbe(Arc<AtomicBool>);
+
+impl CancellationProbe {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn request(&self) {
+        self.0.store(true, Ordering::Release);
+    }
+
+    #[must_use]
+    pub fn is_requested(&self) -> bool {
+        self.0.load(Ordering::Acquire)
+    }
+}
+
+impl fmt::Debug for CancellationProbe {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("CancellationProbe")
+            .field("requested", &self.is_requested())
+            .finish_non_exhaustive()
+    }
+}
+
+impl PartialEq for CancellationProbe {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for CancellationProbe {}
+
 impl Cancellation {
     pub fn new(
         id: CancellationId,
@@ -182,6 +220,7 @@ pub struct Invocation {
     pub limits: ResourceLimits,
     pub bindings: BTreeMap<String, BoundedPayload>,
     pub cancellation: Option<Cancellation>,
+    pub cancellation_probe: Option<CancellationProbe>,
     pub provider_generations: BTreeMap<CapabilityId, String>,
     pub audit_correlation: String,
 }
@@ -239,6 +278,7 @@ impl Invocation {
             limits: resource_limits.validate()?,
             bindings,
             cancellation: None,
+            cancellation_probe: None,
             provider_generations: BTreeMap::new(),
             audit_correlation,
         })
@@ -266,6 +306,21 @@ impl Invocation {
     pub fn with_cancellation(mut self, cancellation: Cancellation) -> Self {
         self.cancellation = Some(cancellation);
         self
+    }
+
+    #[must_use]
+    pub fn with_cancellation_probe(mut self, cancellation_probe: CancellationProbe) -> Self {
+        self.cancellation_probe = Some(cancellation_probe);
+        self
+    }
+
+    #[must_use]
+    pub fn cancellation_requested(&self) -> bool {
+        self.cancellation.is_some()
+            || self
+                .cancellation_probe
+                .as_ref()
+                .is_some_and(CancellationProbe::is_requested)
     }
 }
 

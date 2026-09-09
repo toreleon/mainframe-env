@@ -1,6 +1,6 @@
 # IBM coverage release plans
 
-Status: **0.2.0 through 0.8.1 released; 0.9.0 through 1.0.0 planned**
+Status: **0.8.3 pre-0.9 hardening in development; 0.2.0 through 0.8.2 released; 0.9.0 through 1.0.0 planned**
 Applies after: `mainframe-env 0.1.1`
 Planning authority:
 [`IBM-OFFICIAL-COVERAGE-ROADMAP.md`](../../research/IBM-OFFICIAL-COVERAGE-ROADMAP.md)
@@ -47,6 +47,15 @@ Patch 0.8.1 published on 2026-09-05 after
 [#43](https://github.com/toreleon/mainframe-env/pull/43) resolved all nine
 review findings. It preserves the approved licensed-differential-pending
 disposition without assigning Hercules or modeled results equivalence credit.
+
+Patch 0.8.2 published on 2026-09-06 with runtime, persistence, provider-move,
+and source-distribution hardening. It published a locked Cargo source bundle,
+not new native binaries; the exact compatibility limits are in the
+[0.8 release notes](../../releases/0.8.md). Later changes on `main` remain
+unreleased and do not retroactively change the 0.8.2 tag or its evidence.
+
+The current workspace is `0.8.3` development. It owns the pre-0.9 hardening
+backlog and is not a release, tag, or compatibility claim.
 
 See [Parallel implementation plan](PARALLEL-IMPLEMENTATION.md) for the work DAG,
 safe concurrency lanes, merge discipline, and critical path.

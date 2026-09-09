@@ -1,21 +1,32 @@
+#[path = "handlers/mod.rs"]
+mod handlers;
+
+use crate::generated::{CICS_COMMAND_DESCRIPTORS, CicsCommandFamily, command_descriptor};
+use crate::retention::{
+    CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
+    CICS_OUTER_EFFECT_ORIGIN_BINDING, CICS_OUTER_EFFECT_ORIGIN_SCHEMA, DecodedUow,
+    UowRetentionMetadata,
+};
 use mainframe_env_encoding::CodePage;
 use mainframe_env_execution_api::{
-    BoundedPayload, CapabilityId, IdempotencyKey, Invocation, InvocationLimits, PrincipalId,
-    RunUnitId,
+    BoundedPayload, CapabilityId, ExecutionId, IdempotencyKey, Invocation, InvocationLimits,
+    PrincipalId, RunUnitId,
 };
 use mainframe_env_host_api::{
     AccessIntent, CapabilityDescriptor, CicsConditionPolicy, CicsDisposition, CicsOperation,
-    CicsRequest, CicsResponse, CicsUnitOfWorkOutcome, ClockRequest, DatasetName, DatasetRequest,
-    DatasetResult, Db2Operation, Db2Request, EffectRequest, EffectResult, HostProblem,
-    HostProvider, HostRequest, HostResult, ImsOperation, ImsRequest, MemberName, MqOperation,
-    MqRequest, Mutation, ProgramName, ProgramRequest, ResourceName, ScopedHostService,
-    SecurityDecision, SecurityRequest, SessionId,
+    CicsRequest, CicsResponse, CicsUnitOfWorkOutcome, DatasetName, EffectRequest, EffectResult,
+    HostProblem, HostProvider, HostRequest, HostResult, Mutation, ResourceName, ScopedHostService,
+    SecurityDecision, SecurityRequest, SessionId, canonical_request_digest,
+    canonical_result_digest,
 };
+#[cfg(test)]
+use mainframe_env_host_api::{ClockRequest, DatasetRequest, DatasetResult, ProgramRequest};
 use mainframe_env_store_api::{
     ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
 };
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -97,6 +108,19 @@ struct DurableFileStatus {
     version: u64,
 }
 
+pub(crate) struct CicsEffectReplay {
+    pub(crate) effect_key: Option<String>,
+    pub(crate) owner_execution: Option<String>,
+    pub(crate) owner_run_unit: Option<String>,
+    pub(crate) sequence: Option<u64>,
+    pub(crate) deadline_tick: Option<u64>,
+    pub(crate) resolution_tick: Option<u64>,
+    pub(crate) request_digest: [u8; 32],
+    pub(crate) result_digest: Option<[u8; 32]>,
+    pub(crate) binding_digest: Option<[u8; 32]>,
+    pub(crate) response: CicsResponse,
+}
+
 #[derive(Clone, Debug)]
 struct Session {
     rows: u16,
@@ -154,6 +178,7 @@ struct Run {
     applid: String,
     sysid: String,
     host_sequence: u64,
+    outer_effect_key: Option<String>,
     handlers: BTreeMap<String, String>,
     abend_handler: Option<String>,
     retrieve: Vec<u8>,
@@ -222,6 +247,8 @@ struct State {
     file_failure: Option<(CicsOperation, String)>,
     #[cfg(feature = "fault-injection")]
     file_fault: Option<(CicsOperation, String, CicsFileFaultPoint)>,
+    #[cfg(feature = "fault-injection")]
+    mutation_fault: Option<CicsOperation>,
 }
 
 #[cfg(feature = "fault-injection")]
@@ -237,13 +264,57 @@ pub struct CicsService {
     store: Arc<dyn ProviderStateStore>,
     limits: CicsLimits,
     state: Mutex<State>,
+    replay_clock: Option<Arc<dyn CicsReplayClock>>,
+    replay_unknown_after_persist: AtomicBool,
+}
+
+/// Trusted durable logical-time source used after CICS work is durably resolved.
+pub trait CicsReplayClock: Send + Sync {
+    /// Observe the current nonzero durable logical tick.
+    fn now_tick(&self) -> Result<u64, HostProblem>;
 }
 
 impl CicsService {
+    fn invoke_host(
+        &self,
+        invocation: &Invocation,
+        now_tick: u64,
+        cancellation_requested: bool,
+        request: EffectRequest,
+    ) -> EffectResult {
+        ScopedHostService::invoke(
+            &self.host,
+            invocation,
+            now_tick,
+            cancellation_requested,
+            request,
+        )
+        .persist_with(|audit| self.store.record_audit(audit).map_err(store_error))
+    }
+
     pub fn open(
         host: Arc<ScopedHostService>,
         store: Arc<dyn ProviderStateStore>,
         limits: CicsLimits,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_inner(host, store, limits, None)
+    }
+
+    /// Open with the durable clock used to resolve outer replay and UOW age.
+    pub fn open_with_replay_clock(
+        host: Arc<ScopedHostService>,
+        store: Arc<dyn ProviderStateStore>,
+        limits: CicsLimits,
+        replay_clock: Arc<dyn CicsReplayClock>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_inner(host, store, limits, Some(replay_clock))
+    }
+
+    fn open_inner(
+        host: Arc<ScopedHostService>,
+        store: Arc<dyn ProviderStateStore>,
+        limits: CicsLimits,
+        replay_clock: Option<Arc<dyn CicsReplayClock>>,
     ) -> Result<Arc<Self>, HostProblem> {
         let mut sessions = BTreeMap::new();
         for row in store
@@ -333,6 +404,8 @@ impl CicsService {
             host,
             store,
             limits,
+            replay_clock,
+            replay_unknown_after_persist: AtomicBool::new(false),
             state: Mutex::new(State {
                 sessions,
                 runs: BTreeMap::new(),
@@ -347,6 +420,8 @@ impl CicsService {
                 file_failure: None,
                 #[cfg(feature = "fault-injection")]
                 file_fault: None,
+                #[cfg(feature = "fault-injection")]
+                mutation_fault: None,
             }),
         }))
     }
@@ -397,6 +472,28 @@ impl CicsService {
             return Err(HostProblem::IdempotencyConflict);
         }
         Ok(())
+    }
+
+    /// Stop after a mutating CICS result is durably replayable but before the
+    /// caller observes it. This models the exact process-crash gap shared by
+    /// file, queue, program, and unit-of-work operations.
+    #[cfg(feature = "fault-injection")]
+    pub fn inject_mutation_fault_once(&self, operation: CicsOperation) -> Result<(), HostProblem> {
+        if !operation.is_mutating() {
+            return Err(HostProblem::Malformed);
+        }
+        let mut state = self.lock()?;
+        if state.mutation_fault.replace(operation).is_some() {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        Ok(())
+    }
+
+    /// Inject the exact crash gap after a protected outer replay write.
+    #[cfg(any(test, feature = "fault-injection"))]
+    pub fn inject_replay_unknown_after_persist_once(&self) {
+        self.replay_unknown_after_persist
+            .store(true, Ordering::SeqCst);
     }
 
     pub fn create_session(
@@ -459,6 +556,7 @@ impl CicsService {
         now_tick: u64,
         idle_timeout_ticks: u64,
     ) -> Result<CicsTerminalSnapshot, HostProblem> {
+        reject_reserved_nested_origin(&invocation)?;
         validate_terminal_identity(transaction, 16)?;
         validate_terminal_identity(csrf_token, 256)?;
         if rows == 0 || columns == 0 || idle_timeout_ticks == 0 {
@@ -528,6 +626,20 @@ impl CicsService {
         now_tick: u64,
     ) -> Result<CicsTerminalSnapshot, HostProblem> {
         self.public_session(session, principal, None, now_tick)
+            .map(|value| terminal_snapshot(session.as_str(), &value))
+    }
+
+    /// Validate ownership and the terminal anti-forgery token without changing
+    /// the conversation. Durable online recovery uses this before resuming an
+    /// exchange that was already admitted before a process boundary.
+    pub fn validate_terminal_resume(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        csrf_token: &str,
+        now_tick: u64,
+    ) -> Result<CicsTerminalSnapshot, HostProblem> {
+        self.public_session(session, principal, Some(csrf_token), now_tick)
             .map(|value| terminal_snapshot(session.as_str(), &value))
     }
 
@@ -616,6 +728,47 @@ impl CicsService {
         }
         state.runs.remove(&run_id);
         Ok(())
+    }
+
+    /// Idempotently discard a terminal run while recovering a durable online
+    /// exchange. The persisted session remains usable for a fresh task, and a
+    /// continuation claim owned by the abandoned run is released.
+    pub fn discard_terminal_run_if_present(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        now_tick: u64,
+    ) -> Result<Vec<CicsTraceEntry>, HostProblem> {
+        let current = self.public_session(session, principal, None, now_tick)?;
+        let run_id = RunUnitId::new(&current.run_unit, InvocationLimits::default())
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let mut state = self.lock()?;
+        let trace = match state.runs.get(&run_id) {
+            Some(run)
+                if run.session == session.as_str()
+                    && run.invocation.principal.id() == principal =>
+            {
+                run.trace.clone()
+            }
+            Some(_) => return Err(HostProblem::Unauthorized),
+            None => Vec::new(),
+        };
+        if let Some(current) = state.continuations.get(session.as_str()).cloned()
+            && current.claimed_by.as_deref() == Some(run_id.as_str())
+        {
+            let mut released = current.clone();
+            released.version = released
+                .version
+                .checked_add(1)
+                .ok_or(HostProblem::ResourceExhausted)?;
+            released.claimed_by = None;
+            self.persist_continuation(session.as_str(), &released, Some(current.version))?;
+            state
+                .continuations
+                .insert(session.as_str().into(), released);
+        }
+        state.runs.remove(&run_id);
+        Ok(trace)
     }
 
     pub fn submit_terminal_input(
@@ -729,6 +882,7 @@ impl CicsService {
         csrf_token: &str,
         now_tick: u64,
     ) -> Result<CicsTerminalSnapshot, HostProblem> {
+        reject_reserved_nested_origin(&invocation)?;
         let principal = invocation.principal.id();
         let current = self.public_session(session, principal, Some(csrf_token), now_tick)?;
         self.authorize_terminal(&invocation, &current.transaction)?;
@@ -858,6 +1012,7 @@ impl CicsService {
         applid: &str,
         sysid: &str,
     ) -> Result<(), HostProblem> {
+        reject_reserved_nested_origin(&invocation)?;
         let values = [transaction, applid, sysid];
         if values.iter().any(|value| {
             value.is_empty()
@@ -893,6 +1048,62 @@ impl CicsService {
                 applid: applid.to_ascii_uppercase(),
                 sysid: sysid.to_ascii_uppercase(),
                 host_sequence: 0,
+                outer_effect_key: None,
+                handlers: BTreeMap::new(),
+                abend_handler: None,
+                retrieve,
+                current_records: BTreeMap::new(),
+                current_record_values: BTreeMap::new(),
+                undo,
+                undo_version,
+                browses: BTreeMap::new(),
+                trace: Vec::new(),
+            },
+        );
+        Ok(())
+    }
+
+    /// Rebuild volatile CICS run state for the exact durable terminal run.
+    ///
+    /// The machine is replayed through its durable coordinator after this
+    /// call, so all transient handlers and cursors are deliberately reset.
+    /// Durable undo data is reloaded and the session/run/principal identity is
+    /// checked before replacing any abandoned in-memory copy.
+    pub fn restore_terminal_run(
+        &self,
+        invocation: Invocation,
+        session: &SessionId,
+        transaction: &str,
+        retrieve: Vec<u8>,
+        now_tick: u64,
+    ) -> Result<(), HostProblem> {
+        reject_reserved_nested_origin(&invocation)?;
+        validate_terminal_identity(transaction, 16)?;
+        if retrieve.len() > self.limits.max_screen_bytes {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let current = self.public_session(session, invocation.principal.id(), None, now_tick)?;
+        if current.run_unit != invocation.run_unit_id.as_str()
+            || current.transaction != transaction.to_ascii_uppercase()
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        let (undo, undo_version) = self.load_undo(&invocation.run_unit_id)?;
+        let mut state = self.lock()?;
+        state.runs.retain(|_, run| run.session != session.as_str());
+        if state.runs.len() >= self.limits.max_runs {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        state.runs.insert(
+            invocation.run_unit_id.clone(),
+            Run {
+                invocation,
+                session: session.as_str().into(),
+                transaction: transaction.to_ascii_uppercase(),
+                applid: "ME01".into(),
+                sysid: "S001".into(),
+                host_sequence: 0,
+                outer_effect_key: None,
                 handlers: BTreeMap::new(),
                 abend_handler: None,
                 retrieve,
@@ -914,6 +1125,7 @@ impl CicsService {
         applid: &str,
         sysid: &str,
     ) -> Result<CicsContinuation, HostProblem> {
+        reject_reserved_nested_origin(&invocation)?;
         let values = [applid, sysid];
         if values.iter().any(|value| {
             value.is_empty()
@@ -971,6 +1183,7 @@ impl CicsService {
                 applid: applid.to_ascii_uppercase(),
                 sysid: sysid.to_ascii_uppercase(),
                 host_sequence: 0,
+                outer_effect_key: None,
                 handlers: BTreeMap::new(),
                 abend_handler: None,
                 retrieve: Vec::new(),
@@ -986,6 +1199,7 @@ impl CicsService {
     }
 
     fn ensure_run(&self, invocation: &Invocation) -> Result<(), HostProblem> {
+        reject_reserved_nested_origin(invocation)?;
         {
             let state = self.lock()?;
             if state.runs.contains_key(&invocation.run_unit_id) {
@@ -1237,13 +1451,173 @@ impl CicsService {
         if !request.operation.supported() {
             return Err(HostProblem::Unsupported);
         }
+        let replay_identity = if request.operation.is_mutating() {
+            let mutation = request
+                .mutation
+                .as_ref()
+                .ok_or(HostProblem::MissingIdempotency)?;
+            if effect.idempotency_key.as_ref() != Some(&mutation.idempotency_key)
+                || mutation.sequence != effect.sequence
+            {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            Some((
+                mutation.idempotency_key.clone(),
+                canonical_request_digest(&HostRequest::Cics(request.clone()))
+                    .map_err(|_| HostProblem::ResourceExhausted)?,
+            ))
+        } else {
+            None
+        };
+        let (replay_owner, replay_run_unit) = {
+            let state = self.lock()?;
+            let run = state
+                .runs
+                .get(&effect.run_unit)
+                .ok_or(HostProblem::Unauthorized)?;
+            (
+                run.invocation.execution_id.as_str().to_string(),
+                run.invocation.run_unit_id.as_str().to_string(),
+            )
+        };
+        if let Some((key, digest)) = replay_identity.as_ref()
+            && let Some(record) = self
+                .store
+                .get_provider_state("cics-effect-replay-v1", key.as_str())
+                .map_err(store_error)?
+        {
+            let replay = decode_cics_effect_replay(&record.payload, self.limits)?;
+            validate_cics_effect_replay_identity(
+                &replay,
+                key.as_str(),
+                &replay_owner,
+                &replay_run_unit,
+                effect.sequence,
+                *digest,
+            )?;
+            let replay = self
+                .finalize_effect_replay(record, replay, effect.deadline_tick)
+                .map_err(|_| HostProblem::UnknownOutcome)?;
+            return Ok(replay.response);
+        }
         let mut run = self
             .lock()?
             .runs
             .remove(&effect.run_unit)
             .ok_or(HostProblem::Unauthorized)?;
+        run.outer_effect_key = effect.idempotency_key.as_ref().map(ToString::to_string);
         let operation = request.operation;
-        let result = self.invoke_run(&mut run, request);
+        #[cfg(feature = "fault-injection")]
+        let after_mutation_file = matches!(
+            operation,
+            CicsOperation::Write | CicsOperation::Rewrite | CicsOperation::Delete
+        )
+        .then(|| argument_text(&request, "FILE").or_else(|_| argument_text(&request, "DATASET")))
+        .transpose()?
+        .map(|name| name.trim().to_ascii_uppercase());
+        let retention_tick = effect.deadline_tick.max(run.invocation.deadline_tick);
+        let result = self.invoke_run(&mut run, request, retention_tick);
+        let result = match (&result, replay_identity.as_ref()) {
+            (Ok(response), Some((key, digest))) => {
+                let result_digest =
+                    canonical_result_digest(&Ok(HostResult::Cics(response.clone())))
+                        .map_err(|_| HostProblem::InfrastructureFailure)?;
+                let mut replay = CicsEffectReplay {
+                    effect_key: Some(key.as_str().into()),
+                    owner_execution: Some(replay_owner.clone()),
+                    owner_run_unit: Some(replay_run_unit.clone()),
+                    sequence: Some(effect.sequence),
+                    deadline_tick: Some(retention_tick),
+                    resolution_tick: None,
+                    request_digest: *digest,
+                    result_digest: Some(result_digest),
+                    binding_digest: None,
+                    response: response.clone(),
+                };
+                replay.binding_digest = Some(cics_effect_replay_binding_digest(&replay));
+                let payload = encode_cics_effect_replay(&replay)?;
+                match self.store.put_provider_state(
+                    ProviderStateRecord {
+                        namespace: "cics-effect-replay-v1".into(),
+                        key: key.as_str().into(),
+                        version: 1,
+                        payload,
+                    },
+                    None,
+                ) {
+                    Ok(()) => {
+                        if self
+                            .replay_unknown_after_persist
+                            .swap(false, Ordering::SeqCst)
+                        {
+                            Err(HostProblem::UnknownOutcome)
+                        } else {
+                            self.finalize_effect_replay(
+                                ProviderStateRecord {
+                                    namespace: "cics-effect-replay-v1".into(),
+                                    key: key.as_str().into(),
+                                    version: 1,
+                                    payload: encode_cics_effect_replay(&replay)?,
+                                },
+                                replay,
+                                retention_tick,
+                            )
+                            .map(|_| result)
+                            .unwrap_or(Err(HostProblem::UnknownOutcome))
+                        }
+                    }
+                    Err(StoreError::AlreadyExists | StoreError::Conflict) => {
+                        match self
+                            .store
+                            .get_provider_state("cics-effect-replay-v1", key.as_str())
+                            .map_err(store_error)?
+                        {
+                            Some(record) => {
+                                let replay =
+                                    decode_cics_effect_replay(&record.payload, self.limits)?;
+                                validate_cics_effect_replay_identity(
+                                    &replay,
+                                    key.as_str(),
+                                    &replay_owner,
+                                    &replay_run_unit,
+                                    effect.sequence,
+                                    *digest,
+                                )?;
+                                if replay.response != *response {
+                                    Err(HostProblem::IdempotencyConflict)
+                                } else {
+                                    self.finalize_effect_replay(record, replay, retention_tick)
+                                        .map(|_| result)
+                                        .unwrap_or(Err(HostProblem::UnknownOutcome))
+                                }
+                            }
+                            _ => Err(HostProblem::IdempotencyConflict),
+                        }
+                    }
+                    Err(_) => Err(HostProblem::UnknownOutcome),
+                }
+            }
+            _ => result,
+        };
+        #[cfg(feature = "fault-injection")]
+        let mutation_fault = result.is_ok() && self.consume_mutation_fault(operation)?;
+        #[cfg(feature = "fault-injection")]
+        let file_fault = if result.is_ok() {
+            match after_mutation_file {
+                Some(file) => {
+                    self.consume_file_fault(operation, &file, CicsFileFaultPoint::AfterMutation)?
+                }
+                None => false,
+            }
+        } else {
+            false
+        };
+        #[cfg(feature = "fault-injection")]
+        let result = if mutation_fault || file_fault {
+            Err(HostProblem::UnknownOutcome)
+        } else {
+            result
+        };
         if run.trace.len() < 4096 {
             run.trace.push(match &result {
                 Ok(response) => CicsTraceEntry {
@@ -1264,6 +1638,50 @@ impl CicsService {
         }
         self.lock()?.runs.insert(effect.run_unit.clone(), run);
         result
+    }
+
+    fn finalize_effect_replay(
+        &self,
+        record: ProviderStateRecord,
+        mut replay: CicsEffectReplay,
+        resolution_lower_bound: u64,
+    ) -> Result<CicsEffectReplay, HostProblem> {
+        if replay.effect_key.is_none() {
+            return Ok(replay);
+        }
+        match (record.version, replay.resolution_tick) {
+            (1, None) => {}
+            (2, Some(_)) => return Ok(replay),
+            _ => return Err(HostProblem::InfrastructureFailure),
+        }
+        let Some(clock) = &self.replay_clock else {
+            return Ok(replay);
+        };
+        if record.version != 1 || resolution_lower_bound == 0 {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let observed_tick = clock.now_tick()?;
+        if observed_tick == 0 {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        replay.resolution_tick = Some(
+            observed_tick
+                .max(resolution_lower_bound)
+                .max(replay.deadline_tick.unwrap_or(0)),
+        );
+        replay.binding_digest = Some(cics_effect_replay_binding_digest(&replay));
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "cics-effect-replay-v1".into(),
+                    key: record.key,
+                    version: 2,
+                    payload: encode_cics_effect_replay(&replay)?,
+                },
+                Some(1),
+            )
+            .map_err(store_error)?;
+        Ok(replay)
     }
 
     pub fn terminal_run_trace(
@@ -1297,7 +1715,12 @@ impl CicsService {
             .is_some_and(|continuation| continuation.claimed_by.is_none()))
     }
 
-    fn invoke_run(&self, run: &mut Run, request: CicsRequest) -> Result<CicsResponse, HostProblem> {
+    fn invoke_run(
+        &self,
+        run: &mut Run,
+        request: CicsRequest,
+        retention_tick: u64,
+    ) -> Result<CicsResponse, HostProblem> {
         if let Some(mutation) = &request.mutation
             && mutation.transaction.as_deref() != Some(run.transaction.as_str())
         {
@@ -1309,735 +1732,38 @@ impl CicsService {
             &format!("CICS.{}", run.transaction),
             AccessIntent::Execute,
         )?;
-        match request.operation {
-            CicsOperation::HandleCondition => {
-                let (condition, label) = request
-                    .arguments
-                    .iter()
-                    .find(|(name, _)| !name.starts_with("OPTION."))
-                    .map(|(name, value)| {
-                        (
-                            name.to_ascii_uppercase(),
-                            String::from_utf8_lossy(value.bytes()).into_owned(),
-                        )
-                    })
-                    .ok_or(HostProblem::Malformed)?;
-                run.handlers.insert(condition, label);
-                self.response(
-                    run,
-                    CicsDisposition::Complete,
-                    "NORMAL",
-                    0,
-                    0,
-                    None,
-                    None,
-                    Vec::new(),
-                )
+        let descriptor = command_descriptor(request.operation);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 25);
+        debug_assert_eq!(descriptor.operation, request.operation);
+        debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
+        debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
+        match descriptor.family {
+            CicsCommandFamily::TaskControl => handlers::invoke_task_control(self, run, &request),
+            CicsCommandFamily::Time => handlers::invoke_time(self, run, &request),
+            CicsCommandFamily::ProgramControl => {
+                handlers::invoke_program_control(self, run, &request)
             }
-            CicsOperation::HandleAbend => {
-                if request.arguments.contains_key("OPTION.CANCEL") {
-                    run.abend_handler = None;
-                } else {
-                    run.abend_handler = Some(argument_text(&request, "LABEL")?);
-                }
-                self.response(
-                    run,
-                    CicsDisposition::Complete,
-                    "NORMAL",
-                    0,
-                    0,
-                    None,
-                    None,
-                    Vec::new(),
-                )
+            CicsCommandFamily::TerminalControl => {
+                handlers::invoke_terminal_control(self, run, &request)
             }
-            CicsOperation::Assign => {
-                let mut response = self.response(
-                    run,
-                    CicsDisposition::Complete,
-                    "NORMAL",
-                    0,
-                    0,
-                    None,
-                    None,
-                    Vec::new(),
-                )?;
-                for (name, value) in [
-                    ("APPLID", run.applid.as_bytes()),
-                    ("SYSID", run.sysid.as_bytes()),
-                    ("TRANSID", run.transaction.as_bytes()),
-                    (
-                        "PRINCIPAL",
-                        run.invocation.principal.id().as_str().as_bytes(),
-                    ),
-                ] {
-                    if request.arguments.contains_key(name) {
-                        response
-                            .outputs
-                            .insert(name.into(), bounded(value.to_vec())?);
-                    }
-                }
-                Ok(response)
+            CicsCommandFamily::FileControl => handlers::invoke_file_control(self, run, &request),
+            CicsCommandFamily::QueueControl => handlers::invoke_queue_control(self, run, &request),
+            CicsCommandFamily::Recovery => {
+                handlers::invoke_recovery(self, run, &request, retention_tick)
             }
-            CicsOperation::Asktime => self.asktime(run),
-            CicsOperation::FormatTime => self.format_time(run, &request),
-            CicsOperation::Inquire => self.inquire(run, &request),
-            CicsOperation::SendMap | CicsOperation::SendText => self.send(run, &request),
-            CicsOperation::ReceiveMap => self.receive(run),
-            CicsOperation::SetFileStatus => self.set_file_statuses(run, &request),
-            CicsOperation::Retrieve => self.response(
-                run,
-                CicsDisposition::Complete,
-                "NORMAL",
-                0,
-                0,
-                None,
-                None,
-                run.retrieve.clone(),
-            ),
-            CicsOperation::Read
-            | CicsOperation::Write
-            | CicsOperation::Rewrite
-            | CicsOperation::Delete
-            | CicsOperation::StartBrowse
-            | CicsOperation::ReadNext
-            | CicsOperation::ReadPrev
-            | CicsOperation::EndBrowse => self.file(run, &request),
-            CicsOperation::Link | CicsOperation::Xctl => self.transfer(run, &request),
-            CicsOperation::Return => self.return_transaction(run, &request),
-            CicsOperation::Abend => self.response(
-                run,
-                if run.abend_handler.is_some() {
-                    CicsDisposition::Handler
-                } else {
-                    CicsDisposition::Abended
-                },
-                "ERROR",
-                27,
-                0,
-                run.abend_handler.clone(),
-                None,
-                argument_bytes(&request, "ABCODE").unwrap_or_default(),
-            ),
-            CicsOperation::WriteTransientData => self.write_transient(run, &request),
-            CicsOperation::Syncpoint => self.syncpoint(run, &request),
         }
         .or_else(|problem| self.condition(run, &request.condition_policy, problem))
     }
 
-    fn send(&self, run: &Run, request: &CicsRequest) -> Result<CicsResponse, HostProblem> {
-        let mut state = self.lock()?;
-        let mut payload = argument_bytes(request, "FROM")
-            .or_else(|| argument_bytes(request, "DATA"))
-            .unwrap_or_default();
-        let mut field_protection = None;
-        let mut field_modified = None;
-        let mut field_values = None;
-        if request.operation == CicsOperation::SendMap {
-            let mapset = argument_text(request, "MAPSET")?;
-            let map = argument_text(request, "MAP")?;
-            let definition = state
-                .maps
-                .get(&(mapset.to_ascii_uppercase(), map.to_ascii_uppercase()))
-                .ok_or(HostProblem::NotFound)?;
-            field_protection = Some(symbolic_map_protection(definition, &payload));
-            field_modified = Some(symbolic_map_modified(definition, &payload));
-            if payload.is_empty() {
-                let mut values = BTreeMap::new();
-                for item in &definition.fields {
-                    field(&mut payload, item.name.as_bytes())?;
-                    field(&mut payload, &item.initial)?;
-                    values.insert(item.name.to_ascii_uppercase(), item.initial.clone());
-                }
-                field_values = Some(values);
-            } else if definition
-                .fields
-                .iter()
-                .all(|field| field.output_offset.is_some())
-            {
-                field_values = Some(symbolic_map_values(definition, &payload)?);
-                payload = encode_symbolic_map_output(definition, &payload)?;
-            } else if definition.fields.iter().any(|field| field.secret) {
-                return Err(HostProblem::Unsupported);
-            } else {
-                field_values = Some(decode_map_payload(&payload, self.limits)?);
-            }
-        }
-        if payload.len() > self.limits.max_screen_bytes {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        let current = state
-            .sessions
-            .get(&run.session)
-            .cloned()
-            .ok_or(HostProblem::NotFound)?;
-        let mut next = current.clone();
-        next.version += 1;
-        next.screen = payload.clone();
-        if request.operation == CicsOperation::SendMap {
-            next.mapset = Some(argument_text(request, "MAPSET")?.to_ascii_uppercase());
-            next.map = Some(argument_text(request, "MAP")?.to_ascii_uppercase());
-            next.field_protection = field_protection.unwrap_or_default();
-            next.field_modified = field_modified.unwrap_or_default();
-            next.field_values = field_values.unwrap_or_default();
-        }
-        self.persist_session(&run.session, &next, Some(current.version))?;
-        state.sessions.insert(run.session.clone(), next);
-        self.response(
-            run,
-            CicsDisposition::Complete,
-            "NORMAL",
-            0,
-            0,
-            None,
-            None,
-            payload,
-        )
-    }
-
-    fn receive(&self, run: &Run) -> Result<CicsResponse, HostProblem> {
-        let mut state = self.lock()?;
-        let current = state
-            .sessions
-            .get(&run.session)
-            .cloned()
-            .ok_or(HostProblem::NotFound)?;
-        let mut next = current.clone();
-        next.version += 1;
-        let (disposition, payload, fields) = if let Some(input) = next.input.take() {
-            let fields = decode_map_payload(&input, self.limits)?;
-            (CicsDisposition::Complete, input, fields)
-        } else {
-            next.suspended = true;
-            (CicsDisposition::Suspended, Vec::new(), BTreeMap::new())
-        };
-        self.persist_session(&run.session, &next, Some(current.version))?;
-        state.sessions.insert(run.session.clone(), next);
-        let mut response = self.response(run, disposition, "NORMAL", 0, 0, None, None, payload)?;
-        response.aid = current.aid;
-        for (name, value) in fields {
-            let input_length = value.len();
-            let value = current
-                .mapset
-                .as_ref()
-                .zip(current.map.as_ref())
-                .and_then(|(mapset, map)| state.maps.get(&(mapset.clone(), map.clone())))
-                .and_then(|map| {
-                    map.fields
-                        .iter()
-                        .find(|field| field.name.eq_ignore_ascii_case(&name))
-                })
-                .map_or(value.clone(), |field| normalize_bms_input(field, &value));
-            response
-                .outputs
-                .insert(format!("BMS.{name}"), bounded(value.clone())?);
-            response.outputs.insert(
-                format!("BMS.{name}.LENGTH"),
-                decimal_payload(
-                    i64::try_from(input_length).map_err(|_| HostProblem::ResourceExhausted)?,
-                )?,
-            );
-        }
-        Ok(response)
-    }
-
-    fn asktime(&self, run: &mut Run) -> Result<CicsResponse, HostProblem> {
-        let timestamp = match self.nested(run, HostRequest::Clock(ClockRequest::UtcTimestamp))? {
-            HostResult::Clock(value) => value,
-            _ => return Err(HostProblem::ProviderFailure),
-        };
-        let instant = parse_clock_timestamp(&timestamp)?;
-        let absolute = absolute_milliseconds(instant)?;
-        let mut response = self.response(
-            run,
-            CicsDisposition::Complete,
-            "NORMAL",
-            0,
-            0,
-            None,
-            None,
-            Vec::new(),
-        )?;
-        response
-            .outputs
-            .insert("ABSTIME".into(), decimal_payload(absolute)?);
-        Ok(response)
-    }
-
-    fn format_time(&self, run: &Run, request: &CicsRequest) -> Result<CicsResponse, HostProblem> {
-        let absolute = argument_text(request, "ABSTIME")?
-            .trim()
-            .parse::<i64>()
-            .map_err(|_| HostProblem::Malformed)?;
-        let instant = instant_from_absolute(absolute)?;
-        let date_separator = separator(request, "DATESEP", b'/')?;
-        let time_separator = separator(request, "TIMESEP", b':')?;
-        let mut response = self.response(
-            run,
-            CicsDisposition::Complete,
-            "NORMAL",
-            0,
-            0,
-            None,
-            None,
-            Vec::new(),
-        )?;
-        for key in ["YYYYMMDD", "YYMMDD", "MMDDYY", "MMDDYYYY", "YYDDD"] {
-            if request.arguments.contains_key(key) {
-                let value = format_date(instant, key, date_separator)?;
-                response.outputs.insert(key.into(), bounded(value)?);
-            }
-        }
-        if request.arguments.contains_key("TIME") {
-            response.outputs.insert(
-                "TIME".into(),
-                bounded(format_time_value(instant, time_separator))?,
-            );
-        }
-        if request.arguments.contains_key("MILLISECONDS") {
-            response.outputs.insert(
-                "MILLISECONDS".into(),
-                bounded(format!("{:03}", instant.millisecond).into_bytes())?,
-            );
-        }
-        Ok(response)
-    }
-
-    fn inquire(&self, run: &mut Run, request: &CicsRequest) -> Result<CicsResponse, HostProblem> {
-        let target = argument_text(request, "PROGRAM")?
-            .trim()
-            .to_ascii_uppercase();
-        self.authorize(
-            run,
-            "FACILITY",
-            &format!("CICS.PROGRAM.{target}"),
-            AccessIntent::Execute,
-        )?;
-        if self.lock()?.programs.contains(&target) {
-            return self.response(
-                run,
-                CicsDisposition::Complete,
-                "NORMAL",
-                0,
-                0,
-                None,
-                None,
-                Vec::new(),
-            );
-        }
-        let program = ProgramName::new(target, 128).map_err(|_| HostProblem::Malformed)?;
-        let result = self.nested(
-            run,
-            HostRequest::Program(ProgramRequest::Inquire { program }),
-        );
-        match result {
-            Err(HostProblem::NotFound) => Err(HostProblem::Condition {
-                name: "PGMIDERR".into(),
-                response: 27,
-                response2: 0,
-            }),
-            Err(problem) => Err(problem),
-            Ok(HostResult::Program(_)) => self.response(
-                run,
-                CicsDisposition::Complete,
-                "NORMAL",
-                0,
-                0,
-                None,
-                None,
-                Vec::new(),
-            ),
-            Ok(_) => Err(HostProblem::ProviderFailure),
-        }
-    }
-
-    fn return_transaction(
-        &self,
-        run: &Run,
-        request: &CicsRequest,
-    ) -> Result<CicsResponse, HostProblem> {
-        let mut state = self.lock()?;
-        let next_transaction = argument_optional(request, "TRANSID")
-            .map(|value| value.trim().to_ascii_uppercase())
-            .filter(|value| !value.is_empty());
-        let commarea = argument_bytes(request, "COMMAREA").unwrap_or_default();
-        if commarea.len() > self.limits.max_screen_bytes {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        if let Some(transaction) = &next_transaction {
-            if transaction.len() > 16
-                || !transaction
-                    .bytes()
-                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
-            {
-                return Err(HostProblem::Malformed);
-            }
-            let effect_key = request
-                .mutation
-                .as_ref()
-                .ok_or(HostProblem::MissingIdempotency)?
-                .idempotency_key
-                .as_str()
-                .to_string();
-            let current = state.continuations.get(&run.session).cloned();
-            if let Some(current) = &current
-                && current.effect_key == effect_key
-            {
-                if current.transaction != *transaction || current.commarea != commarea {
-                    return Err(HostProblem::IdempotencyConflict);
-                }
-            } else {
-                let version = current.as_ref().map_or(Ok(1), |value| {
-                    value
-                        .version
-                        .checked_add(1)
-                        .ok_or(HostProblem::ResourceExhausted)
-                })?;
-                let next = DurableContinuation {
-                    transaction: transaction.clone(),
-                    commarea: commarea.clone(),
-                    claimed_by: None,
-                    effect_key,
-                    version,
-                };
-                self.persist_continuation(
-                    &run.session,
-                    &next,
-                    current.as_ref().map(|value| value.version),
-                )
-                .map_err(mutation_problem)?;
-                state.continuations.insert(run.session.clone(), next);
-            }
-        } else if let Some(current) = state.continuations.get(&run.session).cloned()
-            && current.claimed_by.as_deref() == Some(run.invocation.run_unit_id.as_str())
-        {
-            self.store
-                .delete_provider_state("cics-continuation", &run.session, current.version)
-                .map_err(store_error)
-                .map_err(mutation_problem)?;
-            state.continuations.remove(&run.session);
-        }
-        self.response(
-            run,
-            CicsDisposition::Returned,
-            "NORMAL",
-            0,
-            0,
-            None,
-            next_transaction,
-            commarea,
-        )
-    }
-
-    fn syncpoint(&self, run: &mut Run, request: &CicsRequest) -> Result<CicsResponse, HostProblem> {
-        let mutation = request
-            .mutation
-            .as_ref()
-            .ok_or(HostProblem::MissingIdempotency)?;
-        let outcome = if request.arguments.contains_key("OPTION.ROLLBACK") {
-            CicsUnitOfWorkOutcome::RolledBack
-        } else {
-            CicsUnitOfWorkOutcome::Committed
-        };
-        let key = mutation.idempotency_key.as_str();
-        if let Some(record) = self
-            .store
-            .get_provider_state("cics-uow", key)
-            .map_err(store_error)?
-        {
-            let existing = decode_uow(&record.payload)?;
-            if existing.transaction != run.transaction {
-                return Err(HostProblem::IdempotencyConflict);
-            }
-            match (existing.finalized, existing.outcome) {
-                (false, existing) if existing == outcome => {
-                    return Err(HostProblem::UnknownOutcome);
-                }
-                (true, existing) if existing == outcome => {
-                    return self.uow_response(run, outcome);
-                }
-                _ => return Err(HostProblem::IdempotencyConflict),
-            }
-        }
-        self.store
-            .put_provider_state(
-                ProviderStateRecord {
-                    namespace: "cics-uow".into(),
-                    key: key.into(),
-                    version: 1,
-                    payload: encode_uow(&UowRecord {
-                        finalized: false,
-                        outcome,
-                        transaction: run.transaction.clone(),
-                    })?,
-                },
-                None,
-            )
-            .map_err(store_error)?;
-        self.syncpoint_db2(run, outcome)?;
-        self.syncpoint_ims(run, outcome)?;
-        self.syncpoint_mq(run, outcome)?;
-        if outcome == CicsUnitOfWorkOutcome::RolledBack {
-            self.rollback_run(run)?;
-        } else {
-            self.clear_undo(run)?;
-        }
-        // A syncpoint ends every no-token file update context regardless of
-        // whether the unit of work commits or rolls back.
-        run.current_records.clear();
-        run.current_record_values.clear();
-        if self
-            .store
-            .put_provider_state(
-                ProviderStateRecord {
-                    namespace: "cics-uow".into(),
-                    key: key.into(),
-                    version: 2,
-                    payload: encode_uow(&UowRecord {
-                        finalized: true,
-                        outcome,
-                        transaction: run.transaction.clone(),
-                    })?,
-                },
-                Some(1),
-            )
-            .is_err()
-        {
-            return Err(HostProblem::UnknownOutcome);
-        }
-        self.uow_response(run, outcome)
-    }
-
-    fn syncpoint_db2(
-        &self,
-        run: &mut Run,
-        outcome: CicsUnitOfWorkOutcome,
-    ) -> Result<(), HostProblem> {
-        let capability = CapabilityId::new("host.db2.write", InvocationLimits::default())
-            .expect("static Db2 capability");
-        if !self.host.capability_ready(capability.as_str())
-            || !run.invocation.principal.has_grant(&capability)
-        {
-            return Ok(());
-        }
-        run.host_sequence = run
-            .host_sequence
-            .checked_add(1)
-            .ok_or(HostProblem::ResourceExhausted)?;
-        let key = nested_key(run, run.host_sequence)?;
-        let result = self.host.invoke(
-            &run.invocation,
-            run.invocation.deadline_tick.saturating_sub(1),
-            false,
-            EffectRequest {
-                run_unit: run.invocation.run_unit_id.clone(),
-                sequence: run.host_sequence,
-                deadline_tick: run.invocation.deadline_tick,
-                idempotency_key: Some(key.clone()),
-                request: HostRequest::Db2(Db2Request {
-                    operation: if outcome == CicsUnitOfWorkOutcome::RolledBack {
-                        Db2Operation::Rollback
-                    } else {
-                        Db2Operation::Commit
-                    },
-                    statement: String::new(),
-                    cursor: None,
-                    inputs: BTreeMap::new(),
-                    outputs: Vec::new(),
-                    max_rows: 0,
-                    mutation: Some(Mutation {
-                        sequence: run.host_sequence,
-                        idempotency_key: key,
-                        transaction: Some(run.transaction.clone()),
-                    }),
-                }),
-            },
-        );
-        match result.effect.outcome? {
-            HostResult::Db2(result) if result.sqlcode == 0 => Ok(()),
-            HostResult::Db2(result) => Err(HostProblem::Condition {
-                name: format!("SQLCODE{}", result.sqlcode),
-                response: result.sqlcode,
-                response2: 0,
-            }),
-            _ => Err(HostProblem::ProviderFailure),
-        }
-    }
-
-    fn syncpoint_ims(
-        &self,
-        run: &mut Run,
-        outcome: CicsUnitOfWorkOutcome,
-    ) -> Result<(), HostProblem> {
-        let capability = CapabilityId::new("host.ims.write", InvocationLimits::default())
-            .expect("static IMS capability");
-        if !self.host.capability_ready(capability.as_str())
-            || !run.invocation.principal.has_grant(&capability)
-        {
-            return Ok(());
-        }
-        run.host_sequence = run
-            .host_sequence
-            .checked_add(1)
-            .ok_or(HostProblem::ResourceExhausted)?;
-        let key = nested_key(run, run.host_sequence)?;
-        let result = self.host.invoke(
-            &run.invocation,
-            run.invocation.deadline_tick.saturating_sub(1),
-            false,
-            EffectRequest {
-                run_unit: run.invocation.run_unit_id.clone(),
-                sequence: run.host_sequence,
-                deadline_tick: run.invocation.deadline_tick,
-                idempotency_key: Some(key.clone()),
-                request: HostRequest::Ims(ImsRequest {
-                    operation: if outcome == CicsUnitOfWorkOutcome::RolledBack {
-                        ImsOperation::Rollback
-                    } else {
-                        ImsOperation::Commit
-                    },
-                    psb: None,
-                    pcb: 1,
-                    segments: Vec::new(),
-                    data: Vec::new(),
-                    qualifiers: Vec::new(),
-                    checkpoint_id: None,
-                    max_segments: 1,
-                    mutation: Some(Mutation {
-                        sequence: run.host_sequence,
-                        idempotency_key: key,
-                        transaction: Some(run.transaction.clone()),
-                    }),
-                }),
-            },
-        );
-        match result.effect.outcome? {
-            HostResult::Ims(result) if result.status.trim().is_empty() => Ok(()),
-            HostResult::Ims(result) => Err(HostProblem::Condition {
-                name: format!("IMS{}", result.status.trim()),
-                response: 1,
-                response2: 0,
-            }),
-            _ => Err(HostProblem::ProviderFailure),
-        }
-    }
-
-    fn syncpoint_mq(
-        &self,
-        run: &mut Run,
-        outcome: CicsUnitOfWorkOutcome,
-    ) -> Result<(), HostProblem> {
-        let capability = CapabilityId::new("host.mq.write", InvocationLimits::default())
-            .expect("static MQ capability");
-        if !self.host.capability_ready(capability.as_str())
-            || !run.invocation.principal.has_grant(&capability)
-        {
-            return Ok(());
-        }
-        run.host_sequence = run
-            .host_sequence
-            .checked_add(1)
-            .ok_or(HostProblem::ResourceExhausted)?;
-        let key = nested_key(run, run.host_sequence)?;
-        let result = self.host.invoke(
-            &run.invocation,
-            run.invocation.deadline_tick.saturating_sub(1),
-            false,
-            EffectRequest {
-                run_unit: run.invocation.run_unit_id.clone(),
-                sequence: run.host_sequence,
-                deadline_tick: run.invocation.deadline_tick,
-                idempotency_key: Some(key.clone()),
-                request: HostRequest::Mq(MqRequest {
-                    operation: if outcome == CicsUnitOfWorkOutcome::RolledBack {
-                        MqOperation::Rollback
-                    } else {
-                        MqOperation::Commit
-                    },
-                    queue: None,
-                    handle: None,
-                    options: 0,
-                    message: Vec::new(),
-                    message_id: None,
-                    correlation_id: None,
-                    wait_ticks: 0,
-                    max_message_bytes: 1,
-                    mutation: Some(Mutation {
-                        sequence: run.host_sequence,
-                        idempotency_key: key,
-                        transaction: Some(run.transaction.clone()),
-                    }),
-                }),
-            },
-        );
-        match result.effect.outcome? {
-            HostResult::Mq(result) if result.completion_code == 0 => Ok(()),
-            HostResult::Mq(result) => Err(HostProblem::Condition {
-                name: format!("MQRC{}", result.reason_code),
-                response: result.completion_code,
-                response2: result.reason_code,
-            }),
-            _ => Err(HostProblem::ProviderFailure),
-        }
-    }
-
-    fn rollback_run(&self, run: &mut Run) -> Result<(), HostProblem> {
-        let undo = run.undo.clone();
-        for operation in undo.into_iter().rev() {
-            let sequence = run
-                .host_sequence
-                .checked_add(1)
-                .ok_or(HostProblem::ResourceExhausted)?;
-            let mutation = nested_mutation(run, sequence)?;
-            let request = match operation {
-                DatasetUndo::Restore {
-                    dataset,
-                    key,
-                    record,
-                } => DatasetRequest::RewriteRecord {
-                    dataset,
-                    key,
-                    record,
-                    expected_version: None,
-                    mutation,
-                },
-                DatasetUndo::Delete { dataset, key } => DatasetRequest::DeleteRecord {
-                    dataset,
-                    key,
-                    expected_version: None,
-                    mutation,
-                },
-            };
-            match self.nested(run, HostRequest::Dataset(request))? {
-                HostResult::Dataset(DatasetResult::Mutated { .. }) => {}
-                _ => return Err(HostProblem::ProviderFailure),
-            }
-        }
-        run.current_records.clear();
-        run.current_record_values.clear();
-        self.clear_undo(run)
-    }
-
-    fn uow_response(
-        &self,
-        run: &Run,
-        outcome: CicsUnitOfWorkOutcome,
-    ) -> Result<CicsResponse, HostProblem> {
-        let mut response = self.response(
-            run,
-            CicsDisposition::Complete,
-            "NORMAL",
-            0,
-            0,
-            None,
-            None,
-            Vec::new(),
-        )?;
-        response.unit_of_work = Some(outcome);
-        Ok(response)
-    }
-
     pub fn reconcile_unit_of_work(
+        &self,
+        key: &IdempotencyKey,
+        outcome: CicsUnitOfWorkOutcome,
+    ) -> Result<(), HostProblem> {
+        self.reconcile_unit_of_work_inner(key, outcome)
+    }
+
+    fn reconcile_unit_of_work_inner(
         &self,
         key: &IdempotencyKey,
         outcome: CicsUnitOfWorkOutcome,
@@ -2048,640 +1774,69 @@ impl CicsService {
             .map_err(store_error)?
             .ok_or(HostProblem::NotFound)?;
         let existing = decode_uow(&record.payload)?;
-        match (existing.finalized, existing.outcome) {
-            (true, existing_outcome) if existing_outcome == outcome => Ok(()),
-            (false, existing_outcome) if existing_outcome == outcome => self
-                .store
-                .put_provider_state(
-                    ProviderStateRecord {
-                        namespace: "cics-uow".into(),
-                        key: key.as_str().into(),
-                        version: record
-                            .version
-                            .checked_add(1)
-                            .ok_or(HostProblem::ResourceExhausted)?,
-                        payload: encode_uow(&UowRecord {
-                            finalized: true,
-                            outcome,
-                            transaction: existing.transaction,
-                        })?,
-                    },
-                    Some(record.version),
-                )
-                .map_err(store_error),
-            _ => Err(HostProblem::IdempotencyConflict),
-        }
-    }
-
-    fn set_file_statuses(
-        &self,
-        run: &mut Run,
-        request: &CicsRequest,
-    ) -> Result<CicsResponse, HostProblem> {
-        if request.arguments.is_empty() {
-            return Err(HostProblem::Malformed);
-        }
-        let mut requested = BTreeMap::new();
-        for (name, value) in &request.arguments {
-            let normalized = normalize_terminal_name(name, 16)?;
-            if value.schema() != "mainframe-env.cics.file-status@1" {
-                return Err(HostProblem::Malformed);
-            }
-            let status = match value.bytes() {
-                b"OPEN" => CicsFileStatus::Open,
-                b"CLOSED-ENABLED" => CicsFileStatus::ClosedEnabled,
-                b"CLOSED" | b"CLOSED-UNENABLED" => CicsFileStatus::Closed,
-                b"DISABLED" => CicsFileStatus::Disabled,
-                _ => return Err(HostProblem::Malformed),
-            };
-            if requested.insert(normalized, status).is_some() {
-                return Err(HostProblem::Malformed);
-            }
-        }
-        let mut state = self.lock()?;
-        if requested
-            .keys()
-            .any(|name| !state.file_aliases.contains_key(name))
-        {
-            return Err(HostProblem::NotFound);
-        }
-        let mut writes = Vec::new();
-        let mut changes = BTreeMap::new();
-        for (name, status) in &requested {
-            let current = state.file_statuses.get(name).copied();
-            if current.is_some_and(|current| current.status == *status)
-                || current.is_none() && *status == CicsFileStatus::Open
-            {
-                continue;
-            }
-            let version = current.map_or(Ok(1), |current| {
-                current
-                    .version
-                    .checked_add(1)
-                    .ok_or(HostProblem::ResourceExhausted)
-            })?;
-            writes.push(ProviderStateWrite {
-                record: ProviderStateRecord {
-                    namespace: "cics-file-status".into(),
-                    key: name.clone(),
-                    version,
-                    payload: encode_file_status(*status),
-                },
-                expected_version: current.map(|current| current.version),
-            });
-            changes.insert(
-                name.clone(),
-                DurableFileStatus {
-                    status: *status,
-                    version,
-                },
-            );
-        }
-        if !writes.is_empty() {
-            self.store
-                .put_provider_states_atomic(writes)
-                .map_err(store_error)?;
-        }
-        for (name, status) in changes {
-            state.file_statuses.insert(name, status);
-        }
-        drop(state);
-        self.response(
-            run,
-            CicsDisposition::Complete,
-            "NORMAL",
-            0,
-            0,
-            None,
-            None,
-            Vec::new(),
-        )
-    }
-
-    fn file(&self, run: &mut Run, request: &CicsRequest) -> Result<CicsResponse, HostProblem> {
-        let logical_name = argument_text(request, "DATASET")
-            .or_else(|_| argument_text(request, "FILE"))?
-            .trim()
-            .to_ascii_uppercase();
-        #[cfg(feature = "fault-injection")]
-        {
-            let mut state = self.lock()?;
-            if state
-                .file_failure
+        if existing.outcome != outcome
+            || existing
+                .metadata
                 .as_ref()
-                .is_some_and(|(operation, file)| {
-                    *operation == request.operation && file == &logical_name
-                })
-            {
-                state.file_failure = None;
-                return Err(HostProblem::Condition {
-                    name: "IOERR".into(),
-                    response: 17,
-                    response2: 1,
-                });
-            }
+                .is_some_and(|metadata| metadata.effect_key != key.as_str())
+        {
+            return Err(HostProblem::IdempotencyConflict);
         }
-        let definition = {
-            let mut state = self.lock()?;
-            match state.file_statuses.get(&logical_name).copied() {
-                Some(DurableFileStatus {
-                    status: CicsFileStatus::Closed,
-                    ..
-                }) => {
-                    return Err(HostProblem::Condition {
-                        name: "NOTOPEN".into(),
-                        response: 19,
-                        response2: 60,
-                    });
-                }
-                Some(DurableFileStatus {
-                    status: CicsFileStatus::Disabled,
-                    ..
-                }) => {
-                    return Err(HostProblem::Condition {
-                        name: "DISABLED".into(),
-                        response: 84,
-                        response2: 0,
-                    });
-                }
-                Some(
-                    current @ DurableFileStatus {
-                        status: CicsFileStatus::ClosedEnabled,
-                        ..
-                    },
-                ) => {
-                    let version = current
-                        .version
-                        .checked_add(1)
-                        .ok_or(HostProblem::ResourceExhausted)?;
-                    self.store
-                        .put_provider_state(
-                            ProviderStateRecord {
-                                namespace: "cics-file-status".into(),
-                                key: logical_name.clone(),
-                                version,
-                                payload: encode_file_status(CicsFileStatus::Open),
-                            },
-                            Some(current.version),
-                        )
-                        .map_err(store_error)?;
-                    state.file_statuses.insert(
-                        logical_name.clone(),
-                        DurableFileStatus {
-                            status: CicsFileStatus::Open,
-                            version,
-                        },
-                    );
-                }
-                Some(DurableFileStatus {
-                    status: CicsFileStatus::Open,
-                    ..
-                })
-                | None => {}
-            }
-            state.file_aliases.get(&logical_name).cloned()
-        };
-        let ccsid = definition.as_ref().and_then(|definition| definition.ccsid);
-        let name = definition
-            .map(|definition| definition.dataset.as_str().to_string())
-            .unwrap_or_else(|| logical_name.clone());
-        let dataset = DatasetName::new(name, 128).map_err(|_| HostProblem::Malformed)?;
-        let dataset_key = dataset.as_str().to_string();
-        self.authorize(
-            run,
-            "DATASET",
-            dataset.as_str(),
-            access_for(request.operation),
-        )
-        .map_err(|problem| match problem {
-            HostProblem::Unauthorized => HostProblem::Condition {
-                name: "NOTAUTH".into(),
-                response: 70,
-                response2: 101,
+        if existing.finalized {
+            return Ok(());
+        }
+        let observed_tick = match (&self.replay_clock, existing.metadata.as_ref()) {
+            (Some(clock), Some(metadata)) => match clock.now_tick() {
+                Ok(tick) if tick != 0 => Some(tick.max(metadata.deadline_tick)),
+                _ => return Err(HostProblem::UnknownOutcome),
             },
-            other => other,
-        })?;
-        let member = argument_optional(request, "MEMBER")
-            .map(|name| MemberName::new(name, 8).map_err(|_| HostProblem::Malformed))
-            .transpose()?;
-        let pending_undo = match request.operation {
-            CicsOperation::Write => argument_bytes(request, "RIDFLD")
-                .map(|key| encode_dataset_bytes(ccsid, &key))
-                .transpose()?
-                .map(|key| DatasetUndo::Delete {
-                    dataset: dataset.clone(),
-                    key,
-                }),
-            CicsOperation::Rewrite | CicsOperation::Delete => {
-                let key = argument_bytes(request, "RIDFLD")
-                    .map(|value| encode_dataset_bytes(ccsid, &value))
-                    .transpose()?
-                    .or_else(|| run.current_records.get(&dataset_key).cloned());
-                key.zip(run.current_record_values.get(&dataset_key).cloned())
-                    .map(|(key, record)| DatasetUndo::Restore {
-                        dataset: dataset.clone(),
-                        key,
-                        record,
-                    })
-            }
             _ => None,
         };
-        let mutated_record = matches!(
-            request.operation,
-            CicsOperation::Write | CicsOperation::Rewrite
-        )
-        .then(|| encode_dataset_bytes(ccsid, &argument_bytes(request, "FROM").unwrap_or_default()))
-        .transpose()?;
-        let host_request = match request.operation {
-            CicsOperation::Read => DatasetRequest::Read {
-                dataset: dataset.clone(),
-                member,
-                key: argument_bytes(request, "RIDFLD")
-                    .map(|value| encode_dataset_bytes(ccsid, &value))
-                    .transpose()?,
-                max_records: 1,
-                control: Default::default(),
-            },
-            CicsOperation::Write => {
-                let sequence = run
-                    .host_sequence
-                    .checked_add(1)
-                    .ok_or(HostProblem::ResourceExhausted)?;
-                let mutation = nested_mutation(run, sequence)?;
-                DatasetRequest::Write {
-                    dataset: dataset.clone(),
-                    member,
-                    records: vec![encode_dataset_bytes(
-                        ccsid,
-                        &argument_bytes(request, "FROM").unwrap_or_default(),
-                    )?],
-                    expected_version: argument_optional(request, "VERSION")
-                        .map(|value| value.parse().map_err(|_| HostProblem::Malformed))
-                        .transpose()?,
-                    mutation,
-                }
+        let metadata = existing.metadata.map(|mut metadata| {
+            if let Some(observed_tick) = observed_tick {
+                metadata.terminal_tick = Some(observed_tick);
             }
-            CicsOperation::Rewrite => {
-                let sequence = run
-                    .host_sequence
-                    .checked_add(1)
-                    .ok_or(HostProblem::ResourceExhausted)?;
-                let mutation = nested_mutation(run, sequence)?;
-                let key = argument_bytes(request, "RIDFLD")
-                    .map(|value| encode_dataset_bytes(ccsid, &value))
-                    .transpose()?
-                    .or_else(|| run.current_records.get(&dataset_key).cloned())
-                    .ok_or_else(|| HostProblem::Condition {
-                        name: "INVREQ".into(),
-                        response: 16,
-                        response2: 30,
-                    })?;
-                DatasetRequest::RewriteRecord {
-                    dataset: dataset.clone(),
-                    key,
-                    record: encode_dataset_bytes(
-                        ccsid,
-                        &argument_bytes(request, "FROM").unwrap_or_default(),
-                    )?,
-                    expected_version: argument_optional(request, "VERSION")
-                        .map(|value| value.parse().map_err(|_| HostProblem::Malformed))
-                        .transpose()?,
-                    mutation,
-                }
-            }
-            CicsOperation::Delete => {
-                let sequence = run
-                    .host_sequence
-                    .checked_add(1)
-                    .ok_or(HostProblem::ResourceExhausted)?;
-                let mutation = nested_mutation(run, sequence)?;
-                let key = argument_bytes(request, "RIDFLD")
-                    .map(|value| encode_dataset_bytes(ccsid, &value))
-                    .transpose()?
-                    .or_else(|| run.current_records.get(&dataset_key).cloned())
-                    .ok_or_else(|| HostProblem::Condition {
-                        name: "INVREQ".into(),
-                        response: 16,
-                        response2: 0,
-                    })?;
-                DatasetRequest::DeleteRecord {
-                    dataset: dataset.clone(),
-                    key,
-                    expected_version: argument_optional(request, "VERSION")
-                        .map(|value| value.parse().map_err(|_| HostProblem::Malformed))
-                        .transpose()?,
-                    mutation,
-                }
-            }
-            CicsOperation::StartBrowse => DatasetRequest::StartBrowse {
-                dataset: dataset.clone(),
-                key: encode_dataset_bytes(
-                    ccsid,
-                    &argument_bytes(request, "RIDFLD").unwrap_or_default(),
-                )?,
-                relation: mainframe_env_host_api::KeyRelation::GreaterOrEqual,
-            },
-            CicsOperation::ReadNext | CicsOperation::ReadPrev => DatasetRequest::ReadNext {
-                dataset: dataset.clone(),
-                cursor: argument_optional(request, "CURSOR")
-                    .or_else(|| run.browses.get(&dataset_key).cloned())
-                    .ok_or_else(|| HostProblem::Condition {
-                        name: "INVREQ".into(),
-                        response: 16,
-                        response2: 0,
-                    })?,
-                reverse: request.operation == CicsOperation::ReadPrev,
-                control: Default::default(),
-            },
-            CicsOperation::EndBrowse => DatasetRequest::EndBrowse {
-                dataset: dataset.clone(),
-                cursor: argument_optional(request, "CURSOR")
-                    .or_else(|| run.browses.get(&dataset_key).cloned())
-                    .ok_or_else(|| HostProblem::Condition {
-                        name: "INVREQ".into(),
-                        response: 16,
-                        response2: 0,
-                    })?,
-            },
-            _ => return Err(HostProblem::Malformed),
-        };
-        let operation = request.operation;
-        #[cfg(feature = "fault-injection")]
-        if self.consume_file_fault(operation, &logical_name, CicsFileFaultPoint::BeforeIntent)? {
-            return Err(HostProblem::InfrastructureFailure);
-        }
-        if let Some(undo) = pending_undo.clone() {
-            self.append_undo(run, undo)?;
-        }
-        #[cfg(feature = "fault-injection")]
-        if self.consume_file_fault(operation, &logical_name, CicsFileFaultPoint::AfterIntent)? {
-            return Err(HostProblem::InfrastructureFailure);
-        }
-        let result = self
-            .nested(run, HostRequest::Dataset(host_request))
-            .map_err(|problem| match (operation, problem) {
-                (CicsOperation::Read, HostProblem::NotFound) => HostProblem::Condition {
-                    name: "NOTFND".into(),
-                    response: 13,
-                    response2: 80,
-                },
-                (
-                    CicsOperation::Read,
-                    HostProblem::Condition {
-                        name, response: 13, ..
-                    },
-                ) if name == "NOTFND" => HostProblem::Condition {
-                    name,
-                    response: 13,
-                    response2: 80,
-                },
-                (_, other) => other,
-            })?;
-        #[cfg(feature = "fault-injection")]
-        if self.consume_file_fault(operation, &logical_name, CicsFileFaultPoint::AfterMutation)? {
-            return Err(HostProblem::InfrastructureFailure);
-        }
-        let mut browse_key = None;
-        let payload = match result {
-            HostResult::Dataset(DatasetResult::Records {
-                records,
-                identities,
-                ..
-            }) => {
-                if request.arguments.contains_key("OPTION.UPDATE")
-                    && let Some(identity) = identities.first()
-                {
-                    run.current_records
-                        .insert(dataset_key.clone(), identity.clone());
-                }
-                let record = records.into_iter().next().unwrap_or_default();
-                if request.arguments.contains_key("OPTION.UPDATE") {
-                    run.current_record_values
-                        .insert(dataset_key.clone(), record.clone());
-                }
-                decode_dataset_bytes(ccsid, &record)?
-            }
-            HostResult::Dataset(DatasetResult::Browse {
-                cursor,
-                record,
-                identity,
-                key,
-            }) => {
-                if operation == CicsOperation::StartBrowse {
-                    run.browses.insert(dataset_key.clone(), cursor);
-                } else if operation == CicsOperation::EndBrowse {
-                    run.browses.remove(&dataset_key);
-                    run.current_records.remove(&dataset_key);
-                }
-                if request.arguments.contains_key("OPTION.UPDATE")
-                    && let Some(identity) = identity
-                {
-                    run.current_records.insert(dataset_key.clone(), identity);
-                }
-                browse_key = key
-                    .map(|key| decode_dataset_bytes(ccsid, &key))
-                    .transpose()?;
-                if matches!(operation, CicsOperation::ReadNext | CicsOperation::ReadPrev)
-                    && record.is_none()
-                {
-                    return Err(HostProblem::Condition {
-                        name: "ENDFILE".into(),
-                        response: 20,
-                        response2: 0,
-                    });
-                }
-                let record = record.unwrap_or_default();
-                if !record.is_empty() && request.arguments.contains_key("OPTION.UPDATE") {
-                    run.current_record_values
-                        .insert(dataset_key.clone(), record.clone());
-                }
-                decode_dataset_bytes(ccsid, &record)?
-            }
-            HostResult::Dataset(_) => Vec::new(),
-            _ => return Err(HostProblem::ProviderFailure),
-        };
-        if matches!(operation, CicsOperation::Delete | CicsOperation::Rewrite) {
-            run.current_records.remove(&dataset_key);
-            run.current_record_values.remove(&dataset_key);
-        } else if operation == CicsOperation::Write
-            && let Some(identity) = argument_bytes(request, "RIDFLD")
-        {
-            run.current_records
-                .insert(dataset_key.clone(), encode_dataset_bytes(ccsid, &identity)?);
-        }
-        if let Some(record) = mutated_record
-            && operation != CicsOperation::Rewrite
-        {
-            run.current_record_values.insert(dataset_key, record);
-        }
-        let mut response = self.response(
-            run,
-            CicsDisposition::Complete,
-            "NORMAL",
-            0,
-            0,
-            None,
-            None,
-            payload,
-        )?;
-        if let Some(key) = browse_key {
-            response.outputs.insert("RIDFLD".into(), bounded(key)?);
-        }
-        Ok(response)
-    }
-
-    fn transfer(&self, run: &mut Run, request: &CicsRequest) -> Result<CicsResponse, HostProblem> {
-        let target = argument_text(request, "PROGRAM")?
-            .trim()
-            .to_ascii_uppercase();
-        self.authorize(
-            run,
-            "FACILITY",
-            &format!("CICS.PROGRAM.{target}"),
-            AccessIntent::Execute,
-        )?;
-        let program = ProgramName::new(target.clone(), 128).map_err(|_| HostProblem::Malformed)?;
-        let payload = bounded(argument_bytes(request, "COMMAREA").unwrap_or_default())?;
-        if request.operation == CicsOperation::Xctl && self.lock()?.programs.contains(&target) {
-            return self.response(
-                run,
-                CicsDisposition::Transfer,
-                "NORMAL",
-                0,
-                0,
-                Some(target),
-                None,
-                payload.bytes().to_vec(),
-            );
-        }
-        let host_request = if request.operation == CicsOperation::Link {
-            HostRequest::Program(ProgramRequest::Link { program, payload })
-        } else {
-            HostRequest::Program(ProgramRequest::Xctl { program, payload })
-        };
-        let result = self.nested(run, host_request)?;
-        let payload = match result {
-            HostResult::Program(payload) => payload.bytes().to_vec(),
-            _ => return Err(HostProblem::ProviderFailure),
-        };
-        let mut response = self.response(
-            run,
-            if request.operation == CicsOperation::Link {
-                CicsDisposition::Complete
-            } else {
-                CicsDisposition::Transfer
-            },
-            "NORMAL",
-            0,
-            0,
-            Some(target),
-            None,
-            payload.clone(),
-        )?;
-        if request.operation == CicsOperation::Link {
-            response
-                .outputs
-                .insert("COMMAREA".into(), bounded(payload)?);
-        }
-        Ok(response)
-    }
-
-    fn write_transient(
-        &self,
-        run: &mut Run,
-        request: &CicsRequest,
-    ) -> Result<CicsResponse, HostProblem> {
-        let queue = argument_text(request, "QUEUE")
-            .or_else(|_| argument_text(request, "TDQUEUE"))?
-            .trim()
-            .to_ascii_uppercase();
-        if queue.is_empty()
-            || queue.len() > 16
-            || !queue
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
-        {
-            return Err(HostProblem::Malformed);
-        }
-        self.authorize(
-            run,
-            "QUEUE",
-            &format!("CICS.TD.{queue}"),
-            AccessIntent::Update,
-        )?;
-        let mut state = self.lock()?;
-        let value = argument_bytes(request, "FROM").unwrap_or_default();
-        let mutation = request
-            .mutation
-            .as_ref()
-            .ok_or(HostProblem::MissingIdempotency)?;
-        let effect_key = mutation.idempotency_key.as_str();
-        let current = state.transient.get(&queue).cloned();
-        if let Some((_, existing_value)) = current
-            .as_ref()
-            .and_then(|queue| queue.records.iter().find(|(key, _)| key == effect_key))
-        {
-            if existing_value != &value {
-                return Err(HostProblem::IdempotencyConflict);
-            }
-            return self.response(
-                run,
-                CicsDisposition::Complete,
-                "NORMAL",
-                0,
-                0,
-                None,
-                None,
-                Vec::new(),
-            );
-        }
-        if state
-            .transient
-            .values()
-            .map(|queue| queue.records.len())
-            .sum::<usize>()
-            >= self.limits.max_queue_records
-            || state
-                .transient_bytes
-                .checked_add(value.len())
-                .is_none_or(|bytes| bytes > self.limits.max_queue_bytes)
-        {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        let mut next = current.unwrap_or(TransientQueue {
-            records: Vec::new(),
-            version: 0,
+            metadata
         });
-        let expected = (next.version != 0).then_some(next.version);
-        next.version = next
-            .version
-            .checked_add(1)
-            .ok_or(HostProblem::ResourceExhausted)?;
-        next.records.push((effect_key.into(), value.clone()));
         self.store
             .put_provider_state(
                 ProviderStateRecord {
-                    namespace: "cics-tdq".into(),
-                    key: queue.clone(),
-                    version: next.version,
-                    payload: encode_transient(&next)?,
+                    namespace: "cics-uow".into(),
+                    key: key.as_str().into(),
+                    version: record
+                        .version
+                        .checked_add(1)
+                        .ok_or(HostProblem::ResourceExhausted)?,
+                    payload: encode_uow(&UowRecord {
+                        finalized: true,
+                        outcome,
+                        transaction: existing.transaction,
+                        metadata,
+                    })?,
                 },
-                expected,
+                Some(record.version),
             )
             .map_err(store_error)
-            .map_err(mutation_problem)?;
-        state.transient.insert(queue, next);
-        state.transient_bytes += value.len();
-        self.response(
-            run,
-            CicsDisposition::Complete,
-            "NORMAL",
-            0,
-            0,
-            None,
-            None,
-            Vec::new(),
-        )
+    }
+
+    /// Resolve an outer CICS effect from the durable provider replay ledger
+    /// without dispatching the mutation again.
+    pub fn reconciled_effect_result_digest(
+        &self,
+        key: &IdempotencyKey,
+        request_digest: [u8; 32],
+    ) -> Result<[u8; 32], HostProblem> {
+        let record = self
+            .store
+            .get_provider_state("cics-effect-replay-v1", key.as_str())
+            .map_err(store_error)?
+            .ok_or(HostProblem::UnknownOutcome)?;
+        let replay = decode_cics_effect_replay(&record.payload, self.limits)?;
+        if replay.request_digest != request_digest {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        canonical_result_digest(&Ok(HostResult::Cics(replay.response)))
+            .map_err(|_| HostProblem::InfrastructureFailure)
     }
 
     fn authorize(
@@ -2721,8 +1876,29 @@ impl CicsService {
             .is_mutating()
             .then(|| nested_key(run, run.host_sequence))
             .transpose()?;
-        let result = self.host.invoke(
-            &run.invocation,
+        let nested_invocation = key
+            .as_ref()
+            .filter(|_| {
+                matches!(
+                    &request,
+                    HostRequest::Dataset(_)
+                        | HostRequest::Db2(_)
+                        | HostRequest::Ims(_)
+                        | HostRequest::Mq(_)
+                )
+            })
+            .map(|key| {
+                invocation_with_nested_origin(
+                    &run.invocation,
+                    key,
+                    run.outer_effect_key
+                        .as_deref()
+                        .ok_or(HostProblem::InfrastructureFailure)?,
+                )
+            })
+            .transpose()?;
+        let result = self.invoke_host(
+            nested_invocation.as_ref().unwrap_or(&run.invocation),
             run.invocation.deadline_tick.saturating_sub(1),
             false,
             EffectRequest {
@@ -2733,7 +1909,7 @@ impl CicsService {
                 request,
             },
         );
-        result.effect.outcome
+        result.outcome
     }
 
     fn condition(
@@ -2817,7 +1993,7 @@ impl CicsService {
         invocation: &Invocation,
         transaction: &str,
     ) -> Result<(), HostProblem> {
-        let result = self.host.invoke(
+        let result = self.invoke_host(
             invocation,
             0,
             false,
@@ -2838,7 +2014,7 @@ impl CicsService {
                 }),
             },
         );
-        match result.effect.outcome? {
+        match result.outcome? {
             HostResult::Security(SecurityDecision::Allow) => Ok(()),
             HostResult::Security(_) => Err(HostProblem::Unauthorized),
             _ => Err(HostProblem::ProviderFailure),
@@ -2963,6 +2139,16 @@ impl CicsService {
         Ok(hit)
     }
 
+    #[cfg(feature = "fault-injection")]
+    fn consume_mutation_fault(&self, operation: CicsOperation) -> Result<bool, HostProblem> {
+        let mut state = self.lock()?;
+        let hit = state.mutation_fault == Some(operation);
+        if hit {
+            state.mutation_fault = None;
+        }
+        Ok(hit)
+    }
+
     fn persist_session(
         &self,
         key: &str,
@@ -3013,6 +2199,12 @@ impl HostProvider for Provider {
     }
 
     fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
+        if let Err(problem) = reject_reserved_nested_origin(invocation) {
+            return EffectResult {
+                sequence: effect.sequence,
+                outcome: Err(problem),
+            };
+        }
         if let Err(problem) = self.service.ensure_run(invocation) {
             return EffectResult {
                 sequence: effect.sequence,
@@ -3034,6 +2226,86 @@ impl HostProvider for Provider {
             outcome: self.service.invoke(&effect, request).map(HostResult::Cics),
         }
     }
+}
+
+fn reject_reserved_nested_origin(invocation: &Invocation) -> Result<(), HostProblem> {
+    if invocation
+        .bindings
+        .contains_key(CICS_NESTED_EFFECT_ORIGIN_BINDING)
+        || invocation
+            .bindings
+            .contains_key(CICS_OUTER_EFFECT_ORIGIN_BINDING)
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_cics_effect_replay_identity(
+    replay: &CicsEffectReplay,
+    key: &str,
+    owner_execution: &str,
+    owner_run_unit: &str,
+    sequence: u64,
+    request_digest: [u8; 32],
+) -> Result<(), HostProblem> {
+    if replay.request_digest != request_digest
+        || replay
+            .owner_execution
+            .as_deref()
+            .is_some_and(|owner| owner != owner_execution)
+    {
+        return Err(HostProblem::IdempotencyConflict);
+    }
+    if replay.effect_key.is_none() {
+        return Ok(());
+    }
+    let result_digest = canonical_result_digest(&Ok(HostResult::Cics(replay.response.clone())))
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    if replay.effect_key.as_deref() != Some(key)
+        || replay.owner_execution.as_deref() != Some(owner_execution)
+        || replay.owner_run_unit.as_deref() != Some(owner_run_unit)
+        || replay.sequence != Some(sequence)
+        || replay.deadline_tick.is_none_or(|tick| tick == 0)
+        || replay.result_digest != Some(result_digest)
+        || replay.binding_digest != Some(cics_effect_replay_binding_digest(replay))
+    {
+        return Err(HostProblem::IdempotencyConflict);
+    }
+    Ok(())
+}
+
+fn invocation_with_nested_origin(
+    invocation: &Invocation,
+    key: &IdempotencyKey,
+    outer_effect_key: &str,
+) -> Result<Invocation, HostProblem> {
+    reject_reserved_nested_origin(invocation)?;
+    let limits = InvocationLimits::default();
+    if invocation.bindings.len().saturating_add(2) > limits.max_bindings {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let mut nested = invocation.clone();
+    nested.bindings.insert(
+        CICS_NESTED_EFFECT_ORIGIN_BINDING.into(),
+        BoundedPayload::new(
+            CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
+            key.as_str().as_bytes().to_vec(),
+            limits,
+        )
+        .map_err(|_| HostProblem::ResourceExhausted)?,
+    );
+    nested.bindings.insert(
+        CICS_OUTER_EFFECT_ORIGIN_BINDING.into(),
+        BoundedPayload::new(
+            CICS_OUTER_EFFECT_ORIGIN_SCHEMA,
+            outer_effect_key.as_bytes().to_vec(),
+            limits,
+        )
+        .map_err(|_| HostProblem::ResourceExhausted)?,
+    );
+    Ok(nested)
 }
 
 pub fn cics_provider(service: Arc<CicsService>, limits: InvocationLimits) -> Arc<dyn HostProvider> {
@@ -3071,6 +2343,7 @@ fn run_for(
         applid: applid.to_ascii_uppercase(),
         sysid: sysid.to_ascii_uppercase(),
         host_sequence: 0,
+        outer_effect_key: None,
         handlers: BTreeMap::new(),
         abend_handler: None,
         retrieve,
@@ -3544,230 +2817,28 @@ struct UowRecord {
     finalized: bool,
     outcome: CicsUnitOfWorkOutcome,
     transaction: String,
+    metadata: Option<UowRetentionMetadata>,
 }
 
 fn encode_uow(record: &UowRecord) -> Result<Vec<u8>, HostProblem> {
-    let state = match (record.finalized, record.outcome) {
-        (false, CicsUnitOfWorkOutcome::Committed) => b'C',
-        (false, CicsUnitOfWorkOutcome::RolledBack) => b'R',
-        (true, CicsUnitOfWorkOutcome::Committed) => b'c',
-        (true, CicsUnitOfWorkOutcome::RolledBack) => b'r',
-    };
-    let mut value = b"MECU1".to_vec();
-    value.push(state);
-    field(&mut value, record.transaction.as_bytes())?;
-    Ok(value)
+    crate::retention::encode_uow(&DecodedUow {
+        state: crate::retention::CicsUowState::from_parts(record.finalized, record.outcome),
+        transaction: record.transaction.clone(),
+        metadata: record.metadata.clone(),
+    })
+    .map_err(|_| HostProblem::InfrastructureFailure)
 }
 
 fn decode_uow(payload: &[u8]) -> Result<UowRecord, HostProblem> {
-    let mut reader = Reader {
-        bytes: payload,
-        at: 0,
-    };
-    if reader.take(5)? != b"MECU1" {
-        return Err(HostProblem::InfrastructureFailure);
-    }
-    let (finalized, outcome) = match reader.take(1)?[0] {
-        b'C' => (false, CicsUnitOfWorkOutcome::Committed),
-        b'R' => (false, CicsUnitOfWorkOutcome::RolledBack),
-        b'c' => (true, CicsUnitOfWorkOutcome::Committed),
-        b'r' => (true, CicsUnitOfWorkOutcome::RolledBack),
-        _ => return Err(HostProblem::InfrastructureFailure),
-    };
-    let transaction =
-        String::from_utf8(reader.field(16)?).map_err(|_| HostProblem::InfrastructureFailure)?;
-    if reader.at != payload.len() || transaction.is_empty() {
-        return Err(HostProblem::InfrastructureFailure);
-    }
+    let decoded =
+        crate::retention::decode_uow(payload).map_err(|_| HostProblem::InfrastructureFailure)?;
+    let (finalized, outcome) = decoded.state.parts();
     Ok(UowRecord {
         finalized,
         outcome,
-        transaction,
+        transaction: decoded.transaction,
+        metadata: decoded.metadata,
     })
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct ClockInstant {
-    year: i64,
-    month: u32,
-    day: u32,
-    hour: u32,
-    minute: u32,
-    second: u32,
-    millisecond: u32,
-}
-
-fn parse_clock_timestamp(value: &str) -> Result<ClockInstant, HostProblem> {
-    if value.len() != 17 || !value.bytes().all(|byte| byte.is_ascii_digit()) {
-        return Err(HostProblem::ProviderFailure);
-    }
-    let number = |range: std::ops::Range<usize>| {
-        value[range]
-            .parse::<u32>()
-            .map_err(|_| HostProblem::ProviderFailure)
-    };
-    let instant = ClockInstant {
-        year: i64::from(number(0..4)?),
-        month: number(4..6)?,
-        day: number(6..8)?,
-        hour: number(8..10)?,
-        minute: number(10..12)?,
-        second: number(12..14)?,
-        millisecond: number(14..17)?,
-    };
-    validate_instant(instant)?;
-    Ok(instant)
-}
-
-fn validate_instant(instant: ClockInstant) -> Result<(), HostProblem> {
-    let days = days_from_civil(instant.year, instant.month, instant.day)
-        .ok_or(HostProblem::ProviderFailure)?;
-    let (year, month, day) = civil_from_days(days);
-    if (year, month, day) != (instant.year, instant.month, instant.day)
-        || instant.hour > 23
-        || instant.minute > 59
-        || instant.second > 59
-        || instant.millisecond > 999
-    {
-        Err(HostProblem::ProviderFailure)
-    } else {
-        Ok(())
-    }
-}
-
-fn absolute_milliseconds(instant: ClockInstant) -> Result<i64, HostProblem> {
-    let epoch = days_from_civil(1900, 1, 1).ok_or(HostProblem::ProviderFailure)?;
-    let days = days_from_civil(instant.year, instant.month, instant.day)
-        .ok_or(HostProblem::ProviderFailure)?
-        .checked_sub(epoch)
-        .ok_or(HostProblem::ResourceExhausted)?;
-    days.checked_mul(86_400_000)
-        .and_then(|value| value.checked_add(i64::from(instant.hour) * 3_600_000))
-        .and_then(|value| value.checked_add(i64::from(instant.minute) * 60_000))
-        .and_then(|value| value.checked_add(i64::from(instant.second) * 1_000))
-        .and_then(|value| value.checked_add(i64::from(instant.millisecond)))
-        .ok_or(HostProblem::ResourceExhausted)
-}
-
-fn instant_from_absolute(value: i64) -> Result<ClockInstant, HostProblem> {
-    if value < 0 {
-        return Err(HostProblem::Malformed);
-    }
-    let epoch = days_from_civil(1900, 1, 1).ok_or(HostProblem::ProviderFailure)?;
-    let days = value / 86_400_000;
-    let rest = value % 86_400_000;
-    let (year, month, day) = civil_from_days(
-        epoch
-            .checked_add(days)
-            .ok_or(HostProblem::ResourceExhausted)?,
-    );
-    Ok(ClockInstant {
-        year,
-        month,
-        day,
-        hour: u32::try_from(rest / 3_600_000).map_err(|_| HostProblem::Malformed)?,
-        minute: u32::try_from((rest / 60_000) % 60).map_err(|_| HostProblem::Malformed)?,
-        second: u32::try_from((rest / 1_000) % 60).map_err(|_| HostProblem::Malformed)?,
-        millisecond: u32::try_from(rest % 1_000).map_err(|_| HostProblem::Malformed)?,
-    })
-}
-
-fn days_from_civil(year: i64, month: u32, day: u32) -> Option<i64> {
-    if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
-        return None;
-    }
-    let adjusted_year = year - i64::from(month <= 2);
-    let era = if adjusted_year >= 0 {
-        adjusted_year
-    } else {
-        adjusted_year - 399
-    } / 400;
-    let year_of_era = adjusted_year - era * 400;
-    let adjusted_month = i64::from(month) + if month > 2 { -3 } else { 9 };
-    let day_of_year = (153 * adjusted_month + 2) / 5 + i64::from(day) - 1;
-    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
-    Some(era * 146_097 + day_of_era - 719_468)
-}
-
-fn civil_from_days(days: i64) -> (i64, u32, u32) {
-    let shifted = days + 719_468;
-    let era = if shifted >= 0 {
-        shifted
-    } else {
-        shifted - 146_096
-    } / 146_097;
-    let day_of_era = shifted - era * 146_097;
-    let year_of_era =
-        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
-    let mut year = year_of_era + era * 400;
-    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
-    let month_prime = (5 * day_of_year + 2) / 153;
-    let day = day_of_year - (153 * month_prime + 2) / 5 + 1;
-    let month = month_prime + if month_prime < 10 { 3 } else { -9 };
-    year += i64::from(month <= 2);
-    (year, month as u32, day as u32)
-}
-
-fn separator(request: &CicsRequest, name: &str, default: u8) -> Result<Option<u8>, HostProblem> {
-    if let Some(value) = request.arguments.get(name) {
-        if value.bytes().len() != 1 {
-            return Err(HostProblem::Malformed);
-        }
-        Ok(value.bytes().first().copied())
-    } else if request.arguments.contains_key(&format!("OPTION.{name}")) {
-        Ok(Some(default))
-    } else {
-        Ok(None)
-    }
-}
-
-fn format_date(
-    instant: ClockInstant,
-    format: &str,
-    separator: Option<u8>,
-) -> Result<Vec<u8>, HostProblem> {
-    let year = u32::try_from(instant.year).map_err(|_| HostProblem::Malformed)?;
-    let parts = match format {
-        "YYYYMMDD" => vec![
-            format!("{year:04}"),
-            format!("{:02}", instant.month),
-            format!("{:02}", instant.day),
-        ],
-        "YYMMDD" => vec![
-            format!("{:02}", year % 100),
-            format!("{:02}", instant.month),
-            format!("{:02}", instant.day),
-        ],
-        "MMDDYY" => vec![
-            format!("{:02}", instant.month),
-            format!("{:02}", instant.day),
-            format!("{:02}", year % 100),
-        ],
-        "MMDDYYYY" => vec![
-            format!("{:02}", instant.month),
-            format!("{:02}", instant.day),
-            format!("{year:04}"),
-        ],
-        "YYDDD" => {
-            let jan1 = days_from_civil(instant.year, 1, 1).ok_or(HostProblem::Malformed)?;
-            let current = days_from_civil(instant.year, instant.month, instant.day)
-                .ok_or(HostProblem::Malformed)?;
-            return Ok(format!("{:02}{:03}", year % 100, current - jan1 + 1).into_bytes());
-        }
-        _ => return Err(HostProblem::Malformed),
-    };
-    let joiner = separator.map_or_else(String::new, |value| char::from(value).to_string());
-    Ok(parts.join(&joiner).into_bytes())
-}
-
-fn format_time_value(instant: ClockInstant, separator: Option<u8>) -> Vec<u8> {
-    let parts = [
-        format!("{:02}", instant.hour),
-        format!("{:02}", instant.minute),
-        format!("{:02}", instant.second),
-    ];
-    let joiner = separator.map_or_else(String::new, |value| char::from(value).to_string());
-    parts.join(&joiner).into_bytes()
 }
 
 fn decimal_payload(value: i64) -> Result<BoundedPayload, HostProblem> {
@@ -4443,6 +3514,358 @@ fn decode_session_flags(
     Ok(values)
 }
 
+fn encode_cics_effect_replay(replay: &CicsEffectReplay) -> Result<Vec<u8>, HostProblem> {
+    let response = &replay.response;
+    let owner = replay
+        .owner_execution
+        .as_deref()
+        .ok_or(HostProblem::InfrastructureFailure)?;
+    let deadline_tick = replay
+        .deadline_tick
+        .filter(|tick| *tick != 0)
+        .ok_or(HostProblem::InfrastructureFailure)?;
+    let mut out = if let Some(effect_key) = replay.effect_key.as_deref() {
+        let owner_run_unit = replay
+            .owner_run_unit
+            .as_deref()
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let sequence = replay
+            .sequence
+            .filter(|sequence| *sequence != 0)
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let result_digest = replay
+            .result_digest
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let binding_digest = replay
+            .binding_digest
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        if replay.resolution_tick == Some(0)
+            || replay
+                .resolution_tick
+                .is_some_and(|tick| tick < deadline_tick)
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let mut out = b"MECER003".to_vec();
+        field(&mut out, effect_key.as_bytes())?;
+        field(&mut out, owner.as_bytes())?;
+        field(&mut out, owner_run_unit.as_bytes())?;
+        out.extend_from_slice(&sequence.to_be_bytes());
+        out.extend_from_slice(&deadline_tick.to_be_bytes());
+        out.extend_from_slice(&replay.resolution_tick.unwrap_or(0).to_be_bytes());
+        out.extend_from_slice(&replay.request_digest);
+        out.extend_from_slice(&result_digest);
+        out.extend_from_slice(&binding_digest);
+        out
+    } else {
+        let mut out = b"MECER002".to_vec();
+        field(&mut out, owner.as_bytes())?;
+        out.extend_from_slice(&deadline_tick.to_be_bytes());
+        out.extend_from_slice(&replay.request_digest);
+        out
+    };
+    out.push(match response.disposition {
+        CicsDisposition::Complete => 1,
+        CicsDisposition::Suspended => 2,
+        CicsDisposition::Transfer => 3,
+        CicsDisposition::Handler => 4,
+        CicsDisposition::Returned => 5,
+        CicsDisposition::Abended => 6,
+    });
+    field(&mut out, response.condition.as_bytes())?;
+    out.extend_from_slice(&response.response.to_be_bytes());
+    out.extend_from_slice(&response.response2.to_be_bytes());
+    field(&mut out, response.applid.as_bytes())?;
+    field(&mut out, response.sysid.as_bytes())?;
+    field(&mut out, response.transaction.as_bytes())?;
+    out.push(response.aid);
+    for value in [&response.target, &response.next_transaction] {
+        match value {
+            Some(value) => {
+                out.push(1);
+                field(&mut out, value.as_bytes())?;
+            }
+            None => out.push(0),
+        }
+    }
+    field(&mut out, response.payload.schema().as_bytes())?;
+    field(&mut out, response.payload.bytes())?;
+    out.extend_from_slice(
+        &u32::try_from(response.outputs.len())
+            .map_err(|_| HostProblem::ResourceExhausted)?
+            .to_be_bytes(),
+    );
+    for (name, value) in &response.outputs {
+        field(&mut out, name.as_bytes())?;
+        field(&mut out, value.schema().as_bytes())?;
+        field(&mut out, value.bytes())?;
+    }
+    out.push(match response.unit_of_work {
+        None => 0,
+        Some(CicsUnitOfWorkOutcome::Committed) => 1,
+        Some(CicsUnitOfWorkOutcome::RolledBack) => 2,
+    });
+    Ok(out)
+}
+
+pub(crate) fn decode_cics_effect_replay(
+    bytes: &[u8],
+    limits: CicsLimits,
+) -> Result<CicsEffectReplay, HostProblem> {
+    let mut reader = Reader { bytes, at: 0 };
+    let version = match reader.take(8)? {
+        b"MECER001" => 1,
+        b"MECER002" => 2,
+        b"MECER003" => 3,
+        _ => return Err(HostProblem::InfrastructureFailure),
+    };
+    let (effect_key, owner_execution, owner_run_unit, sequence, deadline_tick, resolution_tick) =
+        if version == 3 {
+            let effect_key =
+                String::from_utf8(reader.field(InvocationLimits::default().max_identity_bytes)?)
+                    .map_err(|_| HostProblem::InfrastructureFailure)?;
+            let owner_execution =
+                String::from_utf8(reader.field(InvocationLimits::default().max_identity_bytes)?)
+                    .map_err(|_| HostProblem::InfrastructureFailure)?;
+            let owner_run_unit =
+                String::from_utf8(reader.field(InvocationLimits::default().max_identity_bytes)?)
+                    .map_err(|_| HostProblem::InfrastructureFailure)?;
+            let sequence = u64::from_be_bytes(
+                reader
+                    .take(8)?
+                    .try_into()
+                    .map_err(|_| HostProblem::InfrastructureFailure)?,
+            );
+            let deadline_tick = u64::from_be_bytes(
+                reader
+                    .take(8)?
+                    .try_into()
+                    .map_err(|_| HostProblem::InfrastructureFailure)?,
+            );
+            let resolution_tick = match u64::from_be_bytes(
+                reader
+                    .take(8)?
+                    .try_into()
+                    .map_err(|_| HostProblem::InfrastructureFailure)?,
+            ) {
+                0 => None,
+                tick => Some(tick),
+            };
+            (
+                Some(effect_key),
+                Some(owner_execution),
+                Some(owner_run_unit),
+                Some(sequence),
+                Some(deadline_tick),
+                resolution_tick,
+            )
+        } else if version == 2 {
+            (
+                None,
+                Some(
+                    String::from_utf8(
+                        reader.field(InvocationLimits::default().max_identity_bytes)?,
+                    )
+                    .map_err(|_| HostProblem::InfrastructureFailure)?,
+                ),
+                None,
+                None,
+                Some(u64::from_be_bytes(
+                    reader
+                        .take(8)?
+                        .try_into()
+                        .map_err(|_| HostProblem::InfrastructureFailure)?,
+                )),
+                None,
+            )
+        } else {
+            (None, None, None, None, None, None)
+        };
+    if owner_execution
+        .as_ref()
+        .is_some_and(|owner| ExecutionId::new(owner, InvocationLimits::default()).is_err())
+        || owner_run_unit
+            .as_ref()
+            .is_some_and(|owner| RunUnitId::new(owner, InvocationLimits::default()).is_err())
+        || effect_key
+            .as_ref()
+            .is_some_and(|key| IdempotencyKey::new(key, InvocationLimits::default()).is_err())
+        || sequence == Some(0)
+        || deadline_tick == Some(0)
+        || resolution_tick == Some(0)
+        || resolution_tick
+            .zip(deadline_tick)
+            .is_some_and(|(resolution, deadline)| resolution < deadline)
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let request_digest = reader
+        .take(32)?
+        .try_into()
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    let (result_digest, binding_digest) = if version == 3 {
+        (
+            Some(
+                reader
+                    .take(32)?
+                    .try_into()
+                    .map_err(|_| HostProblem::InfrastructureFailure)?,
+            ),
+            Some(
+                reader
+                    .take(32)?
+                    .try_into()
+                    .map_err(|_| HostProblem::InfrastructureFailure)?,
+            ),
+        )
+    } else {
+        (None, None)
+    };
+    let disposition = match reader.take(1)?[0] {
+        1 => CicsDisposition::Complete,
+        2 => CicsDisposition::Suspended,
+        3 => CicsDisposition::Transfer,
+        4 => CicsDisposition::Handler,
+        5 => CicsDisposition::Returned,
+        6 => CicsDisposition::Abended,
+        _ => return Err(HostProblem::InfrastructureFailure),
+    };
+    let condition =
+        String::from_utf8(reader.field(128)?).map_err(|_| HostProblem::InfrastructureFailure)?;
+    let response = i32::from_be_bytes(
+        reader
+            .take(4)?
+            .try_into()
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+    );
+    let response2 = i32::from_be_bytes(
+        reader
+            .take(4)?
+            .try_into()
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+    );
+    let applid =
+        String::from_utf8(reader.field(16)?).map_err(|_| HostProblem::InfrastructureFailure)?;
+    let sysid =
+        String::from_utf8(reader.field(16)?).map_err(|_| HostProblem::InfrastructureFailure)?;
+    let transaction =
+        String::from_utf8(reader.field(16)?).map_err(|_| HostProblem::InfrastructureFailure)?;
+    let aid = reader.take(1)?[0];
+    let mut optional = || -> Result<Option<String>, HostProblem> {
+        match reader.take(1)?[0] {
+            0 => Ok(None),
+            1 => String::from_utf8(reader.field(128)?)
+                .map(Some)
+                .map_err(|_| HostProblem::InfrastructureFailure),
+            _ => Err(HostProblem::InfrastructureFailure),
+        }
+    };
+    let target = optional()?;
+    let next_transaction = optional()?;
+    let payload_schema =
+        String::from_utf8(reader.field(128)?).map_err(|_| HostProblem::InfrastructureFailure)?;
+    let payload = BoundedPayload::new(
+        payload_schema,
+        reader.field(limits.max_screen_bytes)?,
+        InvocationLimits {
+            max_payload_bytes: limits.max_screen_bytes,
+            ..InvocationLimits::default()
+        },
+    )
+    .map_err(|_| HostProblem::InfrastructureFailure)?;
+    let output_count = usize::try_from(u32::from_be_bytes(
+        reader
+            .take(4)?
+            .try_into()
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+    ))
+    .map_err(|_| HostProblem::InfrastructureFailure)?;
+    if output_count > limits.max_fields {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let mut outputs = BTreeMap::new();
+    for _ in 0..output_count {
+        let name = String::from_utf8(reader.field(128)?)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let schema = String::from_utf8(reader.field(128)?)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let value = BoundedPayload::new(
+            schema,
+            reader.field(limits.max_screen_bytes)?,
+            InvocationLimits {
+                max_payload_bytes: limits.max_screen_bytes,
+                ..InvocationLimits::default()
+            },
+        )
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+        if outputs.insert(name, value).is_some() {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+    }
+    let unit_of_work = match reader.take(1)?[0] {
+        0 => None,
+        1 => Some(CicsUnitOfWorkOutcome::Committed),
+        2 => Some(CicsUnitOfWorkOutcome::RolledBack),
+        _ => return Err(HostProblem::InfrastructureFailure),
+    };
+    if reader.at != bytes.len() {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(CicsEffectReplay {
+        effect_key,
+        owner_execution,
+        owner_run_unit,
+        sequence,
+        deadline_tick,
+        resolution_tick,
+        request_digest,
+        result_digest,
+        binding_digest,
+        response: CicsResponse {
+            disposition,
+            condition,
+            response,
+            response2,
+            applid,
+            sysid,
+            transaction,
+            aid,
+            target,
+            next_transaction,
+            payload,
+            outputs,
+            unit_of_work,
+        },
+    })
+}
+
+pub(crate) fn cics_effect_replay_binding_digest(replay: &CicsEffectReplay) -> [u8; 32] {
+    let mut hash = Sha256::new();
+    hash.update(b"mainframe-env.cics-effect-replay-binding@1\0");
+    for field in [
+        replay.effect_key.as_deref().unwrap_or_default().as_bytes(),
+        replay
+            .owner_execution
+            .as_deref()
+            .unwrap_or_default()
+            .as_bytes(),
+        replay
+            .owner_run_unit
+            .as_deref()
+            .unwrap_or_default()
+            .as_bytes(),
+    ] {
+        hash.update((field.len() as u64).to_be_bytes());
+        hash.update(field);
+    }
+    hash.update(replay.sequence.unwrap_or(0).to_be_bytes());
+    hash.update(replay.deadline_tick.unwrap_or(0).to_be_bytes());
+    hash.update(replay.resolution_tick.unwrap_or(0).to_be_bytes());
+    hash.update(replay.request_digest);
+    hash.update(replay.result_digest.unwrap_or([0; 32]));
+    hash.finalize().into()
+}
+
 fn field(out: &mut Vec<u8>, value: &[u8]) -> Result<(), HostProblem> {
     out.extend_from_slice(
         &u32::try_from(value.len())
@@ -4509,7 +3932,138 @@ mod tests {
     };
     use mainframe_env_racf::{MemorySecretResolver, RacfService, racf_providers};
     use mainframe_env_store::{MemoryStore, SqliteStateStore};
+    use mainframe_env_store_api::{
+        EffectDigestFormat, EffectIntentMetadata, EffectRecord, EffectState,
+    };
+    use mainframe_env_store_api::{ProviderStateMutation, ProviderStateWrite};
     use std::collections::BTreeSet;
+    use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+
+    struct TestCicsClock {
+        tick: AtomicU64,
+        fail_next: AtomicBool,
+    }
+
+    struct FailCicsReplayCasStore {
+        inner: MemoryStore,
+        fail_next: AtomicBool,
+    }
+
+    impl FailCicsReplayCasStore {
+        fn new() -> Self {
+            Self {
+                inner: MemoryStore::new(Default::default()),
+                fail_next: AtomicBool::new(false),
+            }
+        }
+    }
+
+    impl mainframe_env_store_api::AuditSink for FailCicsReplayCasStore {
+        fn record_audit(
+            &self,
+            record: mainframe_env_execution_api::AuditRecord,
+        ) -> Result<(), StoreError> {
+            self.inner.record_audit(record)
+        }
+
+        fn audit_records(
+            &self,
+            execution_id: &ExecutionId,
+            start_effect_sequence: u64,
+            max: usize,
+        ) -> Result<Vec<mainframe_env_execution_api::AuditRecord>, StoreError> {
+            self.inner
+                .audit_records(execution_id, start_effect_sequence, max)
+        }
+    }
+
+    impl ProviderStateStore for FailCicsReplayCasStore {
+        fn get_provider_state(
+            &self,
+            namespace: &str,
+            key: &str,
+        ) -> Result<Option<ProviderStateRecord>, StoreError> {
+            self.inner.get_provider_state(namespace, key)
+        }
+
+        fn list_provider_state(
+            &self,
+            namespace: &str,
+            max: usize,
+        ) -> Result<Vec<ProviderStateRecord>, StoreError> {
+            self.inner.list_provider_state(namespace, max)
+        }
+
+        fn put_provider_state(
+            &self,
+            record: ProviderStateRecord,
+            expected_version: Option<u64>,
+        ) -> Result<(), StoreError> {
+            if record.namespace == "cics-effect-replay-v1"
+                && expected_version == Some(1)
+                && self.fail_next.swap(false, Ordering::SeqCst)
+            {
+                Err(StoreError::Infrastructure(
+                    "injected-cics-replay-cas-failure".into(),
+                ))
+            } else {
+                self.inner.put_provider_state(record, expected_version)
+            }
+        }
+
+        fn delete_provider_state(
+            &self,
+            namespace: &str,
+            key: &str,
+            expected_version: u64,
+        ) -> Result<(), StoreError> {
+            self.inner
+                .delete_provider_state(namespace, key, expected_version)
+        }
+
+        fn move_provider_state(
+            &self,
+            record: ProviderStateRecord,
+            old_key: &str,
+            expected_version: u64,
+        ) -> Result<(), StoreError> {
+            self.inner
+                .move_provider_state(record, old_key, expected_version)
+        }
+
+        fn put_provider_states_atomic(
+            &self,
+            writes: Vec<ProviderStateWrite>,
+        ) -> Result<(), StoreError> {
+            self.inner.put_provider_states_atomic(writes)
+        }
+
+        fn mutate_provider_states_atomic(
+            &self,
+            mutations: Vec<ProviderStateMutation>,
+        ) -> Result<(), StoreError> {
+            self.inner.mutate_provider_states_atomic(mutations)
+        }
+    }
+
+    impl TestCicsClock {
+        fn fixed(tick: u64) -> Self {
+            Self {
+                tick: AtomicU64::new(tick),
+                fail_next: AtomicBool::new(false),
+            }
+        }
+    }
+
+    impl CicsReplayClock for TestCicsClock {
+        fn now_tick(&self) -> Result<u64, HostProblem> {
+            if self.fail_next.swap(false, Ordering::SeqCst) {
+                Err(HostProblem::InfrastructureFailure)
+            } else {
+                Ok(self.tick.load(Ordering::SeqCst))
+            }
+        }
+    }
 
     struct Authority {
         descriptor: CapabilityDescriptor,
@@ -4518,11 +4072,23 @@ mod tests {
     #[derive(Default)]
     struct DatasetTrace {
         requests: Mutex<Vec<DatasetRequest>>,
+        origins: Mutex<Vec<(String, String)>>,
     }
 
     struct TracedDataset {
         descriptor: CapabilityDescriptor,
         trace: Arc<DatasetTrace>,
+    }
+
+    struct SyncpointOriginProvider {
+        descriptor: CapabilityDescriptor,
+        seen: Arc<Mutex<Vec<(String, String, String)>>>,
+    }
+
+    #[allow(dead_code)]
+    struct CountedMutationProvider {
+        descriptor: CapabilityDescriptor,
+        commits: Arc<AtomicUsize>,
     }
 
     impl HostProvider for Authority {
@@ -4584,7 +4150,22 @@ mod tests {
             &self.descriptor
         }
 
-        fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
+        fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
+            if let Some(key) = &effect.idempotency_key {
+                let nested = invocation
+                    .bindings
+                    .get(CICS_NESTED_EFFECT_ORIGIN_BINDING)
+                    .map(|value| String::from_utf8(value.bytes().to_vec()).unwrap());
+                let outer = invocation
+                    .bindings
+                    .get(CICS_OUTER_EFFECT_ORIGIN_BINDING)
+                    .map(|value| String::from_utf8(value.bytes().to_vec()).unwrap());
+                assert_eq!(nested.as_deref(), Some(key.as_str()));
+                self.trace.origins.lock().unwrap().push((
+                    nested.unwrap(),
+                    outer.expect("mutating CICS nested request carries outer effect"),
+                ));
+            }
             let outcome = match effect.request {
                 HostRequest::Dataset(request) => {
                     self.trace.requests.lock().unwrap().push(request.clone());
@@ -4624,6 +4205,82 @@ mod tests {
                         _ => Ok(HostResult::Dataset(DatasetResult::Mutated { version: 2 })),
                     }
                 }
+                _ => Err(HostProblem::Malformed),
+            };
+            EffectResult {
+                sequence: effect.sequence,
+                outcome,
+            }
+        }
+    }
+
+    impl HostProvider for CountedMutationProvider {
+        fn descriptor(&self) -> &CapabilityDescriptor {
+            &self.descriptor
+        }
+
+        fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
+            self.commits.fetch_add(1, Ordering::SeqCst);
+            let outcome = match effect.request {
+                HostRequest::Dataset(_) => {
+                    Ok(HostResult::Dataset(DatasetResult::Mutated { version: 2 }))
+                }
+                HostRequest::Program(_) => {
+                    Ok(HostResult::Program(bounded(b"CHILD".to_vec()).unwrap()))
+                }
+                _ => Err(HostProblem::Malformed),
+            };
+            EffectResult {
+                sequence: effect.sequence,
+                outcome,
+            }
+        }
+    }
+
+    impl HostProvider for SyncpointOriginProvider {
+        fn descriptor(&self) -> &CapabilityDescriptor {
+            &self.descriptor
+        }
+
+        fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
+            let nested = invocation
+                .bindings
+                .get(CICS_NESTED_EFFECT_ORIGIN_BINDING)
+                .and_then(|value| String::from_utf8(value.bytes().to_vec()).ok());
+            let outer = invocation
+                .bindings
+                .get(CICS_OUTER_EFFECT_ORIGIN_BINDING)
+                .and_then(|value| String::from_utf8(value.bytes().to_vec()).ok());
+            let key = effect.idempotency_key.as_ref().map(ToString::to_string);
+            assert_eq!(nested, key);
+            self.seen.lock().unwrap().push((
+                self.descriptor.capability.as_str().into(),
+                nested.unwrap(),
+                outer.expect("syncpoint dispatch carries its exact outer effect"),
+            ));
+            let outcome = match effect.request {
+                HostRequest::Db2(_) => Ok(HostResult::Db2(mainframe_env_host_api::Db2Result {
+                    sqlcode: 0,
+                    sqlstate: "00000".into(),
+                    message: String::new(),
+                    rows: Vec::new(),
+                    affected_rows: 0,
+                })),
+                HostRequest::Ims(_) => Ok(HostResult::Ims(mainframe_env_host_api::ImsResult {
+                    status: "  ".into(),
+                    segments: Vec::new(),
+                    checkpoint_id: None,
+                    affected_segments: 0,
+                })),
+                HostRequest::Mq(_) => Ok(HostResult::Mq(mainframe_env_host_api::MqResult {
+                    completion_code: 0,
+                    reason_code: 0,
+                    handle: None,
+                    message: Vec::new(),
+                    message_id: None,
+                    correlation_id: None,
+                    trigger_program: None,
+                })),
                 _ => Err(HostProblem::Malformed),
             };
             EffectResult {
@@ -4693,6 +4350,62 @@ mod tests {
         ))
     }
 
+    fn syncpoint_origin_authorities(
+        seen: Arc<Mutex<Vec<(String, String, String)>>>,
+    ) -> Arc<ScopedHostService> {
+        let mut providers = [
+            "host.security.authorize",
+            "host.dataset.read",
+            "host.dataset.write",
+            "host.program.invoke",
+            "host.clock",
+        ]
+        .into_iter()
+        .map(|capability| {
+            Arc::new(Authority {
+                descriptor: descriptor(capability),
+            }) as Arc<dyn HostProvider>
+        })
+        .collect::<Vec<_>>();
+        for capability in ["host.db2.write", "host.ims.write", "host.mq.write"] {
+            providers.push(Arc::new(SyncpointOriginProvider {
+                descriptor: descriptor(capability),
+                seen: seen.clone(),
+            }));
+        }
+        Arc::new(ScopedHostService::new(
+            Arc::new(RegistrySnapshot::new(1, providers, InvocationLimits::default()).unwrap()),
+            HostLimits::default(),
+        ))
+    }
+
+    #[allow(dead_code)]
+    fn replay_authorities(
+        dataset_commits: Arc<AtomicUsize>,
+        program_commits: Arc<AtomicUsize>,
+    ) -> Arc<ScopedHostService> {
+        let mut providers = ["host.security.authorize", "host.dataset.read", "host.clock"]
+            .into_iter()
+            .map(|capability| {
+                Arc::new(Authority {
+                    descriptor: descriptor(capability),
+                }) as Arc<dyn HostProvider>
+            })
+            .collect::<Vec<_>>();
+        providers.push(Arc::new(CountedMutationProvider {
+            descriptor: descriptor("host.dataset.write"),
+            commits: dataset_commits,
+        }));
+        providers.push(Arc::new(CountedMutationProvider {
+            descriptor: descriptor("host.program.invoke"),
+            commits: program_commits,
+        }));
+        Arc::new(ScopedHostService::new(
+            Arc::new(RegistrySnapshot::new(1, providers, InvocationLimits::default()).unwrap()),
+            HostLimits::default(),
+        ))
+    }
+
     fn invocation() -> Invocation {
         invocation_for("run", BTreeMap::new())
     }
@@ -4706,6 +4419,9 @@ mod tests {
             "host.program.invoke",
             "host.cics.execute",
             "host.clock",
+            "host.db2.write",
+            "host.ims.write",
+            "host.mq.write",
         ]
         .into_iter()
         .map(|name| CapabilityId::new(name, limits).unwrap())
@@ -4788,6 +4504,39 @@ mod tests {
         }
     }
 
+    fn completed_cics_effect(
+        invocation: &Invocation,
+        request: &CicsRequest,
+        response: &CicsResponse,
+        sequence: u64,
+    ) -> EffectRecord {
+        let limits = InvocationLimits::default();
+        EffectRecord {
+            execution_id: invocation.execution_id.clone(),
+            run_unit_id: invocation.run_unit_id.clone(),
+            sequence,
+            key: request.mutation.as_ref().unwrap().idempotency_key.clone(),
+            digest_format: EffectDigestFormat::CanonicalHostV1,
+            request_digest: canonical_request_digest(&HostRequest::Cics(request.clone())).unwrap(),
+            intent: EffectIntentMetadata {
+                owner: invocation.execution_id.clone(),
+                attempt: 1,
+                capability: Some(CapabilityId::new("host.cics.execute", limits).unwrap()),
+                audit_resource: None,
+                audit_invocation_key: None,
+                created_tick: 1,
+                recovery_after_tick: 2,
+                epoch: 1,
+                recovery_lease: None,
+            },
+            state: EffectState::Completed,
+            result_digest: Some(
+                canonical_result_digest(&Ok(HostResult::Cics(response.clone()))).unwrap(),
+            ),
+            resolved_tick: Some(2),
+        }
+    }
+
     #[test]
     fn shared_catalog_recognizes_all_frozen_forms() {
         let cases = [
@@ -4823,6 +4572,23 @@ mod tests {
                 .collect::<Vec<_>>();
             assert_eq!(CicsOperation::from_tokens(&tokens), Some(expected));
         }
+    }
+
+    #[test]
+    fn generated_command_descriptors_are_total_and_family_routed() {
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 25);
+        let mut operations = BTreeSet::new();
+        let mut rows = BTreeSet::new();
+        let mut families = BTreeSet::new();
+        for descriptor in CICS_COMMAND_DESCRIPTORS {
+            assert!(operations.insert(format!("{:?}", descriptor.operation)));
+            assert!(rows.insert(descriptor.official_row));
+            assert!(!descriptor.syntax.is_empty());
+            assert_eq!(descriptor.mutating, descriptor.operation.is_mutating());
+            assert_eq!(command_descriptor(descriptor.operation), descriptor);
+            families.insert(format!("{:?}", descriptor.family));
+        }
+        assert_eq!(families.len(), 7);
     }
 
     #[test]
@@ -4863,19 +4629,7 @@ mod tests {
             .unwrap();
         let absolute =
             String::from_utf8(asked.outputs.get("ABSTIME").unwrap().bytes().to_vec()).unwrap();
-        assert_eq!(
-            absolute.parse::<i64>().unwrap(),
-            absolute_milliseconds(ClockInstant {
-                year: 2026,
-                month: 8,
-                day: 30,
-                hour: 12,
-                minute: 34,
-                second: 56,
-                millisecond: 789,
-            })
-            .unwrap()
-        );
+        assert_eq!(absolute.parse::<i64>().unwrap(), 3_997_082_096_789);
 
         let format = request(
             CicsOperation::FormatTime,
@@ -5020,7 +4774,7 @@ mod tests {
                 "MESYS",
             )
             .unwrap();
-        let second_write = request(
+        let mut second_write = request(
             CicsOperation::WriteTransientData,
             BTreeMap::from([
                 ("QUEUE".into(), argument(b"JOBS")),
@@ -5028,6 +4782,8 @@ mod tests {
             ]),
             1,
         );
+        second_write.mutation.as_mut().unwrap().idempotency_key =
+            IdempotencyKey::new("outer-second-1", InvocationLimits::default()).unwrap();
         initial
             .invoke(
                 &effect(&second_invocation.run_unit_id, second_write.clone(), 1),
@@ -5096,6 +4852,7 @@ mod tests {
                         finalized: false,
                         outcome: CicsUnitOfWorkOutcome::Committed,
                         transaction: "MENU".into(),
+                        metadata: None,
                     })
                     .unwrap(),
                 },
@@ -5135,6 +4892,164 @@ mod tests {
                 .unit_of_work,
             Some(CicsUnitOfWorkOutcome::Committed)
         );
+    }
+
+    #[cfg(feature = "fault-injection")]
+    #[test]
+    fn file_queue_program_and_syncpoint_replay_once_across_process_crash() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-online-replay-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let dataset_commits = Arc::new(AtomicUsize::new(0));
+        let program_commits = Arc::new(AtomicUsize::new(0));
+        let first_store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let first = CicsService::open(
+            replay_authorities(dataset_commits.clone(), program_commits.clone()),
+            first_store.clone(),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        let (invocation, session) = registered(&first);
+        first
+            .register_file_aliases(&BTreeMap::from([(
+                "ACCTDAT".into(),
+                DatasetName::new("IBMUSER.ACCTDAT", 128).unwrap(),
+            )]))
+            .unwrap();
+
+        let cases = [
+            request(
+                CicsOperation::Write,
+                BTreeMap::from([
+                    ("FILE".into(), argument(b"ACCTDAT")),
+                    ("FROM".into(), argument(b"AA11")),
+                    ("RIDFLD".into(), argument(b"AA")),
+                ]),
+                1,
+            ),
+            request(
+                CicsOperation::WriteTransientData,
+                BTreeMap::from([
+                    ("QUEUE".into(), argument(b"RECOVERY")),
+                    ("FROM".into(), argument(b"ONE")),
+                ]),
+                2,
+            ),
+            request(
+                CicsOperation::Link,
+                BTreeMap::from([
+                    ("PROGRAM".into(), argument(b"CHILD")),
+                    ("COMMAREA".into(), argument(b"INPUT")),
+                ]),
+                3,
+            ),
+            request(CicsOperation::Syncpoint, BTreeMap::new(), 4),
+        ];
+        for (offset, request) in cases.iter().enumerate() {
+            first.inject_mutation_fault_once(request.operation).unwrap();
+            assert_eq!(
+                first.invoke(
+                    &effect(
+                        &invocation.run_unit_id,
+                        request.clone(),
+                        u64::try_from(offset + 1).unwrap(),
+                    ),
+                    request.clone(),
+                ),
+                Err(HostProblem::UnknownOutcome),
+                "{:?} did not preserve the post-mutation crash gap",
+                request.operation
+            );
+        }
+        assert_eq!(
+            first.transient_records("RECOVERY").unwrap(),
+            [b"ONE".to_vec()]
+        );
+        assert_eq!(dataset_commits.load(Ordering::SeqCst), 1);
+        assert_eq!(program_commits.load(Ordering::SeqCst), 1);
+        drop((first, first_store));
+
+        let second_store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let second = CicsService::open(
+            replay_authorities(dataset_commits.clone(), program_commits.clone()),
+            second_store.clone(),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        second
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        for (offset, request) in cases.into_iter().enumerate() {
+            let key = request.mutation.as_ref().unwrap().idempotency_key.clone();
+            let request_digest =
+                canonical_request_digest(&HostRequest::Cics(request.clone())).unwrap();
+            let reconciled = second
+                .reconciled_effect_result_digest(&key, request_digest)
+                .unwrap();
+            let response = second
+                .invoke(
+                    &effect(
+                        &invocation.run_unit_id,
+                        request.clone(),
+                        u64::try_from(offset + 1).unwrap(),
+                    ),
+                    request,
+                )
+                .unwrap();
+            assert_eq!(
+                reconciled,
+                canonical_result_digest(&Ok(HostResult::Cics(response))).unwrap()
+            );
+        }
+        assert_eq!(
+            second.transient_records("RECOVERY").unwrap(),
+            [b"ONE".to_vec()]
+        );
+        assert_eq!(dataset_commits.load(Ordering::SeqCst), 1);
+        assert_eq!(program_commits.load(Ordering::SeqCst), 1);
+        let replay_rows = second_store
+            .list_provider_state("cics-effect-replay-v1", 16)
+            .unwrap();
+        assert_eq!(replay_rows.len(), 4);
+        for row in &replay_rows {
+            let replay = decode_cics_effect_replay(&row.payload, CicsLimits::default()).unwrap();
+            assert_eq!(
+                replay.owner_execution.as_deref(),
+                Some(invocation.execution_id.as_str())
+            );
+            assert_eq!(replay.deadline_tick, Some(100));
+        }
+        let current = &replay_rows[0].payload;
+        let replay = decode_cics_effect_replay(current, CicsLimits::default()).unwrap();
+        let mut response_at = 8;
+        for _ in 0..3 {
+            let length = usize::try_from(u32::from_be_bytes(
+                current[response_at..response_at + 4].try_into().unwrap(),
+            ))
+            .unwrap();
+            response_at += 4 + length;
+        }
+        response_at += 3 * 8 + 3 * 32;
+        let mut legacy = b"MECER001".to_vec();
+        legacy.extend_from_slice(&replay.request_digest);
+        legacy.extend_from_slice(&current[response_at..]);
+        let legacy = decode_cics_effect_replay(&legacy, CicsLimits::default()).unwrap();
+        assert_eq!((legacy.owner_execution, legacy.deadline_tick), (None, None));
+        let syncpoint_key = IdempotencyKey::new("outer-4", InvocationLimits::default()).unwrap();
+        assert_eq!(
+            second_store
+                .get_provider_state("cics-uow", syncpoint_key.as_str())
+                .unwrap()
+                .unwrap()
+                .version,
+            2
+        );
+        drop((second, second_store));
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
@@ -5869,6 +5784,11 @@ mod tests {
             &requests[4],
             DatasetRequest::EndBrowse { cursor, .. } if cursor == "CURSOR-1"
         ));
+        drop(requests);
+        let origins = trace.origins.lock().unwrap();
+        assert_eq!(origins.len(), 2);
+        assert_eq!(origins[0].1, "outer-3");
+        assert_eq!(origins[1].1, "outer-4");
     }
 
     #[test]
@@ -6006,13 +5926,15 @@ mod tests {
             HostLimits::default(),
         );
         let assign = request(CicsOperation::Assign, BTreeMap::new(), 1);
-        let selected = outer.invoke(
-            &invocation,
-            1,
-            false,
-            effect(&invocation.run_unit_id, assign, 1),
-        );
-        assert!(matches!(selected.effect.outcome, Ok(HostResult::Cics(_))));
+        let (selected, _) = outer
+            .invoke(
+                &invocation,
+                1,
+                false,
+                effect(&invocation.run_unit_id, assign, 1),
+            )
+            .into_transaction_parts();
+        assert!(matches!(selected.outcome, Ok(HostResult::Cics(_))));
         let asktime = request(CicsOperation::Asktime, BTreeMap::new(), 2);
         assert!(matches!(
             outer
@@ -6022,7 +5944,8 @@ mod tests {
                     false,
                     effect(&invocation.run_unit_id, asktime, 2),
                 )
-                .effect
+                .into_transaction_parts()
+                .0
                 .outcome,
             Ok(HostResult::Cics(CicsResponse { outputs, .. }))
                 if outputs.contains_key("ABSTIME")
@@ -6151,6 +6074,555 @@ mod tests {
                 .unwrap()
                 .condition,
             "NORMAL"
+        );
+    }
+
+    #[test]
+    fn uow_retention_descriptors_are_attributed_exact_and_restart_safe() {
+        use crate::retention::{
+            CicsUowCodecVersion, CicsUowDependencyState, CicsUowState, CicsUowValidationError,
+            describe_cics_uow_row,
+        };
+
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let initial = service(store.clone());
+        let (invocation, session) = registered(&initial);
+
+        let commit = request(CicsOperation::Syncpoint, BTreeMap::new(), 71);
+        assert_eq!(
+            initial
+                .invoke(
+                    &effect(&invocation.run_unit_id, commit.clone(), 71),
+                    commit.clone()
+                )
+                .unwrap()
+                .unit_of_work,
+            Some(CicsUnitOfWorkOutcome::Committed)
+        );
+        let committed = store
+            .get_provider_state("cics-uow", "outer-71")
+            .unwrap()
+            .unwrap();
+        let descriptor = describe_cics_uow_row(&committed, None).unwrap();
+        assert_eq!(descriptor.codec, CicsUowCodecVersion::RetentionV2);
+        assert_eq!(descriptor.state, CicsUowState::Committed);
+        assert_eq!(descriptor.owner_execution.as_deref(), Some("execution-run"));
+        assert_eq!(descriptor.owner_run_unit.as_deref(), Some("run"));
+        assert_eq!(descriptor.terminal_tick, None);
+        assert_eq!(
+            descriptor.dependency,
+            CicsUowDependencyState::TerminalObservationRequired
+        );
+
+        let rollback = request(
+            CicsOperation::Syncpoint,
+            BTreeMap::from([("OPTION.ROLLBACK".into(), argument(b""))]),
+            72,
+        );
+        initial
+            .invoke(
+                &effect(&invocation.run_unit_id, rollback.clone(), 72),
+                rollback,
+            )
+            .unwrap();
+        let rolled_back = store
+            .get_provider_state("cics-uow", "outer-72")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            describe_cics_uow_row(&rolled_back, None).unwrap().state,
+            CicsUowState::RolledBack
+        );
+
+        drop(initial);
+        let restarted = service(store.clone());
+        restarted
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        assert_eq!(
+            restarted
+                .invoke(&effect(&invocation.run_unit_id, commit.clone(), 71), commit)
+                .unwrap()
+                .unit_of_work,
+            Some(CicsUnitOfWorkOutcome::Committed)
+        );
+        assert_eq!(
+            describe_cics_uow_row(
+                &store
+                    .get_provider_state("cics-uow", "outer-71")
+                    .unwrap()
+                    .unwrap(),
+                None,
+            )
+            .unwrap(),
+            descriptor
+        );
+
+        let active = ProviderStateRecord {
+            namespace: "cics-uow".into(),
+            key: "active-key".into(),
+            version: 1,
+            payload: encode_uow(&UowRecord {
+                finalized: false,
+                outcome: CicsUnitOfWorkOutcome::Committed,
+                transaction: "MENU".into(),
+                metadata: Some(UowRetentionMetadata {
+                    effect_key: "active-key".into(),
+                    owner_execution: "execution-active".into(),
+                    owner_run_unit: "run-active".into(),
+                    deadline_tick: 200,
+                    terminal_tick: None,
+                }),
+            })
+            .unwrap(),
+        };
+        assert_eq!(
+            describe_cics_uow_row(&active, None).unwrap().dependency,
+            CicsUowDependencyState::Active
+        );
+        store.put_provider_state(active, None).unwrap();
+        let active_key = IdempotencyKey::new("active-key", InvocationLimits::default()).unwrap();
+        restarted
+            .reconcile_unit_of_work(&active_key, CicsUnitOfWorkOutcome::Committed)
+            .unwrap();
+        let unobserved = store
+            .get_provider_state("cics-uow", active_key.as_str())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            describe_cics_uow_row(&unobserved, None).unwrap().dependency,
+            CicsUowDependencyState::TerminalObservationRequired
+        );
+        let finalized_with_undo = ProviderStateRecord {
+            namespace: "cics-uow".into(),
+            key: "undo-key".into(),
+            version: 2,
+            payload: encode_uow(&UowRecord {
+                finalized: true,
+                outcome: CicsUnitOfWorkOutcome::RolledBack,
+                transaction: "MENU".into(),
+                metadata: Some(UowRetentionMetadata {
+                    effect_key: "undo-key".into(),
+                    owner_execution: "execution-undo".into(),
+                    owner_run_unit: "run-undo".into(),
+                    deadline_tick: 300,
+                    terminal_tick: Some(300),
+                }),
+            })
+            .unwrap(),
+        };
+        let undo = ProviderStateRecord {
+            namespace: "cics-uow-undo".into(),
+            key: "run-undo".into(),
+            version: 1,
+            payload: encode_undo(&[DatasetUndo::Delete {
+                dataset: DatasetName::new("USER.DATA", 128).unwrap(),
+                key: b"AA".to_vec(),
+            }])
+            .unwrap(),
+        };
+        assert_eq!(
+            describe_cics_uow_row(&finalized_with_undo, Some(&undo))
+                .unwrap()
+                .dependency,
+            CicsUowDependencyState::UndoLogPresent
+        );
+        let mut mismatched_undo = undo.clone();
+        mismatched_undo.key = "another-run".into();
+        assert_eq!(
+            describe_cics_uow_row(&finalized_with_undo, Some(&mismatched_undo)),
+            Err(CicsUowValidationError::MismatchedUndo)
+        );
+        let mut wrong_version_undo = undo.clone();
+        wrong_version_undo.version = 2;
+        assert_eq!(
+            crate::describe_cics_undo_row(&wrong_version_undo),
+            Err(CicsUowValidationError::CorruptPayload)
+        );
+
+        let legacy = ProviderStateRecord {
+            namespace: "cics-uow".into(),
+            key: "legacy-key".into(),
+            version: 2,
+            payload: encode_uow(&UowRecord {
+                finalized: true,
+                outcome: CicsUnitOfWorkOutcome::Committed,
+                transaction: "MENU".into(),
+                metadata: None,
+            })
+            .unwrap(),
+        };
+        assert_eq!(
+            describe_cics_uow_row(&legacy, None).unwrap().dependency,
+            CicsUowDependencyState::LegacyTerminal
+        );
+        let mut unsupported_version = committed.clone();
+        unsupported_version.version = 3;
+        assert_eq!(
+            describe_cics_uow_row(&unsupported_version, None),
+            Err(CicsUowValidationError::CorruptPayload)
+        );
+        let mut corrupt = committed;
+        corrupt.payload.push(0);
+        assert_eq!(
+            describe_cics_uow_row(&corrupt, None),
+            Err(CicsUowValidationError::CorruptPayload)
+        );
+        let mut invalid_version = rolled_back;
+        invalid_version.version = 1;
+        assert_eq!(
+            describe_cics_uow_row(&invalid_version, None),
+            Err(CicsUowValidationError::CorruptPayload)
+        );
+    }
+
+    #[test]
+    fn outer_replay_clock_failure_recovers_once_without_sliding_and_codec_is_strict() {
+        use crate::retention::{
+            CicsReplayRetentionState, CicsReplayValidationError, describe_cics_replay_row,
+        };
+
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let clock = Arc::new(TestCicsClock::fixed(250));
+        clock.fail_next.store(true, Ordering::SeqCst);
+        let service = CicsService::open_with_replay_clock(
+            authorities(),
+            store.clone(),
+            CicsLimits::default(),
+            clock.clone(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        let request = request(
+            CicsOperation::WriteTransientData,
+            BTreeMap::from([
+                ("QUEUE".into(), argument(b"CLOCK")),
+                ("FROM".into(), argument(b"ONCE")),
+            ]),
+            81,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 81),
+                request.clone(),
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let pending = store
+            .get_provider_state("cics-effect-replay-v1", "outer-81")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            describe_cics_replay_row(&pending, None, CicsLimits::default())
+                .unwrap()
+                .retention,
+            CicsReplayRetentionState::PendingProtected
+        );
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 81),
+                request.clone(),
+            )
+            .unwrap();
+        let terminal = store
+            .get_provider_state("cics-effect-replay-v1", "outer-81")
+            .unwrap()
+            .unwrap();
+        let effect_record = completed_cics_effect(&invocation, &request, &response, 81);
+        let descriptor =
+            describe_cics_replay_row(&terminal, Some(&effect_record), CicsLimits::default())
+                .unwrap();
+        assert_eq!(descriptor.retention, CicsReplayRetentionState::Terminal);
+        assert_eq!(descriptor.resolution_tick, Some(250));
+        clock.tick.store(900, Ordering::SeqCst);
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 81),
+                request.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            store
+                .get_provider_state("cics-effect-replay-v1", "outer-81")
+                .unwrap()
+                .unwrap(),
+            terminal
+        );
+
+        let mut copied = terminal.clone();
+        copied.key = "outer-82".into();
+        assert_eq!(
+            describe_cics_replay_row(&copied, None, CicsLimits::default()),
+            Err(CicsReplayValidationError::CorruptPayload)
+        );
+        let mut trailing = terminal.clone();
+        trailing.payload.push(0);
+        assert_eq!(
+            describe_cics_replay_row(&trailing, None, CicsLimits::default()),
+            Err(CicsReplayValidationError::CorruptPayload)
+        );
+
+        let mut replay =
+            decode_cics_effect_replay(&terminal.payload, CicsLimits::default()).unwrap();
+        replay.response.outputs.insert(
+            "DUP".into(),
+            BoundedPayload::new("test@1", b"value".to_vec(), InvocationLimits::default()).unwrap(),
+        );
+        replay.result_digest =
+            Some(canonical_result_digest(&Ok(HostResult::Cics(replay.response.clone()))).unwrap());
+        replay.binding_digest = Some(cics_effect_replay_binding_digest(&replay));
+        let mut duplicate = encode_cics_effect_replay(&replay).unwrap();
+        let marker = [0, 0, 0, 3, b'D', b'U', b'P'];
+        let field_at = duplicate
+            .windows(marker.len())
+            .position(|window| window == marker)
+            .unwrap();
+        let count_at = field_at - 4;
+        duplicate[count_at..field_at].copy_from_slice(&2_u32.to_be_bytes());
+        let entry = duplicate[field_at..duplicate.len() - 1].to_vec();
+        let insert_at = duplicate.len() - 1;
+        duplicate.splice(insert_at..insert_at, entry);
+        let duplicate = ProviderStateRecord {
+            payload: duplicate,
+            ..terminal.clone()
+        };
+        assert_eq!(
+            describe_cics_replay_row(&duplicate, None, CicsLimits::default()),
+            Err(CicsReplayValidationError::CorruptPayload)
+        );
+        assert_eq!(
+            describe_cics_replay_row(
+                &ProviderStateRecord {
+                    payload: encode_cics_effect_replay(&replay).unwrap(),
+                    ..terminal
+                },
+                None,
+                CicsLimits {
+                    max_fields: 0,
+                    ..CicsLimits::default()
+                },
+            ),
+            Err(CicsReplayValidationError::CorruptPayload)
+        );
+    }
+
+    #[test]
+    fn outer_replay_metadata_cas_failure_is_unknown_and_retry_recovers() {
+        let store = Arc::new(FailCicsReplayCasStore::new());
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let service = CicsService::open_with_replay_clock(
+            authorities(),
+            provider_store,
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(300)),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        let request = request(
+            CicsOperation::WriteTransientData,
+            BTreeMap::from([
+                ("QUEUE".into(), argument(b"CAS")),
+                ("FROM".into(), argument(b"ONCE")),
+            ]),
+            82,
+        );
+        store.fail_next.store(true, Ordering::SeqCst);
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 82),
+                request.clone(),
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let pending = store
+            .get_provider_state("cics-effect-replay-v1", "outer-82")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            crate::describe_cics_replay_row(&pending, None, CicsLimits::default())
+                .unwrap()
+                .retention,
+            crate::CicsReplayRetentionState::PendingProtected
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 82),
+                request,
+            )
+            .unwrap();
+        let terminal = store
+            .get_provider_state("cics-effect-replay-v1", "outer-82")
+            .unwrap()
+            .unwrap();
+        assert_eq!(terminal.version, 2);
+    }
+
+    #[test]
+    fn durable_clock_ages_uow_after_nested_syncpoint_completion() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open_with_replay_clock(
+            authorities(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(500)),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        let request = request(CicsOperation::Syncpoint, BTreeMap::new(), 91);
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 91),
+                request,
+            )
+            .unwrap();
+        let descriptor = crate::describe_cics_uow_row(
+            &store
+                .get_provider_state("cics-uow", "outer-91")
+                .unwrap()
+                .unwrap(),
+            None,
+        )
+        .unwrap();
+        assert_eq!(descriptor.terminal_tick, Some(500));
+        assert_eq!(descriptor.dependency, crate::CicsUowDependencyState::Clear);
+    }
+
+    #[test]
+    fn uow_clock_failure_stays_pending_until_exact_reconciliation() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let clock = Arc::new(TestCicsClock::fixed(550));
+        clock.fail_next.store(true, Ordering::SeqCst);
+        let service = CicsService::open_with_replay_clock(
+            authorities(),
+            store.clone(),
+            CicsLimits::default(),
+            clock,
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        let request = request(CicsOperation::Syncpoint, BTreeMap::new(), 93);
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 93),
+                request.clone(),
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let key = IdempotencyKey::new("outer-93", InvocationLimits::default()).unwrap();
+        let pending = store
+            .get_provider_state("cics-uow", key.as_str())
+            .unwrap()
+            .unwrap();
+        assert_eq!(pending.version, 1);
+        assert_eq!(
+            crate::describe_cics_uow_row(&pending, None)
+                .unwrap()
+                .dependency,
+            crate::CicsUowDependencyState::Active
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 93),
+                request,
+            )
+            .unwrap();
+        let terminal = store
+            .get_provider_state("cics-uow", key.as_str())
+            .unwrap()
+            .unwrap();
+        let descriptor = crate::describe_cics_uow_row(&terminal, None).unwrap();
+        assert_eq!(terminal.version, 2);
+        assert_eq!(descriptor.terminal_tick, Some(550));
+    }
+
+    #[test]
+    fn every_enterprise_syncpoint_dispatch_carries_nested_and_outer_attestation() {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open(
+            syncpoint_origin_authorities(seen.clone()),
+            store,
+            CicsLimits::default(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        let first = request(CicsOperation::Syncpoint, BTreeMap::new(), 92);
+        service
+            .invoke(&effect(&invocation.run_unit_id, first.clone(), 92), first)
+            .unwrap();
+        let second = request(CicsOperation::Syncpoint, BTreeMap::new(), 94);
+        service
+            .invoke(&effect(&invocation.run_unit_id, second.clone(), 94), second)
+            .unwrap();
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 6);
+        assert_eq!(
+            seen[0],
+            (
+                "host.db2.write".into(),
+                "cics:run:2".into(),
+                "outer-92".into()
+            )
+        );
+        assert_eq!(
+            seen[1],
+            (
+                "host.ims.write".into(),
+                "cics:run:3".into(),
+                "outer-92".into()
+            )
+        );
+        assert_eq!(
+            seen[2],
+            (
+                "host.mq.write".into(),
+                "cics:run:4".into(),
+                "outer-92".into()
+            )
+        );
+        assert!(
+            seen[3..]
+                .iter()
+                .all(|(_, nested, outer)| nested.starts_with("cics:run:") && outer == "outer-94")
+        );
+    }
+
+    #[test]
+    fn external_reserved_origins_are_rejected_and_internal_insertion_is_bounded() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let mut malicious = invocation();
+        malicious.bindings.insert(
+            CICS_NESTED_EFFECT_ORIGIN_BINDING.into(),
+            BoundedPayload::new(
+                CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
+                b"cics:run:1".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        let session = SessionId::new("reserved-session", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        assert_eq!(
+            service.register_run(malicious, &session, "MENU", "MEAPPL", "MESYS"),
+            Err(HostProblem::Malformed)
+        );
+
+        let limits = InvocationLimits::default();
+        let mut full = invocation();
+        for index in 0..(limits.max_bindings - 1) {
+            full.bindings.insert(
+                format!("binding-{index}"),
+                BoundedPayload::new("test@1", Vec::new(), limits).unwrap(),
+            );
+        }
+        assert_eq!(
+            invocation_with_nested_origin(
+                &full,
+                &IdempotencyKey::new("cics:run:1", limits).unwrap(),
+                "outer-1",
+            ),
+            Err(HostProblem::ResourceExhausted)
         );
     }
 }

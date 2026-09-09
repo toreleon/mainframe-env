@@ -1,0 +1,44 @@
+{
+  "coverage": {
+    "minimum_covered_functions": 900,
+    "minimum_covered_lines": 10000,
+    "minimum_total_lines": 12000,
+    "package_roots": [
+      "crates/contracts/mainframe-env-store-api",
+      "crates/foundation/mainframe-env-ir",
+      "crates/kernel/mainframe-env-compiler",
+      "crates/stores/mainframe-env-store"
+    ],
+    "tool": "cargo-llvm-cov",
+    "tool_version": "0.9.1"
+  },
+  "fuzz": {
+    "max_input_bytes": 4096,
+    "periodic_runs_per_target": 4096,
+    "smoke_runs_per_target": 256,
+    "targets": [
+      {
+        "corpus": "fuzz/corpus/cobol_parser",
+        "name": "cobol_parser",
+        "source": "fuzz/fuzz_targets/cobol_parser.rs"
+      },
+      {
+        "corpus": "fuzz/corpus/ir_decoder",
+        "name": "ir_decoder",
+        "source": "fuzz/fuzz_targets/ir_decoder.rs"
+      }
+    ],
+    "tool": "cargo-fuzz",
+    "tool_version": "0.13.2",
+    "toolchain": "nightly-2026-09-01"
+  },
+  "model": {
+    "minimum_tests": 3,
+    "package": "mainframe-env-store-api",
+    "test_name": "loom_durable_state",
+    "test_target": "crates/contracts/mainframe-env-store-api/tests/loom_durable_state.rs",
+    "tool": "loom",
+    "tool_version": "0.7.2"
+  },
+  "schema_version": "mainframe-env.assurance-gates@1"
+}

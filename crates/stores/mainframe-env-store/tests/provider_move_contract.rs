@@ -4,6 +4,7 @@ use mainframe_env_store_api::{
     ProviderStateMutation, ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
 };
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Barrier};
 
 const MAX_PAYLOAD: usize = 8;
 static NEXT_NAMESPACE: AtomicU64 = AtomicU64::new(1);
@@ -195,6 +196,94 @@ fn run_contract(store: &dyn ProviderStateStore) {
     }
 }
 
+fn run_atomic_final_capacity_contract(store: &dyn ProviderStateStore, capacity: usize) {
+    for put_first in [true, false] {
+        let ns = namespace();
+        for index in 0..capacity {
+            store
+                .put_provider_state(record(&ns, &format!("old-{index}"), 1), None)
+                .unwrap();
+        }
+        let put = ProviderStateMutation::Put(ProviderStateWrite {
+            record: record(&ns, "new", 1),
+            expected_version: None,
+        });
+        let delete = ProviderStateMutation::Delete {
+            namespace: ns.clone(),
+            key: "old-0".into(),
+            expected_version: 1,
+        };
+        let mutations = if put_first {
+            vec![put, delete]
+        } else {
+            vec![delete, put]
+        };
+        store.mutate_provider_states_atomic(mutations).unwrap();
+        let rows = store.list_provider_state(&ns, capacity + 1).unwrap();
+        assert_eq!(rows.len(), capacity);
+        assert!(rows.iter().any(|row| row.key == "new"));
+        for row in rows {
+            store
+                .delete_provider_state(&row.namespace, &row.key, row.version)
+                .unwrap();
+        }
+    }
+}
+
+#[test]
+fn memory_atomic_mutation_checks_only_final_capacity() {
+    run_atomic_final_capacity_contract(
+        &MemoryStore::new(StoreLimits {
+            max_provider_state: 1,
+            ..Default::default()
+        }),
+        1,
+    );
+}
+
+#[test]
+fn sqlite_atomic_mutation_checks_only_final_capacity() {
+    run_atomic_final_capacity_contract(
+        &SqliteStateStore::open("sqlite::memory:", MAX_PAYLOAD, 1).unwrap(),
+        1,
+    );
+}
+
+#[test]
+fn sqlite_concurrent_create_cannot_overrun_the_shared_quota() {
+    let directory = std::env::temp_dir().join(format!(
+        "mainframe-env-sqlite-provider-quota-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    std::fs::create_dir_all(&directory).unwrap();
+    let path = directory.join("provider.db");
+    let url = format!("sqlite://{}?mode=rwc", path.display());
+    let left = Arc::new(SqliteStateStore::open(&url, MAX_PAYLOAD, 1).unwrap());
+    let right = Arc::new(SqliteStateStore::open(&url, MAX_PAYLOAD, 1).unwrap());
+    let barrier = Arc::new(Barrier::new(2));
+    let run = |store: Arc<SqliteStateStore>, key: &'static str, barrier: Arc<Barrier>| {
+        std::thread::spawn(move || {
+            barrier.wait();
+            store.put_provider_state(record("quota-race", key, 1), None)
+        })
+    };
+    let first = run(left, "left", barrier.clone());
+    let second = run(right, "right", barrier);
+    let first = first.join().unwrap();
+    let second = second.join().unwrap();
+    assert_eq!(usize::from(first.is_ok()) + usize::from(second.is_ok()), 1);
+    drop((first, second));
+    let reopened = SqliteStateStore::open(&url, MAX_PAYLOAD, 1).unwrap();
+    assert_eq!(
+        reopened.list_provider_state("quota-race", 2).unwrap().len(),
+        1
+    );
+    drop(reopened);
+    let _ = std::fs::remove_file(path);
+    let _ = std::fs::remove_dir(directory);
+}
+
 #[test]
 fn memory_move_contract() {
     run_contract(&MemoryStore::new(StoreLimits {
@@ -213,5 +302,7 @@ fn sqlite_move_contract() {
 fn postgres_move_contract() {
     let url = std::env::var("MAINFRAME_ENV_TEST_POSTGRES_URL")
         .expect("PostgreSQL parity cannot be credited without a real test database");
-    run_contract(&PostgresStateStore::open(&url, MAX_PAYLOAD, 128).unwrap());
+    let store = PostgresStateStore::open(&url, MAX_PAYLOAD, 128).unwrap();
+    run_contract(&store);
+    run_atomic_final_capacity_contract(&store, 128);
 }

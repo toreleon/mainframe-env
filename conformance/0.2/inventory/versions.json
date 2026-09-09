@@ -1,9 +1,10 @@
 {
   "schema_version": "mainframe-env.version-inventory@1",
-  "product": "0.8.2",
+  "product": "0.8.3",
+  "released_product": "0.8.2",
   "release_line": "0.8",
-  "channel": "stable",
-  "release_state": "release-prepared-not-published",
+  "channel": "development",
+  "release_state": "development",
   "rust": {"pinned": "1.98.0", "msrv": "1.95.0", "edition": "2024"},
   "profiles": {"core-server": 1, "conformance": 1},
   "contracts": {
@@ -17,7 +18,7 @@
     "ir_text": "mainframe-env.ir-text@1",
     "ir_binary": "mainframe-env.ir-binary@1",
     "ir_envelope": "mainframe-env.ir-envelope@1",
-    "artifact": "mainframe-env.artifact@1",
+    "artifact": "mainframe-env.artifact@2",
     "execution": "mainframe-env.execution@1",
     "host": "mainframe-env.host@1",
     "cics": "mainframe-env.cics@1",

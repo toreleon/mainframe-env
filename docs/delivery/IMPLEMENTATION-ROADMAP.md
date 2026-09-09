@@ -1,6 +1,9 @@
 # 0.1 Greenfield Implementation Roadmap
 
 Status: **Accepted by repository owner**
+Owner: **repository owner**
+Scope: **implementation sequence and acceptance boundaries**
+Applies from: **mainframe-env 0.1.0**
 
 This roadmap replaces R2A as the active engineering sequence. It does not
 reinterpret historical R0–R2 evidence.

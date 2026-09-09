@@ -75,7 +75,9 @@ class TreeCase(unittest.TestCase):
     """A case that can build a tree with this repository's artifacts and its own record."""
 
     def tree(self, text: str) -> Path:
-        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
         for name in ARTIFACT_TREES:
             (root / name).symlink_to(REPOSITORY / name, target_is_directory=True)
         record = root / FIGURES.RECORD
@@ -256,7 +258,8 @@ class IndependentFigureTests(unittest.TestCase):
                 for field in fields
             )
             self.assertEqual(expected, counts)
-            for classification, count in zip(figures, counts, strict=True):
+            self.assertEqual(len(figures), len(counts))
+            for classification, count in zip(figures, counts):
                 self.assertEqual(
                     count,
                     self.figures[f"racf.{classification}_{population}_names"].value,

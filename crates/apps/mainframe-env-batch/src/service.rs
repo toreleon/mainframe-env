@@ -27,10 +27,10 @@ use mainframe_env_host_api::{
     AccessIntent, CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest,
     DatasetAttributes, DatasetDefinition, DatasetLifecycleState, DatasetLockMode,
     DatasetLockTarget, DatasetName, DatasetOrganization, DatasetRequest, DatasetResult,
-    Db2Operation, Db2Request, EffectRequest, HostProblem, HostRequest, HostResult, ImsOperation,
-    ImsQualifier, ImsRequest, JobName, MemberName, Mutation, ProgramName, ProgramRequest,
-    RecordFormat, ResourceName, ScopedHostService, SecurityDecision, SecurityRequest, SpoolRequest,
-    SpoolResult,
+    Db2Operation, Db2Request, EffectRequest, EffectResult, HostProblem, HostRequest, HostResult,
+    ImsOperation, ImsQualifier, ImsRequest, JobName, MemberName, Mutation, ProgramName,
+    ProgramRequest, RecordFormat, ResourceName, ScopedHostService, SecurityDecision,
+    SecurityRequest, SpoolRequest, SpoolResult,
 };
 use mainframe_env_store_api::{
     CheckpointRecord, CheckpointStore, ProviderStateRecord, ProviderStateStore, StoreError,
@@ -205,6 +205,23 @@ pub struct BatchService {
 }
 
 impl BatchService {
+    fn invoke_host(
+        &self,
+        invocation: &Invocation,
+        now_tick: u64,
+        cancellation_requested: bool,
+        request: EffectRequest,
+    ) -> EffectResult {
+        ScopedHostService::invoke(
+            &self.host,
+            invocation,
+            now_tick,
+            cancellation_requested,
+            request,
+        )
+        .persist_with(|audit| self.store.record_audit(audit).map_err(store_error))
+    }
+
     pub fn open(
         host: Arc<ScopedHostService>,
         store: Arc<dyn ProviderStateStore>,
@@ -517,6 +534,11 @@ impl BatchService {
         let receipt = replacement.select(application, generation)?;
         self.persist_controllers(&mut durable, replacement)?;
         Ok(receipt)
+    }
+
+    /// Parse and validate the immutable JCL plan used for admission decisions.
+    pub fn plan(&self, bundle: &JclBundle) -> Result<JobPlan, HostProblem> {
+        parse_jcl(bundle, self.jcl_limits)
     }
 
     pub fn submit(
@@ -1128,6 +1150,47 @@ impl BatchService {
         initiator: &str,
         cancelled: bool,
     ) -> Result<Option<JobSnapshot>, HostProblem> {
+        self.run_on_member(invocation, member, initiator, cancelled, None)
+    }
+
+    pub fn run_claimed(
+        &self,
+        invocation: &Invocation,
+        id: &str,
+        initiator: &str,
+        cancelled: bool,
+    ) -> Result<Option<JobSnapshot>, HostProblem> {
+        let topology = self.topology()?;
+        let members = topology
+            .members
+            .values()
+            .filter(|member| member.enabled && member.node == topology.local_node)
+            .map(|member| member.name.clone())
+            .collect::<Vec<_>>();
+        if members.is_empty() {
+            return Err(HostProblem::UnsupportedCapability {
+                capability: "jes.mas.member".into(),
+                detail: "no enabled local MAS member".into(),
+            });
+        }
+        for member in members {
+            if let Some(job) =
+                self.run_on_member(invocation, &member, initiator, cancelled, Some(id))?
+            {
+                return Ok(Some(job));
+            }
+        }
+        Ok(None)
+    }
+
+    fn run_on_member(
+        &self,
+        invocation: &Invocation,
+        member: &str,
+        initiator: &str,
+        cancelled: bool,
+        requested_id: Option<&str>,
+    ) -> Result<Option<JobSnapshot>, HostProblem> {
         if self.limits.max_active == 0 {
             return Err(HostProblem::ResourceExhausted);
         }
@@ -1173,6 +1236,7 @@ impl BatchService {
                 .jobs
                 .values()
                 .filter(|job| job.owner == invocation.principal.id().as_str())
+                .filter(|job| requested_id.is_none_or(|id| job.id == id))
                 .filter(|job| {
                     job.route.execution_node == member_definition.node
                         && job
@@ -1200,7 +1264,7 @@ impl BatchService {
             return Ok(None);
         };
         self.ensure_spool_migrated(invocation, &id)?;
-        if cancelled || invocation.cancellation.is_some() {
+        if cancelled || invocation.cancellation_requested() {
             return self.cancel(invocation, &id).map(Some);
         }
         let mut job = {
@@ -1258,6 +1322,12 @@ impl BatchService {
         };
         let mut state = self.lock()?;
         let current = state.jobs.get(&id).cloned().ok_or(HostProblem::NotFound)?;
+        if current.state == JobState::Cancelled {
+            return Ok(Some(snapshot(&current)));
+        }
+        if current.state != JobState::Running {
+            return Err(HostProblem::UnknownOutcome);
+        }
         ensure_job_event_capacity(
             &job,
             self.limits.max_events,
@@ -1801,7 +1871,7 @@ impl BatchService {
                 InvocationLimits::default(),
             )
             .map_err(|_| HostProblem::ResourceExhausted)?;
-            let result = self.host.invoke(
+            let result = self.invoke_host(
                 invocation,
                 invocation.deadline_tick.saturating_sub(1),
                 false,
@@ -1825,7 +1895,7 @@ impl BatchService {
                     }),
                 },
             );
-            match result.effect.outcome {
+            match result.outcome {
                 Ok(HostResult::Dataset(DatasetResult::Mutated { .. }))
                 | Err(HostProblem::NotFound) => {
                     job.temporary_datasets.retain(|current| current != &dataset);
@@ -1892,7 +1962,7 @@ impl BatchService {
         {
             return Err(HostProblem::ResourceExhausted);
         }
-        let result = self.host.invoke(
+        let result = self.invoke_host(
             invocation,
             invocation.deadline_tick.saturating_sub(1),
             false,
@@ -1913,7 +1983,7 @@ impl BatchService {
                 }),
             },
         );
-        let HostResult::Spool(SpoolResult::Mutated { version, .. }) = result.effect.outcome? else {
+        let HostResult::Spool(SpoolResult::Mutated { version, .. }) = result.outcome? else {
             return Err(HostProblem::ProviderFailure);
         };
         let route = spool_route(job, dd);
@@ -2017,7 +2087,7 @@ impl BatchService {
                 InvocationLimits::default(),
             )
             .map_err(|_| HostProblem::ResourceExhausted)?;
-            let result = self.host.invoke(
+            let result = self.invoke_host(
                 invocation,
                 invocation.deadline_tick.saturating_sub(1),
                 false,
@@ -2037,7 +2107,7 @@ impl BatchService {
                     }),
                 },
             );
-            let HostResult::Spool(SpoolResult::Mutated { .. }) = result.effect.outcome? else {
+            let HostResult::Spool(SpoolResult::Mutated { .. }) = result.outcome? else {
                 return Err(HostProblem::ProviderFailure);
             };
             let descriptor = job
@@ -2084,7 +2154,7 @@ impl BatchService {
             InvocationLimits::default(),
         )
         .map_err(|_| HostProblem::ResourceExhausted)?;
-        let outcome = self.host.invoke(
+        let outcome = self.invoke_host(
             invocation,
             invocation.deadline_tick.saturating_sub(1),
             false,
@@ -2103,7 +2173,7 @@ impl BatchService {
                 }),
             },
         );
-        match outcome.effect.outcome? {
+        match outcome.outcome? {
             HostResult::Spool(result @ SpoolResult::Mutated { .. })
             | HostResult::Spool(result @ SpoolResult::PurgePending { .. }) => Ok(result),
             _ => Err(HostProblem::ProviderFailure),
@@ -2136,7 +2206,7 @@ impl BatchService {
         }
         let sequence = next_effect_sequence(invocation, effect_sequence)?;
         let key = effect_key(job, step, sequence)?;
-        let result = self.host.invoke(
+        let result = self.invoke_host(
             invocation,
             invocation.deadline_tick.saturating_sub(1),
             false,
@@ -2164,7 +2234,7 @@ impl BatchService {
                 }),
             },
         );
-        match result.effect.outcome? {
+        match result.outcome? {
             HostResult::Cics(response)
                 if response.disposition == CicsDisposition::Complete
                     && response.condition == "NORMAL" => {}
@@ -2361,7 +2431,7 @@ impl BatchService {
         program_invocation
             .bindings
             .insert("jes.work-id".into(), binding);
-        let result = self.host.invoke(
+        let result = self.invoke_host(
             &program_invocation,
             invocation.deadline_tick.saturating_sub(1),
             false,
@@ -2377,7 +2447,7 @@ impl BatchService {
                 }),
             },
         );
-        match result.effect.outcome? {
+        match result.outcome? {
             HostResult::Program(payload) => decode_program_output(&payload),
             _ => Err(HostProblem::ProviderFailure),
         }
@@ -2714,7 +2784,7 @@ impl BatchService {
         } else {
             None
         };
-        let result = self.host.invoke(
+        let result = self.invoke_host(
             invocation,
             invocation.deadline_tick.saturating_sub(1),
             false,
@@ -2738,7 +2808,7 @@ impl BatchService {
                 }),
             },
         );
-        match result.effect.outcome? {
+        match result.outcome? {
             HostResult::Ims(result) => Ok(result),
             _ => Err(HostProblem::ProviderFailure),
         }
@@ -2766,7 +2836,7 @@ impl BatchService {
         } else {
             None
         };
-        let result = self.host.invoke(
+        let result = self.invoke_host(
             invocation,
             invocation.deadline_tick.saturating_sub(1),
             false,
@@ -2788,7 +2858,7 @@ impl BatchService {
                 }),
             },
         );
-        match result.effect.outcome? {
+        match result.outcome? {
             HostResult::Db2(result) => Ok(result),
             _ => Err(HostProblem::ProviderFailure),
         }
@@ -3063,8 +3133,7 @@ impl BatchService {
     ) -> Result<DatasetResult, HostProblem> {
         let sequence = next_effect_sequence(invocation, effect_sequence)?;
         match self
-            .host
-            .invoke(
+            .invoke_host(
                 invocation,
                 invocation.deadline_tick.saturating_sub(1),
                 false,
@@ -3076,7 +3145,6 @@ impl BatchService {
                     request: HostRequest::Dataset(request),
                 },
             )
-            .effect
             .outcome?
         {
             HostResult::Dataset(result) => Ok(result),
@@ -3100,8 +3168,7 @@ impl BatchService {
             transaction: Some(job.id.clone()),
         });
         match self
-            .host
-            .invoke(
+            .invoke_host(
                 invocation,
                 invocation.deadline_tick.saturating_sub(1),
                 false,
@@ -3113,7 +3180,6 @@ impl BatchService {
                     request: HostRequest::Dataset(request),
                 },
             )
-            .effect
             .outcome?
         {
             HostResult::Dataset(result) => Ok(result),
@@ -4102,7 +4168,7 @@ impl BatchService {
         } else {
             return Err(HostProblem::Unsupported);
         };
-        let result = self.host.invoke(
+        let result = self.invoke_host(
             invocation,
             invocation.deadline_tick.saturating_sub(1),
             false,
@@ -4114,7 +4180,7 @@ impl BatchService {
                 request: HostRequest::Dataset(request),
             },
         );
-        if !matches!(result.effect.outcome?, HostResult::Dataset(_)) {
+        if !matches!(result.outcome?, HostResult::Dataset(_)) {
             return Err(HostProblem::ProviderFailure);
         }
         Ok(())
@@ -4188,7 +4254,7 @@ impl BatchService {
                                     None,
                                 )
                             };
-                        let result = self.host.invoke(
+                        let result = self.invoke_host(
                             invocation,
                             invocation.deadline_tick.saturating_sub(1),
                             false,
@@ -4201,7 +4267,7 @@ impl BatchService {
                             },
                         );
                         let HostResult::Dataset(DatasetResult::Generation { dataset, .. }) =
-                            result.effect.outcome?
+                            result.outcome?
                         else {
                             return Err(HostProblem::ProviderFailure);
                         };
@@ -4270,7 +4336,7 @@ impl BatchService {
             for (dataset, mode) in lock_modes {
                 let sequence = next_effect_sequence(invocation, effect_sequence)?;
                 let key = effect_key(job, step, sequence)?;
-                let result = self.host.invoke(
+                let result = self.invoke_host(
                     invocation,
                     invocation.deadline_tick.saturating_sub(1),
                     false,
@@ -4296,8 +4362,7 @@ impl BatchService {
                         }),
                     },
                 );
-                let HostResult::Dataset(DatasetResult::Locks { locks }) = result.effect.outcome?
-                else {
+                let HostResult::Dataset(DatasetResult::Locks { locks }) = result.outcome? else {
                     return Err(HostProblem::ProviderFailure);
                 };
                 let lock = locks.first().ok_or(HostProblem::ProviderFailure)?;
@@ -4339,7 +4404,7 @@ impl BatchService {
                     let mut definition =
                         DatasetDefinition::compatibility(dataset_attributes_for_dd(dd)?);
                     definition.lifecycle.state = DatasetLifecycleState::Allocated;
-                    let result = self.host.invoke(
+                    let result = self.invoke_host(
                         invocation,
                         invocation.deadline_tick.saturating_sub(1),
                         false,
@@ -4360,7 +4425,7 @@ impl BatchService {
                         },
                     );
                     if !matches!(
-                        result.effect.outcome?,
+                        result.outcome?,
                         HostResult::Dataset(DatasetResult::Created { .. })
                     ) {
                         return Err(HostProblem::ProviderFailure);
@@ -4394,7 +4459,7 @@ impl BatchService {
         effect_sequence: &mut u64,
     ) -> Result<DatasetAttributes, HostProblem> {
         let sequence = next_effect_sequence(invocation, effect_sequence)?;
-        let result = self.host.invoke(
+        let result = self.invoke_host(
             invocation,
             invocation.deadline_tick.saturating_sub(1),
             false,
@@ -4408,8 +4473,7 @@ impl BatchService {
                 }),
             },
         );
-        let HostResult::Dataset(DatasetResult::Attributes { attributes, .. }) =
-            result.effect.outcome?
+        let HostResult::Dataset(DatasetResult::Attributes { attributes, .. }) = result.outcome?
         else {
             return Err(HostProblem::ProviderFailure);
         };
@@ -4459,7 +4523,7 @@ impl BatchService {
         effect_sequence: &mut u64,
     ) -> Result<Vec<Vec<u8>>, HostProblem> {
         let sequence = next_effect_sequence(invocation, effect_sequence)?;
-        let result = self.host.invoke(
+        let result = self.invoke_host(
             invocation,
             invocation.deadline_tick.saturating_sub(1),
             false,
@@ -4477,8 +4541,7 @@ impl BatchService {
                 }),
             },
         );
-        let HostResult::Dataset(DatasetResult::Records { records, .. }) = result.effect.outcome?
-        else {
+        let HostResult::Dataset(DatasetResult::Records { records, .. }) = result.outcome? else {
             return Err(HostProblem::ProviderFailure);
         };
         Ok(records)
@@ -4531,7 +4594,7 @@ impl BatchService {
             }
             if can_read_as_concatenation {
                 let sequence = next_effect_sequence(invocation, effect_sequence)?;
-                let result = self.host.invoke(
+                let result = self.invoke_host(
                     invocation,
                     invocation.deadline_tick.saturating_sub(1),
                     false,
@@ -4553,7 +4616,7 @@ impl BatchService {
                 let HostResult::Dataset(DatasetResult::Records {
                     records: dataset_records,
                     ..
-                }) = result.effect.outcome?
+                }) = result.outcome?
                 else {
                     return Err(HostProblem::ProviderFailure);
                 };
@@ -4688,7 +4751,7 @@ impl BatchService {
                 continue;
             };
             let attribute_sequence = next_effect_sequence(invocation, effect_sequence)?;
-            let attributes = self.host.invoke(
+            let attributes = self.invoke_host(
                 invocation,
                 invocation.deadline_tick.saturating_sub(1),
                 false,
@@ -4703,7 +4766,7 @@ impl BatchService {
                 },
             );
             let HostResult::Dataset(DatasetResult::Attributes { attributes, .. }) =
-                attributes.effect.outcome?
+                attributes.outcome?
             else {
                 return Err(HostProblem::ProviderFailure);
             };
@@ -4715,7 +4778,7 @@ impl BatchService {
                 for (position, record) in records.into_iter().enumerate() {
                     let sequence = next_effect_sequence(invocation, effect_sequence)?;
                     let key = effect_key(job, step, sequence)?;
-                    let result = self.host.invoke(
+                    let result = self.invoke_host(
                         invocation,
                         invocation.deadline_tick.saturating_sub(1),
                         false,
@@ -4739,7 +4802,7 @@ impl BatchService {
                         },
                     );
                     if !matches!(
-                        result.effect.outcome?,
+                        result.outcome?,
                         HostResult::Dataset(DatasetResult::Mutated { .. })
                     ) {
                         return Err(HostProblem::ProviderFailure);
@@ -4774,7 +4837,7 @@ impl BatchService {
                     },
                 }
             };
-            let result = self.host.invoke(
+            let result = self.invoke_host(
                 invocation,
                 invocation.deadline_tick.saturating_sub(1),
                 false,
@@ -4787,7 +4850,7 @@ impl BatchService {
                 },
             );
             if !matches!(
-                result.effect.outcome?,
+                result.outcome?,
                 HostResult::Dataset(DatasetResult::Mutated { .. })
             ) {
                 return Err(HostProblem::ProviderFailure);
@@ -4858,7 +4921,7 @@ impl BatchService {
                 },
                 DdTerminalDisposition::Pass | DdTerminalDisposition::Keep => unreachable!(),
             };
-            let outcome = self.host.invoke(
+            let outcome = self.invoke_host(
                 invocation,
                 invocation.deadline_tick.saturating_sub(1),
                 false,
@@ -4870,7 +4933,7 @@ impl BatchService {
                     request: HostRequest::Dataset(request),
                 },
             );
-            if let Err(problem) = outcome.effect.outcome {
+            if let Err(problem) = outcome.outcome {
                 first_problem.get_or_insert(problem);
             } else if terminal == DdTerminalDisposition::Delete {
                 job.temporary_datasets
@@ -4893,7 +4956,7 @@ impl BatchService {
             }
             let sequence = next_effect_sequence(invocation, effect_sequence)?;
             let key = effect_key(job, step, sequence)?;
-            let result = self.host.invoke(
+            let result = self.invoke_host(
                 invocation,
                 invocation.deadline_tick.saturating_sub(1),
                 false,
@@ -4914,7 +4977,7 @@ impl BatchService {
                     }),
                 },
             );
-            if let Err(problem) = result.effect.outcome {
+            if let Err(problem) = result.outcome {
                 first_problem.get_or_insert(problem);
             }
         }
@@ -5010,7 +5073,7 @@ impl BatchService {
             AccessIntent::Read,
             1,
         )?;
-        let result = self.host.invoke(
+        let result = self.invoke_host(
             invocation,
             invocation.deadline_tick.saturating_sub(1),
             false,
@@ -5024,7 +5087,7 @@ impl BatchService {
                 }),
             },
         );
-        let HostResult::Spool(SpoolResult::Files { files }) = result.effect.outcome? else {
+        let HostResult::Spool(SpoolResult::Files { files }) = result.outcome? else {
             return Err(HostProblem::ProviderFailure);
         };
         files
@@ -5384,7 +5447,7 @@ impl BatchService {
                 AccessIntent::Read,
                 sequence,
             )?;
-            let result = self.host.invoke(
+            let result = self.invoke_host(
                 invocation,
                 invocation.deadline_tick.saturating_sub(1),
                 false,
@@ -5404,7 +5467,7 @@ impl BatchService {
             );
             let HostResult::Spool(SpoolResult::Records {
                 records: selected, ..
-            }) = result.effect.outcome?
+            }) = result.outcome?
             else {
                 return Err(HostProblem::ProviderFailure);
             };
@@ -5617,7 +5680,7 @@ impl BatchService {
         intent: AccessIntent,
         sequence: u64,
     ) -> Result<(), HostProblem> {
-        let result = self.host.invoke(
+        let result = self.invoke_host(
             invocation,
             invocation.deadline_tick.saturating_sub(1),
             false,
@@ -5639,7 +5702,7 @@ impl BatchService {
                 }),
             },
         );
-        match result.effect.outcome? {
+        match result.outcome? {
             HostResult::Security(SecurityDecision::Allow) => Ok(()),
             HostResult::Security(_) => Err(HostProblem::Unauthorized),
             _ => Err(HostProblem::ProviderFailure),
@@ -7459,6 +7522,25 @@ mod tests {
 
         fn arm(&self) {
             self.fail_next_mutation.store(true, Ordering::SeqCst);
+        }
+    }
+
+    impl mainframe_env_store_api::AuditSink for FailDatasetCommitOnceStore {
+        fn record_audit(
+            &self,
+            record: mainframe_env_execution_api::AuditRecord,
+        ) -> Result<(), StoreError> {
+            self.inner.record_audit(record)
+        }
+
+        fn audit_records(
+            &self,
+            execution_id: &mainframe_env_execution_api::ExecutionId,
+            start_effect_sequence: u64,
+            max: usize,
+        ) -> Result<Vec<mainframe_env_execution_api::AuditRecord>, StoreError> {
+            self.inner
+                .audit_records(execution_id, start_effect_sequence, max)
         }
     }
 
@@ -11738,7 +11820,7 @@ mod tests {
     }
 
     #[test]
-    fn corrupted_common_checkpoint_fails_closed_on_restart() {
+    fn corrupted_common_checkpoint_is_rejected_before_restart() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let checkpoint_store: Arc<dyn CheckpointStore> = store.clone();
         let service =
@@ -11756,22 +11838,23 @@ mod tests {
         let execution_id = checkpoint_execution_id(&submitted.id).unwrap();
         let mut checkpoint = store.get_checkpoint(&execution_id).unwrap().unwrap();
         checkpoint.payload[0] ^= 0xff;
-        store.put_checkpoint(checkpoint).unwrap();
+        assert_eq!(
+            store.put_checkpoint(checkpoint),
+            Err(StoreError::IncompatibleVersion)
+        );
         drop(service);
 
         let checkpoint_store: Arc<dyn CheckpointStore> = store.clone();
         let provider_store: Arc<dyn ProviderStateStore> = store;
         let providers = spool_test_providers(provider_store.clone());
-        assert!(matches!(
-            BatchService::open_with_checkpoint_store(
-                host_with(builtins(), providers),
-                provider_store,
-                checkpoint_store,
-                Default::default(),
-                Default::default(),
-            ),
-            Err(HostProblem::InfrastructureFailure)
-        ));
+        BatchService::open_with_checkpoint_store(
+            host_with(builtins(), providers),
+            provider_store,
+            checkpoint_store,
+            Default::default(),
+            Default::default(),
+        )
+        .unwrap();
     }
 
     #[test]

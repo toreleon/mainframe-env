@@ -22,17 +22,32 @@ impl EncodedSecretSource for ProcessEnvironment {
     }
 }
 
-/// Resolves only explicitly referenced package-trust secrets from the process
-/// environment. It never snapshots or retains the process environment.
+/// Resolves explicitly referenced runtime secrets from the process environment.
+///
+/// PostgreSQL URLs, TLS keys, bootstrap credentials, and package-trust keys all
+/// use the same bounded base64 contract. The resolver never snapshots or
+/// retains the process environment.
 pub struct EnvironmentSecretResolver {
     source: Arc<dyn EncodedSecretSource>,
 }
 
 impl EnvironmentSecretResolver {
+    /// Create a resolver that reads explicitly named process-environment values.
+    #[must_use]
     pub fn process() -> Self {
         Self {
             source: Arc::new(ProcessEnvironment),
         }
+    }
+
+    /// Parse a reference supported by the standalone environment provider.
+    ///
+    /// Only `env-base64:MAINFRAME_ENV_SECRET_<NAME>` references are accepted;
+    /// the referenced value is not read by this validation operation.
+    pub fn parse_reference(value: &str) -> Result<SecretRef, HostProblem> {
+        let reference = SecretRef::new(value, mainframe_env_host_api::HostLimits::default())?;
+        environment_name(&reference)?;
+        Ok(reference)
     }
 
     #[cfg(test)]
@@ -179,5 +194,23 @@ mod tests {
                 .err()
         );
         assert!(!shown.contains("not@base64"));
+    }
+
+    #[test]
+    fn standalone_reference_parser_rejects_unsupported_providers_without_reading_them() {
+        assert!(
+            EnvironmentSecretResolver::parse_reference("env-base64:MAINFRAME_ENV_SECRET_SUPPORTED")
+                .is_ok()
+        );
+        for invalid in [
+            "secret://mainframe-env/postgres",
+            "env-base64:MAINFRAME_ENV_OTHER_VALUE",
+            "env-base64:MAINFRAME_ENV_SECRET_lower",
+        ] {
+            assert_eq!(
+                EnvironmentSecretResolver::parse_reference(invalid),
+                Err(HostProblem::Malformed)
+            );
+        }
     }
 }
