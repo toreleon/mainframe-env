@@ -34,7 +34,7 @@ pipeline {
         MAINFRAME_ENV_JENKINS_VOLUME = "${params.JENKINS_VOLUME}"
         CARGO_HOME = "${params.JENKINS_VOLUME}/cargo-home"
         CARGO_TARGET_DIR = "${WORKSPACE}/target"
-        TMPDIR = "${WORKSPACE}/.tmp"
+        TMPDIR = "${WORKSPACE}/target/tmp"
         CARGO_INCREMENTAL = '0'
         CARGO_BUILD_JOBS = '2'
         CARGO_PROFILE_DEV_DEBUG = '0'
