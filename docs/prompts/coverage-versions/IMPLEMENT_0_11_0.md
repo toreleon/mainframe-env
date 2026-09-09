@@ -5,6 +5,10 @@ Completion dependencies: 0.5.0, 0.6.0, 0.8.0, 0.10.0
 
 Use this prompt from the repository root. The
 [common execution contract](README.md#common-execution-contract) is normative.
+Apply its [hardened slice acceptance](README.md#hardened-slice-acceptance),
+[early participant contract](README.md#early-transaction-participant-contract),
+and [licensed-harness preparation](README.md#licensed-harness-preparation)
+requirements alongside the version-specific boundaries below.
 
 ---
 
@@ -34,6 +38,32 @@ lane, but no route may publish against a placeholder or incomplete backend.
    discovery, OpenAPI generation, and strict custom-route namespace separation.
 5. Implement **ZMF-1106** malformed, protocol, authn/authz, failure, timeout,
    cancellation, scale, bounds, restart and licensed differential suites.
+
+## Operation normalization and backend ownership
+
+ZMF-1101 is not complete with a family list or generated HTTP handlers. The
+pinned catalog contains 27 service families and 189 guide-heading rows marked
+`heading-only-pending-endpoint-normalization`; those headings are not 189
+proven distinct executable endpoints. Preserve source provenance and normalize
+headings, aliases, overviews and asynchronous operation lifecycles explicitly.
+
+Before broad ZMF-1102/ZMF-1103 work, freeze a reviewed mapping from each source
+locator to normalized operation, method/path/request/response/error schema,
+backend owner and capability version, authorization intent, state/failure model,
+existing work package/slice and mandatory Conformance IR obligations. Resolve
+ownership for cloud provisioning, software management, sysplex, TSO/E address
+spaces, WLM pooling and RMF metering as well as jobs, files, console and workflows.
+The listed SAF/data/JES/CICS dependencies do not by themselves establish these
+additional backend capabilities. Record concrete existing owners or explicit
+prerequisite implementation slices; do not claim absent or accepted backends
+without inspecting the current source and evidence.
+
+A missing required backend blocks its adapter's public integration and remains
+pending. Truthful unsupported responses are necessary failure behavior but do
+not satisfy required execution. ZMF-1106 must close every required normalized
+operation and obligation across all 27 families, not merely the advertised
+subset. Keep one catalog/codegen and typed backend authority, without shadow
+administrative state or a second asynchronous-operation scheduler.
 
 ## Reuse and architecture guardrails
 
@@ -67,8 +97,9 @@ lane, but no route may publish against a placeholder or incomplete backend.
 
 ## Completion gate
 
-Do not finish until 27/27 service families have reviewed executable routes with
-no placeholder/generic-success path; exact protocol, schema, pagination,
+Do not finish until 27/27 service families close every required normalized
+operation and mandatory obligation through reviewed executable routes and
+accepted backends, with no placeholder/generic-success path; exact protocol, schema, pagination,
 authn/authz, async, cancellation, malformed, bound and recovery matrices pass;
 custom routes remain separate; licensed z/OSMF 3.2 differentials pass; and route,
 profile, OpenAPI and capability artifacts share one candidate identity.

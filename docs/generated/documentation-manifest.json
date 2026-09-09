@@ -793,64 +793,64 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/0.10.0.md",
-      "relative_links": 0,
-      "sha256": "sha256:b4ef55a1770abb7a7cbe055428cfa77f08f62dd38a9cabffcb8196686ff580f9",
+      "relative_links": 2,
+      "sha256": "sha256:6d9a1eabc41f3fb3734c2216d478c5019668f580bef619239a8f0d36f760803f",
       "title": "mainframe-env 0.10.0 — Complete CICS SPI and FEPI",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/0.11.0.md",
-      "relative_links": 0,
-      "sha256": "sha256:f3ddf0ef9d586018a57d51aa11099f5d8e555844793203ef85cbdec778784b79",
+      "relative_links": 2,
+      "sha256": "sha256:3c47dac1f3e7ea196e8162a0520af1e4d811611f0ce643c4e9dc2dbfc14aa6a4",
       "title": "mainframe-env 0.11.0 — Complete z/OSMF 3.2 REST portfolio",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/0.12.0.md",
-      "relative_links": 0,
-      "sha256": "sha256:9e0b235c6d90b8b96d5315e7be9b7a71e7d8ca96f3548e7a1b0115938b909096",
+      "relative_links": 3,
+      "sha256": "sha256:792bcb4030f06a8c29f42438f8d81e54cd0c625294d275a6b5919527a47a2864",
       "title": "mainframe-env 0.12.0 — Generic Db2 engine and common SQL",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/0.13.0.md",
-      "relative_links": 0,
-      "sha256": "sha256:f62b0ab804bb3d980c15f9a1a1ca0c6a3fec56a8cabb792baf74d0a8b0bdadb5",
+      "relative_links": 2,
+      "sha256": "sha256:bbdcc5948ce4e2febd9e2ccb962391754a70e25335958279d93ad54aa298b605",
       "title": "mainframe-env 0.13.0 — Complete Db2 13 programming surface",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/0.14.0.md",
-      "relative_links": 0,
-      "sha256": "sha256:432eb6cbdc508b469f20c804445f7473ac527c0f275b138fd9e0aff7283539dd",
+      "relative_links": 2,
+      "sha256": "sha256:35b4ba227121ad154317450794b424e168dbca26f1683aede618edb408ff00d5",
       "title": "mainframe-env 0.14.0 — Complete IMS 15.6 programming surface",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/0.15.0.md",
-      "relative_links": 0,
-      "sha256": "sha256:f323eaa3b4aa067c5fbce59f79e39bb1466fadc85f493ff7b282a58d9325115e",
+      "relative_links": 2,
+      "sha256": "sha256:6ef74c56bd3964d10c45ba6f3271cddd06311a1332a01a9551cd083d2df274a6",
       "title": "mainframe-env 0.15.0 — Complete IBM MQ 9.4 programming surface",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/0.16.0.md",
-      "relative_links": 0,
-      "sha256": "sha256:94033e75c253b2d09308c7096d8daf1135e84e5ed80d6484dd781d348a29a349",
+      "relative_links": 2,
+      "sha256": "sha256:4d4d2b81884dfc34b6893bd85f82b5e259b9f2af3151a8cf4139dc08a2dae669",
       "title": "mainframe-env 0.16.0 — Complete cross-resource transaction and failure semantics",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/0.17.0.md",
-      "relative_links": 0,
-      "sha256": "sha256:4286800559bf8726d430309181ef0b9a9498c18cee7b8bea3f42918295bd3306",
+      "relative_links": 2,
+      "sha256": "sha256:a124c40120f9667774df8e9808790e9ccbffba9f87eddf3e6e1e69a6c07a7e34",
       "title": "mainframe-env 0.17.0 — Licensed IBM differential certification",
       "xtask_commands": 0
     },
@@ -937,16 +937,16 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/0.9.0.md",
-      "relative_links": 6,
-      "sha256": "sha256:d79022271dc5e53888cbfbff4f25e0d3fb1b76f7d976c6e0a0ba1a87f9ebad23",
+      "relative_links": 10,
+      "sha256": "sha256:245458a9d7409aae48e3177f4a88446acba7fee18f54ea75c7d350173fa2e280",
       "title": "mainframe-env 0.9.0 — Complete CICS application API",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/1.0.0.md",
-      "relative_links": 0,
-      "sha256": "sha256:834b1dd27dc44ac952dae9e9c977c3950731d058f8b68f3c2846d1e8d6f57133",
+      "relative_links": 1,
+      "sha256": "sha256:23dadda584db862dd2bde0dafe9883049862e64558353aa33fd0eecfd74a77f8",
       "title": "mainframe-env 1.0.0 — Stable pinned programming-surface release",
       "xtask_commands": 0
     },
@@ -961,16 +961,16 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/PARALLEL-IMPLEMENTATION.md",
-      "relative_links": 0,
-      "sha256": "sha256:5dea9a45ef39a2a40de0178bad576323fbe8f9f6416c6dcfdd36fe2c451089b9",
+      "relative_links": 3,
+      "sha256": "sha256:6a681a77278c34660762848a9ee162aeea69586572b0fe02fe70ff7ae1eba1b0",
       "title": "Parallel implementation plan",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/README.md",
-      "relative_links": 29,
-      "sha256": "sha256:a57d3562c9544d4b6554920c3cbd8dece6e7230719c32e9d1aed9322bdc3ebcf",
+      "relative_links": 45,
+      "sha256": "sha256:92988c21b60bbfe41e273145c97b0b7f9bc594830e8187ab38e488cffa7cf7ac",
       "title": "IBM coverage release plans",
       "xtask_commands": 0
     },
@@ -1041,8 +1041,8 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
-      "relative_links": 18,
-      "sha256": "sha256:b9436a5b5bac7bf2f84f4a6ff6f7da913468c7efb1fc06d8a4a1e27af2d20898",
+      "relative_links": 20,
+      "sha256": "sha256:cb34e9bf795529a8dc1de96a47a93a1138605c560fa707750dc0c63b72da98d0",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },
@@ -1161,64 +1161,64 @@
     {
       "normative": false,
       "path": "docs/prompts/coverage-versions/IMPLEMENT_0_10_0.md",
-      "relative_links": 1,
-      "sha256": "sha256:a0bc7c8614badb68bad83680ae3e818a16b5d0180d37a8018c09ad89c64213cf",
+      "relative_links": 4,
+      "sha256": "sha256:f2fdab429221976148a8bc12f8dbbcbd604d680173ac438e045c34f3556b488b",
       "title": "Execution Prompt — Implement mainframe-env 0.10.0",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/prompts/coverage-versions/IMPLEMENT_0_11_0.md",
-      "relative_links": 1,
-      "sha256": "sha256:7e7d7bbfe3ef1f13cc79a1ae44c25e50c473352989f9a5d65294720f94429eca",
+      "relative_links": 4,
+      "sha256": "sha256:ff8da4c3aa934f9a250cd98940431593597711314c31b9023f3b524223f6a265",
       "title": "Execution Prompt — Implement mainframe-env 0.11.0",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/prompts/coverage-versions/IMPLEMENT_0_12_0.md",
-      "relative_links": 1,
-      "sha256": "sha256:1c39517a3c130e9ddc8f509821700a4c13845552bb457fc42446096d6d44706e",
+      "relative_links": 5,
+      "sha256": "sha256:67b039db7419e569ec7b8a2e57c51767dcb3ec843a2717a2906c17ad3c638d92",
       "title": "Execution Prompt — Implement mainframe-env 0.12.0",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/prompts/coverage-versions/IMPLEMENT_0_13_0.md",
-      "relative_links": 1,
-      "sha256": "sha256:3fdea76569bd61246a337ac35ecfe036bd089441372555d701cac15005ab82d2",
+      "relative_links": 4,
+      "sha256": "sha256:ea4cbba30c28a20b0aa08538fecdaf2949511736da571f95748e6e109037667a",
       "title": "Execution Prompt — Implement mainframe-env 0.13.0",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/prompts/coverage-versions/IMPLEMENT_0_14_0.md",
-      "relative_links": 1,
-      "sha256": "sha256:a30e0d93ee644e9f5b8324c7c6a8a9abc74e1b1c1f214b63583dc09b021c6a64",
+      "relative_links": 4,
+      "sha256": "sha256:05103f36dd39bb0a192e5c1eb78f3dc752ce7691a099508c4247e11df023f3b5",
       "title": "Execution Prompt — Implement mainframe-env 0.14.0",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/prompts/coverage-versions/IMPLEMENT_0_15_0.md",
-      "relative_links": 1,
-      "sha256": "sha256:3caa849ae70e0c5c1de2e53d41e47bfe5e1889d635106e8ad128c92bef0c27aa",
+      "relative_links": 4,
+      "sha256": "sha256:559154edc7f27474a4b53ddeb218831a4168d2c48cbc671af332d9fb50bdb9fa",
       "title": "Execution Prompt — Implement mainframe-env 0.15.0",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/prompts/coverage-versions/IMPLEMENT_0_16_0.md",
-      "relative_links": 1,
-      "sha256": "sha256:c7baac9b151a333ea0332972fc617474d9b1d200b9cce571040d5ee2860cfbf5",
+      "relative_links": 4,
+      "sha256": "sha256:031b83eaef98f2664d31494296c36af3aa0dc621a69ee9893733fa69ec20b882",
       "title": "Execution Prompt — Implement mainframe-env 0.16.0",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/prompts/coverage-versions/IMPLEMENT_0_17_0.md",
-      "relative_links": 1,
-      "sha256": "sha256:a65566fbbec3208467016865a8e16b9345058eb69edf3a757e99f7b90bf900fb",
+      "relative_links": 4,
+      "sha256": "sha256:98ec8175e4b015657d8009524aabd6a287c5db7a9a0a0ec046cd1ff3ae96fe2b",
       "title": "Execution Prompt — Implement mainframe-env 0.17.0",
       "xtask_commands": 0
     },
@@ -1281,16 +1281,16 @@
     {
       "normative": false,
       "path": "docs/prompts/coverage-versions/IMPLEMENT_0_9_0.md",
-      "relative_links": 1,
-      "sha256": "sha256:06a25be2063d00c3df582eef78f0b0d314220d82288acac7b59a48cff9d66fd2",
+      "relative_links": 6,
+      "sha256": "sha256:d7d4723619e51e44d199ba2e419c34b24825e3a5687f3126cd935da8f7eafa65",
       "title": "Execution Prompt — Implement mainframe-env 0.9.0",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/prompts/coverage-versions/README.md",
-      "relative_links": 19,
-      "sha256": "sha256:740ad1d2fceb3ddfea6bde1504572660a58b31200596eeecb4b6420e3d6a092a",
+      "relative_links": 25,
+      "sha256": "sha256:3bb8784528293d1d22129ff6ab3df7b3460ae4cf04368a2b9ae871a5c0ddf7ca",
       "title": "Implementation prompts for IBM coverage minor releases",
       "xtask_commands": 0
     },

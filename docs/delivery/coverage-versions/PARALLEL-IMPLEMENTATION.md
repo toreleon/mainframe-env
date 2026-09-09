@@ -15,6 +15,34 @@ This document distinguishes three events:
 Starting 0.14 work before 0.11 ships does not allow 0.14 behavior to leak into
 the 0.11 `core-server` profile.
 
+## Post-131 entry and shared prerequisites
+
+The release DAG below is unchanged. Before broad 0.9 work, verify and record the
+integrated post-#131 entry candidate in [status/0.9.0.md](status/0.9.0.md);
+[#137](https://github.com/toreleon/mainframe-env/issues/137) tracks this real
+evidence handoff. A merged hardening PR alone does not make CIC-901 ready.
+
+All 0.9–0.17 lanes use the shared
+[hardened slice acceptance](../../prompts/coverage-versions/README.md#hardened-slice-acceptance).
+Freeze the minimum shared participant contract through its existing owner before
+dependent CICS/Db2/IMS/MQ adapters integrate; track that early work under INT-1601,
+not as a new foundation release or another runtime. Provider-specific mutation,
+replay and recovery proof lands with each slice; 0.16 owns the final mixed-resource
+matrix and coherent restore boundary, not the first participant interface.
+
+Prepare licensed environment, fixture and capture/normalization inputs alongside
+each lane through CER-1701's shared interfaces. Preserve each minor's licensed
+exit requirement and the complete final 0.17 campaigns. Normalize z/OSMF
+operations and assign backend owners before broad adapter implementation; the
+four named backend dependency versions alone do not cover every service family.
+
+After accepted dependencies, CICS 0.9→0.10, Db2 0.12→0.13, IMS 0.14 and MQ 0.15
+remain parallel lanes; z/OSMF 0.11 consumes accepted operation-level backends.
+0.16 integrates the providers and 0.17 certifies their exact final composition.
+Prepare REL-1001 metadata before terminal CER-1706 rehearsal; promote 1.0 only
+with separate authorization. Early contract/harness work neither changes release
+order nor permits later-version capabilities in an earlier public profile.
+
 ## Dependency graph
 
 ```text

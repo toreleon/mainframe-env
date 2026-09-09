@@ -5,12 +5,16 @@ Completion dependencies: 0.2.0, 0.4.0, 0.5.0
 
 Use this prompt from the repository root. The
 [common execution contract](README.md#common-execution-contract) is normative.
+Apply its [hardened slice acceptance](README.md#hardened-slice-acceptance),
+[early participant contract](README.md#early-transaction-participant-contract),
+and [licensed-harness preparation](README.md#licensed-harness-preparation)
+requirements alongside the version-specific boundaries below.
 
 ---
 
 You are implementing **mainframe-env 0.12.0: generic Db2 engine and common SQL**.
-Replace CardDemo-shaped database logic with a generic architecture that can
-complete the pinned Db2 13 surface in 0.13.
+Extend the current generic static-SQL provider into the declared common Db2 core
+so that 0.13 can complete the pinned Db2 13 for z/OS programming surface.
 
 ## Read and verify first
 
@@ -32,6 +36,29 @@ evidence. Parser/catalog work may start after 0.2, but host integration requires
 5. Implement **DB2-1206** application-data migration, hardcode removal,
    property/metamorphic/failure/recovery/compatibility and licensed differential
    suites for the accepted common subset.
+
+## Current baseline and common-subset freeze
+
+Inspect the [current provider](../../../crates/providers/mainframe-env-db2/README.md)
+and its `Db2CatalogGeneration`, atomic package/generation selection, static SQL,
+cursor, object-row persistence, replay and rollback contracts. Extend these
+accepted authorities with the parser/binder/relational execution work; preserve
+package/catalog upgrades, bounded readers, migration and rollback compatibility.
+Do not replace the generic provider with a parallel engine or reimplement its
+already-accepted baseline merely to satisfy stale roadmap prose.
+
+The 29 CardDemo H1/H3 hits are a historical audit, not a measured post-#131 defect
+count. DB2-1206 requires a fresh candidate-bound scan, remediation of actual
+prohibited dispatch and a zero-prohibited-dispatch ratchet. Application schemas,
+rows, packages and privileges continue to enter through versioned packages.
+
+Before broad DB2-1203 execution, DB2-1201/DB2-1202 must freeze exact common and
+0.13-deferred row/obligation sets against the pinned 174-row catalog: 158 SQL
+headings plus 16 SQL PL rows. Preserve every mandatory obligation, source locator
+and owner. Recognition covers the full pinned set; execution credit in 0.12 is
+limited to the frozen common subset. A partially implemented row remains partial;
+do not choose the common subset retrospectively from passing tests. Hand every
+remaining obligation to DB2-1301 without reducing the official denominator.
 
 ## Reuse and architecture guardrails
 
@@ -60,8 +87,9 @@ evidence. Parser/catalog work may start after 0.2, but host integration requires
 
 - Catalog and parse all 158 pinned SQL statement headings plus pinned SQL PL,
   while crediting execution only to rows with real generic semantics.
-- Eliminate all 29 audited production Db2 H1/H3 hits. Application schemas, rows,
-  packages and privileges enter only through versioned application packages.
+- Recompute the current production Db2 H1/H3 scan and keep prohibited dispatch
+  at zero; the historical 29-hit audit is not a current baseline measurement.
+  Application schemas, rows, packages and privileges enter through packages.
 - Names, tables, statements, packages or plans never select application-specific
   branches. There is one generic catalog/binder/executor path.
 - Enforce exact types, nulls, conversion, SQLCODE/SQLSTATE/SQLCA, authorization,

@@ -5,6 +5,10 @@ Completion dependencies: 0.4.0, 0.5.0
 
 Use this prompt from the repository root. The
 [common execution contract](README.md#common-execution-contract) is normative.
+Apply its [hardened slice acceptance](README.md#hardened-slice-acceptance),
+[early participant contract](README.md#early-transaction-participant-contract),
+and [licensed-harness preparation](README.md#licensed-harness-preparation)
+requirements alongside the version-specific boundaries below.
 
 ---
 
@@ -32,6 +36,26 @@ and accepted 0.4.0 and 0.5.0 evidence.
 5. Implement **MQ-1506** SAF, context/alternate-user authorization, malformed/
    boundary/limit, concurrency, overload, compatibility and licensed
    differential suites.
+
+## MQ host-context and early durability acceptance
+
+MQ-1501 must freeze call, host environment, structure version, option, handle
+lifetime and syncpoint-owner applicability. Include CICS, IMS and batch/client
+contexts where the pinned MQI surface applies. MQCMIT must not become a generic
+commit operation in CICS or in IMS environments other than batch DL/I; use the
+pinned host-owned syncpoint rules and exact rejection/status behavior. Correct
+rejection in a forbidden context is required compatibility, not a missing call.
+
+Every mutating MQ-1502–MQ-1504 slice includes its applicable persistence,
+syncpoint/backout, replay, failure and restart obligations before integration.
+MQ-1505/MQ-1506 complete and stress delivery/recovery/security guarantees rather
+than introducing them after put/get or pub/sub has already integrated.
+
+Any optional native IBM-client pass-through provider is an explicit, separately
+selected profile with its own capability and evidence identity. Native execution
+cannot increment owned-simulator coverage, become hidden fallback or supply the
+product expectation for its own differential test. Preserve all 26 unique calls
+and the 27 source rows in provenance without duplicate credit.
 
 ## Reuse and architecture guardrails
 

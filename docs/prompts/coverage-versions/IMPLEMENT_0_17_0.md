@@ -5,6 +5,10 @@ Completion dependencies: 0.11.0, 0.16.0
 
 Use this prompt from the repository root. The
 [common execution contract](README.md#common-execution-contract) is normative.
+Apply its [hardened slice acceptance](README.md#hardened-slice-acceptance),
+[early participant contract](README.md#early-transaction-participant-contract),
+and [licensed-harness preparation](README.md#licensed-harness-preparation)
+requirements alongside the version-specific boundaries below.
 
 ---
 
@@ -64,6 +68,30 @@ licensed receipt before release certification can pass.
    backup/restore, upgrade, rollback and compatibility certification.
 5. Produce **CER-1705/CER-1706** canonical evidence/provenance/SBOM/security
    closure and an independent, unchanged-source 1.0 release rehearsal.
+
+## Early harness inputs and exact-candidate handoff
+
+CER-1701 preparation starts alongside provider lanes: pin environment capability,
+independent fixture/capture/normalization inputs and representative harness
+checks through the existing shared interfaces. Revalidate those inputs for the
+final candidate; earlier observations or local plumbing checks are not final
+licensed campaign credit. The four recorded historical campaigns remain pending
+at COBOL 0/153, RACF/SAF 0/48, dataset/VSAM/AMS 0/36 and JES2 0/16 until real
+licensed receipts are accepted.
+
+Prepare and freeze REL-1001 version/changelog/scope/migration/release metadata
+before the terminal CER-1706 rehearsal. This is release preparation, not authority
+to tag, publish or promote. The exact proposed 1.0 source/artifact identities must
+be the ones rehearsed and independently accepted. A later source, metadata,
+dependency, generated catalog, fixture, oracle or environment change invalidates
+affected certification under existing policy; record the impact and rerun required
+gates, never silently relabel receipts. Reuse of demonstrably unaffected evidence
+requires the existing explicit identity/compatibility proof, not a docs-only waiver.
+
+CER-1702 mismatch dispositions cannot drop a mandatory row by prose. An actual
+baseline correction requires pinned provenance and review; every row remaining
+mandatory must close. Final certification and separately authorized 1.0 promotion
+remain distinct even when preparation overlaps.
 
 ## Reuse and architecture guardrails
 
