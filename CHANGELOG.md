@@ -65,6 +65,14 @@ All notable changes to mainframe-env are documented here.
   bootstrap with secret-free restart, and separate writable/auth/artifact/worker
   readiness checks backed by rolled-back provider-state DML proof, retention
   headroom, and per-worker queue-progress freshness.
+- Added the PostgreSQL writable-readiness rollback contract to the blocking
+  parity stage so every environment-gated PostgreSQL correctness test is run.
+- Kept full development certification runnable while preserving stable
+  release-artifact checks behind an explicit release-candidate promotion.
+- Required the archive CLI to verify the locked offline/Docker runtime before
+  granting reproducibility credit.
+- Kept Jenkins test temporaries below the excluded Cargo target tree so
+  parallel fixtures cannot be mistaken for candidate repository contents.
 - Moved synchronous z/OSMF backend calls to a bounded four-worker lane and
   propagated finite HTTP deadlines plus live cancellation into invocations.
 - Classified mutating-effect journal failures after dispatch as unknown outcomes

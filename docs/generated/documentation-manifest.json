@@ -10,7 +10,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:f9b6326476205c0156874d0709beb015005b87662bdc5fbc9cc0c603fdb2fea5",
+      "sha256": "sha256:af34d201593591e92e845c04dd83b6f97ee4b6749887845b05aae18b2a6c9200",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -1041,8 +1041,8 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
-      "relative_links": 20,
-      "sha256": "sha256:cb34e9bf795529a8dc1de96a47a93a1138605c560fa707750dc0c63b72da98d0",
+      "relative_links": 80,
+      "sha256": "sha256:5fcd6f5563c174b8630d944705798e8ae7f71c9f7e2ea1528cd93403c3c2fc87",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },
@@ -1106,7 +1106,7 @@
       "normative": false,
       "path": "docs/delivery/hardening/54-assurance-tiers.md",
       "relative_links": 0,
-      "sha256": "sha256:0d7098311ee8563fbd7fe692c04f7d04edb23619ef7cd0ab13a5fa198798c0d1",
+      "sha256": "sha256:5725bd9089f7953311d5b3f19483b790da2eb178491f7aca9f28ed3d561e7669",
       "title": "#54 — selected PR gates and explicit full campaigns",
       "xtask_commands": 0
     },

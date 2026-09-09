@@ -34,7 +34,7 @@ pipeline {
         MAINFRAME_ENV_JENKINS_VOLUME = "${params.JENKINS_VOLUME}"
         CARGO_HOME = "${params.JENKINS_VOLUME}/cargo-home"
         CARGO_TARGET_DIR = "${WORKSPACE}/target"
-        TMPDIR = "${WORKSPACE}/.tmp"
+        TMPDIR = "${WORKSPACE}/target/tmp"
         CARGO_INCREMENTAL = '0'
         CARGO_BUILD_JOBS = '2'
         CARGO_PROFILE_DEV_DEBUG = '0'
@@ -365,6 +365,17 @@ pipeline {
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate fuzz-smoke -- tools/run_fuzz_assurance.sh smoke
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate fuzz-periodic -- tools/run_fuzz_assurance.sh periodic
                     "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record --output "$out" --gate coverage-baseline -- tools/run_coverage_baseline.sh
+                    archive_source="$CARGO_TARGET_DIR/archive-reproduction-source"
+                    rm -rf "$archive_source"
+                    mkdir -p "$archive_source" "$out/archive-reproduction"
+                    git archive --format=tar HEAD | tar -xf - -C "$archive_source"
+                    "$MAINFRAME_ENV_PYTHON" -B tools/ci_assurance.py record \
+                      --output "$out" --gate archive-reproduction -- \
+                      "$MAINFRAME_ENV_PYTHON" -B tools/reproducible_archive.py \
+                        --source "$archive_source" \
+                        --output "$out/archive-reproduction/mainframe-env-source.tar.gz" \
+                        --root-name mainframe-env-source
+                    rm -rf "$archive_source"
                 '''
             }
         }

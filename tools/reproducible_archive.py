@@ -9,6 +9,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 
 
@@ -21,6 +22,17 @@ SAFE_ROOT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,191}\Z")
 
 class ArchiveError(RuntimeError):
     pass
+
+
+def _verify_archive_runtime() -> None:
+    checker = Path(__file__).with_name("supply_chain.py")
+    try:
+        subprocess.run(
+            [sys.executable, "-B", str(checker), "check", "--runtime", "offline"],
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise ArchiveError("the locked archive runtime verification failed") from error
 
 
 def _digest(path: Path) -> str:
@@ -194,6 +206,7 @@ def main() -> int:
     parser.add_argument("--root-name")
     args = parser.parse_args()
     try:
+        _verify_archive_runtime()
         digest = create_archive(args.source, args.output, args.root_name)
     except (ArchiveError, OSError) as error:
         parser.exit(1, f"reproducible archive: {error}\n")
