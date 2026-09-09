@@ -5,8 +5,7 @@ use mainframe_env_batch::DdPlan;
 use mainframe_env_execution_api::{CapabilityId, PrincipalId, ResourceLimits, ServiceClass};
 use mainframe_env_host_api::{HostLimits, ProgramName, RegistrySnapshot};
 use mainframe_env_store::{LocalArtifactStore, MemoryStore, SqliteStateStore, StoreLimits};
-use mainframe_env_store_api::{ArtifactRecord, EffectState};
-use sha2::{Digest, Sha256};
+use mainframe_env_store_api::EffectState;
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::sync::{Mutex, Weak};
@@ -240,21 +239,11 @@ impl Fixture {
         else {
             panic!("executable artifact required");
         };
-        let payload = artifact.payload().to_vec();
-        let digest: [u8; 32] = Sha256::digest(&payload).into();
-        let id = ArtifactRef::new(
-            format!("sha256:{:x}", Sha256::digest(&payload)),
-            InvocationLimits::default(),
-        )
-        .unwrap();
+        let record = artifact::published_artifact_record(&artifact).unwrap();
+        let id = record.artifact.clone();
         LocalArtifactStore::open(&self.root, 64 * 1024 * 1024)
             .unwrap()
-            .put_artifact(ArtifactRecord {
-                artifact: id.clone(),
-                media_type: "application/vnd.mainframe-env.core-mir".into(),
-                payload_digest: digest,
-                payload,
-            })
+            .put_artifact(record)
             .unwrap();
         self.store
             .put_provider_state(

@@ -634,11 +634,19 @@ impl CobolProgram {
             .map_err(|_| HostProblem::InfrastructureFailure)?
         {
             let result = previous(record, &fingerprint, parent)?;
+            self.preflight_installed_program(
+                program,
+                payload.schema() == "mainframe-env.program.input@1",
+            )?;
             if payload.schema() == "mainframe-env.program.input@1" {
                 self.finish_run_unit(parent)?;
             }
             return Ok(result);
         }
+        let admitted = self.preflight_installed_program(
+            program,
+            payload.schema() == "mainframe-env.program.input@1",
+        )?;
         self.ensure_call_protocol(parent)?;
         let prefix = if payload.schema() == "mainframe-env.cobol.call@1" {
             "online-call-execution"
@@ -688,9 +696,9 @@ impl CobolProgram {
         // No call can dispatch without winning the durable reservation.
         let mut writes = Vec::new();
         let result = if payload.schema() == "mainframe-env.cobol.call@1" {
-            self.execute_installed(parent, program, payload, &key, &mut writes)
+            self.execute_admitted(parent, program, admitted, payload, &key, &mut writes)
         } else {
-            self.execute_installed_batch(parent, program, payload, &key)
+            self.execute_installed_batch(parent, program, admitted, payload, &key)
                 .and_then(|output| {
                     serde_json::to_vec(&output).map_err(|_| HostProblem::ProviderFailure)
                 })

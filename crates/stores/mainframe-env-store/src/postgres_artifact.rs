@@ -159,6 +159,11 @@ impl ArtifactStore for PostgresArtifactStore {
             return Err(StoreError::PayloadTooLarge);
         }
         validation::artifact(&record)?;
+        let executable = record
+            .executable
+            .as_ref()
+            .map(validation::encode_executable_metadata)
+            .transpose()?;
         if let Some(existing) = self.get_artifact(&record.artifact)? {
             return if existing == record {
                 Ok(())
@@ -172,12 +177,13 @@ impl ArtifactStore for PostgresArtifactStore {
             let outcome = async {
                 adjust_quota(&mut transaction, ARTIFACT_OBJECT_QUOTA, self.max_objects, 1).await?;
                 let affected = sqlx::query(
-                    "INSERT INTO artifact_object(object_key,schema_version,media_type,payload_digest,payload) VALUES($1,1,$2,$3,$4) ON CONFLICT DO NOTHING",
+                    "INSERT INTO artifact_object(object_key,schema_version,media_type,payload_digest,payload,executable_metadata) VALUES($1,2,$2,$3,$4,$5) ON CONFLICT DO NOTHING",
                 )
                 .bind(artifact)
                 .bind(&record.media_type)
                 .bind(record.payload_digest.as_slice())
                 .bind(&record.payload)
+                .bind(&executable)
                 .execute(&mut *transaction)
                 .await
                 .map_err(infrastructure)?
@@ -206,7 +212,7 @@ impl ArtifactStore for PostgresArtifactStore {
     fn get_artifact(&self, id: &ArtifactRef) -> Result<Option<ArtifactRecord>, StoreError> {
         let row = self.run(
             sqlx::query(
-                "SELECT schema_version,media_type,payload_digest,payload FROM artifact_object WHERE object_key=$1",
+                "SELECT schema_version,media_type,payload_digest,payload,executable_metadata FROM artifact_object WHERE object_key=$1",
             )
             .bind(id.as_str())
             .fetch_optional(&self.pool),
@@ -216,10 +222,12 @@ impl ArtifactStore for PostgresArtifactStore {
             let media_type: String = row.try_get(1).map_err(infrastructure)?;
             let digest: Vec<u8> = row.try_get(2).map_err(infrastructure)?;
             let payload: Vec<u8> = row.try_get(3).map_err(infrastructure)?;
-            if schema != 1
+            let executable: Option<Vec<u8>> = row.try_get(4).map_err(infrastructure)?;
+            if !matches!(schema, 1 | 2)
                 || media_type.is_empty()
                 || media_type.len() > 4_096
                 || payload.len() > self.max_artifact_bytes
+                || (schema == 1 && executable.is_some())
             {
                 return Err(StoreError::IncompatibleVersion);
             }
@@ -230,6 +238,9 @@ impl ArtifactStore for PostgresArtifactStore {
                     .try_into()
                     .map_err(|_| StoreError::IncompatibleVersion)?,
                 payload,
+                executable: executable
+                    .map(|bytes| validation::decode_executable_metadata(&bytes))
+                    .transpose()?,
             };
             validation::artifact(&record)?;
             Ok(record)

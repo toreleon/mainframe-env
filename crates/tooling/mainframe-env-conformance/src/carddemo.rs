@@ -25,7 +25,7 @@ use mainframe_env_compiler::{
 };
 use mainframe_env_compiler_api::{
     CompilationMode, CompileOptions, CompileTarget, CompilerRequest, CompilerResult,
-    CompilerService,
+    CompilerService, PublishedArtifact,
 };
 use mainframe_env_dataset::{DatasetLimits, DatasetSeedObject, DatasetService};
 use mainframe_env_db2::{
@@ -6227,8 +6227,7 @@ fn verify_cdv1_correction(
         .enable_all()
         .build()
         .map_err(|error| CorpusProblem::new("carddemo.full.cdv1_runtime", error.to_string()))?;
-    let (screen_sha256, public_routes) =
-        runtime.block_on(exercise_cdv1_route(payload, &artifact_sha256))?;
+    let (screen_sha256, public_routes) = runtime.block_on(exercise_cdv1_route(&artifact))?;
     Ok(Cdv1CorrectionReceipt {
         disposition: correction.disposition.clone(),
         correction_sha256: format!("{:x}", Sha256::digest(&correction_bytes)),
@@ -6240,8 +6239,7 @@ fn verify_cdv1_correction(
 }
 
 async fn exercise_cdv1_route(
-    payload: Vec<u8>,
-    artifact_sha256: &str,
+    artifact: &PublishedArtifact,
 ) -> Result<(String, usize), CorpusProblem> {
     let artifact_root = env::temp_dir().join(format!(
         "mainframe-env-carddemo-cdv1-{}",
@@ -6263,20 +6261,7 @@ async fn exercise_cdv1_route(
         .map_err(terminal_problem)?;
     server
         .install_online_application(OnlineApplicationDefinition {
-            programs: vec![OnlineProgramDefinition {
-                name: "COCRDSEC".into(),
-                artifact: ArtifactRef::new(
-                    format!("sha256:{artifact_sha256}"),
-                    InvocationLimits::default(),
-                )
-                .map_err(|_| {
-                    CorpusProblem::new(
-                        "carddemo.full.cdv1_artifact_invalid",
-                        "accepted COCRDSEC artifact identity is invalid",
-                    )
-                })?,
-                payload,
-            }],
+            programs: vec![OnlineProgramDefinition::current("COCRDSEC", artifact)],
             transactions: BTreeMap::from([("CDV1".into(), "COCRDSEC".into())]),
             maps: vec![BmsMapDefinition {
                 mapset: "COCRDSEC".into(),
@@ -10164,22 +10149,7 @@ fn compile_carddemo_batch_definitions(
                     ));
                 }
             };
-            let payload = artifact.payload().to_vec();
-            let reference = mainframe_env_execution_api::ArtifactRef::new(
-                format!("sha256:{:x}", Sha256::digest(&payload)),
-                InvocationLimits::default(),
-            )
-            .map_err(|_| {
-                CorpusProblem::new(
-                    "carddemo.batch_program.artifact_invalid",
-                    format!("{path} artifact identity is invalid"),
-                )
-            })?;
-            Ok(BatchProgramDefinition {
-                name: name.clone(),
-                artifact: reference,
-                payload,
-            })
+            Ok(BatchProgramDefinition::current(name.clone(), &artifact))
         })
         .collect()
 }
@@ -10234,21 +10204,7 @@ fn compile_free_batch_definition(
             format!("{name} did not publish"),
         ));
     };
-    let payload = artifact.payload().to_vec();
-    Ok(BatchProgramDefinition {
-        name: name.into(),
-        artifact: mainframe_env_execution_api::ArtifactRef::new(
-            format!("sha256:{:x}", Sha256::digest(&payload)),
-            InvocationLimits::default(),
-        )
-        .map_err(|_| {
-            CorpusProblem::new(
-                "carddemo.batch_program.fixture_invalid",
-                "fixture artifact identity is invalid",
-            )
-        })?,
-        payload,
-    })
+    Ok(BatchProgramDefinition::current(name, &artifact))
 }
 
 struct BatchProgramExercise {
@@ -13490,22 +13446,7 @@ fn carddemo_base_online_definition(
                 ));
             }
         };
-        let payload = artifact.payload().to_vec();
-        let reference = mainframe_env_execution_api::ArtifactRef::new(
-            format!("sha256:{:x}", Sha256::digest(&payload)),
-            InvocationLimits::default(),
-        )
-        .map_err(|_| {
-            CorpusProblem::new(
-                "carddemo.online.artifact_invalid",
-                format!("{primary} artifact identity is invalid"),
-            )
-        })?;
-        programs.push(OnlineProgramDefinition {
-            name: name.clone(),
-            artifact: reference,
-            payload,
-        });
+        programs.push(OnlineProgramDefinition::current(name.clone(), &artifact));
     }
     if programs.len() != 18 || transactions.len() != 17 {
         return Err(CorpusProblem::new(
@@ -13597,18 +13538,10 @@ fn carddemo_db2_online_definition(
                 format!("{relative} did not publish"),
             ));
         };
-        let payload = artifact.payload().to_vec();
-        definition.programs.push(OnlineProgramDefinition {
-            name: (*program).clone(),
-            artifact: ArtifactRef::new(
-                format!("sha256:{:x}", Sha256::digest(&payload)),
-                InvocationLimits::default(),
-            )
-            .map_err(|_| {
-                CorpusProblem::new("carddemo.db2.artifact_invalid", "artifact ID is invalid")
-            })?,
-            payload,
-        });
+        definition.programs.push(OnlineProgramDefinition::current(
+            (*program).clone(),
+            &artifact,
+        ));
     }
     definition.transactions.extend(transactions);
     definition.maps.extend(carddemo_maps(

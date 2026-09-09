@@ -14,6 +14,7 @@ ADRs capture decisions that constrain implementation and public contracts.
 | [0008](0008-icu-license-compliance.md) | retain the locked decNumber dependency under ICU and ship complete notices | Accepted |
 | [0009](0009-current-package-topology.md) | current 26-package topology and change governance | Accepted |
 | [0010](0010-rust-module-review-budgets.md) | hard Rust module budgets, facade ratchet, and CICS family layout | Accepted |
+| [0011](0011-typed-language-hir-and-semantic-ir.md) | language-specific HIR, semantic IR dialects, and typed host effects | Accepted |
 
 An accepted ADR is immutable. A material change creates a superseding ADR and
 links to the previous decision.

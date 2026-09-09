@@ -6,6 +6,16 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added ADR-0011 and the first typed-HIR vertical slices: resolved COBOL
+  arithmetic plans, typed CICS file/unit-of-work plans, versioned executable
+  dialect identities, and bounded canonical plan codecs.
+- Added candidate-bound product-source mutants for typed decimal receiver-local
+  updates, operand capture, condition timing, rounding, and qualified
+  `ADD CORRESPONDING`; unchanged exact-result tests must kill every
+  representative mutant.
+- Added a reviewed, pinned-source COBOL arithmetic pilot with independent
+  golden bytes and typed-plan observations for `SIZE ERROR`, relative
+  qualification, numeric-edited eligibility, and the no-pair no-op.
 - Added persistent bounded COBOL-parser and IR-decoder fuzzing, Loom schedule
   models with a negative concurrency mutant, and instrumented critical-package
   coverage reporting as receipt-backed full CI gates.
@@ -24,6 +34,25 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Advanced decimal assignment to a policy-bearing `@2` contract with explicit
+  arithmetic context, COBOL numeric-storage ABI, receiver-update, condition,
+  and rounding behavior. The exact `@1` compatibility route remains readable,
+  while an independent `ledger.formula@1` adapter proves bounded reuse without
+  importing COBOL HIR.
+- Made `mainframe.core.cobol@1.define` a dialect-owned semantic contract so
+  legalization, artifact admission, and defensive VM admission reject malformed
+  static layout ABI metadata before runtime construction.
+- Corrected omitted-minimum ODO parsing, clause boundaries and phrase ordering,
+  qualified ODO execution, and bounded key/index admission against the pinned
+  grammar authority. Unsupported DYNAMIC table/alias combinations and TYPEDEF
+  ODO objects now fail before publication; CONDITION and RENAMES associations
+  no longer inherit REDEFINES-only constraints. Executable admission also checks
+  nonnumeric category shapes, physical alias topology, RENAMES endpoints, and
+  the bounded level-88 value subset shared with the frontend.
+- Advanced artifact publication to `mainframe-env.artifact@3`; manifests now
+  carry the exact dialect namespace/major set derived from their executable
+  payload and bind COBOL arithmetic/display-sign/LP options to payload config,
+  while historical `@2` artifacts retain their original bytes and contract.
 - Updated the 0.9 CICS implementation plan to require the integrated 28-finding
   hardening baseline, bounded family slices, per-slice security/recovery,
   explicit backend validation, and early licensed-campaign planning.
@@ -43,6 +72,19 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Corrected typed ADD/COMPUTE receiver-local `SIZE ERROR` commits, resolved
+  `ADD CORRESPONDING` by relative qualifiers with bilateral uniqueness and
+  subordinate-item exclusions, and made selected-table compatibility preserve
+  the requested occurrence while invalid or unrepresentable forms fail before
+  publication.
+- Moved decimal/CICS plan decoding, slot binding, and condition-topology checks
+  into dialect-aware HIR/MIR/artifact verification, while retaining defensive
+  machine admission.
+- Persisted versioned executable manifests with installed artifacts and required
+  manifest-aware admission before installed batch, online, nested-call, reload,
+  or continuation execution.
+- Routed the CICS file/UOW pilot through the durable execution coordinator and
+  bounded arithmetic-expression grammar descent before typed HIR construction.
 - Persisted bounded typed host audit decisions with versioned canonical resource
   digests; made effect-result, lifecycle, outbox, and audit commits atomic; and
   made ordinary RACF authorization auditing fail closed and survive recovery.

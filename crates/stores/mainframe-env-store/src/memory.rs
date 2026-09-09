@@ -3718,6 +3718,9 @@ fn remove_memory_row(state: &mut State, row: &ArchivedRetentionRow) -> Result<()
 }
 
 #[cfg(test)]
+mod hardening_bench;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use mainframe_env_execution_api::{
@@ -4052,6 +4055,7 @@ mod tests {
             media_type: "application/test".into(),
             payload_digest: digest,
             payload,
+            executable: None,
         };
         store.put_artifact(first.clone()).unwrap();
         assert!(store.put_artifact(first).is_ok());
@@ -4060,6 +4064,7 @@ mod tests {
             media_type: "application/other".into(),
             payload_digest: digest,
             payload: vec![1],
+            executable: None,
         };
         assert_eq!(store.put_artifact(conflicting), Err(StoreError::Conflict));
     }
@@ -4078,6 +4083,7 @@ mod tests {
                 media_type: "application/test".into(),
                 payload_digest: digest,
                 payload,
+                executable: None,
             }
         }
 
@@ -4250,6 +4256,3 @@ mod tests {
         assert_eq!(store.get_execution(&ids.execution).unwrap(), None);
     }
 }
-
-#[cfg(test)]
-mod hardening_bench;

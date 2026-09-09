@@ -11,8 +11,8 @@ use mainframe_env_dataset::{DatasetLimits, DatasetService, dataset_providers};
 use mainframe_env_encoding::CodePage;
 use mainframe_env_execution_api::{
     ArtifactRef, BoundedPayload, CapabilityId, ExecutionId, IdempotencyKey, Invocation,
-    InvocationLimits, Machine, MachineDrive, MachineResume, Principal, PrincipalId, Quantum,
-    RequestId, ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
+    InvocationLimits, Principal, PrincipalId, RequestId, ResourceLimits, RunUnitId, Selector,
+    ServiceClass, TraceId,
 };
 use mainframe_env_host_api::{
     CapabilityDescriptor, CicsConditionPolicy, CicsOperation, CicsRequest, DatasetAttributes,
@@ -20,10 +20,8 @@ use mainframe_env_host_api::{
     HostLimits, HostProblem, HostProvider, HostRequest, HostResult, Mutation, RecordFormat,
     RegistrySnapshot, ScopedHostService, SecurityDecision, SecurityRequest, SessionId,
 };
-use mainframe_env_interpreter::ReferenceMachine;
-use mainframe_env_ir::CodecLimits;
 use mainframe_env_store::{MemoryStore, SqliteStateStore, StoreLimits};
-use mainframe_env_store_api::{AuditSink, ProviderStateStore};
+use mainframe_env_store_api::{PlatformStore, ProviderStateStore};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -31,6 +29,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+
+mod coordinator;
+
+use coordinator::{PilotExecution, drive_artifact};
 
 const FIXTURES: &str = include_str!("../../../../conformance/0.9/cics/pilot-fixtures.json");
 const ENVIRONMENT: &str = include_str!("../../../../conformance/0.9/cics/pilot-environment.json");
@@ -332,7 +334,7 @@ pub fn run_cics_pilot_profiles() -> Result<CicsPilotReport, String> {
     let expected_policy = fixtures["comparison_policy"]["version"]
         .as_str()
         .ok_or_else(|| "CICS pilot comparison policy is missing".to_string())?;
-    let memory: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(StoreLimits::default()));
+    let memory = Arc::new(MemoryStore::new(StoreLimits::default()));
     let memory_observation = run_profile("memory", memory)?;
 
     let nonce = PROFILE_NONCE.fetch_add(1, Ordering::Relaxed);
@@ -344,7 +346,7 @@ pub fn run_cics_pilot_profiles() -> Result<CicsPilotReport, String> {
     let database = directory.join("state.db");
     let url = format!("sqlite://{}?mode=rwc", database.display());
     let sqlite_observation = (|| {
-        let sqlite: Arc<dyn ProviderStateStore> = Arc::new(
+        let sqlite = Arc::new(
             SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144)
                 .map_err(|error| error.to_string())?,
         );
@@ -364,16 +366,18 @@ pub fn run_cics_pilot_profiles() -> Result<CicsPilotReport, String> {
     })
 }
 
-fn run_profile(
-    profile: &str,
-    store: Arc<dyn ProviderStateStore>,
-) -> Result<CicsPilotProfileObservation, String> {
-    let dataset = DatasetService::open(store.clone(), DatasetLimits::default())
+fn run_profile<S>(profile: &str, store: Arc<S>) -> Result<CicsPilotProfileObservation, String>
+where
+    S: PlatformStore + 'static,
+{
+    let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+    let platform_store: Arc<dyn PlatformStore> = store;
+    let dataset = DatasetService::open(provider_store.clone(), DatasetLimits::default())
         .map_err(|problem| format!("{profile} dataset open: {problem}"))?;
     seed_dataset(&dataset, profile).map_err(|problem| format!("{profile} seed: {problem}"))?;
     let inner = pilot_inner_host(dataset.clone())
         .map_err(|problem| format!("{profile} inner host: {problem}"))?;
-    let cics = CicsService::open(inner, store, CicsLimits::default())
+    let cics = CicsService::open(inner, provider_store, CicsLimits::default())
         .map_err(|problem| format!("{profile} CICS open: {problem}"))?;
     cics.register_file_definitions(&BTreeMap::from([(
         "ACCTDAT".into(),
@@ -385,13 +389,14 @@ fn run_profile(
     .map_err(|problem| format!("{profile} file registration: {problem}"))?;
     let outer = pilot_outer_host(cics.clone())
         .map_err(|problem| format!("{profile} outer host: {problem}"))?;
+    let execution = PilotExecution::new(outer, platform_store);
 
     let invalid_output = execute_source(
         INVALID_REWRITE_SOURCE,
         "CICSINV",
         "IBMUSER",
         &format!("{profile}-invalid"),
-        outer.clone(),
+        &execution,
     )
     .map_err(|problem| format!("{profile} invalid rewrite path: {problem}"))?;
     let record_after_invalid_hex = read_record_hex(&dataset)?;
@@ -401,7 +406,7 @@ fn run_profile(
         "CICSPILOT",
         "IBMUSER",
         &format!("{profile}-commit"),
-        outer.clone(),
+        &execution,
     )
     .map_err(|problem| format!("{profile} commit path: {problem}"))?;
     let record_after_commit_hex = read_record_hex(&dataset)?;
@@ -411,7 +416,7 @@ fn run_profile(
         "CICSCTX",
         "IBMUSER",
         &format!("{profile}-context"),
-        outer.clone(),
+        &execution,
     )
     .map_err(|problem| format!("{profile} context path: {problem}"))?;
     let record_after_context_hex = read_record_hex(&dataset)?;
@@ -421,7 +426,7 @@ fn run_profile(
         "CICSROLL",
         "IBMUSER",
         &format!("{profile}-rollback"),
-        outer.clone(),
+        &execution,
     )
     .map_err(|problem| format!("{profile} rollback path: {problem}"))?;
     let record_after_rollback_hex = read_record_hex(&dataset)?;
@@ -431,7 +436,7 @@ fn run_profile(
         "ZZ",
         "IBMUSER",
         &format!("{profile}-missing"),
-        outer.clone(),
+        &execution,
     )
     .map_err(|problem| format!("{profile} missing path: {problem}"))?;
     let unauthorized_output = execute_read_case(
@@ -439,7 +444,7 @@ fn run_profile(
         "AA",
         "DENIED",
         &format!("{profile}-denied"),
-        outer.clone(),
+        &execution,
     )
     .map_err(|problem| format!("{profile} unauthorized path: {problem}"))?;
     let record_after_unauthorized_hex = read_record_hex(&dataset)?;
@@ -468,7 +473,7 @@ fn run_profile(
         "close-unenabled",
     )
     .map_err(|problem| format!("{profile} close setup: {problem}"))?;
-    let closed_output = drive_artifact(&closed_artifact, closed_invocation, outer.clone())
+    let closed_output = drive_artifact(&closed_artifact, closed_invocation, &execution)
         .map_err(|problem| format!("{profile} closed path: {problem}"))?;
     let record_after_closed_hex = read_record_hex(&dataset)?;
 
@@ -502,7 +507,7 @@ fn run_profile(
         "close-enabled",
     )
     .map_err(|problem| format!("{profile} closed-enabled setup: {problem}"))?;
-    let enabled_output = drive_artifact(&enabled_artifact, enabled_invocation, outer)
+    let enabled_output = drive_artifact(&enabled_artifact, enabled_invocation, &execution)
         .map_err(|problem| format!("{profile} closed-enabled path: {problem}"))?;
     let record_after_closed_enabled_hex = read_record_hex(&dataset)?;
 
@@ -618,7 +623,7 @@ fn run_profile(
 }
 
 fn restart_mutate(url: &str, fault_point: CicsFileFaultPoint) -> Result<(), String> {
-    let store: Arc<dyn ProviderStateStore> = Arc::new(
+    let store = Arc::new(
         SqliteStateStore::open(url, 64 * 1024 * 1024, 262_144)
             .map_err(|error| error.to_string())?,
     );
@@ -627,7 +632,7 @@ fn restart_mutate(url: &str, fault_point: CicsFileFaultPoint) -> Result<(), Stri
     seed_dataset(&dataset, "restart")?;
     let cics = CicsService::open(
         pilot_inner_host(dataset.clone())?,
-        store,
+        store.clone(),
         CicsLimits::default(),
     )
     .map_err(|problem| problem.to_string())?;
@@ -641,13 +646,13 @@ fn restart_mutate(url: &str, fault_point: CicsFileFaultPoint) -> Result<(), Stri
     .map_err(|problem| problem.to_string())?;
     cics.inject_file_fault_once(CicsOperation::Rewrite, "ACCTDAT", fault_point)
         .map_err(|problem| problem.to_string())?;
-    let outer = pilot_outer_host(cics)?;
+    let execution = PilotExecution::new(pilot_outer_host(cics)?, store);
     let result = execute_source(
         RESTART_MUTATE_SOURCE,
         "CICSCRASH",
         "IBMUSER",
         "restart",
-        outer,
+        &execution,
     );
     if result.is_ok() {
         return Err("faulted rewrite unexpectedly completed".into());
@@ -666,7 +671,7 @@ fn restart_mutate(url: &str, fault_point: CicsFileFaultPoint) -> Result<(), Stri
 }
 
 fn restart_recover(url: &str) -> Result<String, String> {
-    let store: Arc<dyn ProviderStateStore> = Arc::new(
+    let store = Arc::new(
         SqliteStateStore::open(url, 64 * 1024 * 1024, 262_144)
             .map_err(|error| error.to_string())?,
     );
@@ -674,7 +679,7 @@ fn restart_recover(url: &str) -> Result<String, String> {
         .map_err(|problem| problem.to_string())?;
     let cics = CicsService::open(
         pilot_inner_host(dataset.clone())?,
-        store,
+        store.clone(),
         CicsLimits::default(),
     )
     .map_err(|problem| problem.to_string())?;
@@ -686,13 +691,12 @@ fn restart_recover(url: &str) -> Result<String, String> {
         },
     )]))
     .map_err(|problem| problem.to_string())?;
-    let output = execute_source(
-        RESTART_ROLLBACK_SOURCE,
-        "CICSRECOVER",
-        "IBMUSER",
-        "restart",
-        pilot_outer_host(cics)?,
-    )?;
+    let execution = PilotExecution::new(pilot_outer_host(cics)?, store);
+    let artifact = crate::compile(RESTART_ROLLBACK_SOURCE)?;
+    let mut invocation = pilot_invocation(&artifact, "IBMUSER", "restart-recover", "CICSRECOVER")?;
+    invocation.run_unit_id = RunUnitId::new("restart-run", InvocationLimits::default())
+        .map_err(|problem| problem.to_string())?;
+    let output = drive_artifact(&artifact, invocation, &execution)?;
     if output != "RECOVERED:000:000\n" {
         return Err(format!("unexpected restart output: {output:?}"));
     }
@@ -818,11 +822,11 @@ fn execute_source(
     program: &str,
     principal: &str,
     identity: &str,
-    host: Arc<ScopedHostService>,
+    execution: &PilotExecution,
 ) -> Result<String, String> {
     let artifact = crate::compile(source)?;
     let invocation = pilot_invocation(&artifact, principal, identity, program)?;
-    drive_artifact(&artifact, invocation, host)
+    drive_artifact(&artifact, invocation, execution)
 }
 
 fn execute_read_case(
@@ -830,14 +834,14 @@ fn execute_read_case(
     key: &str,
     principal: &str,
     identity: &str,
-    host: Arc<ScopedHostService>,
+    execution: &PilotExecution,
 ) -> Result<String, String> {
     execute_source(
         &read_source(label, key),
         "CICSNEG",
         principal,
         identity,
-        host,
+        execution,
     )
 }
 
@@ -902,48 +906,6 @@ fn pilot_invocation(
         limits,
     )
     .map_err(|problem| problem.to_string())
-}
-
-fn drive_artifact(
-    artifact: &mainframe_env_compiler_api::PublishedArtifact,
-    invocation: Invocation,
-    host: Arc<ScopedHostService>,
-) -> Result<String, String> {
-    let mut machine = ReferenceMachine::from_binary(
-        artifact.payload(),
-        invocation.clone(),
-        CodecLimits::default(),
-    )
-    .map_err(|problem| format!("{problem:?}"))?;
-    let mut resume = MachineResume::Start;
-    let audit = MemoryStore::new(StoreLimits::default());
-    loop {
-        let quantum =
-            Quantum::new(128, 4096).ok_or_else(|| "CICS pilot quantum is invalid".to_string())?;
-        match machine.drive(resume, quantum) {
-            MachineDrive::Continue => resume = MachineResume::Start,
-            MachineDrive::HostCall(effect) => {
-                let result = host
-                    .invoke(
-                        &invocation,
-                        invocation.deadline_tick.saturating_sub(1),
-                        false,
-                        effect,
-                    )
-                    .persist_with(|record| {
-                        audit
-                            .record_audit(record)
-                            .map_err(|_| HostProblem::InfrastructureFailure)
-                    });
-                resume = MachineResume::HostResult(result);
-            }
-            MachineDrive::Completed(done) => {
-                return String::from_utf8(done.output.bytes().to_vec())
-                    .map_err(|_| "CICS pilot application output is not UTF-8".into());
-            }
-            other => return Err(format!("CICS pilot machine did not complete: {other:?}")),
-        }
-    }
 }
 
 fn set_file_status(
@@ -1363,7 +1325,56 @@ mod tests {
     use std::process::Command;
 
     #[test]
-    fn cics_pilot_runs_compiler_interpreter_providers_and_real_stores() {
+    fn cics_pilot_sources_use_only_the_typed_executable_dialects() {
+        for source in [
+            COMMIT_SOURCE,
+            CONTEXT_SOURCE,
+            ROLLBACK_SOURCE,
+            INVALID_REWRITE_SOURCE,
+        ] {
+            let artifact = crate::compile(source).unwrap();
+            assert!(
+                artifact
+                    .manifest()
+                    .dialect_contracts
+                    .iter()
+                    .any(|dialect| matches!(dialect.as_str(), "cics.file@1" | "cics.recovery@1"))
+            );
+            let module = mainframe_env_ir::decode_binary(
+                artifact.payload(),
+                mainframe_env_ir::CodecLimits::default(),
+            )
+            .unwrap();
+            let operations = module
+                .regions()
+                .iter()
+                .flat_map(|region| &region.blocks)
+                .flat_map(|block| &block.operations)
+                .collect::<Vec<_>>();
+            assert!(!operations.iter().any(|operation| {
+                operation.identity.namespace() == "mainframe.core.cobol"
+                    && operation.identity.name() == "exec_cics"
+            }));
+            let typed = operations
+                .iter()
+                .filter(|operation| {
+                    matches!(
+                        operation.identity.namespace(),
+                        "cics.file" | "cics.recovery"
+                    )
+                })
+                .collect::<Vec<_>>();
+            assert!(!typed.is_empty());
+            assert!(typed.iter().all(|operation| {
+                operation.attributes.contains_key("cics_plan")
+                    && !operation.attributes.contains_key("arguments")
+                    && !operation.attributes.contains_key("control_text")
+            }));
+        }
+    }
+
+    #[test]
+    fn cics_pilot_runs_compiler_interpreter_coordinator_providers_and_real_stores() {
         let report = run_cics_pilot_profiles().unwrap();
         assert_eq!(report.profiles.len(), 2);
         assert_eq!(report.differential_credit, 0);

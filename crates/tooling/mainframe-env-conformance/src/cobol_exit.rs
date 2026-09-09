@@ -9,10 +9,13 @@ use mainframe_env_compiler::{
     INTRINSIC_FUNCTIONS, PROCEDURE_STATEMENTS, SPECIAL_REGISTERS,
 };
 use mainframe_env_compiler_api::{
-    CompilationMode, CompileOptions, CompileTarget, CompilerRequest, CompilerResult,
-    CompilerService,
+    ArtifactLimits, ArtifactManifestV2, CompilationMode, CompileOptions, CompileTarget,
+    CompilerRequest, CompilerResult, CompilerService, LEGACY_ARTIFACT_CONTRACT, ValidatedArtifact,
+    VersionedArtifactManifest,
 };
-use mainframe_env_execution_api::{Machine, MachineDrive, MachineResume, Quantum};
+use mainframe_env_execution_api::{
+    ArtifactRef, InvocationLimits, Machine, MachineDrive, MachineResume, Quantum,
+};
 use mainframe_env_interpreter::ReferenceMachine;
 use mainframe_env_ir::{CodecLimits, decode_binary, encode_binary};
 use mainframe_env_source::{
@@ -22,9 +25,9 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 const PRIOR_ARTIFACT_B64: &str =
-    include_str!("../../../../conformance/0.3/cobol/prior-artifact-0.1.1.b64");
+    include_str!("../../../../conformance/0.9/cobol/artifact-v2-c029219.b64");
 const PRIOR_ARTIFACT_SHA256: &str =
-    "e2c8dd98b6c06f3b8c248f48bb77d8ba7ca26fd30a83423c75276aa9e2ef312d";
+    "cf5de374e76c07ff001af9a20053fd8692f55337a4ebece2085ce62c436d58db";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CobolExitReceipt {
@@ -163,20 +166,73 @@ fn verify_prior_artifact() -> Result<usize, String> {
     let payload = base64::engine::general_purpose::STANDARD
         .decode(PRIOR_ARTIFACT_B64.trim())
         .map_err(|error| error.to_string())?;
-    if format!("{:x}", Sha256::digest(&payload)) != PRIOR_ARTIFACT_SHA256 || payload.len() != 955 {
-        return Err("accepted 0.1.1 artifact fixture drifted".into());
+    if format!("{:x}", Sha256::digest(&payload)) != PRIOR_ARTIFACT_SHA256 || payload.len() != 1261 {
+        return Err("accepted c029219 artifact-v2 fixture drifted".into());
     }
     let module =
         decode_binary(&payload, CodecLimits::default()).map_err(|error| error.to_string())?;
     let encoded =
         encode_binary(&module, CodecLimits::default()).map_err(|error| error.to_string())?;
     if encoded != payload {
-        return Err("accepted 0.1.1 artifact is not canonically readable".into());
+        return Err("accepted c029219 artifact-v2 is not canonically readable".into());
     }
     let current = compile(HELLO_SOURCE)?;
-    let mut machine =
-        ReferenceMachine::from_binary(&payload, invocation(&current, 1024), CodecLimits::default())
-            .map_err(|problem| format!("{problem:?}"))?;
+    let legacy_manifest = ArtifactManifestV2 {
+        compiler_generation: "mainframe-env-cobol-0.8.3".into(),
+        target: CompileTarget::new("reference").map_err(|problem| problem.to_string())?,
+        options: CompileOptions::new(BTreeMap::from([
+            ("cobol.effective-arith".into(), "extended".into()),
+            ("cobol.effective-dispsign".into(), "compatible".into()),
+            ("cobol.effective-lp".into(), "32".into()),
+        ]))
+        .map_err(|problem| problem.to_string())?,
+        host_interfaces: BTreeSet::from([
+            "mainframe-env.host@1".into(),
+            "mainframe-env.cics@1".into(),
+        ]),
+        ir_contract: mainframe_env_ir::IR_ENVELOPE_CONTRACT.into(),
+    };
+    let catalog = mainframe_env_compiler::core_mir_catalog();
+    let profile = mainframe_env_compiler::core_mir_profile();
+    let migrated = ValidatedArtifact::read(
+        VersionedArtifactManifest::V2(legacy_manifest),
+        &payload,
+        &catalog,
+        &profile,
+        CodecLimits::default(),
+        ArtifactLimits::default(),
+    )
+    .map_err(|problem| problem.to_string())?;
+    if migrated.source_contract() != LEGACY_ARTIFACT_CONTRACT
+        || migrated.payload() != payload
+        || migrated.content_id().to_hex() != PRIOR_ARTIFACT_SHA256
+        || migrated.manifest().dialect_contracts.is_empty()
+    {
+        return Err("version-2 artifact migration changed identity or executable bytes".into());
+    }
+    execute_hello_payload(
+        migrated.payload(),
+        &current,
+        b"HELLO\n",
+        "accepted version-2 artifact",
+    )?;
+    Ok(payload.len())
+}
+
+fn execute_hello_payload(
+    payload: &[u8],
+    current: &mainframe_env_compiler_api::PublishedArtifact,
+    expected: &[u8],
+    label: &str,
+) -> Result<(), String> {
+    let mut execution = invocation(current, 1024);
+    execution.artifact = ArtifactRef::new(
+        format!("sha256:{:x}", Sha256::digest(payload)),
+        InvocationLimits::default(),
+    )
+    .map_err(|problem| problem.to_string())?;
+    let mut machine = ReferenceMachine::from_binary(payload, execution, CodecLimits::default())
+        .map_err(|problem| format!("{label}: {problem:?}"))?;
     let mut resume = MachineResume::Start;
     loop {
         match machine.drive(
@@ -185,15 +241,15 @@ fn verify_prior_artifact() -> Result<usize, String> {
         ) {
             MachineDrive::Continue => resume = MachineResume::Start,
             MachineDrive::Completed(done) => {
-                if done.return_code != 0 || done.output.bytes() != b"HELLO WORLD!\n" {
-                    return Err("accepted 0.1.1 artifact execution drifted".into());
+                if done.return_code != 0 || done.output.bytes() != expected {
+                    return Err(format!("{label} execution drifted"));
                 }
                 break;
             }
-            other => return Err(format!("accepted 0.1.1 artifact stopped: {other:?}")),
+            other => return Err(format!("{label} stopped: {other:?}")),
         }
     }
-    Ok(payload.len())
+    Ok(())
 }
 
 fn request(source: &str) -> Result<CompilerRequest, String> {
@@ -229,7 +285,7 @@ mod tests {
     fn complete_cobol_exit_matrix_passes() {
         let receipt = verify_cobol_exit().unwrap();
         assert_eq!(receipt.official_rows, 173);
-        assert_eq!(receipt.prior_artifact_bytes, 955);
+        assert_eq!(receipt.prior_artifact_bytes, 1261);
     }
 
     #[test]

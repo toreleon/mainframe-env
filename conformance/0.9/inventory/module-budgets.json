@@ -30,19 +30,19 @@
     },
     {
       "path": "crates/apps/mainframe-env-server/src/cobol/hardening.rs",
-      "max_production_lines": 1411,
+      "max_production_lines": 1400,
       "responsibility": "Bounded COBOL runtime hardening helpers implement several unrelated LE-compatible service families.",
       "split_boundary": "Separate date/time, numeric, character, and environment service families while retaining one bounded dispatcher."
     },
     {
       "path": "crates/apps/mainframe-env-server/src/cobol.rs",
-      "max_production_lines": 1510,
+      "max_production_lines": 1452,
       "responsibility": "Server-side COBOL program routing, runtime service binding, and installed-program lifecycle helpers remain co-located.",
       "split_boundary": "Separate runtime service binding, installed-program lookup, and program execution adapters around the existing router."
     },
     {
       "path": "crates/apps/mainframe-env-server/src/product.rs",
-      "max_production_lines": 6568,
+      "max_production_lines": 6494,
       "responsibility": "Product construction, dependency assembly, application publication, JES control, and HTTP route behavior converge here.",
       "split_boundary": "Extract bootstrap/construction, publication, JES operations, and route-family adapters around the Product state owner."
     },
@@ -78,7 +78,7 @@
     },
     {
       "path": "crates/kernel/mainframe-env-compiler/src/hir.rs",
-      "max_production_lines": 1912,
+      "max_production_lines": 1849,
       "responsibility": "HIR declarations, builder state, and source-to-HIR integration remain combined at the compiler stage boundary.",
       "split_boundary": "Separate HIR records and invariants from builder orchestration while keeping the stage-private public surface unchanged."
     },
@@ -90,7 +90,7 @@
     },
     {
       "path": "crates/kernel/mainframe-env-compiler/src/semantic.rs",
-      "max_production_lines": 2938,
+      "max_production_lines": 2819,
       "responsibility": "Semantic analysis owns the cross-family model, name resolution, validation passes, and diagnostic assembly.",
       "split_boundary": "Separate model construction, symbol resolution, cross-reference validation, and diagnostics behind the semantic facade."
     },
@@ -108,7 +108,7 @@
     },
     {
       "path": "crates/kernel/mainframe-env-interpreter/src/machine.rs",
-      "max_production_lines": 13523,
+      "max_production_lines": 13149,
       "responsibility": "The deterministic COBOL machine executes all operations, control flow, calls, host effects, and conditions.",
       "split_boundary": "Extract operation handlers by control, numeric/data, call, file/host-effect, and condition families around one machine state."
     },
@@ -174,13 +174,13 @@
     },
     {
       "path": "crates/stores/mainframe-env-store/src/durable.rs",
-      "max_production_lines": 2298,
+      "max_production_lines": 2285,
       "responsibility": "Shared durable SQL helpers implement effect, event, work, checkpoint, session, replay, and provider-state domains.",
       "split_boundary": "Partition SQL repositories by execution journal, work/session, replay/provider state, and maintenance/retention domains."
     },
     {
       "path": "crates/stores/mainframe-env-store/src/memory.rs",
-      "max_production_lines": 4255,
+      "max_production_lines": 3722,
       "responsibility": "The deterministic in-memory adapter implements execution, work, session, replay, and provider-state contracts in one state owner.",
       "split_boundary": "Separate domain-specific store trait implementations while retaining one bounded in-memory state and atomic lock authority."
     },
@@ -198,13 +198,13 @@
     },
     {
       "path": "crates/tooling/mainframe-env-conformance/src/carddemo.rs",
-      "max_production_lines": 14250,
+      "max_production_lines": 14183,
       "responsibility": "CardDemo conformance provisions the full fixture, drives online and batch journeys, and checks persistence and failures.",
       "split_boundary": "Separate fixture provisioning, online transactions, batch jobs, authorization, and durability/failure scenario families."
     },
     {
       "path": "crates/tooling/mainframe-env-conformance/src/cics_pilot.rs",
-      "max_production_lines": 1359,
+      "max_production_lines": 1321,
       "responsibility": "The CICS pilot harness decodes fixtures, drives candidate behavior, and compares licensed and local evidence.",
       "split_boundary": "Separate fixture decoding, local scenario execution, licensed capture adaptation, and evidence assertions."
     },

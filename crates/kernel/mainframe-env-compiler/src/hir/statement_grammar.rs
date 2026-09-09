@@ -2715,24 +2715,24 @@ fn validate_expression(tokens: &[Token<'_>]) -> bool {
 ///
 /// The one caller is `validate_compute`, over the tokens right of the equals.
 /// COMPUTE's own phrase words -- `ROUNDED`, `ON SIZE ERROR`, `END-COMPUTE` --
-/// are stripped or split off before the slice is cut, so the whole of what is
-/// left has to be the expression: every operand is an operand, and no two
-/// operands stand next to each other.
+/// The caller strips phrases first, so every remaining token must be an operand.
+const MAX_ARITHMETIC_EXPRESSION_DEPTH: usize = 128;
 fn validate_arithmetic_expression(tokens: &[Token<'_>]) -> bool {
-    validate_expression(tokens) && consume_arithmetic(tokens, 0) == Some(tokens.len())
+    validate_expression(tokens) && consume_arithmetic(tokens, 0, 1) == Some(tokens.len())
 }
 
-fn consume_arithmetic(tokens: &[Token<'_>], start: usize) -> Option<usize> {
-    let mut position = consume_arithmetic_term(tokens, start)?;
+fn consume_arithmetic(tokens: &[Token<'_>], start: usize, depth: usize) -> Option<usize> {
+    (depth <= MAX_ARITHMETIC_EXPRESSION_DEPTH).then_some(())?;
+    let mut position = consume_arithmetic_term(tokens, start, depth)?;
     while tokens.get(position).is_some_and(|token| {
         token.kind == TokenKind::Punctuation && matches!(token.text, "+" | "-" | "*" | "/" | "**")
     }) {
-        position = consume_arithmetic_term(tokens, position + 1)?;
+        position = consume_arithmetic_term(tokens, position + 1, depth)?;
     }
     Some(position)
 }
 
-fn consume_arithmetic_term(tokens: &[Token<'_>], start: usize) -> Option<usize> {
+fn consume_arithmetic_term(tokens: &[Token<'_>], start: usize, depth: usize) -> Option<usize> {
     let mut position = start;
     while tokens
         .get(position)
@@ -2741,8 +2741,8 @@ fn consume_arithmetic_term(tokens: &[Token<'_>], start: usize) -> Option<usize> 
         position += 1;
     }
     if tokens.get(position)?.text == "(" {
-        let close = matching_parenthesis(tokens, position)?;
-        return (consume_arithmetic(tokens, position + 1)? == close).then_some(close + 1);
+        let close = consume_arithmetic(tokens, position + 1, depth.checked_add(1)?)?;
+        return (tokens.get(close)?.text == ")").then_some(close + 1);
     }
     consume_operand(tokens, position)
 }
@@ -3337,7 +3337,31 @@ mod statement_scoped_phrases {
     //! INSPECT row draws another operand, so a word there is a second counted
     //! item and this reader takes it, `ZZTOP` included.
 
-    use super::{INSPECT_OPERATIONS, JSON_PHRASES, PROCEDURE_STATEMENTS, parse};
+    use super::{
+        INSPECT_OPERATIONS, JSON_PHRASES, MAX_ARITHMETIC_EXPRESSION_DEPTH, PROCEDURE_STATEMENTS,
+        parse,
+    };
+
+    fn nested_compute(nesting: usize) -> String {
+        format!(
+            "COMPUTE A = {}A{}.",
+            "(".repeat(nesting),
+            ")".repeat(nesting)
+        )
+    }
+
+    #[test]
+    fn arithmetic_expression_depth_boundary_is_exact() {
+        // The expression root counts as depth one, matching the typed-plan
+        // codec. Therefore 127 parenthesis pairs reach depth 128.
+        assert!(parse(&nested_compute(MAX_ARITHMETIC_EXPRESSION_DEPTH - 1), 4).is_ok());
+        assert!(parse(&nested_compute(MAX_ARITHMETIC_EXPRESSION_DEPTH), 4).is_err());
+    }
+
+    #[test]
+    fn hostile_nesting_is_rejected_by_the_early_linear_guard() {
+        assert!(parse(&nested_compute(16 * 1024), 4).is_err());
+    }
 
     /// The words `cf1f8a2` took out of the union because the `Reserved words`
     /// appendix does not publish them. They are data-names now, which is why

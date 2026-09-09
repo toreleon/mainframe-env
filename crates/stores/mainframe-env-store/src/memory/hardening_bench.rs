@@ -74,6 +74,7 @@ fn seeded(dimension: &str, count: usize) -> MemoryStore {
                         media_type: "application/octet-stream".into(),
                         payload_digest: [0; 32],
                         payload: vec![7; 16 * 1024],
+                        executable: None,
                     },
                 );
                 state.blob_bytes += 16 * 1024;

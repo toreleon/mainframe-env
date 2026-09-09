@@ -1,14 +1,15 @@
 use crate::service::VerifiedCobolHir;
 use crate::{CobolHir, ControlEdgeKind, ControlRole, ControlScope, DataCategory, StatementKind};
 use mainframe_env_ir::{
-    Attribute, Effect, IrLimits, LegalityProfile, Module, ModuleBuilder, OperationCatalog,
-    OperationIdentity, OperationSchema, StorageReference,
+    Attribute, COBOL_MAX_UNBOUNDED_OCCURRENCES, COBOL_MAX_UNBOUNDED_STORAGE_BYTES, Effect,
+    IrLimits, LegalityProfile, Module, ModuleBuilder, OperationCatalog, OperationIdentity,
+    OperationSchema, StorageReference, cobol_layout_definition_schema,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const CORE_NAMESPACE: &str = "mainframe.core.cobol";
-pub const MAX_UNBOUNDED_OCCURRENCES: usize = 4096;
-pub const MAX_UNBOUNDED_STORAGE_BYTES: usize = 16 * 1024 * 1024;
+const SIZE_ERROR_BRANCH: i64 = 1;
+const NOT_SIZE_ERROR_BRANCH: i64 = 2;
 pub const PUBLISHABLE_LAYOUT_CATEGORIES: &[&str] = &[
     "alphabetic",
     "alphanumeric",
@@ -40,6 +41,7 @@ pub(crate) fn lower_to_core(
     verified: &VerifiedCobolHir<'_>,
     arithmetic_mode: &str,
     display_sign: &str,
+    address_mode: u8,
     declaratives: &[(String, Vec<String>)],
     limits: IrLimits,
 ) -> Result<Module, LowerProblem> {
@@ -65,7 +67,9 @@ pub(crate) fn lower_to_core(
     let storage_bytes = hir
         .layouts
         .iter()
-        .filter(|layout| !layout.dynamic && unbounded_ancestor(layout, &hir.layouts).is_none())
+        .filter(|layout| {
+            !layout.typedef && !layout.dynamic && unbounded_ancestor(layout, &hir.layouts).is_none()
+        })
         .map(|layout| layout.offset.saturating_add(layout.length))
         .max()
         .unwrap_or(0);
@@ -73,11 +77,9 @@ pub(crate) fn lower_to_core(
         .then(|| builder.add_storage("__program_storage", storage_bytes as u64, None))
         .transpose()
         .map_err(|_| LowerProblem::InvalidLayout)?;
-    for layout in hir
-        .layouts
-        .iter()
-        .filter(|layout| layout.length > 0 || layout.dynamic || layout.unbounded)
-    {
+    for layout in hir.layouts.iter().filter(|layout| {
+        !layout.typedef && (layout.length > 0 || layout.dynamic || layout.unbounded)
+    }) {
         let unbounded_parent = unbounded_ancestor(layout, &hir.layouts);
         let storage_length = if layout.dynamic {
             layout.dynamic_limit.ok_or(LowerProblem::InvalidLayout)?
@@ -131,6 +133,10 @@ pub(crate) fn lower_to_core(
                 ),
                 ("display_sign".into(), Attribute::Text(display_sign.into())),
                 (
+                    "address_mode".into(),
+                    Attribute::Text(address_mode.to_string()),
+                ),
+                (
                     "program_lifecycle".into(),
                     Attribute::Text(hir.program_lifecycle.clone()),
                 ),
@@ -155,7 +161,7 @@ pub(crate) fn lower_to_core(
             None,
         )
         .map_err(|_| LowerProblem::LimitExceeded)?;
-    for layout in &hir.layouts {
+    for layout in hir.layouts.iter().filter(|layout| !layout.typedef) {
         let attributes = BTreeMap::from([
             (
                 "name".into(),
@@ -164,7 +170,7 @@ pub(crate) fn lower_to_core(
             ("simple_name".into(), Attribute::Text(layout.name.clone())),
             (
                 "category".into(),
-                Attribute::Text(category_slug(layout.category).into()),
+                Attribute::Text(layout.category.executable_name().into()),
             ),
             (
                 "picture".into(),
@@ -214,12 +220,20 @@ pub(crate) fn lower_to_core(
                 Attribute::Integer(layout.element_length as i64),
             ),
             (
+                "byte_length".into(),
+                Attribute::Integer(layout.byte_length.unwrap_or_default() as i64),
+            ),
+            (
                 "occurs".into(),
                 Attribute::Integer(if layout.unbounded {
                     unbounded_occurrences(layout)? as i64
                 } else {
                     layout.occurs as i64
                 }),
+            ),
+            (
+                "occurs_clause".into(),
+                Attribute::Integer(i64::from(layout.occurs_clause)),
             ),
             (
                 "occurs_min".into(),
@@ -261,6 +275,14 @@ pub(crate) fn lower_to_core(
             (
                 "parent".into(),
                 Attribute::Text(layout.parent.clone().unwrap_or_default()),
+            ),
+            (
+                "alias_of".into(),
+                Attribute::Text(layout.alias_of.clone().unwrap_or_default()),
+            ),
+            (
+                "rename_through".into(),
+                Attribute::Text(layout.rename_through.clone().unwrap_or_default()),
             ),
             (
                 "condition_values".into(),
@@ -395,7 +417,7 @@ pub(crate) fn lower_to_core(
             .map_err(|_| LowerProblem::LimitExceeded)?;
     }
     if structured {
-        lower_structured(hir, &mut builder, block, &storage)?;
+        lower_structured(hir, &mut builder, block, &storage, arithmetic_mode)?;
     } else {
         for statement in &hir.statements {
             lower_statement(
@@ -405,6 +427,7 @@ pub(crate) fn lower_to_core(
                 block,
                 &storage,
                 BTreeMap::new(),
+                arithmetic_mode,
             )?;
         }
     }
@@ -416,7 +439,9 @@ fn lower_structured(
     builder: &mut ModuleBuilder,
     block: mainframe_env_ir::BlockId,
     storage: &BTreeMap<String, mainframe_env_ir::StorageId>,
+    arithmetic_mode: &str,
 ) -> Result<(), LowerProblem> {
+    let typed_size_error_branches = typed_size_error_branch_polarities(hir)?;
     for node in &hir.control_nodes {
         let mut control = BTreeMap::from([
             ("control_node".into(), Attribute::Integer(node.id as i64)),
@@ -484,8 +509,26 @@ fn lower_structured(
                 );
             }
         }
+        if let Some(polarity) = typed_size_error_branches.get(&node.id) {
+            control.insert(
+                crate::hir::decimal::CONDITION_STATUS_ATTRIBUTE.into(),
+                Attribute::Text(crate::hir::decimal::SIZE_ERROR_STATUS.into()),
+            );
+            control.insert(
+                crate::hir::decimal::CONDITION_POLARITY_ATTRIBUTE.into(),
+                Attribute::Boolean(*polarity),
+            );
+        }
         if let Some(statement) = node.statement.and_then(|index| hir.statements.get(index)) {
-            lower_statement(statement, hir, builder, block, storage, control)?;
+            lower_statement(
+                statement,
+                hir,
+                builder,
+                block,
+                storage,
+                control,
+                arithmetic_mode,
+            )?;
         } else {
             builder
                 .add_operation(
@@ -550,9 +593,9 @@ fn unbounded_occurrences(layout: &crate::CobolLayout) -> Result<usize, LowerProb
     if !layout.unbounded || layout.element_length == 0 {
         return Err(LowerProblem::InvalidLayout);
     }
-    MAX_UNBOUNDED_OCCURRENCES
+    COBOL_MAX_UNBOUNDED_OCCURRENCES
         .min(
-            MAX_UNBOUNDED_STORAGE_BYTES
+            COBOL_MAX_UNBOUNDED_STORAGE_BYTES
                 .checked_div(layout.element_length)
                 .ok_or(LowerProblem::InvalidLayout)?,
         )
@@ -590,7 +633,72 @@ fn lower_statement(
     block: mainframe_env_ir::BlockId,
     storage: &BTreeMap<String, mainframe_env_ir::StorageId>,
     attributes: BTreeMap<String, Attribute>,
+    arithmetic_mode: &str,
 ) -> Result<(), LowerProblem> {
+    if let Some(resolved) = statement.resolved.as_ref()
+        && matches!(
+            resolved,
+            crate::HirResolvedStatement::Add(_) | crate::HirResolvedStatement::Compute(_)
+        )
+    {
+        let policy = crate::hir::decimal::execution_policy(arithmetic_mode)
+            .map_err(|_| LowerProblem::InvalidOperation)?;
+        let encoded = crate::hir::decimal::encode_statement(resolved, storage, policy)
+            .map_err(|_| LowerProblem::InvalidOperation)?;
+        let mut operation_attributes = attributes;
+        operation_attributes.remove("control_text");
+        let branches = typed_size_error_branch_mask(resolved)?;
+        operation_attributes.insert(
+            crate::hir::decimal::CONDITION_STATUS_ATTRIBUTE.into(),
+            Attribute::Text(crate::hir::decimal::SIZE_ERROR_STATUS.into()),
+        );
+        operation_attributes.insert(
+            crate::hir::decimal::CONDITION_BRANCHES_ATTRIBUTE.into(),
+            Attribute::Integer(branches),
+        );
+        operation_attributes.insert("line".into(), Attribute::Integer(statement.line as i64));
+        operation_attributes.insert(
+            crate::hir::decimal::ASSIGNMENT_PLAN_ATTRIBUTE.into(),
+            Attribute::Bytes(encoded.bytes),
+        );
+        builder
+            .add_operation(
+                block,
+                crate::hir::decimal::executable_identity(),
+                Vec::new(),
+                0,
+                operation_attributes,
+                crate::hir::effects(statement.kind),
+                encoded.storage,
+                statement.location.clone(),
+            )
+            .map_err(|_| LowerProblem::LimitExceeded)?;
+        return Ok(());
+    }
+    if let Some(crate::HirResolvedStatement::Cics(command)) = statement.resolved.as_ref() {
+        let encoded = crate::hir::cics::encode_statement(command, storage)
+            .map_err(|_| LowerProblem::InvalidOperation)?;
+        let mut operation_attributes = attributes;
+        operation_attributes.remove("control_text");
+        operation_attributes.insert("line".into(), Attribute::Integer(statement.line as i64));
+        operation_attributes.insert(
+            crate::hir::cics::CICS_PLAN_ATTRIBUTE.into(),
+            Attribute::Bytes(encoded.bytes),
+        );
+        builder
+            .add_operation(
+                block,
+                crate::hir::cics::executable_identity(command.operation),
+                Vec::new(),
+                0,
+                operation_attributes,
+                crate::hir::cics::operation_effects(command.operation),
+                encoded.storage,
+                statement.location.clone(),
+            )
+            .map_err(|_| LowerProblem::LimitExceeded)?;
+        return Ok(());
+    }
     let name = match statement.kind {
         StatementKind::ProgramEnd => "halt",
         other => other.slug(),
@@ -622,10 +730,9 @@ fn lower_statement(
         for argument in &arguments {
             let normalized = argument.trim_matches(['\'', '"']).to_ascii_uppercase();
             if seen.insert(normalized.clone())
-                && let Some(layout) = hir
-                    .layouts
-                    .iter()
-                    .find(|layout| layout.name == normalized && layout.length > 0)
+                && let Some(layout) = hir.layouts.iter().find(|layout| {
+                    !layout.typedef && layout.name == normalized && layout.length > 0
+                })
             {
                 let id = *storage
                     .get(&layout.qualified_name)
@@ -646,11 +753,72 @@ fn lower_statement(
                 operation_attributes,
                 crate::hir::effects(statement.kind),
                 references,
-                None,
+                statement.location.clone(),
             )
             .map_err(|_| LowerProblem::LimitExceeded)?;
     }
     Ok(())
+}
+
+fn typed_size_error_branch_mask(
+    resolved: &crate::HirResolvedStatement,
+) -> Result<i64, LowerProblem> {
+    let policy = match resolved {
+        crate::HirResolvedStatement::Add(add) => add.size_error,
+        crate::HirResolvedStatement::Compute(compute) => compute.size_error,
+        crate::HirResolvedStatement::Cics(_) => return Err(LowerProblem::InvalidOperation),
+    };
+    Ok((i64::from(policy.on_size_error) * SIZE_ERROR_BRANCH)
+        | (i64::from(policy.not_on_size_error) * NOT_SIZE_ERROR_BRANCH))
+}
+
+fn typed_size_error_branch_polarities(
+    hir: &CobolHir,
+) -> Result<BTreeMap<usize, bool>, LowerProblem> {
+    let mut children = BTreeMap::<usize, Vec<usize>>::new();
+    for branch in hir
+        .control_nodes
+        .iter()
+        .filter(|node| node.role == ControlRole::Branch)
+    {
+        if let Some(parent) = branch.parent {
+            children.entry(parent).or_default().push(branch.id);
+        }
+    }
+    let mut polarities = BTreeMap::new();
+    for parent in &hir.control_nodes {
+        let Some(statement) = parent.statement.and_then(|index| hir.statements.get(index)) else {
+            continue;
+        };
+        let Some(resolved) = statement.resolved.as_ref().filter(|resolved| {
+            matches!(
+                resolved,
+                crate::HirResolvedStatement::Add(_) | crate::HirResolvedStatement::Compute(_)
+            )
+        }) else {
+            continue;
+        };
+        let mask = typed_size_error_branch_mask(resolved)?;
+        let expected = [
+            (mask & SIZE_ERROR_BRANCH != 0).then_some(true),
+            (mask & NOT_SIZE_ERROR_BRANCH != 0).then_some(false),
+        ]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+        let branches = children
+            .get(&parent.id)
+            .map(Vec::as_slice)
+            .unwrap_or_default();
+        if branches.len() != expected.len() {
+            return Err(LowerProblem::InvalidControl(format!(
+                "typed arithmetic node {} has a drifted condition branch set",
+                parent.id
+            )));
+        }
+        polarities.extend(branches.iter().copied().zip(expected));
+    }
+    Ok(polarities)
 }
 
 fn statement_argument_groups(
@@ -757,11 +925,7 @@ pub fn core_mir_catalog() -> OperationCatalog {
         ))
         .expect("unique config");
     catalog
-        .register(OperationSchema::pure(
-            core_identity("define").expect("static identity"),
-            0,
-            0,
-        ))
+        .register(cobol_layout_definition_schema())
         .expect("unique define");
     catalog
         .register(OperationSchema::pure(
@@ -800,6 +964,8 @@ pub fn core_mir_catalog() -> OperationCatalog {
         schema.runtime_import = runtime_import(kind).map(str::to_string);
         catalog.register(schema).expect("unique core operation");
     }
+    crate::hir::decimal::register_executable_operation(&mut catalog);
+    crate::hir::cics::register_executable_operations(&mut catalog);
     catalog
 }
 
@@ -836,35 +1002,6 @@ const fn edge_attribute(kind: ControlEdgeKind) -> &'static str {
         ControlEdgeKind::Call => "edge_call",
         ControlEdgeKind::Transfer => "edge_transfer",
         ControlEdgeKind::Return => "edge_return",
-    }
-}
-
-const fn category_slug(category: DataCategory) -> &'static str {
-    match category {
-        DataCategory::Alphabetic => "alphabetic",
-        DataCategory::Alphanumeric => "alphanumeric",
-        DataCategory::AlphanumericEdited => "alphanumeric_edited",
-        DataCategory::Dbcs => "dbcs",
-        DataCategory::National => "national",
-        DataCategory::NationalEdited => "national_edited",
-        DataCategory::Utf8 => "utf8",
-        DataCategory::NumericDisplay => "numeric_display",
-        DataCategory::NumericEdited => "numeric_edited",
-        DataCategory::PackedDecimal => "packed_decimal",
-        DataCategory::Binary => "binary",
-        DataCategory::FloatShort => "float_short",
-        DataCategory::FloatLong => "float_long",
-        DataCategory::Index => "index",
-        DataCategory::Pointer => "pointer",
-        DataCategory::Pointer32 => "pointer_32",
-        DataCategory::ProcedurePointer => "procedure_pointer",
-        DataCategory::FunctionPointer => "function_pointer",
-        DataCategory::ObjectReference => "object_reference",
-        DataCategory::Group => "group",
-        DataCategory::NationalGroup => "national_group",
-        DataCategory::Utf8Group => "utf8_group",
-        DataCategory::Condition => "condition",
-        DataCategory::Rename => "rename",
     }
 }
 

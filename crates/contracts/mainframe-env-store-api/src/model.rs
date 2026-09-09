@@ -2,6 +2,7 @@ use mainframe_env_execution_api::{
     ArtifactRef, AuditResourceDigest, CapabilityId, ExecutionId, IdempotencyKey, LifecycleEvent,
     PrincipalId, RunUnitId, Selector,
 };
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fmt;
 
@@ -185,11 +186,147 @@ pub struct SessionRecord {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Immutable executable admission metadata stored beside an artifact payload.
+///
+/// The store owns persistence of these framework-free values. The compiler
+/// API remains responsible for interpreting the versioned manifest and the
+/// product environment selects and enforces `compatibility_profile` before
+/// constructing a machine.
+pub struct ExecutableArtifactMetadata {
+    /// Source artifact contract, for example `mainframe-env.artifact@2` or `@3`.
+    pub artifact_contract: String,
+    /// Product-selected runtime/profile contract required to admit this payload.
+    pub compatibility_profile: String,
+    /// Exact compiler generation recorded by the source manifest.
+    pub compiler_generation: String,
+    /// Executable target selected by the compiler.
+    pub target: String,
+    /// Normalized compiler options covered by the manifest identity.
+    pub options: BTreeMap<String, String>,
+    /// Required host ABI namespace/major identities.
+    pub host_interfaces: std::collections::BTreeSet<String>,
+    /// Binary IR envelope contract declared by the source manifest.
+    pub ir_contract: String,
+    /// Exact dialect set for current manifests. Historical manifests retain
+    /// `None`; an empty set is not interchangeable with missing metadata.
+    pub dialect_contracts: Option<std::collections::BTreeSet<String>>,
+    /// Publisher semantic identity retained without reinterpretation.
+    pub semantic_identity: String,
+    /// Canonical digest binding this metadata, its source contract and semantic
+    /// identity to the immutable payload digest.
+    pub manifest_payload_digest: [u8; 32],
+}
+
+impl ExecutableArtifactMetadata {
+    /// Validate the framework-free storage bounds before persistence.
+    #[must_use]
+    pub fn validate(&self) -> bool {
+        let bounded = |value: &str, max: usize| !value.is_empty() && value.len() <= max;
+        bounded(&self.artifact_contract, 256)
+            && bounded(&self.compatibility_profile, 256)
+            && bounded(&self.compiler_generation, 256)
+            && bounded(&self.target, 128)
+            && bounded(&self.ir_contract, 256)
+            && self
+                .semantic_identity
+                .strip_prefix("semantic-sha256:")
+                .is_some_and(|digest| {
+                    digest.len() == 64
+                        && digest
+                            .bytes()
+                            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+                })
+            && self.options.len() <= 128
+            && self
+                .options
+                .iter()
+                .all(|(key, value)| bounded(key, 256) && value.len() <= 1024)
+            && self.host_interfaces.len() <= 128
+            && self.host_interfaces.iter().all(|value| bounded(value, 256))
+            && self.dialect_contracts.as_ref().is_none_or(|dialects| {
+                !dialects.is_empty()
+                    && dialects.len() <= 128
+                    && dialects.iter().all(|value| bounded(value, 256))
+            })
+    }
+
+    /// Return the canonical identity binding for this metadata and payload.
+    #[must_use]
+    pub fn expected_manifest_payload_digest(&self, payload_digest: &[u8; 32]) -> [u8; 32] {
+        let mut digest = Sha256::new();
+        metadata_field(&mut digest, b"mainframe-env.executable-manifest-payload@1");
+        metadata_field(&mut digest, b"artifact-contract");
+        metadata_field(&mut digest, self.artifact_contract.as_bytes());
+        metadata_field(&mut digest, b"compatibility-profile");
+        metadata_field(&mut digest, self.compatibility_profile.as_bytes());
+        metadata_field(&mut digest, b"compiler-generation");
+        metadata_field(&mut digest, self.compiler_generation.as_bytes());
+        metadata_field(&mut digest, b"target");
+        metadata_field(&mut digest, self.target.as_bytes());
+        metadata_field(&mut digest, b"options");
+        metadata_count(&mut digest, self.options.len());
+        for (key, value) in &self.options {
+            metadata_field(&mut digest, key.as_bytes());
+            metadata_field(&mut digest, value.as_bytes());
+        }
+        metadata_field(&mut digest, b"host-interfaces");
+        metadata_count(&mut digest, self.host_interfaces.len());
+        for interface in &self.host_interfaces {
+            metadata_field(&mut digest, interface.as_bytes());
+        }
+        metadata_field(&mut digest, b"ir-contract");
+        metadata_field(&mut digest, self.ir_contract.as_bytes());
+        metadata_field(&mut digest, b"dialect-contracts");
+        match &self.dialect_contracts {
+            Some(dialects) => {
+                metadata_field(&mut digest, b"declared-dialects");
+                metadata_count(&mut digest, dialects.len());
+                for dialect in dialects {
+                    metadata_field(&mut digest, dialect.as_bytes());
+                }
+            }
+            None => metadata_field(&mut digest, b"historical-derived-dialects"),
+        }
+        metadata_field(&mut digest, b"semantic-identity");
+        metadata_field(&mut digest, self.semantic_identity.as_bytes());
+        metadata_field(&mut digest, b"payload-digest");
+        metadata_field(&mut digest, payload_digest);
+        digest.finalize().into()
+    }
+
+    /// Bind this metadata to an immutable payload before persistence.
+    #[must_use]
+    pub fn bind_to_payload(mut self, payload_digest: &[u8; 32]) -> Self {
+        self.manifest_payload_digest = self.expected_manifest_payload_digest(payload_digest);
+        self
+    }
+
+    /// Validate both bounded shape and the immutable manifest/payload binding.
+    #[must_use]
+    pub fn validates_payload(&self, payload_digest: &[u8; 32]) -> bool {
+        self.validate()
+            && self.manifest_payload_digest == self.expected_manifest_payload_digest(payload_digest)
+    }
+}
+
+fn metadata_field(digest: &mut Sha256, value: &[u8]) {
+    digest.update((value.len() as u64).to_be_bytes());
+    digest.update(value);
+}
+
+fn metadata_count(digest: &mut Sha256, count: usize) {
+    digest.update((count as u64).to_be_bytes());
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ArtifactRecord {
     pub artifact: ArtifactRef,
     pub media_type: String,
     pub payload_digest: [u8; 32],
     pub payload: Vec<u8>,
+    /// Present only for executable artifacts admitted through a versioned
+    /// compiler manifest. Opaque provider objects deliberately leave it absent.
+    pub executable: Option<ExecutableArtifactMetadata>,
 }
 
 /// A bounded, backend-reported artifact authority health and capacity snapshot.

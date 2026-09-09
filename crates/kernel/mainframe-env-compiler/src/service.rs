@@ -11,7 +11,10 @@ use mainframe_env_diagnostics::{
     Completeness, Diagnostic, DiagnosticCode, DiagnosticLimits, FailureCategory, Phase, Redaction,
     Severity,
 };
-use mainframe_env_ir::{CodecLimits, IrLimits, to_text};
+use mainframe_env_ir::{
+    COBOL_EFFECTIVE_ARITH_OPTION, COBOL_EFFECTIVE_DISPSIGN_OPTION, COBOL_EFFECTIVE_LP_OPTION,
+    CodecLimits, IrLimits, to_text,
+};
 use mainframe_env_source::SourceBundle;
 use std::collections::BTreeSet;
 
@@ -102,7 +105,7 @@ impl CobolCompiler {
                 };
             }
         };
-        let hir = match CobolHir::build(&syntax, &semantic, self.limits.ir) {
+        let hir = match CobolHir::build(source, &syntax, &semantic, self.limits.ir) {
             Ok(hir) => hir,
             Err(problem) => {
                 return CobolAnalysis {
@@ -288,23 +291,39 @@ impl CobolCompiler {
             &verified,
             effective_options.arithmetic_mode().as_str(),
             effective_options.display_sign().as_str(),
+            effective_options.lp(),
             &declaratives,
             self.limits.ir,
         )
         .map_err(lower_problem)?;
         let lowered = verified.stage.lower(mir);
         let legalized = LegalizedMir::legalize(lowered, &core_mir_catalog(), &core_mir_profile())?;
+        let dialect_contracts = legalized
+            .legal()
+            .module()
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .map(|operation| {
+                format!(
+                    "{}@{}",
+                    operation.identity.namespace(),
+                    operation.identity.major()
+                )
+            })
+            .collect();
         let mut manifest_options = request.options.values().clone();
         manifest_options.insert(
-            "cobol.effective-lp".into(),
+            COBOL_EFFECTIVE_LP_OPTION.into(),
             effective_options.lp().to_string(),
         );
         manifest_options.insert(
-            "cobol.effective-arith".into(),
+            COBOL_EFFECTIVE_ARITH_OPTION.into(),
             effective_options.arithmetic_mode().as_str().into(),
         );
         manifest_options.insert(
-            "cobol.effective-dispsign".into(),
+            COBOL_EFFECTIVE_DISPSIGN_OPTION.into(),
             effective_options.display_sign().as_str().into(),
         );
         let manifest = ArtifactManifest {
@@ -316,6 +335,7 @@ impl CobolCompiler {
                 "mainframe-env.cics@1".to_string(),
             ]),
             ir_contract: mainframe_env_ir::IR_ENVELOPE_CONTRACT.to_string(),
+            dialect_contracts,
         };
         let artifact = PublishedArtifact::publish(
             legalized,
@@ -398,11 +418,16 @@ fn diagnostic(code: &str, phase: Phase, category: FailureCategory, message: Stri
 mod tests {
     use super::*;
     use mainframe_env_compiler_api::{CompileOptions, CompileTarget};
-    use mainframe_env_ir::{Attribute, CodecLimits, decode_binary};
+    use mainframe_env_ir::{
+        Attribute, CICS_EXECUTABLE_DESCRIPTORS, CicsCondition, CicsEffectPlan, CicsOperandName,
+        CicsOperandValue, CicsOutputName, CicsPlanLimits, CicsPlanOperation, CodecLimits,
+        DecimalExecutionPolicy, DecimalPlanLimits, StorageId, cics_executable_descriptor,
+        decode_binary, decode_cics_effect_plan, decode_decimal_assignment_plan, encode_binary,
+    };
     use mainframe_env_source::{
         LogicalPath, SourceEncoding, SourceFile, SourceFormat, SourceLibrary, SourceLimits,
     };
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
 
     fn bundle(source: &str) -> SourceBundle {
         bundle_in_format(source, SourceFormat::Free)
@@ -520,9 +545,9 @@ mod tests {
 
     #[test]
     fn arithmetic_mode_is_embedded_in_manifest_and_executable_payload() {
-        let source = format!("PROCESS ARITH(COMPAT)\n{HELLO}");
+        let source = "PROCESS ARITH(COMPAT)\nIDENTIFICATION DIVISION. PROGRAM-ID. COMPAT. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 99 VALUE 1. 01 B PIC 99 VALUE 2. PROCEDURE DIVISION. ADD A TO B. STOP RUN.";
         let result = CobolCompiler::default()
-            .compile(request(&source, CompilationMode::Executable))
+            .compile(request(source, CompilationMode::Executable))
             .unwrap();
         let CompilerResult::Published { artifact, .. } = result else {
             panic!("ARITH(COMPAT) did not publish: {result:?}");
@@ -548,6 +573,18 @@ mod tests {
             config.attributes.get("arithmetic_mode"),
             Some(&Attribute::Text("compatible".into()))
         );
+        let assignment = module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .find(|operation| operation.identity.namespace() == "mainframe.decimal")
+            .expect("typed decimal operation");
+        let Attribute::Bytes(bytes) = &assignment.attributes["assignment_plan"] else {
+            panic!("typed decimal plan bytes")
+        };
+        let plan = decode_decimal_assignment_plan(bytes, DecimalPlanLimits::default()).unwrap();
+        assert_eq!(plan.policy, DecimalExecutionPolicy::decimal18_v1());
     }
     #[test]
     fn display_sign_is_embedded_in_manifest_and_executable_payload() {
@@ -741,6 +778,46 @@ mod tests {
     }
 
     #[test]
+    fn layout_abi_validation_preserves_national_dynamic_utf8_and_float_tables() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. LAYOUTABI. DATA DIVISION. WORKING-STORAGE SECTION. 01 NATIONAL-X PIC 9(3) USAGE NATIONAL. 01 DYNAMIC-U PIC U DYNAMIC LENGTH LIMIT IS 100 UTF-8. 01 FLOAT-TABLE. 05 FLOAT-X OCCURS 2 TIMES COMP-1. PROCEDURE DIVISION. STOP RUN.";
+        assert!(matches!(
+            CobolCompiler::default()
+                .compile(request(source, CompilationMode::Executable))
+                .unwrap(),
+            CompilerResult::Published { .. }
+        ));
+    }
+
+    #[test]
+    fn unsupported_dynamic_table_and_alias_forms_fail_before_publication() {
+        for declarations in [
+            "01 ROOT-X. 05 DYN-X PIC X OCCURS 2 TIMES INDEXED BY IX DYNAMIC LENGTH LIMIT IS 100.",
+            "01 ROOT-X. 05 DYN-X PIC X DYNAMIC LENGTH LIMIT IS 100 OCCURS 2 TIMES INDEXED BY IX.",
+            "01 ROOT-X OCCURS 2 TIMES. 05 DYN-X PIC X DYNAMIC LENGTH LIMIT IS 100.",
+            "01 BASE-X PIC X DYNAMIC LENGTH LIMIT IS 100. 01 VIEW-X REDEFINES BASE-X PIC X.",
+            "01 BASE-X PIC X. 01 DYN-X REDEFINES BASE-X PIC X DYNAMIC LENGTH LIMIT IS 100.",
+            "01 ROOT-X. 05 BASE-X. 10 DYN-X PIC X DYNAMIC LENGTH LIMIT IS 100. 05 VIEW-X REDEFINES BASE-X. 10 FIX-X PIC X.",
+            "01 ROOT-X. 05 BASE-X PIC X. 05 VIEW-X REDEFINES BASE-X. 10 DYN-X PIC X DYNAMIC LENGTH LIMIT IS 100.",
+            "01 ROOT-X. 05 BASE-X. 10 DYN-A PIC X DYNAMIC LENGTH LIMIT IS 100. 05 VIEW-X REDEFINES BASE-X. 10 DYN-B PIC X DYNAMIC LENGTH LIMIT IS 100.",
+            "01 ROOT-X. 05 DYN-X PIC X OCCURS 1 TIMES DYNAMIC LENGTH LIMIT IS 100.",
+            "01 ROOT-X. 05 TABLE-X OCCURS 1 TIMES. 10 DYN-X PIC X DYNAMIC LENGTH LIMIT IS 100.",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. DYNSCOPE. DATA DIVISION. WORKING-STORAGE SECTION. {declarations} PROCEDURE DIVISION. STOP RUN."
+            );
+            let analysis = CobolCompiler::default().analyze(&bundle(&source));
+            assert!(analysis.semantic.is_none());
+            assert!(analysis.hir.is_none());
+            assert!(matches!(
+                CobolCompiler::default()
+                    .compile(request(&source, CompilationMode::Executable))
+                    .unwrap(),
+                CompilerResult::Failed { .. }
+            ));
+        }
+    }
+
+    #[test]
     fn type_instances_retain_definition_and_instance_provenance() {
         let source = "IDENTIFICATION DIVISION.\nPROGRAM-ID. TYPES.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PART-T TYPEDEF.\n 05 CODE-X PIC X(2).\n 05 QTY-X PIC 9(3) COMP-3.\n01 PART TYPE PART-T.\nPROCEDURE DIVISION.\nSTOP RUN.\n";
         let analysis = CobolCompiler::default().analyze(&bundle(source));
@@ -755,6 +832,40 @@ mod tests {
             semantic
                 .layout("PART.CODE-X")
                 .is_some_and(|layout| layout.source.len() >= 2)
+        );
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(request(source, CompilationMode::Executable))
+            .unwrap()
+        else {
+            panic!("the allocated TYPE instance must publish");
+        };
+        let module = decode_binary(artifact.payload(), CodecLimits::default()).unwrap();
+        let definition_names = module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .filter(|operation| {
+                operation.identity.namespace() == "mainframe.core.cobol"
+                    && operation.identity.name() == "define"
+            })
+            .filter_map(|operation| match operation.attributes.get("name") {
+                Some(Attribute::Text(name)) => Some(name.as_str()),
+                _ => None,
+            })
+            .collect::<BTreeSet<_>>();
+        assert!(definition_names.contains("PART"));
+        assert!(definition_names.contains("PART.CODE-X"));
+        assert!(
+            definition_names
+                .iter()
+                .all(|name| !name.starts_with("PART-T"))
+        );
+        assert!(
+            module
+                .storage()
+                .iter()
+                .all(|region| !region.name.to_ascii_uppercase().starts_with("PART-T"))
         );
     }
 
@@ -1152,5 +1263,662 @@ mod tests {
                 .unwrap(),
             CompilerResult::Published { .. }
         ));
+    }
+
+    #[test]
+    fn typed_arithmetic_is_proof_bound_and_publishes_one_atomic_plan_per_statement() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. PLAN. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 99 VALUE 1. 01 B PIC 99 VALUE 2. 01 C PIC 99 VALUE 3. 01 LEFT-G. 05 X PIC 99 VALUE 4. 05 Y PIC 99 VALUE 5. 01 RIGHT-G. 05 X PIC 99 VALUE 6. 05 Y PIC 99 VALUE 7. PROCEDURE DIVISION. ADD A TO B C ROUNDED. ADD CORRESPONDING LEFT-G TO RIGHT-G. COMPUTE C = ( A + B ) * 2. STOP RUN.";
+        let compiler = CobolCompiler::default();
+        let analysis = compiler.analyze(&bundle(source));
+        let hir = analysis.hir.as_ref().expect("typed arithmetic HIR");
+        let hir_operations = hir
+            .module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .collect::<Vec<_>>();
+        let hir_dialects = hir_operations
+            .iter()
+            .map(|operation| {
+                format!(
+                    "{}@{}",
+                    operation.identity.namespace(),
+                    operation.identity.major()
+                )
+            })
+            .collect::<BTreeSet<_>>();
+        assert_eq!(
+            hir_dialects,
+            BTreeSet::from(["cobol.hir@1".into(), "cobol.hir@2".into()])
+        );
+        let typed_hir = hir_operations
+            .iter()
+            .copied()
+            .filter(|operation| operation.identity.major() == 2)
+            .collect::<Vec<_>>();
+        assert_eq!(typed_hir.len(), 3);
+        for operation in typed_hir {
+            assert_eq!(operation.identity.namespace(), "cobol.hir");
+            assert!(matches!(operation.identity.name(), "add" | "compute"));
+            assert!(!operation.attributes.contains_key("arguments"));
+            assert!(operation.location.is_some());
+            assert_eq!(
+                operation
+                    .storage
+                    .iter()
+                    .map(|reference| reference.storage)
+                    .collect::<BTreeSet<_>>()
+                    .len(),
+                operation.storage.len()
+            );
+            assert!(
+                operation
+                    .storage
+                    .iter()
+                    .all(|reference| reference.offset == 0 && reference.length > 0)
+            );
+            let Attribute::Bytes(bytes) = &operation.attributes["assignment_plan"] else {
+                panic!("typed HIR plan bytes")
+            };
+            let plan = decode_decimal_assignment_plan(bytes, DecimalPlanLimits::default()).unwrap();
+            assert_eq!(
+                plan.semantic_origin,
+                if operation.identity.name() == "compute" {
+                    "cobol.compute@1"
+                } else {
+                    "cobol.add@1"
+                }
+            );
+            assert_eq!(plan.policy, DecimalExecutionPolicy::decimal34_v1());
+            assert_eq!(
+                plan.assignments.len(),
+                if operation.identity.name() == "compute" {
+                    1
+                } else {
+                    2
+                }
+            );
+            for forbidden in [b"TO".as_slice(), b"GIVING", b"ROUNDED"] {
+                assert!(
+                    !bytes
+                        .windows(forbidden.len())
+                        .any(|window| window == forbidden)
+                );
+            }
+        }
+
+        let CompilerResult::Published { artifact, .. } = compiler
+            .compile(request(source, CompilationMode::Executable))
+            .unwrap()
+        else {
+            panic!("published typed arithmetic")
+        };
+        assert_eq!(
+            artifact.manifest().dialect_contracts,
+            BTreeSet::from([
+                "mainframe.core.cobol@1".into(),
+                "mainframe.decimal@2".into(),
+            ])
+        );
+        let module = decode_binary(artifact.payload(), CodecLimits::default()).unwrap();
+        let assignments = module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .filter(|operation| {
+                operation.identity.namespace() == "mainframe.decimal"
+                    && operation.identity.name() == "assign"
+                    && operation.identity.major() == 2
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(assignments.len(), 3);
+        for operation in assignments {
+            assert!(!operation.attributes.contains_key("arguments"));
+            assert!(!operation.attributes.contains_key("control_text"));
+            assert_eq!(
+                operation.attributes.get("typed_condition_status"),
+                Some(&Attribute::Text("cobol.arithmetic-size-error@1".into()))
+            );
+            assert_eq!(
+                operation.attributes.get("typed_condition_branches"),
+                Some(&Attribute::Integer(0))
+            );
+            assert!(operation.location.is_some());
+            let Attribute::Bytes(bytes) = &operation.attributes["assignment_plan"] else {
+                panic!("typed executable plan bytes")
+            };
+            let plan = decode_decimal_assignment_plan(bytes, DecimalPlanLimits::default()).unwrap();
+            assert!(matches!(
+                plan.semantic_origin.as_str(),
+                "cobol.add@1" | "cobol.compute@1"
+            ));
+            assert_eq!(plan.policy, DecimalExecutionPolicy::decimal34_v1());
+            assert_eq!(
+                plan.assignments.len(),
+                if plan.semantic_origin == "cobol.compute@1" {
+                    1
+                } else {
+                    2
+                }
+            );
+            for forbidden in [b"TO".as_slice(), b"GIVING", b"ROUNDED"] {
+                assert!(
+                    !bytes
+                        .windows(forbidden.len())
+                        .any(|window| window == forbidden)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn typed_size_error_edges_are_bound_without_branch_text() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SIZEEDGE. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 9 VALUE 1. 01 B PIC 9 VALUE 0. PROCEDURE DIVISION. COMPUTE B = A / B ON SIZE ERROR CONTINUE NOT ON SIZE ERROR CONTINUE END-COMPUTE. STOP RUN.";
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(request(source, CompilationMode::Executable))
+            .unwrap()
+        else {
+            panic!("published typed size-error control")
+        };
+        let module = decode_binary(artifact.payload(), CodecLimits::default()).unwrap();
+        let operations = module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .collect::<Vec<_>>();
+        let assignment = operations
+            .iter()
+            .copied()
+            .find(|operation| operation.identity.namespace() == "mainframe.decimal")
+            .expect("typed decimal assignment");
+        assert_eq!(
+            assignment.attributes.get("typed_condition_status"),
+            Some(&Attribute::Text("cobol.arithmetic-size-error@1".into()))
+        );
+        assert_eq!(
+            assignment.attributes.get("typed_condition_branches"),
+            Some(&Attribute::Integer(3))
+        );
+        assert!(!assignment.attributes.contains_key("control_text"));
+        let owner = match assignment.attributes.get("control_node") {
+            Some(Attribute::Integer(owner)) => *owner,
+            _ => panic!("typed condition owner"),
+        };
+        let branches = operations
+            .iter()
+            .copied()
+            .filter(|operation| {
+                operation.attributes.get("control_parent") == Some(&Attribute::Integer(owner))
+                    && operation.attributes.get("control_role")
+                        == Some(&Attribute::Text("branch".into()))
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(branches.len(), 2);
+        assert_eq!(
+            branches
+                .iter()
+                .map(|branch| branch.attributes.get("typed_condition_polarity"))
+                .collect::<Vec<_>>(),
+            vec![
+                Some(&Attribute::Boolean(true)),
+                Some(&Attribute::Boolean(false)),
+            ]
+        );
+        assert!(branches.iter().all(|branch| {
+            branch.attributes.get("typed_condition_status")
+                == Some(&Attribute::Text("cobol.arithmetic-size-error@1".into()))
+                && branch.attributes.contains_key("edge_branch_false")
+        }));
+        let schema = crate::core_mir_catalog()
+            .get(&assignment.identity)
+            .cloned()
+            .expect("typed decimal schema");
+        assert!(
+            schema
+                .required_attributes
+                .contains("typed_condition_status")
+        );
+        assert!(
+            schema
+                .required_attributes
+                .contains("typed_condition_branches")
+        );
+    }
+
+    #[test]
+    fn typed_cics_is_proof_bound_in_hir_and_the_published_executable() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSP. DATA DIVISION. WORKING-STORAGE SECTION. 01 RECORD-X PIC X(4). 01 KEY-X PIC X(3) VALUE '003'. 01 CODE-A PIC S9(9) COMP. 01 CODE-B PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') UPDATE INTO(RECORD-X) RIDFLD(KEY-X) RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS REWRITE DATASET('ACCTDAT') FROM(RECORD-X) END-EXEC. EXEC CICS SYNCPOINT ROLLBACK NOHANDLE END-EXEC. STOP RUN.";
+        let compiler = CobolCompiler::default();
+        let analysis = compiler.analyze(&bundle(source));
+        let hir = analysis.hir.as_ref().expect("typed CICS HIR");
+        let encoded_hir = encode_binary(&hir.module, CodecLimits::default()).unwrap();
+        let hir_module = decode_binary(&encoded_hir, CodecLimits::default()).unwrap();
+        let hir_operations = hir_module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            hir_operations
+                .iter()
+                .map(|operation| format!(
+                    "{}@{}",
+                    operation.identity.namespace(),
+                    operation.identity.major()
+                ))
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from(["cobol.hir@1".into(), "cobol.hir@2".into()])
+        );
+        let typed_hir = hir_operations
+            .iter()
+            .copied()
+            .filter(|operation| {
+                operation.identity.namespace() == "cobol.hir"
+                    && operation.identity.name() == "exec_cics"
+                    && operation.identity.major() == 2
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(typed_hir.len(), 3);
+        let mut hir_plans = Vec::new();
+        for operation in typed_hir {
+            assert!(!operation.attributes.contains_key("arguments"));
+            assert!(!operation.attributes.contains_key("control_text"));
+            assert!(operation.location.is_some());
+            assert_eq!(
+                operation
+                    .storage
+                    .iter()
+                    .map(|reference| reference.storage)
+                    .collect::<BTreeSet<_>>()
+                    .len(),
+                operation.storage.len()
+            );
+            assert!(
+                operation
+                    .storage
+                    .iter()
+                    .all(|reference| reference.offset == 0 && reference.length > 0)
+            );
+            let Attribute::Bytes(bytes) = &operation.attributes["cics_plan"] else {
+                panic!("typed HIR CICS plan bytes")
+            };
+            let plan = decode_cics_effect_plan(bytes, CicsPlanLimits::default()).unwrap();
+            assert_eq!(
+                operation
+                    .storage
+                    .iter()
+                    .map(|reference| reference.storage)
+                    .collect::<BTreeSet<_>>(),
+                cics_plan_storage(&plan)
+            );
+            for reference in &operation.storage {
+                assert_eq!(
+                    hir_module
+                        .storage()
+                        .iter()
+                        .find(|region| region.id == reference.storage)
+                        .unwrap()
+                        .size,
+                    reference.length
+                );
+            }
+            let source_operation = match plan.operation {
+                CicsPlanOperation::Read => crate::HirCicsOperation::Read,
+                CicsPlanOperation::Rewrite => crate::HirCicsOperation::Rewrite,
+                CicsPlanOperation::Syncpoint => crate::HirCicsOperation::Syncpoint,
+            };
+            assert_eq!(
+                operation.effects,
+                crate::hir::cics::operation_effects(source_operation)
+            );
+            for forbidden in cics_grammar_tokens() {
+                assert!(
+                    !bytes
+                        .windows(forbidden.len())
+                        .any(|window| window == forbidden)
+                );
+            }
+            hir_plans.push(plan);
+        }
+        assert_eq!(
+            hir_plans
+                .iter()
+                .map(|plan| plan.operation)
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                CicsPlanOperation::Read,
+                CicsPlanOperation::Rewrite,
+                CicsPlanOperation::Syncpoint,
+            ])
+        );
+        let read = hir_plans
+            .iter()
+            .find(|plan| plan.operation == CicsPlanOperation::Read)
+            .unwrap();
+        assert!(
+            read.options
+                .contains(&mainframe_env_ir::CicsPlanOption::Update)
+        );
+        assert!(matches!(
+            read.operands
+                .iter()
+                .find(|operand| operand.name == CicsOperandName::File)
+                .map(|operand| &operand.value),
+            Some(CicsOperandValue::Literal(bytes)) if bytes == b"ACCTDAT"
+        ));
+        assert!(matches!(
+            read.operands
+                .iter()
+                .find(|operand| operand.name == CicsOperandName::Ridfld)
+                .map(|operand| &operand.value),
+            Some(CicsOperandValue::Storage(slot)) if slot.qualified_layout_name == "KEY-X"
+        ));
+        assert!(read.outputs.iter().any(|output| {
+            output.name == CicsOutputName::Into && output.target.qualified_layout_name == "RECORD-X"
+        }));
+        assert!(matches!(
+            &read.condition,
+            CicsCondition::Respond {
+                response2: Some(_),
+                ..
+            }
+        ));
+        let rewrite = hir_plans
+            .iter()
+            .find(|plan| plan.operation == CicsPlanOperation::Rewrite)
+            .unwrap();
+        assert!(matches!(
+            rewrite
+                .operands
+                .iter()
+                .find(|operand| operand.name == CicsOperandName::Dataset)
+                .map(|operand| &operand.value),
+            Some(CicsOperandValue::Literal(bytes)) if bytes == b"ACCTDAT"
+        ));
+        assert!(matches!(
+            rewrite
+                .operands
+                .iter()
+                .find(|operand| operand.name == CicsOperandName::From)
+                .map(|operand| &operand.value),
+            Some(CicsOperandValue::Storage(slot)) if slot.qualified_layout_name == "RECORD-X"
+        ));
+        assert!(rewrite.outputs.is_empty());
+        assert_eq!(rewrite.condition, CicsCondition::Default);
+        let syncpoint = hir_plans
+            .iter()
+            .find(|plan| plan.operation == CicsPlanOperation::Syncpoint)
+            .unwrap();
+        assert!(
+            syncpoint
+                .options
+                .contains(&mainframe_env_ir::CicsPlanOption::Rollback)
+        );
+        assert!(
+            syncpoint
+                .options
+                .contains(&mainframe_env_ir::CicsPlanOption::NoHandle)
+        );
+        assert_eq!(syncpoint.condition, CicsCondition::NoHandle);
+
+        let CompilerResult::Published { artifact, .. } = compiler
+            .compile(request(source, CompilationMode::Executable))
+            .unwrap()
+        else {
+            panic!("published typed CICS")
+        };
+        assert_eq!(
+            artifact.manifest().dialect_contracts,
+            BTreeSet::from([
+                "cics.file@1".into(),
+                "cics.recovery@1".into(),
+                "mainframe.core.cobol@1".into(),
+            ])
+        );
+        let module = decode_binary(artifact.payload(), CodecLimits::default()).unwrap();
+        let operations = module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .filter(|operation| {
+                matches!(
+                    operation.identity.namespace(),
+                    "cics.file" | "cics.recovery"
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(operations.len(), 3);
+        assert_eq!(
+            operations
+                .iter()
+                .map(|operation| format!(
+                    "{}@{}.{}",
+                    operation.identity.namespace(),
+                    operation.identity.major(),
+                    operation.identity.name()
+                ))
+                .collect::<BTreeSet<_>>(),
+            CICS_EXECUTABLE_DESCRIPTORS
+                .iter()
+                .map(|descriptor| descriptor.identity().to_string())
+                .collect()
+        );
+        let catalog = crate::core_mir_catalog();
+        for operation in operations {
+            assert!(!operation.attributes.contains_key("arguments"));
+            assert!(!operation.attributes.contains_key("control_text"));
+            assert!(operation.location.is_some());
+            assert_eq!(
+                operation
+                    .storage
+                    .iter()
+                    .map(|reference| reference.storage)
+                    .collect::<BTreeSet<_>>()
+                    .len(),
+                operation.storage.len()
+            );
+            assert!(
+                operation
+                    .storage
+                    .iter()
+                    .all(|reference| reference.offset == 0 && reference.length > 0)
+            );
+            let Attribute::Bytes(bytes) = &operation.attributes["cics_plan"] else {
+                panic!("typed executable CICS plan bytes")
+            };
+            let plan = decode_cics_effect_plan(bytes, CicsPlanLimits::default()).unwrap();
+            assert_eq!(
+                operation
+                    .storage
+                    .iter()
+                    .map(|reference| reference.storage)
+                    .collect::<BTreeSet<_>>(),
+                cics_plan_storage(&plan)
+            );
+            for reference in &operation.storage {
+                assert_eq!(
+                    module
+                        .storage()
+                        .iter()
+                        .find(|region| region.id == reference.storage)
+                        .unwrap()
+                        .size,
+                    reference.length
+                );
+            }
+            let descriptor = cics_executable_descriptor(plan.operation);
+            assert_eq!(operation.identity, descriptor.identity());
+            assert_eq!(operation.effects, descriptor.effects);
+            let schema = catalog.get(&operation.identity).expect("typed CICS schema");
+            assert_eq!(
+                schema.runtime_import.as_deref(),
+                Some(descriptor.runtime_import)
+            );
+            assert_eq!(
+                schema.allowed_effects,
+                operation.effects.iter().copied().collect::<BTreeSet<_>>()
+            );
+            for forbidden in cics_grammar_tokens() {
+                assert!(
+                    !bytes
+                        .windows(forbidden.len())
+                        .any(|window| window == forbidden)
+                );
+            }
+        }
+    }
+
+    fn cics_grammar_tokens() -> [&'static [u8]; 13] {
+        [
+            b"READ",
+            b"REWRITE",
+            b"SYNCPOINT",
+            b"FILE",
+            b"DATASET",
+            b"RIDFLD",
+            b"INTO",
+            b"RESP",
+            b"RESP2",
+            b"UPDATE",
+            b"ROLLBACK",
+            b"NOHANDLE",
+            b"END-EXEC",
+        ]
+    }
+
+    fn cics_plan_storage(plan: &CicsEffectPlan) -> BTreeSet<StorageId> {
+        let mut storage = plan
+            .operands
+            .iter()
+            .filter_map(|operand| match &operand.value {
+                CicsOperandValue::Literal(_) => None,
+                CicsOperandValue::Storage(slot) => Some(slot.storage),
+            })
+            .chain(plan.outputs.iter().map(|output| output.target.storage))
+            .collect::<BTreeSet<_>>();
+        if let CicsCondition::Respond {
+            response,
+            response2,
+        } = &plan.condition
+        {
+            storage.insert(response.storage);
+            storage.extend(response2.iter().map(|response| response.storage));
+        }
+        storage
+    }
+
+    #[test]
+    fn unsupported_and_numeric_cics_forms_keep_the_version_one_route() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSL. DATA DIVISION. WORKING-STORAGE SECTION. 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS WRITEQ TD QUEUE('OUTQ') FROM(RECORD-X) END-EXEC. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(003) END-EXEC. STOP RUN.";
+        let compiler = CobolCompiler::default();
+        let analysis = compiler.analyze(&bundle(source));
+        let hir = analysis.hir.as_ref().expect("legacy-compatible CICS HIR");
+        let statements = hir
+            .statements
+            .iter()
+            .filter(|statement| statement.kind == crate::StatementKind::ExecCics)
+            .collect::<Vec<_>>();
+        assert_eq!(statements.len(), 2);
+        assert!(
+            statements
+                .iter()
+                .all(|statement| statement.resolved.is_none())
+        );
+        assert!(
+            statements[0]
+                .arguments
+                .iter()
+                .any(|argument| argument == "WRITEQ")
+        );
+        assert!(
+            statements[1]
+                .arguments
+                .iter()
+                .any(|argument| argument == "003")
+        );
+        let hir_operations = hir
+            .module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .filter(|operation| operation.identity.name() == "exec_cics")
+            .collect::<Vec<_>>();
+        assert_eq!(hir_operations.len(), 2);
+        assert!(hir_operations.iter().all(|operation| {
+            operation.identity.namespace() == "cobol.hir"
+                && operation.identity.major() == 1
+                && operation.attributes.contains_key("arguments")
+                && !operation.attributes.contains_key("cics_plan")
+        }));
+
+        let CompilerResult::Published { artifact, .. } = compiler
+            .compile(request(source, CompilationMode::Executable))
+            .unwrap()
+        else {
+            panic!("published legacy CICS")
+        };
+        assert_eq!(
+            artifact.manifest().dialect_contracts,
+            BTreeSet::from(["mainframe.core.cobol@1".into()])
+        );
+        let module = decode_binary(artifact.payload(), CodecLimits::default()).unwrap();
+        let operations = module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .filter(|operation| operation.identity.name() == "exec_cics")
+            .collect::<Vec<_>>();
+        assert_eq!(operations.len(), 2);
+        assert!(operations.iter().all(|operation| {
+            operation.identity.namespace() == "mainframe.core.cobol"
+                && operation.identity.major() == 1
+                && operation.attributes.contains_key("arguments")
+                && !operation.attributes.contains_key("cics_plan")
+        }));
+        let numeric = operations
+            .iter()
+            .find_map(|operation| match &operation.attributes["arguments"] {
+                Attribute::Bytes(bytes) if bytes.windows(3).any(|window| window == b"003") => {
+                    Some(bytes)
+                }
+                _ => None,
+            })
+            .expect("numeric CICS lexeme remains exact");
+        assert!(numeric.windows(3).any(|window| window == b"003"));
+    }
+
+    #[test]
+    fn unresolved_function_arithmetic_keeps_the_version_one_executable_route() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. LEGACY. DATA DIVISION. WORKING-STORAGE SECTION. 01 TEXT-X PIC X VALUE '1'. PROCEDURE DIVISION. COMPUTE RETURN-CODE = FUNCTION NUMVAL(TEXT-X). STOP RUN.";
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(request(source, CompilationMode::Executable))
+            .unwrap()
+        else {
+            panic!("published legacy arithmetic")
+        };
+        assert_eq!(
+            artifact.manifest().dialect_contracts,
+            BTreeSet::from(["mainframe.core.cobol@1".into()])
+        );
+        let module = decode_binary(artifact.payload(), CodecLimits::default()).unwrap();
+        let operation = module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .find(|operation| operation.identity.name() == "compute")
+            .expect("legacy compute operation");
+        assert_eq!(operation.identity.namespace(), "mainframe.core.cobol");
+        assert_eq!(operation.identity.major(), 1);
+        assert!(operation.attributes.contains_key("arguments"));
+        assert!(!operation.attributes.contains_key("assignment_plan"));
+        assert!(operation.location.is_some());
     }
 }

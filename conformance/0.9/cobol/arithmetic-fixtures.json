@@ -1,0 +1,115 @@
+{
+  "schema_version": "mainframe-env.cobol-arithmetic-pilot-fixtures@1",
+  "fixture_id": "cobol.typed-arithmetic.issue-140-141-v1",
+  "row_id": "ibm-enterprise-cobol-6.5-2026-05-31:procedure-statements:0002",
+  "compiler_options": {
+    "source_format": "free",
+    "target": "reference",
+    "arithmetic_mode": "extended",
+    "codepage": 37,
+    "explicit_overrides": []
+  },
+  "cases": [
+    {
+      "case_id": "receiver-local-size-error",
+      "issue": 140,
+      "rule_ids": [
+        "cobol.add.receiver-local-size-error",
+        "cobol.add.size-error-after-receiver-processing"
+      ],
+      "program_source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. RECEIVERERR.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 GOOD-X PIC 9 VALUE 4.\n01 SMALL-X PIC 9 VALUE 9.\n01 ERROR-X PIC 9 VALUE 0.\nPROCEDURE DIVISION.\nADD 2 TO GOOD-X SMALL-X ON SIZE ERROR MOVE 1 TO ERROR-X NOT ON SIZE ERROR MOVE 2 TO ERROR-X END-ADD.\nDISPLAY GOOD-X SMALL-X ERROR-X.\nSTOP RUN.\n",
+      "expected_output_hex": "3639310a",
+      "expected_typed_plan": {
+        "operation_majors": [2],
+        "assignment_counts": [2],
+        "assignment_targets": ["GOOD-X", "SMALL-X"],
+        "semantic_origins": ["cobol.add@1"],
+        "execution_policies": ["decimal34-v1/cobol-numeric-v1/captured-operands-receiver-local-v1/cobol-size-error-v1"]
+      }
+    },
+    {
+      "case_id": "receiver-overflow-without-handler",
+      "issue": 140,
+      "rule_ids": [
+        "cobol.add.no-handler-overflow-truncates"
+      ],
+      "program_source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. TRUNCATEERR.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 GOOD-X PIC 9 VALUE 4.\n01 SMALL-X PIC 9 VALUE 9.\nPROCEDURE DIVISION.\nADD 2 TO GOOD-X SMALL-X.\nDISPLAY GOOD-X SMALL-X.\nSTOP RUN.\n",
+      "expected_output_hex": "36310a",
+      "expected_typed_plan": {
+        "operation_majors": [2],
+        "assignment_counts": [2],
+        "assignment_targets": ["GOOD-X", "SMALL-X"],
+        "semantic_origins": ["cobol.add@1"],
+        "execution_policies": ["decimal34-v1/cobol-numeric-v1/captured-operands-receiver-local-v1/cobol-size-error-v1"]
+      }
+    },
+    {
+      "case_id": "corresponding-relative-qualifiers",
+      "issue": 141,
+      "rule_ids": ["cobol.add-corresponding.relative-qualification"],
+      "program_source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. CORRQUAL.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 SRC-G.\n05 MATCH-X PIC 99 VALUE 1.\n05 LEFT-G.\n10 AMOUNT PIC 99 VALUE 2.\n01 DST-G.\n05 MATCH-X PIC 99 VALUE 10.\n05 RIGHT-G.\n10 AMOUNT PIC 99 VALUE 20.\nPROCEDURE DIVISION.\nADD CORRESPONDING SRC-G TO DST-G.\nDISPLAY MATCH-X OF DST-G.\nDISPLAY AMOUNT OF RIGHT-G OF DST-G.\nSTOP RUN.\n",
+      "expected_output_hex": "31310a32300a",
+      "expected_typed_plan": {
+        "operation_majors": [2],
+        "assignment_counts": [1],
+        "assignment_targets": ["DST-G.MATCH-X"],
+        "semantic_origins": ["cobol.add@1"],
+        "execution_policies": ["decimal34-v1/cobol-numeric-v1/captured-operands-receiver-local-v1/cobol-size-error-v1"]
+      }
+    },
+    {
+      "case_id": "corresponding-no-pair-no-op",
+      "issue": 141,
+      "rule_ids": ["cobol.add-corresponding.no-pair-no-op"],
+      "program_source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. CORRNONE.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 SRC-G.\n05 SOURCE-ONLY PIC 99 VALUE 12.\n01 DST-G.\n05 TARGET-ONLY PIC 99 VALUE 34.\nPROCEDURE DIVISION.\nADD CORRESPONDING SRC-G TO DST-G.\nDISPLAY TARGET-ONLY OF DST-G.\nSTOP RUN.\n",
+      "expected_output_hex": "33340a",
+      "expected_typed_plan": {
+        "operation_majors": [2],
+        "assignment_counts": [0],
+        "assignment_targets": [],
+        "semantic_origins": ["cobol.add@1"],
+        "execution_policies": ["decimal34-v1/cobol-numeric-v1/captured-operands-receiver-local-v1/cobol-size-error-v1"]
+      }
+    },
+    {
+      "case_id": "corresponding-numeric-edited-eligible",
+      "issue": 141,
+      "rule_ids": ["cobol.add-corresponding.numeric-edited-eligible"],
+      "program_source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. CORREDIT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 SRC-G.\n05 GOOD-X PIC 99 VALUE 1.\n05 EDIT-X PIC +99.\n01 DST-G.\n05 GOOD-X PIC 99 VALUE 10.\n05 EDIT-X PIC +99.\nPROCEDURE DIVISION.\nMOVE 2 TO EDIT-X OF SRC-G.\nMOVE 20 TO EDIT-X OF DST-G.\nADD CORRESPONDING SRC-G TO DST-G.\nDISPLAY GOOD-X OF DST-G.\nDISPLAY EDIT-X OF DST-G.\nSTOP RUN.\n",
+      "expected_output_hex": "31310a2b32320a",
+      "expected_typed_plan": {
+        "operation_majors": [2],
+        "assignment_counts": [2],
+        "assignment_targets": ["DST-G.GOOD-X", "DST-G.EDIT-X"],
+        "semantic_origins": ["cobol.add@1"],
+        "execution_policies": ["decimal34-v1/cobol-numeric-v1/captured-operands-receiver-local-v1/cobol-size-error-v1"]
+      }
+    }
+  ],
+  "expectation_authority": {
+    "kind": "maintainer-directed-independent-golden",
+    "reviewed_on": "2026-09-09",
+    "issues": [140, 141],
+    "derivation": "Expected bytes and typed-plan facts are stored independently of candidate execution; the runner only compiles and observes the candidate.",
+    "external_control": {
+      "status": "not-run",
+      "coverage_credit": 0,
+      "licensed_credit": 0
+    }
+  },
+  "comparison_policy": {
+    "version": "cobol-typed-arithmetic-exact-contract@1",
+    "exact_fields": [
+      "output_bytes",
+      "typed_decimal_operation_majors",
+      "decimal_plan_assignment_counts",
+      "assignment_targets",
+      "semantic_origins",
+      "execution_policies",
+      "legacy_cobol_arithmetic_operations"
+    ],
+    "normalizable_fields": [],
+    "differential_credit": 0,
+    "licensed_credit": 0
+  }
+}
