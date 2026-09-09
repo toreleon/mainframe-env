@@ -119,10 +119,16 @@ class SelectionTests(unittest.TestCase):
             'postgres-atomic-invariants',
             'postgres-work-leases',
             'postgres-storage-profile',
+            'postgres-readiness',
             'postgres-retention',
             'postgres-durable',
             'postgres-carddemo-restart',
         ])
+        postgres = (root / 'tools/jenkins/postgres_parity.sh').read_text()
+        self.assertIn(
+            'writable_probe_requires_provider_state_dml_and_rolls_everything_back',
+            postgres,
+        )
         self.assertIn('postgres_parity.sh list', pipeline)
 
     @patch.object(ci,'identity',return_value={'candidate':'a'*40,'tree':'b'*40})

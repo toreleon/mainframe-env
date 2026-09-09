@@ -25,7 +25,7 @@ POLICY = ['supply-chain', 'cargo-deny', 'license-notices']
 FULL = [
     'targets', 'documentation', 'docs', 'conformance', 'certification',
     'evidence-seal', 'runtime-architecture', 'fuzz-smoke', 'fuzz-periodic',
-    'model-check', 'coverage-baseline',
+    'model-check', 'coverage-baseline', 'archive-reproduction',
 ]
 SHA = re.compile(r'[0-9a-f]{40}\Z')
 EVENTS = frozenset({'local', 'push', 'pull_request', 'schedule', 'manual', 'tag'})

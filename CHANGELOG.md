@@ -65,6 +65,8 @@ All notable changes to mainframe-env are documented here.
   bootstrap with secret-free restart, and separate writable/auth/artifact/worker
   readiness checks backed by rolled-back provider-state DML proof, retention
   headroom, and per-worker queue-progress freshness.
+- Added the PostgreSQL writable-readiness rollback contract to the blocking
+  parity stage so every environment-gated PostgreSQL correctness test is run.
 - Moved synchronous z/OSMF backend calls to a bounded four-worker lane and
   propagated finite HTTP deadlines plus live cancellation into invocations.
 - Classified mutating-effect journal failures after dispatch as unknown outcomes

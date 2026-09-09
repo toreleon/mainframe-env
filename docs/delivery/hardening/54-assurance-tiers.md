@@ -51,6 +51,9 @@ against normal, mixed, unknown, renamed and deleted paths.
 Manual `full` runs, the weekly Jenkins schedule and release tags select the full
 tier. Workspace target checks/documentation, full conformance, certification,
 the evidence seal and runtime architecture run on one exact checked-out commit.
+The full tier also exports that commit with `git archive` and requires two
+mtime-distinct reproductions in the digest-pinned GNU-tar image to match before
+retaining the source archive and command receipt.
 Tag release packaging and release checks remain unchanged. Scheduling only takes
 effect after the Jenkinsfile reaches the configured job branch; an unexecuted
 schedule grants no credit.
@@ -59,7 +62,9 @@ Backend parity runs on relevant store/shared/normative changes and all full tier
 using a disposable PostgreSQL 18 service. It explicitly selects #51's ignored
 PostgreSQL Move contract and rejects zero-test success. Memory/SQLite counterparts
 remain in the workspace suite. When #57's effect contract exists in the candidate,
-its ignored PostgreSQL contract is also explicitly required and recorded.
+its ignored PostgreSQL contract is also explicitly required and recorded. The
+writable-readiness rollback contract is selected explicitly as well, so the
+provider-state DML probe cannot remain hidden behind workspace-test skipping.
 
 #53's four reference-source mutants run only for selected mutation obligations
 and full tiers. Their receipt retains zero product-runtime-mutation and licensed

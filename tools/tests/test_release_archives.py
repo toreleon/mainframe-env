@@ -130,6 +130,9 @@ class ImmutablePublicationTests(unittest.TestCase):
         self.assertNotIn("tar --version", package)
         self.assertIn("tools/reproducible_archive.py", package)
         self.assertIn("tools/publish_release_assets.py", pipeline)
+        self.assertIn("--gate archive-reproduction", pipeline)
+        self.assertIn("git archive --format=tar HEAD", pipeline)
+        self.assertIn("--root-name mainframe-env-source", pipeline)
 
 
 if __name__ == "__main__":
