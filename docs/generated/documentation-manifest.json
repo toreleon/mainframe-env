@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 182,
+    "markdown_documents": 183,
     "navigation_groups": 5,
-    "normative_documents": 38,
+    "normative_documents": 39,
     "xtask_commands": 160
   },
   "documents": [
@@ -10,7 +10,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:f9b6326476205c0156874d0709beb015005b87662bdc5fbc9cc0c603fdb2fea5",
+      "sha256": "sha256:a12ee99efe781f9e4d6e46bf92c409df454bb52eede37d1355e7fec982c1b585",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -114,7 +114,7 @@
       "normative": false,
       "path": "crates/contracts/mainframe-env-compiler-api/README.md",
       "relative_links": 0,
-      "sha256": "sha256:4db81f06fd0d584ee1f03e0d5a4a61a34f4c19a4d8f11280ed419d5dda05012e",
+      "sha256": "sha256:f135345400d8c90b2580c0f3234c00952b98e22e5dc62427fcc7d2bae2f18980",
       "title": "mainframe-env-compiler-api",
       "xtask_commands": 0
     },
@@ -301,8 +301,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 73,
-      "sha256": "sha256:0dd3dd892d5ca4f37e291abbb9b88064fa8b55d4c9f7fa5f03477a0d137fea5c",
+      "relative_links": 74,
+      "sha256": "sha256:4f1bb8b28dd72fdd56d36e8221f8e7ecde5c44214febd769a9c65e7a21068ad0",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -335,9 +335,9 @@
       "normative": true,
       "owner": "CICS provider maintainers",
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
-      "relative_links": 3,
+      "relative_links": 4,
       "scope": "typed CICS operation descriptors, generated routing families, and provider semantic modules",
-      "sha256": "sha256:cb7537ea3af433d15dc8c3a85d76a66f21fdd44623fe9c87ea545f4c834c6ecd",
+      "sha256": "sha256:5f9b2eec5ba10f35404654741086f8e0a199a7ddbf82de81e698b4c8271dad20",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -359,9 +359,9 @@
       "normative": true,
       "owner": "compiler and IR maintainers",
       "path": "docs/architecture/COMPILER-AND-IR.md",
-      "relative_links": 0,
+      "relative_links": 1,
       "scope": "compiler stages, IR contracts, and publication pipeline",
-      "sha256": "sha256:f7e1ee78e5b6f228909eab19d4d42dfd746dfb21c146a6c0b752e774c8afb630",
+      "sha256": "sha256:040f59feab7a0841dc9573b61a322febb9a5ba23642efb26f58f862a3f7d4eb4",
       "status": "Accepted by repository owner",
       "title": "Compiler and IR Architecture",
       "xtask_commands": 0
@@ -419,9 +419,9 @@
       "normative": true,
       "owner": "execution and store maintainers",
       "path": "docs/architecture/EXECUTION-AND-DURABILITY.md",
-      "relative_links": 0,
+      "relative_links": 1,
       "scope": "execution lifecycle, effects, work, checkpoints, and durability",
-      "sha256": "sha256:3fcdd4cf696cc63c24b8b1ee258caf0eeb907ae7bae41d2e6f3bfe1508be3185",
+      "sha256": "sha256:b7e066a059128aa7e1c4e523fdc6b945ae5981025f43201385505f73194082fd",
       "status": "Accepted by repository owner",
       "title": "Execution and Durability Architecture",
       "xtask_commands": 0
@@ -443,9 +443,9 @@
       "normative": true,
       "owner": "JES, batch, and spool maintainers",
       "path": "docs/architecture/JES-EXECUTION.md",
-      "relative_links": 0,
+      "relative_links": 1,
       "scope": "JES execution, scheduling, spool, and utility behavior",
-      "sha256": "sha256:9180b316068ad2f8f062009d51ac789332457c752002bc7ab9c8c8cf71ca276b",
+      "sha256": "sha256:9a8c85684ed9ae9ca8badeece315b33780029f84e37d56e33f5c476d4af7083b",
       "status": "Normative from mainframe-env 0.8.0",
       "title": "JES execution, scheduling, spool, and utilities",
       "xtask_commands": 1
@@ -455,9 +455,9 @@
       "normative": true,
       "owner": "architecture maintainers",
       "path": "docs/architecture/OVERVIEW.md",
-      "relative_links": 3,
+      "relative_links": 4,
       "scope": "system layers, dependency direction, and maintainability rules",
-      "sha256": "sha256:6979c4a0b21c3d0adfc84e98571e091c74d22fc94bcb1a25ab8d99da8418c837",
+      "sha256": "sha256:224e3b6ecbfc9c4e0c8f7ce156de45b70ab1711e344c8447203c849a7e47538c",
       "status": "Accepted by repository owner",
       "title": "Architecture Overview",
       "xtask_commands": 1
@@ -699,10 +699,22 @@
       "xtask_commands": 1
     },
     {
+      "applies_from": "mainframe-env 0.9.0 development",
+      "normative": true,
+      "owner": "compiler, execution, and subsystem maintainers",
+      "path": "docs/decisions/0011-typed-language-hir-and-semantic-ir.md",
+      "relative_links": 0,
+      "scope": "language HIR, executable semantic IR, host effects, and compatibility boundaries",
+      "sha256": "sha256:a146931e799c6bc9fb9494918f85761a0945b601ea5795f79513d1aab8e7bb03",
+      "status": "Accepted by repository owner",
+      "title": "ADR-0011: Adopt language-specific HIR and versioned semantic IR dialects",
+      "xtask_commands": 0
+    },
+    {
       "normative": false,
       "path": "docs/decisions/README.md",
-      "relative_links": 10,
-      "sha256": "sha256:87e00d9bb2ab7f3a6eb60500aabe309a7ab3b416be6f00d5de0c13bea2e1a9f3",
+      "relative_links": 11,
+      "sha256": "sha256:6fba710ae25b2fc16ab04d01c471d1d2d3b80a72a61aae5dccf31d11f1f9d352",
       "title": "Architecture Decision Records",
       "xtask_commands": 0
     },
@@ -1098,7 +1110,7 @@
       "normative": false,
       "path": "docs/delivery/hardening/53-dataset-mutations.md",
       "relative_links": 0,
-      "sha256": "sha256:54d8a74309010bceb016bcc12c5fc2874cdd67557aad2b72c17d2c40ea175fec",
+      "sha256": "sha256:8fbf0af46b855d99f26e54a18fb039cd2b53c20c0ea9e7b02650cd0a327ad04d",
       "title": "Dataset evidence terminology and source-mutation campaign (#53)",
       "xtask_commands": 0
     },
@@ -1756,6 +1768,10 @@
           "path": "docs/decisions/0010-rust-module-review-budgets.md"
         },
         {
+          "label": "ADR-0011: Typed language HIR and semantic IR",
+          "path": "docs/decisions/0011-typed-language-hir-and-semantic-ir.md"
+        },
+        {
           "label": "Decision index and template",
           "path": "docs/decisions/README.md"
         }
@@ -1919,7 +1935,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:966d3bdad99cd075839c366e1f429c08432122fca2bc684c8c9c89eda50f4493",
+  "registry_sha256": "sha256:1a60772cee4f6817504770dc5751fec131f8ab601ad8310ec389f4f2fe285d8d",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

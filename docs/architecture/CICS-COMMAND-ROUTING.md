@@ -43,6 +43,14 @@ The accepted `retention.rs` sibling owns provider-lifecycle codecs and
 dependency descriptions; it is deliberately outside the command-family layer
 and cannot become an alternate dispatch path.
 
+The compiler/runtime boundary is governed by
+[ADR-0011](../decisions/0011-typed-language-hir-and-semantic-ir.md). A migrated
+COBOL CICS family resolves static command identity, options, resource bindings,
+and output destinations before execution, then emits the existing owned typed
+request through the execution coordinator. The provider never parses COBOL HIR
+or source syntax, and the migration cannot introduce a parallel CICS provider,
+store, unit-of-work protocol, or condition authority.
+
 ## Change contract
 
 Adding or changing a typed CICS command requires one reviewable change that:

@@ -41,6 +41,7 @@
     "docs/decisions/0008-icu-license-compliance.md",
     "docs/decisions/0009-current-package-topology.md",
     "docs/decisions/0010-rust-module-review-budgets.md",
+    "docs/decisions/0011-typed-language-hir-and-semantic-ir.md",
     "docs/delivery/COMPATIBILITY-AND-CUTOVER.md",
     "docs/delivery/IMPLEMENTATION-ROADMAP.md",
     "docs/delivery/VERIFICATION-STRATEGY.md",
@@ -89,6 +90,7 @@
         {"label": "ADR-0008: ICU license compliance", "path": "docs/decisions/0008-icu-license-compliance.md"},
         {"label": "ADR-0009: Current package topology", "path": "docs/decisions/0009-current-package-topology.md"},
         {"label": "ADR-0010: Rust module review budgets", "path": "docs/decisions/0010-rust-module-review-budgets.md"},
+        {"label": "ADR-0011: Typed language HIR and semantic IR", "path": "docs/decisions/0011-typed-language-hir-and-semantic-ir.md"},
         {"label": "Decision index and template", "path": "docs/decisions/README.md"}
       ],
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."

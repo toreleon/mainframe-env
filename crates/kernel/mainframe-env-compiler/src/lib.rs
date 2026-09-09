@@ -26,8 +26,13 @@ pub use generated::cobol_language::{
 };
 
 pub use hir::{
-    CobolHir, ControlEdge, ControlEdgeKind, ControlNode, ControlRole, ControlScope, HirStatement,
-    StatementKind, StatementOption, StatementOptionKind, cobol_hir_catalog,
+    CobolHir, ControlEdge, ControlEdgeKind, ControlNode, ControlRole, ControlScope, HirAddMode,
+    HirAddStatement, HirArithmeticReceiver, HirBinaryOperator, HirCicsConditionPolicy,
+    HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsOption, HirCicsOutputBinding,
+    HirCicsOutputName, HirCicsStatement, HirCicsValue, HirComputeStatement, HirCorrespondingPair,
+    HirDataReference, HirNumericExpression, HirNumericLiteral, HirResolvedStatement, HirRounding,
+    HirSizeErrorPolicy, HirStatement, HirUnaryOperator, StatementKind, StatementOption,
+    StatementOptionKind, cobol_hir_catalog,
 };
 pub use lower::{
     CORE_NAMESPACE, PUBLISHABLE_LAYOUT_CATEGORIES, core_mir_catalog, core_mir_profile,
@@ -46,5 +51,10 @@ pub use syntax::{
     Expansion, LosslessSyntax, SourceOrigin, SourceSpan, SyntaxLimits, SyntaxToken, SyntaxTokenId,
 };
 
+/// Historical token-oriented COBOL HIR dialect retained for compatibility.
 pub const COBOL_HIR_DIALECT: &str = "cobol.hir@1";
+/// Typed COBOL HIR dialect used by resolved statement families.
+pub const COBOL_TYPED_HIR_DIALECT: &str = "cobol.hir@2";
+/// Every COBOL HIR dialect version the compiler may currently emit.
+pub const COBOL_HIR_DIALECTS: &[&str] = &[COBOL_HIR_DIALECT, COBOL_TYPED_HIR_DIALECT];
 pub const CORE_MIR_DIALECT: &str = "mainframe.core.cobol@1";

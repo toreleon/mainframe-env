@@ -85,16 +85,17 @@ infrastructure failure remain distinguishable.
 
 ## Core compiler model
 
-Compiler stages are represented by distinct opaque types:
+Compiler stages are represented by distinct opaque types and language-owned
+semantic models:
 
 ```text
 SourceBundle
-  -> LosslessSyntax
-  -> ParsedProgram
-  -> SemanticProgram
-  -> VerifiedHir
+  -> language-specific syntax and semantic model
+  -> language-specific typed HIR
+  -> VerifiedHir proof
+  -> typed executable semantic IR dialects
   -> LegalizedMir
-  -> PublishedArtifact
+  -> versioned PublishedArtifact
 ```
 
 Frontend parsed and semantic stages remain compiler-private. The public proof
@@ -108,6 +109,19 @@ describes source/compiler/manifest meaning and uses the
 `semantic-sha256:` namespace; `ArtifactContentId` is the SHA-256 of the exact
 published payload and is the only identity serialized as a runtime `sha256:`
 artifact reference.
+
+[ADR-0011](../decisions/0011-typed-language-hir-and-semantic-ir.md) prohibits a
+universal language HIR. The generic IR is a multi-dialect container: shared
+memory, decimal, string, control, and program primitives coexist with explicit
+COBOL and subsystem operations. A migrated operation carries resolved operands
+and policies instead of asking the machine or a provider to rediscover static
+source grammar.
+
+JCL follows a separate typed, versioned `JobPlan`/JES workflow and supplies the
+current bounded second-frontend proof. BMS, CSD, and similar resource DSLs stay
+on separate subsystem-owned parser/resource paths rather than entering the
+ordinary program machine; standalone versioned serialization of their current
+in-memory models remains a later resource-family slice.
 
 ## Conformance model
 

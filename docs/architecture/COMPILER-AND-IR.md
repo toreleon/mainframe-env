@@ -77,14 +77,44 @@ legalized MIR; publication encodes that legal module internally. Semantic
 artifact identity uses `semantic-sha256:`, while the exact payload digest alone
 uses the runtime `sha256:` artifact-reference namespace.
 
-This distinction is artifact contract `mainframe-env.artifact@2`. Version 1
-compiler outputs used a semantic digest in the `sha256:` namespace and are not
-silently reinterpreted; they must be rebuilt so every executable reference can
-be verified against the exact payload bytes.
+The current writer is artifact contract `mainframe-env.artifact@3`. It preserves
+the separate semantic and content identities introduced by version 2 and adds
+an exact `dialect_contracts` manifest set derived from the executable payload.
+`mainframe-env.artifact@2` remains the historical pre-dialect-manifest contract.
+Its explicit reader validates the canonical binary envelope and executable
+profile before deriving an in-memory dialect manifest; it neither rewrites the
+payload nor fabricates a version-3 semantic identity. The release and current
+conformance inventories therefore name version 3, while historical inventories
+remain bound to their original versions.
+Version 1 compiler outputs used a semantic digest in the `sha256:` namespace
+and are not silently reinterpreted; they must be rebuilt so every executable
+reference can be verified against the exact payload bytes.
 
 Analyze mode may return partial syntax, AST, semantic, or HIR results with
 diagnostics and completeness metadata. It may never construct a publishable or
 executable artifact.
+
+## Semantic execution boundary
+
+[ADR-0011](../decisions/0011-typed-language-hir-and-semantic-ir.md) makes the
+target boundary explicit:
+
+```text
+language frontend -> language-specific typed HIR
+                  -> executable semantic IR dialects
+                  -> reference machine -> typed host effects
+```
+
+`VerifiedHir` is a common proof-stage wrapper, not a universal language HIR.
+COBOL, PL/I, HLASM, and REXX retain independent HIR types and verification
+rules. They may reuse generic IR containers and semantic primitives without a
+shared language enum or COBOL types leaking into another frontend.
+
+For each migrated operation family, the frontend resolves statically knowable
+grammar, reference identity, policies, and control edges. The executable form
+must not require the machine to search statement strings for separators or
+options. Runtime subscripts, values, authorization, resource state, provider
+generation, transactions, and dynamic SQL remain runtime inputs.
 
 ## IR object model
 
@@ -106,24 +136,26 @@ that translate through a validated envelope.
 ## Dialects
 
 The common framework does not define a language enum. Dialects own operation
-and type families, for example:
+and type families. Shared primitives are deliberately narrow, while observable
+language and subsystem semantics stay specialized, for example:
 
 ```text
-cobol.hir
-mainframe.core
-mainframe.memory
-mainframe.decimal
-mainframe.control
-cics.terminal
-cics.file
-cics.program
-db2.sql
-jcl.workflow
+cobol.hir                 language-specific analysis
+memory.* / decimal.*      genuinely shared semantic primitives
+string.* / control.*      genuinely shared semantic primitives
+cobol.*                   specialized COBOL execution
+cics.* / db2.* / ims.*   specialized host semantics
+mq.* / dataset.*          specialized host semantics
 ```
 
 A language may retain a valid independent HIR while still sharing lifecycle,
 diagnostics, effects, host capabilities, artifact publication, and execution
 contracts.
+
+An operation's dialect, name, and major version form one immutable semantic
+identity. An incompatible operand shape or meaning uses a new identity or
+major; an existing major is never reinterpreted based on which optional
+attributes happen to be present.
 
 ## Operation catalog
 
@@ -190,6 +222,18 @@ A `LoweringContext` owns builders, layouts, symbols, CFG state, limits,
 diagnostics, and provenance. Domain modules do not reconstruct or bypass those
 invariants.
 
+## Non-program language paths
+
+JCL lowers to an immutable typed job/workflow plan executed by JES and batch
+services, not to an ordinary program for the reference machine. It is the
+bounded second-frontend proof for the initial typed-HIR migration. BMS, CSD,
+and similar resource DSLs remain separate subsystem-owned parser/resource
+paths; their target is versioned resource artifacts consumed by the owning
+subsystem, but this slice does not relabel their current in-memory models as
+such. These paths reuse source, provenance, artifact, security, store, and
+conformance contracts where justified without pretending to share a
+programming-language HIR or execution loop.
+
 ## Reference backend
 
 The deterministic MIR interpreter is the only 0.1 execution backend and the
@@ -216,9 +260,14 @@ includes:
 - compiler and frontend generation;
 - normalized compilation options;
 - target and backend contract;
-- IR/dialect contract versions;
+- IR contract and the exact executable `dialect_contracts` namespace/major set;
 - precompiler and code-generation inputs; and
 - required host interface versions.
 
 The hash is not computed from ordinary Protobuf, JSON, Rust debug, or map
 serialization output. Artifact payload bytes have their own integrity digest.
+
+Artifact readers accept only documented IR envelope, dialect-major, and host
+ABI combinations. Writers emit the current combination. Historical operation
+majors remain executable through their registered handlers or fail with an
+explicit compatibility error; new semantics never silently replace them.

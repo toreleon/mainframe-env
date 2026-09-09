@@ -1,7 +1,5 @@
 use crate::FixedValue;
-use crate::runtime::{
-    CobolArithmetic, CobolArithmeticMode, CobolDecimal, CobolRounding, RuntimeContractProblem,
-};
+use crate::runtime::CobolArithmeticMode;
 use mainframe_env_diagnostics::{
     DiagnosticCode, DiagnosticLimits, ExecutionProblem, FailureCategory, Phase,
 };
@@ -26,6 +24,10 @@ use sha2::{Digest as _, Sha256};
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::OnceLock;
+
+use typed_decimal::{decimal_add, decimal_divide, decimal_multiply, decimal_subtract};
+mod typed_cics;
+mod typed_decimal;
 
 const NAMESPACE: &str = "mainframe.core.cobol";
 pub const SUPPORTED_LAYOUT_CATEGORIES: &[&str] = &[
@@ -331,10 +333,10 @@ enum PendingKind {
     Cics {
         operation: CicsOperation,
         argument_summary: String,
-        into: Option<String>,
-        outputs: BTreeMap<String, String>,
-        response: Option<String>,
-        response2: Option<String>,
+        into: Option<typed_cics::CicsTarget>,
+        outputs: BTreeMap<String, typed_cics::CicsTarget>,
+        response: Option<typed_cics::CicsTarget>,
+        response2: Option<typed_cics::CicsTarget>,
         no_handle: bool,
     },
     Ignore,
@@ -406,13 +408,11 @@ pub type MachineSnapshotSortIo = (
     usize,
     usize,
 );
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MachineSnapshotValue {
     Bytes(Vec<u8>),
     Decimal { coefficient: i128, scale: u32 },
 }
-
 pub struct ReferenceMachine {
     invocation: Invocation,
     operations: Vec<Operation>,
@@ -422,6 +422,7 @@ pub struct ReferenceMachine {
     static_base_count: usize,
     views: BTreeMap<String, StorageView>,
     views_by_id: BTreeMap<StorageId, StorageView>,
+    storage_names_by_id: BTreeMap<StorageId, String>,
     entry_initials: BTreeMap<StorageId, Vec<u8>>,
     implicit: BTreeMap<String, CobolValue>,
     layouts: BTreeMap<String, LayoutMetadata>,
@@ -453,7 +454,6 @@ pub struct ReferenceMachine {
     perform_stack: Vec<usize>,
     deferred_drive: Option<MachineDrive<EffectRequest>>,
 }
-
 impl ReferenceMachine {
     pub fn from_binary(
         binary: &[u8],
@@ -463,7 +463,8 @@ impl ReferenceMachine {
         let module = decode_binary(binary, codec_limits)
             .map_err(|problem| MachineProblem::InvalidArtifact(problem.to_string()))?;
         validate_module(&module)?;
-        let (bases, views, views_by_id) = storage(&module, invocation.limits.max_storage_bytes)?;
+        let (bases, views, views_by_id, storage_names_by_id) =
+            storage(&module, invocation.limits.max_storage_bytes)?;
         let static_base_count = bases.len();
         let mut entry_initials = BTreeMap::new();
         let entry_commarea_len = invocation
@@ -768,6 +769,7 @@ impl ReferenceMachine {
             static_base_count,
             views,
             views_by_id,
+            storage_names_by_id,
             entry_initials,
             implicit: std::mem::take(&mut implicit),
             layouts,
@@ -799,6 +801,8 @@ impl ReferenceMachine {
             perform_stack: Vec::new(),
             deferred_drive: None,
         };
+        typed_decimal::validate_machine(&machine)?;
+        typed_cics::validate_machine(&machine)?;
         if let Some(entry_commarea_len) = entry_commarea_len
             && machine.layout("EIBCALEN").is_some()
         {
@@ -1945,7 +1949,8 @@ impl ReferenceMachine {
             ) => {
                 let responded = response_target.is_some() || no_handle;
                 if let Some(target) = response_target {
-                    self.write_cics_value(
+                    typed_cics::write_target(
+                        self,
                         &target,
                         &CobolValue::Decimal(Decimal {
                             coefficient: i128::from(response.response),
@@ -1954,7 +1959,8 @@ impl ReferenceMachine {
                     )?;
                 }
                 if let Some(target) = response2_target {
-                    self.write_cics_value(
+                    typed_cics::write_target(
+                        self,
                         &target,
                         &CobolValue::Decimal(Decimal {
                             coefficient: i128::from(response.response2),
@@ -1968,7 +1974,8 @@ impl ReferenceMachine {
                         "mainframe-env.cics.into@1" | "mainframe-env.cics.payload@1"
                     )
                 {
-                    self.write_cics_value(
+                    typed_cics::write_target(
+                        self,
                         &target,
                         &CobolValue::Bytes(response.payload.bytes().to_vec()),
                     )?;
@@ -2004,7 +2011,8 @@ impl ReferenceMachine {
                         let coefficient = String::from_utf8_lossy(value.bytes())
                             .parse::<i128>()
                             .map_err(|_| MachineProblem::UnexpectedHostResult)?;
-                        self.write_cics_value(
+                        typed_cics::write_target(
+                            self,
                             target,
                             &CobolValue::Decimal(Decimal {
                                 coefficient,
@@ -2012,7 +2020,11 @@ impl ReferenceMachine {
                             }),
                         )?;
                     } else {
-                        self.write_cics_value(target, &CobolValue::Bytes(value.bytes().to_vec()))?;
+                        typed_cics::write_target(
+                            self,
+                            target,
+                            &CobolValue::Bytes(value.bytes().to_vec()),
+                        )?;
                     }
                 }
                 self.write_cics_context(operation, &response)?;
@@ -2099,6 +2111,9 @@ impl ReferenceMachine {
     }
 
     fn execute(&mut self, operation: &Operation) -> Result<Step, MachineProblem> {
+        if typed_cics::is_typed(operation) {
+            return typed_cics::execute(self, operation);
+        }
         let name = operation.identity.name();
         let args = arguments(operation);
         if let Some(step) = self.execute_control(operation, name, &args)? {
@@ -2170,6 +2185,9 @@ impl ReferenceMachine {
                 self.append_output(&line)?;
             }
             "move" => self.move_op(&args)?,
+            "assign" if typed_decimal::is_assign(operation) => {
+                typed_decimal::execute_with_condition(self, operation)?;
+            }
             "add" | "subtract" | "multiply" | "divide" | "compute" => {
                 match self.arithmetic(name, &args) {
                     Ok(()) => self.condition_status.arithmetic_size_error = false,
@@ -2321,7 +2339,7 @@ impl ReferenceMachine {
             "sort" | "merge" => return self.sort_effect(name, &args),
             "release" => self.release_sort_record(&args)?,
             "return_statement" => self.return_sort_record(&args)?,
-            "exec_cics" => return self.cics_effect(&args),
+            "exec_cics" => return typed_cics::execute_legacy(self, &args),
             "exec_sql" => return self.sql_effect(&args),
             "exec_dli" => return self.ims_effect(&args),
             "stop_run" => {
@@ -2469,8 +2487,10 @@ impl ReferenceMachine {
         )
         .map(Step::Jump)
     }
-
     fn control_branch(&self, operation: &Operation) -> Result<bool, MachineProblem> {
+        if let Some(status) = typed_decimal::control_branch(self, operation)? {
+            return Ok(status);
+        }
         let text = text_attribute(operation, "control_text")?.trim();
         if text.eq_ignore_ascii_case("ELSE") || text.eq_ignore_ascii_case("WHEN OTHER") {
             return Ok(true);
@@ -2580,7 +2600,6 @@ impl ReferenceMachine {
             Ok(true)
         }
     }
-
     fn prepare_search(
         &mut self,
         operation: &Operation,
@@ -4292,151 +4311,6 @@ impl ReferenceMachine {
         };
         self.effect(HostRequest::Dataset(request), pending)
     }
-    fn cics_effect(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
-        let operation = CicsOperation::from_tokens(args).ok_or(MachineProblem::UnsupportedForm)?;
-        let mut arguments = cics_arguments(args)?;
-        let into = cics_destination(&arguments, "INTO");
-        let output_names: &[&str] = match operation {
-            CicsOperation::Asktime => &["ABSTIME"],
-            CicsOperation::Assign => &["APPLID", "SYSID", "TRANSID", "PRINCIPAL"],
-            CicsOperation::FormatTime => &[
-                "YYYYMMDD",
-                "YYMMDD",
-                "MMDDYY",
-                "MMDDYYYY",
-                "YYDDD",
-                "TIME",
-                "MILLISECONDS",
-            ],
-            CicsOperation::Link => &["COMMAREA"],
-            CicsOperation::ReadNext | CicsOperation::ReadPrev => &["RIDFLD"],
-            _ => &[],
-        };
-        let outputs = output_names
-            .iter()
-            .filter_map(|name| {
-                cics_destination(&arguments, name).map(|target| ((*name).into(), target))
-            })
-            .collect::<BTreeMap<_, _>>();
-        let response_target = cics_destination(&arguments, "RESP");
-        let response2_target = cics_destination(&arguments, "RESP2");
-        let absolute_time = cics_destination(&arguments, "ABSTIME");
-        for key in [
-            "FROM", "COMMAREA", "RIDFLD", "LENGTH", "QUEUE", "MAP", "MAPSET", "TRANSID", "PROGRAM",
-            "DATASET", "FILE", "MEMBER", "VERSION",
-        ] {
-            if outputs.contains_key(key) {
-                continue;
-            }
-            let Some(argument) = arguments.get(key) else {
-                continue;
-            };
-            if argument.schema() == "mainframe-env.cics.literal@1" {
-                continue;
-            }
-            let token = String::from_utf8_lossy(argument.bytes()).into_owned();
-            let reference_tokens = token
-                .split_whitespace()
-                .map(str::to_string)
-                .collect::<Vec<_>>();
-            if let Ok(reference) = self.reference(&reference_tokens) {
-                let value = self.read_reference(&reference)?;
-                arguments.insert(
-                    key.into(),
-                    BoundedPayload::new(
-                        "mainframe-env.cics.storage-value@1",
-                        value,
-                        InvocationLimits::default(),
-                    )
-                    .map_err(|_| MachineProblem::ResourceExhausted)?,
-                );
-            }
-        }
-        if operation == CicsOperation::FormatTime
-            && let Some(target) = absolute_time
-        {
-            let tokens = target
-                .split_whitespace()
-                .map(str::to_string)
-                .collect::<Vec<_>>();
-            let reference = self.reference(&tokens)?;
-            let bytes = self.read_reference(&reference)?;
-            if !is_numeric(reference.layout.category) {
-                return Err(MachineProblem::DataException);
-            }
-            let value = decode_decimal(&reference.layout, &bytes)?;
-            if value.scale != 0 {
-                return Err(MachineProblem::DataException);
-            }
-            arguments.insert(
-                "ABSTIME".into(),
-                BoundedPayload::new(
-                    "mainframe-env.cics.decimal@1",
-                    value.coefficient.to_string().into_bytes(),
-                    InvocationLimits::default(),
-                )
-                .map_err(|_| MachineProblem::ResourceExhausted)?,
-            );
-        }
-        let condition_policy = if args.iter().any(|arg| arg.eq_ignore_ascii_case("NOHANDLE")) {
-            CicsConditionPolicy::NoHandle
-        } else if let Some(response) = arguments.get("RESP") {
-            CicsConditionPolicy::Respond {
-                response_field: String::from_utf8_lossy(response.bytes()).into_owned(),
-                response2_field: arguments
-                    .get("RESP2")
-                    .map(|value| String::from_utf8_lossy(value.bytes()).into_owned()),
-            }
-        } else {
-            CicsConditionPolicy::Default
-        };
-        let mut mutation = operation
-            .is_mutating()
-            .then(|| self.mutation())
-            .transpose()?;
-        if let Some(mutation) = &mut mutation {
-            mutation.transaction = Some(
-                self.invocation
-                    .bindings
-                    .get("cics.transaction")
-                    .map(|payload| String::from_utf8_lossy(payload.bytes()).into_owned())
-                    .unwrap_or_else(|| "DEFAULT".into()),
-            );
-        }
-        let argument_summary = arguments
-            .iter()
-            .map(|(name, value)| {
-                if matches!(name.as_str(), "MAP" | "MAPSET" | "TRANSID" | "PROGRAM") {
-                    format!(
-                        "{name}={:?}/{}",
-                        String::from_utf8_lossy(value.bytes()),
-                        value.schema()
-                    )
-                } else {
-                    format!("{name}=<{} bytes>/{}", value.bytes().len(), value.schema())
-                }
-            })
-            .collect::<Vec<_>>()
-            .join(",");
-        self.effect(
-            HostRequest::Cics(CicsRequest {
-                operation,
-                arguments,
-                condition_policy,
-                mutation,
-            }),
-            PendingKind::Cics {
-                operation,
-                argument_summary,
-                into,
-                outputs,
-                response: response_target,
-                response2: response2_target,
-                no_handle: args.iter().any(|argument| argument == "NOHANDLE"),
-            },
-        )
-    }
-
     fn write_cics_context(
         &mut self,
         operation: CicsOperation,
@@ -8374,13 +8248,6 @@ impl ReferenceMachine {
         }
     }
 
-    fn write_cics_value(&mut self, target: &str, value: &CobolValue) -> Result<(), MachineProblem> {
-        let tokens = target
-            .split_whitespace()
-            .map(str::to_string)
-            .collect::<Vec<_>>();
-        self.write_reference_value(&tokens, value)
-    }
     fn read(&self, name: &str) -> Result<Vec<u8>, MachineProblem> {
         if self.layout(name).is_none()
             && let Some(value) = self.implicit.get(&normalize(name))
@@ -9420,107 +9287,16 @@ impl<'a> SnapshotInput<'a> {
         }
         Ok(self.take(length)?.to_vec())
     }
-
     fn finished(&self) -> bool {
         self.offset == self.bytes.len()
     }
 }
-
-fn cics_arguments(tokens: &[String]) -> Result<BTreeMap<String, BoundedPayload>, MachineProblem> {
-    let mut arguments = BTreeMap::new();
-    let command = tokens
-        .iter()
-        .position(|token| {
-            !matches!(
-                token.to_ascii_uppercase().as_str(),
-                "EXEC" | "CICS" | "END-EXEC"
-            )
-        })
-        .ok_or(MachineProblem::InvalidOperation)?;
-    let first = tokens[command].to_ascii_uppercase();
-    let mut index = command + 1;
-    if matches!(first.as_str(), "HANDLE" | "RECEIVE" | "SEND" | "WRITEQ")
-        && tokens.get(index).is_some_and(|token| {
-            matches!(
-                token.to_ascii_uppercase().as_str(),
-                "ABEND" | "CONDITION" | "MAP" | "TEXT" | "TD"
-            )
-        })
-    {
-        let subcommand = tokens[index].to_ascii_uppercase();
-        index += 1;
-        if tokens.get(index).is_some_and(|token| token == "(") {
-            let end = matching_close(tokens, index).ok_or(MachineProblem::InvalidOperation)?;
-            let raw = tokens[index + 1..end].join(" ");
-            let literal = raw.starts_with(['\'', '"']) && raw.ends_with(['\'', '"']);
-            arguments.insert(
-                subcommand,
-                BoundedPayload::new(
-                    if literal {
-                        "mainframe-env.cics.literal@1"
-                    } else {
-                        "mainframe-env.cics.argument@1"
-                    },
-                    raw.trim_matches(['\'', '"']).as_bytes().to_vec(),
-                    InvocationLimits::default(),
-                )
-                .map_err(|_| MachineProblem::ResourceExhausted)?,
-            );
-            index = end + 1;
-        }
-    }
-    while index < tokens.len() {
-        let key = tokens[index].to_ascii_uppercase();
-        if key == "END-EXEC" {
-            break;
-        }
-        if tokens.get(index + 1).is_some_and(|token| token == "(") {
-            let end = matching_close(tokens, index + 1).ok_or(MachineProblem::InvalidOperation)?;
-            let raw = tokens[index + 2..end].join(" ");
-            let literal = raw.starts_with(['\'', '"']) && raw.ends_with(['\'', '"']);
-            let value = raw.trim_matches(['\'', '"']).to_string();
-            arguments.insert(
-                key,
-                BoundedPayload::new(
-                    if literal {
-                        "mainframe-env.cics.literal@1"
-                    } else {
-                        "mainframe-env.cics.argument@1"
-                    },
-                    value.into_bytes(),
-                    InvocationLimits::default(),
-                )
-                .map_err(|_| MachineProblem::ResourceExhausted)?,
-            );
-            index = end + 1;
-        } else {
-            arguments.insert(
-                format!("OPTION.{key}"),
-                BoundedPayload::new(
-                    "mainframe-env.cics.option@1",
-                    Vec::new(),
-                    InvocationLimits::default(),
-                )
-                .map_err(|_| MachineProblem::ResourceExhausted)?,
-            );
-            index += 1;
-        }
-    }
-    Ok(arguments)
-}
-
-fn cics_destination(arguments: &BTreeMap<String, BoundedPayload>, key: &str) -> Option<String> {
-    arguments
-        .get(key)
-        .map(|value| String::from_utf8_lossy(value.bytes()).into_owned())
-}
-
 type StorageState = (
     Vec<Vec<u8>>,
     BTreeMap<String, StorageView>,
     BTreeMap<StorageId, StorageView>,
+    BTreeMap<StorageId, String>,
 );
-
 fn storage(module: &Module, max: u64) -> Result<StorageState, MachineProblem> {
     let total = module
         .storage()
@@ -9534,6 +9310,7 @@ fn storage(module: &Module, max: u64) -> Result<StorageState, MachineProblem> {
     let mut bases: Vec<Vec<u8>> = Vec::new();
     let mut by_id: BTreeMap<StorageId, StorageView> = BTreeMap::new();
     let mut names: BTreeMap<String, StorageView> = BTreeMap::new();
+    let mut names_by_id = BTreeMap::new();
     for item in module.storage() {
         let view = if let Some(alias) = &item.alias_of {
             let target = by_id
@@ -9554,9 +9331,11 @@ fn storage(module: &Module, max: u64) -> Result<StorageState, MachineProblem> {
             }
         };
         by_id.insert(item.id, view.clone());
-        names.insert(item.name.to_ascii_uppercase(), view);
+        let name = item.name.to_ascii_uppercase();
+        names_by_id.insert(item.id, name.clone());
+        names.insert(name, view);
     }
-    Ok((bases, names, by_id))
+    Ok((bases, names, by_id, names_by_id))
 }
 fn validate_module(module: &Module) -> Result<(), MachineProblem> {
     let supported = supported_operations();
@@ -9587,6 +9366,8 @@ fn validate_module(module: &Module) -> Result<(), MachineProblem> {
             "illegal operation or terminator".into(),
         ));
     }
+    typed_cics::validate_module_operations(&operations)?;
+    typed_decimal::validate_module_operations(&operations)?;
     Ok(())
 }
 pub fn supported_operations() -> &'static BTreeSet<OperationIdentity> {
@@ -9649,10 +9430,13 @@ pub fn supported_operations() -> &'static BTreeSet<OperationIdentity> {
             "label",
             "halt",
         ];
-        names
+        let mut operations = names
             .into_iter()
             .map(|name| OperationIdentity::new(NAMESPACE, name, 1).expect("static operation"))
-            .collect()
+            .collect::<BTreeSet<_>>();
+        operations.extend(typed_cics::operation_identities());
+        operations.insert(typed_decimal::operation_identity());
+        operations
     })
 }
 fn arguments(operation: &Operation) -> Vec<String> {
@@ -11121,84 +10905,6 @@ fn decimal_rescale_rounded(value: Decimal, scale: u32) -> Result<Decimal, Machin
             .ok_or(MachineProblem::SizeError)?,
         scale,
     })
-}
-
-fn decimal_add(
-    mode: CobolArithmeticMode,
-    left: Decimal,
-    right: Decimal,
-) -> Result<Decimal, MachineProblem> {
-    decimal_primitive_binary(mode, left, right, CobolArithmetic::add)
-}
-
-fn decimal_subtract(
-    mode: CobolArithmeticMode,
-    left: Decimal,
-    right: Decimal,
-) -> Result<Decimal, MachineProblem> {
-    decimal_primitive_binary(mode, left, right, CobolArithmetic::subtract)
-}
-
-fn decimal_multiply(
-    mode: CobolArithmeticMode,
-    left: Decimal,
-    right: Decimal,
-) -> Result<Decimal, MachineProblem> {
-    decimal_primitive_binary(mode, left, right, CobolArithmetic::multiply)
-}
-
-fn decimal_divide(
-    mode: CobolArithmeticMode,
-    dividend: Decimal,
-    divisor: Decimal,
-    result_scale: u32,
-) -> Result<Decimal, MachineProblem> {
-    if divisor.coefficient == 0 {
-        return Err(MachineProblem::SizeError);
-    }
-    decimal_rescale(
-        decimal_primitive_binary(mode, dividend, divisor, CobolArithmetic::divide)?,
-        result_scale,
-    )
-}
-
-type DecimalBinaryOperation =
-    fn(
-        &mut CobolArithmetic,
-        CobolDecimal,
-        CobolDecimal,
-    ) -> Result<(CobolDecimal, crate::runtime::CobolArithmeticFlags), RuntimeContractProblem>;
-
-fn decimal_primitive_binary(
-    mode: CobolArithmeticMode,
-    left: Decimal,
-    right: Decimal,
-    operation: DecimalBinaryOperation,
-) -> Result<Decimal, MachineProblem> {
-    let mut arithmetic =
-        CobolArithmetic::new(mode, CobolRounding::Truncation).map_err(runtime_decimal_problem)?;
-    let (left, left_flags) = arithmetic
-        .parse(&decimal_string(left))
-        .map_err(runtime_decimal_problem)?;
-    let (right, right_flags) = arithmetic
-        .parse(&decimal_string(right))
-        .map_err(runtime_decimal_problem)?;
-    if left_flags.size_error() || right_flags.size_error() {
-        return Err(MachineProblem::SizeError);
-    }
-    let (value, flags) =
-        operation(&mut arithmetic, left, right).map_err(runtime_decimal_problem)?;
-    if flags.size_error() {
-        return Err(MachineProblem::SizeError);
-    }
-    decimal_text(&value.to_standard_string()).ok_or(MachineProblem::SizeError)
-}
-
-const fn runtime_decimal_problem(problem: RuntimeContractProblem) -> MachineProblem {
-    match problem {
-        RuntimeContractProblem::InvalidDecimal => MachineProblem::DataException,
-        _ => MachineProblem::SizeError,
-    }
 }
 
 fn ten_power(exponent: u32) -> Result<i128, MachineProblem> {
@@ -13150,7 +12856,7 @@ mod tests {
         ResourceLimits, RunUnitId, Selector, ServiceClass, TraceId,
     };
     use mainframe_env_ir::{Effect, IrLimits, ModuleBuilder};
-    fn invocation() -> Invocation {
+    pub(super) fn invocation() -> Invocation {
         let l = InvocationLimits::default();
         Invocation::new(
             RequestId::new("req", l).unwrap(),
@@ -13392,7 +13098,7 @@ mod tests {
             CicsOperation::from_tokens(&tokens),
             Some(CicsOperation::SendMap)
         );
-        let arguments = cics_arguments(&tokens).unwrap();
+        let arguments = typed_cics::legacy_arguments(&tokens).unwrap();
         assert_eq!(arguments["MAPSET"].bytes(), b"MENUMS");
         assert_eq!(arguments["MAP"].bytes(), b"MENU");
         assert!(arguments.contains_key("OPTION.ERASE"));

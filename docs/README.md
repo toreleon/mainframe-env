@@ -72,6 +72,7 @@ explicitly names that authority as superseded.
 - [ADR-0008: ICU license compliance](decisions/0008-icu-license-compliance.md)
 - [ADR-0009: Current package topology](decisions/0009-current-package-topology.md)
 - [ADR-0010: Rust module review budgets](decisions/0010-rust-module-review-budgets.md)
+- [ADR-0011: Typed language HIR and semantic IR](decisions/0011-typed-language-hir-and-semantic-ir.md)
 - [Decision index and template](decisions/README.md)
 
 ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized.

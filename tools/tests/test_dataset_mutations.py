@@ -85,6 +85,23 @@ class ClassificationTests(unittest.TestCase):
                 module.digest((TOOL.parents[1] / module.COBOL_MOVE_SCENARIOS).read_bytes()),
             )
 
+    def test_typed_arithmetic_product_mutation_anchors_are_unique_and_scenario_is_unchanged(self):
+        source = (TOOL.parents[1] / module.TYPED_ARITHMETIC_SOURCE).read_text()
+        scenarios = (TOOL.parents[1] / module.TYPED_ARITHMETIC_SCENARIOS).read_bytes()
+        for mutation in module.TYPED_ARITHMETIC_MUTATIONS:
+            changed = module.apply_mutation(source, mutation)
+            self.assertNotEqual(changed, source)
+            self.assertEqual(
+                changed.partition('#[cfg(test)]')[2],
+                source.partition('#[cfg(test)]')[2],
+            )
+            self.assertEqual(
+                module.digest(scenarios),
+                module.digest(
+                    (TOOL.parents[1] / module.TYPED_ARITHMETIC_SCENARIOS).read_bytes()
+                ),
+            )
+
 
 if __name__ == '__main__':
     unittest.main()

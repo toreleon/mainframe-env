@@ -78,7 +78,7 @@
     },
     {
       "path": "crates/kernel/mainframe-env-compiler/src/hir.rs",
-      "max_production_lines": 1912,
+      "max_production_lines": 1849,
       "responsibility": "HIR declarations, builder state, and source-to-HIR integration remain combined at the compiler stage boundary.",
       "split_boundary": "Separate HIR records and invariants from builder orchestration while keeping the stage-private public surface unchanged."
     },
@@ -108,7 +108,7 @@
     },
     {
       "path": "crates/kernel/mainframe-env-interpreter/src/machine.rs",
-      "max_production_lines": 13523,
+      "max_production_lines": 13229,
       "responsibility": "The deterministic COBOL machine executes all operations, control flow, calls, host effects, and conditions.",
       "split_boundary": "Extract operation handlers by control, numeric/data, call, file/host-effect, and condition families around one machine state."
     },
@@ -204,7 +204,7 @@
     },
     {
       "path": "crates/tooling/mainframe-env-conformance/src/cics_pilot.rs",
-      "max_production_lines": 1359,
+      "max_production_lines": 1321,
       "responsibility": "The CICS pilot harness decodes fixtures, drives candidate behavior, and compares licensed and local evidence.",
       "split_boundary": "Separate fixture decoding, local scenario execution, licensed capture adaptation, and evidence assertions."
     },

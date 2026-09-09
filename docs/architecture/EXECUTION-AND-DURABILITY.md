@@ -79,6 +79,15 @@ identical.
 
 ## Host-effect protocol
 
+A host effect is an owned typed integration request, not a syntax transport.
+Under
+[ADR-0011](../decisions/0011-typed-language-hir-and-semantic-ir.md), providers
+never receive source text, language HIR, or statement token lists. Executable
+semantic operations carry pre-resolved resource and output bindings; the
+machine evaluates runtime values, authorization context, provider generation,
+and transaction state before emitting the request. Provider and store
+authorities remain unchanged as semantic families migrate.
+
 For a mutating effect:
 
 1. Validate request, capability, principal, bounds, transaction, and deadline.

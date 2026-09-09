@@ -369,6 +369,50 @@ mod tests {
         );
     }
     #[test]
+    fn arithmetic_conformance_programs_use_the_typed_decimal_dialect() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. TYPEDMATH. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 99 VALUE 2. 01 B PIC 99 VALUE 3. 01 C PIC 99 VALUE 0. 01 D PIC 99 VALUE 0. 01 GOOD-X PIC 9 VALUE 4. 01 SMALL-X PIC 9 VALUE 9. PROCEDURE DIVISION. ADD A TO B. COMPUTE C = A + B. COMPUTE D ROUNDED = B / 2. ADD A TO GOOD-X SMALL-X ON SIZE ERROR CONTINUE END-ADD. DISPLAY B C D GOOD-X SMALL-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        assert!(
+            artifact
+                .manifest()
+                .dialect_contracts
+                .contains("mainframe.decimal@1")
+        );
+        let module = mainframe_env_ir::decode_binary(
+            artifact.payload(),
+            mainframe_env_ir::CodecLimits::default(),
+        )
+        .unwrap();
+        let operations = module
+            .regions()
+            .iter()
+            .flat_map(|region| &region.blocks)
+            .flat_map(|block| &block.operations)
+            .collect::<Vec<_>>();
+        assert!(!operations.iter().any(|operation| {
+            operation.identity.namespace() == "mainframe.core.cobol"
+                && matches!(operation.identity.name(), "add" | "compute")
+        }));
+        let typed = operations
+            .iter()
+            .filter(|operation| {
+                operation.identity.namespace() == "mainframe.decimal"
+                    && operation.identity.name() == "assign"
+                    && operation.identity.major() == 1
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(typed.len(), 4);
+        assert!(typed.iter().all(|operation| {
+            operation.attributes.contains_key("assignment_plan")
+                && !operation.attributes.contains_key("arguments")
+                && !operation.attributes.contains_key("control_text")
+        }));
+        assert!(matches!(
+            execute(&artifact, 1024),
+            MachineDrive::Completed(done) if done.output.bytes() == b"05070349\n"
+        ));
+    }
+    #[test]
     fn every_publishable_layout_category_decodes_and_constructs_the_machine() {
         use mainframe_env_ir::{Attribute, decode_binary};
 
@@ -2103,7 +2147,7 @@ mod tests {
     fn cics_response_updates_into_resp_and_eib_storage() {
         use mainframe_env_host_api::{CicsDisposition, CicsResponse, EffectResult, HostResult};
 
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSRESULT. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(3). 01 RESP-X PIC 99. 01 RESP2-X PIC 99. 01 EIBRESP PIC 99. 01 EIBRESP2 PIC 99. 01 EIBCALEN PIC 99. 01 EIBAID PIC X. 01 EIBTRNID PIC X(4). PROCEDURE DIVISION. EXEC CICS READ DATASET('D') INTO(DATA-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. DISPLAY DATA-X. DISPLAY RESP-X. DISPLAY RESP2-X. DISPLAY EIBCALEN. DISPLAY EIBTRNID. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSRESULT. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(3). 01 RESP-X PIC 99. 01 RESP2-X PIC 99. 01 EIBRESP PIC 99. 01 EIBRESP2 PIC 99. 01 EIBCALEN PIC 99. 01 EIBAID PIC X. 01 EIBTRNID PIC X(4). PROCEDURE DIVISION. EXEC CICS READ DATASET('D') RIDFLD('K') INTO(DATA-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. DISPLAY DATA-X. DISPLAY RESP-X. DISPLAY RESP2-X. DISPLAY EIBCALEN. DISPLAY EIBTRNID. STOP RUN.";
         let artifact = compile(source).unwrap();
         let mut machine = ReferenceMachine::from_binary(
             artifact.payload(),

@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added ADR-0011 and the first typed-HIR vertical slices: resolved COBOL
+  arithmetic plans, typed CICS file/unit-of-work plans, versioned executable
+  dialect identities, and bounded canonical plan codecs.
+- Added candidate-bound product-source mutants for typed decimal addition,
+  receiver rounding, and atomic multi-receiver assignment; the unchanged
+  arithmetic conformance path must kill every representative mutant.
 - Added persistent bounded COBOL-parser and IR-decoder fuzzing, Loom schedule
   models with a negative concurrency mutant, and instrumented critical-package
   coverage reporting as receipt-backed full CI gates.
@@ -24,6 +30,9 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Advanced artifact publication to `mainframe-env.artifact@3`; manifests now
+  carry the exact dialect namespace/major set derived from their executable
+  payload while historical `@2` artifacts retain their original contract.
 - Updated the 0.9 CICS implementation plan to require the integrated 28-finding
   hardening baseline, bounded family slices, per-slice security/recovery,
   explicit backend validation, and early licensed-campaign planning.
@@ -43,6 +52,8 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Routed the CICS file/UOW pilot through the durable execution coordinator and
+  bounded arithmetic-expression grammar descent before typed HIR construction.
 - Persisted bounded typed host audit decisions with versioned canonical resource
   digests; made effect-result, lifecycle, outbox, and audit commits atomic; and
   made ordinary RACF authorization auditing fail closed and survive recovery.

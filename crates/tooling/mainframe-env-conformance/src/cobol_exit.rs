@@ -9,8 +9,9 @@ use mainframe_env_compiler::{
     INTRINSIC_FUNCTIONS, PROCEDURE_STATEMENTS, SPECIAL_REGISTERS,
 };
 use mainframe_env_compiler_api::{
-    CompilationMode, CompileOptions, CompileTarget, CompilerRequest, CompilerResult,
-    CompilerService,
+    ArtifactLimits, ArtifactManifestV2, CompilationMode, CompileOptions, CompileTarget,
+    CompilerRequest, CompilerResult, CompilerService, LEGACY_ARTIFACT_CONTRACT, ValidatedArtifact,
+    VersionedArtifactManifest,
 };
 use mainframe_env_execution_api::{Machine, MachineDrive, MachineResume, Quantum};
 use mainframe_env_interpreter::ReferenceMachine;
@@ -174,9 +175,44 @@ fn verify_prior_artifact() -> Result<usize, String> {
         return Err("accepted 0.1.1 artifact is not canonically readable".into());
     }
     let current = compile(HELLO_SOURCE)?;
+    execute_hello_payload(&payload, &current, "accepted 0.1.1 artifact")?;
+
+    let legacy_manifest = ArtifactManifestV2 {
+        compiler_generation: current.manifest().compiler_generation.clone(),
+        target: current.manifest().target.clone(),
+        options: current.manifest().options.clone(),
+        host_interfaces: current.manifest().host_interfaces.clone(),
+        ir_contract: current.manifest().ir_contract.clone(),
+    };
+    let catalog = mainframe_env_compiler::core_mir_catalog();
+    let profile = mainframe_env_compiler::core_mir_profile();
+    let migrated = ValidatedArtifact::read(
+        VersionedArtifactManifest::V2(legacy_manifest),
+        current.payload(),
+        &catalog,
+        &profile,
+        CodecLimits::default(),
+        ArtifactLimits::default(),
+    )
+    .map_err(|problem| problem.to_string())?;
+    if migrated.source_contract() != LEGACY_ARTIFACT_CONTRACT
+        || migrated.payload() != current.payload()
+        || migrated.manifest().dialect_contracts != current.manifest().dialect_contracts
+    {
+        return Err("version-2 artifact migration changed identity or executable bytes".into());
+    }
+    execute_hello_payload(migrated.payload(), &current, "migrated version-2 artifact")?;
+    Ok(payload.len())
+}
+
+fn execute_hello_payload(
+    payload: &[u8],
+    current: &mainframe_env_compiler_api::PublishedArtifact,
+    label: &str,
+) -> Result<(), String> {
     let mut machine =
-        ReferenceMachine::from_binary(&payload, invocation(&current, 1024), CodecLimits::default())
-            .map_err(|problem| format!("{problem:?}"))?;
+        ReferenceMachine::from_binary(payload, invocation(current, 1024), CodecLimits::default())
+            .map_err(|problem| format!("{label}: {problem:?}"))?;
     let mut resume = MachineResume::Start;
     loop {
         match machine.drive(
@@ -186,14 +222,14 @@ fn verify_prior_artifact() -> Result<usize, String> {
             MachineDrive::Continue => resume = MachineResume::Start,
             MachineDrive::Completed(done) => {
                 if done.return_code != 0 || done.output.bytes() != b"HELLO WORLD!\n" {
-                    return Err("accepted 0.1.1 artifact execution drifted".into());
+                    return Err(format!("{label} execution drifted"));
                 }
                 break;
             }
-            other => return Err(format!("accepted 0.1.1 artifact stopped: {other:?}")),
+            other => return Err(format!("{label} stopped: {other:?}")),
         }
     }
-    Ok(payload.len())
+    Ok(())
 }
 
 fn request(source: &str) -> Result<CompilerRequest, String> {

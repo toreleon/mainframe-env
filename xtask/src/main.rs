@@ -7053,6 +7053,21 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         status.success(),
         "Rust module boundary architecture guard failed",
     )?;
+    let typed_semantic_boundaries = root.join("tools/check_typed_semantic_boundaries.py");
+    require(
+        typed_semantic_boundaries.is_file(),
+        "typed semantic boundary architecture guard is missing",
+    )?;
+    let status = Command::new("python3")
+        .arg("-B")
+        .arg(&typed_semantic_boundaries)
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("typed semantic boundary guard: {error}"))?;
+    require(
+        status.success(),
+        "typed semantic boundary architecture guard failed",
+    )?;
     Ok(())
 }
 

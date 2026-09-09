@@ -15,6 +15,13 @@ through the common `WorkStore`; dataset DD effects use the 0.6 dataset
 authority; and every admission, selection, execution, output, and control route
 uses the 0.5 SAF authority.
 
+JCL remains a non-program language path under
+[ADR-0011](../decisions/0011-typed-language-hir-and-semantic-ir.md): its
+frontend produces an immutable typed `JobPlan` consumed by these JES/batch
+authorities. The plan is not lowered to a pretend program operation or driven
+through the ordinary reference machine. Individual registered program steps
+may invoke that machine after JES has resolved the step and its typed DDs.
+
 The public contracts are:
 
 - `mainframe-env.jes-runtime@1` for class, initiator, queue, lifecycle, control,

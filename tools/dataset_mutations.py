@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Candidate-bound behavioral mutation tests of the independent dataset model.
+"""Candidate-bound behavioral mutation tests of reviewed model/runtime slices.
 
 Mutate transition *source*, never observations, test assertions or live product
 state. A compiler failure, missing assertion, or timeout receives no kill credit.
-Receipts are local-model evidence; they grant zero product/IBM differential credit.
+Each receipt distinguishes independent-model and product-runtime credit; no local
+mutation grants licensed IBM differential credit.
 """
 from __future__ import annotations
 
@@ -27,6 +28,12 @@ CICS_SOURCES = (CICS_FILE_SOURCE, CICS_RECOVERY_SOURCE)
 CICS_SCENARIOS = Path('crates/tooling/mainframe-env-conformance/src/cics_pilot.rs')
 COBOL_MOVE_SOURCE = Path('crates/kernel/mainframe-env-interpreter/src/machine.rs')
 COBOL_MOVE_SCENARIOS = Path('crates/tooling/mainframe-env-conformance/src/cobol_move_pilot.rs')
+TYPED_ARITHMETIC_SOURCE = Path(
+    'crates/kernel/mainframe-env-interpreter/src/machine/typed_decimal.rs'
+)
+TYPED_ARITHMETIC_SCENARIOS = Path(
+    'crates/tooling/mainframe-env-conformance/src/framework.rs'
+)
 TEST_PREFIX = 'dataset_reference::tests::'
 COMMAND = ['cargo', 'test', '--locked', '-p', 'mainframe-env-conformance',
            TEST_PREFIX, '--', '--test-threads=1']
@@ -64,11 +71,11 @@ MUTATIONS = (
 
 CICS_COMMAND = [
     'cargo', 'test', '--locked', '-p', 'mainframe-env-conformance',
-    'cics_pilot::tests::cics_pilot_runs_compiler_interpreter_providers_and_real_stores',
+    'cics_pilot::tests::cics_pilot_runs_compiler_interpreter_coordinator_providers_and_real_stores',
     '--', '--exact', '--test-threads=1',
 ]
 CICS_EXPECTED_TESTS = {
-    'cics_pilot::tests::cics_pilot_runs_compiler_interpreter_providers_and_real_stores'
+    'cics_pilot::tests::cics_pilot_runs_compiler_interpreter_coordinator_providers_and_real_stores'
 }
 CICS_MUTATIONS = (
     Mutation(
@@ -131,6 +138,49 @@ COBOL_MOVE_MUTATIONS = (
         "if floating_sign_slot == Some(digit_index) {\n"
         "                    output.push(if value.coefficient < 0 {\n"
         "                        b' '",
+    ),
+)
+
+TYPED_ARITHMETIC_COMMAND = [
+    'cargo', 'test', '--locked', '-p', 'mainframe-env-conformance',
+    'framework::tests::arithmetic_conformance_programs_use_the_typed_decimal_dialect',
+    '--', '--exact', '--test-threads=1',
+]
+TYPED_ARITHMETIC_EXPECTED_TESTS = {
+    'framework::tests::arithmetic_conformance_programs_use_the_typed_decimal_dialect'
+}
+TYPED_ARITHMETIC_MUTATIONS = (
+    Mutation(
+        'typed-decimal-add-as-subtract',
+        'Execute the shared typed decimal addition primitive as subtraction',
+        'decimal_primitive_binary(mode, left, right, CobolArithmetic::add)',
+        'decimal_primitive_binary(mode, left, right, CobolArithmetic::subtract)',
+    ),
+    Mutation(
+        'typed-decimal-ignore-rounded',
+        'Force every fixed-point typed receiver to truncate instead of using its policy',
+        'round_to_scale(value, layout.scale, receiver.rounding)?',
+        'round_to_scale(value, layout.scale, DecimalRoundingPolicy::Truncation)?',
+    ),
+    Mutation(
+        'typed-decimal-write-before-batch-validates',
+        'Write each typed receiver before all assignments have staged successfully',
+        '        staged.push(stage_receiver(\n'
+        '            machine,\n'
+        '            operation,\n'
+        '            &assignment.receiver,\n'
+        '            value,\n'
+        '        )?);',
+        '        let staged_receiver = stage_receiver(\n'
+        '            machine,\n'
+        '            operation,\n'
+        '            &assignment.receiver,\n'
+        '            value,\n'
+        '        )?;\n'
+        '        let (view, bytes) = &staged_receiver;\n'
+        '        machine.bases[view.base][view.offset..view.offset + view.length]\n'
+        '            .copy_from_slice(bytes);\n'
+        '        staged.push(staged_receiver);',
     ),
 )
 
@@ -213,8 +263,14 @@ def campaign(root: Path, output: Path, timeout: int) -> int:
     cobol_move_scenarios = subprocess.check_output(
         ['git', 'show', f'{candidate}:{COBOL_MOVE_SCENARIOS.as_posix()}'], cwd=root
     )
+    typed_arithmetic_original = subprocess.check_output(
+        ['git', 'show', f'{candidate}:{TYPED_ARITHMETIC_SOURCE.as_posix()}'], cwd=root
+    ).decode()
+    typed_arithmetic_scenarios = subprocess.check_output(
+        ['git', 'show', f'{candidate}:{TYPED_ARITHMETIC_SCENARIOS.as_posix()}'], cwd=root
+    )
     output.mkdir(parents=True, exist_ok=False)
-    receipt = {'schema_version': 'mainframe-env.source-mutations@2',
+    receipt = {'schema_version': 'mainframe-env.source-mutations@3',
                'candidate': candidate, 'tree': tree, 'model_kind': 'independent-reference-source',
                'scope': 'model transitions, not product-runtime mutants',
                'product_mutation_credit': 0, 'licensed_differential_credit': 0,
@@ -251,6 +307,20 @@ def campaign(root: Path, output: Path, timeout: int) -> int:
                    'unchanged_scenarios': COBOL_MOVE_SCENARIOS.as_posix(),
                    'unchanged_scenarios_digest': digest(cobol_move_scenarios),
                    'command': COBOL_MOVE_COMMAND,
+                   'timeout_seconds': timeout,
+                   'mutants': [],
+                   'equivalence_assessment': 'not inferred; surviving mutants require review',
+               },
+               'typed_arithmetic_runtime': {
+                   'model_kind': 'production-runtime-source',
+                   'scope': 'typed decimal ADD/COMPUTE primitives, rounding, and atomic assignment',
+                   'product_mutation_credit': 1,
+                   'licensed_differential_credit': 0,
+                   'source': TYPED_ARITHMETIC_SOURCE.as_posix(),
+                   'original_source_digest': digest(typed_arithmetic_original.encode()),
+                   'unchanged_scenarios': TYPED_ARITHMETIC_SCENARIOS.as_posix(),
+                   'unchanged_scenarios_digest': digest(typed_arithmetic_scenarios),
+                   'command': TYPED_ARITHMETIC_COMMAND,
                    'timeout_seconds': timeout,
                    'mutants': [],
                    'equivalence_assessment': 'not inferred; surviving mutants require review',
@@ -345,6 +415,34 @@ def campaign(root: Path, output: Path, timeout: int) -> int:
                 (snapshot / COBOL_MOVE_SOURCE).write_text(cobol_move_original)
                 save()
             print(f"{mutation.identity}: {entry['classification']}", flush=True)
+        arithmetic = receipt['typed_arithmetic_runtime']
+        arithmetic['baseline'] = execute(
+            snapshot, output / 'typed-arithmetic-baseline.log', timeout,
+            TYPED_ARITHMETIC_COMMAND, TYPED_ARITHMETIC_EXPECTED_TESTS,
+        )
+        save()
+        if arithmetic['baseline']['classification'] != 'survived':
+            raise ValueError(
+                'unchanged typed arithmetic test did not pass; no product mutant receives credit'
+            )
+        for mutation in TYPED_ARITHMETIC_MUTATIONS:
+            entry = {'id': mutation.identity, 'behavior': mutation.behavior,
+                     'old': mutation.old, 'new': mutation.new}
+            arithmetic['mutants'].append(entry)
+            try:
+                changed = apply_mutation(typed_arithmetic_original, mutation)
+                (snapshot / TYPED_ARITHMETIC_SOURCE).write_text(changed)
+                entry['mutated_source_digest'] = digest(changed.encode())
+                entry.update(execute(
+                    snapshot, output / (mutation.identity + '.log'), timeout,
+                    TYPED_ARITHMETIC_COMMAND, TYPED_ARITHMETIC_EXPECTED_TESTS,
+                ))
+            except (ValueError, OSError) as error:
+                entry.update(classification='invalid', error=str(error), killing_tests=[])
+            finally:
+                (snapshot / TYPED_ARITHMETIC_SOURCE).write_text(typed_arithmetic_original)
+                save()
+            print(f"{mutation.identity}: {entry['classification']}", flush=True)
     receipt['counts'] = {state: sum(m['classification'] == state for m in receipt['mutants'])
                          for state in ('killed', 'survived', 'invalid', 'timed_out')}
     receipt['product_runtime']['counts'] = {
@@ -355,15 +453,25 @@ def campaign(root: Path, output: Path, timeout: int) -> int:
         state: sum(m['classification'] == state for m in receipt['cobol_runtime']['mutants'])
         for state in ('killed', 'survived', 'invalid', 'timed_out')
     }
+    receipt['typed_arithmetic_runtime']['counts'] = {
+        state: sum(
+            m['classification'] == state
+            for m in receipt['typed_arithmetic_runtime']['mutants']
+        )
+        for state in ('killed', 'survived', 'invalid', 'timed_out')
+    }
     receipt['success'] = (
         receipt['counts']['killed'] == len(MUTATIONS)
         and receipt['product_runtime']['counts']['killed'] == len(CICS_MUTATIONS)
         and receipt['cobol_runtime']['counts']['killed'] == len(COBOL_MOVE_MUTATIONS)
+        and receipt['typed_arithmetic_runtime']['counts']['killed']
+        == len(TYPED_ARITHMETIC_MUTATIONS)
     )
     save()
     print(json.dumps(receipt['counts'], sort_keys=True))
     print(json.dumps(receipt['product_runtime']['counts'], sort_keys=True))
     print(json.dumps(receipt['cobol_runtime']['counts'], sort_keys=True))
+    print(json.dumps(receipt['typed_arithmetic_runtime']['counts'], sort_keys=True))
     return 0 if receipt['success'] else 1
 
 

@@ -2,14 +2,21 @@ use crate::{
     CobolFileBinding, CobolLayout, LosslessSyntax, ProcedureStatementKind, SemanticModel,
     SourceSpan,
 };
+use mainframe_env_diagnostics::SourceSpan as IrSourceSpan;
 use mainframe_env_ir::{
     Attribute, Effect, IrLimits, Module, ModuleBuilder, OperationCatalog, OperationIdentity,
     OperationSchema, StorageReference,
 };
+use mainframe_env_source::SourceBundle;
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
 
+pub(crate) mod cics;
+pub(crate) mod decimal;
 mod statement_grammar;
+mod typed;
+
+pub use typed::*;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum StatementKind {
@@ -268,6 +275,8 @@ pub struct HirStatement {
     pub official: Option<ProcedureStatementKind>,
     pub arguments: Vec<String>,
     pub options: Vec<StatementOption>,
+    pub resolved: Option<HirResolvedStatement>,
+    pub location: Option<IrSourceSpan>,
     pub line: usize,
     pub source: Vec<SourceSpan>,
 }
@@ -339,6 +348,7 @@ pub struct CobolHir {
 
 impl CobolHir {
     pub(crate) fn build(
+        source: &SourceBundle,
         syntax: &LosslessSyntax,
         semantic: &SemanticModel,
         limits: IrLimits,
@@ -347,12 +357,13 @@ impl CobolHir {
             procedure_text(syntax.semantic_text()).ok_or(HirProblem::MissingProcedure)?;
         let mut parsed = parse_procedure(procedure, limits.max_operations.saturating_sub(1))?;
         for (statement, range) in parsed.statements.iter_mut().zip(&parsed.statement_ranges) {
-            statement.source = source_spans_for_range(syntax, procedure_offset, range);
+            statement.source = typed::source_spans_for_range(syntax, procedure_offset, range);
         }
         for (node, range) in parsed.nodes.iter_mut().zip(&parsed.node_ranges) {
-            node.source = source_spans_for_range(syntax, procedure_offset, range);
+            node.source = typed::source_spans_for_range(syntax, procedure_offset, range);
         }
         let mut statements = parsed.statements;
+        typed::resolve_statements(&mut statements, semantic)?;
         if statements.len() > limits.max_operations.saturating_sub(1) {
             return Err(HirProblem::StatementLimitExceeded);
         }
@@ -361,6 +372,8 @@ impl CobolHir {
             official: None,
             arguments: Vec::new(),
             options: Vec::new(),
+            resolved: None,
+            location: None,
             line: syntax.semantic_text().lines().count(),
             source: syntax
                 .semantic_text()
@@ -373,6 +386,7 @@ impl CobolHir {
                     )
                 }),
         });
+        typed::attach_locations(&mut statements, source);
         let module = build_module(&statements, &semantic.layouts, limits)?;
         Ok(Self {
             program_id: semantic.program_id.clone(),
@@ -401,93 +415,11 @@ impl CobolHir {
             .iter()
             .filter(|statement| {
                 matches!(statement.kind, StatementKind::Add | StatementKind::Subtract)
-                    && has_multiple_arithmetic_receivers(statement)
+                    && typed::has_multiple_arithmetic_receivers(statement)
             })
             .map(|statement| (statement.kind, statement.line))
             .collect()
     }
-}
-
-fn has_multiple_arithmetic_receivers(statement: &HirStatement) -> bool {
-    let separator = match statement.kind {
-        StatementKind::Add => statement
-            .arguments
-            .iter()
-            .position(|argument| argument == "TO")
-            .or_else(|| {
-                statement
-                    .arguments
-                    .iter()
-                    .position(|argument| argument == "GIVING")
-            }),
-        StatementKind::Subtract => statement
-            .arguments
-            .iter()
-            .position(|argument| argument == "FROM"),
-        _ => None,
-    };
-    let Some(separator) = separator else {
-        return false;
-    };
-    let giving = statement
-        .arguments
-        .iter()
-        .enumerate()
-        .skip(separator + 1)
-        .find_map(|(index, argument)| (argument == "GIVING").then_some(index));
-    let primary_start = separator + 1;
-    let primary_end = giving.unwrap_or(statement.arguments.len());
-    arithmetic_receiver_count(&statement.arguments[primary_start..primary_end]) > 1
-        || giving
-            .is_some_and(|giving| arithmetic_receiver_count(&statement.arguments[giving + 1..]) > 1)
-}
-
-fn arithmetic_receiver_count(tokens: &[String]) -> usize {
-    let mut count = 0usize;
-    let mut position = 0usize;
-    while position < tokens.len() {
-        if matches!(tokens[position].as_str(), "," | "ROUNDED") {
-            position += 1;
-            continue;
-        }
-        count += 1;
-        position += 1;
-        while position < tokens.len() {
-            if tokens[position] == "(" {
-                let mut depth = 1usize;
-                position += 1;
-                while position < tokens.len() && depth > 0 {
-                    match tokens[position].as_str() {
-                        "(" => depth += 1,
-                        ")" => depth = depth.saturating_sub(1),
-                        _ => {}
-                    }
-                    position += 1;
-                }
-            } else if matches!(tokens[position].as_str(), "OF" | "IN")
-                && position + 1 < tokens.len()
-            {
-                position += 2;
-            } else {
-                break;
-            }
-        }
-    }
-    count
-}
-
-fn source_spans_for_range(
-    syntax: &LosslessSyntax,
-    procedure_offset: usize,
-    range: &Range<usize>,
-) -> Vec<SourceSpan> {
-    if range.start >= range.end {
-        return Vec::new();
-    }
-    crate::syntax::source_spans(
-        syntax.semantic_origins(),
-        procedure_offset + range.start..procedure_offset + range.end,
-    )
 }
 
 pub fn cobol_hir_catalog() -> OperationCatalog {
@@ -510,6 +442,8 @@ pub fn cobol_hir_catalog() -> OperationCatalog {
         schema.terminator = kind == StatementKind::ProgramEnd;
         catalog.register(schema).expect("unique HIR operation");
     }
+    decimal::register_hir_operations(&mut catalog);
+    cics::register_hir_operation(&mut catalog);
     catalog
 }
 
@@ -577,6 +511,12 @@ fn build_module(
         .add_block(region)
         .map_err(|_| HirProblem::StatementLimitExceeded)?;
     for statement in statements {
+        if cics::emit_hir_operation(statement, &mut builder, block, &storage)? {
+            continue;
+        }
+        if decimal::emit_hir_operation(statement, &mut builder, block, &storage)? {
+            continue;
+        }
         let mut attributes = BTreeMap::new();
         attributes.insert("line".into(), Attribute::Integer(statement.line as i64));
         attributes.insert(
@@ -593,7 +533,7 @@ fn build_module(
                 attributes,
                 effects(statement.kind),
                 Vec::new(),
-                None,
+                statement.location.clone(),
             )
             .map_err(|_| HirProblem::StatementLimitExceeded)?;
     }
@@ -1010,6 +950,8 @@ impl ProcedureParser {
             official: kind.official_kind(),
             arguments,
             options,
+            resolved: None,
+            location: None,
             line,
             source: Vec::new(),
         });
@@ -1180,6 +1122,8 @@ impl ProcedureParser {
                 vec![name.to_string()]
             },
             options: Vec::new(),
+            resolved: None,
+            location: None,
             line,
             source: Vec::new(),
         });
@@ -1471,6 +1415,7 @@ pub(crate) enum HirProblem {
     UnmatchedScope,
     UnterminatedExec,
     MissingTarget(String),
+    InvalidResolvedStatement(StatementKind, usize, String),
 }
 
 #[cfg(test)]
@@ -1516,7 +1461,6 @@ mod tests {
         assert_eq!(parsed.statements[0].kind, StatementKind::Compute);
         assert_eq!(parsed.statements[1].kind, StatementKind::StopRun);
     }
-
     #[test]
     fn token_parser_ignores_comment_and_embedded_host_periods() {
         let source = "*> sentence. comment\nEXEC SQL SELECT A.COL FROM T END-EXEC. STOP RUN.";
@@ -1525,7 +1469,6 @@ mod tests {
         assert_eq!(parsed.statements[1].kind, StatementKind::StopRun);
         assert!(parsed.nodes[0].text.contains("A.COL"));
     }
-
     #[test]
     fn optional_xml_parse_and_host_dialect_operands_remain_compatible() {
         let parsed = parse_procedure(
@@ -1546,7 +1489,6 @@ mod tests {
             ) || statement.options.is_empty()
         }));
     }
-
     #[test]
     fn same_line_and_inline_statements_have_distinct_nodes() {
         let source =
@@ -1577,7 +1519,6 @@ mod tests {
                 .all(|range| range.start < range.end)
         );
     }
-
     #[test]
     fn grammar_boundaries_ignore_line_breaks_but_retain_nested_statement_identity() {
         let parsed = parse_procedure(
@@ -1618,7 +1559,6 @@ mod tests {
             ]
         );
     }
-
     #[test]
     fn nested_scopes_and_explicit_terminators_have_control_identity() {
         let parsed = parse_procedure(
@@ -1660,7 +1600,6 @@ mod tests {
                 || node.scope != Some(ControlScope::Search)
         }));
     }
-
     #[test]
     fn perform_go_to_and_next_sentence_resolve_explicit_edges() {
         let parsed = parse_procedure(
@@ -1692,7 +1631,6 @@ mod tests {
             node.role == ControlRole::BlockStart && node.scope == Some(ControlScope::Perform)
         }));
     }
-
     #[test]
     fn numeric_leading_hyphenated_perform_targets_remain_single_names() {
         let parsed = parse_procedure(
@@ -1711,7 +1649,6 @@ mod tests {
             .collect::<BTreeSet<_>>();
         assert!(labels.contains("1000-INITIALIZE") && labels.contains("1000-EXIT"));
     }
-
     #[test]
     fn compute_accepts_a_well_formed_intrinsic_function_expression() {
         let parsed = parse_procedure(

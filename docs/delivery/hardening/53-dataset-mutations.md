@@ -19,13 +19,16 @@ python3 -B tools/dataset_mutations.py --output target/mutations/run-1
 ```
 
 The runner archives that exact commit into a disposable directory, proves the
-ordinary independent-reference tests pass, then changes one transition source
-at a time: reverse KSDS sort, omit AIX publication, publish a failed transaction,
-and omit GDG scratch. It reruns the **unchanged normal tests** for every mutant.
-No observation is fabricated and no test assertion is patched. The source copy
-is restored between cases and removed at exit; the caller's worktree is not
-modified. Shared Cargo build output may be used, but no cache is published by
-this tool.
+ordinary tests pass, then changes one production source at a time. The
+independent dataset section reverses KSDS order, omits AIX publication,
+publishes a failed transaction, and omits GDG scratch. Separate product-runtime
+sections mutate CICS file/UOW transitions, numeric-edited `MOVE`, and the typed
+decimal ADD/COMPUTE path. The typed-decimal mutations corrupt the shared add
+primitive, ignore receiver rounding, and violate staged atomic assignment. The
+runner reruns the **unchanged normal tests** for every mutant. No observation is
+fabricated and no test assertion is patched. The source copy is restored
+between cases and removed at exit; the caller's worktree is not modified.
+Shared Cargo build output may be used, but no cache is published by this tool.
 
 A valid runtime assertion failure identifies a killing test. Compile errors,
 timeouts, empty selections and harness failures are not kills. Surviving mutants
@@ -36,11 +39,8 @@ human review and supporting evidence.
 The receipt records the commit/tree, toolchain, source and test digests, exact
 mutation anchors, changed-source digests, identical command, exit codes,
 durations, killing tests, and log hashes. Preserve the receipt and **all logs**
-as candidate-bound CI artifacts. They are not folded into the comparator's
-count. The reference implementation contains no product imports or fault flags.
-
-These four mutants change the **independent model's implementation**, not the
-product dataset provider. The receipt explicitly grants zero product-runtime
-mutation credit and zero licensed IBM differential credit. This is a bounded
-first behavioral campaign, not a complete mutation score or a compatibility
-certification. Expand product-runtime mutations independently when needed.
+as candidate-bound CI artifacts. They are not folded into comparator counts.
+The independent dataset section grants zero product-runtime credit; each named
+product section records its own product-runtime credit. Every section grants
+zero licensed IBM differential credit. This remains a bounded representative
+campaign, not a complete mutation score or compatibility certification.

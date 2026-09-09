@@ -7,6 +7,8 @@ use mainframe_env_ir::{
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const CORE_NAMESPACE: &str = "mainframe.core.cobol";
+const SIZE_ERROR_BRANCH: i64 = 1;
+const NOT_SIZE_ERROR_BRANCH: i64 = 2;
 pub const MAX_UNBOUNDED_OCCURRENCES: usize = 4096;
 pub const MAX_UNBOUNDED_STORAGE_BYTES: usize = 16 * 1024 * 1024;
 pub const PUBLISHABLE_LAYOUT_CATEGORIES: &[&str] = &[
@@ -417,6 +419,7 @@ fn lower_structured(
     block: mainframe_env_ir::BlockId,
     storage: &BTreeMap<String, mainframe_env_ir::StorageId>,
 ) -> Result<(), LowerProblem> {
+    let typed_size_error_branches = typed_size_error_branch_polarities(hir)?;
     for node in &hir.control_nodes {
         let mut control = BTreeMap::from([
             ("control_node".into(), Attribute::Integer(node.id as i64)),
@@ -483,6 +486,16 @@ fn lower_structured(
                     Attribute::Integer(true_target.id as i64),
                 );
             }
+        }
+        if let Some(polarity) = typed_size_error_branches.get(&node.id) {
+            control.insert(
+                crate::hir::decimal::CONDITION_STATUS_ATTRIBUTE.into(),
+                Attribute::Text(crate::hir::decimal::SIZE_ERROR_STATUS.into()),
+            );
+            control.insert(
+                crate::hir::decimal::CONDITION_POLARITY_ATTRIBUTE.into(),
+                Attribute::Boolean(*polarity),
+            );
         }
         if let Some(statement) = node.statement.and_then(|index| hir.statements.get(index)) {
             lower_statement(statement, hir, builder, block, storage, control)?;
@@ -591,6 +604,68 @@ fn lower_statement(
     storage: &BTreeMap<String, mainframe_env_ir::StorageId>,
     attributes: BTreeMap<String, Attribute>,
 ) -> Result<(), LowerProblem> {
+    if let Some(resolved) = statement.resolved.as_ref()
+        && matches!(
+            resolved,
+            crate::HirResolvedStatement::Add(_) | crate::HirResolvedStatement::Compute(_)
+        )
+    {
+        let encoded = crate::hir::decimal::encode_statement(resolved, storage)
+            .map_err(|_| LowerProblem::InvalidOperation)?;
+        let mut operation_attributes = attributes;
+        operation_attributes.remove("control_text");
+        let branches = typed_size_error_branch_mask(resolved)?;
+        operation_attributes.insert(
+            crate::hir::decimal::CONDITION_STATUS_ATTRIBUTE.into(),
+            Attribute::Text(crate::hir::decimal::SIZE_ERROR_STATUS.into()),
+        );
+        operation_attributes.insert(
+            crate::hir::decimal::CONDITION_BRANCHES_ATTRIBUTE.into(),
+            Attribute::Integer(branches),
+        );
+        operation_attributes.insert("line".into(), Attribute::Integer(statement.line as i64));
+        operation_attributes.insert(
+            crate::hir::decimal::ASSIGNMENT_PLAN_ATTRIBUTE.into(),
+            Attribute::Bytes(encoded.bytes),
+        );
+        builder
+            .add_operation(
+                block,
+                crate::hir::decimal::executable_identity(),
+                Vec::new(),
+                0,
+                operation_attributes,
+                crate::hir::effects(statement.kind),
+                encoded.storage,
+                statement.location.clone(),
+            )
+            .map_err(|_| LowerProblem::LimitExceeded)?;
+        return Ok(());
+    }
+    if let Some(crate::HirResolvedStatement::Cics(command)) = statement.resolved.as_ref() {
+        let encoded = crate::hir::cics::encode_statement(command, storage)
+            .map_err(|_| LowerProblem::InvalidOperation)?;
+        let mut operation_attributes = attributes;
+        operation_attributes.remove("control_text");
+        operation_attributes.insert("line".into(), Attribute::Integer(statement.line as i64));
+        operation_attributes.insert(
+            crate::hir::cics::CICS_PLAN_ATTRIBUTE.into(),
+            Attribute::Bytes(encoded.bytes),
+        );
+        builder
+            .add_operation(
+                block,
+                crate::hir::cics::executable_identity(command.operation),
+                Vec::new(),
+                0,
+                operation_attributes,
+                crate::hir::cics::operation_effects(command.operation),
+                encoded.storage,
+                statement.location.clone(),
+            )
+            .map_err(|_| LowerProblem::LimitExceeded)?;
+        return Ok(());
+    }
     let name = match statement.kind {
         StatementKind::ProgramEnd => "halt",
         other => other.slug(),
@@ -646,11 +721,72 @@ fn lower_statement(
                 operation_attributes,
                 crate::hir::effects(statement.kind),
                 references,
-                None,
+                statement.location.clone(),
             )
             .map_err(|_| LowerProblem::LimitExceeded)?;
     }
     Ok(())
+}
+
+fn typed_size_error_branch_mask(
+    resolved: &crate::HirResolvedStatement,
+) -> Result<i64, LowerProblem> {
+    let policy = match resolved {
+        crate::HirResolvedStatement::Add(add) => add.size_error,
+        crate::HirResolvedStatement::Compute(compute) => compute.size_error,
+        crate::HirResolvedStatement::Cics(_) => return Err(LowerProblem::InvalidOperation),
+    };
+    Ok((i64::from(policy.on_size_error) * SIZE_ERROR_BRANCH)
+        | (i64::from(policy.not_on_size_error) * NOT_SIZE_ERROR_BRANCH))
+}
+
+fn typed_size_error_branch_polarities(
+    hir: &CobolHir,
+) -> Result<BTreeMap<usize, bool>, LowerProblem> {
+    let mut children = BTreeMap::<usize, Vec<usize>>::new();
+    for branch in hir
+        .control_nodes
+        .iter()
+        .filter(|node| node.role == ControlRole::Branch)
+    {
+        if let Some(parent) = branch.parent {
+            children.entry(parent).or_default().push(branch.id);
+        }
+    }
+    let mut polarities = BTreeMap::new();
+    for parent in &hir.control_nodes {
+        let Some(statement) = parent.statement.and_then(|index| hir.statements.get(index)) else {
+            continue;
+        };
+        let Some(resolved) = statement.resolved.as_ref().filter(|resolved| {
+            matches!(
+                resolved,
+                crate::HirResolvedStatement::Add(_) | crate::HirResolvedStatement::Compute(_)
+            )
+        }) else {
+            continue;
+        };
+        let mask = typed_size_error_branch_mask(resolved)?;
+        let expected = [
+            (mask & SIZE_ERROR_BRANCH != 0).then_some(true),
+            (mask & NOT_SIZE_ERROR_BRANCH != 0).then_some(false),
+        ]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+        let branches = children
+            .get(&parent.id)
+            .map(Vec::as_slice)
+            .unwrap_or_default();
+        if branches.len() != expected.len() {
+            return Err(LowerProblem::InvalidControl(format!(
+                "typed arithmetic node {} has a drifted condition branch set",
+                parent.id
+            )));
+        }
+        polarities.extend(branches.iter().copied().zip(expected));
+    }
+    Ok(polarities)
 }
 
 fn statement_argument_groups(
@@ -800,6 +936,8 @@ pub fn core_mir_catalog() -> OperationCatalog {
         schema.runtime_import = runtime_import(kind).map(str::to_string);
         catalog.register(schema).expect("unique core operation");
     }
+    crate::hir::decimal::register_executable_operation(&mut catalog);
+    crate::hir::cics::register_executable_operations(&mut catalog);
     catalog
 }
 
