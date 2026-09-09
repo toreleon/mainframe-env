@@ -67,6 +67,8 @@ All notable changes to mainframe-env are documented here.
   headroom, and per-worker queue-progress freshness.
 - Added the PostgreSQL writable-readiness rollback contract to the blocking
   parity stage so every environment-gated PostgreSQL correctness test is run.
+- Kept full development certification runnable while preserving stable
+  release-artifact checks behind an explicit release-candidate promotion.
 - Moved synchronous z/OSMF backend calls to a bounded four-worker lane and
   propagated finite HTTP deadlines plus live cancellation into invocations.
 - Classified mutating-effect journal failures after dispatch as unknown outcomes

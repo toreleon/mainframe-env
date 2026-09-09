@@ -6703,14 +6703,38 @@ fn validate_public_version_truth(
 }
 
 fn require_release_candidate(root: &Path) -> TaskResult {
+    require(
+        release_candidate_mode(root)?,
+        "release artifacts require an explicit stable release-candidate promotion",
+    )
+}
+
+fn release_candidate_mode(root: &Path) -> TaskResult<bool> {
     let release: toml::Value = read(&root.join("release.toml"))?
         .parse()
         .map_err(|error| format!("release.toml: {error}"))?;
-    require(
-        release["product"]["state"].as_str() == Some("release-candidate")
-            && release["product"]["channel"].as_str() == Some("stable"),
-        "release artifacts require an explicit stable release-candidate promotion",
-    )
+    let product = release
+        .get("product")
+        .and_then(toml::Value::as_table)
+        .ok_or("release.toml product table is missing")?;
+    match (
+        product.get("state").and_then(toml::Value::as_str),
+        product.get("channel").and_then(toml::Value::as_str),
+    ) {
+        (Some("development"), Some("development")) => Ok(false),
+        (Some("release-candidate"), Some("stable")) => Ok(true),
+        _ => Err("release state and channel are inconsistent".into()),
+    }
+}
+
+fn check_certification_release_artifacts(root: &Path) -> TaskResult {
+    if !release_candidate_mode(root)? {
+        return Ok(());
+    }
+    if !validate_source_distribution_release(root)? {
+        check_release_artifacts(root, &host_target(root)?)?;
+    }
+    Ok(())
 }
 
 fn check_versions(root: &Path) -> TaskResult {
@@ -12278,9 +12302,7 @@ fn check_certification(root: &Path) -> TaskResult {
         workspace_tests.success(),
         "certification workspace tests failed",
     )?;
-    if !validate_source_distribution_release(root)? {
-        check_release_artifacts(root, &host_target(root)?)?;
-    }
+    check_certification_release_artifacts(root)?;
     Ok(())
 }
 
@@ -14624,8 +14646,34 @@ mod tests {
             "[product]\nstate = \"development\"\nchannel = \"development\"\n",
         )
         .unwrap();
+        assert!(!release_candidate_mode(&root).unwrap());
+        check_certification_release_artifacts(&root).unwrap();
         let problem = require_release_candidate(&root).unwrap_err();
         assert!(problem.contains("release-candidate promotion"));
+
+        fs::write(
+            root.join("release.toml"),
+            "[product]\nstate = \"release-candidate\"\nchannel = \"stable\"\n",
+        )
+        .unwrap();
+        assert!(release_candidate_mode(&root).unwrap());
+        require_release_candidate(&root).unwrap();
+        assert!(check_certification_release_artifacts(&root).is_err());
+
+        fs::write(
+            root.join("release.toml"),
+            "[product]\nstate = \"development\"\nchannel = \"stable\"\n",
+        )
+        .unwrap();
+        assert!(release_candidate_mode(&root).is_err());
+        assert!(check_certification_release_artifacts(&root).is_err());
+
+        fs::write(
+            root.join("release.toml"),
+            "[product]\nstate = \"release-candidate\"\n",
+        )
+        .unwrap();
+        assert!(release_candidate_mode(&root).is_err());
         fs::remove_dir_all(root).unwrap();
     }
 

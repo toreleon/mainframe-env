@@ -54,6 +54,10 @@ the evidence seal and runtime architecture run on one exact checked-out commit.
 The full tier also exports that commit with `git archive` and requires two
 mtime-distinct reproductions in the digest-pinned GNU-tar image to match before
 retaining the source archive and command receipt.
+On a development candidate, certification retains the exact-target runtime
+smoke but does not try to emit or compare stable release artifacts. An explicit
+stable release-candidate promotion still enables that artifact check, and the
+release command continues to reject development state.
 Tag release packaging and release checks remain unchanged. Scheduling only takes
 effect after the Jenkinsfile reaches the configured job branch; an unexecuted
 schedule grants no credit.
