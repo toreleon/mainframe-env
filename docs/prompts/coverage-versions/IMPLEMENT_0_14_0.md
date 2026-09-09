@@ -5,6 +5,10 @@ Completion dependencies: 0.4.0, 0.5.0, 0.6.0
 
 Use this prompt from the repository root. The
 [common execution contract](README.md#common-execution-contract) is normative.
+Apply its [hardened slice acceptance](README.md#hardened-slice-acceptance),
+[early participant contract](README.md#early-transaction-participant-contract),
+and [licensed-harness preparation](README.md#licensed-harness-preparation)
+requirements alongside the version-specific boundaries below.
 
 ---
 
@@ -34,6 +38,26 @@ security and storage integration requires all listed dependencies.
    extract, reorganization and recovery utilities.
 5. Implement **IMS-1406** SAF, malformed/boundary/limit, concurrency, scale,
    compatibility and licensed differential suites.
+
+## IMS context and positioning matrix
+
+IMS-1401/IMS-1402 must freeze applicability across the 25 call families,
+execution environments, pinned database organizations, PCB kinds/options and
+SSA forms. Use reviewed equivalence classes, mandatory boundaries and bounded
+pairwise combinations instead of an exhaustive Cartesian product.
+
+IMS-1403 proves exact PCB status and retained position after both successful
+and unsuccessful calls, including GN/GNP navigation, path/qualified SSAs,
+Get Hold and update restrictions. IMS-1404 adds alternate PCBs, TM scheduling
+and conversations; IMS-1405 adds checkpoint/restart position and status. A test
+that returns the expected segment but leaves the wrong position does not pass.
+Bind forbidden-context/no-mutation cases to the same reviewed matrix.
+
+Shared storage/locking/UOW authorities do not prohibit IMS-owned hierarchy,
+index or positioning algorithms. They prohibit competing stores, lock services,
+coordinators and migration authorities. Each mutating database/TM/utility slice
+includes minimum failure, replay and restart proof; IMS-1405/IMS-1406 complete
+and stress recovery rather than first introducing it.
 
 ## Reuse and architecture guardrails
 
