@@ -353,6 +353,7 @@ impl CobolProgram {
         let limits = InvocationLimits::default();
         let sequence = identity;
         let mut bindings = parent.bindings.clone();
+        replay::bind_protocol_owner(parent, &mut bindings)?;
         bindings.insert("cobol.call.arguments".into(), payload.clone());
         let invocation = Invocation::new(
             RequestId::new(format!("online-call-request-{sequence}"), limits)
@@ -532,6 +533,7 @@ impl CobolProgram {
         let limits = InvocationLimits::default();
         let sequence = identity;
         let mut bindings = parent.bindings.clone();
+        replay::bind_protocol_owner(parent, &mut bindings)?;
         for dd in &input.dds {
             if let Some(dataset) = &dd.dataset {
                 bindings.insert(
@@ -1502,5 +1504,7 @@ mod tests {
 mod hardening;
 
 mod replay;
+#[allow(dead_code, reason = "R-11 product integration seam")]
+pub(crate) mod retention;
 
 mod instance;

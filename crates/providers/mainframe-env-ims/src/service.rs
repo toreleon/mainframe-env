@@ -15,14 +15,19 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, MutexGuard};
 
+use crate::retention::{
+    ImsReplayOwnerKind, ims_pending_replay_matches, prepare_ims_replay, resolve_ims_replay,
+    validate_ims_recorded_result,
+};
+
 const STATE_NAMESPACE: &str = "ims-state";
 const STATE_KEY: &str = "catalog";
 const ROW_STORE_SCHEMA: &str = "mainframe-env.ims-row-store@1";
-const OBJECT_ROW_SCHEMA: &str = "mainframe-env.ims-object-row@1";
+pub(crate) const OBJECT_ROW_SCHEMA: &str = "mainframe-env.ims-object-row@1";
 const DATABASE_NAMESPACE: &str = "ims-v1-database";
 const SESSION_NAMESPACE: &str = "ims-v1-session-index";
 const CHECKPOINT_NAMESPACE: &str = "ims-v1-checkpoint";
-const REPLAY_NAMESPACE: &str = "ims-v1-replay";
+pub(crate) const REPLAY_NAMESPACE: &str = "ims-v1-replay";
 const PENDING_NAMESPACE: &str = "ims-v1-unit-of-work";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -146,7 +151,7 @@ struct Session {
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-enum ReplayDigestFormat {
+pub(crate) enum ReplayDigestFormat {
     #[default]
     #[serde(rename = "legacy-debug@0")]
     LegacyDebugV0,
@@ -155,14 +160,33 @@ enum ReplayDigestFormat {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-struct RecordedResult {
+#[serde(deny_unknown_fields)]
+pub(crate) struct RecordedResult {
     #[serde(default)]
-    request_digest_format: ReplayDigestFormat,
-    request_sha256: [u8; 32],
-    status: String,
-    segments: Vec<(String, Option<Vec<u8>>, Vec<u8>)>,
-    checkpoint_id: Option<String>,
-    affected_segments: u64,
+    pub(crate) request_digest_format: ReplayDigestFormat,
+    pub(crate) request_sha256: [u8; 32],
+    #[serde(default)]
+    pub(crate) recorded_deadline_tick: u64,
+    #[serde(default)]
+    pub(crate) owner_execution: Option<String>,
+    #[serde(default)]
+    pub(crate) owner_run_unit: Option<String>,
+    #[serde(default)]
+    pub(crate) recorded_sequence: u64,
+    #[serde(default)]
+    pub(crate) resolution_tick: u64,
+    #[serde(default)]
+    pub(crate) owner_kind: Option<ImsReplayOwnerKind>,
+    #[serde(default)]
+    pub(crate) outer_effect_key: Option<String>,
+    #[serde(default)]
+    pub(crate) result_sha256: [u8; 32],
+    #[serde(default)]
+    pub(crate) retention_binding_sha256: [u8; 32],
+    pub(crate) status: String,
+    pub(crate) segments: Vec<(String, Option<Vec<u8>>, Vec<u8>)>,
+    pub(crate) checkpoint_id: Option<String>,
+    pub(crate) affected_segments: u64,
 }
 
 impl RecordedResult {
@@ -170,6 +194,15 @@ impl RecordedResult {
         Self {
             request_digest_format: ReplayDigestFormat::CanonicalHostV1,
             request_sha256,
+            recorded_deadline_tick: 0,
+            owner_execution: None,
+            owner_run_unit: None,
+            recorded_sequence: 0,
+            resolution_tick: 0,
+            owner_kind: None,
+            outer_effect_key: None,
+            result_sha256: [0; 32],
+            retention_binding_sha256: [0; 32],
             status: result.status.clone(),
             segments: result
                 .segments
@@ -187,7 +220,7 @@ impl RecordedResult {
         }
     }
 
-    fn result(&self) -> ImsResult {
+    pub(crate) fn result(&self) -> ImsResult {
         ImsResult {
             status: self.status.clone(),
             segments: self
@@ -246,11 +279,18 @@ struct DurableState {
     state: State,
 }
 
+/// Trusted durable logical-time source used to age newly persisted replay rows.
+pub trait ImsReplayClock: Send + Sync {
+    /// Observe the current nonzero durable logical tick.
+    fn now_tick(&self) -> Result<u64, HostProblem>;
+}
+
 pub struct ImsService {
     store: Arc<dyn ProviderStateStore>,
     limits: ImsLimits,
     durable: Mutex<DurableState>,
     authorizer: Option<Arc<dyn EnterpriseAuthorizer>>,
+    replay_clock: Option<Arc<dyn ImsReplayClock>>,
 }
 
 impl ImsService {
@@ -258,7 +298,16 @@ impl ImsService {
         store: Arc<dyn ProviderStateStore>,
         limits: ImsLimits,
     ) -> Result<Arc<Self>, HostProblem> {
-        Self::open_inner(store, limits, None)
+        Self::open_inner(store, limits, None, None)
+    }
+
+    /// Open with a trusted durable clock so new replay rows become retention-eligible.
+    pub fn open_with_replay_clock(
+        store: Arc<dyn ProviderStateStore>,
+        limits: ImsLimits,
+        replay_clock: Arc<dyn ImsReplayClock>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_inner(store, limits, None, Some(replay_clock))
     }
 
     pub fn open_authorized(
@@ -266,13 +315,24 @@ impl ImsService {
         limits: ImsLimits,
         authorizer: Arc<dyn EnterpriseAuthorizer>,
     ) -> Result<Arc<Self>, HostProblem> {
-        Self::open_inner(store, limits, Some(authorizer))
+        Self::open_inner(store, limits, Some(authorizer), None)
+    }
+
+    /// Open with enterprise authorization and a trusted durable replay clock.
+    pub fn open_authorized_with_replay_clock(
+        store: Arc<dyn ProviderStateStore>,
+        limits: ImsLimits,
+        authorizer: Arc<dyn EnterpriseAuthorizer>,
+        replay_clock: Arc<dyn ImsReplayClock>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_inner(store, limits, Some(authorizer), Some(replay_clock))
     }
 
     fn open_inner(
         store: Arc<dyn ProviderStateStore>,
         limits: ImsLimits,
         authorizer: Option<Arc<dyn EnterpriseAuthorizer>>,
+        replay_clock: Option<Arc<dyn ImsReplayClock>>,
     ) -> Result<Arc<Self>, HostProblem> {
         let (state, versions) = load_or_migrate(&*store, limits)?;
         Ok(Arc::new(Self {
@@ -280,6 +340,7 @@ impl ImsService {
             limits,
             durable: Mutex::new(DurableState { versions, state }),
             authorizer,
+            replay_clock,
         }))
     }
 
@@ -315,29 +376,57 @@ impl ImsService {
         invocation: &Invocation,
         request: &ImsRequest,
     ) -> Result<ImsResult, HostProblem> {
+        self.execute_at(invocation, request, invocation.deadline_tick)
+    }
+
+    fn execute_at(
+        &self,
+        invocation: &Invocation,
+        request: &ImsRequest,
+        resolution_lower_bound: u64,
+    ) -> Result<ImsResult, HostProblem> {
+        if resolution_lower_bound == 0 {
+            return Err(HostProblem::Malformed);
+        }
         let mut durable = self.lock()?;
+        refresh_replay(&*self.store, self.limits, &mut durable)?;
         if let Some(authorizer) = &self.authorizer {
             for resource in ims_resources(&durable.state, invocation, request)? {
                 authorizer.authorize(invocation.principal.id(), &resource)?;
             }
         }
+        refresh_replay(&*self.store, self.limits, &mut durable)?;
         let request_sha256 = request_digest(request)?;
         let replay_key = request
             .mutation
             .as_ref()
             .map(|mutation| mutation.idempotency_key.as_str());
+        let sequence = request.mutation.as_ref().map(|mutation| mutation.sequence);
         if let Some(key) = replay_key
             && let Some(recorded) = durable.state.replay.get(key)
         {
-            return match recorded.request_digest_format {
-                ReplayDigestFormat::LegacyDebugV0 => Err(HostProblem::UnknownOutcome),
+            match recorded.request_digest_format {
+                ReplayDigestFormat::LegacyDebugV0 => return Err(HostProblem::UnknownOutcome),
                 ReplayDigestFormat::CanonicalHostV1
                     if recorded.request_sha256 == request_sha256 =>
                 {
-                    Ok(recorded.result())
+                    let result = recorded.result();
+                    let pending = ims_pending_replay_matches(
+                        recorded,
+                        key,
+                        invocation,
+                        sequence.ok_or(HostProblem::MissingIdempotency)?,
+                    )?;
+                    if pending {
+                        self.finalize_replay_metadata(&mut durable, key, resolution_lower_bound)
+                            .map_err(|_| HostProblem::UnknownOutcome)?;
+                    }
+                    return Ok(result);
                 }
-                ReplayDigestFormat::CanonicalHostV1 => Err(HostProblem::IdempotencyConflict),
-            };
+                ReplayDigestFormat::CanonicalHostV1 => {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+            }
         }
         let mut next = durable.state.scoped_snapshot();
         let result = apply_request(
@@ -359,14 +448,49 @@ impl ImsService {
             if next.replay.len() >= self.limits.max_replays {
                 return Err(HostProblem::ResourceExhausted);
             }
-            next.replay.insert(
-                key.into(),
-                Arc::new(RecordedResult::from_result(request_sha256, &result)),
-            );
+            let mut recorded = RecordedResult::from_result(request_sha256, &result);
+            prepare_ims_replay(
+                &mut recorded,
+                key,
+                invocation,
+                sequence.ok_or(HostProblem::MissingIdempotency)?,
+                self.limits,
+            )?;
+            next.replay.insert(key.into(), Arc::new(recorded));
             validate_state(&next, self.limits)?;
             self.persist(&mut durable, next)?;
+            self.finalize_replay_metadata(&mut durable, key, resolution_lower_bound)
+                .map_err(|_| HostProblem::UnknownOutcome)?;
         }
         Ok(result)
+    }
+
+    fn finalize_replay_metadata(
+        &self,
+        durable: &mut DurableState,
+        key: &str,
+        resolution_lower_bound: u64,
+    ) -> Result<(), HostProblem> {
+        let Some(clock) = &self.replay_clock else {
+            return Ok(());
+        };
+        let observed_tick = clock.now_tick()?;
+        if observed_tick == 0 {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let mut next = durable.state.scoped_snapshot();
+        let recorded = next
+            .replay
+            .get_mut(key)
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        resolve_ims_replay(
+            Arc::make_mut(recorded),
+            key,
+            observed_tick,
+            resolution_lower_bound,
+        )?;
+        validate_state(&next, self.limits)?;
+        self.persist(durable, next)
     }
 
     /// Bind a retained pre-canonical replay receipt to a reviewed typed request.
@@ -390,6 +514,7 @@ impl ImsService {
         }
         let canonical = request_digest(request)?;
         let mut durable = self.lock()?;
+        refresh_replay(&*self.store, self.limits, &mut durable)?;
         let retained = durable
             .state
             .replay
@@ -470,6 +595,33 @@ impl ImsService {
         durable.state = state;
         Ok(())
     }
+}
+
+fn refresh_replay(
+    store: &dyn ProviderStateStore,
+    limits: ImsLimits,
+    durable: &mut DurableState,
+) -> Result<(), HostProblem> {
+    let mut replay_versions = RowVersions::new();
+    let replay: BTreeMap<String, Arc<RecordedResult>> = load_row_map(
+        store,
+        REPLAY_NAMESPACE,
+        limits.max_replays,
+        limits,
+        &mut replay_versions,
+    )?;
+    if replay
+        .iter()
+        .any(|(key, recorded)| validate_ims_recorded_result(key, recorded, limits).is_err())
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    durable
+        .versions
+        .retain(|(namespace, _), _| namespace != REPLAY_NAMESPACE);
+    durable.versions.extend(replay_versions);
+    durable.state.replay = replay;
+    Ok(())
 }
 
 struct RowChange {
@@ -1628,6 +1780,10 @@ fn validate_state(state: &State, limits: ImsLimits) -> Result<(), HostProblem> {
         || state.sessions.keys().any(String::is_empty)
         || state.checkpoints.keys().any(String::is_empty)
         || state.pending_undo.keys().any(String::is_empty)
+        || state
+            .replay
+            .iter()
+            .any(|(key, recorded)| validate_ims_recorded_result(key, recorded, limits).is_err())
         || state.databases.values().any(|database| {
             database.roots.len() > limits.max_roots
                 || database.roots.values().any(|root| {
@@ -1764,10 +1920,11 @@ impl HostProvider for ImsProvider {
 
     fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
         let sequence = effect.sequence;
+        let resolution_tick = effect.deadline_tick.max(invocation.deadline_tick);
         let outcome = match effect.request {
             HostRequest::Ims(request) => self
                 .service
-                .execute(invocation, &request)
+                .execute_at(invocation, &request, resolution_tick)
                 .map(HostResult::Ims),
             _ => Err(HostProblem::Malformed),
         };
@@ -1809,6 +1966,56 @@ mod tests {
     };
     use mainframe_env_host_api::{ImsQualifier, Mutation};
     use mainframe_env_store::{MemoryStore, SqliteStateStore};
+    use mainframe_env_store_api::{
+        ExecutionRecord, ExecutionState, ExecutionStore, RetentionPolicy, RetentionRequest,
+        RetentionStore, RetentionTarget,
+    };
+    use std::sync::atomic::{AtomicU8, Ordering as AtomicOrdering};
+
+    fn finish_invocation(store: &MemoryStore, invocation: &Invocation) {
+        store
+            .create_execution(ExecutionRecord {
+                execution_id: invocation.execution_id.clone(),
+                run_unit_id: invocation.run_unit_id.clone(),
+                selector: invocation.selector.clone(),
+                artifact: invocation.artifact.clone(),
+                principal: invocation.principal.id().clone(),
+                state: ExecutionState::Admitted,
+                attempt: invocation.attempt,
+                version: 1,
+                owner_lease: None,
+                lease_expiry_tick: None,
+                terminal_tick: None,
+            })
+            .unwrap();
+        let queued = store
+            .transition_execution(&invocation.execution_id, 1, ExecutionState::Queued, 1)
+            .unwrap();
+        let running = store
+            .transition_execution(
+                &invocation.execution_id,
+                queued.version,
+                ExecutionState::Running,
+                2,
+            )
+            .unwrap();
+        let completing = store
+            .transition_execution(
+                &invocation.execution_id,
+                running.version,
+                ExecutionState::Completing,
+                3,
+            )
+            .unwrap();
+        store
+            .transition_execution(
+                &invocation.execution_id,
+                completing.version,
+                ExecutionState::Completed,
+                4,
+            )
+            .unwrap();
+    }
 
     #[derive(Default)]
     struct DenyEnterprise {
@@ -1823,6 +2030,51 @@ mod tests {
         ) -> Result<(), HostProblem> {
             self.seen.lock().unwrap().push(resource.clone());
             Err(HostProblem::Unauthorized)
+        }
+    }
+
+    struct PersistAwareReplayClock {
+        store: Arc<dyn ProviderStateStore>,
+        key: String,
+        tick: u64,
+        fault_stage: AtomicU8,
+    }
+
+    impl ImsReplayClock for PersistAwareReplayClock {
+        fn now_tick(&self) -> Result<u64, HostProblem> {
+            match self.fault_stage.load(AtomicOrdering::SeqCst) {
+                1 => {
+                    self.fault_stage.store(2, AtomicOrdering::SeqCst);
+                    return Err(HostProblem::InfrastructureFailure);
+                }
+                2 => {
+                    self.fault_stage.store(0, AtomicOrdering::SeqCst);
+                    let mut row = self
+                        .store
+                        .get_provider_state(REPLAY_NAMESPACE, &self.key)
+                        .map_err(store_error)?
+                        .ok_or(HostProblem::InfrastructureFailure)?;
+                    let expected = row.version;
+                    row.version = row
+                        .version
+                        .checked_add(1)
+                        .ok_or(HostProblem::ResourceExhausted)?;
+                    self.store
+                        .put_provider_state(row, Some(expected))
+                        .map_err(store_error)?;
+                }
+                _ => {}
+            }
+            let row = self
+                .store
+                .get_provider_state(REPLAY_NAMESPACE, &self.key)
+                .map_err(store_error)?
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            let value: serde_json::Value = serde_json::from_slice(&row.payload)
+                .map_err(|_| HostProblem::InfrastructureFailure)?;
+            assert_eq!(value["value"]["resolution_tick"], 0);
+            assert!(value["value"]["owner_execution"].is_string());
+            Ok(self.tick)
         }
     }
 
@@ -1927,6 +2179,19 @@ mod tests {
         let mut state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
         let replay = state["value"].as_object_mut().unwrap();
         replay.remove("request_digest_format");
+        for field in [
+            "recorded_deadline_tick",
+            "owner_execution",
+            "owner_run_unit",
+            "recorded_sequence",
+            "resolution_tick",
+            "owner_kind",
+            "outer_effect_key",
+            "result_sha256",
+            "retention_binding_sha256",
+        ] {
+            replay.remove(field);
+        }
         replay.insert("request_sha256".into(), serde_json::json!(digest));
         let version = row.version;
         store
@@ -1939,6 +2204,133 @@ mod tests {
                 Some(version),
             )
             .unwrap();
+    }
+
+    #[test]
+    fn external_replay_prune_refreshes_live_cache_before_replay_and_capacity() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let limits = ImsLimits {
+            max_replays: 1,
+            ..ImsLimits::default()
+        };
+        let first = ImsService::open(store.clone(), limits).unwrap();
+        first.install(definition()).unwrap();
+        let invocation = invocation("refresh-ims");
+        let schedule = request(ImsOperation::Schedule, 801, &[], &[], Vec::new());
+        first.execute(&invocation, &schedule).unwrap();
+
+        let second = ImsService::open(store.clone(), limits).unwrap();
+        let schedule_key = schedule.mutation.as_ref().unwrap().idempotency_key.as_str();
+        let schedule_row = store
+            .get_provider_state(REPLAY_NAMESPACE, schedule_key)
+            .unwrap()
+            .unwrap();
+        store
+            .delete_provider_state(REPLAY_NAMESPACE, schedule_key, schedule_row.version)
+            .unwrap();
+
+        let insert = request(
+            ImsOperation::Insert,
+            802,
+            &["ROOT"],
+            b"000801ROOT",
+            Vec::new(),
+        );
+        assert_eq!(
+            second
+                .execute(&invocation, &insert)
+                .unwrap()
+                .affected_segments,
+            1
+        );
+
+        let insert_key = insert.mutation.as_ref().unwrap().idempotency_key.as_str();
+        let insert_row = store
+            .get_provider_state(REPLAY_NAMESPACE, insert_key)
+            .unwrap()
+            .unwrap();
+        store
+            .delete_provider_state(REPLAY_NAMESPACE, insert_key, insert_row.version)
+            .unwrap();
+        let redispatched = second.execute(&invocation, &insert).unwrap();
+        assert_eq!(redispatched.status, "II");
+        assert_eq!(redispatched.affected_segments, 0);
+
+        assert_eq!(first.lock().unwrap().state.replay.len(), 1);
+    }
+
+    #[test]
+    fn delayed_resolution_is_observed_after_protected_replay_persistence() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let invocation = invocation("delayed-ims");
+        let request = request(ImsOperation::Schedule, 803, &[], &[], Vec::new());
+        let key = request
+            .mutation
+            .as_ref()
+            .unwrap()
+            .idempotency_key
+            .as_str()
+            .to_string();
+        let clock = Arc::new(PersistAwareReplayClock {
+            store: store.clone(),
+            key: key.clone(),
+            tick: 250,
+            fault_stage: AtomicU8::new(0),
+        });
+        let service =
+            ImsService::open_with_replay_clock(store.clone(), ImsLimits::default(), clock).unwrap();
+        service.install(definition()).unwrap();
+        service.execute(&invocation, &request).unwrap();
+
+        let row = store
+            .get_provider_state(REPLAY_NAMESPACE, &key)
+            .unwrap()
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        assert_eq!(value["value"]["recorded_deadline_tick"], 100);
+        assert_eq!(value["value"]["resolution_tick"], 250);
+        assert_eq!(
+            value["value"]["owner_execution"],
+            invocation.execution_id.as_str()
+        );
+    }
+
+    #[test]
+    fn post_commit_clock_and_cas_failures_are_unknown_then_retry_recovers() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let invocation = invocation("fault-ims");
+        let request = request(ImsOperation::Schedule, 804, &[], &[], Vec::new());
+        let key = request
+            .mutation
+            .as_ref()
+            .unwrap()
+            .idempotency_key
+            .as_str()
+            .to_string();
+        let clock = Arc::new(PersistAwareReplayClock {
+            store: store.clone(),
+            key: key.clone(),
+            tick: 250,
+            fault_stage: AtomicU8::new(1),
+        });
+        let service =
+            ImsService::open_with_replay_clock(store.clone(), ImsLimits::default(), clock).unwrap();
+        service.install(definition()).unwrap();
+        assert_eq!(
+            service.execute(&invocation, &request),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(
+            service.execute(&invocation, &request),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(service.execute(&invocation, &request).unwrap().status, "  ");
+        let row = store
+            .get_provider_state(REPLAY_NAMESPACE, &key)
+            .unwrap()
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        assert_eq!(value["value"]["resolution_tick"], 250);
     }
 
     fn qualifier(segment: &str, field: &str, value: &[u8]) -> ImsQualifier {
@@ -2466,5 +2858,79 @@ mod tests {
                 .unwrap(),
             manifest
         );
+    }
+
+    #[test]
+    fn replay_retention_preserves_the_live_idempotency_window() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = ImsService::open(
+            store.clone(),
+            ImsLimits {
+                max_replays: 2,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        service.install(definition()).unwrap();
+        let mut expired_invocation = invocation("expired-replay");
+        expired_invocation.deadline_tick = 10;
+        let expired = request(ImsOperation::Schedule, 981, &[], &[], Vec::new());
+        service.execute(&expired_invocation, &expired).unwrap();
+        let mut live_invocation = invocation("live-replay");
+        live_invocation.deadline_tick = 95;
+        let live = request(ImsOperation::Schedule, 982, &[], &[], Vec::new());
+        let live_result = service.execute(&live_invocation, &live).unwrap();
+        finish_invocation(store.as_ref(), &expired_invocation);
+        finish_invocation(store.as_ref(), &live_invocation);
+        let expired_key = expired.mutation.as_ref().unwrap().idempotency_key.clone();
+        let live_key = live.mutation.as_ref().unwrap().idempotency_key.clone();
+        let raw_retention = store.archive_and_prune(
+            retention_policy(),
+            RetentionRequest {
+                target: RetentionTarget::ImsReplay,
+                now_tick: 100,
+                max_records: 8,
+            },
+        );
+        assert_eq!(raw_retention, Err(StoreError::InvalidTransition));
+        if raw_retention.is_err() {
+            return;
+        }
+        assert!(
+            store
+                .get_provider_state(REPLAY_NAMESPACE, expired_key.as_str())
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            store
+                .get_provider_state(REPLAY_NAMESPACE, live_key.as_str())
+                .unwrap()
+                .is_some()
+        );
+        assert_eq!(service.execute(&live_invocation, &live), Ok(live_result));
+        let fresh = request(ImsOperation::Schedule, 983, &[], &[], Vec::new());
+        service
+            .execute(&invocation("fresh-replay"), &fresh)
+            .unwrap();
+        assert_eq!(
+            store
+                .list_provider_state(REPLAY_NAMESPACE, 3)
+                .unwrap()
+                .len(),
+            2
+        );
+    }
+
+    fn retention_policy() -> RetentionPolicy {
+        RetentionPolicy {
+            lifecycle_ticks: 10,
+            idempotency_ticks: 10,
+            audit_ticks: 20,
+            archive_ticks: 50,
+            low_watermark_percent: 70,
+            high_watermark_percent: 85,
+            max_batch: 8,
+        }
     }
 }

@@ -1,10 +1,12 @@
 use crate::cobol::bind_compatible_runtime_services;
+use crate::console_retention::{decode_console_log_rows, encode_console_log};
 #[cfg(test)]
 use crate::jes_worker::ManualJesClock;
 use crate::jes_worker::{
     DurableJesClock, JES_HEARTBEAT_MILLIS, JES_IDLE_MILLIS, JES_LEASE_TICKS,
     JES_WORK_DEADLINE_TICKS, JES_WORK_GENERATION, JES_WORKER_COUNT, JesClock, JesWorkPayload,
 };
+use crate::retention_maintenance::provider::RetentionPlanner;
 use crate::{ArtifactProfile, DefaultProgramRouter, ServerConfig, default_program_router};
 use axum::http::StatusCode;
 use base64::Engine;
@@ -20,12 +22,12 @@ use mainframe_env_batch::{
     BatchControllerSelector, BatchLimits, BatchService, JclBundle,
 };
 use mainframe_env_cics::{
-    BmsMapDefinition, CicsService, CicsTerminalExecution, CicsTerminalSnapshot, CicsTraceEntry,
-    cics_provider,
+    BmsMapDefinition, CicsReplayClock, CicsService, CicsTerminalExecution, CicsTerminalSnapshot,
+    CicsTraceEntry, cics_provider,
 };
-use mainframe_env_dataset::{DatasetService, dataset_providers};
+use mainframe_env_dataset::{DatasetReplayClock, DatasetService, dataset_providers};
 use mainframe_env_db2::{
-    Db2CatalogGeneration, Db2Limits, Db2SeedRow, Db2Service, db2_providers,
+    Db2CatalogGeneration, Db2Limits, Db2ReplayClock, Db2SeedRow, Db2Service, db2_providers,
     decode_table_definitions_bounded,
 };
 use mainframe_env_encoding::CodePage;
@@ -41,19 +43,21 @@ use mainframe_env_host_api::{
     MemberName, Mutation, RecordFormat, RegistrySnapshot, ResourceName, ScopedHostService,
     SecretRef, SecurityDecision, SessionId, TerminalRequest,
 };
-use mainframe_env_ims::{ImsService, ims_providers};
+use mainframe_env_ims::{ImsReplayClock, ImsService, ims_providers};
 use mainframe_env_interpreter::{CoordinatorLimits, ExecutionCoordinator, ReferenceMachine};
 use mainframe_env_ir::CodecLimits;
-use mainframe_env_mq::{MqService, mq_providers};
+use mainframe_env_mq::{MqReplayClock, MqService, mq_providers};
 use mainframe_env_racf::{
     MemorySecretResolver, PrincipalAuthenticationEpoch, RacfService, SecretResolver, racf_providers,
 };
-use mainframe_env_spool::{SpoolService, spool_providers};
+use mainframe_env_spool::{SpoolRetentionClock, SpoolService, spool_providers};
 use mainframe_env_store::{LocalArtifactStore, MemoryStore};
 use mainframe_env_store_api::{
     ArtifactRecord, ArtifactStore, CheckpointStore, EffectDigestFormat, EffectState,
     ExecutionState, PlatformStore, ProviderStateMutation, ProviderStateRecord, ProviderStateStore,
-    ProviderStateWrite, StoreError, WorkRecord, WorkState,
+    ProviderStateWrite, RetentionAgeReconciliation, RetentionArchive, RetentionArchivePruneOutcome,
+    RetentionArchivePruneRequest, RetentionForecast, RetentionLegacyRow, RetentionReceipt,
+    RetentionReconciliationReceipt, RetentionTarget, StoreError, WorkRecord, WorkState,
 };
 use mainframe_env_zosmf::{
     Authentication, GatewayCallContext, GatewayProblem, GatewayRequest, GatewayResponse,
@@ -264,6 +268,44 @@ enum JesWorkOutcome {
     Deferred,
 }
 
+struct EnterpriseReplayClock(Arc<dyn JesClock>);
+
+impl Db2ReplayClock for EnterpriseReplayClock {
+    fn now_tick(&self) -> Result<u64, HostProblem> {
+        self.0.now_tick().map_err(store_error)
+    }
+}
+
+impl ImsReplayClock for EnterpriseReplayClock {
+    fn now_tick(&self) -> Result<u64, HostProblem> {
+        self.0.now_tick().map_err(store_error)
+    }
+}
+
+impl MqReplayClock for EnterpriseReplayClock {
+    fn now_tick(&self) -> Result<u64, HostProblem> {
+        self.0.now_tick().map_err(store_error)
+    }
+}
+
+impl DatasetReplayClock for EnterpriseReplayClock {
+    fn now_tick(&self) -> Result<u64, HostProblem> {
+        self.0.now_tick().map_err(store_error)
+    }
+}
+
+impl CicsReplayClock for EnterpriseReplayClock {
+    fn now_tick(&self) -> Result<u64, HostProblem> {
+        self.0.now_tick().map_err(store_error)
+    }
+}
+
+impl SpoolRetentionClock for EnterpriseReplayClock {
+    fn now_tick(&self) -> Result<u64, HostProblem> {
+        self.0.now_tick().map_err(store_error)
+    }
+}
+
 pub struct ProductServer {
     config: ServerConfig,
     store: Arc<dyn PlatformStore>,
@@ -274,6 +316,7 @@ pub struct ProductServer {
     db2: Arc<Db2Service>,
     ims: Arc<ImsService>,
     mq: Arc<MqService>,
+    spool: Arc<SpoolService>,
     batch: Arc<BatchService>,
     artifacts: Arc<ProductArtifactStore>,
     host: Arc<ScopedHostService>,
@@ -572,28 +615,44 @@ impl ProductServer {
         jes_clock: Option<Arc<dyn JesClock>>,
     ) -> Result<Arc<Self>, HostProblem> {
         config.validate()?;
+        let jes_clock: Arc<dyn JesClock> = match jes_clock {
+            Some(clock) => clock,
+            None => Arc::new(DurableJesClock::new(store.clone()).map_err(store_error)?),
+        };
+        let enterprise_replay_clock = Arc::new(EnterpriseReplayClock(jes_clock.clone()));
         let provider_store: Arc<dyn ProviderStateStore> = store.clone();
         let racf = RacfService::open(provider_store.clone(), secrets.clone(), Default::default())?;
-        let dataset = DatasetService::open(provider_store.clone(), Default::default())?;
+        let dataset = DatasetService::open_with_replay_clock(
+            provider_store.clone(),
+            Default::default(),
+            enterprise_replay_clock.clone(),
+        )?;
         let enterprise_authorizer: Arc<dyn EnterpriseAuthorizer> = racf.clone();
-        let db2 = Db2Service::open_authorized(
+        let db2 = Db2Service::open_authorized_with_replay_clock(
             provider_store.clone(),
             Default::default(),
             enterprise_authorizer.clone(),
+            enterprise_replay_clock.clone(),
         )?;
-        let ims = ImsService::open_authorized(
+        let ims = ImsService::open_authorized_with_replay_clock(
             provider_store.clone(),
             Default::default(),
             enterprise_authorizer.clone(),
+            enterprise_replay_clock.clone(),
         )?;
-        let mq = MqService::open_authorized(
+        let mq = MqService::open_authorized_with_replay_clock(
             provider_store.clone(),
             Default::default(),
             enterprise_authorizer,
+            enterprise_replay_clock.clone(),
         )?;
         let spool_artifacts: Arc<dyn ArtifactStore> = artifacts.clone();
-        let spool =
-            SpoolService::open(provider_store.clone(), spool_artifacts, Default::default())?;
+        let spool = SpoolService::open_with_retention_clock(
+            provider_store.clone(),
+            spool_artifacts,
+            Default::default(),
+            enterprise_replay_clock.clone(),
+        )?;
         let mut enterprise_providers = db2_providers(db2.clone(), InvocationLimits::default());
         enterprise_providers.extend(ims_providers(ims.clone(), InvocationLimits::default()));
         enterprise_providers.extend(mq_providers(mq.clone(), InvocationLimits::default()));
@@ -606,12 +665,17 @@ impl ProductServer {
             false,
             None,
         )?;
-        let cics = CicsService::open(inner, provider_store.clone(), Default::default())?;
+        let cics = CicsService::open_with_replay_clock(
+            inner,
+            provider_store.clone(),
+            Default::default(),
+            enterprise_replay_clock,
+        )?;
         let program_provider: Arc<dyn HostProvider> = program.clone();
         let mut enterprise_providers = db2_providers(db2.clone(), InvocationLimits::default());
         enterprise_providers.extend(ims_providers(ims.clone(), InvocationLimits::default()));
         enterprise_providers.extend(mq_providers(mq.clone(), InvocationLimits::default()));
-        enterprise_providers.extend(spool_providers(spool, InvocationLimits::default()));
+        enterprise_providers.extend(spool_providers(spool.clone(), InvocationLimits::default()));
         let host = scoped_host(
             &racf,
             &dataset,
@@ -684,25 +748,21 @@ impl ProductServer {
             }
         }
         reconcile_auth_session_index(&*store)?;
-        let mut console = Vec::new();
-        for row in store
-            .list_provider_state("console-log", 65536)
-            .map_err(store_error)?
-        {
-            let separator = row
-                .payload
-                .iter()
-                .position(|byte| *byte == 0)
-                .ok_or(HostProblem::InfrastructureFailure)?;
-            let (name, tail) = row.payload.split_at(separator);
-            let text = tail.get(1..).ok_or(HostProblem::InfrastructureFailure)?;
-            console.push(ConsoleMessage {
-                key: row.key,
-                console: String::from_utf8(name.to_vec())
-                    .map_err(|_| HostProblem::InfrastructureFailure)?,
-                text: text.to_vec(),
-            });
+        let console_rows = store
+            .list_provider_state("console-log", 65_537)
+            .map_err(store_error)?;
+        if console_rows.len() > 65_536 {
+            return Err(HostProblem::ResourceExhausted);
         }
+        let console = decode_console_log_rows(&console_rows)
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .into_iter()
+            .map(|entry| ConsoleMessage {
+                key: entry.key,
+                console: entry.console,
+                text: entry.text,
+            })
+            .collect();
         let mut online_programs = BTreeMap::new();
         for row in store
             .list_provider_state("online-program", 4096)
@@ -777,10 +837,6 @@ impl ProductServer {
                 version: None,
             },
         };
-        let jes_clock: Arc<dyn JesClock> = match jes_clock {
-            Some(clock) => clock,
-            None => Arc::new(DurableJesClock::new(store.clone()).map_err(store_error)?),
-        };
         let product = Arc::new(Self {
             config,
             store,
@@ -791,6 +847,7 @@ impl ProductServer {
             db2,
             ims,
             mq,
+            spool,
             batch,
             artifacts,
             host,
@@ -2894,6 +2951,96 @@ impl ProductServer {
         }
     }
 
+    fn retention_planner(&self) -> Result<RetentionPlanner, HostProblem> {
+        RetentionPlanner::from_existing(
+            self.store.clone(),
+            self.config.retention.policy()?,
+            Some(self.racf.database().clone()),
+        )
+    }
+
+    /// Forecast eligibility and capacity for one retained record family.
+    pub fn operator_retention_forecast(
+        &self,
+        target: RetentionTarget,
+        observed_growth_per_tick: u64,
+    ) -> Result<RetentionForecast, HostProblem> {
+        self.retention_planner()?
+            .forecast(target, self.jes_tick()?, observed_growth_per_tick)
+    }
+    /// Atomically archive and prune at most `max_records` eligible source rows.
+    pub fn operator_archive_and_prune(
+        &self,
+        target: RetentionTarget,
+        max_records: usize,
+    ) -> Result<RetentionReceipt, HostProblem> {
+        let receipt =
+            self.retention_planner()?
+                .archive_and_prune(target, self.jes_tick()?, max_records)?;
+        if receipt.pruned != 0 {
+            match target {
+                RetentionTarget::DatasetReplay => {
+                    self.dataset.refresh_replay_index()?;
+                }
+                RetentionTarget::SpoolJobs => self.spool.refresh_after_external_retention()?,
+                RetentionTarget::ConsoleLog => self.refresh_console_cache()?,
+                _ => {}
+            }
+        }
+        Ok(receipt)
+    }
+
+    /// Read whole verified archives containing at most `max` source rows in total.
+    pub fn operator_retention_archives(
+        &self,
+        target: RetentionTarget,
+        max: usize,
+    ) -> Result<Vec<RetentionArchive>, HostProblem> {
+        let policy = self.config.retention.policy()?;
+        if max == 0 || max > policy.max_batch {
+            return Err(HostProblem::Malformed);
+        }
+        self.store
+            .retention_archives(target, max)
+            .map_err(store_error)
+    }
+
+    /// Permanently delete whole archive batches containing at most `max` source rows.
+    pub fn operator_prune_retention_archives(&self, max: usize) -> Result<usize, HostProblem> {
+        self.store
+            .prune_retention_archives(self.config.retention.policy()?, self.jes_tick()?, max)
+            .map_err(store_error)
+    }
+
+    /// Permanently delete expired archives, requiring an exact identity for an oversized batch.
+    pub fn operator_prune_retention_archives_authorized(
+        &self,
+        mut request: RetentionArchivePruneRequest,
+    ) -> Result<RetentionArchivePruneOutcome, HostProblem> {
+        request.now_tick = self.jes_tick()?;
+        self.store
+            .prune_retention_archives_authorized(self.config.retention.policy()?, request)
+            .map_err(store_error)
+    }
+
+    /// Add conservative owner/age metadata to one operator-inspected legacy row.
+    pub fn operator_reconcile_retention_age(
+        &self,
+        request: RetentionAgeReconciliation,
+    ) -> Result<RetentionReconciliationReceipt, HostProblem> {
+        self.retention_planner()?
+            .reconcile(request, self.jes_tick()?)
+    }
+
+    /// List protected legacy rows and their exact reconciliation CAS tokens.
+    pub fn operator_retention_legacy_rows(
+        &self,
+        target: RetentionTarget,
+        max: usize,
+    ) -> Result<Vec<RetentionLegacyRow>, HostProblem> {
+        self.retention_planner()?.legacy_rows(target, max)
+    }
+
     pub async fn graceful_shutdown(&self) -> bool {
         self.accepting.store(false, Ordering::SeqCst);
         self.jes_workers_stopping.store(true, Ordering::SeqCst);
@@ -2985,8 +3132,13 @@ impl ProductServer {
             .pending_notifications(4096)
             .map_err(store_error)?
         {
+            let delivered_tick = self.jes_tick()?;
             self.store
-                .mark_notification_delivered(&notification.notification_id, notification.version)
+                .mark_notification_delivered(
+                    &notification.notification_id,
+                    notification.version,
+                    delivered_tick,
+                )
                 .map_err(store_error)?;
             self.outbox_delivered.fetch_add(1, Ordering::Relaxed);
         }
@@ -3366,6 +3518,7 @@ impl ProductServer {
                     lease_epoch: 0,
                     lease_expiry_tick: None,
                     heartbeat_tick: None,
+                    terminal_tick: None,
                     checkpoint_id: None,
                     effect_sequence: 0,
                     payload,
@@ -4249,7 +4402,7 @@ impl ProductServer {
             .host
             .invoke(
                 &invocation,
-                session_tick().map_err(gateway_problem)?,
+                self.jes_tick().map_err(gateway_problem)?,
                 invocation.cancellation_requested(),
                 EffectRequest {
                     run_unit: invocation.run_unit_id.clone(),
@@ -4372,7 +4525,7 @@ impl ProductServer {
             .host
             .invoke(
                 &invocation,
-                session_tick().map_err(gateway_problem)?,
+                self.jes_tick().map_err(gateway_problem)?,
                 invocation.cancellation_requested(),
                 EffectRequest {
                     run_unit: invocation.run_unit_id.clone(),
@@ -4515,14 +4668,10 @@ impl ProductServer {
             .map(|capability| (capability, "1".to_string()))
             .collect();
         let context = current_gateway_call_context();
-        let deadline_tick = context.as_ref().map_or_else(
-            || {
-                session_tick()?
-                    .checked_add(self.config.timeout_millis)
-                    .ok_or(HostProblem::ResourceExhausted)
-            },
-            |context| Ok(context.deadline_tick()),
-        )?;
+        let deadline_tick = self
+            .jes_tick()?
+            .checked_add(self.config.timeout_millis)
+            .ok_or(HostProblem::ResourceExhausted)?;
         let invocation = Invocation::new(
             RequestId::new(format!("request-{sequence}"), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
@@ -4754,6 +4903,30 @@ impl ProductServer {
         }
     }
 
+    fn refresh_console_cache(&self) -> Result<(), HostProblem> {
+        let rows = self
+            .store
+            .list_provider_state("console-log", 65_537)
+            .map_err(store_error)?;
+        if rows.len() > 65_536 {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let decoded = decode_console_log_rows(&rows)
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .into_iter()
+            .map(|entry| ConsoleMessage {
+                key: entry.key,
+                console: entry.console,
+                text: entry.text,
+            })
+            .collect();
+        *self
+            .console
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)? = decoded;
+        Ok(())
+    }
+
     fn console_issue(
         &self,
         principal: &str,
@@ -4775,6 +4948,7 @@ impl ProductServer {
             "D U,ALL" => b"IEE457I UNIT STATUS AVAILABLE".to_vec(),
             _ => return Err(gateway_problem(HostProblem::Unsupported)),
         };
+        self.refresh_console_cache().map_err(gateway_problem)?;
         let mut messages = self
             .console
             .lock()
@@ -4783,9 +4957,16 @@ impl ProductServer {
             return Err(gateway_problem(HostProblem::ResourceExhausted));
         }
         let key = format!("{:016}", self.next_sequence().map_err(gateway_problem)?);
-        let mut payload = name.to_ascii_uppercase().into_bytes();
-        payload.push(0);
-        payload.extend_from_slice(&text);
+        let observed_tick = self.jes_tick().map_err(gateway_problem)?;
+        let payload = encode_console_log(
+            &key,
+            &name.to_ascii_uppercase(),
+            &text,
+            principal,
+            "direct-console",
+            observed_tick,
+        )
+        .map_err(|_| gateway_problem(HostProblem::InfrastructureFailure))?;
         self.store
             .put_provider_state(
                 ProviderStateRecord {
@@ -4815,6 +4996,7 @@ impl ProductServer {
         name: &str,
         key: &str,
     ) -> Result<GatewayResponse, GatewayProblem> {
+        self.refresh_console_cache().map_err(gateway_problem)?;
         self.authorize_resource(
             principal,
             "FACILITY",
@@ -4836,6 +5018,7 @@ impl ProductServer {
     }
 
     fn console_logs(&self, principal: &str) -> Result<GatewayResponse, GatewayProblem> {
+        self.refresh_console_cache().map_err(gateway_problem)?;
         self.authorize_resource(principal, "FACILITY", "CONSOLE.LOG", AccessIntent::Read)?;
         let messages = self
             .console
@@ -6019,7 +6202,7 @@ mod tests {
         LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
     };
     use mainframe_env_store::SqliteStateStore;
-    use mainframe_env_store_api::WorkStore;
+    use mainframe_env_store_api::{RetentionRequest, RetentionStore, WorkStore};
     use tower::ServiceExt;
 
     #[test]
@@ -8471,8 +8654,7 @@ mod tests {
 
     #[test]
     fn invocation_grants_are_selector_scoped_and_generation_pinned() {
-        let server = ProductServer::memory(config()).unwrap();
-        let before = session_tick().unwrap();
+        let (server, _, _) = worker_test_server(500);
         let invocation = server
             .invocation(
                 "IBMUSER",
@@ -8481,8 +8663,7 @@ mod tests {
                 &["host.dataset.read"],
             )
             .unwrap();
-        assert!(invocation.deadline_tick >= before + server.config.timeout_millis);
-        assert!(invocation.deadline_tick <= session_tick().unwrap() + server.config.timeout_millis);
+        assert_eq!(invocation.deadline_tick, 500 + server.config.timeout_millis);
         assert_eq!(invocation.principal.grants().len(), 1);
         let capability =
             CapabilityId::new("host.dataset.read", InvocationLimits::default()).unwrap();
@@ -8494,7 +8675,7 @@ mod tests {
             &CapabilityId::new("host.cics.execute", InvocationLimits::default()).unwrap()
         ));
 
-        let deadline = session_tick().unwrap() + 1_000;
+        let deadline = 1;
         let context = GatewayCallContext::new(deadline).unwrap();
         let cancellation = context.cancellation_probe();
         let _scope = GatewayCallContextScope::enter(context);
@@ -8506,10 +8687,147 @@ mod tests {
                 &["host.dataset.read"],
             )
             .unwrap();
-        assert_eq!(controlled.deadline_tick, deadline);
+        assert_eq!(controlled.deadline_tick, 500 + server.config.timeout_millis);
         assert!(!controlled.cancellation_requested());
         cancellation.request();
         assert!(controlled.cancellation_requested());
+    }
+
+    #[test]
+    fn direct_audit_age_uses_durable_clock_after_wall_clock_regression() {
+        let durable_tick = session_tick().unwrap().saturating_add(1_000_000);
+        let mut server_config = config();
+        server_config.retention.audit_ticks = 10;
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let platform: Arc<dyn PlatformStore> = store.clone();
+        let server = ProductServer::open_with_clock(
+            server_config,
+            platform,
+            Arc::new(ManualJesClock::new(durable_tick)),
+        )
+        .unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let _ = server.resource_decision(
+            "IBMUSER",
+            "FACILITY",
+            "RETENTION.CLOCK.TEST",
+            AccessIntent::Read,
+        );
+        let forecast = server
+            .operator_retention_forecast(RetentionTarget::Audit, 0)
+            .unwrap();
+        assert_eq!(forecast.active_records, 1);
+        assert_eq!(forecast.eligible_records, 0);
+    }
+
+    #[test]
+    fn legacy_console_sidecar_reconciles_and_reclaims_capacity() {
+        let mut server_config = config();
+        server_config.retention.lifecycle_ticks = 10;
+        server_config.retention.max_batch = 8;
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let clock = Arc::new(ManualJesClock::new(100));
+        let platform: Arc<dyn PlatformStore> = store.clone();
+        let server =
+            ProductServer::open_with_clock(server_config, platform, clock.clone()).unwrap();
+        let row = ProviderStateRecord {
+            namespace: "console-log".into(),
+            key: "0000000000000001".into(),
+            version: 1,
+            payload: b"OPER\0legacy console".to_vec(),
+        };
+        store.put_provider_state(row, None).unwrap();
+        assert!(
+            server
+                .retention_planner()
+                .unwrap()
+                .core_dependencies()
+                .unwrap()
+                .unowned
+        );
+
+        let legacy = server
+            .operator_retention_legacy_rows(RetentionTarget::ConsoleLog, 8)
+            .unwrap();
+        assert_eq!(legacy.len(), 1);
+        let receipt = server
+            .operator_reconcile_retention_age(RetentionAgeReconciliation {
+                target: RetentionTarget::ConsoleLog,
+                namespace: legacy[0].namespace.clone(),
+                key: legacy[0].key.clone(),
+                expected_version: legacy[0].source_version,
+                owner_execution: None,
+            })
+            .unwrap();
+        assert_eq!(receipt.reconciled_tick, 100);
+        assert!(
+            !server
+                .retention_planner()
+                .unwrap()
+                .core_dependencies()
+                .unwrap()
+                .unowned
+        );
+        clock.advance(9);
+        assert_eq!(
+            server
+                .operator_archive_and_prune(RetentionTarget::ConsoleLog, 8)
+                .unwrap()
+                .pruned,
+            0
+        );
+        clock.advance(1);
+        assert_eq!(
+            server
+                .operator_archive_and_prune(RetentionTarget::ConsoleLog, 8)
+                .unwrap()
+                .pruned,
+            1
+        );
+        assert!(
+            store
+                .get_provider_state("console-log", "0000000000000001")
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn core_retention_requires_a_current_provider_dependency_snapshot() {
+        let (server, store, _) = worker_test_server(100);
+        let request = RetentionRequest {
+            target: RetentionTarget::TerminalExecutions,
+            now_tick: 100,
+            max_records: 1,
+        };
+        assert_eq!(
+            store.archive_and_prune(server.config.retention.policy().unwrap(), request),
+            Err(StoreError::InvalidTransition)
+        );
+        let snapshot = server
+            .retention_planner()
+            .unwrap()
+            .core_dependencies()
+            .unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "snapshot-race".into(),
+                    key: "late-writer".into(),
+                    version: 1,
+                    payload: b"late".to_vec(),
+                },
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            store.archive_and_prune_with_dependencies(
+                server.config.retention.policy().unwrap(),
+                request,
+                &snapshot,
+            ),
+            Err(StoreError::Conflict)
+        );
     }
 
     #[test]

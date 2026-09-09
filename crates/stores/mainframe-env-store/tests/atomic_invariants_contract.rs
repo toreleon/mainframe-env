@@ -34,6 +34,7 @@ fn execution_record(label: &str) -> ExecutionRecord {
         version: 1,
         owner_lease: None,
         lease_expiry_tick: None,
+        terminal_tick: None,
     }
 }
 
@@ -60,6 +61,7 @@ fn notification(
         payload: vec![1],
         attempt: 0,
         delivered: false,
+        delivered_tick: None,
         version: 1,
     }
 }
@@ -130,6 +132,7 @@ fn intent_record(execution: &ExecutionRecord, key: &str) -> EffectRecord {
         },
         state: EffectState::Intent,
         result_digest: None,
+        resolved_tick: None,
     }
 }
 
@@ -467,6 +470,7 @@ fn assert_direct_effect_invariants(store: &dyn PlatformStore, prefix: &str) {
     let completed = EffectRecord {
         state: EffectState::Completed,
         result_digest: Some([3; 32]),
+        resolved_tick: Some(3),
         ..intent.clone()
     };
     store.record_result(&intent.key, completed.clone()).unwrap();
@@ -586,6 +590,7 @@ fn assert_atomic_effect_invariants(store: &dyn PlatformStore, prefix: &str) {
     let completed = EffectRecord {
         state: EffectState::Completed,
         result_digest: Some([3; 32]),
+        resolved_tick: Some(3),
         ..intent.clone()
     };
     assert_eq!(

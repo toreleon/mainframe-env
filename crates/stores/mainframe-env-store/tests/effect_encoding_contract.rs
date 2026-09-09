@@ -29,6 +29,7 @@ fn record(key: &str) -> EffectRecord {
             recovery_lease: None,
         },
         result_digest: None,
+        resolved_tick: None,
         state: EffectState::Intent,
     }
 }
@@ -56,6 +57,17 @@ fn contract(store: &dyn IdempotencyStore, key: &str) {
     assert_eq!(
         store.record_result(&intent.key, mixed),
         Err(StoreError::Conflict)
+    );
+    assert_eq!(store.effect(&intent.key).unwrap(), Some(intent.clone()));
+    let prematurely_aged = EffectRecord {
+        state: EffectState::Completed,
+        result_digest: Some([2; 32]),
+        resolved_tick: Some(intent.intent.created_tick - 1),
+        ..intent.clone()
+    };
+    assert_eq!(
+        store.record_result(&intent.key, prematurely_aged),
+        Err(StoreError::InvalidTransition)
     );
     assert_eq!(store.effect(&intent.key).unwrap(), Some(intent.clone()));
     let unknown = EffectRecord {

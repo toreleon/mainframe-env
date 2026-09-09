@@ -1,8 +1,8 @@
 {
   "counts": {
-    "markdown_documents": 179,
+    "markdown_documents": 180,
     "navigation_groups": 5,
-    "normative_documents": 35,
+    "normative_documents": 36,
     "xtask_commands": 156
   },
   "documents": [
@@ -10,7 +10,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:d2e29d6f17bf3b91fc148b2f07d6b077ae9ea639dc8549c45063c5a040f3ff7f",
+      "sha256": "sha256:21cb6716826c16ea90e35bdd5f38eef326c7a11c323ebe222cb58396285a9f24",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -106,7 +106,7 @@
       "normative": false,
       "path": "crates/apps/mainframe-env-server/README.md",
       "relative_links": 0,
-      "sha256": "sha256:f0f2dc5aa90d9261dca973301bf24f76112c5bb507a4cb7b7411a7895d9af0ce",
+      "sha256": "sha256:48fdf83d7da7c3f23082da1d9780c953c14f09e7193f29e6ae6c4d340f548ed2",
       "title": "mainframe-env-server",
       "xtask_commands": 0
     },
@@ -146,7 +146,7 @@
       "normative": false,
       "path": "crates/contracts/mainframe-env-store-api/README.md",
       "relative_links": 0,
-      "sha256": "sha256:db63fcc6682dda1f03e6f220d5b86e2dd7dbb06d705bb04eb608bfaa81ff2d87",
+      "sha256": "sha256:e2f6198379643761b709caf17b764d182ec3ea18b2ea099a9e5775e674f2086d",
       "title": "mainframe-env-store-api",
       "xtask_commands": 0
     },
@@ -257,8 +257,8 @@
     {
       "normative": false,
       "path": "crates/providers/mainframe-env-racf/README.md",
-      "relative_links": 0,
-      "sha256": "sha256:f103b5190c29afbca5fb1c1ab430f2edf735bc6bced9df373e4d1d9fc90bfbcf",
+      "relative_links": 1,
+      "sha256": "sha256:52be40bd4a6c4d138d70f0e0a78855d81bed1c4247e8c2b119778ba7bf7df35d",
       "title": "mainframe-env-racf",
       "xtask_commands": 2
     },
@@ -274,7 +274,7 @@
       "normative": false,
       "path": "crates/stores/mainframe-env-store/README.md",
       "relative_links": 0,
-      "sha256": "sha256:195e45131a1adedd33f5385383d7f07de70e6c003f32178e356d8228a53570ee",
+      "sha256": "sha256:a9f1b7e9dda54f8f410a22be55e99a4d2f9fec403d5cfa085faf8452772cc879",
       "title": "mainframe-env-store",
       "xtask_commands": 0
     },
@@ -301,8 +301,8 @@
     {
       "normative": false,
       "path": "docs/README.md",
-      "relative_links": 70,
-      "sha256": "sha256:ffaa86f45f18d444776990c951e639810e0d5438e22dc3c8baf3a4ee36e714e3",
+      "relative_links": 71,
+      "sha256": "sha256:3e00d8d26d1aaca51ee47c9fb068467678e746b5a24fb0c61116537344bda9e6",
       "title": "Documentation portal",
       "xtask_commands": 2
     },
@@ -535,9 +535,9 @@
       "normative": true,
       "owner": "Db2, IMS, MQ, and store-contract maintainers",
       "path": "docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md",
-      "relative_links": 0,
+      "relative_links": 1,
       "scope": "provider object-row envelopes, manifests, migrations, and CAS boundaries",
-      "sha256": "sha256:c9e6d1e06b53be966773c0e1ac27dc768f5dcfe509a82ae1f17f04a35fb8b9bf",
+      "sha256": "sha256:3e7f935ff23d9022c93512fbc69160bc9e18a988be82371d35cc640d1e1f6ddc",
       "status": "Implemented",
       "title": "Provider object-row persistence, version 1",
       "xtask_commands": 0
@@ -552,6 +552,18 @@
       "sha256": "sha256:cf39d539d7bb8a34734ac5f0ca21b1b37d8947a714ed72f732ba8a47af7ce1dc",
       "status": "Implemented",
       "title": "mainframe-env target release build type v1",
+      "xtask_commands": 0
+    },
+    {
+      "applies_from": "mainframe-env 0.8.3 development",
+      "normative": true,
+      "owner": "store-contract, provider, and core-server maintainers",
+      "path": "docs/contracts/RETENTION-LIFECYCLE-V1.md",
+      "relative_links": 3,
+      "scope": "all durable source families, provider replay and recovery graphs, age observations, retained archives, and offline maintenance",
+      "sha256": "sha256:0ef86e6e4d5002a3359c7a799ce54799bab0a4cd0fb41f67f144146a6f98186d",
+      "status": "Implemented",
+      "title": "Durable retention lifecycle, version 1",
       "xtask_commands": 0
     },
     {
@@ -1373,8 +1385,8 @@
     {
       "normative": false,
       "path": "docs/runbooks/CAPACITY-AND-RECOVERY.md",
-      "relative_links": 0,
-      "sha256": "sha256:a39b54b02d8b0762896627be487816be893672eb2b52b599547adb6edeea3deb",
+      "relative_links": 2,
+      "sha256": "sha256:054e3f9dea59b65861b882398555c43a41da98f1a0bd65582accfe97060f1061",
       "title": "Capacity and recovery",
       "xtask_commands": 0
     },
@@ -1406,7 +1418,7 @@
       "normative": false,
       "path": "docs/runbooks/OPERATIONS.md",
       "relative_links": 3,
-      "sha256": "sha256:4eb9f6b2ae9c1dac7bf48634719de84e9cf3bd6deaefa0dd05aa8ef6f32c477c",
+      "sha256": "sha256:f2340bebc27c399065170a2cf3910ac879d38c8efeed7cbddbed24d744b78e1f",
       "title": "Core-server operations",
       "xtask_commands": 0
     },
@@ -1659,6 +1671,10 @@
           "path": "docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md"
         },
         {
+          "label": "Durable retention lifecycle",
+          "path": "docs/contracts/RETENTION-LIFECYCLE-V1.md"
+        },
+        {
           "label": "Target release build type",
           "path": "docs/contracts/RELEASE-BUILD-V1.md"
         },
@@ -1871,7 +1887,7 @@
     "state": "development"
   },
   "registry": "docs/documentation-registry.json",
-  "registry_sha256": "sha256:30b31ecb1278643e5d74a18fd19f6e74d7674db58f255aca7a9ce733855babe9",
+  "registry_sha256": "sha256:c7b3071245c522ddb77ab71ee24d781383bfb5bcc314b906dc960339a28a6a3f",
   "schema_version": "mainframe-env.documentation-manifest@1",
   "validation": {
     "generated_navigation": true,

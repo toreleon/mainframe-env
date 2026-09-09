@@ -1,3 +1,8 @@
+use crate::retention::{
+    CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
+    CICS_OUTER_EFFECT_ORIGIN_BINDING, CICS_OUTER_EFFECT_ORIGIN_SCHEMA, DecodedUow,
+    UowRetentionMetadata,
+};
 use mainframe_env_encoding::CodePage;
 use mainframe_env_execution_api::{
     BoundedPayload, CapabilityId, ExecutionId, IdempotencyKey, Invocation, InvocationLimits,
@@ -17,6 +22,7 @@ use mainframe_env_store_api::{
 };
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -98,11 +104,17 @@ struct DurableFileStatus {
     version: u64,
 }
 
-struct CicsEffectReplay {
-    owner_execution: Option<String>,
-    deadline_tick: Option<u64>,
-    request_digest: [u8; 32],
-    response: CicsResponse,
+pub(crate) struct CicsEffectReplay {
+    pub(crate) effect_key: Option<String>,
+    pub(crate) owner_execution: Option<String>,
+    pub(crate) owner_run_unit: Option<String>,
+    pub(crate) sequence: Option<u64>,
+    pub(crate) deadline_tick: Option<u64>,
+    pub(crate) resolution_tick: Option<u64>,
+    pub(crate) request_digest: [u8; 32],
+    pub(crate) result_digest: Option<[u8; 32]>,
+    pub(crate) binding_digest: Option<[u8; 32]>,
+    pub(crate) response: CicsResponse,
 }
 
 #[derive(Clone, Debug)]
@@ -162,6 +174,7 @@ struct Run {
     applid: String,
     sysid: String,
     host_sequence: u64,
+    outer_effect_key: Option<String>,
     handlers: BTreeMap<String, String>,
     abend_handler: Option<String>,
     retrieve: Vec<u8>,
@@ -247,6 +260,14 @@ pub struct CicsService {
     store: Arc<dyn ProviderStateStore>,
     limits: CicsLimits,
     state: Mutex<State>,
+    replay_clock: Option<Arc<dyn CicsReplayClock>>,
+    replay_unknown_after_persist: AtomicBool,
+}
+
+/// Trusted durable logical-time source used after CICS work is durably resolved.
+pub trait CicsReplayClock: Send + Sync {
+    /// Observe the current nonzero durable logical tick.
+    fn now_tick(&self) -> Result<u64, HostProblem>;
 }
 
 impl CicsService {
@@ -271,6 +292,25 @@ impl CicsService {
         host: Arc<ScopedHostService>,
         store: Arc<dyn ProviderStateStore>,
         limits: CicsLimits,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_inner(host, store, limits, None)
+    }
+
+    /// Open with the durable clock used to resolve outer replay and UOW age.
+    pub fn open_with_replay_clock(
+        host: Arc<ScopedHostService>,
+        store: Arc<dyn ProviderStateStore>,
+        limits: CicsLimits,
+        replay_clock: Arc<dyn CicsReplayClock>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_inner(host, store, limits, Some(replay_clock))
+    }
+
+    fn open_inner(
+        host: Arc<ScopedHostService>,
+        store: Arc<dyn ProviderStateStore>,
+        limits: CicsLimits,
+        replay_clock: Option<Arc<dyn CicsReplayClock>>,
     ) -> Result<Arc<Self>, HostProblem> {
         let mut sessions = BTreeMap::new();
         for row in store
@@ -360,6 +400,8 @@ impl CicsService {
             host,
             store,
             limits,
+            replay_clock,
+            replay_unknown_after_persist: AtomicBool::new(false),
             state: Mutex::new(State {
                 sessions,
                 runs: BTreeMap::new(),
@@ -443,6 +485,13 @@ impl CicsService {
         Ok(())
     }
 
+    /// Inject the exact crash gap after a protected outer replay write.
+    #[cfg(any(test, feature = "fault-injection"))]
+    pub fn inject_replay_unknown_after_persist_once(&self) {
+        self.replay_unknown_after_persist
+            .store(true, Ordering::SeqCst);
+    }
+
     pub fn create_session(
         &self,
         session: &SessionId,
@@ -503,6 +552,7 @@ impl CicsService {
         now_tick: u64,
         idle_timeout_ticks: u64,
     ) -> Result<CicsTerminalSnapshot, HostProblem> {
+        reject_reserved_nested_origin(&invocation)?;
         validate_terminal_identity(transaction, 16)?;
         validate_terminal_identity(csrf_token, 256)?;
         if rows == 0 || columns == 0 || idle_timeout_ticks == 0 {
@@ -828,6 +878,7 @@ impl CicsService {
         csrf_token: &str,
         now_tick: u64,
     ) -> Result<CicsTerminalSnapshot, HostProblem> {
+        reject_reserved_nested_origin(&invocation)?;
         let principal = invocation.principal.id();
         let current = self.public_session(session, principal, Some(csrf_token), now_tick)?;
         self.authorize_terminal(&invocation, &current.transaction)?;
@@ -957,6 +1008,7 @@ impl CicsService {
         applid: &str,
         sysid: &str,
     ) -> Result<(), HostProblem> {
+        reject_reserved_nested_origin(&invocation)?;
         let values = [transaction, applid, sysid];
         if values.iter().any(|value| {
             value.is_empty()
@@ -992,6 +1044,7 @@ impl CicsService {
                 applid: applid.to_ascii_uppercase(),
                 sysid: sysid.to_ascii_uppercase(),
                 host_sequence: 0,
+                outer_effect_key: None,
                 handlers: BTreeMap::new(),
                 abend_handler: None,
                 retrieve,
@@ -1020,6 +1073,7 @@ impl CicsService {
         retrieve: Vec<u8>,
         now_tick: u64,
     ) -> Result<(), HostProblem> {
+        reject_reserved_nested_origin(&invocation)?;
         validate_terminal_identity(transaction, 16)?;
         if retrieve.len() > self.limits.max_screen_bytes {
             return Err(HostProblem::ResourceExhausted);
@@ -1045,6 +1099,7 @@ impl CicsService {
                 applid: "ME01".into(),
                 sysid: "S001".into(),
                 host_sequence: 0,
+                outer_effect_key: None,
                 handlers: BTreeMap::new(),
                 abend_handler: None,
                 retrieve,
@@ -1066,6 +1121,7 @@ impl CicsService {
         applid: &str,
         sysid: &str,
     ) -> Result<CicsContinuation, HostProblem> {
+        reject_reserved_nested_origin(&invocation)?;
         let values = [applid, sysid];
         if values.iter().any(|value| {
             value.is_empty()
@@ -1123,6 +1179,7 @@ impl CicsService {
                 applid: applid.to_ascii_uppercase(),
                 sysid: sysid.to_ascii_uppercase(),
                 host_sequence: 0,
+                outer_effect_key: None,
                 handlers: BTreeMap::new(),
                 abend_handler: None,
                 retrieve: Vec::new(),
@@ -1138,6 +1195,7 @@ impl CicsService {
     }
 
     fn ensure_run(&self, invocation: &Invocation) -> Result<(), HostProblem> {
+        reject_reserved_nested_origin(invocation)?;
         {
             let state = self.lock()?;
             if state.runs.contains_key(&invocation.run_unit_id) {
@@ -1407,13 +1465,16 @@ impl CicsService {
         } else {
             None
         };
-        let replay_owner = {
+        let (replay_owner, replay_run_unit) = {
             let state = self.lock()?;
             let run = state
                 .runs
                 .get(&effect.run_unit)
                 .ok_or(HostProblem::Unauthorized)?;
-            run.invocation.execution_id.as_str().to_string()
+            (
+                run.invocation.execution_id.as_str().to_string(),
+                run.invocation.run_unit_id.as_str().to_string(),
+            )
         };
         if let Some((key, digest)) = replay_identity.as_ref()
             && let Some(record) = self
@@ -1422,14 +1483,17 @@ impl CicsService {
                 .map_err(store_error)?
         {
             let replay = decode_cics_effect_replay(&record.payload, self.limits)?;
-            if replay.request_digest != *digest
-                || replay
-                    .owner_execution
-                    .as_ref()
-                    .is_some_and(|owner| owner != &replay_owner)
-            {
-                return Err(HostProblem::IdempotencyConflict);
-            }
+            validate_cics_effect_replay_identity(
+                &replay,
+                key.as_str(),
+                &replay_owner,
+                &replay_run_unit,
+                effect.sequence,
+                *digest,
+            )?;
+            let replay = self
+                .finalize_effect_replay(record, replay, effect.deadline_tick)
+                .map_err(|_| HostProblem::UnknownOutcome)?;
             return Ok(replay.response);
         }
         let mut run = self
@@ -1437,6 +1501,7 @@ impl CicsService {
             .runs
             .remove(&effect.run_unit)
             .ok_or(HostProblem::Unauthorized)?;
+        run.outer_effect_key = effect.idempotency_key.as_ref().map(ToString::to_string);
         let operation = request.operation;
         #[cfg(feature = "fault-injection")]
         let after_mutation_file = matches!(
@@ -1446,15 +1511,27 @@ impl CicsService {
         .then(|| argument_text(&request, "FILE").or_else(|_| argument_text(&request, "DATASET")))
         .transpose()?
         .map(|name| name.trim().to_ascii_uppercase());
-        let result = self.invoke_run(&mut run, request);
+        let retention_tick = effect.deadline_tick.max(run.invocation.deadline_tick);
+        let result = self.invoke_run(&mut run, request, retention_tick);
         let result = match (&result, replay_identity.as_ref()) {
             (Ok(response), Some((key, digest))) => {
-                let payload = encode_cics_effect_replay(&CicsEffectReplay {
+                let result_digest =
+                    canonical_result_digest(&Ok(HostResult::Cics(response.clone())))
+                        .map_err(|_| HostProblem::InfrastructureFailure)?;
+                let mut replay = CicsEffectReplay {
+                    effect_key: Some(key.as_str().into()),
                     owner_execution: Some(replay_owner.clone()),
-                    deadline_tick: Some(effect.deadline_tick.min(run.invocation.deadline_tick)),
+                    owner_run_unit: Some(replay_run_unit.clone()),
+                    sequence: Some(effect.sequence),
+                    deadline_tick: Some(retention_tick),
+                    resolution_tick: None,
                     request_digest: *digest,
+                    result_digest: Some(result_digest),
+                    binding_digest: None,
                     response: response.clone(),
-                })?;
+                };
+                replay.binding_digest = Some(cics_effect_replay_binding_digest(&replay));
+                let payload = encode_cics_effect_replay(&replay)?;
                 match self.store.put_provider_state(
                     ProviderStateRecord {
                         namespace: "cics-effect-replay-v1".into(),
@@ -1464,7 +1541,27 @@ impl CicsService {
                     },
                     None,
                 ) {
-                    Ok(()) => result,
+                    Ok(()) => {
+                        if self
+                            .replay_unknown_after_persist
+                            .swap(false, Ordering::SeqCst)
+                        {
+                            Err(HostProblem::UnknownOutcome)
+                        } else {
+                            self.finalize_effect_replay(
+                                ProviderStateRecord {
+                                    namespace: "cics-effect-replay-v1".into(),
+                                    key: key.as_str().into(),
+                                    version: 1,
+                                    payload: encode_cics_effect_replay(&replay)?,
+                                },
+                                replay,
+                                retention_tick,
+                            )
+                            .map(|_| result)
+                            .unwrap_or(Err(HostProblem::UnknownOutcome))
+                        }
+                    }
                     Err(StoreError::AlreadyExists | StoreError::Conflict) => {
                         match self
                             .store
@@ -1474,18 +1571,20 @@ impl CicsService {
                             Some(record) => {
                                 let replay =
                                     decode_cics_effect_replay(&record.payload, self.limits)?;
-                                if replay.request_digest == *digest
-                                    && replay.owner_execution.as_deref()
-                                        == Some(replay_owner.as_str())
-                                    && replay.deadline_tick
-                                        == Some(
-                                            effect.deadline_tick.min(run.invocation.deadline_tick),
-                                        )
-                                    && replay.response == *response
-                                {
-                                    result
-                                } else {
+                                validate_cics_effect_replay_identity(
+                                    &replay,
+                                    key.as_str(),
+                                    &replay_owner,
+                                    &replay_run_unit,
+                                    effect.sequence,
+                                    *digest,
+                                )?;
+                                if replay.response != *response {
                                     Err(HostProblem::IdempotencyConflict)
+                                } else {
+                                    self.finalize_effect_replay(record, replay, retention_tick)
+                                        .map(|_| result)
+                                        .unwrap_or(Err(HostProblem::UnknownOutcome))
                                 }
                             }
                             _ => Err(HostProblem::IdempotencyConflict),
@@ -1537,6 +1636,50 @@ impl CicsService {
         result
     }
 
+    fn finalize_effect_replay(
+        &self,
+        record: ProviderStateRecord,
+        mut replay: CicsEffectReplay,
+        resolution_lower_bound: u64,
+    ) -> Result<CicsEffectReplay, HostProblem> {
+        if replay.effect_key.is_none() {
+            return Ok(replay);
+        }
+        match (record.version, replay.resolution_tick) {
+            (1, None) => {}
+            (2, Some(_)) => return Ok(replay),
+            _ => return Err(HostProblem::InfrastructureFailure),
+        }
+        let Some(clock) = &self.replay_clock else {
+            return Ok(replay);
+        };
+        if record.version != 1 || resolution_lower_bound == 0 {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let observed_tick = clock.now_tick()?;
+        if observed_tick == 0 {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        replay.resolution_tick = Some(
+            observed_tick
+                .max(resolution_lower_bound)
+                .max(replay.deadline_tick.unwrap_or(0)),
+        );
+        replay.binding_digest = Some(cics_effect_replay_binding_digest(&replay));
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "cics-effect-replay-v1".into(),
+                    key: record.key,
+                    version: 2,
+                    payload: encode_cics_effect_replay(&replay)?,
+                },
+                Some(1),
+            )
+            .map_err(store_error)?;
+        Ok(replay)
+    }
+
     pub fn terminal_run_trace(
         &self,
         session: &SessionId,
@@ -1568,7 +1711,12 @@ impl CicsService {
             .is_some_and(|continuation| continuation.claimed_by.is_none()))
     }
 
-    fn invoke_run(&self, run: &mut Run, request: CicsRequest) -> Result<CicsResponse, HostProblem> {
+    fn invoke_run(
+        &self,
+        run: &mut Run,
+        request: CicsRequest,
+        retention_tick: u64,
+    ) -> Result<CicsResponse, HostProblem> {
         if let Some(mutation) = &request.mutation
             && mutation.transaction.as_deref() != Some(run.transaction.as_str())
         {
@@ -1691,7 +1839,7 @@ impl CicsService {
                 argument_bytes(&request, "ABCODE").unwrap_or_default(),
             ),
             CicsOperation::WriteTransientData => self.write_transient(run, &request),
-            CicsOperation::Syncpoint => self.syncpoint(run, &request),
+            CicsOperation::Syncpoint => self.syncpoint(run, &request, retention_tick),
         }
         .or_else(|problem| self.condition(run, &request.condition_policy, problem))
     }
@@ -2000,7 +2148,12 @@ impl CicsService {
         )
     }
 
-    fn syncpoint(&self, run: &mut Run, request: &CicsRequest) -> Result<CicsResponse, HostProblem> {
+    fn syncpoint(
+        &self,
+        run: &mut Run,
+        request: &CicsRequest,
+        retention_tick: u64,
+    ) -> Result<CicsResponse, HostProblem> {
         let mutation = request
             .mutation
             .as_ref()
@@ -2011,7 +2164,10 @@ impl CicsService {
             CicsUnitOfWorkOutcome::Committed
         };
         let key = mutation.idempotency_key.as_str();
-        if let Some(record) = self
+        if retention_tick == 0 {
+            return Err(HostProblem::Malformed);
+        }
+        let existing_deadline = if let Some(record) = self
             .store
             .get_provider_state("cics-uow", key)
             .map_err(store_error)?
@@ -2020,31 +2176,59 @@ impl CicsService {
             if existing.transaction != run.transaction {
                 return Err(HostProblem::IdempotencyConflict);
             }
+            if existing.metadata.as_ref().is_some_and(|metadata| {
+                metadata.owner_execution != run.invocation.execution_id.as_str()
+                    || metadata.owner_run_unit != run.invocation.run_unit_id.as_str()
+            }) {
+                return Err(HostProblem::IdempotencyConflict);
+            }
             match (existing.finalized, existing.outcome) {
-                (false, existing) if existing == outcome => {
-                    return Err(HostProblem::UnknownOutcome);
+                (false, existing_outcome) if existing_outcome == outcome => {
+                    if record.version != 1 {
+                        return Err(HostProblem::InfrastructureFailure);
+                    }
+                    if existing.metadata.is_none() {
+                        return Err(HostProblem::UnknownOutcome);
+                    }
+                    Some(
+                        existing
+                            .metadata
+                            .as_ref()
+                            .map(|metadata| metadata.deadline_tick)
+                            .unwrap_or(retention_tick),
+                    )
                 }
-                (true, existing) if existing == outcome => {
+                (true, existing_outcome) if existing_outcome == outcome => {
                     return self.uow_response(run, outcome);
                 }
                 _ => return Err(HostProblem::IdempotencyConflict),
             }
-        }
-        self.store
-            .put_provider_state(
-                ProviderStateRecord {
-                    namespace: "cics-uow".into(),
-                    key: key.into(),
-                    version: 1,
-                    payload: encode_uow(&UowRecord {
-                        finalized: false,
-                        outcome,
-                        transaction: run.transaction.clone(),
-                    })?,
-                },
-                None,
-            )
-            .map_err(store_error)?;
+        } else {
+            self.store
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: "cics-uow".into(),
+                        key: key.into(),
+                        version: 1,
+                        payload: encode_uow(&UowRecord {
+                            finalized: false,
+                            outcome,
+                            transaction: run.transaction.clone(),
+                            metadata: Some(UowRetentionMetadata {
+                                effect_key: key.into(),
+                                owner_execution: run.invocation.execution_id.as_str().into(),
+                                owner_run_unit: run.invocation.run_unit_id.as_str().into(),
+                                deadline_tick: retention_tick,
+                                terminal_tick: None,
+                            }),
+                        })?,
+                    },
+                    None,
+                )
+                .map_err(store_error)?;
+            None
+        };
+        let uow_deadline = existing_deadline.unwrap_or(retention_tick);
         self.syncpoint_db2(run, outcome)?;
         self.syncpoint_ims(run, outcome)?;
         self.syncpoint_mq(run, outcome)?;
@@ -2057,6 +2241,13 @@ impl CicsService {
         // whether the unit of work commits or rolls back.
         run.current_records.clear();
         run.current_record_values.clear();
+        let terminal_tick = match &self.replay_clock {
+            Some(clock) => match clock.now_tick() {
+                Ok(tick) if tick != 0 => Some(tick.max(uow_deadline)),
+                _ => return Err(HostProblem::UnknownOutcome),
+            },
+            None => None,
+        };
         if self
             .store
             .put_provider_state(
@@ -2068,6 +2259,13 @@ impl CicsService {
                         finalized: true,
                         outcome,
                         transaction: run.transaction.clone(),
+                        metadata: Some(UowRetentionMetadata {
+                            effect_key: key.into(),
+                            owner_execution: run.invocation.execution_id.as_str().into(),
+                            owner_run_unit: run.invocation.run_unit_id.as_str().into(),
+                            deadline_tick: uow_deadline,
+                            terminal_tick,
+                        }),
                     })?,
                 },
                 Some(1),
@@ -2096,8 +2294,15 @@ impl CicsService {
             .checked_add(1)
             .ok_or(HostProblem::ResourceExhausted)?;
         let key = nested_key(run, run.host_sequence)?;
-        let result = self.invoke_host(
+        let nested_invocation = invocation_with_nested_origin(
             &run.invocation,
+            &key,
+            run.outer_effect_key
+                .as_deref()
+                .ok_or(HostProblem::InfrastructureFailure)?,
+        )?;
+        let result = self.invoke_host(
+            &nested_invocation,
             run.invocation.deadline_tick.saturating_sub(1),
             false,
             EffectRequest {
@@ -2152,8 +2357,15 @@ impl CicsService {
             .checked_add(1)
             .ok_or(HostProblem::ResourceExhausted)?;
         let key = nested_key(run, run.host_sequence)?;
-        let result = self.invoke_host(
+        let nested_invocation = invocation_with_nested_origin(
             &run.invocation,
+            &key,
+            run.outer_effect_key
+                .as_deref()
+                .ok_or(HostProblem::InfrastructureFailure)?,
+        )?;
+        let result = self.invoke_host(
+            &nested_invocation,
             run.invocation.deadline_tick.saturating_sub(1),
             false,
             EffectRequest {
@@ -2210,8 +2422,15 @@ impl CicsService {
             .checked_add(1)
             .ok_or(HostProblem::ResourceExhausted)?;
         let key = nested_key(run, run.host_sequence)?;
-        let result = self.invoke_host(
+        let nested_invocation = invocation_with_nested_origin(
             &run.invocation,
+            &key,
+            run.outer_effect_key
+                .as_deref()
+                .ok_or(HostProblem::InfrastructureFailure)?,
+        )?;
+        let result = self.invoke_host(
+            &nested_invocation,
             run.invocation.deadline_tick.saturating_sub(1),
             false,
             EffectRequest {
@@ -2308,7 +2527,20 @@ impl CicsService {
         Ok(response)
     }
 
+    /// Reconcile an in-doubt UOW without inventing a terminal observation tick.
+    ///
+    /// Version-2 rows finalized through this compatibility path remain
+    /// retention-protected until `reconcile_unit_of_work_at` records an actual
+    /// nonzero recovery observation.
     pub fn reconcile_unit_of_work(
+        &self,
+        key: &IdempotencyKey,
+        outcome: CicsUnitOfWorkOutcome,
+    ) -> Result<(), HostProblem> {
+        self.reconcile_unit_of_work_inner(key, outcome)
+    }
+
+    fn reconcile_unit_of_work_inner(
         &self,
         key: &IdempotencyKey,
         outcome: CicsUnitOfWorkOutcome,
@@ -2319,29 +2551,49 @@ impl CicsService {
             .map_err(store_error)?
             .ok_or(HostProblem::NotFound)?;
         let existing = decode_uow(&record.payload)?;
-        match (existing.finalized, existing.outcome) {
-            (true, existing_outcome) if existing_outcome == outcome => Ok(()),
-            (false, existing_outcome) if existing_outcome == outcome => self
-                .store
-                .put_provider_state(
-                    ProviderStateRecord {
-                        namespace: "cics-uow".into(),
-                        key: key.as_str().into(),
-                        version: record
-                            .version
-                            .checked_add(1)
-                            .ok_or(HostProblem::ResourceExhausted)?,
-                        payload: encode_uow(&UowRecord {
-                            finalized: true,
-                            outcome,
-                            transaction: existing.transaction,
-                        })?,
-                    },
-                    Some(record.version),
-                )
-                .map_err(store_error),
-            _ => Err(HostProblem::IdempotencyConflict),
+        if existing.outcome != outcome
+            || existing
+                .metadata
+                .as_ref()
+                .is_some_and(|metadata| metadata.effect_key != key.as_str())
+        {
+            return Err(HostProblem::IdempotencyConflict);
         }
+        if existing.finalized {
+            return Ok(());
+        }
+        let observed_tick = match (&self.replay_clock, existing.metadata.as_ref()) {
+            (Some(clock), Some(metadata)) => match clock.now_tick() {
+                Ok(tick) if tick != 0 => Some(tick.max(metadata.deadline_tick)),
+                _ => return Err(HostProblem::UnknownOutcome),
+            },
+            _ => None,
+        };
+        let metadata = existing.metadata.map(|mut metadata| {
+            if let Some(observed_tick) = observed_tick {
+                metadata.terminal_tick = Some(observed_tick);
+            }
+            metadata
+        });
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "cics-uow".into(),
+                    key: key.as_str().into(),
+                    version: record
+                        .version
+                        .checked_add(1)
+                        .ok_or(HostProblem::ResourceExhausted)?,
+                    payload: encode_uow(&UowRecord {
+                        finalized: true,
+                        outcome,
+                        transaction: existing.transaction,
+                        metadata,
+                    })?,
+                },
+                Some(record.version),
+            )
+            .map_err(store_error)
     }
 
     /// Resolve an outer CICS effect from the durable provider replay ledger
@@ -3008,8 +3260,29 @@ impl CicsService {
             .is_mutating()
             .then(|| nested_key(run, run.host_sequence))
             .transpose()?;
+        let nested_invocation = key
+            .as_ref()
+            .filter(|_| {
+                matches!(
+                    &request,
+                    HostRequest::Dataset(_)
+                        | HostRequest::Db2(_)
+                        | HostRequest::Ims(_)
+                        | HostRequest::Mq(_)
+                )
+            })
+            .map(|key| {
+                invocation_with_nested_origin(
+                    &run.invocation,
+                    key,
+                    run.outer_effect_key
+                        .as_deref()
+                        .ok_or(HostProblem::InfrastructureFailure)?,
+                )
+            })
+            .transpose()?;
         let result = self.invoke_host(
-            &run.invocation,
+            nested_invocation.as_ref().unwrap_or(&run.invocation),
             run.invocation.deadline_tick.saturating_sub(1),
             false,
             EffectRequest {
@@ -3310,6 +3583,12 @@ impl HostProvider for Provider {
     }
 
     fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
+        if let Err(problem) = reject_reserved_nested_origin(invocation) {
+            return EffectResult {
+                sequence: effect.sequence,
+                outcome: Err(problem),
+            };
+        }
         if let Err(problem) = self.service.ensure_run(invocation) {
             return EffectResult {
                 sequence: effect.sequence,
@@ -3331,6 +3610,86 @@ impl HostProvider for Provider {
             outcome: self.service.invoke(&effect, request).map(HostResult::Cics),
         }
     }
+}
+
+fn reject_reserved_nested_origin(invocation: &Invocation) -> Result<(), HostProblem> {
+    if invocation
+        .bindings
+        .contains_key(CICS_NESTED_EFFECT_ORIGIN_BINDING)
+        || invocation
+            .bindings
+            .contains_key(CICS_OUTER_EFFECT_ORIGIN_BINDING)
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_cics_effect_replay_identity(
+    replay: &CicsEffectReplay,
+    key: &str,
+    owner_execution: &str,
+    owner_run_unit: &str,
+    sequence: u64,
+    request_digest: [u8; 32],
+) -> Result<(), HostProblem> {
+    if replay.request_digest != request_digest
+        || replay
+            .owner_execution
+            .as_deref()
+            .is_some_and(|owner| owner != owner_execution)
+    {
+        return Err(HostProblem::IdempotencyConflict);
+    }
+    if replay.effect_key.is_none() {
+        return Ok(());
+    }
+    let result_digest = canonical_result_digest(&Ok(HostResult::Cics(replay.response.clone())))
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    if replay.effect_key.as_deref() != Some(key)
+        || replay.owner_execution.as_deref() != Some(owner_execution)
+        || replay.owner_run_unit.as_deref() != Some(owner_run_unit)
+        || replay.sequence != Some(sequence)
+        || replay.deadline_tick.is_none_or(|tick| tick == 0)
+        || replay.result_digest != Some(result_digest)
+        || replay.binding_digest != Some(cics_effect_replay_binding_digest(replay))
+    {
+        return Err(HostProblem::IdempotencyConflict);
+    }
+    Ok(())
+}
+
+fn invocation_with_nested_origin(
+    invocation: &Invocation,
+    key: &IdempotencyKey,
+    outer_effect_key: &str,
+) -> Result<Invocation, HostProblem> {
+    reject_reserved_nested_origin(invocation)?;
+    let limits = InvocationLimits::default();
+    if invocation.bindings.len().saturating_add(2) > limits.max_bindings {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    let mut nested = invocation.clone();
+    nested.bindings.insert(
+        CICS_NESTED_EFFECT_ORIGIN_BINDING.into(),
+        BoundedPayload::new(
+            CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
+            key.as_str().as_bytes().to_vec(),
+            limits,
+        )
+        .map_err(|_| HostProblem::ResourceExhausted)?,
+    );
+    nested.bindings.insert(
+        CICS_OUTER_EFFECT_ORIGIN_BINDING.into(),
+        BoundedPayload::new(
+            CICS_OUTER_EFFECT_ORIGIN_SCHEMA,
+            outer_effect_key.as_bytes().to_vec(),
+            limits,
+        )
+        .map_err(|_| HostProblem::ResourceExhausted)?,
+    );
+    Ok(nested)
 }
 
 pub fn cics_provider(service: Arc<CicsService>, limits: InvocationLimits) -> Arc<dyn HostProvider> {
@@ -3368,6 +3727,7 @@ fn run_for(
         applid: applid.to_ascii_uppercase(),
         sysid: sysid.to_ascii_uppercase(),
         host_sequence: 0,
+        outer_effect_key: None,
         handlers: BTreeMap::new(),
         abend_handler: None,
         retrieve,
@@ -3841,45 +4201,27 @@ struct UowRecord {
     finalized: bool,
     outcome: CicsUnitOfWorkOutcome,
     transaction: String,
+    metadata: Option<UowRetentionMetadata>,
 }
 
 fn encode_uow(record: &UowRecord) -> Result<Vec<u8>, HostProblem> {
-    let state = match (record.finalized, record.outcome) {
-        (false, CicsUnitOfWorkOutcome::Committed) => b'C',
-        (false, CicsUnitOfWorkOutcome::RolledBack) => b'R',
-        (true, CicsUnitOfWorkOutcome::Committed) => b'c',
-        (true, CicsUnitOfWorkOutcome::RolledBack) => b'r',
-    };
-    let mut value = b"MECU1".to_vec();
-    value.push(state);
-    field(&mut value, record.transaction.as_bytes())?;
-    Ok(value)
+    crate::retention::encode_uow(&DecodedUow {
+        state: crate::retention::CicsUowState::from_parts(record.finalized, record.outcome),
+        transaction: record.transaction.clone(),
+        metadata: record.metadata.clone(),
+    })
+    .map_err(|_| HostProblem::InfrastructureFailure)
 }
 
 fn decode_uow(payload: &[u8]) -> Result<UowRecord, HostProblem> {
-    let mut reader = Reader {
-        bytes: payload,
-        at: 0,
-    };
-    if reader.take(5)? != b"MECU1" {
-        return Err(HostProblem::InfrastructureFailure);
-    }
-    let (finalized, outcome) = match reader.take(1)?[0] {
-        b'C' => (false, CicsUnitOfWorkOutcome::Committed),
-        b'R' => (false, CicsUnitOfWorkOutcome::RolledBack),
-        b'c' => (true, CicsUnitOfWorkOutcome::Committed),
-        b'r' => (true, CicsUnitOfWorkOutcome::RolledBack),
-        _ => return Err(HostProblem::InfrastructureFailure),
-    };
-    let transaction =
-        String::from_utf8(reader.field(16)?).map_err(|_| HostProblem::InfrastructureFailure)?;
-    if reader.at != payload.len() || transaction.is_empty() {
-        return Err(HostProblem::InfrastructureFailure);
-    }
+    let decoded =
+        crate::retention::decode_uow(payload).map_err(|_| HostProblem::InfrastructureFailure)?;
+    let (finalized, outcome) = decoded.state.parts();
     Ok(UowRecord {
         finalized,
         outcome,
-        transaction,
+        transaction: decoded.transaction,
+        metadata: decoded.metadata,
     })
 }
 
@@ -4748,11 +5090,48 @@ fn encode_cics_effect_replay(replay: &CicsEffectReplay) -> Result<Vec<u8>, HostP
         .ok_or(HostProblem::InfrastructureFailure)?;
     let deadline_tick = replay
         .deadline_tick
+        .filter(|tick| *tick != 0)
         .ok_or(HostProblem::InfrastructureFailure)?;
-    let mut out = b"MECER002".to_vec();
-    field(&mut out, owner.as_bytes())?;
-    out.extend_from_slice(&deadline_tick.to_be_bytes());
-    out.extend_from_slice(&replay.request_digest);
+    let mut out = if let Some(effect_key) = replay.effect_key.as_deref() {
+        let owner_run_unit = replay
+            .owner_run_unit
+            .as_deref()
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let sequence = replay
+            .sequence
+            .filter(|sequence| *sequence != 0)
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let result_digest = replay
+            .result_digest
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let binding_digest = replay
+            .binding_digest
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        if replay.resolution_tick == Some(0)
+            || replay
+                .resolution_tick
+                .is_some_and(|tick| tick < deadline_tick)
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let mut out = b"MECER003".to_vec();
+        field(&mut out, effect_key.as_bytes())?;
+        field(&mut out, owner.as_bytes())?;
+        field(&mut out, owner_run_unit.as_bytes())?;
+        out.extend_from_slice(&sequence.to_be_bytes());
+        out.extend_from_slice(&deadline_tick.to_be_bytes());
+        out.extend_from_slice(&replay.resolution_tick.unwrap_or(0).to_be_bytes());
+        out.extend_from_slice(&replay.request_digest);
+        out.extend_from_slice(&result_digest);
+        out.extend_from_slice(&binding_digest);
+        out
+    } else {
+        let mut out = b"MECER002".to_vec();
+        field(&mut out, owner.as_bytes())?;
+        out.extend_from_slice(&deadline_tick.to_be_bytes());
+        out.extend_from_slice(&replay.request_digest);
+        out
+    };
     out.push(match response.disposition {
         CicsDisposition::Complete => 1,
         CicsDisposition::Suspended => 2,
@@ -4797,7 +5176,7 @@ fn encode_cics_effect_replay(replay: &CicsEffectReplay) -> Result<Vec<u8>, HostP
     Ok(out)
 }
 
-fn decode_cics_effect_replay(
+pub(crate) fn decode_cics_effect_replay(
     bytes: &[u8],
     limits: CicsLimits,
 ) -> Result<CicsEffectReplay, HostProblem> {
@@ -4805,28 +5184,86 @@ fn decode_cics_effect_replay(
     let version = match reader.take(8)? {
         b"MECER001" => 1,
         b"MECER002" => 2,
+        b"MECER003" => 3,
         _ => return Err(HostProblem::InfrastructureFailure),
     };
-    let (owner_execution, deadline_tick) = if version == 2 {
-        (
-            Some(
+    let (effect_key, owner_execution, owner_run_unit, sequence, deadline_tick, resolution_tick) =
+        if version == 3 {
+            let effect_key =
                 String::from_utf8(reader.field(InvocationLimits::default().max_identity_bytes)?)
-                    .map_err(|_| HostProblem::InfrastructureFailure)?,
-            ),
-            Some(u64::from_be_bytes(
+                    .map_err(|_| HostProblem::InfrastructureFailure)?;
+            let owner_execution =
+                String::from_utf8(reader.field(InvocationLimits::default().max_identity_bytes)?)
+                    .map_err(|_| HostProblem::InfrastructureFailure)?;
+            let owner_run_unit =
+                String::from_utf8(reader.field(InvocationLimits::default().max_identity_bytes)?)
+                    .map_err(|_| HostProblem::InfrastructureFailure)?;
+            let sequence = u64::from_be_bytes(
                 reader
                     .take(8)?
                     .try_into()
                     .map_err(|_| HostProblem::InfrastructureFailure)?,
-            )),
-        )
-    } else {
-        (None, None)
-    };
+            );
+            let deadline_tick = u64::from_be_bytes(
+                reader
+                    .take(8)?
+                    .try_into()
+                    .map_err(|_| HostProblem::InfrastructureFailure)?,
+            );
+            let resolution_tick = match u64::from_be_bytes(
+                reader
+                    .take(8)?
+                    .try_into()
+                    .map_err(|_| HostProblem::InfrastructureFailure)?,
+            ) {
+                0 => None,
+                tick => Some(tick),
+            };
+            (
+                Some(effect_key),
+                Some(owner_execution),
+                Some(owner_run_unit),
+                Some(sequence),
+                Some(deadline_tick),
+                resolution_tick,
+            )
+        } else if version == 2 {
+            (
+                None,
+                Some(
+                    String::from_utf8(
+                        reader.field(InvocationLimits::default().max_identity_bytes)?,
+                    )
+                    .map_err(|_| HostProblem::InfrastructureFailure)?,
+                ),
+                None,
+                None,
+                Some(u64::from_be_bytes(
+                    reader
+                        .take(8)?
+                        .try_into()
+                        .map_err(|_| HostProblem::InfrastructureFailure)?,
+                )),
+                None,
+            )
+        } else {
+            (None, None, None, None, None, None)
+        };
     if owner_execution
         .as_ref()
         .is_some_and(|owner| ExecutionId::new(owner, InvocationLimits::default()).is_err())
+        || owner_run_unit
+            .as_ref()
+            .is_some_and(|owner| RunUnitId::new(owner, InvocationLimits::default()).is_err())
+        || effect_key
+            .as_ref()
+            .is_some_and(|key| IdempotencyKey::new(key, InvocationLimits::default()).is_err())
+        || sequence == Some(0)
         || deadline_tick == Some(0)
+        || resolution_tick == Some(0)
+        || resolution_tick
+            .zip(deadline_tick)
+            .is_some_and(|(resolution, deadline)| resolution < deadline)
     {
         return Err(HostProblem::InfrastructureFailure);
     }
@@ -4834,6 +5271,24 @@ fn decode_cics_effect_replay(
         .take(32)?
         .try_into()
         .map_err(|_| HostProblem::InfrastructureFailure)?;
+    let (result_digest, binding_digest) = if version == 3 {
+        (
+            Some(
+                reader
+                    .take(32)?
+                    .try_into()
+                    .map_err(|_| HostProblem::InfrastructureFailure)?,
+            ),
+            Some(
+                reader
+                    .take(32)?
+                    .try_into()
+                    .map_err(|_| HostProblem::InfrastructureFailure)?,
+            ),
+        )
+    } else {
+        (None, None)
+    };
     let disposition = match reader.take(1)?[0] {
         1 => CicsDisposition::Complete,
         2 => CicsDisposition::Suspended,
@@ -4925,9 +5380,15 @@ fn decode_cics_effect_replay(
         return Err(HostProblem::InfrastructureFailure);
     }
     Ok(CicsEffectReplay {
+        effect_key,
         owner_execution,
+        owner_run_unit,
+        sequence,
         deadline_tick,
+        resolution_tick,
         request_digest,
+        result_digest,
+        binding_digest,
         response: CicsResponse {
             disposition,
             condition,
@@ -4944,6 +5405,33 @@ fn decode_cics_effect_replay(
             unit_of_work,
         },
     })
+}
+
+pub(crate) fn cics_effect_replay_binding_digest(replay: &CicsEffectReplay) -> [u8; 32] {
+    let mut hash = Sha256::new();
+    hash.update(b"mainframe-env.cics-effect-replay-binding@1\0");
+    for field in [
+        replay.effect_key.as_deref().unwrap_or_default().as_bytes(),
+        replay
+            .owner_execution
+            .as_deref()
+            .unwrap_or_default()
+            .as_bytes(),
+        replay
+            .owner_run_unit
+            .as_deref()
+            .unwrap_or_default()
+            .as_bytes(),
+    ] {
+        hash.update((field.len() as u64).to_be_bytes());
+        hash.update(field);
+    }
+    hash.update(replay.sequence.unwrap_or(0).to_be_bytes());
+    hash.update(replay.deadline_tick.unwrap_or(0).to_be_bytes());
+    hash.update(replay.resolution_tick.unwrap_or(0).to_be_bytes());
+    hash.update(replay.request_digest);
+    hash.update(replay.result_digest.unwrap_or([0; 32]));
+    hash.finalize().into()
 }
 
 fn field(out: &mut Vec<u8>, value: &[u8]) -> Result<(), HostProblem> {
@@ -5012,8 +5500,138 @@ mod tests {
     };
     use mainframe_env_racf::{MemorySecretResolver, RacfService, racf_providers};
     use mainframe_env_store::{MemoryStore, SqliteStateStore};
+    use mainframe_env_store_api::{
+        EffectDigestFormat, EffectIntentMetadata, EffectRecord, EffectState,
+    };
+    use mainframe_env_store_api::{ProviderStateMutation, ProviderStateWrite};
     use std::collections::BTreeSet;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+
+    struct TestCicsClock {
+        tick: AtomicU64,
+        fail_next: AtomicBool,
+    }
+
+    struct FailCicsReplayCasStore {
+        inner: MemoryStore,
+        fail_next: AtomicBool,
+    }
+
+    impl FailCicsReplayCasStore {
+        fn new() -> Self {
+            Self {
+                inner: MemoryStore::new(Default::default()),
+                fail_next: AtomicBool::new(false),
+            }
+        }
+    }
+
+    impl mainframe_env_store_api::AuditSink for FailCicsReplayCasStore {
+        fn record_audit(
+            &self,
+            record: mainframe_env_execution_api::AuditRecord,
+        ) -> Result<(), StoreError> {
+            self.inner.record_audit(record)
+        }
+
+        fn audit_records(
+            &self,
+            execution_id: &ExecutionId,
+            start_effect_sequence: u64,
+            max: usize,
+        ) -> Result<Vec<mainframe_env_execution_api::AuditRecord>, StoreError> {
+            self.inner
+                .audit_records(execution_id, start_effect_sequence, max)
+        }
+    }
+
+    impl ProviderStateStore for FailCicsReplayCasStore {
+        fn get_provider_state(
+            &self,
+            namespace: &str,
+            key: &str,
+        ) -> Result<Option<ProviderStateRecord>, StoreError> {
+            self.inner.get_provider_state(namespace, key)
+        }
+
+        fn list_provider_state(
+            &self,
+            namespace: &str,
+            max: usize,
+        ) -> Result<Vec<ProviderStateRecord>, StoreError> {
+            self.inner.list_provider_state(namespace, max)
+        }
+
+        fn put_provider_state(
+            &self,
+            record: ProviderStateRecord,
+            expected_version: Option<u64>,
+        ) -> Result<(), StoreError> {
+            if record.namespace == "cics-effect-replay-v1"
+                && expected_version == Some(1)
+                && self.fail_next.swap(false, Ordering::SeqCst)
+            {
+                Err(StoreError::Infrastructure(
+                    "injected-cics-replay-cas-failure".into(),
+                ))
+            } else {
+                self.inner.put_provider_state(record, expected_version)
+            }
+        }
+
+        fn delete_provider_state(
+            &self,
+            namespace: &str,
+            key: &str,
+            expected_version: u64,
+        ) -> Result<(), StoreError> {
+            self.inner
+                .delete_provider_state(namespace, key, expected_version)
+        }
+
+        fn move_provider_state(
+            &self,
+            record: ProviderStateRecord,
+            old_key: &str,
+            expected_version: u64,
+        ) -> Result<(), StoreError> {
+            self.inner
+                .move_provider_state(record, old_key, expected_version)
+        }
+
+        fn put_provider_states_atomic(
+            &self,
+            writes: Vec<ProviderStateWrite>,
+        ) -> Result<(), StoreError> {
+            self.inner.put_provider_states_atomic(writes)
+        }
+
+        fn mutate_provider_states_atomic(
+            &self,
+            mutations: Vec<ProviderStateMutation>,
+        ) -> Result<(), StoreError> {
+            self.inner.mutate_provider_states_atomic(mutations)
+        }
+    }
+
+    impl TestCicsClock {
+        fn fixed(tick: u64) -> Self {
+            Self {
+                tick: AtomicU64::new(tick),
+                fail_next: AtomicBool::new(false),
+            }
+        }
+    }
+
+    impl CicsReplayClock for TestCicsClock {
+        fn now_tick(&self) -> Result<u64, HostProblem> {
+            if self.fail_next.swap(false, Ordering::SeqCst) {
+                Err(HostProblem::InfrastructureFailure)
+            } else {
+                Ok(self.tick.load(Ordering::SeqCst))
+            }
+        }
+    }
 
     struct Authority {
         descriptor: CapabilityDescriptor,
@@ -5022,6 +5640,7 @@ mod tests {
     #[derive(Default)]
     struct DatasetTrace {
         requests: Mutex<Vec<DatasetRequest>>,
+        origins: Mutex<Vec<(String, String)>>,
     }
 
     struct TracedDataset {
@@ -5029,6 +5648,12 @@ mod tests {
         trace: Arc<DatasetTrace>,
     }
 
+    struct SyncpointOriginProvider {
+        descriptor: CapabilityDescriptor,
+        seen: Arc<Mutex<Vec<(String, String, String)>>>,
+    }
+
+    #[allow(dead_code)]
     struct CountedMutationProvider {
         descriptor: CapabilityDescriptor,
         commits: Arc<AtomicUsize>,
@@ -5093,7 +5718,22 @@ mod tests {
             &self.descriptor
         }
 
-        fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
+        fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
+            if let Some(key) = &effect.idempotency_key {
+                let nested = invocation
+                    .bindings
+                    .get(CICS_NESTED_EFFECT_ORIGIN_BINDING)
+                    .map(|value| String::from_utf8(value.bytes().to_vec()).unwrap());
+                let outer = invocation
+                    .bindings
+                    .get(CICS_OUTER_EFFECT_ORIGIN_BINDING)
+                    .map(|value| String::from_utf8(value.bytes().to_vec()).unwrap());
+                assert_eq!(nested.as_deref(), Some(key.as_str()));
+                self.trace.origins.lock().unwrap().push((
+                    nested.unwrap(),
+                    outer.expect("mutating CICS nested request carries outer effect"),
+                ));
+            }
             let outcome = match effect.request {
                 HostRequest::Dataset(request) => {
                     self.trace.requests.lock().unwrap().push(request.clone());
@@ -5165,6 +5805,59 @@ mod tests {
         }
     }
 
+    impl HostProvider for SyncpointOriginProvider {
+        fn descriptor(&self) -> &CapabilityDescriptor {
+            &self.descriptor
+        }
+
+        fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
+            let nested = invocation
+                .bindings
+                .get(CICS_NESTED_EFFECT_ORIGIN_BINDING)
+                .and_then(|value| String::from_utf8(value.bytes().to_vec()).ok());
+            let outer = invocation
+                .bindings
+                .get(CICS_OUTER_EFFECT_ORIGIN_BINDING)
+                .and_then(|value| String::from_utf8(value.bytes().to_vec()).ok());
+            let key = effect.idempotency_key.as_ref().map(ToString::to_string);
+            assert_eq!(nested, key);
+            self.seen.lock().unwrap().push((
+                self.descriptor.capability.as_str().into(),
+                nested.unwrap(),
+                outer.expect("syncpoint dispatch carries its exact outer effect"),
+            ));
+            let outcome = match effect.request {
+                HostRequest::Db2(_) => Ok(HostResult::Db2(mainframe_env_host_api::Db2Result {
+                    sqlcode: 0,
+                    sqlstate: "00000".into(),
+                    message: String::new(),
+                    rows: Vec::new(),
+                    affected_rows: 0,
+                })),
+                HostRequest::Ims(_) => Ok(HostResult::Ims(mainframe_env_host_api::ImsResult {
+                    status: "  ".into(),
+                    segments: Vec::new(),
+                    checkpoint_id: None,
+                    affected_segments: 0,
+                })),
+                HostRequest::Mq(_) => Ok(HostResult::Mq(mainframe_env_host_api::MqResult {
+                    completion_code: 0,
+                    reason_code: 0,
+                    handle: None,
+                    message: Vec::new(),
+                    message_id: None,
+                    correlation_id: None,
+                    trigger_program: None,
+                })),
+                _ => Err(HostProblem::Malformed),
+            };
+            EffectResult {
+                sequence: effect.sequence,
+                outcome,
+            }
+        }
+    }
+
     fn descriptor(capability: &str) -> CapabilityDescriptor {
         let limits = InvocationLimits::default();
         CapabilityDescriptor {
@@ -5225,6 +5918,36 @@ mod tests {
         ))
     }
 
+    fn syncpoint_origin_authorities(
+        seen: Arc<Mutex<Vec<(String, String, String)>>>,
+    ) -> Arc<ScopedHostService> {
+        let mut providers = [
+            "host.security.authorize",
+            "host.dataset.read",
+            "host.dataset.write",
+            "host.program.invoke",
+            "host.clock",
+        ]
+        .into_iter()
+        .map(|capability| {
+            Arc::new(Authority {
+                descriptor: descriptor(capability),
+            }) as Arc<dyn HostProvider>
+        })
+        .collect::<Vec<_>>();
+        for capability in ["host.db2.write", "host.ims.write", "host.mq.write"] {
+            providers.push(Arc::new(SyncpointOriginProvider {
+                descriptor: descriptor(capability),
+                seen: seen.clone(),
+            }));
+        }
+        Arc::new(ScopedHostService::new(
+            Arc::new(RegistrySnapshot::new(1, providers, InvocationLimits::default()).unwrap()),
+            HostLimits::default(),
+        ))
+    }
+
+    #[allow(dead_code)]
     fn replay_authorities(
         dataset_commits: Arc<AtomicUsize>,
         program_commits: Arc<AtomicUsize>,
@@ -5264,6 +5987,9 @@ mod tests {
             "host.program.invoke",
             "host.cics.execute",
             "host.clock",
+            "host.db2.write",
+            "host.ims.write",
+            "host.mq.write",
         ]
         .into_iter()
         .map(|name| CapabilityId::new(name, limits).unwrap())
@@ -5343,6 +6069,39 @@ mod tests {
                 .as_ref()
                 .map(|mutation| mutation.idempotency_key.clone()),
             request: HostRequest::Cics(request),
+        }
+    }
+
+    fn completed_cics_effect(
+        invocation: &Invocation,
+        request: &CicsRequest,
+        response: &CicsResponse,
+        sequence: u64,
+    ) -> EffectRecord {
+        let limits = InvocationLimits::default();
+        EffectRecord {
+            execution_id: invocation.execution_id.clone(),
+            run_unit_id: invocation.run_unit_id.clone(),
+            sequence,
+            key: request.mutation.as_ref().unwrap().idempotency_key.clone(),
+            digest_format: EffectDigestFormat::CanonicalHostV1,
+            request_digest: canonical_request_digest(&HostRequest::Cics(request.clone())).unwrap(),
+            intent: EffectIntentMetadata {
+                owner: invocation.execution_id.clone(),
+                attempt: 1,
+                capability: Some(CapabilityId::new("host.cics.execute", limits).unwrap()),
+                audit_resource: None,
+                audit_invocation_key: None,
+                created_tick: 1,
+                recovery_after_tick: 2,
+                epoch: 1,
+                recovery_lease: None,
+            },
+            state: EffectState::Completed,
+            result_digest: Some(
+                canonical_result_digest(&Ok(HostResult::Cics(response.clone()))).unwrap(),
+            ),
+            resolved_tick: Some(2),
         }
     }
 
@@ -5656,6 +6415,7 @@ mod tests {
                         finalized: false,
                         outcome: CicsUnitOfWorkOutcome::Committed,
                         transaction: "MENU".into(),
+                        metadata: None,
                     })
                     .unwrap(),
                 },
@@ -5827,10 +6587,19 @@ mod tests {
             assert_eq!(replay.deadline_tick, Some(100));
         }
         let current = &replay_rows[0].payload;
-        let owner_length =
-            usize::try_from(u32::from_be_bytes(current[8..12].try_into().unwrap())).unwrap();
+        let replay = decode_cics_effect_replay(current, CicsLimits::default()).unwrap();
+        let mut response_at = 8;
+        for _ in 0..3 {
+            let length = usize::try_from(u32::from_be_bytes(
+                current[response_at..response_at + 4].try_into().unwrap(),
+            ))
+            .unwrap();
+            response_at += 4 + length;
+        }
+        response_at += 3 * 8 + 3 * 32;
         let mut legacy = b"MECER001".to_vec();
-        legacy.extend_from_slice(&current[12 + owner_length + 8..]);
+        legacy.extend_from_slice(&replay.request_digest);
+        legacy.extend_from_slice(&current[response_at..]);
         let legacy = decode_cics_effect_replay(&legacy, CicsLimits::default()).unwrap();
         assert_eq!((legacy.owner_execution, legacy.deadline_tick), (None, None));
         let syncpoint_key = IdempotencyKey::new("outer-4", InvocationLimits::default()).unwrap();
@@ -6578,6 +7347,11 @@ mod tests {
             &requests[4],
             DatasetRequest::EndBrowse { cursor, .. } if cursor == "CURSOR-1"
         ));
+        drop(requests);
+        let origins = trace.origins.lock().unwrap();
+        assert_eq!(origins.len(), 2);
+        assert_eq!(origins[0].1, "outer-3");
+        assert_eq!(origins[1].1, "outer-4");
     }
 
     #[test]
@@ -6863,6 +7637,555 @@ mod tests {
                 .unwrap()
                 .condition,
             "NORMAL"
+        );
+    }
+
+    #[test]
+    fn uow_retention_descriptors_are_attributed_exact_and_restart_safe() {
+        use crate::retention::{
+            CicsUowCodecVersion, CicsUowDependencyState, CicsUowState, CicsUowValidationError,
+            describe_cics_uow_row,
+        };
+
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let initial = service(store.clone());
+        let (invocation, session) = registered(&initial);
+
+        let commit = request(CicsOperation::Syncpoint, BTreeMap::new(), 71);
+        assert_eq!(
+            initial
+                .invoke(
+                    &effect(&invocation.run_unit_id, commit.clone(), 71),
+                    commit.clone()
+                )
+                .unwrap()
+                .unit_of_work,
+            Some(CicsUnitOfWorkOutcome::Committed)
+        );
+        let committed = store
+            .get_provider_state("cics-uow", "outer-71")
+            .unwrap()
+            .unwrap();
+        let descriptor = describe_cics_uow_row(&committed, None).unwrap();
+        assert_eq!(descriptor.codec, CicsUowCodecVersion::RetentionV2);
+        assert_eq!(descriptor.state, CicsUowState::Committed);
+        assert_eq!(descriptor.owner_execution.as_deref(), Some("execution-run"));
+        assert_eq!(descriptor.owner_run_unit.as_deref(), Some("run"));
+        assert_eq!(descriptor.terminal_tick, None);
+        assert_eq!(
+            descriptor.dependency,
+            CicsUowDependencyState::TerminalObservationRequired
+        );
+
+        let rollback = request(
+            CicsOperation::Syncpoint,
+            BTreeMap::from([("OPTION.ROLLBACK".into(), argument(b""))]),
+            72,
+        );
+        initial
+            .invoke(
+                &effect(&invocation.run_unit_id, rollback.clone(), 72),
+                rollback,
+            )
+            .unwrap();
+        let rolled_back = store
+            .get_provider_state("cics-uow", "outer-72")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            describe_cics_uow_row(&rolled_back, None).unwrap().state,
+            CicsUowState::RolledBack
+        );
+
+        drop(initial);
+        let restarted = service(store.clone());
+        restarted
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        assert_eq!(
+            restarted
+                .invoke(&effect(&invocation.run_unit_id, commit.clone(), 71), commit)
+                .unwrap()
+                .unit_of_work,
+            Some(CicsUnitOfWorkOutcome::Committed)
+        );
+        assert_eq!(
+            describe_cics_uow_row(
+                &store
+                    .get_provider_state("cics-uow", "outer-71")
+                    .unwrap()
+                    .unwrap(),
+                None,
+            )
+            .unwrap(),
+            descriptor
+        );
+
+        let active = ProviderStateRecord {
+            namespace: "cics-uow".into(),
+            key: "active-key".into(),
+            version: 1,
+            payload: encode_uow(&UowRecord {
+                finalized: false,
+                outcome: CicsUnitOfWorkOutcome::Committed,
+                transaction: "MENU".into(),
+                metadata: Some(UowRetentionMetadata {
+                    effect_key: "active-key".into(),
+                    owner_execution: "execution-active".into(),
+                    owner_run_unit: "run-active".into(),
+                    deadline_tick: 200,
+                    terminal_tick: None,
+                }),
+            })
+            .unwrap(),
+        };
+        assert_eq!(
+            describe_cics_uow_row(&active, None).unwrap().dependency,
+            CicsUowDependencyState::Active
+        );
+        store.put_provider_state(active, None).unwrap();
+        let active_key = IdempotencyKey::new("active-key", InvocationLimits::default()).unwrap();
+        restarted
+            .reconcile_unit_of_work(&active_key, CicsUnitOfWorkOutcome::Committed)
+            .unwrap();
+        let unobserved = store
+            .get_provider_state("cics-uow", active_key.as_str())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            describe_cics_uow_row(&unobserved, None).unwrap().dependency,
+            CicsUowDependencyState::TerminalObservationRequired
+        );
+        let finalized_with_undo = ProviderStateRecord {
+            namespace: "cics-uow".into(),
+            key: "undo-key".into(),
+            version: 2,
+            payload: encode_uow(&UowRecord {
+                finalized: true,
+                outcome: CicsUnitOfWorkOutcome::RolledBack,
+                transaction: "MENU".into(),
+                metadata: Some(UowRetentionMetadata {
+                    effect_key: "undo-key".into(),
+                    owner_execution: "execution-undo".into(),
+                    owner_run_unit: "run-undo".into(),
+                    deadline_tick: 300,
+                    terminal_tick: Some(300),
+                }),
+            })
+            .unwrap(),
+        };
+        let undo = ProviderStateRecord {
+            namespace: "cics-uow-undo".into(),
+            key: "run-undo".into(),
+            version: 1,
+            payload: encode_undo(&[DatasetUndo::Delete {
+                dataset: DatasetName::new("USER.DATA", 128).unwrap(),
+                key: b"AA".to_vec(),
+            }])
+            .unwrap(),
+        };
+        assert_eq!(
+            describe_cics_uow_row(&finalized_with_undo, Some(&undo))
+                .unwrap()
+                .dependency,
+            CicsUowDependencyState::UndoLogPresent
+        );
+        let mut mismatched_undo = undo.clone();
+        mismatched_undo.key = "another-run".into();
+        assert_eq!(
+            describe_cics_uow_row(&finalized_with_undo, Some(&mismatched_undo)),
+            Err(CicsUowValidationError::MismatchedUndo)
+        );
+        let mut wrong_version_undo = undo.clone();
+        wrong_version_undo.version = 2;
+        assert_eq!(
+            crate::describe_cics_undo_row(&wrong_version_undo),
+            Err(CicsUowValidationError::CorruptPayload)
+        );
+
+        let legacy = ProviderStateRecord {
+            namespace: "cics-uow".into(),
+            key: "legacy-key".into(),
+            version: 2,
+            payload: encode_uow(&UowRecord {
+                finalized: true,
+                outcome: CicsUnitOfWorkOutcome::Committed,
+                transaction: "MENU".into(),
+                metadata: None,
+            })
+            .unwrap(),
+        };
+        assert_eq!(
+            describe_cics_uow_row(&legacy, None).unwrap().dependency,
+            CicsUowDependencyState::LegacyTerminal
+        );
+        let mut unsupported_version = committed.clone();
+        unsupported_version.version = 3;
+        assert_eq!(
+            describe_cics_uow_row(&unsupported_version, None),
+            Err(CicsUowValidationError::CorruptPayload)
+        );
+        let mut corrupt = committed;
+        corrupt.payload.push(0);
+        assert_eq!(
+            describe_cics_uow_row(&corrupt, None),
+            Err(CicsUowValidationError::CorruptPayload)
+        );
+        let mut invalid_version = rolled_back;
+        invalid_version.version = 1;
+        assert_eq!(
+            describe_cics_uow_row(&invalid_version, None),
+            Err(CicsUowValidationError::CorruptPayload)
+        );
+    }
+
+    #[test]
+    fn outer_replay_clock_failure_recovers_once_without_sliding_and_codec_is_strict() {
+        use crate::retention::{
+            CicsReplayRetentionState, CicsReplayValidationError, describe_cics_replay_row,
+        };
+
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let clock = Arc::new(TestCicsClock::fixed(250));
+        clock.fail_next.store(true, Ordering::SeqCst);
+        let service = CicsService::open_with_replay_clock(
+            authorities(),
+            store.clone(),
+            CicsLimits::default(),
+            clock.clone(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        let request = request(
+            CicsOperation::WriteTransientData,
+            BTreeMap::from([
+                ("QUEUE".into(), argument(b"CLOCK")),
+                ("FROM".into(), argument(b"ONCE")),
+            ]),
+            81,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 81),
+                request.clone(),
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let pending = store
+            .get_provider_state("cics-effect-replay-v1", "outer-81")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            describe_cics_replay_row(&pending, None, CicsLimits::default())
+                .unwrap()
+                .retention,
+            CicsReplayRetentionState::PendingProtected
+        );
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 81),
+                request.clone(),
+            )
+            .unwrap();
+        let terminal = store
+            .get_provider_state("cics-effect-replay-v1", "outer-81")
+            .unwrap()
+            .unwrap();
+        let effect_record = completed_cics_effect(&invocation, &request, &response, 81);
+        let descriptor =
+            describe_cics_replay_row(&terminal, Some(&effect_record), CicsLimits::default())
+                .unwrap();
+        assert_eq!(descriptor.retention, CicsReplayRetentionState::Terminal);
+        assert_eq!(descriptor.resolution_tick, Some(250));
+        clock.tick.store(900, Ordering::SeqCst);
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 81),
+                request.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            store
+                .get_provider_state("cics-effect-replay-v1", "outer-81")
+                .unwrap()
+                .unwrap(),
+            terminal
+        );
+
+        let mut copied = terminal.clone();
+        copied.key = "outer-82".into();
+        assert_eq!(
+            describe_cics_replay_row(&copied, None, CicsLimits::default()),
+            Err(CicsReplayValidationError::CorruptPayload)
+        );
+        let mut trailing = terminal.clone();
+        trailing.payload.push(0);
+        assert_eq!(
+            describe_cics_replay_row(&trailing, None, CicsLimits::default()),
+            Err(CicsReplayValidationError::CorruptPayload)
+        );
+
+        let mut replay =
+            decode_cics_effect_replay(&terminal.payload, CicsLimits::default()).unwrap();
+        replay.response.outputs.insert(
+            "DUP".into(),
+            BoundedPayload::new("test@1", b"value".to_vec(), InvocationLimits::default()).unwrap(),
+        );
+        replay.result_digest =
+            Some(canonical_result_digest(&Ok(HostResult::Cics(replay.response.clone()))).unwrap());
+        replay.binding_digest = Some(cics_effect_replay_binding_digest(&replay));
+        let mut duplicate = encode_cics_effect_replay(&replay).unwrap();
+        let marker = [0, 0, 0, 3, b'D', b'U', b'P'];
+        let field_at = duplicate
+            .windows(marker.len())
+            .position(|window| window == marker)
+            .unwrap();
+        let count_at = field_at - 4;
+        duplicate[count_at..field_at].copy_from_slice(&2_u32.to_be_bytes());
+        let entry = duplicate[field_at..duplicate.len() - 1].to_vec();
+        let insert_at = duplicate.len() - 1;
+        duplicate.splice(insert_at..insert_at, entry);
+        let duplicate = ProviderStateRecord {
+            payload: duplicate,
+            ..terminal.clone()
+        };
+        assert_eq!(
+            describe_cics_replay_row(&duplicate, None, CicsLimits::default()),
+            Err(CicsReplayValidationError::CorruptPayload)
+        );
+        assert_eq!(
+            describe_cics_replay_row(
+                &ProviderStateRecord {
+                    payload: encode_cics_effect_replay(&replay).unwrap(),
+                    ..terminal
+                },
+                None,
+                CicsLimits {
+                    max_fields: 0,
+                    ..CicsLimits::default()
+                },
+            ),
+            Err(CicsReplayValidationError::CorruptPayload)
+        );
+    }
+
+    #[test]
+    fn outer_replay_metadata_cas_failure_is_unknown_and_retry_recovers() {
+        let store = Arc::new(FailCicsReplayCasStore::new());
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let service = CicsService::open_with_replay_clock(
+            authorities(),
+            provider_store,
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(300)),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        let request = request(
+            CicsOperation::WriteTransientData,
+            BTreeMap::from([
+                ("QUEUE".into(), argument(b"CAS")),
+                ("FROM".into(), argument(b"ONCE")),
+            ]),
+            82,
+        );
+        store.fail_next.store(true, Ordering::SeqCst);
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 82),
+                request.clone(),
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let pending = store
+            .get_provider_state("cics-effect-replay-v1", "outer-82")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            crate::describe_cics_replay_row(&pending, None, CicsLimits::default())
+                .unwrap()
+                .retention,
+            crate::CicsReplayRetentionState::PendingProtected
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 82),
+                request,
+            )
+            .unwrap();
+        let terminal = store
+            .get_provider_state("cics-effect-replay-v1", "outer-82")
+            .unwrap()
+            .unwrap();
+        assert_eq!(terminal.version, 2);
+    }
+
+    #[test]
+    fn durable_clock_ages_uow_after_nested_syncpoint_completion() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open_with_replay_clock(
+            authorities(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(500)),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        let request = request(CicsOperation::Syncpoint, BTreeMap::new(), 91);
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 91),
+                request,
+            )
+            .unwrap();
+        let descriptor = crate::describe_cics_uow_row(
+            &store
+                .get_provider_state("cics-uow", "outer-91")
+                .unwrap()
+                .unwrap(),
+            None,
+        )
+        .unwrap();
+        assert_eq!(descriptor.terminal_tick, Some(500));
+        assert_eq!(descriptor.dependency, crate::CicsUowDependencyState::Clear);
+    }
+
+    #[test]
+    fn uow_clock_failure_stays_pending_until_exact_reconciliation() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let clock = Arc::new(TestCicsClock::fixed(550));
+        clock.fail_next.store(true, Ordering::SeqCst);
+        let service = CicsService::open_with_replay_clock(
+            authorities(),
+            store.clone(),
+            CicsLimits::default(),
+            clock,
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        let request = request(CicsOperation::Syncpoint, BTreeMap::new(), 93);
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 93),
+                request.clone(),
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let key = IdempotencyKey::new("outer-93", InvocationLimits::default()).unwrap();
+        let pending = store
+            .get_provider_state("cics-uow", key.as_str())
+            .unwrap()
+            .unwrap();
+        assert_eq!(pending.version, 1);
+        assert_eq!(
+            crate::describe_cics_uow_row(&pending, None)
+                .unwrap()
+                .dependency,
+            crate::CicsUowDependencyState::Active
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, request.clone(), 93),
+                request,
+            )
+            .unwrap();
+        let terminal = store
+            .get_provider_state("cics-uow", key.as_str())
+            .unwrap()
+            .unwrap();
+        let descriptor = crate::describe_cics_uow_row(&terminal, None).unwrap();
+        assert_eq!(terminal.version, 2);
+        assert_eq!(descriptor.terminal_tick, Some(550));
+    }
+
+    #[test]
+    fn every_enterprise_syncpoint_dispatch_carries_nested_and_outer_attestation() {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open(
+            syncpoint_origin_authorities(seen.clone()),
+            store,
+            CicsLimits::default(),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        let first = request(CicsOperation::Syncpoint, BTreeMap::new(), 92);
+        service
+            .invoke(&effect(&invocation.run_unit_id, first.clone(), 92), first)
+            .unwrap();
+        let second = request(CicsOperation::Syncpoint, BTreeMap::new(), 94);
+        service
+            .invoke(&effect(&invocation.run_unit_id, second.clone(), 94), second)
+            .unwrap();
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 6);
+        assert_eq!(
+            seen[0],
+            (
+                "host.db2.write".into(),
+                "cics:run:2".into(),
+                "outer-92".into()
+            )
+        );
+        assert_eq!(
+            seen[1],
+            (
+                "host.ims.write".into(),
+                "cics:run:3".into(),
+                "outer-92".into()
+            )
+        );
+        assert_eq!(
+            seen[2],
+            (
+                "host.mq.write".into(),
+                "cics:run:4".into(),
+                "outer-92".into()
+            )
+        );
+        assert!(
+            seen[3..]
+                .iter()
+                .all(|(_, nested, outer)| nested.starts_with("cics:run:") && outer == "outer-94")
+        );
+    }
+
+    #[test]
+    fn external_reserved_origins_are_rejected_and_internal_insertion_is_bounded() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let mut malicious = invocation();
+        malicious.bindings.insert(
+            CICS_NESTED_EFFECT_ORIGIN_BINDING.into(),
+            BoundedPayload::new(
+                CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
+                b"cics:run:1".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        let session = SessionId::new("reserved-session", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        assert_eq!(
+            service.register_run(malicious, &session, "MENU", "MEAPPL", "MESYS"),
+            Err(HostProblem::Malformed)
+        );
+
+        let limits = InvocationLimits::default();
+        let mut full = invocation();
+        for index in 0..(limits.max_bindings - 1) {
+            full.bindings.insert(
+                format!("binding-{index}"),
+                BoundedPayload::new("test@1", Vec::new(), limits).unwrap(),
+            );
+        }
+        assert_eq!(
+            invocation_with_nested_origin(
+                &full,
+                &IdempotencyKey::new("cics:run:1", limits).unwrap(),
+                "outer-1",
+            ),
+            Err(HostProblem::ResourceExhausted)
         );
     }
 }

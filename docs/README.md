@@ -55,6 +55,7 @@ explicitly names that authority as superseded.
 - [Durable storage profile](contracts/DURABLE-STORAGE-PROFILE.md)
 - [Canonical effect encoding](contracts/EFFECT-CANONICAL-V1.md)
 - [Provider object-row persistence](contracts/PROVIDER-ROW-PERSISTENCE-V1.md)
+- [Durable retention lifecycle](contracts/RETENTION-LIFECYCLE-V1.md)
 - [Target release build type](contracts/RELEASE-BUILD-V1.md)
 - [Release builder security model](architecture/RELEASE-BUILDER.md)
 

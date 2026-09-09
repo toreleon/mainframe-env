@@ -1,7 +1,10 @@
 use crate::{
     ArtifactRecord, CheckpointRecord, EffectRecord, ExecutionRecord, ExecutionState,
-    GenerationRecord, OutboxRecord, ProviderStateMutation, ProviderStateRecord, ProviderStateWrite,
-    SessionRecord, StoreError, WorkRecord,
+    GenerationRecord, OutboxRecord, ProviderStateArchiveDeletion, ProviderStateArchiveReplacement,
+    ProviderStateMutation, ProviderStateRecord, ProviderStateWrite, RetentionAgeReconciliation,
+    RetentionArchive, RetentionForecast, RetentionLegacyRow, RetentionPolicy, RetentionReceipt,
+    RetentionReconciliationReceipt, RetentionRequest, RetentionTarget, SessionRecord, StoreError,
+    WorkRecord,
 };
 use mainframe_env_execution_api::{
     ArtifactRef, AuditRecord, ExecutionId, IdempotencyKey, LifecycleEvent,
@@ -26,6 +29,7 @@ pub trait ExecutionStore: Send + Sync {
         id: &ExecutionId,
         expected_version: u64,
         next: ExecutionState,
+        now_tick: u64,
     ) -> Result<ExecutionRecord, StoreError>;
 }
 
@@ -93,7 +97,118 @@ pub trait OutboxStore: Send + Sync {
         &self,
         notification_id: &str,
         expected_version: u64,
+        delivered_tick: u64,
     ) -> Result<OutboxRecord, StoreError>;
+}
+
+/// Forecasting and atomic archive-before-prune operations for bounded durable state.
+pub trait RetentionStore: Send + Sync {
+    /// Read bounded capacity counters without scanning eligibility or provider payload codecs.
+    fn retention_capacity_health(
+        &self,
+        _policy: RetentionPolicy,
+    ) -> Result<crate::RetentionCapacityHealth, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Measure one target's eligibility, headroom, and saturation trajectory.
+    fn retention_forecast(
+        &self,
+        target: RetentionTarget,
+        policy: RetentionPolicy,
+        now_tick: u64,
+        observed_growth_per_tick: u64,
+    ) -> Result<RetentionForecast, StoreError>;
+    /// Forecast a core family using an exhaustive provider-owned dependency snapshot.
+    fn retention_forecast_with_dependencies(
+        &self,
+        _target: RetentionTarget,
+        _policy: RetentionPolicy,
+        _now_tick: u64,
+        _observed_growth_per_tick: u64,
+        _dependencies: &crate::CoreRetentionDependencySnapshot,
+    ) -> Result<RetentionForecast, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Forecast a provider-owned target after its full codec validated the counts.
+    #[allow(clippy::too_many_arguments)]
+    fn provider_validated_retention_forecast(
+        &self,
+        _target: RetentionTarget,
+        _policy: RetentionPolicy,
+        _now_tick: u64,
+        _observed_growth_per_tick: u64,
+        _active_records: usize,
+        _eligible_records: usize,
+        _source_capacity: usize,
+    ) -> Result<RetentionForecast, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Copy eligible source rows into one verified archive and delete them atomically.
+    fn archive_and_prune(
+        &self,
+        policy: RetentionPolicy,
+        request: RetentionRequest,
+    ) -> Result<RetentionReceipt, StoreError>;
+    /// Archive a core family while atomically fencing provider-owned dependencies.
+    fn archive_and_prune_with_dependencies(
+        &self,
+        _policy: RetentionPolicy,
+        _request: RetentionRequest,
+        _dependencies: &crate::CoreRetentionDependencySnapshot,
+    ) -> Result<RetentionReceipt, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Read whole verified archives containing at most `max` source rows in total.
+    fn retention_archives(
+        &self,
+        target: RetentionTarget,
+        max: usize,
+    ) -> Result<Vec<RetentionArchive>, StoreError>;
+    /// Permanently delete whole archive batches without authorizing a bound override.
+    ///
+    /// An indivisible historical archive larger than `max` is retained and reported as an
+    /// invalid transition. Operator surfaces should use
+    /// [`Self::prune_retention_archives_authorized`] to obtain its exact identity.
+    fn prune_retention_archives(
+        &self,
+        policy: RetentionPolicy,
+        now_tick: u64,
+        max: usize,
+    ) -> Result<usize, StoreError> {
+        match self.prune_retention_archives_authorized(
+            policy,
+            crate::RetentionArchivePruneRequest {
+                now_tick,
+                max_records: max,
+                authorized_oversized_archive_id: None,
+            },
+        )? {
+            crate::RetentionArchivePruneOutcome::Pruned(receipt) => Ok(receipt.pruned_source_rows),
+            crate::RetentionArchivePruneOutcome::AuthorizationRequired { .. } => {
+                Err(StoreError::InvalidTransition)
+            }
+        }
+    }
+    /// Permanently delete expired whole archives with an optional exact oversized authorization.
+    fn prune_retention_archives_authorized(
+        &self,
+        _policy: RetentionPolicy,
+        _request: crate::RetentionArchivePruneRequest,
+    ) -> Result<crate::RetentionArchivePruneOutcome, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Add conservative owner/age metadata to one inspected legacy row under CAS.
+    fn reconcile_retention_age(
+        &self,
+        request: RetentionAgeReconciliation,
+        now_tick: u64,
+    ) -> Result<RetentionReconciliationReceipt, StoreError>;
+    /// List protected legacy rows with the CAS token needed for explicit reconciliation.
+    fn retention_legacy_rows(
+        &self,
+        target: RetentionTarget,
+        max: usize,
+    ) -> Result<Vec<RetentionLegacyRow>, StoreError>;
 }
 
 pub trait JournalStore: Send + Sync {
@@ -148,6 +263,10 @@ pub trait IdempotencyStore: Send + Sync {
     fn record_result(&self, key: &IdempotencyKey, record: EffectRecord) -> Result<(), StoreError>;
     fn effect(&self, key: &IdempotencyKey) -> Result<Option<EffectRecord>, StoreError>;
     fn unknown_effects(&self, max: usize) -> Result<Vec<EffectRecord>, StoreError>;
+    /// Enumerate all intent or unknown-outcome effects that still require recovery.
+    fn unresolved_effects(&self, _max: usize) -> Result<Vec<EffectRecord>, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
     /// Enumerate intents old enough for recovery whose recovery lease is absent or expired.
     fn stale_intents(
         &self,
@@ -201,6 +320,16 @@ pub trait IdempotencyStore: Send + Sync {
 }
 
 pub trait ProviderStateStore: AuditSink + Send + Sync {
+    /// Return a positive durable tick no lower than `observed_floor` or any
+    /// previously observed floor.
+    ///
+    /// Equal observations may return the same tick: logical time measures elapsed
+    /// duration and must not advance merely because request volume increases. Clock
+    /// advancement must not consume provider-state row capacity or change the
+    /// provider mutation epoch used by retention scans.
+    fn advance_logical_clock(&self, _observed_floor: u64) -> Result<u64, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
     fn get_provider_state(
         &self,
         namespace: &str,
@@ -211,6 +340,14 @@ pub trait ProviderStateStore: AuditSink + Send + Sync {
         namespace: &str,
         max: usize,
     ) -> Result<Vec<ProviderStateRecord>, StoreError>;
+    /// List a bounded, key-ordered snapshot across provider namespaces sharing a prefix.
+    fn list_provider_state_prefix(
+        &self,
+        _namespace_prefix: &str,
+        _max: usize,
+    ) -> Result<Vec<ProviderStateRecord>, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
     fn put_provider_state(
         &self,
         record: ProviderStateRecord,
@@ -234,6 +371,71 @@ pub trait ProviderStateStore: AuditSink + Send + Sync {
         &self,
         mutations: Vec<ProviderStateMutation>,
     ) -> Result<(), StoreError>;
+    /// Atomically archive extracted subrecords and CAS-replace their aggregate provider row.
+    fn archive_provider_state_replacement(
+        &self,
+        _request: ProviderStateArchiveReplacement,
+    ) -> Result<RetentionArchive, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Measure archived row and payload-byte usage for one provider-owned family.
+    fn provider_retention_archive_usage(
+        &self,
+        _target: RetentionTarget,
+    ) -> Result<(usize, u64), StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Return target usage and actual shared archive/observation capacities.
+    fn provider_retention_authority_usage(
+        &self,
+        _target: RetentionTarget,
+    ) -> Result<crate::RetentionAuthorityUsage, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Read the provider-state mutation epoch used to fence provider-built retention plans.
+    fn provider_state_retention_epoch(&self) -> Result<u64, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// List bounded dedicated age observations for provider full-codec validation.
+    fn provider_retention_observations(
+        &self,
+        _target: RetentionTarget,
+        _max: usize,
+    ) -> Result<Vec<crate::RetentionObservation>, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Read one bounded, stable-key page of provider retention observations.
+    fn provider_retention_observation_page(
+        &self,
+        _target: RetentionTarget,
+        _after: Option<&crate::ProviderStateIdentity>,
+        _max: usize,
+    ) -> Result<Vec<(u64, crate::RetentionObservation)>, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// CAS-delete one stale provider observation after full-codec source comparison.
+    fn delete_provider_retention_observation(
+        &self,
+        _request: crate::ProviderRetentionObservationDeletion,
+    ) -> Result<(), StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Attest one provider-validated logical row while CAS-fencing its exact aggregate source.
+    fn record_provider_retention_observation(
+        &self,
+        _source: ProviderStateRecord,
+        _expected_epoch: u64,
+        _observation: crate::RetentionObservation,
+    ) -> Result<RetentionReconciliationReceipt, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
+    /// Atomically archive and delete provider-validated rows after rechecking generic dependencies.
+    fn archive_provider_state_deletion(
+        &self,
+        _request: ProviderStateArchiveDeletion,
+    ) -> Result<RetentionArchive, StoreError> {
+        Err(StoreError::InvalidTransition)
+    }
 }
 
 pub trait PlatformStore:
@@ -249,6 +451,7 @@ pub trait PlatformStore:
     + JournalStore
     + AuditSink
     + ProviderStateStore
+    + RetentionStore
     + Send
     + Sync
 {
@@ -267,6 +470,7 @@ impl<T> PlatformStore for T where
         + JournalStore
         + AuditSink
         + ProviderStateStore
+        + RetentionStore
         + Send
         + Sync
 {

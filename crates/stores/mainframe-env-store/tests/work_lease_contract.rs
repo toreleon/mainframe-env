@@ -30,6 +30,7 @@ fn work(label: &str, deadline_tick: u64) -> WorkRecord {
         lease_epoch: 0,
         lease_expiry_tick: None,
         heartbeat_tick: None,
+        terminal_tick: None,
         checkpoint_id: None,
         effect_sequence: 0,
         payload: vec![1],
@@ -273,9 +274,10 @@ fn legacy_claimed_work_migrates_to_an_explicit_fencing_epoch() {
         .unwrap()
         .unwrap();
     let migrated: serde_json::Value = serde_json::from_slice(&migrated.payload).unwrap();
-    assert_eq!(migrated["schema"], 3);
+    assert_eq!(migrated["schema"], 4);
     assert_eq!(migrated["lease_epoch"], 1);
     assert_eq!(migrated["priority"], 0);
+    assert!(migrated["terminal_tick"].is_null());
 }
 
 #[test]

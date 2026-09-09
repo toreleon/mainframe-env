@@ -418,7 +418,12 @@ pub(crate) fn execute(
     if preflight.is_none() && !initial.principals.contains_key(context.caller().as_str()) {
         preflight = Some(DecisionReason::PrincipalNotFound);
     }
-    if descriptor.mutating() && initial.transactions.contains_key(context.idempotency_key()) {
+    if descriptor.mutating()
+        && service
+            .database
+            .transaction_for_replay(&initial, context.idempotency_key())?
+            .is_some()
+    {
         return execute_existing_transaction(
             service,
             context,
@@ -472,9 +477,16 @@ pub(crate) fn execute(
     };
     let ((execution, mut states), generation) = service.database.mutate_retry(|snapshot| {
         let mut states = vec![RacrouteState::Received, RacrouteState::Validated];
-        if descriptor.mutating()
-            && let Some(existing) = snapshot.transactions.get(context.idempotency_key())
-        {
+        let existing = descriptor
+            .mutating()
+            .then(|| {
+                service
+                    .database
+                    .transaction_for_replay(snapshot, context.idempotency_key())
+            })
+            .transpose()?
+            .flatten();
+        if let Some(existing) = existing.as_ref() {
             if existing.request_digest_format != SecurityRequestDigestFormat::RacrouteCanonicalV1 {
                 return Ok(((SafExecution::UnknownOutcome, states), false));
             }
@@ -752,9 +764,9 @@ fn execute_existing_transaction(
     request_digest: &str,
 ) -> Result<RacrouteOutcome, HostProblem> {
     let (execution, generation) = service.database.mutate_retry(|snapshot| {
-        let existing = snapshot
-            .transactions
-            .get(context.idempotency_key())
+        let existing = service
+            .database
+            .transaction_for_replay(snapshot, context.idempotency_key())?
             .ok_or(HostProblem::UnknownOutcome)?;
         if existing.request_digest_format != SecurityRequestDigestFormat::RacrouteCanonicalV1 {
             return Ok((SafExecution::UnknownOutcome, false));
@@ -764,7 +776,7 @@ fn execute_existing_transaction(
             let _ = append_audit(snapshot, context, keyword, status, request_digest)?;
             return Ok((SafExecution::Conflict, true));
         }
-        Ok((replay_execution(existing)?, false))
+        Ok((replay_execution(&existing)?, false))
     })?;
     match execution {
         SafExecution::Terminal {
@@ -829,6 +841,9 @@ fn append_racroute_transaction(
     if terminal_result.len() > 65_536 {
         return Err(HostProblem::ResourceExhausted);
     }
+    let terminal_tick = snapshot
+        .observe_retention_tick(context.tick())
+        .ok_or(HostProblem::ResourceExhausted)?;
     snapshot.transactions.insert(
         context.idempotency_key().into(),
         SecurityTransaction {
@@ -848,6 +863,7 @@ fn append_racroute_transaction(
             ),
             status: terminal.status,
             terminal_result: Some(terminal_result),
+            terminal_tick: Some(terminal_tick),
         },
     );
     Ok(())
@@ -1013,6 +1029,9 @@ fn apply_request(
             let status = status_for_reason(DecisionReason::Granted);
             let id = next_id("AUDIT", snapshot.generation, snapshot.audits.len());
             let fields = crate::audit::redact_fields(fields.clone());
+            let tick = snapshot
+                .observe_retention_tick(context.tick())
+                .ok_or(DecisionReason::ResourceExhausted)?;
             snapshot.audits.push(SecurityAuditRecord {
                 id: id.clone(),
                 correlation: context.correlation().into(),
@@ -1023,7 +1042,8 @@ fn apply_request(
                 decision: *decision,
                 status,
                 fields,
-                tick: context.tick(),
+                tick,
+                retention_observed_tick: Some(tick),
             });
             Ok((status, RacrouteResult::Audit { audit_id: id }))
         }
@@ -1915,6 +1935,9 @@ fn append_audit(
     if snapshot.audits.len() >= 65_536 {
         return Err(HostProblem::ResourceExhausted);
     }
+    let tick = snapshot
+        .observe_retention_tick(context.tick())
+        .ok_or(HostProblem::ResourceExhausted)?;
     let id = next_id("AUDIT", snapshot.generation, snapshot.audits.len());
     snapshot.audits.push(SecurityAuditRecord {
         id: id.clone(),
@@ -1945,7 +1968,8 @@ fn append_audit(
                 ),
             ),
         ])),
-        tick: context.tick(),
+        tick,
+        retention_observed_tick: Some(tick),
     });
     Ok(id)
 }
@@ -3389,11 +3413,9 @@ mod tests {
             service
                 .database
                 .mutate(|snapshot| {
-                    snapshot
-                        .transactions
-                        .get_mut("UNKNOWN-TOKEN")
-                        .unwrap()
-                        .state = TransactionState::UnknownOutcome;
+                    let transaction = snapshot.transactions.get_mut("UNKNOWN-TOKEN").unwrap();
+                    transaction.state = TransactionState::UnknownOutcome;
+                    transaction.terminal_tick = None;
                     Ok(())
                 })
                 .unwrap();

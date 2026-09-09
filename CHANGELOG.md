@@ -55,6 +55,9 @@ All notable changes to mainframe-env are documented here.
   checkpoints now close their old execution with an explicit durable handoff,
   and restart cleanup preserves only that handed-off continuation while
   retaining known terminal failure categories.
+- Added bounded, transactional retention archives and saturation forecasts for
+  lifecycle events, delivered outbox rows, resolved effects, and Db2/IMS/MQ
+  replay receipts while protecting checkpoints and unresolved recovery state.
 - Moved synchronous z/OSMF backend calls to a bounded four-worker lane and
   propagated finite HTTP deadlines plus live cancellation into invocations.
 - Classified mutating-effect journal failures after dispatch as unknown outcomes

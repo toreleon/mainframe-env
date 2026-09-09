@@ -11,6 +11,15 @@ max_concurrency = 256
 timeout_millis = 30000
 shutdown_millis = 30000
 
+[retention]
+lifecycle_ticks = 604800000
+idempotency_ticks = 86400000
+audit_ticks = 7776000000
+archive_ticks = 31536000000
+low_watermark_percent = 70
+high_watermark_percent = 85
+max_batch = 1024
+
 [tls]
 enabled = true
 certificate_path = "config/tls/server.crt"

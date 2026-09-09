@@ -7007,6 +7007,21 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         status.success(),
         "enterprise authorization architecture guard failed",
     )?;
+    let retention = root.join("tools/check_retention_lifecycle.py");
+    require(
+        retention.is_file(),
+        "durable retention lifecycle architecture guard is missing",
+    )?;
+    let status = Command::new("python3")
+        .arg("-B")
+        .arg(&retention)
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("durable retention lifecycle guard: {error}"))?;
+    require(
+        status.success(),
+        "durable retention lifecycle architecture guard failed",
+    )?;
     Ok(())
 }
 

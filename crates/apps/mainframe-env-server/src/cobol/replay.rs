@@ -1,25 +1,128 @@
 //! Versioned at-most-once dispatch for installed COBOL calls. Pending != retryable.
 use super::*;
+use mainframe_env_store_api::{ProviderStateMutation, StoreError};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-const NAMESPACE: &str = "cobol-call-replay@1";
-const RUN_NAMESPACE: &str = "cobol-call-protocol@2";
+use super::retention::{
+    CALL_PROTOCOL_NAMESPACE, CALL_REPLAY_NAMESPACE, CobolRetentionDependency,
+    CobolRetentionRowDescriptor, CobolRetentionRowKind, CobolRetentionState,
+    CobolRetentionValidationError, owner_dependencies, protocol_key, provider_dependency,
+    run_state_key, valid_digest, valid_identity, validate_row_identity,
+};
 
-#[derive(Deserialize, Serialize)]
+const RUN_OWNER_BINDING: &str = "cobol.run-owner-execution";
+const RUN_OWNER_BINDING_SCHEMA: &str = "mainframe-env.cobol.run-owner@1";
+
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct Reply {
+pub(super) struct Reply {
     schema: String,
     bytes: Vec<u8>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Receipt {
+struct LegacyReceipt {
     schema_version: u32,
     fingerprint: String,
     child_execution: String,
     reply: Option<Reply>,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct Receipt {
+    schema_version: u32,
+    replay_key: String,
+    fingerprint: String,
+    child_execution: String,
+    owner_execution: String,
+    owner_run_unit: String,
+    owner_principal: String,
+    protocol_key: String,
+    run_state_key: String,
+    metadata_digest: String,
+    completion_tick: Option<u64>,
+    reply: Option<Reply>,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct CallProtocol {
+    schema_version: u32,
+    owner_execution: String,
+    owner_run_unit: String,
+    owner_principal: String,
+    run_state_key: String,
+    metadata_digest: String,
+    ended_tick: Option<u64>,
+}
+
+enum DecodedReceipt {
+    Legacy(LegacyReceipt),
+    Current(Receipt),
+}
+
+enum DecodedProtocol {
+    Legacy,
+    Current(CallProtocol),
+}
+
+fn receipt_metadata_digest(receipt: &Receipt) -> String {
+    let mut hash = Sha256::new();
+    hash.update(b"mainframe-env.cobol-call-receipt-metadata@2\0");
+    for field in [
+        receipt.replay_key.as_bytes(),
+        receipt.fingerprint.as_bytes(),
+        receipt.child_execution.as_bytes(),
+        receipt.owner_execution.as_bytes(),
+        receipt.owner_run_unit.as_bytes(),
+        receipt.owner_principal.as_bytes(),
+        receipt.protocol_key.as_bytes(),
+        receipt.run_state_key.as_bytes(),
+    ] {
+        hash.update((field.len() as u64).to_be_bytes());
+        hash.update(field);
+    }
+    hash.update(receipt.completion_tick.unwrap_or(0).to_be_bytes());
+    match &receipt.reply {
+        Some(reply) => {
+            hash.update([1]);
+            hash.update((reply.schema.len() as u64).to_be_bytes());
+            hash.update(reply.schema.as_bytes());
+            hash.update((reply.bytes.len() as u64).to_be_bytes());
+            hash.update(&reply.bytes);
+        }
+        None => hash.update([0]),
+    }
+    format!("{:x}", hash.finalize())
+}
+
+fn protocol_metadata_digest(protocol: &CallProtocol) -> String {
+    let ended = protocol.ended_tick.unwrap_or(0).to_be_bytes();
+    digest(&[
+        b"protocol-metadata",
+        protocol.owner_execution.as_bytes(),
+        protocol.owner_run_unit.as_bytes(),
+        protocol.owner_principal.as_bytes(),
+        protocol.run_state_key.as_bytes(),
+        &ended,
+    ])
+}
+
+fn new_call_protocol(parent: &Invocation) -> Result<CallProtocol, HostProblem> {
+    let mut protocol = CallProtocol {
+        schema_version: 2,
+        owner_execution: protocol_owner_execution(parent)?,
+        owner_run_unit: parent.run_unit_id.as_str().into(),
+        owner_principal: parent.principal.id().as_str().into(),
+        run_state_key: run_state_key(parent.run_unit_id.as_str(), parent.principal.id().as_str()),
+        metadata_digest: String::new(),
+        ended_tick: None,
+    };
+    protocol.metadata_digest = protocol_metadata_digest(&protocol);
+    Ok(protocol)
 }
 
 pub(super) fn digest(parts: &[&[u8]]) -> String {
@@ -30,6 +133,43 @@ pub(super) fn digest(parts: &[&[u8]]) -> String {
         hash.update(part);
     }
     format!("{:x}", hash.finalize())
+}
+
+pub(super) fn protocol_owner_execution(invocation: &Invocation) -> Result<String, HostProblem> {
+    let Some(binding) = invocation.bindings.get(RUN_OWNER_BINDING) else {
+        return Ok(invocation.execution_id.as_str().into());
+    };
+    if binding.schema() != RUN_OWNER_BINDING_SCHEMA {
+        return Err(HostProblem::Malformed);
+    }
+    let owner = std::str::from_utf8(binding.bytes()).map_err(|_| HostProblem::Malformed)?;
+    if !valid_identity(owner) {
+        return Err(HostProblem::Malformed);
+    }
+    Ok(owner.into())
+}
+
+pub(super) fn bind_protocol_owner(
+    parent: &Invocation,
+    bindings: &mut BTreeMap<String, BoundedPayload>,
+) -> Result<(), HostProblem> {
+    let owner = protocol_owner_execution(parent)?;
+    if bindings.contains_key(RUN_OWNER_BINDING) {
+        return Ok(());
+    }
+    if bindings.len() >= InvocationLimits::default().max_bindings {
+        return Err(HostProblem::ResourceExhausted);
+    }
+    bindings.insert(
+        RUN_OWNER_BINDING.into(),
+        BoundedPayload::new(
+            RUN_OWNER_BINDING_SCHEMA,
+            owner.into_bytes(),
+            InvocationLimits::default(),
+        )
+        .map_err(|_| HostProblem::ResourceExhausted)?,
+    );
+    Ok(())
 }
 
 fn identity(parent: &Invocation, effect: &EffectRequest) -> Result<String, HostProblem> {
@@ -87,34 +227,338 @@ fn fingerprint(
     Ok(digest(&[b"fingerprint", &bytes]))
 }
 
-fn previous(record: ProviderStateRecord, expected: &str) -> Result<BoundedPayload, HostProblem> {
-    let receipt: Receipt =
-        serde_json::from_slice(&record.payload).map_err(|_| HostProblem::UnknownOutcome)?;
-    if receipt.schema_version != 1 {
-        return Err(HostProblem::UnknownOutcome);
-    }
-    if receipt.fingerprint != expected {
-        return Err(HostProblem::IdempotencyConflict);
-    }
-    match (record.version, receipt.reply) {
-        (2, Some(reply)) => {
-            BoundedPayload::new(reply.schema, reply.bytes, InvocationLimits::default())
-                .map_err(|_| HostProblem::UnknownOutcome)
+fn decode_receipt(
+    record: &ProviderStateRecord,
+) -> Result<DecodedReceipt, CobolRetentionValidationError> {
+    validate_row_identity(record, CALL_REPLAY_NAMESPACE)?;
+    if let Ok(receipt) = serde_json::from_slice::<Receipt>(&record.payload)
+        && receipt.schema_version == 2
+    {
+        if !valid_digest(&receipt.fingerprint)
+            || receipt.replay_key != record.key
+            || !valid_identity(&receipt.child_execution)
+            || !valid_identity(&receipt.owner_execution)
+            || !valid_identity(&receipt.owner_run_unit)
+            || !valid_identity(&receipt.owner_principal)
+            || receipt.protocol_key != protocol_key(&receipt.owner_run_unit)
+            || receipt.run_state_key
+                != run_state_key(&receipt.owner_run_unit, &receipt.owner_principal)
+            || receipt.metadata_digest != receipt_metadata_digest(&receipt)
+            || !matches!(
+                receipt.child_execution.strip_suffix(&record.key),
+                Some("online-call-execution-") | Some("batch-installed-execution-")
+            )
+            || receipt.reply.as_ref().is_some_and(|reply| {
+                reply.schema.is_empty()
+                    || reply.schema.len() > 128
+                    || reply.bytes.len() > InvocationLimits::default().max_payload_bytes
+            })
+            || !matches!(
+                (
+                    record.version,
+                    receipt.reply.is_some(),
+                    receipt.completion_tick
+                ),
+                (1, false, None) | (2, true, Some(1..))
+            )
+        {
+            return Err(CobolRetentionValidationError::InconsistentState);
         }
-        _ => Err(HostProblem::UnknownOutcome),
+        return Ok(DecodedReceipt::Current(receipt));
+    }
+    let receipt: LegacyReceipt = serde_json::from_slice(&record.payload)
+        .map_err(|_| CobolRetentionValidationError::CorruptPayload)?;
+    if receipt.schema_version != 1
+        || !valid_digest(&receipt.fingerprint)
+        || !valid_identity(&receipt.child_execution)
+        || !matches!(
+            receipt.child_execution.strip_suffix(&record.key),
+            Some("online-call-execution-") | Some("batch-installed-execution-")
+        )
+        || receipt.reply.as_ref().is_some_and(|reply| {
+            reply.schema.is_empty()
+                || reply.schema.len() > 128
+                || reply.bytes.len() > InvocationLimits::default().max_payload_bytes
+        })
+        || !matches!(
+            (record.version, receipt.reply.is_some()),
+            (1, false) | (2, true)
+        )
+    {
+        return Err(CobolRetentionValidationError::InconsistentState);
+    }
+    Ok(DecodedReceipt::Legacy(receipt))
+}
+
+#[allow(dead_code, reason = "R-11 product integration seam")]
+pub(super) fn describe_call_replay_row(
+    record: &ProviderStateRecord,
+) -> Result<CobolRetentionRowDescriptor, CobolRetentionValidationError> {
+    match decode_receipt(record)? {
+        DecodedReceipt::Legacy(receipt) => Ok(CobolRetentionRowDescriptor {
+            namespace: record.namespace.clone(),
+            key: record.key.clone(),
+            row_version: record.version,
+            kind: CobolRetentionRowKind::CallReplay,
+            state: if receipt.reply.is_some() {
+                CobolRetentionState::LegacyProtected
+            } else {
+                CobolRetentionState::Active
+            },
+            owner_execution: None,
+            owner_run_unit: None,
+            terminal_tick: None,
+            dependencies: vec![CobolRetentionDependency::Execution(receipt.child_execution)],
+        }),
+        DecodedReceipt::Current(receipt) => {
+            let state = if receipt.reply.is_some() {
+                CobolRetentionState::Terminal
+            } else {
+                CobolRetentionState::Active
+            };
+            let mut dependencies =
+                owner_dependencies(&receipt.owner_execution, &receipt.owner_run_unit);
+            dependencies.push(CobolRetentionDependency::Execution(receipt.child_execution));
+            dependencies.push(provider_dependency(
+                CALL_PROTOCOL_NAMESPACE,
+                receipt.protocol_key,
+            ));
+            dependencies.push(provider_dependency(
+                super::retention::RUN_STATE_NAMESPACE,
+                receipt.run_state_key,
+            ));
+            Ok(CobolRetentionRowDescriptor {
+                namespace: record.namespace.clone(),
+                key: record.key.clone(),
+                row_version: record.version,
+                kind: CobolRetentionRowKind::CallReplay,
+                state,
+                owner_execution: Some(receipt.owner_execution),
+                owner_run_unit: Some(receipt.owner_run_unit),
+                terminal_tick: receipt.completion_tick,
+                dependencies,
+            })
+        }
+    }
+}
+
+fn previous(
+    record: ProviderStateRecord,
+    expected: &str,
+    parent: &Invocation,
+) -> Result<BoundedPayload, HostProblem> {
+    let reply = match decode_receipt(&record).map_err(|_| HostProblem::UnknownOutcome)? {
+        DecodedReceipt::Legacy(receipt) => {
+            if receipt.fingerprint != expected {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            receipt.reply
+        }
+        DecodedReceipt::Current(receipt) => {
+            if receipt.fingerprint != expected
+                || receipt.owner_execution != parent.execution_id.as_str()
+                || receipt.owner_run_unit != parent.run_unit_id.as_str()
+                || receipt.owner_principal != parent.principal.id().as_str()
+                || receipt.run_state_key
+                    != run_state_key(parent.run_unit_id.as_str(), parent.principal.id().as_str())
+            {
+                return Err(HostProblem::IdempotencyConflict);
+            }
+            receipt.reply
+        }
+    };
+    let reply = reply.ok_or(HostProblem::UnknownOutcome)?;
+    BoundedPayload::new(reply.schema, reply.bytes, InvocationLimits::default())
+        .map_err(|_| HostProblem::UnknownOutcome)
+}
+
+fn decode_protocol(
+    record: &ProviderStateRecord,
+) -> Result<DecodedProtocol, CobolRetentionValidationError> {
+    validate_row_identity(record, CALL_PROTOCOL_NAMESPACE)?;
+    if !valid_digest(&record.key) {
+        return Err(CobolRetentionValidationError::InvalidIdentity);
+    }
+    if record.version == 1 && record.payload == b"installed-call@2" {
+        return Ok(DecodedProtocol::Legacy);
+    }
+    let protocol: CallProtocol = serde_json::from_slice(&record.payload)
+        .map_err(|_| CobolRetentionValidationError::CorruptPayload)?;
+    if protocol.schema_version != 2
+        || !valid_identity(&protocol.owner_execution)
+        || !valid_identity(&protocol.owner_run_unit)
+        || !valid_identity(&protocol.owner_principal)
+        || protocol.run_state_key
+            != run_state_key(&protocol.owner_run_unit, &protocol.owner_principal)
+        || protocol.metadata_digest != protocol_metadata_digest(&protocol)
+        || record.key != protocol_key(&protocol.owner_run_unit)
+        || !matches!(
+            (record.version, protocol.ended_tick),
+            (1, None) | (2, Some(1..))
+        )
+    {
+        return Err(CobolRetentionValidationError::InconsistentState);
+    }
+    Ok(DecodedProtocol::Current(protocol))
+}
+
+#[allow(dead_code, reason = "R-11 product integration seam")]
+pub(super) fn describe_call_protocol_row(
+    record: &ProviderStateRecord,
+) -> Result<CobolRetentionRowDescriptor, CobolRetentionValidationError> {
+    match decode_protocol(record)? {
+        DecodedProtocol::Legacy => Ok(CobolRetentionRowDescriptor {
+            namespace: record.namespace.clone(),
+            key: record.key.clone(),
+            row_version: record.version,
+            kind: CobolRetentionRowKind::CallProtocol,
+            // The legacy marker has no durable end-state or owner evidence. It cannot be
+            // aged safely even after an operator attests an unrelated execution.
+            state: CobolRetentionState::Active,
+            owner_execution: None,
+            owner_run_unit: None,
+            terminal_tick: None,
+            dependencies: Vec::new(),
+        }),
+        DecodedProtocol::Current(protocol) => {
+            let mut dependencies =
+                owner_dependencies(&protocol.owner_execution, &protocol.owner_run_unit);
+            dependencies.push(provider_dependency(
+                super::retention::RUN_STATE_NAMESPACE,
+                protocol.run_state_key,
+            ));
+            Ok(CobolRetentionRowDescriptor {
+                namespace: record.namespace.clone(),
+                key: record.key.clone(),
+                row_version: record.version,
+                kind: CobolRetentionRowKind::CallProtocol,
+                state: if protocol.ended_tick.is_some() {
+                    CobolRetentionState::Terminal
+                } else {
+                    CobolRetentionState::Active
+                },
+                owner_execution: Some(protocol.owner_execution),
+                owner_run_unit: Some(protocol.owner_run_unit),
+                terminal_tick: protocol.ended_tick,
+                dependencies,
+            })
+        }
+    }
+}
+
+pub(super) fn protocol_terminal_mutation(
+    store: &dyn PlatformStore,
+    invocation: &Invocation,
+    ended_tick: u64,
+) -> Result<Option<ProviderStateMutation>, HostProblem> {
+    if ended_tick == 0 {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let key = protocol_key(invocation.run_unit_id.as_str());
+    let Some(record) = store
+        .get_provider_state(CALL_PROTOCOL_NAMESPACE, &key)
+        .map_err(|_| HostProblem::InfrastructureFailure)?
+    else {
+        return Ok(None);
+    };
+    let protocol = match decode_protocol(&record).map_err(|_| HostProblem::UnknownOutcome)? {
+        DecodedProtocol::Legacy => CallProtocol {
+            schema_version: 2,
+            owner_execution: protocol_owner_execution(invocation)?,
+            owner_run_unit: invocation.run_unit_id.as_str().into(),
+            owner_principal: invocation.principal.id().as_str().into(),
+            run_state_key: run_state_key(
+                invocation.run_unit_id.as_str(),
+                invocation.principal.id().as_str(),
+            ),
+            metadata_digest: String::new(),
+            ended_tick: Some(ended_tick),
+        },
+        DecodedProtocol::Current(mut protocol) => {
+            if protocol.owner_execution != protocol_owner_execution(invocation)?
+                || protocol.owner_run_unit != invocation.run_unit_id.as_str()
+                || protocol.owner_principal != invocation.principal.id().as_str()
+                || protocol.run_state_key
+                    != run_state_key(
+                        invocation.run_unit_id.as_str(),
+                        invocation.principal.id().as_str(),
+                    )
+            {
+                return Err(HostProblem::UnknownOutcome);
+            }
+            if let Some(existing) = protocol.ended_tick {
+                return if existing == ended_tick {
+                    Ok(None)
+                } else {
+                    Err(HostProblem::UnknownOutcome)
+                };
+            }
+            protocol.ended_tick = Some(ended_tick);
+            protocol
+        }
+    };
+    let mut protocol = protocol;
+    protocol.metadata_digest = protocol_metadata_digest(&protocol);
+    let version = record
+        .version
+        .checked_add(1)
+        .ok_or(HostProblem::ResourceExhausted)?;
+    Ok(Some(ProviderStateMutation::Put(ProviderStateWrite {
+        record: ProviderStateRecord {
+            namespace: CALL_PROTOCOL_NAMESPACE.into(),
+            key,
+            version,
+            payload: serde_json::to_vec(&protocol)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+        },
+        expected_version: Some(record.version),
+    })))
+}
+
+pub(super) fn retention_observation_tick(
+    program: &CobolProgram,
+    invocation: &Invocation,
+) -> Result<u64, HostProblem> {
+    let tick = program
+        .observe_execution_control(invocation)
+        .map_err(|_| HostProblem::InfrastructureFailure)?
+        .now_tick;
+    if tick == 0 {
+        Err(HostProblem::InfrastructureFailure)
+    } else {
+        Ok(tick)
     }
 }
 
 impl CobolProgram {
     pub(super) fn ensure_call_protocol(&self, parent: &Invocation) -> Result<(), HostProblem> {
         let store = self.store.get().ok_or(HostProblem::InfrastructureFailure)?;
-        let key = digest(&[b"run-protocol", parent.run_unit_id.as_str().as_bytes()]);
+        let key = protocol_key(parent.run_unit_id.as_str());
+        let expected_owner = protocol_owner_execution(parent)?;
         match store
-            .get_provider_state(RUN_NAMESPACE, &key)
+            .get_provider_state(CALL_PROTOCOL_NAMESPACE, &key)
             .map_err(|_| HostProblem::InfrastructureFailure)?
         {
-            Some(record) if record.version == 1 && record.payload == b"installed-call@2" => Ok(()),
-            Some(_) => Err(HostProblem::UnknownOutcome),
+            Some(record) => match decode_protocol(&record) {
+                Ok(DecodedProtocol::Legacy) => Ok(()),
+                Ok(DecodedProtocol::Current(protocol))
+                    if protocol.owner_execution == expected_owner
+                        && protocol.owner_run_unit == parent.run_unit_id.as_str()
+                        && protocol.owner_principal == parent.principal.id().as_str()
+                        && protocol.run_state_key
+                            == run_state_key(
+                                parent.run_unit_id.as_str(),
+                                parent.principal.id().as_str(),
+                            ) =>
+                {
+                    if protocol.ended_tick.is_some() {
+                        Err(run_ended_problem())
+                    } else {
+                        Ok(())
+                    }
+                }
+                _ => Err(HostProblem::UnknownOutcome),
+            },
             None if parent.attempt != 1 => Err(HostProblem::UnknownOutcome),
             None => {
                 // Version-1 calls never persisted ordinary program state. Their
@@ -128,24 +572,41 @@ impl CobolProgram {
                     return Err(HostProblem::UnknownOutcome);
                 }
                 let record = ProviderStateRecord {
-                    namespace: RUN_NAMESPACE.into(),
+                    namespace: CALL_PROTOCOL_NAMESPACE.into(),
                     key: key.clone(),
                     version: 1,
-                    payload: b"installed-call@2".to_vec(),
+                    payload: serde_json::to_vec(&new_call_protocol(parent)?)
+                        .map_err(|_| HostProblem::InfrastructureFailure)?,
                 };
                 match store.put_provider_state(record, None) {
                     Ok(()) => Ok(()),
-                    Err(
-                        mainframe_env_store_api::StoreError::Conflict
-                        | mainframe_env_store_api::StoreError::AlreadyExists,
-                    ) => match store.get_provider_state(RUN_NAMESPACE, &key) {
-                        Ok(Some(record))
-                            if record.version == 1 && record.payload == b"installed-call@2" =>
-                        {
-                            Ok(())
+                    Err(StoreError::Conflict | StoreError::AlreadyExists) => {
+                        match store.get_provider_state(CALL_PROTOCOL_NAMESPACE, &key) {
+                            Ok(Some(record)) => match decode_protocol(&record) {
+                                Ok(DecodedProtocol::Legacy) => Ok(()),
+                                Ok(DecodedProtocol::Current(protocol))
+                                    if protocol.owner_execution == expected_owner
+                                        && protocol.owner_run_unit
+                                            == parent.run_unit_id.as_str()
+                                        && protocol.owner_principal
+                                            == parent.principal.id().as_str()
+                                        && protocol.run_state_key
+                                            == run_state_key(
+                                                parent.run_unit_id.as_str(),
+                                                parent.principal.id().as_str(),
+                                            ) =>
+                                {
+                                    if protocol.ended_tick.is_some() {
+                                        Err(run_ended_problem())
+                                    } else {
+                                        Ok(())
+                                    }
+                                }
+                                _ => Err(HostProblem::UnknownOutcome),
+                            },
+                            _ => Err(HostProblem::UnknownOutcome),
                         }
-                        _ => Err(HostProblem::UnknownOutcome),
-                    },
+                    }
                     Err(_) => Err(HostProblem::InfrastructureFailure),
                 }
             }
@@ -165,47 +626,55 @@ impl CobolProgram {
         ) {
             return Err(HostProblem::Malformed);
         }
-        self.ensure_call_protocol(parent)?;
         let store = self.store.get().ok_or(HostProblem::InfrastructureFailure)?;
         let key = identity(parent, effect)?;
         let fingerprint = fingerprint(parent, effect, program, payload)?;
         if let Some(record) = store
-            .get_provider_state(NAMESPACE, &key)
+            .get_provider_state(CALL_REPLAY_NAMESPACE, &key)
             .map_err(|_| HostProblem::InfrastructureFailure)?
         {
-            let result = previous(record, &fingerprint)?;
+            let result = previous(record, &fingerprint, parent)?;
             if payload.schema() == "mainframe-env.program.input@1" {
                 self.finish_run_unit(parent)?;
             }
             return Ok(result);
         }
+        self.ensure_call_protocol(parent)?;
         let prefix = if payload.schema() == "mainframe-env.cobol.call@1" {
             "online-call-execution"
         } else {
             "batch-installed-execution"
         };
         let mut receipt = Receipt {
-            schema_version: 1,
+            schema_version: 2,
+            replay_key: key.clone(),
             fingerprint,
             child_execution: format!("{prefix}-{key}"),
+            owner_execution: parent.execution_id.as_str().into(),
+            owner_run_unit: parent.run_unit_id.as_str().into(),
+            owner_principal: parent.principal.id().as_str().into(),
+            protocol_key: protocol_key(parent.run_unit_id.as_str()),
+            run_state_key: run_state_key(
+                parent.run_unit_id.as_str(),
+                parent.principal.id().as_str(),
+            ),
+            metadata_digest: String::new(),
+            completion_tick: None,
             reply: None,
         };
+        receipt.metadata_digest = receipt_metadata_digest(&receipt);
         let pending = ProviderStateRecord {
-            namespace: NAMESPACE.into(),
+            namespace: CALL_REPLAY_NAMESPACE.into(),
             key: key.clone(),
             version: 1,
             payload: serde_json::to_vec(&receipt)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
         };
         if let Err(problem) = store.put_provider_state(pending, None) {
-            if matches!(
-                problem,
-                mainframe_env_store_api::StoreError::Conflict
-                    | mainframe_env_store_api::StoreError::AlreadyExists
-            ) {
-                return match store.get_provider_state(NAMESPACE, &key) {
+            if matches!(problem, StoreError::Conflict | StoreError::AlreadyExists) {
+                return match store.get_provider_state(CALL_REPLAY_NAMESPACE, &key) {
                     Ok(Some(record)) => {
-                        let result = previous(record, &receipt.fingerprint)?;
+                        let result = previous(record, &receipt.fingerprint, parent)?;
                         if payload.schema() == "mainframe-env.program.input@1" {
                             self.finish_run_unit(parent)?;
                         }
@@ -238,10 +707,12 @@ impl CobolProgram {
             schema: result.schema().into(),
             bytes: result.bytes().to_vec(),
         });
+        receipt.completion_tick = Some(retention_observation_tick(self, parent)?);
+        receipt.metadata_digest = receipt_metadata_digest(&receipt);
         let payload = serde_json::to_vec(&receipt).map_err(|_| HostProblem::UnknownOutcome)?;
         writes.push(ProviderStateWrite {
             record: ProviderStateRecord {
-                namespace: NAMESPACE.into(),
+                namespace: CALL_REPLAY_NAMESPACE.into(),
                 key,
                 version: 2,
                 payload,
@@ -255,5 +726,13 @@ impl CobolProgram {
             self.finish_run_unit(parent)?;
         }
         Ok(result)
+    }
+}
+
+fn run_ended_problem() -> HostProblem {
+    HostProblem::Condition {
+        name: "COBOL-RUN-ENDED".into(),
+        response: -9,
+        response2: 0,
     }
 }

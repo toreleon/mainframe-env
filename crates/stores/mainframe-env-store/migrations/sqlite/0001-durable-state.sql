@@ -4,4 +4,4 @@ CREATE TABLE IF NOT EXISTS provider_state (
   version INTEGER NOT NULL CHECK(version > 0),
   payload BLOB NOT NULL,
   PRIMARY KEY(namespace, key)
-)
+);

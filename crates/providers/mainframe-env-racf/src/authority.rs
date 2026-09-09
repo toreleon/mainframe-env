@@ -7,6 +7,7 @@ use crate::model::{
     ResourceProfile, SafStatus, SecurityAuditRecord, SecurityDatabaseLimits, SegmentTemplate,
     connection_key, profile_key,
 };
+use crate::retention::{RacfRetentionForecast, RacfRetentionPolicy, RacfRetentionReceipt};
 use argon2::Argon2;
 use argon2::password_hash::{PasswordHasher, PasswordVerifier, phc::PasswordHash};
 use mainframe_env_execution_api::{CapabilityId, Invocation, InvocationLimits, PrincipalId};
@@ -15,7 +16,7 @@ use mainframe_env_host_api::{
     EnterpriseAuthorizer, EnterpriseResource, HostProblem, HostProvider, HostRequest, HostResult,
     ResourceName, SecretRef, SecurityDecision, SecurityRequest,
 };
-use mainframe_env_store_api::ProviderStateStore;
+use mainframe_env_store_api::{ProviderStateStore, RetentionObservation};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Deref;
@@ -328,6 +329,51 @@ impl RacfService {
     #[must_use]
     pub fn database(&self) -> &Arc<SecurityDatabase> {
         &self.database
+    }
+
+    /// Forecast RACF evidence eligibility and live/archive saturation.
+    pub fn retention_forecast(
+        &self,
+        policy: RacfRetentionPolicy,
+        supplied_tick: u64,
+    ) -> Result<RacfRetentionForecast, HostProblem> {
+        self.database.retention_forecast(policy, supplied_tick)
+    }
+
+    /// Forecast RACF evidence after validating dedicated legacy-age observations.
+    pub fn retention_forecast_with_observations(
+        &self,
+        policy: RacfRetentionPolicy,
+        supplied_tick: u64,
+        observations: &[RetentionObservation],
+    ) -> Result<RacfRetentionForecast, HostProblem> {
+        self.database
+            .retention_forecast_with_observations(policy, supplied_tick, observations)
+    }
+
+    /// Atomically archive old terminal RACF evidence before pruning live rows.
+    pub fn archive_and_prune(
+        &self,
+        policy: RacfRetentionPolicy,
+        supplied_tick: u64,
+    ) -> Result<RacfRetentionReceipt, HostProblem> {
+        self.database.archive_and_prune(policy, supplied_tick)
+    }
+
+    /// Atomically archive RACF evidence using provider-validated legacy-age observations.
+    pub fn archive_and_prune_with_observations(
+        &self,
+        policy: RacfRetentionPolicy,
+        supplied_tick: u64,
+        observations: &[(u64, RetentionObservation)],
+        expected_epoch: u64,
+    ) -> Result<RacfRetentionReceipt, HostProblem> {
+        self.database.archive_and_prune_with_observations(
+            policy,
+            supplied_tick,
+            observations,
+            expected_epoch,
+        )
     }
 
     pub fn install_manifest(
@@ -778,6 +824,7 @@ impl RacfService {
         let audit_class = (!class.is_empty() && class.len() <= self.limits.max_name_bytes)
             .then(|| class.to_ascii_uppercase());
         let principal = principal.as_str().to_string();
+        let observed_tick = self.database.retention_observation_tick(0)?;
         let ((decision, _audit_id), _) = self.database.mutate_retry(|snapshot| {
             let decision = crate::saf::evaluate_access(
                 snapshot,
@@ -791,6 +838,9 @@ impl RacfService {
             if snapshot.audits.len() >= self.limits.max_audits {
                 return Err(HostProblem::ResourceExhausted);
             }
+            let tick = snapshot
+                .observe_retention_tick(observed_tick)
+                .ok_or(HostProblem::ResourceExhausted)?;
             let audit_id = format!("AUDIT{:020}", snapshot.generation);
             snapshot.audits.push(SecurityAuditRecord {
                 id: audit_id.clone(),
@@ -805,7 +855,8 @@ impl RacfService {
                     "RESOURCE_DIGEST_FORMAT".into(),
                     AuditFieldValue::Text("mainframe-env.racf-authorize-resource@1".into()),
                 )]),
-                tick: 0,
+                tick,
+                retention_observed_tick: Some(tick),
             });
             Ok(((decision, audit_id), true))
         })?;
@@ -990,10 +1041,14 @@ impl RacfService {
 
     fn audit(&self, event: AuditEvent) -> Result<SecurityDecision, HostProblem> {
         let event = redact_audit(event, self.limits)?;
+        let observed_tick = self.database.retention_observation_tick(0)?;
         self.database.mutate(|snapshot| {
             if snapshot.audits.len() >= self.limits.max_audits {
                 return Err(HostProblem::ResourceExhausted);
             }
+            let tick = snapshot
+                .observe_retention_tick(observed_tick)
+                .ok_or(HostProblem::ResourceExhausted)?;
             let id = format!("AUDIT{:020}", snapshot.generation);
             snapshot.audits.push(SecurityAuditRecord {
                 id,
@@ -1022,7 +1077,8 @@ impl RacfService {
                         })
                         .collect(),
                 ),
-                tick: 0,
+                tick,
+                retention_observed_tick: Some(tick),
             });
             Ok(())
         })?;

@@ -70,7 +70,7 @@ and all 14 RACROUTE request types.
 
 SEC-506 local gates add one centralized fail-closed audit redactor and a bounded
 SMF type-80 projection, automatic migration of retained v1 provider records,
-rollback that leaves the v1 source intact for an older reader, startup
+rollback backed by exact bounded v1 rows embedded in the v2 migration record, startup
 reconciliation of intent/unknown-outcome transactions, and restart/replay
 coverage for every command and RACROUTE row. Corrupt migration input and
 corrupt v2 snapshots never publish partial authority state. Licensed IBM
@@ -98,3 +98,37 @@ authorization precedes credential resolution, closed ACEEs do not permanently
 block user deletion, and ACEE extraction is owner/auditor/SPECIAL scoped.
 Legacy namespace exhaustion and mixed-case secret-reference redaction fail
 closed before migration or public type-80 projection.
+
+The provider-owned retention planner uses the persisted monotonic RACF clock
+for direct authorization audits, command and RACROUTE evidence, recovery,
+forecasting, and pruning. It fully decodes the bounded `racf-database-v2`
+aggregate and emits exact standalone descriptors for audit, transaction, and
+recovery subrecords. Only terminal evidence with a trusted nonzero age is a
+candidate; every recovery dependency must itself be terminal and old before
+its transaction can move. Pre-clock tick-zero evidence preserves its original
+value and remains protected until an exact source-version/digest observation is
+recorded in the platform's dedicated observation authority.
+
+Offline maintenance uses `SecurityDatabase::open_existing_for_retention`,
+which strictly decodes an existing v2 aggregate without initializing an empty
+authority, advancing its clock, scrubbing data, migrating legacy namespaces,
+or reconciling recovery. A legacy-only RACF store is exposed as migration-pending:
+maintenance fully decodes and protects that target while continuing other target
+families, but never performs the migration implicitly. Normal startup atomically
+replaces the exact legacy rows with the v2 aggregate at full live row quota and
+retains their namespace, key, version, and payload inside the migration record.
+
+Archival no longer consumes a second live provider-state row. The provider
+builds an epoch-fenced plan which atomically CAS-replaces the RACF aggregate and
+writes the removed exact bytes to the store's dedicated, checksummed,
+row-and-byte-bounded archive authority. A stale epoch, archive/observation
+capacity failure, corrupt descriptor, or aggregate CAS conflict commits neither
+half. Forecast pressure includes the shared archive and observation row and byte
+headroom, so a full live provider-state table can still shrink when those
+dedicated authorities have space.
+
+Archives are retention evidence, not an RACF replay cache. After terminal
+evidence has outlived the stricter audit/idempotency lifetime and is pruned, its
+old transaction key denotes a new operation. Archive inspection and permanent
+deletion use the platform retention APIs and whole-batch rules described by the
+[durable retention contract](../../../docs/contracts/RETENTION-LIFECYCLE-V1.md).

@@ -241,9 +241,17 @@ pub(crate) fn execute(
     let ((outcome, replayed, status), generation) = service
         .database
         .mutate_retry(|snapshot| {
-            if parsed.descriptor.mutating()
-                && let Some(existing) = snapshot.transactions.get(context.idempotency_key())
-            {
+            let existing = parsed
+                .descriptor
+                .mutating()
+                .then(|| {
+                    service
+                        .database
+                        .transaction_for_replay(snapshot, context.idempotency_key())
+                })
+                .transpose()?
+                .flatten();
+            if let Some(existing) = existing.as_ref() {
                 if existing.actor != context.actor().as_str()
                     || require_active(snapshot, context).is_err()
                 {
@@ -2554,6 +2562,9 @@ fn append_transaction(
     if snapshot.transactions.len() >= 65_536 {
         return Err(HostProblem::ResourceExhausted);
     }
+    let terminal_tick = snapshot
+        .observe_retention_tick(context.tick())
+        .ok_or(HostProblem::ResourceExhausted)?;
     snapshot.transactions.insert(
         context.idempotency_key().into(),
         SecurityTransaction {
@@ -2573,6 +2584,7 @@ fn append_transaction(
             ),
             status,
             terminal_result: None,
+            terminal_tick: Some(terminal_tick),
         },
     );
     Ok(())
@@ -2589,6 +2601,9 @@ fn append_audit(
     if snapshot.audits.len() >= 65_536 {
         return Err(HostProblem::ResourceExhausted);
     }
+    let tick = snapshot
+        .observe_retention_tick(context.tick())
+        .ok_or(HostProblem::ResourceExhausted)?;
     let id = format!(
         "AUDIT{:020}{:06}",
         snapshot.generation,
@@ -2621,7 +2636,8 @@ fn append_audit(
                 ),
             ),
         ])),
-        tick: context.tick(),
+        tick,
+        retention_observed_tick: Some(tick),
     });
     Ok(())
 }

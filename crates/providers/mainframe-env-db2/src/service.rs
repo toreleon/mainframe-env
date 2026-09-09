@@ -20,10 +20,15 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, MutexGuard};
 
+use crate::retention::{
+    Db2ReplayOwnerKind, db2_pending_replay_matches, prepare_db2_replay, resolve_db2_replay,
+    validate_db2_recorded_result,
+};
+
 const STATE_NAMESPACE: &str = "db2-state";
 const STATE_KEY: &str = "catalog";
 const ROW_STORE_SCHEMA: &str = "mainframe-env.db2-row-store@1";
-const OBJECT_ROW_SCHEMA: &str = "mainframe-env.db2-object-row@1";
+pub(crate) const OBJECT_ROW_SCHEMA: &str = "mainframe-env.db2-object-row@1";
 const TABLE_NAMESPACE: &str = "db2-v1-table";
 const SCHEMA_NAMESPACE: &str = "db2-v1-schema";
 const INSTALLATION_NAMESPACE: &str = "db2-v1-installation";
@@ -33,7 +38,7 @@ const LEGACY_SNAPSHOT_NAMESPACE: &str = "db2-v1-legacy-snapshot";
 const PENDING_NAMESPACE: &str = "db2-v1-unit-of-work";
 const CURSOR_NAMESPACE: &str = "db2-v1-cursor";
 const CURSOR_DECLARATION_NAMESPACE: &str = "db2-v1-cursor-declaration";
-const REPLAY_NAMESPACE: &str = "db2-v1-replay";
+pub(crate) const REPLAY_NAMESPACE: &str = "db2-v1-replay";
 const MAX_RETAINED_CATALOG_GENERATIONS: usize = 64;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -96,7 +101,7 @@ struct Cursor {
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-enum ReplayDigestFormat {
+pub(crate) enum ReplayDigestFormat {
     #[default]
     #[serde(rename = "legacy-debug@0")]
     LegacyDebugV0,
@@ -105,15 +110,34 @@ enum ReplayDigestFormat {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-struct RecordedResult {
+#[serde(deny_unknown_fields)]
+pub(crate) struct RecordedResult {
     #[serde(default)]
-    request_digest_format: ReplayDigestFormat,
-    request_sha256: [u8; 32],
-    sqlcode: i32,
-    sqlstate: String,
-    message: String,
-    rows: Vec<Vec<Vec<u8>>>,
-    affected_rows: u64,
+    pub(crate) request_digest_format: ReplayDigestFormat,
+    pub(crate) request_sha256: [u8; 32],
+    #[serde(default)]
+    pub(crate) recorded_deadline_tick: u64,
+    #[serde(default)]
+    pub(crate) owner_execution: Option<String>,
+    #[serde(default)]
+    pub(crate) owner_run_unit: Option<String>,
+    #[serde(default)]
+    pub(crate) recorded_sequence: u64,
+    #[serde(default)]
+    pub(crate) resolution_tick: u64,
+    #[serde(default)]
+    pub(crate) owner_kind: Option<Db2ReplayOwnerKind>,
+    #[serde(default)]
+    pub(crate) outer_effect_key: Option<String>,
+    #[serde(default)]
+    pub(crate) result_sha256: [u8; 32],
+    #[serde(default)]
+    pub(crate) retention_binding_sha256: [u8; 32],
+    pub(crate) sqlcode: i32,
+    pub(crate) sqlstate: String,
+    pub(crate) message: String,
+    pub(crate) rows: Vec<Vec<Vec<u8>>>,
+    pub(crate) affected_rows: u64,
 }
 
 impl From<&Db2Result> for RecordedResult {
@@ -121,6 +145,15 @@ impl From<&Db2Result> for RecordedResult {
         Self {
             request_digest_format: ReplayDigestFormat::CanonicalHostV1,
             request_sha256: [0; 32],
+            recorded_deadline_tick: 0,
+            owner_execution: None,
+            owner_run_unit: None,
+            recorded_sequence: 0,
+            resolution_tick: 0,
+            owner_kind: None,
+            outer_effect_key: None,
+            result_sha256: [0; 32],
+            retention_binding_sha256: [0; 32],
             sqlcode: result.sqlcode,
             sqlstate: result.sqlstate.clone(),
             message: result.message.clone(),
@@ -131,7 +164,7 @@ impl From<&Db2Result> for RecordedResult {
 }
 
 impl RecordedResult {
-    fn result(&self) -> Db2Result {
+    pub(crate) fn result(&self) -> Db2Result {
         Db2Result {
             sqlcode: self.sqlcode,
             sqlstate: self.sqlstate.clone(),
@@ -230,11 +263,18 @@ struct DurableState {
     state: State,
 }
 
+/// Trusted durable logical-time source used to age newly persisted replay rows.
+pub trait Db2ReplayClock: Send + Sync {
+    /// Observe the current nonzero durable logical tick.
+    fn now_tick(&self) -> Result<u64, HostProblem>;
+}
+
 pub struct Db2Service {
     store: Arc<dyn ProviderStateStore>,
     limits: Db2Limits,
     durable: Mutex<DurableState>,
     authorizer: Option<Arc<dyn EnterpriseAuthorizer>>,
+    replay_clock: Option<Arc<dyn Db2ReplayClock>>,
 }
 
 impl Db2Service {
@@ -242,7 +282,16 @@ impl Db2Service {
         store: Arc<dyn ProviderStateStore>,
         limits: Db2Limits,
     ) -> Result<Arc<Self>, HostProblem> {
-        Self::open_inner(store, limits, None)
+        Self::open_inner(store, limits, None, None)
+    }
+
+    /// Open with a trusted durable clock so new replay rows become retention-eligible.
+    pub fn open_with_replay_clock(
+        store: Arc<dyn ProviderStateStore>,
+        limits: Db2Limits,
+        replay_clock: Arc<dyn Db2ReplayClock>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_inner(store, limits, None, Some(replay_clock))
     }
 
     pub fn open_authorized(
@@ -250,13 +299,24 @@ impl Db2Service {
         limits: Db2Limits,
         authorizer: Arc<dyn EnterpriseAuthorizer>,
     ) -> Result<Arc<Self>, HostProblem> {
-        Self::open_inner(store, limits, Some(authorizer))
+        Self::open_inner(store, limits, Some(authorizer), None)
+    }
+
+    /// Open with enterprise authorization and a trusted durable replay clock.
+    pub fn open_authorized_with_replay_clock(
+        store: Arc<dyn ProviderStateStore>,
+        limits: Db2Limits,
+        authorizer: Arc<dyn EnterpriseAuthorizer>,
+        replay_clock: Arc<dyn Db2ReplayClock>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_inner(store, limits, Some(authorizer), Some(replay_clock))
     }
 
     fn open_inner(
         store: Arc<dyn ProviderStateStore>,
         limits: Db2Limits,
         authorizer: Option<Arc<dyn EnterpriseAuthorizer>>,
+        replay_clock: Option<Arc<dyn Db2ReplayClock>>,
     ) -> Result<Arc<Self>, HostProblem> {
         let (state, versions) = load_or_migrate(&*store, limits)?;
         Ok(Arc::new(Self {
@@ -264,6 +324,7 @@ impl Db2Service {
             limits,
             durable: Mutex::new(DurableState { versions, state }),
             authorizer,
+            replay_clock,
         }))
     }
 
@@ -380,29 +441,57 @@ impl Db2Service {
         invocation: &Invocation,
         request: &Db2Request,
     ) -> Result<Db2Result, HostProblem> {
+        self.execute_at(invocation, request, invocation.deadline_tick)
+    }
+
+    fn execute_at(
+        &self,
+        invocation: &Invocation,
+        request: &Db2Request,
+        resolution_lower_bound: u64,
+    ) -> Result<Db2Result, HostProblem> {
+        if resolution_lower_bound == 0 {
+            return Err(HostProblem::Malformed);
+        }
         let mut durable = self.lock()?;
+        refresh_replay(&*self.store, self.limits, &mut durable)?;
         if let Some(authorizer) = &self.authorizer {
             for resource in db2_resources(&durable.state, invocation, request, self.limits)? {
                 authorizer.authorize(invocation.principal.id(), &resource)?;
             }
         }
+        refresh_replay(&*self.store, self.limits, &mut durable)?;
         let request_sha256 = request_digest(request)?;
         let replay_key = request
             .mutation
             .as_ref()
             .map(|mutation| mutation.idempotency_key.as_str());
+        let sequence = request.mutation.as_ref().map(|mutation| mutation.sequence);
         if let Some(key) = replay_key
             && let Some(recorded) = durable.state.replay.get(key)
         {
-            return match recorded.request_digest_format {
-                ReplayDigestFormat::LegacyDebugV0 => Err(HostProblem::UnknownOutcome),
+            match recorded.request_digest_format {
+                ReplayDigestFormat::LegacyDebugV0 => return Err(HostProblem::UnknownOutcome),
                 ReplayDigestFormat::CanonicalHostV1
                     if recorded.request_sha256 == request_sha256 =>
                 {
-                    Ok(recorded.result())
+                    let result = recorded.result();
+                    let pending = db2_pending_replay_matches(
+                        recorded,
+                        key,
+                        invocation,
+                        sequence.ok_or(HostProblem::MissingIdempotency)?,
+                    )?;
+                    if pending {
+                        self.finalize_replay_metadata(&mut durable, key, resolution_lower_bound)
+                            .map_err(|_| HostProblem::UnknownOutcome)?;
+                    }
+                    return Ok(result);
                 }
-                ReplayDigestFormat::CanonicalHostV1 => Err(HostProblem::IdempotencyConflict),
-            };
+                ReplayDigestFormat::CanonicalHostV1 => {
+                    return Err(HostProblem::IdempotencyConflict);
+                }
+            }
         }
         let mut next = durable.state.scoped_snapshot();
         let result = apply_request(&mut next, invocation, request, self.limits)?;
@@ -414,12 +503,55 @@ impl Db2Service {
                 }
                 let mut recorded = RecordedResult::from(&result);
                 recorded.request_sha256 = request_sha256;
+                prepare_db2_replay(
+                    &mut recorded,
+                    key,
+                    invocation,
+                    sequence.ok_or(HostProblem::MissingIdempotency)?,
+                    self.limits,
+                )?;
                 next.replay.insert(key.to_string(), Arc::new(recorded));
             }
             validate_state(&next, self.limits)?;
             self.persist(&mut durable, next)?;
+            if request.operation.is_mutating() {
+                self.finalize_replay_metadata(
+                    &mut durable,
+                    replay_key.ok_or(HostProblem::MissingIdempotency)?,
+                    resolution_lower_bound,
+                )
+                .map_err(|_| HostProblem::UnknownOutcome)?;
+            }
         }
         Ok(result)
+    }
+
+    fn finalize_replay_metadata(
+        &self,
+        durable: &mut DurableState,
+        key: &str,
+        resolution_lower_bound: u64,
+    ) -> Result<(), HostProblem> {
+        let Some(clock) = &self.replay_clock else {
+            return Ok(());
+        };
+        let observed_tick = clock.now_tick()?;
+        if observed_tick == 0 {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let mut next = durable.state.scoped_snapshot();
+        let recorded = next
+            .replay
+            .get_mut(key)
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        resolve_db2_replay(
+            Arc::make_mut(recorded),
+            key,
+            observed_tick,
+            resolution_lower_bound,
+        )?;
+        validate_state(&next, self.limits)?;
+        self.persist(durable, next)
     }
 
     /// Bind a retained pre-canonical replay receipt to a reviewed typed request.
@@ -443,6 +575,7 @@ impl Db2Service {
         }
         let canonical = request_digest(request)?;
         let mut durable = self.lock()?;
+        refresh_replay(&*self.store, self.limits, &mut durable)?;
         let retained = durable
             .state
             .replay
@@ -516,6 +649,33 @@ impl Db2Service {
             .lock()
             .map_err(|_| HostProblem::InfrastructureFailure)
     }
+}
+
+fn refresh_replay(
+    store: &dyn ProviderStateStore,
+    limits: Db2Limits,
+    durable: &mut DurableState,
+) -> Result<(), HostProblem> {
+    let mut replay_versions = RowVersions::new();
+    let replay: BTreeMap<String, Arc<RecordedResult>> = load_row_map(
+        store,
+        REPLAY_NAMESPACE,
+        limits.max_replays,
+        limits,
+        &mut replay_versions,
+    )?;
+    if replay
+        .iter()
+        .any(|(key, recorded)| validate_db2_recorded_result(key, recorded, limits).is_err())
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    durable
+        .versions
+        .retain(|(namespace, _), _| namespace != REPLAY_NAMESPACE);
+    durable.versions.extend(replay_versions);
+    durable.state.replay = replay;
+    Ok(())
 }
 
 struct RowChange {
@@ -3035,6 +3195,10 @@ fn validate_state(state: &State, limits: Db2Limits) -> Result<(), HostProblem> {
             .values()
             .any(|cursor| cursor.index > cursor.rows.len())
         || state.replay.keys().any(String::is_empty)
+        || state
+            .replay
+            .iter()
+            .any(|(key, recorded)| validate_db2_recorded_result(key, recorded, limits).is_err())
         || state.table_provenance.keys().collect::<BTreeSet<_>>()
             != state.tables.keys().collect::<BTreeSet<_>>()
         || state.legacy_snapshots.len() > limits.max_tables
@@ -3130,10 +3294,11 @@ impl HostProvider for Db2Provider {
 
     fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
         let sequence = effect.sequence;
+        let resolution_tick = effect.deadline_tick.max(invocation.deadline_tick);
         let outcome = match effect.request {
             HostRequest::Db2(request) => self
                 .service
-                .execute(invocation, &request)
+                .execute_at(invocation, &request, resolution_tick)
                 .map(HostResult::Db2),
             _ => Err(HostProblem::Malformed),
         };
@@ -3175,7 +3340,12 @@ mod tests {
     };
     use mainframe_env_host_api::Mutation;
     use mainframe_env_store::{MemoryStore, SqliteStateStore};
+    use mainframe_env_store_api::{
+        ExecutionRecord, ExecutionState, ExecutionStore, RetentionPolicy, RetentionRequest,
+        RetentionStore, RetentionTarget,
+    };
     use std::collections::BTreeSet;
+    use std::sync::atomic::{AtomicU8, Ordering as AtomicOrdering};
 
     #[derive(Default)]
     struct DenyEnterprise {
@@ -3190,6 +3360,96 @@ mod tests {
         ) -> Result<(), HostProblem> {
             self.seen.lock().unwrap().push(resource.clone());
             Err(HostProblem::Unauthorized)
+        }
+    }
+
+    fn finish_invocation(store: &MemoryStore, invocation: &Invocation) {
+        store
+            .create_execution(ExecutionRecord {
+                execution_id: invocation.execution_id.clone(),
+                run_unit_id: invocation.run_unit_id.clone(),
+                selector: invocation.selector.clone(),
+                artifact: invocation.artifact.clone(),
+                principal: invocation.principal.id().clone(),
+                state: ExecutionState::Admitted,
+                attempt: invocation.attempt,
+                version: 1,
+                owner_lease: None,
+                lease_expiry_tick: None,
+                terminal_tick: None,
+            })
+            .unwrap();
+        let queued = store
+            .transition_execution(&invocation.execution_id, 1, ExecutionState::Queued, 1)
+            .unwrap();
+        let running = store
+            .transition_execution(
+                &invocation.execution_id,
+                queued.version,
+                ExecutionState::Running,
+                2,
+            )
+            .unwrap();
+        let completing = store
+            .transition_execution(
+                &invocation.execution_id,
+                running.version,
+                ExecutionState::Completing,
+                3,
+            )
+            .unwrap();
+        store
+            .transition_execution(
+                &invocation.execution_id,
+                completing.version,
+                ExecutionState::Completed,
+                4,
+            )
+            .unwrap();
+    }
+
+    struct PersistAwareReplayClock {
+        store: Arc<dyn ProviderStateStore>,
+        key: String,
+        tick: u64,
+        fault_stage: AtomicU8,
+    }
+
+    impl Db2ReplayClock for PersistAwareReplayClock {
+        fn now_tick(&self) -> Result<u64, HostProblem> {
+            match self.fault_stage.load(AtomicOrdering::SeqCst) {
+                1 => {
+                    self.fault_stage.store(2, AtomicOrdering::SeqCst);
+                    return Err(HostProblem::InfrastructureFailure);
+                }
+                2 => {
+                    self.fault_stage.store(0, AtomicOrdering::SeqCst);
+                    let mut row = self
+                        .store
+                        .get_provider_state(REPLAY_NAMESPACE, &self.key)
+                        .map_err(store_error)?
+                        .ok_or(HostProblem::InfrastructureFailure)?;
+                    let expected = row.version;
+                    row.version = row
+                        .version
+                        .checked_add(1)
+                        .ok_or(HostProblem::ResourceExhausted)?;
+                    self.store
+                        .put_provider_state(row, Some(expected))
+                        .map_err(store_error)?;
+                }
+                _ => {}
+            }
+            let row = self
+                .store
+                .get_provider_state(REPLAY_NAMESPACE, &self.key)
+                .map_err(store_error)?
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            let value: serde_json::Value = serde_json::from_slice(&row.payload)
+                .map_err(|_| HostProblem::InfrastructureFailure)?;
+            assert_eq!(value["value"]["resolution_tick"], 0);
+            assert!(value["value"]["owner_execution"].is_string());
+            Ok(self.tick)
         }
     }
 
@@ -3294,6 +3554,19 @@ mod tests {
         let mut state: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
         let replay = state["value"].as_object_mut().unwrap();
         replay.remove("request_digest_format");
+        for field in [
+            "recorded_deadline_tick",
+            "owner_execution",
+            "owner_run_unit",
+            "recorded_sequence",
+            "resolution_tick",
+            "owner_kind",
+            "outer_effect_key",
+            "result_sha256",
+            "retention_binding_sha256",
+        ] {
+            replay.remove(field);
+        }
         replay.insert("request_sha256".into(), serde_json::json!(digest));
         let version = row.version;
         store
@@ -3306,6 +3579,153 @@ mod tests {
                 Some(version),
             )
             .unwrap();
+    }
+
+    #[test]
+    fn external_replay_prune_refreshes_live_cache_before_replay_and_capacity() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let limits = Db2Limits {
+            max_replays: 1,
+            ..Db2Limits::default()
+        };
+        let first = Db2Service::open(store.clone(), limits).unwrap();
+        first.install_catalog(installed_catalog(1)).unwrap();
+        let invocation = invocation("refresh-db2");
+        let old = request(
+            Db2Operation::Insert,
+            801,
+            "INSERT INTO APP.CODE",
+            BTreeMap::from([
+                ("CODE".into(), variable("81")),
+                ("DESCRIPTION".into(), varchar_variable("OLD")),
+            ]),
+        );
+        assert_eq!(first.execute(&invocation, &old).unwrap().sqlcode, 0);
+
+        let second = Db2Service::open(store.clone(), limits).unwrap();
+        let old_key = old.mutation.as_ref().unwrap().idempotency_key.as_str();
+        let old_row = store
+            .get_provider_state(REPLAY_NAMESPACE, old_key)
+            .unwrap()
+            .unwrap();
+        store
+            .delete_provider_state(REPLAY_NAMESPACE, old_key, old_row.version)
+            .unwrap();
+
+        let fresh = request(
+            Db2Operation::Insert,
+            802,
+            "INSERT INTO APP.CODE",
+            BTreeMap::from([
+                ("CODE".into(), variable("82")),
+                ("DESCRIPTION".into(), varchar_variable("FRESH")),
+            ]),
+        );
+        assert_eq!(second.execute(&invocation, &fresh).unwrap().sqlcode, 0);
+
+        let fresh_key = fresh.mutation.as_ref().unwrap().idempotency_key.as_str();
+        let fresh_row = store
+            .get_provider_state(REPLAY_NAMESPACE, fresh_key)
+            .unwrap()
+            .unwrap();
+        store
+            .delete_provider_state(REPLAY_NAMESPACE, fresh_key, fresh_row.version)
+            .unwrap();
+        let redispatched = second.execute(&invocation, &old).unwrap();
+        assert_eq!(redispatched.sqlcode, -803);
+        assert_eq!(redispatched.sqlstate, "23505");
+
+        assert_eq!(first.pending_units().unwrap(), 1);
+    }
+
+    #[test]
+    fn delayed_resolution_is_observed_after_protected_replay_persistence() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let invocation = invocation("delayed-db2");
+        let request = request(
+            Db2Operation::Insert,
+            803,
+            "INSERT INTO APP.CODE",
+            BTreeMap::from([
+                ("CODE".into(), variable("83")),
+                ("DESCRIPTION".into(), varchar_variable("DELAYED")),
+            ]),
+        );
+        let key = request
+            .mutation
+            .as_ref()
+            .unwrap()
+            .idempotency_key
+            .as_str()
+            .to_string();
+        let clock = Arc::new(PersistAwareReplayClock {
+            store: store.clone(),
+            key: key.clone(),
+            tick: 20_000,
+            fault_stage: AtomicU8::new(0),
+        });
+        let service =
+            Db2Service::open_with_replay_clock(store.clone(), Db2Limits::default(), clock).unwrap();
+        service.install_catalog(installed_catalog(1)).unwrap();
+        service.execute(&invocation, &request).unwrap();
+
+        let row = store
+            .get_provider_state(REPLAY_NAMESPACE, &key)
+            .unwrap()
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        assert_eq!(value["value"]["recorded_deadline_tick"], 10_000);
+        assert_eq!(value["value"]["resolution_tick"], 20_000);
+        assert_eq!(
+            value["value"]["owner_execution"],
+            invocation.execution_id.as_str()
+        );
+    }
+
+    #[test]
+    fn post_commit_clock_and_cas_failures_are_unknown_then_retry_recovers() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let invocation = invocation("fault-db2");
+        let request = request(
+            Db2Operation::Insert,
+            804,
+            "INSERT INTO APP.CODE",
+            BTreeMap::from([
+                ("CODE".into(), variable("84")),
+                ("DESCRIPTION".into(), varchar_variable("FAULT")),
+            ]),
+        );
+        let key = request
+            .mutation
+            .as_ref()
+            .unwrap()
+            .idempotency_key
+            .as_str()
+            .to_string();
+        let clock = Arc::new(PersistAwareReplayClock {
+            store: store.clone(),
+            key: key.clone(),
+            tick: 20_000,
+            fault_stage: AtomicU8::new(1),
+        });
+        let service =
+            Db2Service::open_with_replay_clock(store.clone(), Db2Limits::default(), clock).unwrap();
+        service.install_catalog(installed_catalog(1)).unwrap();
+        assert_eq!(
+            service.execute(&invocation, &request),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(
+            service.execute(&invocation, &request),
+            Err(HostProblem::UnknownOutcome)
+        );
+        assert_eq!(service.execute(&invocation, &request).unwrap().sqlcode, 0);
+        let row = store
+            .get_provider_state(REPLAY_NAMESPACE, &key)
+            .unwrap()
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&row.payload).unwrap();
+        assert_eq!(value["value"]["resolution_tick"], 20_000);
     }
 
     fn variable(value: &str) -> Db2HostVariable {
@@ -4923,5 +5343,103 @@ mod tests {
             )
             .is_ok()
         );
+    }
+
+    #[test]
+    fn replay_retention_preserves_the_live_idempotency_window() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = Db2Service::open(
+            store.clone(),
+            Db2Limits {
+                max_replays: 2,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        service.install_catalog(installed_catalog(113)).unwrap();
+        let mut expired_invocation = invocation("expired-replay");
+        expired_invocation.deadline_tick = 10;
+        let expired = request(
+            Db2Operation::Insert,
+            981,
+            "INSERT INTO APP.CODE",
+            BTreeMap::from([
+                ("CODE".into(), variable("81")),
+                ("DESCRIPTION".into(), varchar_variable("EXPIRED")),
+            ]),
+        );
+        service.execute(&expired_invocation, &expired).unwrap();
+        let mut live_invocation = invocation("live-replay");
+        live_invocation.deadline_tick = 95;
+        let live = request(
+            Db2Operation::Insert,
+            982,
+            "INSERT INTO APP.CODE",
+            BTreeMap::from([
+                ("CODE".into(), variable("82")),
+                ("DESCRIPTION".into(), varchar_variable("LIVE")),
+            ]),
+        );
+        let live_result = service.execute(&live_invocation, &live).unwrap();
+        finish_invocation(store.as_ref(), &expired_invocation);
+        finish_invocation(store.as_ref(), &live_invocation);
+        let expired_key = expired.mutation.as_ref().unwrap().idempotency_key.clone();
+        let live_key = live.mutation.as_ref().unwrap().idempotency_key.clone();
+        let raw_retention = store.archive_and_prune(
+            retention_policy(),
+            RetentionRequest {
+                target: RetentionTarget::Db2Replay,
+                now_tick: 100,
+                max_records: 8,
+            },
+        );
+        assert_eq!(raw_retention, Err(StoreError::InvalidTransition));
+        if raw_retention.is_err() {
+            return;
+        }
+        assert!(
+            store
+                .get_provider_state(REPLAY_NAMESPACE, expired_key.as_str())
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            store
+                .get_provider_state(REPLAY_NAMESPACE, live_key.as_str())
+                .unwrap()
+                .is_some()
+        );
+        assert_eq!(service.execute(&live_invocation, &live), Ok(live_result));
+        let fresh = request(
+            Db2Operation::Insert,
+            983,
+            "INSERT INTO APP.CODE",
+            BTreeMap::from([
+                ("CODE".into(), variable("83")),
+                ("DESCRIPTION".into(), varchar_variable("FRESH")),
+            ]),
+        );
+        service
+            .execute(&invocation("fresh-replay"), &fresh)
+            .unwrap();
+        assert_eq!(
+            store
+                .list_provider_state(REPLAY_NAMESPACE, 3)
+                .unwrap()
+                .len(),
+            2
+        );
+    }
+
+    fn retention_policy() -> RetentionPolicy {
+        RetentionPolicy {
+            lifecycle_ticks: 10,
+            idempotency_ticks: 10,
+            audit_ticks: 20,
+            archive_ticks: 50,
+            low_watermark_percent: 70,
+            high_watermark_percent: 85,
+            max_batch: 8,
+        }
     }
 }

@@ -117,6 +117,7 @@ class SelectionTests(unittest.TestCase):
             'postgres-atomic-invariants',
             'postgres-work-leases',
             'postgres-storage-profile',
+            'postgres-retention',
             'postgres-durable',
             'postgres-carddemo-restart',
         ])

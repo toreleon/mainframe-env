@@ -12,5 +12,9 @@ shared artifact objects; incompatible limits or count drift fail on open. Local
 artifacts publish through an atomic no-replace link after file sync and sync the
 containing directory. Public adapters include `MemoryStore`,
 `SqliteStateStore`, `PostgresStateStore`, `PostgresArtifactStore`, and
-`LocalArtifactStore`. Verify with `cargo test -p mainframe-env-store` and the
-opt-in PostgreSQL storage-profile contract.
+`LocalArtifactStore`. Memory, SQLite, and PostgreSQL implement the same bounded
+retention policy: terminal lifecycle/outbox state, resolved effects, and expired
+Db2/IMS/MQ replay rows move atomically into content-verified archive batches;
+live retries, unresolved effects, and checkpoint-owned rows remain protected.
+Verify with `cargo test -p mainframe-env-store` and the opt-in PostgreSQL
+storage-profile and retention contracts.

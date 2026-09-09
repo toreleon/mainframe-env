@@ -8,7 +8,11 @@ use mainframe_env_store_api::{
 use sha2::{Digest, Sha256};
 
 pub(crate) fn new_execution(record: &ExecutionRecord) -> Result<(), StoreError> {
-    if record.version != 1 || record.attempt == 0 || record.state != ExecutionState::Admitted {
+    if record.version != 1
+        || record.attempt == 0
+        || record.state != ExecutionState::Admitted
+        || record.terminal_tick.is_some()
+    {
         Err(StoreError::InvalidTransition)
     } else {
         Ok(())
@@ -29,6 +33,7 @@ pub(crate) fn new_outbox(record: &OutboxRecord) -> Result<(), StoreError> {
         || record.sequence == 0
         || record.attempt != 0
         || record.delivered
+        || record.delivered_tick.is_some()
         || record.version != 1
     {
         Err(StoreError::InvalidTransition)
@@ -84,16 +89,24 @@ pub(crate) fn effect(record: &EffectRecord) -> Result<(), StoreError> {
                 || lease.epoch == 0
                 || lease.expires_tick <= record.intent.created_tick
         })
+        || record
+            .resolved_tick
+            .is_some_and(|tick| tick == 0 || tick < record.intent.created_tick)
+        || (record.digest_format == mainframe_env_store_api::EffectDigestFormat::LegacyDebug
+            && record.resolved_tick.is_some())
     {
         return Err(StoreError::InvalidTransition);
     }
     match record.state {
-        EffectState::Intent if record.result_digest.is_none() => Ok(()),
-        EffectState::Completed | EffectState::Failed | EffectState::UnknownOutcome
-            if record.result_digest.is_some() =>
+        EffectState::Intent if record.result_digest.is_none() && record.resolved_tick.is_none() => {
+            Ok(())
+        }
+        EffectState::UnknownOutcome
+            if record.result_digest.is_some() && record.resolved_tick.is_none() =>
         {
             Ok(())
         }
+        EffectState::Completed | EffectState::Failed if record.result_digest.is_some() => Ok(()),
         _ => Err(StoreError::InvalidTransition),
     }
 }

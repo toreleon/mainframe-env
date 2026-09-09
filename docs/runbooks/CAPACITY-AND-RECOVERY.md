@@ -63,3 +63,51 @@ or releases quota with its data mutation. All nodes must use identical limits;
 startup rejects limit drift, over-capacity legacy rows, or a quota/count
 mismatch. Drain old binaries before the first quota-aware startup because they
 do not maintain these reservations.
+
+## Retention and saturation
+
+The configured retention policy has three distinct lifetimes: terminal
+lifecycle/outbox history, mutation idempotency receipts, and retained archive
+batches. Do not set them from storage pressure alone. The idempotency lifetime
+must exceed every supported retry window; lifecycle retention must exceed
+checkpoint and incident-recovery needs; archive retention must exceed the
+audit/backup recovery horizon.
+
+Use `ProductServer::operator_retention_forecast` from an authenticated embedding
+control plane or the standalone binary's offline `retention forecast` command.
+Alert at the configured low watermark and start bounded archive batches before
+the high watermark. Forecasts report source, archive, and conservative
+observation headroom; PostgreSQL source usage includes unrelated namespaces in
+the shared quota. A full live store can compact an eligible multi-row batch on
+its net row delta because archives and observations have dedicated bounded
+authorities, but operators should act before saturation.
+
+Run `operator_archive_and_prune` in `RetentionTarget::ALL` order, or use one
+offline `retention maintain` pass, which uses that frozen provider-first order
+and deletes only whole archive batches past `archive_ticks`, cumulatively
+bounded by source rows. Inspect every returned archive identifier and retain
+the machine-readable receipts. If the oldest historical archive alone exceeds
+the lowered bound, inspect the reported content-addressed ID and rerun with
+`--authorize-oversized-archive EXACT_ID`; a missing, wrong, stale, or
+unnecessary ID deletes nothing. Corrupt batches fail closed and require
+forensic repair. Never manually delete active provider-state rows or archive
+manifests.
+
+Maintenance accepts only durable SQLite and PostgreSQL profiles (not Memory or
+in-memory SQLite) and opens only the migrated state store plus the shared
+store-only planner. It does not open Product, providers, artifact/package
+authorities, recovery caches, a listener, or workers. Drain all writers first;
+bounded jittered conflict retries do not
+guarantee progress under online write traffic. If more eligible rows remain,
+run another bounded pass. See the [operations runbook](OPERATIONS.md) for the
+exact commands, backup gate, partial-pass behavior, and restart procedure.
+
+Retention will not remove pending notifications, stale effect intents, unknown
+outcomes, non-terminal executions, checkpoint-owned state, or legacy rows with
+no trustworthy age. If those rows cause saturation, resolve the owning recovery
+workflow rather than weakening the watermark. Use the bounded `retention
+legacy` listing and explicit CAS-fenced `retention reconcile` command only after
+verifying the exact row's provenance; the command never guesses an execution
+owner. See the
+[retention contract](../contracts/RETENTION-LIFECYCLE-V1.md) for exact
+eligibility and concurrency semantics.

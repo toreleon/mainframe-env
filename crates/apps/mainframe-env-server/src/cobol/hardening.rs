@@ -599,6 +599,7 @@ fn queued_control_work(inv: &Invocation, id: &str) -> mainframe_env_store_api::W
         lease_epoch: 0,
         lease_expiry_tick: None,
         heartbeat_tick: None,
+        terminal_tick: None,
         checkpoint_id: None,
         effect_sequence: 0,
         payload: vec![],

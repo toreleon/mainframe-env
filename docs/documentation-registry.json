@@ -28,6 +28,7 @@
     "docs/contracts/DURABLE-STORAGE-PROFILE.md",
     "docs/contracts/EFFECT-CANONICAL-V1.md",
     "docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md",
+    "docs/contracts/RETENTION-LIFECYCLE-V1.md",
     "docs/contracts/RELEASE-BUILD-V1.md",
     "docs/decisions/0001-technology-stack.md",
     "docs/decisions/0002-deterministic-core.md",
@@ -67,6 +68,7 @@
         {"label": "Durable storage profile", "path": "docs/contracts/DURABLE-STORAGE-PROFILE.md"},
         {"label": "Canonical effect encoding", "path": "docs/contracts/EFFECT-CANONICAL-V1.md"},
         {"label": "Provider object-row persistence", "path": "docs/contracts/PROVIDER-ROW-PERSISTENCE-V1.md"},
+        {"label": "Durable retention lifecycle", "path": "docs/contracts/RETENTION-LIFECYCLE-V1.md"},
         {"label": "Target release build type", "path": "docs/contracts/RELEASE-BUILD-V1.md"},
         {"label": "Release builder security model", "path": "docs/architecture/RELEASE-BUILDER.md"}
       ]

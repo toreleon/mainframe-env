@@ -433,6 +433,7 @@ impl ExecutionCoordinator {
                         },
                         state: EffectState::Intent,
                         result_digest: None,
+                        resolved_tick: None,
                     });
                     if record_step(
                         &mut journal,
@@ -457,12 +458,21 @@ impl ExecutionCoordinator {
                         Ok(control) => control,
                         Err(outcome) => return outcome,
                     };
+                    let dispatch_deadline = invocation.deadline_tick.min(effect.deadline_tick);
                     let audited = host.invoke(
                         invocation,
                         control.now_tick,
                         control.cancellation_requested,
                         effect,
                     );
+                    // Dispatch has already happened. Sample the clock again before recording
+                    // completion so a slow synchronous provider receives its full retention
+                    // lifetime. A failed or regressed observation must not discard the result or
+                    // manufacture an early age; the committed result remains conservatively
+                    // unaged and therefore ineligible for retention until reconciliation.
+                    let post_dispatch_control = observe()
+                        .ok()
+                        .filter(|observed| observed.now_tick >= control.now_tick);
                     let (result, audit) = audited.into_transaction_parts();
                     let result_digest = match canonical_result_digest(&result.outcome) {
                         Ok(digest) => digest,
@@ -481,6 +491,11 @@ impl ExecutionCoordinator {
                             Err(_) => EffectState::Failed,
                         };
                         record.result_digest = Some(result_digest);
+                        record.resolved_tick =
+                            matches!(record.state, EffectState::Completed | EffectState::Failed)
+                                .then(|| post_dispatch_control.map(|observed| observed.now_tick))
+                                .flatten()
+                                .filter(|tick| *tick != 0);
                         record
                     });
                     if record_audited_step(
@@ -520,6 +535,29 @@ impl ExecutionCoordinator {
                             FailureCategory::UnknownOutcome,
                             "host outcome unknown",
                         ));
+                    }
+                    let Some(observed) = post_dispatch_control else {
+                        let _ = record_step(
+                            &mut journal,
+                            Some(ExecutionState::Failed),
+                            LifecycleEventKind::Failed,
+                            None,
+                            None,
+                        );
+                        return infrastructure_failure(
+                            "post-dispatch execution clock unavailable or regressed",
+                        );
+                    };
+                    let previous_control = control;
+                    control = observed;
+                    if let Err(outcome) = check_control(
+                        control,
+                        Some(previous_control),
+                        invocation,
+                        dispatch_deadline,
+                        &mut journal,
+                    ) {
+                        return outcome;
                     }
                     resume = MachineResume::HostResult(result);
                 }
@@ -780,6 +818,7 @@ impl JournalCursor {
                 version: 1,
                 owner_lease: None,
                 lease_expiry_tick: None,
+                terminal_tick: None,
             },
             event,
             notification,
@@ -843,6 +882,7 @@ fn notification(event: &LifecycleEvent) -> OutboxRecord {
         payload: lifecycle_payload(&event.kind),
         attempt: 0,
         delivered: false,
+        delivered_tick: None,
         version: 1,
     }
 }
@@ -1010,6 +1050,7 @@ mod tests {
         CapabilityDescriptor, HostLimits, HostProvider, HostRequest, HostResult, RegistrySnapshot,
         StateRequest,
     };
+    use mainframe_env_store::MemoryStore;
     use std::collections::{BTreeMap, BTreeSet};
     use std::sync::Mutex;
 
@@ -1494,6 +1535,45 @@ mod tests {
             assert_eq!(records[0].principal, *invocation.principal.id());
             assert_eq!(records[0].capability.as_str(), "host.state.read");
         }
+    }
+
+    #[test]
+    fn post_dispatch_tick_ages_the_effect_without_rewriting_the_dispatch_audit_tick() {
+        let invocation = audit_invocation(true);
+        let key = IdempotencyKey::new("post-dispatch-effect", InvocationLimits::default()).unwrap();
+        let mut request = audit_request(&invocation);
+        request.idempotency_key = Some(key.clone());
+        let store: Arc<dyn PlatformStore> = Arc::new(MemoryStore::new(Default::default()));
+        let coordinator = ExecutionCoordinator::durable(
+            audited_host(Ok(HostResult::State {
+                value: Some(vec![1]),
+                version: 1,
+            })),
+            store.clone(),
+            CoordinatorLimits::default(),
+        );
+        let mut observations = 0;
+        let outcome =
+            coordinator.execute_with_control(&mut OneHostCall(Some(request)), &invocation, || {
+                observations += 1;
+                Ok(ExecutionControl {
+                    now_tick: if observations <= 3 { 10 } else { 90 },
+                    cancellation_requested: false,
+                })
+            });
+        assert!(matches!(outcome, ExecutionOutcome::Completed(_)));
+        assert_eq!(store.effect(&key).unwrap().unwrap().resolved_tick, Some(90));
+        let result_event = store
+            .events(&invocation.execution_id, 1, 16)
+            .unwrap()
+            .into_iter()
+            .find(|event| matches!(event.kind, LifecycleEventKind::EffectResult { sequence: 1 }))
+            .unwrap();
+        assert_eq!(result_event.tick, 10);
+        assert_eq!(
+            store.audit_records(&invocation.execution_id, 1, 8).unwrap()[0].observed_tick,
+            10
+        );
     }
 
     #[test]

@@ -29,7 +29,7 @@ def check(root: Path = ROOT) -> None:
     require("job_capabilities(&jcl)" not in product, "raw JCL still controls grants")
     for service in ("Db2Service", "ImsService", "MqService"):
         require(
-            f"{service}::open_authorized(" in product,
+            f"{service}::open_authorized_with_replay_clock(" in product,
             f"production composition bypasses {service} resource authorization",
         )
 

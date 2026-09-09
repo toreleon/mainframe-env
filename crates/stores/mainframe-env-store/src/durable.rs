@@ -16,6 +16,17 @@ use mainframe_env_store_api::{
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
+pub(crate) const AUDIT_NAMESPACE: &str = "durable-audit-v1";
+
+pub(crate) fn audit_storage_key(execution_id: &ExecutionId, suffix: &str) -> String {
+    format!(
+        "{:03}:{}:{}",
+        execution_id.as_str().len(),
+        execution_id,
+        suffix
+    )
+}
+
 macro_rules! durable_implementations {
     ($store:ty) => {
         impl ExecutionStore for $store {
@@ -47,6 +58,7 @@ macro_rules! durable_implementations {
                 id: &ExecutionId,
                 expected_version: u64,
                 next: ExecutionState,
+                now_tick: u64,
             ) -> Result<ExecutionRecord, StoreError> {
                 let current = self.get_execution(id)?.ok_or(StoreError::NotFound)?;
                 if current.version != expected_version {
@@ -57,6 +69,10 @@ macro_rules! durable_implementations {
                 }
                 let mut updated = current;
                 updated.state = next;
+                updated.terminal_tick = next
+                    .terminal()
+                    .then_some(now_tick)
+                    .filter(|tick| *tick != 0);
                 updated.version = updated.version.checked_add(1).ok_or(StoreError::Conflict)?;
                 self.put_provider_state(
                     state_record(
@@ -149,6 +165,7 @@ macro_rules! durable_implementations {
                     || work.lease_id.is_some()
                     || work.lease_expiry_tick.is_some()
                     || work.heartbeat_tick.is_some()
+                    || work.terminal_tick.is_some()
                 {
                     return Err(StoreError::InvalidTransition);
                 }
@@ -203,6 +220,11 @@ macro_rules! durable_implementations {
                             } else {
                                 WorkState::Queued
                             };
+                            work.terminal_tick = work
+                                .state
+                                .terminal()
+                                .then_some(now_tick)
+                                .filter(|tick| *tick != 0);
                             work.worker_id = None;
                             work.lease_id = None;
                             work.lease_expiry_tick = None;
@@ -230,6 +252,7 @@ macro_rules! durable_implementations {
                         }
                         if work.state == WorkState::Queued && work.deadline_tick <= now_tick {
                             work.state = WorkState::DeadLetter;
+                            work.terminal_tick = (now_tick != 0).then_some(now_tick);
                             clear_lease(&mut work);
                             match self.put_provider_state(
                                 state_record(
@@ -282,6 +305,7 @@ macro_rules! durable_implementations {
                         .checked_add(1)
                         .ok_or(StoreError::Conflict)?;
                     work.state = WorkState::Claimed;
+                    work.terminal_tick = None;
                     work.worker_id = Some(worker.into());
                     work.lease_id = Some(format!("{worker}:{}", work.lease_epoch));
                     work.lease_expiry_tick = Some(
@@ -364,6 +388,11 @@ macro_rules! durable_implementations {
                 } else {
                     WorkState::Queued
                 };
+                work.terminal_tick = work
+                    .state
+                    .terminal()
+                    .then_some(now_tick)
+                    .filter(|tick| *tick != 0);
                 work.available_tick = available_tick;
                 clear_lease(&mut work);
                 self.put_provider_state(
@@ -386,6 +415,7 @@ macro_rules! durable_implementations {
                 work.cancellation_requested = true;
                 if work.state == WorkState::Queued {
                     work.state = WorkState::Cancelled;
+                    work.terminal_tick = None;
                 }
                 self.put_provider_state(
                     state_record(
@@ -412,6 +442,7 @@ macro_rules! durable_implementations {
                 let mut work = decode_work(&row.payload)?;
                 valid_lease(&work, lease_id, lease_epoch, now_tick)?;
                 work.state = WorkState::DeadLetter;
+                work.terminal_tick = (now_tick != 0).then_some(now_tick);
                 clear_lease(&mut work);
                 self.put_provider_state(
                     state_record(
@@ -438,6 +469,7 @@ macro_rules! durable_implementations {
                 let mut work = decode_work(&row.payload)?;
                 valid_lease(&work, lease_id, lease_epoch, now_tick)?;
                 work.state = WorkState::Completed;
+                work.terminal_tick = (now_tick != 0).then_some(now_tick);
                 clear_lease(&mut work);
                 self.put_provider_state(
                     state_record(
@@ -633,14 +665,48 @@ macro_rules! durable_implementations {
                 if max == 0 || max > 65536 {
                     return Err(StoreError::CapacityExceeded);
                 }
-                let rows =
-                    self.list_provider_state("durable-effect", self.max_rows().min(65_536))?;
+                let scan_limit = self
+                    .max_rows()
+                    .min(mainframe_env_store_api::MAX_PROVIDER_STATE_SCAN);
+                let rows = self.list_provider_state("durable-effect", scan_limit)?;
+                if self.max_rows() > scan_limit && rows.len() == scan_limit {
+                    return Err(StoreError::CapacityExceeded);
+                }
                 let mut records = Vec::new();
                 for row in rows {
                     let key = IdempotencyKey::new(&row.key, InvocationLimits::default())
                         .map_err(|_| StoreError::IncompatibleVersion)?;
                     let record = decode_effect(&key, &row.payload)?;
                     if record.state == EffectState::UnknownOutcome {
+                        records.push(record);
+                        if records.len() == max {
+                            break;
+                        }
+                    }
+                }
+                Ok(records)
+            }
+
+            fn unresolved_effects(&self, max: usize) -> Result<Vec<EffectRecord>, StoreError> {
+                if max == 0 || max > mainframe_env_store_api::MAX_PROVIDER_STATE_SCAN {
+                    return Err(StoreError::CapacityExceeded);
+                }
+                let mut records = Vec::new();
+                let scan_limit = self
+                    .max_rows()
+                    .min(mainframe_env_store_api::MAX_PROVIDER_STATE_SCAN);
+                let rows = self.list_provider_state("durable-effect", scan_limit)?;
+                if self.max_rows() > scan_limit && rows.len() == scan_limit {
+                    return Err(StoreError::CapacityExceeded);
+                }
+                for row in rows {
+                    let key = IdempotencyKey::new(&row.key, InvocationLimits::default())
+                        .map_err(|_| StoreError::IncompatibleVersion)?;
+                    let record = decode_effect(&key, &row.payload)?;
+                    if matches!(
+                        record.state,
+                        EffectState::Intent | EffectState::UnknownOutcome
+                    ) {
                         records.push(record);
                         if records.len() == max {
                             break;
@@ -663,9 +729,14 @@ macro_rules! durable_implementations {
                     return Err(StoreError::InvalidTransition);
                 }
                 let mut records = Vec::new();
-                for row in
-                    self.list_provider_state("durable-effect", self.max_rows().min(65_536))?
-                {
+                let scan_limit = self
+                    .max_rows()
+                    .min(mainframe_env_store_api::MAX_PROVIDER_STATE_SCAN);
+                let rows = self.list_provider_state("durable-effect", scan_limit)?;
+                if self.max_rows() > scan_limit && rows.len() == scan_limit {
+                    return Err(StoreError::CapacityExceeded);
+                }
+                for row in rows {
                     let key = IdempotencyKey::new(&row.key, InvocationLimits::default())
                         .map_err(|_| StoreError::IncompatibleVersion)?;
                     let record = decode_effect(&key, &row.payload)?;
@@ -763,6 +834,7 @@ macro_rules! durable_implementations {
                 )?;
                 record.state = final_state;
                 record.result_digest = Some(result_digest);
+                record.resolved_tick = Some(now_tick);
                 validation::effect(&record)?;
                 let next_version = row.version.checked_add(1).ok_or(StoreError::Conflict)?;
                 let mut writes = vec![ProviderStateWrite {
@@ -782,8 +854,11 @@ macro_rules! durable_implementations {
                     {
                         writes.push(ProviderStateWrite {
                             record: state_record(
-                                &format!("durable-audit:{}", audit.execution_id),
-                                &format!("recovery:{}", audit_key(&audit)),
+                                AUDIT_NAMESPACE,
+                                &audit_storage_key(
+                                    &audit.execution_id,
+                                    &format!("recovery:{}", audit_key(&audit)),
+                                ),
                                 1,
                                 encode_audit(&audit)?,
                             ),
@@ -872,7 +947,11 @@ macro_rules! durable_implementations {
                 &self,
                 notification_id: &str,
                 expected_version: u64,
+                delivered_tick: u64,
             ) -> Result<OutboxRecord, StoreError> {
+                if delivered_tick == 0 {
+                    return Err(StoreError::InvalidTransition);
+                }
                 let row = self
                     .get_provider_state("durable-outbox", notification_id)?
                     .ok_or(StoreError::NotFound)?;
@@ -884,6 +963,7 @@ macro_rules! durable_implementations {
                     return Err(StoreError::Conflict);
                 }
                 record.delivered = true;
+                record.delivered_tick = Some(delivered_tick);
                 record.attempt = record.attempt.checked_add(1).ok_or(StoreError::Conflict)?;
                 record.version = record.version.checked_add(1).ok_or(StoreError::Conflict)?;
                 self.put_provider_state(
@@ -902,14 +982,14 @@ macro_rules! durable_implementations {
         impl AuditSink for $store {
             fn record_audit(&self, record: AuditRecord) -> Result<(), StoreError> {
                 validation::audit(&record)?;
-                let namespace = format!("durable-audit:{}", record.execution_id);
+                let key_prefix = audit_storage_key(&record.execution_id, "direct:");
                 for _ in 0..4 {
                     let next = self
-                        .list_provider_state(&namespace, self.max_rows().min(65_536))?
+                        .list_provider_state(AUDIT_NAMESPACE, self.max_rows())?
                         .into_iter()
                         .filter_map(|row| {
                             row.key
-                                .strip_prefix("direct:")
+                                .strip_prefix(&key_prefix)
                                 .and_then(|value| value.parse::<u64>().ok())
                         })
                         .max()
@@ -917,8 +997,8 @@ macro_rules! durable_implementations {
                         .ok_or(StoreError::CapacityExceeded)?;
                     match self.put_provider_state(
                         state_record(
-                            &namespace,
-                            &format!("direct:{next:020}"),
+                            AUDIT_NAMESPACE,
+                            &audit_storage_key(&record.execution_id, &format!("direct:{next:020}")),
                             1,
                             encode_audit(&record)?,
                         ),
@@ -941,28 +1021,28 @@ macro_rules! durable_implementations {
                 if max == 0 || max > 65_536 {
                     return Err(StoreError::CapacityExceeded);
                 }
-                self.list_provider_state(
-                    &format!("durable-audit:{execution_id}"),
-                    self.max_rows().min(65_536),
-                )?
-                .into_iter()
-                .map(|row| decode_audit(&row.payload))
-                .collect::<Result<Vec<_>, _>>()
-                .map(|records| {
-                    let mut records = records
-                        .into_iter()
-                        .filter(|record| record.effect_sequence >= start_effect_sequence)
-                        .collect::<Vec<_>>();
-                    records.sort_by(|left, right| {
-                        (left.attempt, left.effect_sequence, &left.invocation_key).cmp(&(
-                            right.attempt,
-                            right.effect_sequence,
-                            &right.invocation_key,
-                        ))
-                    });
-                    records.truncate(max);
-                    records
-                })
+                self.list_provider_state(AUDIT_NAMESPACE, self.max_rows())?
+                    .into_iter()
+                    .map(|row| decode_audit(&row.payload))
+                    .collect::<Result<Vec<_>, _>>()
+                    .map(|records| {
+                        let mut records = records
+                            .into_iter()
+                            .filter(|record| {
+                                record.execution_id == *execution_id
+                                    && record.effect_sequence >= start_effect_sequence
+                            })
+                            .collect::<Vec<_>>();
+                        records.sort_by(|left, right| {
+                            (left.attempt, left.effect_sequence, &left.invocation_key).cmp(&(
+                                right.attempt,
+                                right.effect_sequence,
+                                &right.invocation_key,
+                            ))
+                        });
+                        records.truncate(max);
+                        records
+                    })
             }
         }
 
@@ -1031,6 +1111,10 @@ macro_rules! durable_implementations {
                         return Err(StoreError::InvalidTransition);
                     }
                     execution.state = next;
+                    execution.terminal_tick = next
+                        .terminal()
+                        .then_some(event.tick)
+                        .filter(|tick| *tick != 0);
                 }
                 execution.version = execution
                     .version
@@ -1078,7 +1162,14 @@ macro_rules! durable_implementations {
                         expected_version: None,
                     },
                 ];
-                if let Some(effect) = effect {
+                if let Some(mut effect) = effect {
+                    if matches!(effect.state, EffectState::Completed | EffectState::Failed)
+                        && effect.digest_format == EffectDigestFormat::CanonicalHostV1
+                        && effect.resolved_tick.is_none()
+                        && event.tick != 0
+                    {
+                        effect.resolved_tick = Some(event.tick);
+                    }
                     validation::effect(&effect)?;
                     validation::effect_execution(&execution, &effect)?;
                     let (version, expected) = match effect.state {
@@ -1115,8 +1206,11 @@ macro_rules! durable_implementations {
                 if let Some(audit) = audit {
                     writes.push(ProviderStateWrite {
                         record: state_record(
-                            &format!("durable-audit:{}", audit.execution_id),
-                            &format!("journal:{:020}", event.sequence),
+                            AUDIT_NAMESPACE,
+                            &audit_storage_key(
+                                &audit.execution_id,
+                                &format!("journal:{:020}", event.sequence),
+                            ),
                             1,
                             encode_audit(&audit)?,
                         ),
@@ -1189,6 +1283,16 @@ fn optional_string(value: &Value, name: &str) -> Result<Option<String>, StoreErr
     }
 }
 
+fn optional_number(value: &Value, name: &str) -> Result<Option<u64>, StoreError> {
+    match value.get(name) {
+        Some(Value::Null) | None => Ok(None),
+        Some(value) => value
+            .as_u64()
+            .map(Some)
+            .ok_or(StoreError::IncompatibleVersion),
+    }
+}
+
 fn binary(bytes: &[u8]) -> String {
     base64::engine::general_purpose::STANDARD_NO_PAD.encode(bytes)
 }
@@ -1215,19 +1319,24 @@ fn digest_back(value: &str) -> Result<[u8; 32], StoreError> {
     Ok(output)
 }
 
-fn encode_execution(record: &ExecutionRecord) -> Result<Vec<u8>, StoreError> {
+pub(crate) fn encode_execution(record: &ExecutionRecord) -> Result<Vec<u8>, StoreError> {
     encode(json!({
-        "schema":1,"execution":record.execution_id.as_str(),"run":record.run_unit_id.as_str(),
+        "schema":3,"execution":record.execution_id.as_str(),"run":record.run_unit_id.as_str(),
         "selector":record.selector.as_str(),"artifact":record.artifact.as_str(),
         "principal":record.principal.as_str(),"state":execution_state(record.state),
-        "attempt":record.attempt,"lease":record.owner_lease,"expiry":record.lease_expiry_tick
+        "attempt":record.attempt,"lease":record.owner_lease,"expiry":record.lease_expiry_tick,
+        "version":record.version,"terminal_tick":record.terminal_tick
     }))
 }
 
-fn decode_execution(bytes: &[u8], version: u64) -> Result<ExecutionRecord, StoreError> {
+pub(crate) fn decode_execution(bytes: &[u8], version: u64) -> Result<ExecutionRecord, StoreError> {
     let value = decode(bytes)?;
+    let schema = number(&value, "schema")?;
+    if !matches!(schema, 1..=3) {
+        return Err(StoreError::IncompatibleVersion);
+    }
     let limits = InvocationLimits::default();
-    Ok(ExecutionRecord {
+    let record = ExecutionRecord {
         execution_id: ExecutionId::new(string(&value, "execution")?, limits)
             .map_err(|_| StoreError::IncompatibleVersion)?,
         run_unit_id: RunUnitId::new(string(&value, "run")?, limits)
@@ -1241,10 +1350,28 @@ fn decode_execution(bytes: &[u8], version: u64) -> Result<ExecutionRecord, Store
         state: execution_state_back(string(&value, "state")?)?,
         attempt: u32::try_from(number(&value, "attempt")?)
             .map_err(|_| StoreError::IncompatibleVersion)?,
-        version,
+        version: if schema >= 3 {
+            number(&value, "version")?
+        } else {
+            version
+        },
         owner_lease: optional_string(&value, "lease")?,
         lease_expiry_tick: value.get("expiry").and_then(Value::as_u64),
-    })
+        terminal_tick: if schema == 1 {
+            None
+        } else {
+            optional_number(&value, "terminal_tick")?
+        },
+    };
+    if record.version == 0
+        || (schema >= 3 && record.version != version)
+        || (schema < 3 && record.version > version)
+        || (!record.state.terminal() && record.terminal_tick.is_some())
+        || record.terminal_tick == Some(0)
+    {
+        return Err(StoreError::IncompatibleVersion);
+    }
+    Ok(record)
 }
 
 fn execution_state(value: ExecutionState) -> &'static str {
@@ -1278,14 +1405,14 @@ fn execution_state_back(value: &str) -> Result<ExecutionState, StoreError> {
     })
 }
 
-fn encode_event(event: &LifecycleEvent) -> Result<Vec<u8>, StoreError> {
+pub(crate) fn encode_event(event: &LifecycleEvent) -> Result<Vec<u8>, StoreError> {
     encode(
         json!({"schema":1,"execution":event.execution_id.as_str(),"run":event.run_unit_id.as_str(),
         "sequence":event.sequence,"attempt":event.attempt,"tick":event.tick,"kind":event_kind(&event.kind)}),
     )
 }
 
-fn decode_event(bytes: &[u8]) -> Result<LifecycleEvent, StoreError> {
+pub(crate) fn decode_event(bytes: &[u8]) -> Result<LifecycleEvent, StoreError> {
     let value = decode(bytes)?;
     let limits = InvocationLimits::default();
     Ok(LifecycleEvent {
@@ -1351,7 +1478,7 @@ fn event_kind_back(value: &str) -> Result<LifecycleEventKind, StoreError> {
     })
 }
 
-fn encode_audit(record: &AuditRecord) -> Result<Vec<u8>, StoreError> {
+pub(crate) fn encode_audit(record: &AuditRecord) -> Result<Vec<u8>, StoreError> {
     encode(json!({
         "schema": 1,
         "execution": record.execution_id.as_str(),
@@ -1368,7 +1495,7 @@ fn encode_audit(record: &AuditRecord) -> Result<Vec<u8>, StoreError> {
     }))
 }
 
-fn audit_key(record: &AuditRecord) -> String {
+pub(crate) fn audit_key(record: &AuditRecord) -> String {
     let mut digest = Sha256::new();
     digest.update(b"mainframe-env.audit-key@1\0");
     digest.update(record.invocation_key.as_str().as_bytes());
@@ -1377,7 +1504,7 @@ fn audit_key(record: &AuditRecord) -> String {
     hex(&digest.finalize())
 }
 
-fn decode_audit(bytes: &[u8]) -> Result<AuditRecord, StoreError> {
+pub(crate) fn decode_audit(bytes: &[u8]) -> Result<AuditRecord, StoreError> {
     let value = decode(bytes)?;
     if number(&value, "schema")? != 1 {
         return Err(StoreError::IncompatibleVersion);
@@ -1454,9 +1581,9 @@ fn audit_decision_back(value: &str) -> Result<AuditDecision, StoreError> {
     }
 }
 
-fn encode_work(work: &WorkRecord) -> Result<Vec<u8>, StoreError> {
+pub(crate) fn encode_work(work: &WorkRecord) -> Result<Vec<u8>, StoreError> {
     encode(
-        json!({"schema":3,"id":work.work_id,"execution":work.execution_id.as_str(),
+        json!({"schema":4,"id":work.work_id,"execution":work.execution_id.as_str(),
         "selector":work.required_selector.as_str(),"generation":work.required_generation,
         "artifact":work.artifact.as_str(),"state":work_state(work.state),"priority":work.priority,
         "attempt":work.attempt,
@@ -1464,13 +1591,14 @@ fn encode_work(work: &WorkRecord) -> Result<Vec<u8>, StoreError> {
         "cancel":work.cancellation_requested,"worker":work.worker_id,"lease":work.lease_id,
         "lease_epoch":work.lease_epoch,
         "expiry":work.lease_expiry_tick,"heartbeat":work.heartbeat_tick,
+        "terminal_tick":work.terminal_tick,
         "checkpoint":work.checkpoint_id,"effect":work.effect_sequence,"payload":binary(&work.payload)}),
     )
 }
-fn decode_work(bytes: &[u8]) -> Result<WorkRecord, StoreError> {
+pub(crate) fn decode_work(bytes: &[u8]) -> Result<WorkRecord, StoreError> {
     let value = decode(bytes)?;
     let schema = number(&value, "schema")?;
-    if !matches!(schema, 1..=3) {
+    if !matches!(schema, 1..=4) {
         return Err(StoreError::IncompatibleVersion);
     }
     let limits = InvocationLimits::default();
@@ -1510,6 +1638,11 @@ fn decode_work(bytes: &[u8]) -> Result<WorkRecord, StoreError> {
         },
         lease_expiry_tick: value.get("expiry").and_then(Value::as_u64),
         heartbeat_tick: value.get("heartbeat").and_then(Value::as_u64),
+        terminal_tick: if schema < 3 {
+            None
+        } else {
+            optional_number(&value, "terminal_tick")?
+        },
         checkpoint_id: optional_string(&value, "checkpoint")?,
         effect_sequence: number(&value, "effect")?,
         payload: binary_back(string(&value, "payload")?)?,
@@ -1543,6 +1676,8 @@ fn decode_work(bytes: &[u8]) -> Result<WorkRecord, StoreError> {
                 || work.lease_id.is_some()
                 || work.lease_expiry_tick.is_some()
                 || work.heartbeat_tick.is_some()))
+        || (!work.state.terminal() && work.terminal_tick.is_some())
+        || work.terminal_tick == Some(0)
     {
         return Err(StoreError::IncompatibleVersion);
     }
@@ -1568,7 +1703,7 @@ fn work_state_back(value: &str) -> Result<WorkState, StoreError> {
     })
 }
 
-fn encode_checkpoint(record: &CheckpointRecord) -> Result<Vec<u8>, StoreError> {
+pub(crate) fn encode_checkpoint(record: &CheckpointRecord) -> Result<Vec<u8>, StoreError> {
     encode(
         json!({"schema":record.schema_version,"machine_schema":record.machine_schema_version,
         "execution":record.execution_id.as_str(),"run":record.run_unit_id.as_str(),
@@ -1580,7 +1715,7 @@ fn encode_checkpoint(record: &CheckpointRecord) -> Result<Vec<u8>, StoreError> {
         "digest":hex(&record.payload_digest),"payload":binary(&record.payload)}),
     )
 }
-fn decode_checkpoint(bytes: &[u8]) -> Result<CheckpointRecord, StoreError> {
+pub(crate) fn decode_checkpoint(bytes: &[u8]) -> Result<CheckpointRecord, StoreError> {
     let value = decode(bytes)?;
     let limits = InvocationLimits::default();
     let required_host_interfaces = value
@@ -1684,7 +1819,7 @@ fn decode_generation(
     })
 }
 
-fn encode_effect(record: &EffectRecord) -> Result<Vec<u8>, StoreError> {
+pub(crate) fn encode_effect(record: &EffectRecord) -> Result<Vec<u8>, StoreError> {
     let recovery = record.intent.recovery_lease.as_ref().map(|lease| {
         json!({
             "owner": lease.owner,
@@ -1721,17 +1856,21 @@ fn encode_effect(record: &EffectRecord) -> Result<Vec<u8>, StoreError> {
             value["result"] = json!(record.result_digest.map(|value| hex(&value)));
         }
         EffectDigestFormat::CanonicalHostV1 => {
-            value["schema"] = json!(4);
+            value["schema"] = json!(5);
             value["digest_format"] = json!("mainframe-env.effect-canonical@1");
             // Counter-era readers ignore schema numbers. Do not expose the old
             // required field names: their effect decoder must fail on downgrade.
             value["request_canonical_v1"] = json!(hex(&record.request_digest));
             value["result_canonical_v1"] = json!(record.result_digest.map(|value| hex(&value)));
+            value["resolved_tick"] = json!(record.resolved_tick);
         }
     }
     encode(value)
 }
-fn decode_effect(key: &IdempotencyKey, bytes: &[u8]) -> Result<EffectRecord, StoreError> {
+pub(crate) fn decode_effect(
+    key: &IdempotencyKey,
+    bytes: &[u8],
+) -> Result<EffectRecord, StoreError> {
     let value: Value =
         serde_json::from_slice(bytes).map_err(|_| StoreError::IncompatibleVersion)?;
     let schema = number(&value, "schema")?;
@@ -1739,7 +1878,7 @@ fn decode_effect(key: &IdempotencyKey, bytes: &[u8]) -> Result<EffectRecord, Sto
     let digest_format = match (schema, format) {
         (1, None) => EffectDigestFormat::LegacyDebug,
         (1, Some(Value::String(v))) if v == "legacy-debug@0" => EffectDigestFormat::LegacyDebug,
-        (2..=4, Some(Value::String(v))) if v == "mainframe-env.effect-canonical@1" => {
+        (2..=5, Some(Value::String(v))) if v == "mainframe-env.effect-canonical@1" => {
             EffectDigestFormat::CanonicalHostV1
         }
         _ => return Err(StoreError::IncompatibleVersion),
@@ -1779,6 +1918,11 @@ fn decode_effect(key: &IdempotencyKey, bytes: &[u8]) -> Result<EffectRecord, Sto
             Some(Value::String(value)) => Some(digest_back(value)?),
             Some(Value::Null) | None => None,
             _ => return Err(StoreError::IncompatibleVersion),
+        },
+        resolved_tick: if schema >= 5 {
+            optional_number(&value, "resolved_tick")?
+        } else {
+            None
         },
     };
     validation::effect(&record)?;
@@ -1873,16 +2017,20 @@ fn effect_state_back(value: &str) -> Result<EffectState, StoreError> {
     })
 }
 
-fn encode_outbox(record: &OutboxRecord) -> Result<Vec<u8>, StoreError> {
-    encode(json!({"schema":1,"id":record.notification_id,
+pub(crate) fn encode_outbox(record: &OutboxRecord) -> Result<Vec<u8>, StoreError> {
+    encode(json!({"schema":2,"id":record.notification_id,
         "execution":record.execution_id.as_str(),"sequence":record.sequence,
         "topic":record.topic,"payload":binary(&record.payload),"attempt":record.attempt,
-        "delivered":record.delivered}))
+        "delivered":record.delivered,"delivered_tick":record.delivered_tick}))
 }
 
-fn decode_outbox(bytes: &[u8], version: u64) -> Result<OutboxRecord, StoreError> {
+pub(crate) fn decode_outbox(bytes: &[u8], version: u64) -> Result<OutboxRecord, StoreError> {
     let value = decode(bytes)?;
-    Ok(OutboxRecord {
+    let schema = number(&value, "schema")?;
+    if !matches!(schema, 1 | 2) {
+        return Err(StoreError::IncompatibleVersion);
+    }
+    let record = OutboxRecord {
         notification_id: string(&value, "id")?.into(),
         execution_id: ExecutionId::new(string(&value, "execution")?, InvocationLimits::default())
             .map_err(|_| StoreError::IncompatibleVersion)?,
@@ -1895,8 +2043,28 @@ fn decode_outbox(bytes: &[u8], version: u64) -> Result<OutboxRecord, StoreError>
             .get("delivered")
             .and_then(Value::as_bool)
             .ok_or(StoreError::IncompatibleVersion)?,
+        delivered_tick: if schema == 1 {
+            None
+        } else {
+            value
+                .get("delivered_tick")
+                .and_then(|value| {
+                    if value.is_null() {
+                        Some(None)
+                    } else {
+                        value.as_u64().map(Some)
+                    }
+                })
+                .ok_or(StoreError::IncompatibleVersion)?
+        },
         version,
-    })
+    };
+    if schema == 2
+        && (record.delivered != record.delivered_tick.is_some() || record.delivered_tick == Some(0))
+    {
+        return Err(StoreError::IncompatibleVersion);
+    }
+    Ok(record)
 }
 
 fn valid_lease(
@@ -1971,6 +2139,7 @@ mod tests {
                     version: 1,
                     owner_lease: None,
                     lease_expiry_tick: None,
+                    terminal_tick: None,
                 })
                 .unwrap();
             store
@@ -1992,6 +2161,7 @@ mod tests {
                     lease_epoch: 0,
                     lease_expiry_tick: None,
                     heartbeat_tick: None,
+                    terminal_tick: None,
                     checkpoint_id: None,
                     effect_sequence: 0,
                     payload: vec![1],
@@ -2028,6 +2198,7 @@ mod tests {
                         version: 1,
                         owner_lease: None,
                         lease_expiry_tick: None,
+                        terminal_tick: None,
                     },
                     event,
                     OutboxRecord {
@@ -2038,6 +2209,7 @@ mod tests {
                         payload: b"admitted".to_vec(),
                         attempt: 0,
                         delivered: false,
+                        delivered_tick: None,
                         version: 1,
                     },
                 )
@@ -2092,11 +2264,12 @@ mod tests {
                 version: 1,
                 owner_lease: None,
                 lease_expiry_tick: None,
+                terminal_tick: None,
             })
             .unwrap();
         assert_eq!(
             store
-                .transition_execution(&execution, 1, ExecutionState::Queued)
+                .transition_execution(&execution, 1, ExecutionState::Queued, 1)
                 .unwrap()
                 .state,
             ExecutionState::Queued
@@ -2156,6 +2329,7 @@ mod effect_encoding_tests {
             },
             state: EffectState::UnknownOutcome,
             result_digest: Some([2; 32]),
+            resolved_tick: None,
         }
     }
     #[test]
@@ -2219,7 +2393,7 @@ mod effect_encoding_tests {
             (3, json!("legacy-debug@0")),
             (3, json!("future@9")),
             (4, Value::Null),
-            (5, json!("mainframe-env.effect-canonical@1")),
+            (6, json!("mainframe-env.effect-canonical@1")),
         ] {
             let mut bad = value.clone();
             bad["schema"] = json!(schema);

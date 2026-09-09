@@ -26,6 +26,14 @@ guard locks their names and prevents a return to whole-state serialization.
 Object rows are bounded by the provider's state-byte limit and collections are
 bounded by the existing provider limits.
 
+Replay object values also retain the originating invocation deadline as the
+conservative age authority for the
+[durable retention lifecycle](RETENTION-LIFECYCLE-V1.md). Rows written before
+that metadata existed remain readable but cannot be automatically expired.
+Before each dispatch, an open provider refreshes the replay namespace from the
+durable store; a retention transaction therefore releases the live replay-map
+limit without requiring a restart.
+
 ## Atomic changes and in-memory ownership
 
 A logical provider mutation computes only changed object rows and submits their
