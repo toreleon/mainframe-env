@@ -6727,6 +6727,35 @@ fn release_candidate_mode(root: &Path) -> TaskResult<bool> {
     }
 }
 
+fn release_command_retained_candidate(root: &Path) -> TaskResult<Option<String>> {
+    match release_candidate_mode(root) {
+        Ok(true) => Ok(None),
+        Ok(false) => {
+            Err("release artifacts require an explicit stable release-candidate promotion".into())
+        }
+        Err(configuration_error) => {
+            let Ok(version) = read(&root.join("VERSION")) else {
+                return Err(configuration_error);
+            };
+            let version = version.trim();
+            if version != "0.2.0" {
+                return Err(configuration_error);
+            }
+            let Some(accepted) = retained_accepted_release(root)? else {
+                return Err(configuration_error);
+            };
+            let head = command_text(root, "git", &["rev-parse", "HEAD"])?;
+            let tag = format!("refs/tags/mainframe-env-v{version}^{{commit}}");
+            let tagged = command_text(root, "git", &["rev-parse", "--verify", &tag])?;
+            require(
+                head == tagged,
+                "retained release validation requires the exact historical release tag",
+            )?;
+            Ok(Some(accepted))
+        }
+    }
+}
+
 fn check_certification_release_artifacts(root: &Path) -> TaskResult {
     if !release_candidate_mode(root)? {
         return Ok(());
@@ -12665,7 +12694,7 @@ fn cargo_target_directory(root: &Path) -> PathBuf {
 }
 
 fn generate_release_artifacts(root: &Path, target: &str) -> TaskResult {
-    if retained_accepted_release(root)?.is_some() {
+    if release_command_retained_candidate(root)?.is_some() {
         return validate_retained_accepted_release(root, target);
     }
     require_release_candidate(root)?;
@@ -12696,7 +12725,7 @@ fn generate_release_artifacts(root: &Path, target: &str) -> TaskResult {
 }
 
 fn check_release_artifacts(root: &Path, target: &str) -> TaskResult {
-    if retained_accepted_release(root)?.is_some() {
+    if release_command_retained_candidate(root)?.is_some() {
         return validate_retained_accepted_release(root, target);
     }
     require_release_candidate(root)?;
@@ -14650,6 +14679,12 @@ mod tests {
         check_certification_release_artifacts(&root).unwrap();
         let problem = require_release_candidate(&root).unwrap_err();
         assert!(problem.contains("release-candidate promotion"));
+        for problem in [
+            generate_release_artifacts(&root, "aarch64-apple-darwin").unwrap_err(),
+            check_release_artifacts(&root, "aarch64-apple-darwin").unwrap_err(),
+        ] {
+            assert!(problem.contains("release-candidate promotion"));
+        }
 
         fs::write(
             root.join("release.toml"),
@@ -14657,6 +14692,7 @@ mod tests {
         )
         .unwrap();
         assert!(release_candidate_mode(&root).unwrap());
+        assert_eq!(release_command_retained_candidate(&root).unwrap(), None);
         require_release_candidate(&root).unwrap();
         assert!(check_certification_release_artifacts(&root).is_err());
 

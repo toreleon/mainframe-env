@@ -2,6 +2,7 @@ import hashlib
 import importlib.util
 from pathlib import Path
 import shutil
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -22,6 +23,31 @@ publish = load("publish_release_assets", "tools/publish_release_assets.py")
 
 
 class ReproducibleArchiveTests(unittest.TestCase):
+    def test_cli_archive_runtime_is_locked_before_reproduction(self):
+        with patch.object(archive.subprocess, "run") as run:
+            archive._verify_archive_runtime()
+        run.assert_called_once_with(
+            [
+                archive.sys.executable,
+                "-B",
+                str(ROOT / "tools/supply_chain.py"),
+                "check",
+                "--runtime",
+                "offline",
+            ],
+            check=True,
+        )
+
+        with patch.object(
+            archive.subprocess,
+            "run",
+            side_effect=subprocess.CalledProcessError(1, ["supply-chain"]),
+        ):
+            with self.assertRaisesRegex(
+                archive.ArchiveError, "locked archive runtime verification failed"
+            ):
+                archive._verify_archive_runtime()
+
     def test_two_clean_mtime_distinct_stages_must_match_before_immutable_publish(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -133,6 +159,7 @@ class ImmutablePublicationTests(unittest.TestCase):
         self.assertIn("--gate archive-reproduction", pipeline)
         self.assertIn("git archive --format=tar HEAD", pipeline)
         self.assertIn("--root-name mainframe-env-source", pipeline)
+        self.assertIn('"--runtime", "offline"', archive.__loader__.get_source(archive.__name__))
 
 
 if __name__ == "__main__":

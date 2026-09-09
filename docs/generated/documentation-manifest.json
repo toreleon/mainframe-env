@@ -10,7 +10,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:5467a21f30dbe53ffb962447ad44dc8363faaf64c408509cc77364c6900283a5",
+      "sha256": "sha256:f34955bcfee5d6e215706212ef694f3c9a235e5c32eb5e28ed0b1d45086e3fc0",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -1106,7 +1106,7 @@
       "normative": false,
       "path": "docs/delivery/hardening/54-assurance-tiers.md",
       "relative_links": 0,
-      "sha256": "sha256:87bd19a9141d5ec14ea9f8d3375d20776318c3b49a3a2278723a8f992605a50c",
+      "sha256": "sha256:5725bd9089f7953311d5b3f19483b790da2eb178491f7aca9f28ed3d561e7669",
       "title": "#54 — selected PR gates and explicit full campaigns",
       "xtask_commands": 0
     },

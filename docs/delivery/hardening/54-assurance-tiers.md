@@ -53,7 +53,9 @@ tier. Workspace target checks/documentation, full conformance, certification,
 the evidence seal and runtime architecture run on one exact checked-out commit.
 The full tier also exports that commit with `git archive` and requires two
 mtime-distinct reproductions in the digest-pinned GNU-tar image to match before
-retaining the source archive and command receipt.
+retaining the source archive and command receipt. The archive CLI first verifies
+the locked offline runtime, including the exact Docker client version, so a
+drifted container tool cannot receive reproduction credit.
 On a development candidate, certification retains the exact-target runtime
 smoke but does not try to emit or compare stable release artifacts. An explicit
 stable release-candidate promotion still enables that artifact check, and the
