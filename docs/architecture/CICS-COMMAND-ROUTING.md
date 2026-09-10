@@ -11,13 +11,29 @@ The readable command authority is
 [`conformance/0.9/cics/command-descriptors.json`](../../conformance/0.9/cics/command-descriptors.json),
 validated by
 [`cics-command-descriptors.schema.json`](../../conformance/0.9/schemas/cics-command-descriptors.schema.json).
-Every descriptor binds one typed `CicsOperation` to one row in the pinned
-official CICS catalog, records whether the existing host contract treats it as
-mutating, and assigns exactly one stable semantic family.
+It keeps two collections deliberately separate:
+
+- `application_catalog` projects all 263 mandatory `api-commands` row IDs,
+  official labels and two-byte EIB function codes. It fixes
+  `automatic_registration=false` and `generated_coverage_credit=0`; presence
+  does not imply grammar, option, condition, handler or execution support.
+- `runtime` retains the 25 existing typed `CicsOperation` bindings: 23 API
+  operations and two explicit SPI compatibility operations. Each continues to
+  record mutation classification and one of the seven reviewed runtime
+  families below.
+
+The application projection is bound to official-catalog SHA-256
+`fccd2a8e5cc24dd08aeb32754daf14ed80e9f1b20b5d9e762a1b0cfe429ceeba`.
+Its formatting-independent, domain-separated identity-set digest is
+`a18057164564781563252d53586a8afbc401f2783950db456b3b98177fc60b94`.
+EIBFN is metadata rather than identity: the 263 rows contain 258 distinct
+codes, with four reviewed shared-code groups.
 
 `python3 -B tools/generate_cics_descriptors.py` deterministically writes the
-Rust descriptor module. Use `--check` to compare bytes without writing. The
-freshness check and the module-boundary guard both run in
+unchanged provider runtime descriptor module and the additive host-API
+application identity table. Use `--check` to compare both outputs without
+writing. The JSON Schema instance check, freshness check and module-boundary
+guard run in
 `cargo xtask architecture-fast --check`; hand-editing generated Rust or
 changing the catalog without regeneration fails the gate.
 
@@ -33,7 +49,8 @@ changing the catalog without regeneration fails the gate.
 | `queue-control` | transient-data queue writes |
 | `recovery` | SYNCPOINT coordination, rollback, and subsystem unit-of-work completion |
 
-`CicsService::invoke_run` selects the generated descriptor first and routes on
+These families apply only to the 25-row runtime collection.
+`CicsService::invoke_run` selects the generated runtime descriptor first and routes on
 its family. Each family has a real reviewed implementation module under
 `crates/providers/mainframe-env-cics/src/handlers/`; no command is dispatched by
 an ad hoc keyword match in the service monolith. The service retains the shared
@@ -53,7 +70,12 @@ store, unit-of-work protocol, or condition authority.
 
 ## Change contract
 
-Adding or changing a typed CICS command requires one reviewable change that:
+Adding an identity to the application projection requires a reviewed change to
+the pinned official denominator and regeneration. It never updates
+`CicsOperation`, dispatch or coverage by itself.
+
+Adding or changing an executable typed CICS command requires one reviewable
+change that:
 
 1. updates the readable descriptor catalog and its official row binding;
 2. regenerates the Rust descriptor module;
@@ -72,6 +94,6 @@ records the hard limits and exact legacy ceiling policy.
 ```bash
 python3 -B tools/generate_cics_descriptors.py --check
 python3 -B -m unittest tools.tests.test_cics_descriptors tools.tests.test_module_boundaries
-cargo test -p mainframe-env-cics --all-features --locked
+cargo test -p mainframe-env-host-api -p mainframe-env-cics --all-features --locked
 cargo xtask architecture-fast --check
 ```

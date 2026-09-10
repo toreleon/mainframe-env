@@ -34,6 +34,9 @@ All notable changes to mainframe-env are documented here.
 - Added a docs-driven CICS file/unit-of-work conformance pilot with reviewed
   rules, exact per-obligation observations, memory/SQLite execution, restart
   faults, and a fail-closed licensed-capture adapter.
+- Added a zero-credit, non-registering host-API projection for all 263 pinned
+  CICS application-command identities and EIB function codes while retaining
+  the existing 23 API and two SPI compatibility runtime operations unchanged.
 - Added a reviewed COBOL numeric `MOVE` pilot and corrected floating-insertion,
   capacity, sign, and overflow behavior found by that review.
 - Added cost-aware local Jenkins assurance, exact-candidate command receipts,

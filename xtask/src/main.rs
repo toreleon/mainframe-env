@@ -7441,6 +7441,14 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         cics_descriptors.is_file(),
         "CICS command descriptor generator is missing",
     )?;
+    let cics_descriptor_catalog = root.join("conformance/0.9/cics/command-descriptors.json");
+    let cics_descriptor_schema =
+        root.join("conformance/0.9/schemas/cics-command-descriptors.schema.json");
+    validate_schema_instance(
+        &json(&cics_descriptor_schema)?,
+        &json(&cics_descriptor_catalog)?,
+        &cics_descriptor_catalog,
+    )?;
     let status = Command::new("python3")
         .arg("-B")
         .arg(&cics_descriptors)

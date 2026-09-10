@@ -10,6 +10,7 @@ pub use canonical::{
     canonical_request_size, canonical_result_digest, canonical_result_size,
 };
 
+mod cics_catalog;
 mod dataset;
 mod enterprise;
 mod names;
@@ -20,6 +21,11 @@ mod semantic;
 mod service;
 mod surface;
 
+pub use cics_catalog::{
+    CICS_APPLICATION_COMMAND_COUNT, CICS_APPLICATION_COMMAND_IDENTITY_SET_SHA256,
+    CicsApplicationCommandIdentityDescriptor, cics_application_command_identities,
+    cics_application_command_identity,
+};
 pub use dataset::{
     AllocationSpace, BufferingMode, CatalogEntryKind, CatalogKind, CatalogListEntry,
     CatalogMetadata, CatalogResolution, CompressionMode, DATASET_DEFINITION_CONTRACT,
