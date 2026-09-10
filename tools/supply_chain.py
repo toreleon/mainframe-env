@@ -35,7 +35,7 @@ MAX_JSON_BYTES = 1024 * 1024
 MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
 MAX_TREE_FILES = 200_000
 MAX_TREE_BYTES = 4 * 1024 * 1024 * 1024
-CI_PATH_PREFIXES = (".github/workflows/", "tools/")
+CI_PATH_PREFIXES = (".github/workflows/", "tools/", "docker/")
 CI_PATHS = {"Jenkinsfile", "tools/package_offline_cargo_bundle.sh"}
 INSTALL_COMMAND = re.compile(
     r"^\s*(?:sudo\s+)?(?:apt(?:-get)?\s+install|apk\s+add|brew\s+install|"
@@ -225,11 +225,31 @@ def scan_external_inputs(root: Path, tracked: list[str]) -> dict[str, list[str]]
             raise SupplyChainError(f"tracked CI file is missing or too large: {relative}")
         text = path.read_text(encoding="utf-8")
         is_workflow = relative.startswith(".github/workflows/") and relative.endswith((".yml", ".yaml"))
+        is_compose = relative == "docker/compose.yaml"
+        if is_compose:
+            # Local output tags are allowed only beside their reviewed build
+            # recipe. They cannot silently become mutable registry inputs.
+            recipes = load_json(root / 'docker/inputs.lock.json')['local_images']
+            for block in re.split(r'^  [a-z][a-z0-9-]*:\s*$', text, flags=re.MULTILINE):
+                image = re.search(r'^    image: (\S+)\s*$', block, re.MULTILINE)
+                if image and not IMAGE.fullmatch(image.group(1)):
+                    coordinate = image.group(1)
+                    require(coordinate in recipes, f'unreviewed local image: {coordinate}')
+                    recipe = recipes[coordinate]
+                    require(recipe in tracked, f'untracked container recipe: {recipe}')
+                    require(re.search(r'^    build:\s*$', block, re.MULTILINE) is not None
+                            and f'      dockerfile: {recipe}\n' in block
+                            and '      context: ..\n' in block,
+                            f'local image lacks its reviewed build recipe: {coordinate}')
         for number, line in enumerate(text.splitlines(), 1):
             stripped = line.strip()
             archive_image = ARCHIVE_IMAGE_DECLARATION.fullmatch(stripped)
             if archive_image:
                 images.add(archive_image.group(1))
+            if is_compose:
+                image = re.match(r'image:\s*(\S+)', stripped)
+                if image and IMAGE.fullmatch(image.group(1)):
+                    images.add(image.group(1))
             if is_workflow:
                 use = re.match(r"-?\s*uses:\s*['\"]?([^'\"#\s]+)", stripped)
                 if use:
@@ -260,10 +280,35 @@ def scan_external_inputs(root: Path, tracked: list[str]) -> dict[str, list[str]]
     }
 
 
+def validate_docker_inputs(root: Path, ci_lock: dict) -> None:
+    lock = load_json(root / 'docker/inputs.lock.json')
+    exact_keys(lock, {'schema_version', 'recorded_on', 'local_images', 'sources'}, 'Docker input lock')
+    require(lock['schema_version'] == 1, 'bad Docker input schema')
+    require(lock['local_images'] == {
+        'mainframe-env-runtime:dev': 'docker/runtime.Dockerfile',
+        'mainframe-env-toolchain:dev': 'docker/toolchain.Dockerfile',
+    }, 'Docker local image recipes drifted')
+    require(isinstance(lock['sources'], list), 'Docker sources must be a list')
+    sources = {}
+    for source in lock['sources']:
+        exact_keys(source, {'name', 'version', 'url', 'sha256'}, 'Docker source')
+        require(source['name'] not in sources, 'duplicate Docker source')
+        require(SAFE_VERSION.fullmatch(source['version']) is not None, 'invalid Docker source version')
+        require(source['url'].startswith('https://'), 'Docker source must use HTTPS')
+        require(SHA256.fullmatch(source['sha256']) is not None, 'Docker source hash is not SHA-256')
+        sources[source['name']] = source
+    require(set(sources) == {'git', 'postgresql', 'bison', 'flex'}, 'Docker source closure differs')
+    for name in ('git', 'postgresql'):
+        require(sources[name]['version'] == ci_lock['tools'][name]['version'],
+                f'Docker {name} differs from the CI tool lock')
+
+
 def check_repository(root: Path = ROOT) -> tuple[dict, dict]:
     ci_lock = validate_ci_lock(root)
     jenkins_lock = validate_jenkins_lock(root)
     tracked = tracked_files(root)
+    if 'docker/inputs.lock.json' in tracked:
+        validate_docker_inputs(root, ci_lock)
     require(not (set(ci_lock["unsupported_local_inputs"]) & set(tracked)), "an explicitly unsupported local CI input became tracked")
     observed = scan_external_inputs(root, tracked)
     require(observed == ci_lock["tracked_remote_inputs"], "tracked remote CI inputs differ from their lock")

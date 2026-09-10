@@ -1,0 +1,46 @@
+pipeline {
+    agent any
+    options {
+        skipDefaultCheckout(true)
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '5', artifactNumToKeepStr: '2'))
+        timeout(time: 120, unit: 'MINUTES')
+    }
+    triggers { pollSCM('H/5 * * * *') }
+    stages {
+        stage('Checkout main') {
+            steps {
+                deleteDir()
+                checkout([$class: 'GitSCM',
+                    branches: [[name: "*/${env.MAINFRAME_ENV_CI_BRANCH}"]],
+                    userRemoteConfigs: [[url: env.MAINFRAME_ENV_CI_REPOSITORY,
+                        credentialsId: env.MAINFRAME_ENV_CI_REPOSITORY == 'https://github.com/toreleon/mainframe-env.git'
+                            ? env.MAINFRAME_ENV_CI_CREDENTIAL_ID : '']]])
+                sh 'git rev-parse HEAD'
+            }
+        }
+        stage('Storage and checks') {
+            steps {
+                sh 'flock /cache/build.lock /opt/mainframe-env/docker/ci.sh check'
+            }
+        }
+        stage('Build deployable binary') {
+            steps {
+                sh 'flock /cache/build.lock /opt/mainframe-env/docker/ci.sh build'
+            }
+        }
+        stage('Deploy local main') {
+            steps {
+                sh 'python3 /opt/mainframe-env/docker/deploy.py deploy'
+            }
+        }
+    }
+    post {
+        always {
+            sh(returnStatus: true, script: 'mkdir -p ci-backend; cp /target/ci-backend/*.json ci-backend/ 2>/dev/null || true')
+            archiveArtifacts artifacts: 'deployment.json,ci-backend/*.json,.postgres/postgres.log', allowEmptyArchive: true
+            sh(returnStatus: true, script: 'flock /cache/build.lock /opt/mainframe-env/docker/ci.sh maintain')
+            deleteDir()
+        }
+    }
+}

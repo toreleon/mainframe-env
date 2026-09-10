@@ -7,3 +7,4 @@
 /crates/apps/mainframe-env-server/examples/carddemo_signon.rs
 conformance/0.1/evidence/raw/
 __pycache__/
+/docker/.env

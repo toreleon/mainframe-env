@@ -27,6 +27,10 @@ test run is necessary but does not override those findings.
 
 ## Quick start
 
+For the containerized toolchain, persistent PostgreSQL, and local Jenkins CI/CD,
+see the [Docker development guide](docker/README.md). On macOS, `docker/dev init`
+creates an isolated capped VM; `docker/dev up` starts the stack.
+
 The repository pins Rust 1.98.0. Install the toolchain declared in
 [`rust-toolchain.toml`](rust-toolchain.toml), then run:
 

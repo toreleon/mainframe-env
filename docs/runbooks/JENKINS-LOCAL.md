@@ -1,5 +1,10 @@
 # Local Jenkins CI
 
+For the containerized development environment with automatic local deployment
+and a separate disk boundary below 50 GB, use the
+[Docker development guide](../../docker/README.md). This runbook describes the
+existing host-based full-assurance controller and its 10 GiB boundary.
+
 `Jenkinsfile` is the current CI definition. It keeps the changed-path plan and
 command receipts used by the repository, runs the complete tier weekly or on
 demand, and handles the release offline-bundle path explicitly.

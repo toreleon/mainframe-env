@@ -1,0 +1,12 @@
+**
+!docker/
+!docker/**
+!tools/
+!tools/supply_chain.py
+!tools/ci-inputs.lock.json
+!tools/jenkins/
+!tools/jenkins/controller-plugins.lock.json
+!rust-toolchain.toml
+**/.env
+**/.env.*
+**/secrets/

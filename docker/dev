@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# All Docker operations explicitly target this environment's isolated daemon.
+set -euo pipefail
+repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+volume=/Volumes/MainframeEnvDocker
+export COLIMA_HOME="$volume/colima" XDG_CACHE_HOME="$volume/cache"
+export MAINFRAME_ENV_SOURCE="$repo" MAINFRAME_ENV_SECRETS="$volume/secrets"
+export MAINFRAME_ENV_JENKINS_SEED="$volume/jenkins-seed"
+export MAINFRAME_ENV_UID="$(id -u)" MAINFRAME_ENV_GID="$(id -g)"
+action="${1:-help}"
+[[ $# == 0 ]] || shift
+if [[ "$action" == init ]]; then exec "$repo/docker/bootstrap-macos.sh" "$@"; fi
+if [[ "$action" == help ]]; then
+  echo 'Usage: docker/dev init|up|shell|cargo [args...]|test|status|logs|clean|down|stop'
+  exit 0
+fi
+reserve=3221225472
+case "$action" in clean|status|logs|down|stop) reserve=0 ;; esac
+python3 "$repo/docker/storage.py" host "$volume" --minimum-free-bytes "$reserve"
+docker_socket="unix://$COLIMA_HOME/mainframe-env/docker.sock"
+unset DOCKER_CONTEXT DOCKER_HOST
+dc=(docker --host "$docker_socket" compose -p mainframe-env -f "$repo/docker/compose.yaml")
+case "$action" in
+  up)
+    "${dc[@]}" --profile runtime build
+    docker --host "$docker_socket" builder prune -f --keep-storage 2GB
+    "${dc[@]}" up -d --wait --wait-timeout 180 postgres
+    "${dc[@]}" --profile runtime create server
+    "${dc[@]}" up -d --wait --wait-timeout 180 jenkins
+    echo 'Jenkins: http://127.0.0.1:18080 (admin; password in /Volumes/MainframeEnvDocker/secrets/jenkins_password)'
+    echo 'The first successful main build starts the application at http://127.0.0.1:10443/zosmf/info.'
+    ;;
+  shell) "${dc[@]}" run --rm dev bash ;;
+  cargo) "${dc[@]}" run --rm dev cargo "$@" ;;
+  test) "${dc[@]}" run --rm dev /opt/mainframe-env/docker/test-workspace.sh "$@" ;;
+  status)
+    "${dc[@]}" ps -a
+    docker --host "$docker_socket" system df
+    ;;
+  logs) "${dc[@]}" logs --tail 100 -f "$@" ;;
+  clean)
+    # flock in entrypoint waits for any development command to finish.
+    "${dc[@]}" run --rm dev python3 /opt/mainframe-env/docker/storage.py clean /cache /target
+    # Dedicated daemon only; no volume or persistent data deletion.
+    docker --host "$docker_socket" builder prune -f --keep-storage 2GB
+    docker --host "$docker_socket" image prune -f
+    ;;
+  down) "${dc[@]}" down ;;
+  stop)
+    "${dc[@]}" down
+    colima stop mainframe-env
+    ;;
+  *) echo "Unknown command: $action" >&2; exit 2 ;;
+esac

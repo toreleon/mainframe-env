@@ -1,6 +1,8 @@
 # CI supply-chain inputs
 
-`Jenkinsfile` is the only current CI workflow. Its executable inputs are
+`Jenkinsfile` is the full assurance and release CI workflow. The separate
+`docker/Jenkinsfile` supplies local development CI/CD; see the
+[Docker guide](../../docker/README.md). Their executable inputs are
 governed by two reviewed locks:
 
 - `tools/ci-inputs.lock.json` fixes the workspace and MSRV toolchains by
@@ -13,8 +15,12 @@ governed by two reviewed locks:
 `tools/supply_chain.py check` enumerates files with `git ls-files`. A tracked
 GitHub action must use a 40-hex commit, a tracked container must use an
 `@sha256:` digest, and tracked CI cannot install ambient packages. The current
-inventory contains no GitHub actions or package-install commands and exactly
-one Linux/amd64 archive image pinned by digest. The Jenkins controller, plugins,
+inventory contains no GitHub actions or package-install commands. It includes
+the archive image and Docker development base/service images pinned by digest.
+`docker/inputs.lock.json` additionally binds the Git, PostgreSQL, Bison, and Flex
+source archives by SHA-256 and identifies the two locally built image recipes.
+Compose's local output tags are accepted only alongside their tracked build
+recipe; external service images still require digests. The Jenkins controller, plugins,
 Rust toolchains, Cargo dependencies, archive image, and host tools are locked
 inputs.
 

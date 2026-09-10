@@ -1,6 +1,6 @@
 {
   "schema_version": "mainframe-env.ci-input-lock@1",
-  "reviewed_on": "2026-09-08",
+  "reviewed_on": "2026-09-10",
   "rust": {
     "workspace": {
       "version": "1.98.0",
@@ -54,7 +54,12 @@
   "tracked_remote_inputs": {
     "github_actions": [],
     "container_images": [
-      "docker.io/library/debian@sha256:5ae3c39ebd15e229dcedd5cee596b2497182493d41ff162e824ba13fc1b2b867"
+      "docker.io/jenkins/jenkins@sha256:c1e4c349365f6d16d88595b2c5f7e8ff39b8ae1d061f62420bac193b4b9616d0",
+      "docker.io/library/debian@sha256:5ae3c39ebd15e229dcedd5cee596b2497182493d41ff162e824ba13fc1b2b867",
+      "docker.io/library/docker@sha256:51e23845f5caff1e688a2fae003b0c69d635c9200ad544731db1593731df1d3a",
+      "docker.io/library/postgres@sha256:1c59e2c3c818eaa0f0628f695b36e7c9e362d6b219b36a54a32df645cbd7e1af",
+      "docker.io/library/python@sha256:3cd9086bdb30f7c9bc08a3fa621d9842e0d3f6f9291aeb4677e0547817c10b12",
+      "docker.io/library/rust@sha256:82150a52ec202c1b14d7817e14516c392bb7f5cfebd88f1ed531cb37ebd39922"
     ],
     "package_install_commands": []
   },
