@@ -353,7 +353,7 @@
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
       "relative_links": 20,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:26aec958abb033a181affe09e477f6e966f92b0e6708096872bfc94166c3ecd7",
+      "sha256": "sha256:f7c6630568e9598cddd284b1346bca9a29a243e48d953c74db89274a3f985bd4",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -1310,7 +1310,7 @@
       "normative": false,
       "path": "docs/prompts/coverage-versions/IMPLEMENT_0_9_0.md",
       "relative_links": 6,
-      "sha256": "sha256:8695123d472927c8338ef5111b253d18d90fa708ec56ae4d5a46b98a330fbf2f",
+      "sha256": "sha256:f1520faf5c97548cef82401534fe587ee9727b6085195b6d8546a5e5591d8034",
       "title": "Execution Prompt — Implement mainframe-env 0.9.0",
       "xtask_commands": 0
     },
@@ -1470,7 +1470,7 @@
       "normative": false,
       "path": "docs/runbooks/IBM-DOCS-CACHE.md",
       "relative_links": 3,
-      "sha256": "sha256:ad1bf599b738f4485907657a2ff0b03d2dccc5d696eb6ba6ab709eeb64ad0781",
+      "sha256": "sha256:72d9d8d18f4e1279dc82978c41e305a4e6d55961366a55eabea6e1c1b707b19d",
       "title": "IBM documentation cache",
       "xtask_commands": 0
     },

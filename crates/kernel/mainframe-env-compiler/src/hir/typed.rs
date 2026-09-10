@@ -928,6 +928,9 @@ fn resolve_cics(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCi
     {
         body = &body[..body.len() - 1];
     }
+    if cics_resolution::validated_legacy_spi_compatibility(body)?.is_some() {
+        return Err(ResolutionFailure::Unsupported);
+    }
     let (descriptor, clauses, raw_options) = cics_resolution::validated_command(body, semantic)?;
     match descriptor.readiness {
         CicsApplicationHandlerReadiness::TypedRuntime => {}
@@ -1880,16 +1883,24 @@ mod tests {
         let bare = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBASE. PROCEDURE DIVISION. EXEC CICS ASKTIME END-EXEC. STOP RUN.",
         );
-        assert!(bare.hir.is_some(), "{:?}", bare.diagnostics);
+        assert!(bare.hir.is_none());
+        assert!(bare.diagnostics.iter().any(|diagnostic| {
+            let message = diagnostic.public_message();
+            message.contains("ASKTIME") && message.contains("handler is unready")
+        }));
 
         let longer = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLONG. DATA DIVISION. WORKING-STORAGE SECTION. 01 TIME-X PIC X(8). PROCEDURE DIVISION. EXEC CICS ASKTIME ABSTIME(TIME-X) END-EXEC. STOP RUN.",
         );
-        assert!(longer.hir.is_none());
-        assert!(longer.diagnostics.iter().any(|diagnostic| {
-            let message = diagnostic.public_message();
-            message.contains("ASKTIME ABSTIME") && message.contains("handler is unready")
-        }));
+        let hir = longer
+            .hir
+            .unwrap_or_else(|| panic!("ASKTIME ABSTIME: {:?}", longer.diagnostics));
+        let statement = hir
+            .statements
+            .iter()
+            .find(|statement| statement.kind == StatementKind::ExecCics)
+            .expect("EXEC CICS statement");
+        assert!(statement.resolved.is_none());
     }
 
     #[test]
@@ -2173,6 +2184,91 @@ mod tests {
                 descriptor.label_tokens,
                 ["READ"] | ["REWRITE"] | ["SYNCPOINT"]
             )
+        }));
+    }
+
+    #[test]
+    fn legacy_spi_compatibility_is_exactly_inquire_program() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSSPI. DATA DIVISION. WORKING-STORAGE SECTION. 01 IDX PIC 9 VALUE 1. 01 NAMES. 05 PGM-NAME PIC X(4) OCCURS 2. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS INQUIRE PROGRAM(PGM-NAME(IDX)) NOHANDLE RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("INQUIRE PROGRAM: {:?}", analysis.diagnostics));
+        let statement = hir
+            .statements
+            .iter()
+            .find(|statement| statement.kind == StatementKind::ExecCics)
+            .expect("EXEC CICS statement");
+        assert!(statement.resolved.is_none());
+
+        for command in [
+            "INQUIRE NOHANDLE PROGRAM('P001')",
+            "INQUIRE RESP(RESP-X) PROGRAM('P001')",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSSPIO. DATA DIVISION. WORKING-STORAGE SECTION. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{command}: {:?}", analysis.diagnostics));
+            let statement = hir
+                .statements
+                .iter()
+                .find(|statement| statement.kind == StatementKind::ExecCics)
+                .expect("EXEC CICS statement");
+            assert!(statement.resolved.is_none(), "{command}");
+        }
+
+        for (command, expected) in [
+            ("INQUIRE PROGRAM", "requires a parenthesized operand"),
+            ("INQUIRE PROGRAM()", "operand clause is empty"),
+            (
+                "INQUIRE PROGRAM('P001') PROGRAM('P002')",
+                "top-level option PROGRAM is duplicated",
+            ),
+            (
+                "INQUIRE PROGRAM('P001') UNKNOWN",
+                "unknown legacy SPI option UNKNOWN",
+            ),
+            (
+                "INQUIRE PROGRAM('P001') RESP2(RESP2-X)",
+                "option RESP2 requires RESP",
+            ),
+            (
+                "INQUIRE PROGRAM('P001') NOHANDLE('X')",
+                "option NOHANDLE is a flag",
+            ),
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSSPIE. DATA DIVISION. WORKING-STORAGE SECTION. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+
+        for command in ["INQUIRE", "INQUIRE FILE('ACCTDAT')", "SET FILE('ACCTDAT')"] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSSPIN. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            assert!(analyze(&source).hir.is_none(), "{command}");
+        }
+
+        let reordered_application = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBTSA. DATA DIVISION. WORKING-STORAGE SECTION. 01 PGM-OUT PIC X(8). PROCEDURE DIVISION. EXEC CICS INQUIRE PROGRAM(PGM-OUT) ACTIVITYID('A1') END-EXEC. STOP RUN.",
+        );
+        assert!(reordered_application.hir.is_none());
+        assert!(reordered_application.diagnostics.iter().any(|diagnostic| {
+            let message = diagnostic.public_message();
+            message.contains("INQUIRE ACTIVITYID") && message.contains("handler is unready")
         }));
     }
 

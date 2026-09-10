@@ -1041,12 +1041,12 @@
   "coverage_credit": 0,
   "differential_credit": 0,
   "execution_authority": false,
-  "independent_verification_sha256": "sha256:448bb377e814f862d431b8a8c53cd0f791dbfdea0f3f11533c1d1b1201c1b082",
+  "independent_verification_sha256": "sha256:b1220f570c42ad15ab36c9398e52667db1a308746e3c11d13291e0637a085f4b",
   "inputs": {
-    "candidate_projection_sha256": "sha256:b3d41cd9010ac17e57779986053d15ec20af92ebf5565120840585af0c190691",
-    "extraction_plan_sha256": "sha256:4e21fb266527587c26cdba4e51e1882450e842735fbf126775e81f021b779cb5",
-    "source_corpus_sha256": "sha256:bcf2cf916afc8cf1cdcef609994a4c38cb3067b4e8a33c50f4aa1b089870cb4d",
-    "source_map_sha256": "sha256:adcc0d729334168b13395cff55e1d94ef463e8ab254127f0a7ab7a8e278433ac",
+    "candidate_projection_sha256": "sha256:828f942b652262830b9d2ce73604fcd9978e0767e26f021cc74f59f9fed13b33",
+    "extraction_plan_sha256": "sha256:cab0ab3b3baf1abb0b9a4c2bd07525692d3026a8e864abe1a1cdbee24d723c22",
+    "source_corpus_sha256": "sha256:85df7da9e5e6548e6cbeba4349fb84c8dcc0f6e7bfe4198301cabb0503043502",
+    "source_map_sha256": "sha256:6af1ce4e3fd7326b3240a6c5a9fdb2afca1ca4fe4daae3ac10b89f7f93f50145",
     "topic_manifest_sha256": "sha256:6a84b58f232d41cf4cd2f483ceaa640beb0fea77e0ac5e557839e5a5858c47bc"
   },
   "issue_dispositions": {
@@ -1089,7 +1089,7 @@
       "path": "conformance/0.9/schemas/cics-source-review.schema.json"
     }
   },
-  "review_sha256": "sha256:0a3d1e4c5d62cd667fa910e60fcdde34ee9698139faaa796cb93debe2b7adc81",
+  "review_sha256": "sha256:b62ba10bf18685740cea2aa9e229f4e3f455a113eabb9edbb4ecd58ef112f369",
   "review_status": "auto-accepted-with-bounded-ambiguities",
   "schema_version": "mainframe-env.cics-source-review@2",
   "semantic_authority": false,

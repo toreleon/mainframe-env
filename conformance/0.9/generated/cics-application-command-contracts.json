@@ -12,7 +12,7 @@
   "inputs": {
     "command_descriptors": {
       "path": "conformance/0.9/cics/command-descriptors.json",
-      "file_sha256": "sha256:98e61ddec3d1e2a97c4d2b029db8222aa3b893eadaffb1bae673ac95ac7a723f",
+      "file_sha256": "sha256:ecc0a5bf94c28c0f1b135f88a263db2d3c5ad812cf3cea6c313476c6497c35f9",
       "application_identity_set_sha256": "sha256:a18057164564781563252d53586a8afbc401f2783950db456b3b98177fc60b94"
     }
   },
@@ -791,7 +791,7 @@
       "web-control": 14,
       "web-service-control": 8
     },
-    "registry_sha256": "sha256:a2748ccf8b533a27be1589f4569d8ba561d7f4811527f929f384586607df4da8"
+    "registry_sha256": "sha256:26280361a09119b3001cff439a5c10a96845836b85901702f906c3ec74d59346"
   },
   "counts": {
     "batches": 3,
@@ -821,11 +821,11 @@
       "source_input": {
         "projection": {
           "path": "conformance/0.9/generated/cics-application-api-sources-a-candidates.json",
-          "file_sha256": "sha256:ed748d9fdf35a036c6692318829736057694dacecaa07a08508f863e64147e05"
+          "file_sha256": "sha256:f0918433d7f96d51cc7861c12e5d4434cc5f42c977d3cfd8dd264d5d5c512ed7"
         },
         "review": {
           "path": "conformance/0.9/cics/application-api-sources-a-review.json",
-          "file_sha256": "sha256:7be7f26b3ac9d81fef07ebe2b78e7643e5e3a9860a1445b16458f45914356500",
+          "file_sha256": "sha256:bd8af2a410dce2d5c5748546ec845c92680238971744abddf5526428184a596f",
           "review_status": "auto-accepted-with-bounded-ambiguities"
         }
       },
@@ -9961,9 +9961,9 @@
           "eibfn": "1002",
           "source_status": "verified",
           "contract_status": "frozen-with-bounded-ambiguity",
-          "implementation_status": "legacy-compatibility",
-          "registration_status": "legacy-compatibility",
-          "existing_runtime_operation": "Asktime",
+          "implementation_status": "unimplemented",
+          "registration_status": "unready",
+          "existing_runtime_operation": null,
           "source_dimensions": [
             {
               "name": "grammar",
@@ -10370,11 +10370,11 @@
             },
             "resource": {
               "status": "bounded-ambiguity",
-              "scope": "cics-transaction",
+              "scope": "bounded-ambiguity",
               "selectors": [],
               "ambiguous_selectors": [],
               "excluded_output_options": [],
-              "selector_authority": "source-bound-runtime",
+              "selector_authority": "source-candidate-only",
               "selector_completeness": "bounded-ambiguity",
               "fallback_selector": null,
               "access_intent": "bounded-ambiguity",
@@ -10386,7 +10386,6 @@
               "required": [
                 "host.audit",
                 "host.cics.execute",
-                "host.clock",
                 "host.security.authorize"
               ]
             },
@@ -10394,14 +10393,7 @@
               "status": "bounded-ambiguity",
               "class": "bounded-ambiguity",
               "mutating": null,
-              "ir_effects": [
-                "audit",
-                "clock",
-                "condition",
-                "memory-write",
-                "security",
-                "transaction"
-              ],
+              "ir_effects": [],
               "canonical_identity": "mainframe-env.effect-canonical@1"
             },
             "cancellation": {
@@ -10432,14 +10424,14 @@
             "registry": {
               "family": "time",
               "handler_id": "mainframe-env-cics.handlers.time.asktime@1",
-              "readiness": "legacy-compatibility",
-              "advertised": true,
-              "runtime_operation": "Asktime",
-              "unready_result": null,
-              "handler_sha256": "sha256:efb0c7c27309b9b24e3ebd8534ecce7e6b51fce947a4716e239bcb369c0f00ad"
+              "readiness": "unready",
+              "advertised": false,
+              "runtime_operation": null,
+              "unready_result": "explicit-unsupported",
+              "handler_sha256": "sha256:db230516463c9df64cc8120c8253650a3ff1c09c5f67487163d3eacd6b3022e2"
             }
           },
-          "row_contract_sha256": "sha256:ea38d33ffcae4867078d1795ee57a8afc98b20e00e1f2e706bf94d6a340c613d"
+          "row_contract_sha256": "sha256:2c60a00ddb7216accd0edba8564bd0cb0e1442dc4724e3eb74aaa96384eb918c"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0010",
@@ -10447,9 +10439,9 @@
           "eibfn": "4A02",
           "source_status": "verified",
           "contract_status": "frozen-with-bounded-ambiguity",
-          "implementation_status": "unimplemented",
-          "registration_status": "unready",
-          "existing_runtime_operation": null,
+          "implementation_status": "legacy-compatibility",
+          "registration_status": "legacy-compatibility",
+          "existing_runtime_operation": "Asktime",
           "source_dimensions": [
             {
               "name": "grammar",
@@ -10969,11 +10961,11 @@
             },
             "resource": {
               "status": "bounded-ambiguity",
-              "scope": "bounded-ambiguity",
+              "scope": "cics-transaction",
               "selectors": [],
               "ambiguous_selectors": [],
               "excluded_output_options": [],
-              "selector_authority": "source-candidate-only",
+              "selector_authority": "source-bound-runtime",
               "selector_completeness": "bounded-ambiguity",
               "fallback_selector": null,
               "access_intent": "bounded-ambiguity",
@@ -10985,6 +10977,7 @@
               "required": [
                 "host.audit",
                 "host.cics.execute",
+                "host.clock",
                 "host.security.authorize"
               ]
             },
@@ -10992,7 +10985,14 @@
               "status": "bounded-ambiguity",
               "class": "bounded-ambiguity",
               "mutating": null,
-              "ir_effects": [],
+              "ir_effects": [
+                "audit",
+                "clock",
+                "condition",
+                "memory-write",
+                "security",
+                "transaction"
+              ],
               "canonical_identity": "mainframe-env.effect-canonical@1"
             },
             "cancellation": {
@@ -11023,14 +11023,14 @@
             "registry": {
               "family": "time",
               "handler_id": "mainframe-env-cics.handlers.time.asktime-abstime@1",
-              "readiness": "unready",
-              "advertised": false,
-              "runtime_operation": null,
-              "unready_result": "explicit-unsupported",
-              "handler_sha256": "sha256:455d3c832f707ba04b74e45ffe037b1a19a734082add2cf9b719ac87dc58b645"
+              "readiness": "legacy-compatibility",
+              "advertised": true,
+              "runtime_operation": "Asktime",
+              "unready_result": null,
+              "handler_sha256": "sha256:d5f2cd67bc096e4a8050dbf8e35b50f191f3be6a3ead0d6235098ec588f7e7ea"
             }
           },
-          "row_contract_sha256": "sha256:c969807c82acea5559a28f05c5077aa395a156f0f66eb660920f05c135ce3b16"
+          "row_contract_sha256": "sha256:1f49cd61a9f19fbece1ba5dd40f7a2cb09cb5082b2b01223060b54ffb48ae078"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0011",
@@ -145924,11 +145924,11 @@
       "source_input": {
         "projection": {
           "path": "conformance/0.9/generated/cics-application-api-sources-b-candidates.json",
-          "file_sha256": "sha256:a2b82941bf6462cdc42a9bed1a64b4128dfe1df404f0e1e76e16f8ed3ff911eb"
+          "file_sha256": "sha256:e83ee1054f46aa872473729e2a10937c2d60ce4429cf606fe9fec4d939f3156b"
         },
         "review": {
           "path": "conformance/0.9/cics/application-api-sources-b-review.json",
-          "file_sha256": "sha256:2ed187091d5fd7c98b3f390f4ca7777746ee3aa3e3834815dc354083cf715134",
+          "file_sha256": "sha256:3da42fcb80c25c5ce6c3b7c41958b7f428963da90339398179a52be043dffe63",
           "review_status": "auto-accepted-with-bounded-ambiguities"
         }
       },
@@ -273637,11 +273637,11 @@
       "source_input": {
         "projection": {
           "path": "conformance/0.9/generated/cics-application-api-sources-c-candidates.json",
-          "file_sha256": "sha256:b3d41cd9010ac17e57779986053d15ec20af92ebf5565120840585af0c190691"
+          "file_sha256": "sha256:828f942b652262830b9d2ce73604fcd9978e0767e26f021cc74f59f9fed13b33"
         },
         "review": {
           "path": "conformance/0.9/cics/application-api-sources-c-review.json",
-          "file_sha256": "sha256:e2f8afd6c7d7073524a7683c7627fb2cb6c146afe0e9c764d5dea8bc1e1ae506",
+          "file_sha256": "sha256:5c8a50eb5c5f822181028a8b0171bb3675bd13ea5fbed63cb2e6d0f457b330b6",
           "review_status": "auto-accepted-with-bounded-ambiguities"
         }
       },
@@ -446320,5 +446320,5 @@
       ]
     }
   ],
-  "contract_sha256": "sha256:50055fed5f68779427acb2dc43cf895fd4a81ccce35f396f2ebf403f1ee99ff3"
+  "contract_sha256": "sha256:0b2bfe153834b053bda9e40155a5024e9c3ec225be575a5476119889c15b83f2"
 }

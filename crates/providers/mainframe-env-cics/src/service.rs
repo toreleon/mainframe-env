@@ -4541,14 +4541,14 @@ mod tests {
     fn shared_catalog_recognizes_all_frozen_forms() {
         let cases = [
             ("ABEND", CicsOperation::Abend),
-            ("ASKTIME", CicsOperation::Asktime),
+            ("ASKTIME ABSTIME(ABS-TIME)", CicsOperation::Asktime),
             ("ASSIGN", CicsOperation::Assign),
             ("DELETE", CicsOperation::Delete),
             ("ENDBR", CicsOperation::EndBrowse),
             ("FORMATTIME", CicsOperation::FormatTime),
             ("HANDLE ABEND", CicsOperation::HandleAbend),
             ("HANDLE CONDITION", CicsOperation::HandleCondition),
-            ("INQUIRE", CicsOperation::Inquire),
+            ("INQUIRE PROGRAM(PGM)", CicsOperation::Inquire),
             ("LINK", CicsOperation::Link),
             ("READ", CicsOperation::Read),
             ("READNEXT", CicsOperation::ReadNext),
@@ -4589,12 +4589,18 @@ mod tests {
             families.insert(format!("{:?}", descriptor.family));
         }
         assert_eq!(families.len(), 7);
+        let asktime = command_descriptor(CicsOperation::Asktime);
+        assert_eq!(asktime.syntax, "ASKTIME ABSTIME");
+        assert_eq!(
+            asktime.official_row,
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0010"
+        );
     }
 
     #[test]
     fn carddemo_residual_cics_forms_are_executable() {
         for source in [
-            "ASKTIME",
+            "ASKTIME ABSTIME(ABS-TIME)",
             "FORMATTIME",
             "INQUIRE PROGRAM(COCRDLIC)",
             "LINK PROGRAM(COPAUS2C)",

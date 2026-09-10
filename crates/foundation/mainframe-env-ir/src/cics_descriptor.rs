@@ -484,16 +484,18 @@ mod tests {
         let asktime = cics_application_registry_for_tokens(&["asktime"])
             .expect("ASKTIME must be catalog-known");
         assert_eq!(asktime.label_tokens, ["ASKTIME"]);
-        assert_eq!(
-            asktime.readiness,
-            CicsApplicationHandlerReadiness::LegacyCompatibility
-        );
+        assert_eq!(asktime.readiness, CicsApplicationHandlerReadiness::Unready);
+        assert!(!asktime.advertised);
 
         let absolute = cics_application_registry_for_tokens(&["asktime", "abstime", "target"])
             .expect("ASKTIME ABSTIME must be catalog-known");
         assert_eq!(absolute.label_tokens, ["ASKTIME", "ABSTIME"]);
-        assert_eq!(absolute.readiness, CicsApplicationHandlerReadiness::Unready);
-        assert!(!absolute.advertised);
+        assert_eq!(
+            absolute.readiness,
+            CicsApplicationHandlerReadiness::LegacyCompatibility
+        );
+        assert!(absolute.advertised);
+        assert_eq!(absolute.runtime_operation, Some("Asktime"));
     }
 
     #[test]

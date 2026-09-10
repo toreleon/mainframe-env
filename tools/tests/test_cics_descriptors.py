@@ -113,6 +113,7 @@ class CicsDescriptorTests(unittest.TestCase):
         catalog = cics_descriptors.load_catalog(ROOT)
         provider = cics_descriptors.render_provider(ROOT)
         host = cics_descriptors.render_host(ROOT)
+        compiler_spi = cics_descriptors.render_compiler_spi_compatibility(ROOT)
         contracts = cics_descriptors.build_contracts(ROOT)
         ir_registry = cics_descriptors.render_ir_registry(ROOT, contracts)
         self.assertEqual(provider.count("CicsOperation::"), 50)
@@ -121,6 +122,13 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertEqual(len(catalog["_application_commands"]), 263)
         self.assertEqual(len(catalog["_runtime_operations"]), 25)
         self.assertEqual(host.count("official_row:"), 263)
+        self.assertIn(
+            'official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0155"',
+            compiler_spi,
+        )
+        self.assertIn('runtime_operation: "Inquire"', compiler_spi)
+        self.assertNotIn("SetFileStatus", compiler_spi)
+        self.assertNotIn("SET FILE", compiler_spi)
         self.assertIn(
             'CICS_APPLICATION_COMMAND_IDENTITY_SET_SHA256: &str =',
             host,
@@ -160,6 +168,17 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertEqual(
             sum(row["implementation_status"] == "unimplemented" for row in contract_rows),
             240,
+        )
+        rows_by_label = {row["label"]: row for row in contract_rows}
+        self.assertEqual(rows_by_label["ASKTIME"]["registration_status"], "unready")
+        self.assertEqual(rows_by_label["ASKTIME"]["contract"]["registry"]["family"], "time")
+        self.assertEqual(
+            rows_by_label["ASKTIME ABSTIME"]["registration_status"],
+            "legacy-compatibility",
+        )
+        self.assertEqual(
+            rows_by_label["ASKTIME ABSTIME"]["existing_runtime_operation"],
+            "Asktime",
         )
         self.assertEqual(ir_registry.count("CicsApplicationRegistryDescriptor {"), 263)
         self.assertIn("CICS_APPLICATION_REGISTRY_FROZEN", ir_registry)
@@ -274,6 +293,7 @@ class CicsDescriptorTests(unittest.TestCase):
             for relative in [
                 cics_descriptors.OUTPUT_PATH,
                 cics_descriptors.HOST_OUTPUT_PATH,
+                cics_descriptors.COMPILER_SPI_COMPAT_OUTPUT_PATH,
                 cics_descriptors.IR_REGISTRY_OUTPUT_PATH,
                 cics_descriptors.CONTRACT_OUTPUT_PATH,
             ]:

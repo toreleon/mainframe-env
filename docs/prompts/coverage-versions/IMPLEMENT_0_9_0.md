@@ -33,7 +33,16 @@ split is exactly 3 `typed-runtime`, 20 `legacy-compatibility`, and 240 `unready`
 API rows. Only the 23 existing API routes are advertised. Automatic
 registration remains disabled, there is no default handler or generic-success
 fallback, and unready rows fail explicitly. SPI and FEPI identities cannot
-enter this application registry or its compiler route.
+enter this application registry or be treated as application routes.
+
+Within that unchanged split, the existing time handler backs the official
+`ASKTIME ABSTIME` form, which returns the packed-decimal destination. Bare
+`ASKTIME` is unready until its distinct EIBDATE/EIBTIME updates are implemented.
+One generated compiler-only compatibility descriptor preserves exactly
+`INQUIRE PROGRAM` on the pre-existing raw `Inquire` route. It remains bound to
+SPI row `0155` outside the 263-row application registry and digest; it must not
+admit `SET FILE`, another `INQUIRE` form, unknown options, or an application
+candidate selected by an application discriminator.
 
 CIC-901 carries zero execution, coverage, semantic, conformance, and licensed
 differential credit. It establishes the source-backed contract needed for

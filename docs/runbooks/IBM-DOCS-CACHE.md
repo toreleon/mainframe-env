@@ -103,12 +103,15 @@ command-summary gaps; supplemental sources must remain separately identified
 and independently verified rather than being aliased to similarly named
 commands.
 
-The registered `cics-application-api-sources-a` scope currently contains 173
-HTML topics. Verify the pinned topics, TOC and full source closure with:
+The three registered CICS application scopes contain 173, 176, and 224 target
+HTML topics for `sources-a`, `sources-b`, and `sources-c`. Verify every pinned
+topic, TOC, and full one-hop source closure with:
 
 ```bash
 docker/dev docs status --scope cics-application-api-sources-a
-docker/dev exec python3 -B conformance/0.9/tools/fetch_cics_application_sources.py --check --cache /ibm-docs/topic-cache
+docker/dev docs status --scope cics-application-api-sources-b
+docker/dev docs status --scope cics-application-api-sources-c
+docker/dev exec python3 -B conformance/0.9/tools/fetch_cics_application_sources.py --batch all --check --cache /ibm-docs/topic-cache
 ```
 
 The first command checks the manifest topics and TOC. The second also
@@ -117,8 +120,9 @@ run is different: it uses `conformance/tools/browser_fetch.py` through the
 user's Chrome Browser-Control session, not native CUA, and only then publishes
 verified content-endpoint bytes to the content-addressed cache. The committed
 `application-api-sources-a-browser-verification.json` receipt records the
-separate direct-Chrome reproduction of all 173 topic byte counts and SHA-256
-identities; it grants no semantic or coverage credit.
+separate direct-Chrome reproduction of its 173 topic byte counts and SHA-256
+identities; the B/C manifests bind their corresponding browser-imported HTML
+sets. None grants semantic or coverage credit.
 
 Five authority-bounded HTML supplements close the three map-stage gaps. They
 have no TOC claim and are verified separately:
@@ -127,13 +131,15 @@ have no TOC claim and are verified separately:
 docker/dev exec python3 -B conformance/0.9/tools/cache_cics_application_source_supplements.py --check --cache /ibm-docs/topic-cache
 ```
 
-## Reproduce the CICS sources-a structural projection
+## Reproduce the CICS application structural projections
 
 The committed projection can be checked without mounting the documentation
 cache:
 
 ```bash
-docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --check
+docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch a --check
+docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch b --check
+docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch c --check
 ```
 
 This form verifies the exact plan, map, corpus, manifest, browser receipt,
@@ -142,18 +148,26 @@ and projection digest. To re-read every pinned HTML body and regenerate the
 candidate bytes before comparing them to Git, use the cache-backed form:
 
 ```bash
-docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --cache /ibm-docs/topic-cache --check
+docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch a --cache /ibm-docs/topic-cache --check
+docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch b --cache /ibm-docs/topic-cache --check
+docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch c --cache /ibm-docs/topic-cache --check
 ```
 
 Both forms are offline and preserve the zero-credit boundary. The projection
 contains structural locators, fragment hashes, and bounded symbolic values,
 not IBM publication text. It has no source-gap, unmatched, conflicting,
 reprojection, or mismatch finding; two target-equivalence ambiguities remain
-explicit for the authority-bounded `DUMP` and `ENTER TRACEID` sources. Verify
-the projection independently and refresh its compact automatic receipt with:
+explicit for the authority-bounded `DUMP` and `ENTER TRACEID` sources. Run the
+independent verifier directly before checking each compact automatic receipt;
+this keeps extraction and verification implementations separate:
 
 ```bash
-docker/dev exec python3 -B conformance/0.9/tools/review_cics_application_sources.py --check --cache /ibm-docs/topic-cache
+docker/dev exec python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch a --cache /ibm-docs/topic-cache
+docker/dev exec python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch b --cache /ibm-docs/topic-cache
+docker/dev exec python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch c --cache /ibm-docs/topic-cache
+docker/dev exec python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch a --check --cache /ibm-docs/topic-cache
+docker/dev exec python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch b --check --cache /ibm-docs/topic-cache
+docker/dev exec python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch c --check --cache /ibm-docs/topic-cache
 ```
 
 If a later check needs another HTML topic, add and reproduce it through the

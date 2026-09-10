@@ -11,13 +11,13 @@
   "inputs": {
     "source_map": {
       "path": "conformance/0.9/cics/application-api-sources-c-map.json",
-      "file_sha256": "sha256:adcc0d729334168b13395cff55e1d94ef463e8ab254127f0a7ab7a8e278433ac",
-      "logical_sha256": "sha256:745d459bc68113c0f4de767e77da3f3616b73a9aca55c850a6e4b286ca75cfa4"
+      "file_sha256": "sha256:6af1ce4e3fd7326b3240a6c5a9fdb2afca1ca4fe4daae3ac10b89f7f93f50145",
+      "logical_sha256": "sha256:a5f85561c9958e03353938ddb850c8f0614e19d225a91046ac83fb37038463a0"
     },
     "source_corpus": {
       "path": "conformance/0.9/cics/application-api-sources-c-corpus.json",
-      "file_sha256": "sha256:bcf2cf916afc8cf1cdcef609994a4c38cb3067b4e8a33c50f4aa1b089870cb4d",
-      "logical_sha256": "sha256:626ebeeeff8c04874139610ff593235713d4f8b2f237806f59f6c3c2019338f8"
+      "file_sha256": "sha256:85df7da9e5e6548e6cbeba4349fb84c8dcc0f6e7bfe4198301cabb0503043502",
+      "logical_sha256": "sha256:c09c47d893b35e66938c6a43ec2b71674b2f3b0191838037db48d2ecbfc4f757"
     },
     "topic_manifest": {
       "path": "conformance/0.9/manifests/cics-application-api-sources-c-topics.json",
@@ -26,8 +26,8 @@
     },
     "extraction_plan": {
       "path": "conformance/0.9/cics/application-api-sources-c-extraction.json",
-      "file_sha256": "sha256:4e21fb266527587c26cdba4e51e1882450e842735fbf126775e81f021b779cb5",
-      "logical_sha256": "sha256:41cdc2a9a7dab5baeb8d8fa336cdfd9cecc85df61c13b6e42927bd4c78e71a79"
+      "file_sha256": "sha256:cab0ab3b3baf1abb0b9a4c2bd07525692d3026a8e864abe1a1cdbee24d723c22",
+      "logical_sha256": "sha256:567f1c60cf2edf2ce425830f7733b2ac3a17d6e558fad9e0b45fc92fbb419f7a"
     }
   },
   "extractor": {
@@ -228865,5 +228865,5 @@
     }
   ],
   "projection_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-candidates@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of the complete candidate projection with projection_sha256 omitted",
-  "projection_sha256": "sha256:3816721fcf71dc379435765c4c11c9dfef41774e25a92767f182ad14c8601a2f"
+  "projection_sha256": "sha256:b315c0efd19f277a6bd31c2660d57dd369d90cd006e72c512097f684222c0827"
 }

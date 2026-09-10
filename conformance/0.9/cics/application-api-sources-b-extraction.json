@@ -10,11 +10,11 @@
   "inputs": {
     "mapping": {
       "path": "conformance/0.9/cics/application-api-sources-b-map.json",
-      "sha256": "sha256:8fafec72db95bf93a2cde0e8dea44441db377ecdcbfd4b4c5c5ccdf011c9a026"
+      "sha256": "sha256:ac9d5fd77261828636c15fc53677a86c63abced65acbbd2ad605608717f307cf"
     },
     "corpus": {
       "path": "conformance/0.9/cics/application-api-sources-b-corpus.json",
-      "sha256": "sha256:2ebc6cacb08812fe93e0959ea61ded4c8a212c97e4445f0aa4db5e0f7e5f35bf"
+      "sha256": "sha256:ee346ff30c692f7b8e4b8de40c9f8e15f376b3b5f666fe6979d78e7c7db59620"
     },
     "topic_manifest": {
       "path": "conformance/0.9/manifests/cics-application-api-sources-b-topics.json",
@@ -329,5 +329,5 @@
   "conflict_expectations": [],
   "source_resolutions": [],
   "extraction_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-extraction@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of the complete extraction plan with extraction_sha256 omitted",
-  "extraction_sha256": "sha256:a3b3fd0745cfa60c63e5aa1ed1e0b3efeb5ec0108e7c16b47b5b5c198cf164c7"
+  "extraction_sha256": "sha256:a2aaf023ec03426fe33935d1785f69f90c091d40221f52aa40f4c54900b97316"
 }

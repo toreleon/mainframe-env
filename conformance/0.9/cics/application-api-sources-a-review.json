@@ -786,12 +786,12 @@
   "coverage_credit": 0,
   "differential_credit": 0,
   "execution_authority": false,
-  "independent_verification_sha256": "sha256:68fe926637c9ad9d0a7195de613360fdd8e5e902e33eb1411a084aa679bf229a",
+  "independent_verification_sha256": "sha256:af4bdee28dd9461a6c4b6f73cb3c2d60b305e7bdb6cc839218109fdfad53b17e",
   "inputs": {
-    "candidate_projection_sha256": "sha256:ed748d9fdf35a036c6692318829736057694dacecaa07a08508f863e64147e05",
-    "extraction_plan_sha256": "sha256:09f49b1e424c04ec7b0c0c4a1d696e3e623a6b2969428378cbeb05f87b57b147",
-    "source_corpus_sha256": "sha256:52f0b62fea98b76d62144558b3d9db2c1bb3539d745b6945a993c57e4a0aacf4",
-    "source_map_sha256": "sha256:42ec28acc106501d834164bb3896fb0ef3b2a84d1b9028d307c21f6d3573c9a0",
+    "candidate_projection_sha256": "sha256:f0918433d7f96d51cc7861c12e5d4434cc5f42c977d3cfd8dd264d5d5c512ed7",
+    "extraction_plan_sha256": "sha256:a7f1406b4141e4772c0db3e2eac63677d779f09d119b1e33fb103171f276dd88",
+    "source_corpus_sha256": "sha256:be878e45e226d1647750f6ab7defe4afd1d7133a0ddc386cf5be4e9cd46d8ec2",
+    "source_map_sha256": "sha256:14ea98335ea5cc0f08aa30c44cd411236823d6edeaa5f1aecc485cc8cd22bc4d",
     "source_supplements_sha256": "sha256:a66a5e8e1879845a331642f19f5daf38ab775332100bf59d10f59eb07607dc16",
     "topic_manifest_sha256": "sha256:ab7120009fb0f2a9d121ffdf518d05960ee006e74f1d28026858cafd6c5467de"
   },
@@ -835,7 +835,7 @@
       "path": "conformance/0.9/schemas/cics-source-review.schema.json"
     }
   },
-  "review_sha256": "sha256:ed266361802092c19d8549a4cc9b493ce186d933645ba62ba5523c2fe5512b65",
+  "review_sha256": "sha256:03bb2b83212da2ee3bcb6e6c155dae0bf10337ab6f4fea48c2e004b426faa76a",
   "review_status": "auto-accepted-with-bounded-ambiguities",
   "schema_version": "mainframe-env.cics-source-review@2",
   "semantic_authority": false,

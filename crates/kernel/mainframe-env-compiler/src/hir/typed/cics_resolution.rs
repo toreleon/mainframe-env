@@ -12,6 +12,21 @@ use std::collections::{BTreeMap, BTreeSet};
 
 type Clauses = BTreeMap<String, Vec<String>>;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct CicsLegacySpiCompatibilityDescriptor {
+    pub(super) official_row: &'static str,
+    pub(super) label_tokens: &'static [&'static str],
+    pub(super) recognition_head: &'static [&'static str],
+    pub(super) runtime_operation: &'static str,
+    pub(super) required_value_options: &'static [&'static str],
+    pub(super) optional_value_options: &'static [&'static str],
+    pub(super) optional_flag_options: &'static [&'static str],
+    pub(super) application_discriminator_options: &'static [&'static str],
+    pub(super) resp2_requires_resp: bool,
+}
+
+include!("generated_cics_spi_compatibility.rs");
+
 struct ValidatedCandidate {
     descriptor: &'static CicsApplicationRegistryDescriptor,
     clauses: Clauses,
@@ -22,6 +37,103 @@ struct ValidatedCandidate {
 struct CandidateFailure {
     score: (usize, usize, usize),
     detail: String,
+}
+
+pub(super) fn validated_legacy_spi_compatibility(
+    body: &[String],
+) -> Resolution<Option<&'static CicsLegacySpiCompatibilityDescriptor>> {
+    let descriptor = &CICS_LEGACY_SPI_COMPATIBILITY;
+    if descriptor.recognition_head.len() > body.len()
+        || !descriptor
+            .recognition_head
+            .iter()
+            .zip(body)
+            .all(|(expected, actual)| expected.eq_ignore_ascii_case(actual))
+    {
+        return Ok(None);
+    }
+    let remainder = &body[descriptor.recognition_head.len()..];
+    let Some(selector) = descriptor.required_value_options.first() else {
+        return Err(ResolutionFailure::Invalid(
+            "compiler SPI compatibility descriptor has no selector".into(),
+        ));
+    };
+    let (clauses, options) = clauses(remainder)?;
+    if descriptor
+        .application_discriminator_options
+        .iter()
+        .any(|name| {
+            clauses.contains_key(*name) || options.iter().any(|option| option.as_str() == *name)
+        })
+    {
+        return Ok(None);
+    }
+    if !clauses.contains_key(*selector)
+        && !options.iter().any(|option| option.as_str() == *selector)
+    {
+        return Ok(None);
+    }
+    let value_options = descriptor
+        .required_value_options
+        .iter()
+        .chain(descriptor.optional_value_options)
+        .copied()
+        .collect::<BTreeSet<_>>();
+    let flag_options = descriptor
+        .optional_flag_options
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>();
+    for name in clauses.keys() {
+        if flag_options.contains(name.as_str()) {
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS {} option {name} is a flag and rejects a parenthesized operand",
+                descriptor.label_tokens.join(" ")
+            )));
+        }
+        if !value_options.contains(name.as_str()) {
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS {} has unknown legacy SPI option {name}",
+                descriptor.label_tokens.join(" ")
+            )));
+        }
+    }
+    for name in &options {
+        if value_options.contains(name.as_str()) {
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS {} option {name} requires a parenthesized operand",
+                descriptor.label_tokens.join(" ")
+            )));
+        }
+        if !flag_options.contains(name.as_str()) {
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS {} has unknown legacy SPI option {name}",
+                descriptor.label_tokens.join(" ")
+            )));
+        }
+    }
+    if let Some(required) = descriptor
+        .required_value_options
+        .iter()
+        .find(|required| !clauses.contains_key(**required))
+    {
+        return Err(ResolutionFailure::Invalid(format!(
+            "CICS {} requires option {required}",
+            descriptor.label_tokens.join(" ")
+        )));
+    }
+    if descriptor.resp2_requires_resp
+        && clauses.contains_key("RESP2")
+        && !clauses.contains_key("RESP")
+    {
+        return Err(ResolutionFailure::Invalid(format!(
+            "CICS {} option RESP2 requires RESP",
+            descriptor.label_tokens.join(" ")
+        )));
+    }
+    debug_assert_eq!(descriptor.runtime_operation, "Inquire");
+    debug_assert!(descriptor.official_row.contains(":spi-commands-unique:"));
+    Ok(Some(descriptor))
 }
 
 pub(super) fn validated_command(

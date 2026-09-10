@@ -73,18 +73,27 @@ split:
 - 240 `unready` rows that are recognized but fail explicitly as unsupported.
 
 The 23 existing API routes are the only advertised application commands.
+`ASKTIME ABSTIME` is the advertised time form because the existing handler
+returns its packed-decimal destination; bare `ASKTIME` remains unready until
+the runtime also implements its distinct EIBDATE/EIBTIME update contract.
 `automatic_registration` remains false, the default handler is null, and an
 unready row cannot reach a generic-success fallback. The application registry
-does not accept or dispatch SPI or FEPI identities. The two retained SPI
-compatibility operations remain confined to the separate legacy runtime
+does not accept or dispatch SPI or FEPI identities. A separate generated,
+compiler-only compatibility descriptor admits exactly `INQUIRE PROGRAM` to the
+pre-existing raw `Inquire` route; it is bound to SPI row `0155`, excluded from
+the 263-row registry and its digest, and does not admit `SET FILE`, other
+`INQUIRE` forms, or unknown options. The two retained SPI compatibility
+operations otherwise remain confined to the separate legacy runtime
 collection; SPI/FEPI completion belongs to 0.10.
 
 [`tools/generate_cics_descriptors.py`](../../tools/generate_cics_descriptors.py)
 deterministically writes the provider descriptors, host-API identity table,
-263-row contract, and compact IR registry. `--check` compares all generated
-outputs without writing. Schema, freshness, digest and module-boundary checks
-run under `cargo xtask architecture-fast --check`; hand-editing a generated
-artifact or changing an authority without regeneration fails the gate.
+263-row contract, compact IR registry, and the isolated compiler-only
+`INQUIRE PROGRAM` SPI compatibility descriptor. `--check` compares all
+generated outputs without writing. Schema, freshness, digest and
+module-boundary checks run under `cargo xtask architecture-fast --check`;
+hand-editing a generated artifact or changing an authority without
+regeneration fails the gate.
 
 CIC-901 is therefore an incremental, non-release architecture boundary. It
 freezes source-backed contracts and fail-closed registry shape so CIC-902 and

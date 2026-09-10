@@ -1380,7 +1380,7 @@
         "interface": "api",
         "family": "time",
         "mutating": false,
-        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0009"
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0010"
       },
       {
         "operation": "Assign",

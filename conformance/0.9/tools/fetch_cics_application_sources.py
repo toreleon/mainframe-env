@@ -50,7 +50,7 @@ PRODUCT = "SSJL4D_6.x"
 SNAPSHOT_DATE = "2026-09-10"
 TOC_URL = "https://www.ibm.com/docs/api/v1/toc/cics-ts/6.x?lang=en"
 TOC_SHA256 = "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a"
-MAP_SHA256 = "sha256:5bacdef388d9ee405008a895289348a9c95ff21bb271751e4d91407cd4b68b0e"
+MAP_SHA256 = "sha256:e3e453846334aa92235f21f0028e9c77f084fc4e872d9f592b7af227decac863"
 SUMMARY_PATH = source_map.SUMMARY_PATH
 CORPUS_DOMAIN = b"mainframe-env.cics-source-corpus@1\0"
 BROWSER_RECEIPT_DOMAIN = b"mainframe-env.cics-browser-source-verification@1\0"
