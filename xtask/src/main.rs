@@ -7489,6 +7489,39 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         status.success(),
         "CICS sources-a map freshness guard failed",
     )?;
+    let cics_source_corpus = root.join("conformance/0.9/tools/fetch_cics_application_sources.py");
+    require(
+        cics_source_corpus.is_file(),
+        "CICS sources-a corpus generator is missing",
+    )?;
+    let cics_source_corpus_path =
+        root.join("conformance/0.9/cics/application-api-sources-a-corpus.json");
+    let cics_source_corpus_schema =
+        root.join("conformance/0.9/schemas/cics-source-corpus.schema.json");
+    validate_schema_instance(
+        &json(&cics_source_corpus_schema)?,
+        &json(&cics_source_corpus_path)?,
+        &cics_source_corpus_path,
+    )?;
+    let cics_source_manifest =
+        root.join("conformance/0.9/manifests/cics-application-api-sources-a-topics.json");
+    let topic_manifest_schema = root.join("conformance/0.2/schemas/topic-manifest.schema.json");
+    validate_schema_instance(
+        &json(&topic_manifest_schema)?,
+        &json(&cics_source_manifest)?,
+        &cics_source_manifest,
+    )?;
+    let status = Command::new("python3")
+        .arg("-B")
+        .arg(&cics_source_corpus)
+        .arg("--check")
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("CICS sources-a corpus freshness guard: {error}"))?;
+    require(
+        status.success(),
+        "CICS sources-a corpus freshness guard failed",
+    )?;
     let module_boundaries = root.join("tools/check_module_boundaries.py");
     require(
         module_boundaries.is_file(),
