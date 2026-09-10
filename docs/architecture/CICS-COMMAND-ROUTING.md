@@ -160,14 +160,17 @@ records the hard limits and exact legacy ceiling policy.
 
 ```bash
 docker/dev exec python3 -B tools/generate_cics_descriptors.py --check
-docker/dev exec python3 -B tools/generate_cics_source_map.py --check
-docker/dev exec python3 -B conformance/0.9/tools/fetch_cics_application_sources.py --batch all --check
-docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch a --check
-docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch b --check
-docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch c --check
-docker/dev exec python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch a --check
-docker/dev exec python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch b --check
-docker/dev exec python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch c --check
+docker/dev exec python3 -B tools/generate_cics_source_map.py --batch all --check
+docker/dev exec python3 -B conformance/0.9/tools/fetch_cics_application_sources.py --batch all --cache /ibm-docs/topic-cache --check
+docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch a --cache /ibm-docs/topic-cache --check
+docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch b --cache /ibm-docs/topic-cache --check
+docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch c --cache /ibm-docs/topic-cache --check
+docker/dev exec python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch a --cache /ibm-docs/topic-cache
+docker/dev exec python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch b --cache /ibm-docs/topic-cache
+docker/dev exec python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch c --cache /ibm-docs/topic-cache
+docker/dev exec python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch a --cache /ibm-docs/topic-cache --check
+docker/dev exec python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch b --cache /ibm-docs/topic-cache --check
+docker/dev exec python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch c --cache /ibm-docs/topic-cache --check
 docker/dev exec python3 -B -m unittest tools.tests.test_cics_descriptors tools.tests.test_cics_source_map tools.tests.test_module_boundaries
 docker/dev cargo test -p mainframe-env-host-api -p mainframe-env-cics --all-features --locked
 docker/dev cargo xtask architecture-fast --check

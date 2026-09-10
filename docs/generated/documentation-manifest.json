@@ -353,7 +353,7 @@
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
       "relative_links": 20,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:f7c6630568e9598cddd284b1346bca9a29a243e48d953c74db89274a3f985bd4",
+      "sha256": "sha256:2e0f6f75408c32ad9ae17139734f695b7b4225b0eefc3a453bbc15d8fd92c79d",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
