@@ -16,6 +16,32 @@ requirements alongside the version-specific boundaries below.
 You are implementing **mainframe-env 0.9.0: complete CICS application API** for
 all 263 pinned CICS TS 6.x application commands.
 
+## Current CIC-901 boundary
+
+CIC-901 is an incremental, non-release boundary already frozen from three
+independently verified IBM HTML source batches: `sources-a` rows `0001`–`0088`,
+`sources-b` rows `0089`–`0176`, and `sources-c` rows `0177`–`0263`. Treat the
+committed maps, corpora, topic manifests, extraction plans, generated
+candidates, automatic review receipts, 263-row command contract, and compact IR
+registry as the current authority. Fetch missing or changed IBM material as
+fresh HTML through the repository browser-fetch bridge and the user's Chrome
+session, update the content-addressed cache, then reproject and independently
+verify it. Do not use PDF or introduce a human-only approval gate.
+
+The frozen registry shape does not mean 263 executable commands. Its readiness
+split is exactly 3 `typed-runtime`, 20 `legacy-compatibility`, and 240 `unready`
+API rows. Only the 23 existing API routes are advertised. Automatic
+registration remains disabled, there is no default handler or generic-success
+fallback, and unready rows fail explicitly. SPI and FEPI identities cannot
+enter this application registry or its compiler route.
+
+CIC-901 carries zero execution, coverage, semantic, conformance, and licensed
+differential credit. It establishes the source-backed contract needed for
+CIC-902–CIC-905 vertical family slices; it does not make 0.9.0 release-ready.
+Do not add release automation, Docker-in-Docker, or a broad licensed campaign
+at this boundary. Licensed evidence remains mandatory at the full 0.9
+completion gate after the applicable executable families exist.
+
 ## Read and verify first
 
 Read `docs/prompts/coverage-versions/README.md`,
@@ -23,6 +49,13 @@ Read `docs/prompts/coverage-versions/README.md`,
 CICS resource/EIB/condition contracts, and accepted 0.4.0 COBOL host ABI, 0.5.0
 SAF, and 0.6.0 data-authority evidence. Verify all three dependency gates before
 public integration.
+
+For CIC-901 specifically, inspect all three source projections and their
+independent reviews, plus
+`conformance/0.9/generated/cics-application-command-contracts.json` and
+`crates/foundation/mainframe-env-ir/src/generated/cics_application_registry.rs`.
+Preserve every bounded ambiguity as bounded; a closed row is not necessarily a
+fully resolved or executable row.
 
 Also read and verify the current implementation baseline before editing:
 
@@ -64,20 +97,24 @@ Verify the accepted file/UOW pilot evidence against the hardened execution and
 storage contracts; rerun checks only when their evidence is missing or invalidated. Its twelve obligation credits do not imply twelve complete commands
 or completion of any of the six broad work packages.
 
-During entry planning, record the licensed runner availability, exact product
-and environment identities, supported families, and missing campaign coverage.
-The existing licensed adapter covers the bounded pilot only. Extend its owned
-capture/comparison boundary for each new family. If the licensed environment is
-unavailable, continue independent implementation after the hardening entry gate,
-keep `differential=pending`, and record the final-gate blocker. Never substitute
-local/model evidence or remove the licensed completion requirement.
+Do not block CIC-901 contract freeze on licensed-runner availability or start a
+broad campaign before executable family slices exist. When CIC-902 and later
+slices make a family executable, record runner availability, exact product and
+environment identities, supported families, and missing campaign coverage. The
+existing licensed adapter covers the bounded pilot only; extend its owned
+capture/comparison boundary for each implemented family. If the licensed
+environment is unavailable, continue independent implementation after the
+hardening entry gate, keep `differential=pending`, and record the final-gate
+blocker. Never substitute local/model evidence or remove the licensed full-minor
+completion requirement.
 
 ## Implement in this order
 
-1. Freeze **CIC-901** generated grammar, command/option legality, resource keys,
-   EIB/RESP/RESP2, conditions, effects, handler registration, and limits. Bind
-   authorization, audit, mutation identity, deadlines, recovery and retention
-   requirements to those descriptors and the existing owned contracts.
+1. Preserve the frozen **CIC-901** generated grammar, command/option legality,
+   resource keys, EIB/RESP/RESP2, conditions, effects, fail-closed registration
+   shape, and limits. Reproject and regenerate it only when its pinned IBM HTML
+   or owned contracts change; do not convert unready identities into handlers
+   outside a reviewed vertical slice.
 2. Implement **CIC-902/CIC-903** program/task/interval/storage/recovery,
    terminal/BMS, TSQ/TDQ, file, journal, and spool command families.
 3. Implement **CIC-904** channels/containers, BTS, documents, web/HTTP,
@@ -101,6 +138,11 @@ row/obligation scope, owning modules, dependencies, and acceptance gates. For
 example, separate file update, file browse, TSQ, and TDQ work under CIC-903;
 split further when a slice exceeds the repository's module review budget.
 
+The sealed CIC-901 contract/registry boundary may remain complete while the
+0.9.0 minor stays in progress. It authorizes incremental CIC-902–CIC-905 family
+work, not release publication, 263-command execution claims, or early credit
+against CIC-906 and the full-minor completion gate.
+
 Use the common contract's slice commit/sealing rules. Commit each passing slice
 before beginning the next dependent slice, and keep the parent in progress
 until its declared scope and integrated gates pass. Slice completion grants
@@ -123,10 +165,13 @@ substitute for this route proof or complete a whole family.
 
 ## Reuse and architecture guardrails
 
-- Build the 263-command application API on one shared CICS command runtime that
-  owns generated identities, option legality, resource keys, conditions,
-  EIB/RESP mapping, bounds, effect metadata, and exhaustive handler closure.
-  Later SPI/FEPI work must extend this runtime rather than fork it.
+- Build the 263-command application API incrementally on one shared CICS command
+  runtime. CIC-901 owns generated identities, option legality, resource keys,
+  conditions, EIB/RESP mapping, bounds, effect metadata, and the complete
+  fail-closed registry shape. Executable handler closure arrives only through
+  sealed CIC-902–CIC-905 vertical slices; no default handler, automatic
+  registration, or generic-success route may stand in for it. Later SPI/FEPI
+  work must extend this runtime rather than fork it.
 - Keep descriptors and dispatch shared, with semantic handlers in stable
   command-family modules. Follow the R-26 module boundaries and the roughly
   800–1,200-line review trigger; do not expand one service module to hold all
@@ -161,8 +206,9 @@ substitute for this route proof or complete a whole family.
 
 ## Version-specific invariants
 
-- Generate and exhaustively register all 263 commands; every accepted option
-  affects semantics and every missing handler fails explicitly.
+- At CIC-901, generate all 263 registry shapes and make every unready handler
+  fail explicitly. At full 0.9 completion, all 263 commands must have sealed
+  executable registrations and every accepted option must affect semantics.
 - Preserve exact EIB, RESP/RESP2, HANDLE/IGNORE/NOHANDLE and condition behavior
   across normal, failure, cancellation, syncpoint, and restart paths.
 - File and security behavior use the 0.6/0.5 authorities; host calls use the 0.4
@@ -193,6 +239,10 @@ ratchets, full-workspace MSRV, and supply-chain/license gates through their
 existing CI selectors. Coverage percentages remain diagnostic, not IBM credit.
 
 ## Completion gate
+
+The CIC-901 non-release boundary does not weaken or satisfy this gate. Do not
+use its 263 closed contract rows, 23 advertised compatibility routes, or zero-
+credit source reviews as the completion numerator.
 
 Do not finish until 263/263 application commands pass all applicable coverage
 gates; option, EIB/response, condition, terminal, resource, conversation,

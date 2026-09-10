@@ -351,9 +351,9 @@
       "normative": true,
       "owner": "CICS provider maintainers",
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
-      "relative_links": 15,
-      "scope": "typed CICS operation descriptors, generated routing families, and provider semantic modules",
-      "sha256": "sha256:b42cd8e03deba6801c4a1536cdb44cbb45a9e005974fd6d2a75d135bc0a1f33c",
+      "relative_links": 20,
+      "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
+      "sha256": "sha256:26aec958abb033a181affe09e477f6e966f92b0e6708096872bfc94166c3ecd7",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -1310,7 +1310,7 @@
       "normative": false,
       "path": "docs/prompts/coverage-versions/IMPLEMENT_0_9_0.md",
       "relative_links": 6,
-      "sha256": "sha256:d7d4723619e51e44d199ba2e419c34b24825e3a5687f3126cd935da8f7eafa65",
+      "sha256": "sha256:8695123d472927c8338ef5111b253d18d90fa708ec56ae4d5a46b98a330fbf2f",
       "title": "Execution Prompt — Implement mainframe-env 0.9.0",
       "xtask_commands": 0
     },
