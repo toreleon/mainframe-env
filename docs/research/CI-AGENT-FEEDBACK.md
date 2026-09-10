@@ -64,6 +64,37 @@ success. Agent guidance now specifies focused tests, input-aware reuse, escalati
 conditions, and a stopping rule. Read the
 [operational workflow](../runbooks/VERIFICATION-WORKFLOW.md) for exact behavior.
 
+## Controlled validation
+
+The implementation commit `29f1eb0a216a908a5a0ab0c6303e6225b7388546` ran
+the complete local-docs command group in Docker with a warm cache. The comparison
+base was deliberately set to that same clean commit to exercise a no-change
+selection. This is a controlled runner test, not a claim that Jenkins had already
+validated that commit or a before/after benchmark of the complete pipeline.
+
+| Command group | Measured seconds |
+|---|---:|
+| Source-input policy | 0.198 |
+| Dependency policy | 2.152 |
+| License notices | 0.653 |
+| Documentation | 2.796 |
+| Python/shell tooling | 12.128 |
+| Total selected commands | 17.928 |
+
+Tooling reported 403 executed tests and one existing skip, including 16 local
+selector tests. The installed Jenkins Declarative linter accepted the proposed
+pipeline. Histories cover missing/nonancestor bases, failed code followed by
+prose, registry changes, normative paths, deleted code, dirty checkouts, and
+stale/wrong-candidate receipts. No full workspace, CardDemo, or licensed campaign
+was rerun merely to validate this selector.
+
+The Docker controller loads its pipeline/runner from the toolchain image.
+Merging source alone does not replace the running controller definition: rebuild
+from the merged checkout and recreate Jenkins when its executor is idle to
+activate the new pipeline. Preserve work and image changes belonging to another
+active development task. Until rollout, measured savings are limited to the
+controlled command-group test above.
+
 ## Next optimizations, in order
 
 | Priority | Change | Evidence needed before enabling |

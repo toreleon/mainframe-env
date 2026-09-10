@@ -1390,7 +1390,7 @@
       "normative": false,
       "path": "docs/research/CI-AGENT-FEEDBACK.md",
       "relative_links": 6,
-      "sha256": "sha256:ce4851fee7579aef32fed41ae52af96c2f80dbe4764c31dcef318ca254c792c4",
+      "sha256": "sha256:78e312d6c5915df1b8565c1fdbb9f790ac8c3aeb06bd8937ee3c35b205ae636c",
       "title": "CI and agent feedback cost review",
       "xtask_commands": 0
     },
@@ -1494,7 +1494,7 @@
       "normative": false,
       "path": "docs/runbooks/VERIFICATION-WORKFLOW.md",
       "relative_links": 3,
-      "sha256": "sha256:067f3d71954923ae9af09836f1cd3268c9b41e60216c9a9d6c9657fb1318280d",
+      "sha256": "sha256:b54c6cdb546705dcfd291b540a3b4415145df0488284c4f5671a61ba8c7426e3",
       "title": "Verification workflow",
       "xtask_commands": 0
     },

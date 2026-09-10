@@ -37,6 +37,9 @@ repair or new evidence justifies retrying. Required gates must not be waived.
 ## CI ownership
 
 The Docker job uses `CHECK_MODE=auto` by default. It compares the candidate with
+the last successful commit from a clean committed checkout; dirty/untracked
+source is refused. The planner is for CI snapshots, not an uncommitted edit loop.
+It takes the comparison from
 `GIT_PREVIOUS_SUCCESSFUL_COMMIT`, validates ancestry, and keeps the complete local
 runtime checks when the base is missing/unavailable or paths are unclassified.
 Normative contract/architecture/decision/compatibility/release prose and every
