@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:192732032c1dc14611b7723737875a9eb9a3dd344e80e5b945778c9611421eaa",
+      "sha256": "sha256:053cc12ec333c60e0b3118c694cd0635885a8c92f042b1539f0f76135576776f",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -26,7 +26,7 @@
       "normative": false,
       "path": "CONTRIBUTING.md",
       "relative_links": 5,
-      "sha256": "sha256:1bc221148808ab8462dae0ccf6dd9911aab0080ca1b2f201b848c969be4595ae",
+      "sha256": "sha256:e6b838465bc67081ef70692ebc73c920b7e49da9fb6dbebb8bcaaf5d18628991",
       "title": "Contributing to mainframe-env",
       "xtask_commands": 4
     },

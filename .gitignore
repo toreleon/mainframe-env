@@ -1,10 +1,78 @@
+# Rust builds and instrumentation (fuzz outputs are covered by fuzz/.gitignore).
 /target/
-/.idea/
-/.vscode/
-.DS_Store
-*.tmp
-/screenlog.*
-/crates/apps/mainframe-env-server/examples/carddemo_signon.rs
-conformance/0.1/evidence/raw/
+**/*.rs.bk
+*.profraw
+*.profdata
+
+# Local distribution output; reviewed release/ records remain versioned.
+/dist/
+
+# Python bytecode, environments, and analysis caches.
 __pycache__/
-/docker/.env
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local service state and scratch output. Keep database/log fixtures elsewhere visible.
+/.postgres/
+/.tmp/
+/logs/
+/*.log
+/screenlog.*
+/ci-backend/
+/deployment.json
+/mainframe-env*.db
+/mainframe-env*.db-shm
+/mainframe-env*.db-wal
+/mainframe-env*.db-journal
+/mainframe-env-artifacts*/
+
+# Environment secrets; sanitized templates may be committed.
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+!.env.*.example
+!.env.*.sample
+!.env.*.template
+/secrets/
+/docker/secrets/
+/config/tls/*.key
+/config/tls/*-key.pem
+/config/tls/*-private.pem
+/config/tls/*.p12
+/config/tls/*.pfx
+
+# Personal editor/agent state; shared VS Code and agent configuration stay visible.
+/.idea/
+/.vscode/*
+!/.vscode/extensions.json
+!/.vscode/settings.json
+!/.vscode/tasks.json
+!/.vscode/launch.json
+/.claude/settings.local.json
+*.swp
+*.swo
+*~
+*.tmp
+
+# macOS metadata.
+.DS_Store
+._*
+
+# Unsupported local CI experiments: keep aligned with tools/ci-inputs.lock.json.
+/.github/workflows/offline-dev-bundle.yml
+/tools/build_offline_dev_bundle.sh
+/tools/package_offline_bundle.sh
+/tools/offline_bundle_assets/
+/tools/offline_dev_assets/
+
+# Local-only examples and proprietary/raw oracle captures.
+/crates/apps/mainframe-env-server/examples/carddemo_signon.rs
+/conformance/0.1/evidence/raw/
+
+# Cargo.lock, fuzz/Cargo.lock, fuzz/corpus/, conformance/, and release/ are source/evidence.
+# Do not add blanket *.lock, *.log, *.db, or archive exclusions.
