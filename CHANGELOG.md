@@ -85,6 +85,8 @@ All notable changes to mainframe-env are documented here.
 
 - Directed Docker development temporaries to executable target storage so
   Rustdoc can compile and run contract doctests while `/tmp` remains `noexec`.
+- Kept disposable PostgreSQL parity state inside the Docker development
+  scratch mount instead of attempting to remove the mount point itself.
 - Corrected typed ADD/COMPUTE receiver-local `SIZE ERROR` commits, resolved
   `ADD CORRESPONDING` by relative qualifiers with bilateral uniqueness and
   subordinate-item exclusions, and made selected-table compatibility preserve
