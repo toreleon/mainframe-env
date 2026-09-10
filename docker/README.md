@@ -17,6 +17,30 @@ docker/dev test
 docker/dev shell
 ```
 
+For Codex desktop work, keep editing this shared checkout and run development
+commands through the wrapper. `AGENTS.md` requires container execution for
+builds, tests, linters, generators, and dependency tools:
+
+```bash
+docker/dev exec uname -s
+docker/dev cargo fmt --all -- --check
+docker/dev exec python3 -B tools/run_tooling_tests.py
+docker/dev cargo xtask docs --check
+```
+
+The first command must report `Linux`. `exec` passes arguments directly to a
+temporary container, disables TTY allocation for automation, and preserves the
+development cache mounts and host UID/GID mapping. Use `docker/dev shell` for
+interactive commands. If the VM or mount is unavailable, repair it with `init`
+and `up`; do not switch to host Cargo or Python. Worktrees must be shared with
+Colima explicitly so validation runs against the intended checkout.
+
+This is the desktop agent's required workflow, not a host execution sandbox.
+Host editing, Git, and Docker/Colima management remain available. New Codex
+sessions load repository instructions at startup; this device also has a scoped
+rule in its Codex home guidance. See the official
+[AGENTS.md documentation](https://learn.chatgpt.com/docs/agent-configuration/agents-md).
+
 The initial image build downloads the pinned Linux toolchains and compiles the
 locked Cargo tools. Later builds reuse image layers. Jenkins starts its first
 build automatically, then polls the **local Git repository's `main` branch**

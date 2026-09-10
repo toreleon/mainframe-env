@@ -6,6 +6,10 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added repository contributor guidelines in `AGENTS.md` covering structure,
+  development commands, coding conventions, tests, and pull request expectations.
+- Required Docker execution for development tools and added `docker/dev exec`
+  for noninteractive container commands from the desktop workflow.
 - Added ADR-0011 and the first typed-HIR vertical slices: resolved COBOL
   arithmetic plans, typed CICS file/unit-of-work plans, versioned executable
   dialect identities, and bounded canonical plan codecs.

@@ -1,16 +1,24 @@
 {
   "counts": {
-    "markdown_documents": 184,
+    "markdown_documents": 185,
     "navigation_groups": 5,
     "normative_documents": 39,
-    "xtask_commands": 161
+    "xtask_commands": 163
   },
   "documents": [
     {
       "normative": false,
+      "path": "AGENTS.md",
+      "relative_links": 4,
+      "sha256": "sha256:306df7c8faf2662c9c48c8e1a6000d07a4c779d4570ad059881001993b6dc2f9",
+      "title": "Repository Guidelines",
+      "xtask_commands": 1
+    },
+    {
+      "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:243be287670350af12562b60814a33a6f5ad761836c5d17e863ad0ca580ee249",
+      "sha256": "sha256:192732032c1dc14611b7723737875a9eb9a3dd344e80e5b945778c9611421eaa",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -289,10 +297,10 @@
     {
       "normative": false,
       "path": "docker/README.md",
-      "relative_links": 7,
-      "sha256": "sha256:d1f1d5acc786dc7da6c103b83f82d4fcff1fae6ed795cea743b83b91344e5c36",
+      "relative_links": 8,
+      "sha256": "sha256:8e984c24fb7a12f79454e927b504416efb365d54e65a203dd83bb2f97fbd61bc",
       "title": "Docker development environment",
-      "xtask_commands": 0
+      "xtask_commands": 1
     },
     {
       "applies_from": "mainframe-env 0.1.0",
