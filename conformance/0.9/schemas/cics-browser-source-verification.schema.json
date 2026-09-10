@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/cics-browser-source-verification@1",
+  "title": "CIC-901 browser source verification receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_version",
+    "work_package",
+    "verified_on",
+    "source_origin",
+    "retrieval_method",
+    "response_materialization",
+    "source_bytes_retained_in_repository",
+    "semantic_authority",
+    "coverage_credit",
+    "topic_manifest",
+    "observation"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mainframe-env.cics-browser-source-verification@1"
+    },
+    "target_version": {
+      "const": "0.9.0"
+    },
+    "work_package": {
+      "const": "CIC-901.sources-a-corpus"
+    },
+    "verified_on": {
+      "const": "2026-09-10"
+    },
+    "source_origin": {
+      "const": "https://www.ibm.com/docs/"
+    },
+    "retrieval_method": {
+      "const": "user-chrome-direct-content-navigation"
+    },
+    "response_materialization": {
+      "const": "document.body.innerHTML read in 65536-character chunks and UTF-8 encoded"
+    },
+    "source_bytes_retained_in_repository": {
+      "const": false
+    },
+    "semantic_authority": {
+      "const": false
+    },
+    "coverage_credit": {
+      "const": 0
+    },
+    "topic_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "file_sha256",
+        "topic_manifest_sha256",
+        "topic_count",
+        "total_bytes"
+      ],
+      "properties": {
+        "path": {
+          "const": "conformance/0.9/manifests/cics-application-api-sources-a-topics.json"
+        },
+        "file_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "topic_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "topic_count": {
+          "const": 173
+        },
+        "total_bytes": {
+          "const": 5207440
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topics_requested",
+        "topics_loaded",
+        "topic_identity_matches",
+        "mismatches",
+        "identity_digest_definition",
+        "identity_sha256"
+      ],
+      "properties": {
+        "topics_requested": {
+          "const": 173
+        },
+        "topics_loaded": {
+          "const": 173
+        },
+        "topic_identity_matches": {
+          "const": 173
+        },
+        "mismatches": {
+          "type": "array",
+          "maxItems": 0
+        },
+        "identity_digest_definition": {
+          "const": "SHA-256 over ASCII domain mainframe-env.cics-browser-source-verification@1, one NUL byte (0x00), then one UTF-8 '<topic_path> <bytes> <sha256>\\n' line per observed topic sorted by topic_path"
+        },
+        "identity_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

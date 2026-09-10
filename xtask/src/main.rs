@@ -7503,6 +7503,15 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         &json(&cics_source_corpus_path)?,
         &cics_source_corpus_path,
     )?;
+    let cics_browser_receipt =
+        root.join("conformance/0.9/cics/application-api-sources-a-browser-verification.json");
+    let cics_browser_receipt_schema =
+        root.join("conformance/0.9/schemas/cics-browser-source-verification.schema.json");
+    validate_schema_instance(
+        &json(&cics_browser_receipt_schema)?,
+        &json(&cics_browser_receipt)?,
+        &cics_browser_receipt,
+    )?;
     let cics_source_manifest =
         root.join("conformance/0.9/manifests/cics-application-api-sources-a-topics.json");
     let topic_manifest_schema = root.join("conformance/0.2/schemas/topic-manifest.schema.json");

@@ -31,6 +31,9 @@ import ibm_docs  # noqa: E402
 
 MAP_PATH = Path("conformance/0.9/cics/application-api-sources-a-map.json")
 CORPUS_PATH = Path("conformance/0.9/cics/application-api-sources-a-corpus.json")
+BROWSER_RECEIPT_PATH = Path(
+    "conformance/0.9/cics/application-api-sources-a-browser-verification.json"
+)
 MANIFEST_PATH = Path(
     "conformance/0.9/manifests/cics-application-api-sources-a-topics.json"
 )
@@ -47,6 +50,7 @@ TOC_SHA256 = "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a"
 MAP_SHA256 = "sha256:5bacdef388d9ee405008a895289348a9c95ff21bb271751e4d91407cd4b68b0e"
 SUMMARY_PATH = source_map.SUMMARY_PATH
 CORPUS_DOMAIN = b"mainframe-env.cics-source-corpus@1\0"
+BROWSER_RECEIPT_DOMAIN = b"mainframe-env.cics-browser-source-verification@1\0"
 CORPUS_DIGEST_DEFINITION = (
     "SHA-256 over ASCII domain mainframe-env.cics-source-corpus@1, one NUL "
     "byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and "
@@ -80,6 +84,11 @@ MANIFEST_FIELDS = {
     "topics",
     "total_bytes",
 }
+BROWSER_DIGEST_DEFINITION = (
+    "SHA-256 over ASCII domain mainframe-env.cics-browser-source-verification@1, "
+    "one NUL byte (0x00), then one UTF-8 '<topic_path> <bytes> <sha256>\\n' "
+    "line per observed topic sorted by topic_path"
+)
 
 ROW_CICSMESSAGE = "ibm-cics-ts-6x-2026-08-31:api-commands:0027"
 ROW_DUMP = "ibm-cics-ts-6x-2026-08-31:api-commands:0056"
@@ -148,6 +157,50 @@ def canonical_digest(value: object) -> str:
         value, ensure_ascii=True, separators=(",", ":"), sort_keys=True
     ).encode()
     return f"sha256:{hashlib.sha256(CORPUS_DOMAIN + encoded).hexdigest()}"
+
+
+def browser_identity_digest(topics: Iterable[dict[str, Any]]) -> str:
+    lines = sorted(
+        f"{topic['topic_path']} {topic['bytes']} {topic['sha256']}\n"
+        for topic in topics
+    )
+    return "sha256:" + hashlib.sha256(
+        BROWSER_RECEIPT_DOMAIN + "".join(lines).encode()
+    ).hexdigest()
+
+
+def expected_browser_receipt(manifest: dict[str, Any]) -> dict[str, Any]:
+    manifest_bytes = pretty(manifest).encode()
+    count = manifest["topic_count"]
+    return {
+        "schema_version": "mainframe-env.cics-browser-source-verification@1",
+        "target_version": TARGET_VERSION,
+        "work_package": WORK_PACKAGE,
+        "verified_on": SNAPSHOT_DATE,
+        "source_origin": "https://www.ibm.com/docs/",
+        "retrieval_method": "user-chrome-direct-content-navigation",
+        "response_materialization": (
+            "document.body.innerHTML read in 65536-character chunks and UTF-8 encoded"
+        ),
+        "source_bytes_retained_in_repository": False,
+        "semantic_authority": False,
+        "coverage_credit": 0,
+        "topic_manifest": {
+            "path": str(MANIFEST_PATH),
+            "file_sha256": "sha256:" + hashlib.sha256(manifest_bytes).hexdigest(),
+            "topic_manifest_sha256": "sha256:" + manifest["topic_manifest_digest"],
+            "topic_count": count,
+            "total_bytes": manifest["total_bytes"],
+        },
+        "observation": {
+            "topics_requested": count,
+            "topics_loaded": count,
+            "topic_identity_matches": count,
+            "mismatches": [],
+            "identity_digest_definition": BROWSER_DIGEST_DEFINITION,
+            "identity_sha256": browser_identity_digest(manifest["topics"]),
+        },
+    }
 
 
 def canonical_topic_path(value: object) -> str | None:
@@ -615,6 +668,10 @@ def check(root: Path = ROOT, cache: Path | None = None) -> None:
     manifest_path = root / MANIFEST_PATH
     manifest = read_json(manifest_path)
     validate_manifest(manifest)
+    receipt_path = root / BROWSER_RECEIPT_PATH
+    receipt = read_json(receipt_path)
+    if receipt != expected_browser_receipt(manifest):
+        raise CorpusError("browser source verification receipt differs")
     corpus = read_json(root / CORPUS_PATH)
     expected = build_corpus(
         mapping,
@@ -628,7 +685,11 @@ def check(root: Path = ROOT, cache: Path | None = None) -> None:
     expected_registry = registry_with_manifest(registry, manifest)
     if registry != expected_registry:
         raise CorpusError("0.9 topic registry differs from the corpus manifest")
-    for path, value in [(manifest_path, manifest), (root / CORPUS_PATH, corpus)]:
+    for path, value in [
+        (manifest_path, manifest),
+        (receipt_path, receipt),
+        (root / CORPUS_PATH, corpus),
+    ]:
         if path.read_text() != pretty(value):
             raise CorpusError(f"{path} is not canonical generated JSON")
     if cache is None:

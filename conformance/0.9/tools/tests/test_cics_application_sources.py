@@ -36,6 +36,7 @@ class CicsApplicationSourcesTests(unittest.TestCase):
             sources.source_map.descriptors.CATALOG_PATH,
             Path("conformance/0.2/catalogs/cics.json"),
             sources.CORPUS_PATH,
+            sources.BROWSER_RECEIPT_PATH,
             sources.MANIFEST_PATH,
             sources.REGISTRY_PATH,
         ]:
@@ -140,6 +141,28 @@ class CicsApplicationSourcesTests(unittest.TestCase):
             manifest["topic_manifest_digest"],
             sources.docs_api.manifest_digest(manifest["topics"]),
         )
+
+    def test_browser_receipt_is_exactly_manifest_bound(self):
+        manifest = self.manifest()
+        receipt = json.loads((ROOT / sources.BROWSER_RECEIPT_PATH).read_text())
+        self.assertEqual(receipt, sources.expected_browser_receipt(manifest))
+        self.assertEqual(receipt["observation"]["topics_requested"], 173)
+        self.assertEqual(receipt["observation"]["topic_identity_matches"], 173)
+        self.assertEqual(receipt["observation"]["mismatches"], [])
+        self.assertEqual(
+            receipt["observation"]["identity_sha256"],
+            "sha256:6d33171e07e5e247c28e52cb07d6cf7c0a4d132ad110fc1e04a83dfddf119a6d",
+        )
+
+    def test_browser_receipt_tampering_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.fixture(root)
+            receipt = json.loads((root / sources.BROWSER_RECEIPT_PATH).read_text())
+            receipt["observation"]["topic_identity_matches"] -= 1
+            self.write(root, sources.BROWSER_RECEIPT_PATH, receipt)
+            with self.assertRaisesRegex(sources.CorpusError, "browser"):
+                sources.check(root)
 
     def test_corpus_is_html_only_and_gaps_remain_candidates(self):
         corpus = self.corpus()
