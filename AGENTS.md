@@ -22,6 +22,16 @@ pull requests. Report missing or mismatched sources. Follow the
 execution evidence. Infrastructure and formatting changes need no unrelated
 lookup.
 
+When pinned material is missing or must be refreshed, use the user's existing
+Chrome session through tab-scoped Browser Control and the repository's
+`conformance/tools/browser_fetch.py` contract to retrieve official IBM HTML
+content endpoints. Do not drive the native Chrome/macOS UI with CUA, use PDF
+sources, create a temporary Chrome profile, or replace the browser fetch with
+direct non-browser HTTP. Keep raw HTML and TOC bytes in the external cache;
+commit only bounded locators, hashes, manifests, and zero-credit verification
+receipts. Reproduce the selected HTML identities in the same user Chrome
+session before treating a source corpus as complete.
+
 ## Project Structure & Module Organization
 
 Under `crates/`, `foundation/` holds primitives, `contracts/` owns interfaces,
