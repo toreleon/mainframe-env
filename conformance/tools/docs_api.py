@@ -39,7 +39,9 @@ import ast
 import hashlib
 import html as html_module
 import json
+import os
 import re
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -191,6 +193,14 @@ def retrieval_path(value: str) -> Path:
         return outside_repository(value)
     except InsideRepository as error:
         raise argparse.ArgumentTypeError(str(error)) from error
+
+
+def default_cache() -> Path:
+    """Use the persistent development cache, retaining the legacy host default."""
+    return outside_repository(
+        os.environ.get("MAINFRAME_ENV_IBM_DOCS_CACHE")
+        or Path(tempfile.gettempdir()) / "cobolgrammar" / "topic-cache"
+    )
 
 
 def write_retrieved(path: Path | str, data: bytes | str) -> Path:

@@ -8,7 +8,7 @@
   "required": ["schema_version", "target_version", "baseline_id", "subsystem", "product", "book_label", "book_href", "toc_url", "toc_sha256", "content_url_template", "snapshot_date", "topic_count", "total_bytes", "topic_manifest_digest", "topic_manifest_digest_definition", "coverage_credit", "retained_in_repository", "topics"],
   "properties": {
     "schema_version": {"const": "mainframe-env.topic-manifest@1"},
-    "target_version": {"const": "0.2.0"},
+    "target_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
     "baseline_id": {"type": "string", "minLength": 8},
     "subsystem": {"type": "string", "minLength": 2},
     "product": {"type": "string", "minLength": 2},
@@ -32,7 +32,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["topic_path", "sha256", "bytes"],
+        "required": ["topic_path", "sha256", "bytes", "last_modified"],
         "properties": {
           "topic_path": {"$ref": "#/$defs/topic-path"},
           "sha256": {"$ref": "#/$defs/hex"},

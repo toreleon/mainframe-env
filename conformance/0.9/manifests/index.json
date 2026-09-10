@@ -1,0 +1,30 @@
+{
+  "schema_version": "mainframe-env.topic-manifest-registry@1",
+  "target_version": "0.9.0",
+  "semantic_authority": false,
+  "coverage_credit": 0,
+  "manifests": [
+    {
+      "scope_id": "cics-file-uow-pilot",
+      "subsystem": "cics",
+      "baseline_id": "ibm-cics-ts-6x-file-uow-pilot-2026-09-08",
+      "manifest": "conformance/0.9/manifests/cics-file-uow-topics.json",
+      "manifest_sha256": "sha256:ebee114ef6f94fed008f82c0c2c8c5952144fba20a0421b2b17198d8101a44c5",
+      "topic_count": 9,
+      "topic_manifest_sha256": "sha256:fb318cc37ebb5a985317bd68a67d0d9614bc4f27edca8a7c4df0464602847007",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "cobol-numeric-move-pilot",
+      "subsystem": "cobol",
+      "baseline_id": "ibm-enterprise-cobol-6.5-numeric-move-pilot-2026-09-08",
+      "manifest": "conformance/0.9/manifests/cobol-numeric-move-topics.json",
+      "manifest_sha256": "sha256:df9aaa99b077dc5e43b0ccdb0c5c7c15d228d723c74a8d45d1acc40f2cbef512",
+      "topic_count": 6,
+      "topic_manifest_sha256": "sha256:96b3f6d0d7eb08e90dc8ef465be1cc4549a4e431491d1b32c895cd659dbff067",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    }
+  ]
+}
