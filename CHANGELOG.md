@@ -16,6 +16,9 @@ All notable changes to mainframe-env are documented here.
 - Added a reviewed, pinned-source COBOL arithmetic pilot with independent
   golden bytes and typed-plan observations for `SIZE ERROR`, relative
   qualification, numeric-edited eligibility, and the no-pair no-op.
+- Added a Docker development stack with an isolated, capped macOS VM, pinned
+  toolchain images, separate Cargo caches, PostgreSQL persistence, and automatic
+  Jenkins CI/local deployment with readiness checks and binary rollback.
 - Added persistent bounded COBOL-parser and IR-decoder fuzzing, Loom schedule
   models with a negative concurrency mutant, and instrumented critical-package
   coverage reporting as receipt-backed full CI gates.
@@ -53,6 +56,8 @@ All notable changes to mainframe-env are documented here.
   carry the exact dialect namespace/major set derived from their executable
   payload and bind COBOL arithmetic/display-sign/LP options to payload config,
   while historical `@2` artifacts retain their original bytes and contract.
+- Made the release-smoke rejection test cover development hosts that are not
+  advertised release targets, including native Linux ARM Docker environments.
 - Updated the 0.9 CICS implementation plan to require the integrated 28-finding
   hardening baseline, bounded family slices, per-slice security/recovery,
   explicit backend validation, and early licensed-campaign planning.

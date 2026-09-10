@@ -14965,7 +14965,17 @@ mod tests {
     #[test]
     fn release_smoke_refuses_to_certify_a_foreign_target() {
         let root = repository_root().unwrap();
-        let host = host_target(&root).unwrap();
+        let host = match host_target(&root) {
+            Ok(host) => host,
+            Err(problem) => {
+                // Development hosts need not be advertised release targets.
+                // They must reject certification before looking for binaries.
+                assert_eq!(problem, "release target is invalid");
+                let problem = smoke_release_target(&root, "x86_64-unknown-linux-gnu").unwrap_err();
+                assert_eq!(problem, "release target is invalid");
+                return;
+            }
+        };
         let foreign = if host == "aarch64-apple-darwin" {
             "x86_64-unknown-linux-gnu"
         } else {
