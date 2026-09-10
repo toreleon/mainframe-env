@@ -528,6 +528,9 @@ DECLARED_WRITES: dict[str, dict[str, str]] = {
         "args.destination / file_name(path)": "retrieved: topic bodies",
         "args.manifest": "derived: digests and headings this tool composes",
     },
+    "conformance/0.9/tools/fetch_cics_application_sources.py": {
+        "path": "derived: the topic manifest, source-role projection, and registry entry",
+    },
     "conformance/tools/fetch_pinned_sources.py": {
         "report_path": "derived: the re-verification report",
     },

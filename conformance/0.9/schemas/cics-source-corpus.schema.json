@@ -1,0 +1,358 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/cics-source-corpus@1",
+  "title": "CIC-901 sources-a zero-credit IBM HTML corpus",
+  "description": "Binds the accepted source map to pinned IBM HTML metadata, explicit context roles, and unresolved source gaps without granting semantics.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_version",
+    "work_package",
+    "status",
+    "semantic_authority",
+    "automatic_registration",
+    "coverage_credit",
+    "differential_credit",
+    "mapping",
+    "topic_manifest",
+    "counts",
+    "mapped_command_topics",
+    "linked_context_topics",
+    "manual_topics",
+    "excluded_navigation",
+    "source_gaps",
+    "corpus_digest_definition",
+    "corpus_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mainframe-env.cics-source-corpus@1"
+    },
+    "target_version": {
+      "const": "0.9.0"
+    },
+    "work_package": {
+      "const": "CIC-901.sources-a-corpus"
+    },
+    "status": {
+      "const": "candidate"
+    },
+    "semantic_authority": {
+      "const": false
+    },
+    "automatic_registration": {
+      "const": false
+    },
+    "coverage_credit": {
+      "const": 0
+    },
+    "differential_credit": {
+      "const": 0
+    },
+    "mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "const": "conformance/0.9/cics/application-api-sources-a-map.json"
+        },
+        "sha256": {
+          "const": "sha256:5bacdef388d9ee405008a895289348a9c95ff21bb271751e4d91407cd4b68b0e"
+        }
+      }
+    },
+    "topic_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "file_sha256",
+        "topic_manifest_sha256",
+        "topic_count",
+        "total_bytes"
+      ],
+      "properties": {
+        "path": {
+          "const": "conformance/0.9/manifests/cics-application-api-sources-a-topics.json"
+        },
+        "file_sha256": {
+          "$ref": "#/$defs/prefixed-sha256"
+        },
+        "topic_manifest_sha256": {
+          "$ref": "#/$defs/prefixed-sha256"
+        },
+        "topic_count": {
+          "const": 172
+        },
+        "total_bytes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mapping_rows",
+        "mapped_command_topics",
+        "linked_context_topics",
+        "manual_topics",
+        "html_topics",
+        "source_gaps_pending_review"
+      ],
+      "properties": {
+        "mapping_rows": {
+          "const": 88
+        },
+        "mapped_command_topics": {
+          "const": 109
+        },
+        "linked_context_topics": {
+          "const": 58
+        },
+        "manual_topics": {
+          "const": 5
+        },
+        "html_topics": {
+          "const": 172
+        },
+        "source_gaps_pending_review": {
+          "const": 3
+        }
+      }
+    },
+    "mapped_command_topics": {
+      "type": "array",
+      "minItems": 109,
+      "maxItems": 109,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/topic-path"
+      }
+    },
+    "linked_context_topics": {
+      "type": "array",
+      "minItems": 58,
+      "maxItems": 58,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "topic_path",
+          "role",
+          "referenced_by_command_topics"
+        ],
+        "properties": {
+          "topic_path": {
+            "$ref": "#/$defs/topic-path"
+          },
+          "role": {
+            "const": "one-hop-context-candidate"
+          },
+          "referenced_by_command_topics": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 109
+          }
+        }
+      }
+    },
+    "manual_topics": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/manual-all-rows"
+          },
+          {
+            "$ref": "#/$defs/manual-specific-rows"
+          }
+        ]
+      }
+    },
+    "excluded_navigation": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "topic_path",
+          "role",
+          "referenced_by_command_topics",
+          "reason"
+        ],
+        "properties": {
+          "topic_path": {
+            "const": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_commandsummary.html"
+          },
+          "role": {
+            "const": "navigation-index"
+          },
+          "referenced_by_command_topics": {
+            "const": 109
+          },
+          "reason": {
+            "const": "pinned-toc-is-navigation-authority"
+          }
+        }
+      }
+    },
+    "source_gaps": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "$ref": "#/$defs/source-gap"
+      }
+    },
+    "corpus_digest_definition": {
+      "const": "SHA-256 over ASCII domain mainframe-env.cics-source-corpus@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of mapping, topic_manifest, counts, mapped topics, linked topics, manual topics, excluded navigation, and source gaps"
+    },
+    "corpus_sha256": {
+      "$ref": "#/$defs/prefixed-sha256"
+    }
+  },
+  "$defs": {
+    "prefixed-sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "bare-sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "official-row": {
+      "type": "string",
+      "pattern": "^ibm-cics-ts-6x-2026-08-31:api-commands:[0-9]{4}$"
+    },
+    "topic-path": {
+      "type": "string",
+      "pattern": "^SSJL4D_6\\.x/(?:[A-Za-z0-9_][A-Za-z0-9_.-]*/)*[A-Za-z0-9_][A-Za-z0-9_-]*\\.html$"
+    },
+    "manual-common": {
+      "type": "object",
+      "properties": {
+        "topic_path": {
+          "$ref": "#/$defs/topic-path"
+        },
+        "role": {
+          "enum": [
+            "execution-context-candidate",
+            "compatibility-context-candidate",
+            "gap-classification-candidate",
+            "gap-identity-candidate"
+          ]
+        },
+        "reason": {
+          "enum": [
+            "dpl-command-restrictions",
+            "legacy-monitoring-successor",
+            "threadsafe-command-list",
+            "exec-interface-identity-and-availability",
+            "pinned-eibfn-command-table"
+          ]
+        }
+      }
+    },
+    "manual-all-rows": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/manual-common"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "topic_path",
+            "role",
+            "applies_to",
+            "reason"
+          ],
+          "properties": {
+            "topic_path": true,
+            "role": true,
+            "applies_to": {
+              "const": "all-sources-a-rows"
+            },
+            "reason": true
+          }
+        }
+      ]
+    },
+    "manual-specific-rows": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/manual-common"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "topic_path",
+            "role",
+            "applies_to_rows",
+            "reason"
+          ],
+          "properties": {
+            "topic_path": true,
+            "role": true,
+            "applies_to_rows": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 3,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/official-row"
+              }
+            },
+            "reason": true
+          }
+        }
+      ]
+    },
+    "source-gap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "official_row",
+        "label",
+        "state",
+        "topic_sources"
+      ],
+      "properties": {
+        "official_row": {
+          "$ref": "#/$defs/official-row"
+        },
+        "label": {
+          "enum": [
+            "CICSMESSAGE",
+            "DUMP",
+            "ENTER TRACEID"
+          ]
+        },
+        "state": {
+          "const": "pending-review"
+        },
+        "topic_sources": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/topic-path"
+          }
+        }
+      }
+    }
+  }
+}
