@@ -37,6 +37,28 @@ guard run in
 `cargo xtask architecture-fast --check`; hand-editing generated Rust or
 changing the catalog without regeneration fails the gate.
 
+Source preparation remains a separate, non-executable authority. The pinned
+CICS TS 6.x table of contents is reduced to the 345 immediate children of the
+command-summary node in
+[`command-summary-topics.json`](../../conformance/0.9/cics/command-summary-topics.json).
+[`application-api-sources-a-map.json`](../../conformance/0.9/cics/application-api-sources-a-map.json)
+then accounts for catalog rows `0001`–`0088` without adding grammar, options,
+conditions, family ownership, handlers or registration. The map has 88 row
+dispositions, 117 row-to-page edges and 109 unique pages. It records
+`CICSMESSAGE`, `DUMP` and `ENTER TRACEID` as source gaps because the pinned
+command-summary node contains no matching command page; similarly named
+commands with different EIBFN values are not aliases.
+
+`python3 -B tools/generate_cics_source_map.py --toc -` reads the exact pinned
+TOC bytes from standard input and writes only the bounded metadata projection
+and zero-credit candidate map. `--check` is offline by default and verifies
+their domain-separated digests, exact catalog binding, row order, page
+multiplicity, source gaps and canonical rendering. Supplying `--toc -` with
+`--check` additionally compares the committed projection to the external
+source. Raw TOC and topic bodies remain outside the repository. The map's
+candidate status cannot register behavior or grant semantic, execution or
+differential credit.
+
 ## Frozen families
 
 | Family | Owns |
@@ -93,7 +115,8 @@ records the hard limits and exact legacy ceiling policy.
 
 ```bash
 python3 -B tools/generate_cics_descriptors.py --check
-python3 -B -m unittest tools.tests.test_cics_descriptors tools.tests.test_module_boundaries
+python3 -B tools/generate_cics_source_map.py --check
+python3 -B -m unittest tools.tests.test_cics_descriptors tools.tests.test_cics_source_map tools.tests.test_module_boundaries
 cargo test -p mainframe-env-host-api -p mainframe-env-cics --all-features --locked
 cargo xtask architecture-fast --check
 ```

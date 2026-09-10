@@ -7460,6 +7460,35 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         status.success(),
         "CICS command descriptor freshness guard failed",
     )?;
+    let cics_source_map = root.join("tools/generate_cics_source_map.py");
+    require(
+        cics_source_map.is_file(),
+        "CICS sources-a map generator is missing",
+    )?;
+    let cics_source_map_schema =
+        root.join("conformance/0.9/schemas/cics-command-source-map.schema.json");
+    for relative in [
+        "conformance/0.9/cics/command-summary-topics.json",
+        "conformance/0.9/cics/application-api-sources-a-map.json",
+    ] {
+        let artifact = root.join(relative);
+        validate_schema_instance(
+            &json(&cics_source_map_schema)?,
+            &json(&artifact)?,
+            &artifact,
+        )?;
+    }
+    let status = Command::new("python3")
+        .arg("-B")
+        .arg(&cics_source_map)
+        .arg("--check")
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("CICS sources-a map freshness guard: {error}"))?;
+    require(
+        status.success(),
+        "CICS sources-a map freshness guard failed",
+    )?;
     let module_boundaries = root.join("tools/check_module_boundaries.py");
     require(
         module_boundaries.is_file(),

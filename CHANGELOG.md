@@ -37,6 +37,9 @@ All notable changes to mainframe-env are documented here.
 - Added a zero-credit, non-registering host-API projection for all 263 pinned
   CICS application-command identities and EIB function codes while retaining
   the existing 23 API and two SPI compatibility runtime operations unchanged.
+- Added a digest-bound, zero-credit mapping from the first 88 CICS application
+  rows to 109 command-summary pages, preserving shared/variant pages and three
+  explicit source gaps without retaining IBM publication bodies in Git.
 - Added a reviewed COBOL numeric `MOVE` pilot and corrected floating-insertion,
   capacity, sign, and overflow behavior found by that review.
 - Added cost-aware local Jenkins assurance, exact-candidate command receipts,

@@ -1,0 +1,602 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/cics-command-source-map@1",
+  "title": "CICS command-summary projection and zero-credit source mapping",
+  "description": "Strict schemas for the bounded IBM TOC projection and the CIC-901.sources-a row-to-topic candidate mapping. Neither artifact contains command semantics or grants coverage.",
+  "type": "object",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/toc-projection"
+    },
+    {
+      "$ref": "#/$defs/source-map"
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "topic-path": {
+      "type": "string",
+      "pattern": "^SSJL4D_6\\.x/reference-applications/commands-(api|bts)/[A-Za-z0-9_-]+\\.html$"
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "topic_path",
+        "topic_id"
+      ],
+      "properties": {
+        "label": {
+          "const": "CICS command summary"
+        },
+        "topic_path": {
+          "const": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_commandsummary.html"
+        },
+        "topic_id": {
+          "const": "reference-cics-command-summary"
+        }
+      }
+    },
+    "projected-topic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ordinal",
+        "label",
+        "topic_path",
+        "topic_id"
+      ],
+      "properties": {
+        "ordinal": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 345
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "topic_path": {
+          "$ref": "#/$defs/topic-path"
+        },
+        "topic_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "maxLength": 200
+        }
+      }
+    },
+    "toc-projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "target_version",
+        "source_toc_url",
+        "source_toc_sha256",
+        "retained_source_bytes",
+        "coverage_credit",
+        "summary",
+        "topic_count",
+        "projection_digest_definition",
+        "projection_sha256",
+        "topics"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mainframe-env.cics-command-summary-topics@1"
+        },
+        "target_version": {
+          "const": "0.9.0"
+        },
+        "source_toc_url": {
+          "const": "https://www.ibm.com/docs/api/v1/toc/cics-ts/6.x?lang=en"
+        },
+        "source_toc_sha256": {
+          "const": "sha256:f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a"
+        },
+        "retained_source_bytes": {
+          "const": false
+        },
+        "coverage_credit": {
+          "const": 0
+        },
+        "summary": {
+          "$ref": "#/$defs/summary"
+        },
+        "topic_count": {
+          "const": 345
+        },
+        "projection_digest_definition": {
+          "const": "SHA-256 over ASCII domain mainframe-env.cics-command-summary-topics@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of source_toc_sha256, summary, and ordered topics"
+        },
+        "projection_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "topics": {
+          "type": "array",
+          "minItems": 345,
+          "maxItems": 345,
+          "items": {
+            "$ref": "#/$defs/projected-topic"
+          }
+        }
+      }
+    },
+    "topic-reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topic_path",
+        "topic_id",
+        "toc_label",
+        "role"
+      ],
+      "properties": {
+        "topic_path": {
+          "$ref": "#/$defs/topic-path"
+        },
+        "topic_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "maxLength": 200
+        },
+        "toc_label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "role": {
+          "enum": [
+            "primary",
+            "variant",
+            "shared",
+            "combined"
+          ]
+        }
+      }
+    },
+    "mapping-row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "official_row",
+        "label",
+        "eibfn",
+        "state",
+        "selection_kind",
+        "rationale",
+        "topics"
+      ],
+      "properties": {
+        "official_row": {
+          "type": "string",
+          "pattern": "^ibm-cics-ts-6x-2026-08-31:api-commands:[0-9]{4}$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "eibfn": {
+          "type": "string",
+          "pattern": "^[0-9A-F]{4}$"
+        },
+        "state": {
+          "enum": [
+            "mapped",
+            "source-gap"
+          ]
+        },
+        "selection_kind": {
+          "enum": [
+            "exact",
+            "variant-set",
+            "shared-page",
+            "combined-page",
+            "source-gap"
+          ]
+        },
+        "rationale": {
+          "enum": [
+            "exact-toc-label",
+            "qualified-variant-set",
+            "shared-command-form",
+            "combined-command-page",
+            "no-command-summary-node"
+          ]
+        },
+        "topics": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/topic-reference"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "selection_kind": {
+                "const": "source-gap"
+              }
+            },
+            "required": [
+              "selection_kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "state": {
+                "const": "source-gap"
+              },
+              "rationale": {
+                "const": "no-command-summary-node"
+              },
+              "topics": {
+                "maxItems": 0
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "state": {
+                "const": "mapped"
+              },
+              "topics": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "selection_kind": {
+                "const": "exact"
+              }
+            },
+            "required": [
+              "selection_kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "state": {
+                "const": "mapped"
+              },
+              "rationale": {
+                "const": "exact-toc-label"
+              },
+              "topics": {
+                "minItems": 1,
+                "maxItems": 1,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "const": "primary"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "selection_kind": {
+                "const": "variant-set"
+              }
+            },
+            "required": [
+              "selection_kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "state": {
+                "const": "mapped"
+              },
+              "rationale": {
+                "const": "qualified-variant-set"
+              },
+              "topics": {
+                "minItems": 2,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "const": "variant"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "selection_kind": {
+                "const": "shared-page"
+              }
+            },
+            "required": [
+              "selection_kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "state": {
+                "const": "mapped"
+              },
+              "rationale": {
+                "const": "shared-command-form"
+              },
+              "topics": {
+                "minItems": 1,
+                "maxItems": 1,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "const": "shared"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "selection_kind": {
+                "const": "combined-page"
+              }
+            },
+            "required": [
+              "selection_kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "state": {
+                "const": "mapped"
+              },
+              "rationale": {
+                "const": "combined-command-page"
+              },
+              "topics": {
+                "minItems": 1,
+                "maxItems": 1,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "const": "combined"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "catalog-binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "descriptor_path",
+        "descriptor_sha256",
+        "official_catalog_sha256",
+        "application_identity_set_sha256"
+      ],
+      "properties": {
+        "descriptor_path": {
+          "const": "conformance/0.9/cics/command-descriptors.json"
+        },
+        "descriptor_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "official_catalog_sha256": {
+          "const": "sha256:fccd2a8e5cc24dd08aeb32754daf14ed80e9f1b20b5d9e762a1b0cfe429ceeba"
+        },
+        "application_identity_set_sha256": {
+          "const": "sha256:a18057164564781563252d53586a8afbc401f2783950db456b3b98177fc60b94"
+        }
+      }
+    },
+    "toc-binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "source_toc_sha256",
+        "projection_sha256",
+        "summary_topic_path"
+      ],
+      "properties": {
+        "path": {
+          "const": "conformance/0.9/cics/command-summary-topics.json"
+        },
+        "source_toc_sha256": {
+          "const": "sha256:f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a"
+        },
+        "projection_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "summary_topic_path": {
+          "const": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_commandsummary.html"
+        }
+      }
+    },
+    "row-range": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "first",
+        "last",
+        "count"
+      ],
+      "properties": {
+        "first": {
+          "const": "ibm-cics-ts-6x-2026-08-31:api-commands:0001"
+        },
+        "last": {
+          "const": "ibm-cics-ts-6x-2026-08-31:api-commands:0088"
+        },
+        "count": {
+          "const": 88
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "row_count",
+        "resolved_row_count",
+        "source_gap_count",
+        "edge_count",
+        "unique_topic_count",
+        "multi_topic_row_count",
+        "shared_topic_count",
+        "selection_kind_counts"
+      ],
+      "properties": {
+        "row_count": {
+          "const": 88
+        },
+        "resolved_row_count": {
+          "const": 85
+        },
+        "source_gap_count": {
+          "const": 3
+        },
+        "edge_count": {
+          "const": 117
+        },
+        "unique_topic_count": {
+          "const": 109
+        },
+        "multi_topic_row_count": {
+          "const": 9
+        },
+        "shared_topic_count": {
+          "const": 7
+        },
+        "selection_kind_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "exact",
+            "variant-set",
+            "shared-page",
+            "combined-page",
+            "source-gap"
+          ],
+          "properties": {
+            "exact": {
+              "const": 61
+            },
+            "variant-set": {
+              "const": 9
+            },
+            "shared-page": {
+              "const": 9
+            },
+            "combined-page": {
+              "const": 6
+            },
+            "source-gap": {
+              "const": 3
+            }
+          }
+        }
+      }
+    },
+    "source-map": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "target_version",
+        "work_package",
+        "status",
+        "semantic_authority",
+        "automatic_registration",
+        "coverage_credit",
+        "differential_credit",
+        "catalog",
+        "toc_projection",
+        "row_range",
+        "counts",
+        "mapping_digest_definition",
+        "mapping_sha256",
+        "rows"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mainframe-env.cics-command-source-map@1"
+        },
+        "target_version": {
+          "const": "0.9.0"
+        },
+        "work_package": {
+          "const": "CIC-901.sources-a-map"
+        },
+        "status": {
+          "const": "candidate"
+        },
+        "semantic_authority": {
+          "const": false
+        },
+        "automatic_registration": {
+          "const": false
+        },
+        "coverage_credit": {
+          "const": 0
+        },
+        "differential_credit": {
+          "const": 0
+        },
+        "catalog": {
+          "$ref": "#/$defs/catalog-binding"
+        },
+        "toc_projection": {
+          "$ref": "#/$defs/toc-binding"
+        },
+        "row_range": {
+          "$ref": "#/$defs/row-range"
+        },
+        "counts": {
+          "$ref": "#/$defs/counts"
+        },
+        "mapping_digest_definition": {
+          "const": "SHA-256 over ASCII domain mainframe-env.cics-command-source-map@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of catalog, toc_projection, row_range, and ordered rows"
+        },
+        "mapping_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "rows": {
+          "type": "array",
+          "minItems": 88,
+          "maxItems": 88,
+          "items": {
+            "$ref": "#/$defs/mapping-row"
+          }
+        }
+      }
+    }
+  }
+}
