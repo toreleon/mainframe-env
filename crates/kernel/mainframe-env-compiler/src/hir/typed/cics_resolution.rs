@@ -1,0 +1,485 @@
+//! Catalog-bound recognition of top-level EXEC CICS command clauses.
+
+use super::{Resolution, ResolutionFailure};
+use crate::SemanticModel;
+use mainframe_env_ir::{
+    CICS_APPLICATION_CONDITION_NAMES, CicsApplicationCobolApplicability,
+    CicsApplicationConditionLabelOperand, CicsApplicationConstraintStatus,
+    CicsApplicationOptionValueShape, CicsApplicationRegistryDescriptor,
+    cics_application_registry_candidates_for_tokens,
+};
+use std::collections::{BTreeMap, BTreeSet};
+
+type Clauses = BTreeMap<String, Vec<String>>;
+
+struct ValidatedCandidate {
+    descriptor: &'static CicsApplicationRegistryDescriptor,
+    clauses: Clauses,
+    options: Vec<String>,
+    head_len: usize,
+}
+
+struct CandidateFailure {
+    score: (usize, usize, usize),
+    detail: String,
+}
+
+pub(super) fn validated_command(
+    body: &[String],
+    semantic: &SemanticModel,
+) -> Resolution<(
+    &'static CicsApplicationRegistryDescriptor,
+    Clauses,
+    Vec<String>,
+)> {
+    let candidates = cics_application_registry_candidates_for_tokens(body).collect::<Vec<_>>();
+    if candidates.is_empty() {
+        return Err(ResolutionFailure::Invalid(format!(
+            "unknown CICS application command: {}",
+            body.first().map_or("<empty>", String::as_str)
+        )));
+    }
+
+    let mut valid = BTreeMap::<&'static str, ValidatedCandidate>::new();
+    let mut best_failure: Option<CandidateFailure> = None;
+    for candidate in candidates {
+        let tokens = clause_tokens(body, candidate.head_tokens, candidate.descriptor);
+        let (clauses, options) = match clauses(&tokens) {
+            Ok(parsed) => parsed,
+            Err(ResolutionFailure::Invalid(detail)) => {
+                keep_best_failure(
+                    &mut best_failure,
+                    CandidateFailure {
+                        score: (candidate.head_tokens.len(), 0, 0),
+                        detail,
+                    },
+                );
+                continue;
+            }
+            Err(ResolutionFailure::Unsupported) => unreachable!("clause parser is fail-closed"),
+        };
+        let present = clauses
+            .keys()
+            .chain(options.iter())
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>();
+        let discriminator_matches = candidate
+            .descriptor
+            .discriminator_options
+            .iter()
+            .filter(|name| present.contains(**name))
+            .count();
+        let recognized_options = present
+            .iter()
+            .filter(|name| option_is_known(candidate.descriptor, name))
+            .count();
+        if let Err(detail) =
+            validate_candidate(candidate.descriptor, &clauses, &options, &present, semantic)
+        {
+            keep_best_failure(
+                &mut best_failure,
+                CandidateFailure {
+                    score: (
+                        candidate.head_tokens.len(),
+                        discriminator_matches,
+                        recognized_options,
+                    ),
+                    detail,
+                },
+            );
+            continue;
+        }
+
+        let validated = ValidatedCandidate {
+            descriptor: candidate.descriptor,
+            clauses,
+            options,
+            head_len: candidate.head_tokens.len(),
+        };
+        match valid.get(candidate.descriptor.official_row) {
+            Some(existing) if existing.head_len >= validated.head_len => {}
+            _ => {
+                valid.insert(candidate.descriptor.official_row, validated);
+            }
+        }
+    }
+
+    match valid.len() {
+        1 => {
+            let candidate = valid.into_values().next().expect("one validated candidate");
+            Ok((candidate.descriptor, candidate.clauses, candidate.options))
+        }
+        0 => Err(ResolutionFailure::Invalid(best_failure.map_or_else(
+            || "CICS command does not match a source-reviewed application form".into(),
+            |failure| failure.detail,
+        ))),
+        _ => Err(ResolutionFailure::Invalid(format!(
+            "CICS command is ambiguous across source-reviewed forms: {}",
+            valid
+                .values()
+                .map(|candidate| candidate.descriptor.label_tokens.join(" "))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ))),
+    }
+}
+
+fn keep_best_failure(best: &mut Option<CandidateFailure>, candidate: CandidateFailure) {
+    if best
+        .as_ref()
+        .is_none_or(|current| candidate.score > current.score)
+    {
+        *best = Some(candidate);
+    }
+}
+
+fn clause_tokens(
+    body: &[String],
+    head: &[&str],
+    descriptor: &CicsApplicationRegistryDescriptor,
+) -> Vec<String> {
+    let remainder = &body[head.len()..];
+    let mut tokens = Vec::with_capacity(remainder.len() + 1);
+    if remainder.first().is_some_and(|token| token == "(")
+        && let Some(last) = head.last()
+        && descriptor.options.iter().any(|option| option.name == *last)
+    {
+        tokens.push((*last).into());
+    }
+    tokens.extend_from_slice(remainder);
+    tokens
+}
+
+fn validate_candidate(
+    descriptor: &CicsApplicationRegistryDescriptor,
+    clauses: &Clauses,
+    options: &[String],
+    present: &BTreeSet<&str>,
+    semantic: &SemanticModel,
+) -> Result<(), String> {
+    if descriptor.recognition_status == CicsApplicationConstraintStatus::Pending
+        || descriptor.constraint_status == CicsApplicationConstraintStatus::Pending
+    {
+        return Err(format!(
+            "CICS {} has an unfrozen source contract",
+            command_label(descriptor)
+        ));
+    }
+
+    let mut condition_clause_count = 0usize;
+    for name in present {
+        let Some(shape) = option_value_shape(descriptor, name) else {
+            if let Some(condition_clauses) = descriptor.condition_clauses
+                && is_condition_name(name)
+            {
+                condition_clause_count += 1;
+                let value = clauses.get(*name);
+                match (condition_clauses.label_operand, value) {
+                    (CicsApplicationConditionLabelOperand::Optional, Some(tokens))
+                        if !is_single_condition_label(tokens) =>
+                    {
+                        return Err(format!(
+                            "CICS {} condition {name} requires one label operand",
+                            command_label(descriptor)
+                        ));
+                    }
+                    (CicsApplicationConditionLabelOperand::Optional, _) => {}
+                    (CicsApplicationConditionLabelOperand::Forbidden, Some(_)) => {
+                        return Err(format!(
+                            "CICS {} condition {name} forbids a label operand",
+                            command_label(descriptor)
+                        ));
+                    }
+                    (CicsApplicationConditionLabelOperand::Forbidden, None) => {}
+                }
+                continue;
+            }
+            return Err(format!(
+                "CICS {} has unknown or unreviewed top-level option {name}",
+                command_label(descriptor)
+            ));
+        };
+        let has_value = clauses.contains_key(*name);
+        match (shape, has_value) {
+            (CicsApplicationOptionValueShape::Flag, true) => {
+                return Err(format!(
+                    "CICS {} option {name} is a flag and rejects a parenthesized operand",
+                    command_label(descriptor)
+                ));
+            }
+            (CicsApplicationOptionValueShape::Value, false) => {
+                return Err(format!(
+                    "CICS {} option {name} requires a parenthesized operand",
+                    command_label(descriptor)
+                ));
+            }
+            (CicsApplicationOptionValueShape::BoundedAmbiguity, _) => {
+                return Err(format!(
+                    "CICS {} option {name} has a source-bounded operand shape",
+                    command_label(descriptor)
+                ));
+            }
+            _ => {}
+        }
+    }
+    if let Some(condition_clauses) = descriptor.condition_clauses
+        && !(condition_clauses.minimum_occurrences..=condition_clauses.maximum_occurrences)
+            .contains(&condition_clause_count)
+    {
+        return Err(format!(
+            "CICS {} requires {}..={} EIBRESP condition clauses, found {condition_clause_count}",
+            command_label(descriptor),
+            condition_clauses.minimum_occurrences,
+            condition_clauses.maximum_occurrences,
+        ));
+    }
+
+    if !descriptor
+        .required_discriminator_options
+        .iter()
+        .all(|name| present.contains(name))
+    {
+        return Err(format!(
+            "CICS {} is missing a required command discriminator",
+            command_label(descriptor)
+        ));
+    }
+    if let Some(name) = descriptor
+        .forbidden_discriminator_options
+        .iter()
+        .find(|name| present.contains(**name))
+    {
+        return Err(format!(
+            "CICS {} forbids discriminator {name}",
+            command_label(descriptor)
+        ));
+    }
+    if descriptor.required_discriminator_options.is_empty()
+        && descriptor.forbidden_discriminator_options.is_empty()
+        && !descriptor.discriminator_options.is_empty()
+        && !descriptor
+            .discriminator_options
+            .iter()
+            .any(|name| present.contains(name))
+    {
+        return Err(format!(
+            "CICS {} is missing a source-reviewed command discriminator",
+            command_label(descriptor)
+        ));
+    }
+
+    match descriptor.cobol_applicability {
+        CicsApplicationCobolApplicability::Allowed => {}
+        CicsApplicationCobolApplicability::NotApplicable => {
+            return Err(format!(
+                "CICS {} is not applicable to COBOL",
+                command_label(descriptor)
+            ));
+        }
+        CicsApplicationCobolApplicability::Conditional
+        | CicsApplicationCobolApplicability::BoundedAmbiguity => {
+            return Err(format!(
+                "CICS {} has no unconditional source-reviewed COBOL form",
+                command_label(descriptor)
+            ));
+        }
+    }
+
+    if let Some(name) = descriptor
+        .required_options
+        .iter()
+        .find(|name| !present.contains(**name))
+    {
+        return Err(format!(
+            "CICS {} requires option {name}",
+            command_label(descriptor)
+        ));
+    }
+    for alternative in descriptor.alternative_groups {
+        let count = alternative
+            .members
+            .iter()
+            .filter(|name| present.contains(**name))
+            .count();
+        if alternative.required && count == 0 {
+            return Err(format!(
+                "CICS {} requires one of {}",
+                command_label(descriptor),
+                alternative.members.join(", ")
+            ));
+        }
+    }
+    for dependency in descriptor.dependencies {
+        if present.contains(dependency.option)
+            && let Some(required) = dependency
+                .requires
+                .iter()
+                .find(|required| !present.contains(**required))
+        {
+            return Err(format!(
+                "CICS {} option {} requires {required}",
+                command_label(descriptor),
+                dependency.option
+            ));
+        }
+    }
+    for group in descriptor.mutual_exclusion_groups {
+        let selected = group
+            .iter()
+            .filter(|name| present.contains(**name))
+            .copied()
+            .collect::<Vec<_>>();
+        if selected.len() > 1 {
+            return Err(format!(
+                "CICS {} options {} are mutually exclusive",
+                command_label(descriptor),
+                selected.join(", ")
+            ));
+        }
+    }
+
+    for (name, value) in clauses {
+        let Some(limit) = descriptor
+            .options
+            .iter()
+            .find(|option| option.name == name)
+            .and_then(|option| option.source_max_value_bytes)
+        else {
+            continue;
+        };
+        if let Some(bytes) = statically_known_value_bytes(value, semantic)
+            && bytes > limit
+        {
+            return Err(format!(
+                "CICS {} option {name} exceeds its source maximum of {limit} bytes",
+                command_label(descriptor)
+            ));
+        }
+    }
+
+    // Parsing keeps valued and flag options separate; use both here so future
+    // callers cannot accidentally validate only one representation.
+    debug_assert_eq!(present.len(), clauses.len() + options.len());
+    Ok(())
+}
+
+fn option_is_known(descriptor: &CicsApplicationRegistryDescriptor, name: &str) -> bool {
+    option_value_shape(descriptor, name).is_some()
+        || (descriptor.condition_clauses.is_some() && is_condition_name(name))
+}
+
+fn is_condition_name(name: &str) -> bool {
+    CICS_APPLICATION_CONDITION_NAMES
+        .binary_search(&name)
+        .is_ok()
+}
+
+fn is_single_condition_label(tokens: &[String]) -> bool {
+    matches!(tokens, [label] if !label.is_empty() && label.chars().all(|character| {
+        character.is_ascii_alphanumeric() || character == '-'
+    }))
+}
+
+fn option_value_shape(
+    descriptor: &CicsApplicationRegistryDescriptor,
+    name: &str,
+) -> Option<CicsApplicationOptionValueShape> {
+    descriptor
+        .options
+        .iter()
+        .find(|option| option.name == name)
+        .map(|option| option.value_shape)
+        .or_else(|| {
+            is_typed_compatibility_option(descriptor, name)
+                .then_some(CicsApplicationOptionValueShape::Value)
+        })
+}
+
+fn is_typed_compatibility_option(
+    descriptor: &CicsApplicationRegistryDescriptor,
+    name: &str,
+) -> bool {
+    // The shipped typed file plan already accepts DATASET as FILE's spelling.
+    // Keep that one compiler ABI alias without widening any catalog row.
+    name == "DATASET" && matches!(descriptor.label_tokens, ["READ"] | ["REWRITE"])
+}
+
+fn command_label(descriptor: &CicsApplicationRegistryDescriptor) -> String {
+    descriptor.label_tokens.join(" ")
+}
+
+fn statically_known_value_bytes(tokens: &[String], semantic: &SemanticModel) -> Option<usize> {
+    if let [literal] = tokens
+        && literal.len() >= 2
+        && let Some(quote) = literal.chars().next()
+        && matches!(quote, '\'' | '"')
+        && literal.ends_with(quote)
+    {
+        let contents = &literal[quote.len_utf8()..literal.len() - quote.len_utf8()];
+        let escaped = format!("{quote}{quote}");
+        return Some(contents.replace(&escaped, &quote.to_string()).len());
+    }
+    semantic
+        .resolve(&tokens.join(" "))
+        .ok()
+        .map(|layout| layout.length)
+}
+
+fn clauses(tokens: &[String]) -> Resolution<(Clauses, Vec<String>)> {
+    let mut clauses = BTreeMap::new();
+    let mut options = Vec::new();
+    let mut seen = BTreeSet::new();
+    let mut position = 0;
+    while position < tokens.len() {
+        let name = tokens[position].to_ascii_uppercase();
+        if name.is_empty()
+            || !name
+                .chars()
+                .all(|character| character.is_ascii_alphanumeric() || character == '-')
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS top-level clause is malformed".into(),
+            ));
+        }
+        if !seen.insert(name.clone()) {
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS top-level option {name} is duplicated"
+            )));
+        }
+        if tokens.get(position + 1).is_some_and(|token| token == "(") {
+            let close = matching_close(tokens, position + 1)?;
+            if close == position + 2 {
+                return Err(ResolutionFailure::Invalid(
+                    "CICS operand clause is empty".into(),
+                ));
+            }
+            clauses.insert(name, tokens[position + 2..close].to_vec());
+            position = close + 1;
+        } else {
+            options.push(name);
+            position += 1;
+        }
+    }
+    Ok((clauses, options))
+}
+
+fn matching_close(tokens: &[String], open: usize) -> Resolution<usize> {
+    let mut depth = 0usize;
+    for (index, token) in tokens.iter().enumerate().skip(open) {
+        match token.as_str() {
+            "(" => depth += 1,
+            ")" => {
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    ResolutionFailure::Invalid("CICS clause parentheses are malformed".into())
+                })?;
+                if depth == 0 {
+                    return Ok(index);
+                }
+            }
+            _ => {}
+        }
+    }
+    Err(ResolutionFailure::Invalid(
+        "CICS clause parentheses are malformed".into(),
+    ))
+}
