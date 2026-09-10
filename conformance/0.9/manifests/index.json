@@ -5,6 +5,17 @@
   "coverage_credit": 0,
   "manifests": [
     {
+      "scope_id": "cics-application-api-sources-a",
+      "subsystem": "cics",
+      "baseline_id": "ibm-cics-ts-6x-application-api-sources-a-2026-09-10",
+      "manifest": "conformance/0.9/manifests/cics-application-api-sources-a-topics.json",
+      "manifest_sha256": "sha256:903d6093762441b49d602e4b44dfcfd4aaf571f2cc257022377987d410583801",
+      "topic_count": 172,
+      "topic_manifest_sha256": "sha256:625f699b56a7d84ffb4892af287cb45a10c0d9cd808320fa76496c02bb894b60",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
       "scope_id": "cics-file-uow-pilot",
       "subsystem": "cics",
       "baseline_id": "ibm-cics-ts-6x-file-uow-pilot-2026-09-08",
