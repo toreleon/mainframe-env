@@ -65,6 +65,9 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Scoped local Docker CI to the last successful ancestor, preserving policy/docs
+  checks while skipping runtime rebuild/deployment for prose-only changes. Added
+  per-command timings, bounded stage timeouts, and focused agent verification rules.
 - Organized shared Git/Docker ignore rules for generated output, runtime state,
   environment secrets, and local tooling while retaining templates and evidence.
 - Advanced decimal assignment to a policy-bearing `@2` contract with explicit

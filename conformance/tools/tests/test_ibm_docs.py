@@ -296,6 +296,22 @@ class CacheTests(unittest.TestCase):
                     self.assertIn(self.scope.scope_id, output.getvalue())
                     self.assertNotIn("Example rule.", output.getvalue())
 
+    def test_search_does_not_present_corrupt_cache_as_verified(self):
+        corrupt = b"X" + self.body[1:]
+        docs_api.write_retrieved(self.cache / self.pin.key, corrupt)
+        docs_api.write_retrieved(self.cache / self.toc.key, self.toc_body)
+        with patch.object(
+            ibm_docs, "load_pins", return_value=([self.pin], [self.toc])
+        ), redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(
+                ibm_docs.main(
+                    ["--cache", str(self.cache), "search", "Example operation"]
+                ),
+                1,
+            )
+            self.assertIn('"mismatch": 1', output.getvalue())
+            self.assertNotIn("[example] Example operation", output.getvalue())
+
     def test_same_topic_different_snapshots_are_separately_addressable(self):
         newer_body = self.body + b" newer"
         newer_scope = ibm_docs.Scope(

@@ -133,10 +133,13 @@ docker/dev docs search "CICS command" --subsystem cics
 docker/dev docs read TOPIC_PATH --sha256 DIGEST
 ```
 
-The cache volume is mounted only by the development service. Topic and TOC
-bytes must match explicit pins; the cache reader has no network path and grants
-no semantic or licensed-execution credit. This uses the normal host-driven
-development container, not nested Docker or another runner. See the
+The development container supplies
+`MAINFRAME_ENV_IBM_DOCS_CACHE=/ibm-docs/topic-cache`, and the cache volume is
+mounted only by the development service. Topic and TOC bytes must match explicit
+pins; the offline reader grants no semantic or licensed-execution credit. When a
+pinned HTML source is missing or needs refresh, use the existing Chrome Browser
+Control retrieval workflow documented in the runbook. This uses the normal
+host-driven development container, not nested Docker or another runner. See the
 [IBM documentation cache runbook](../docs/runbooks/IBM-DOCS-CACHE.md).
 
 ## CI and deployment
@@ -157,6 +160,15 @@ receipt. Jenkins serializes builds and atomically changes the `current` binary
 link, restarts the container, and checks the application's reported readiness.
 An unhealthy candidate restores and checks the previous binary; a failed first
 deployment stops the application. A failed build never reaches deployment.
+
+`CHECK_MODE=auto` narrows prose-only changes relative to the last successful
+ancestor commit: dependency/license policy, documentation, and Python/shell
+tooling still run, while runtime tests, release compilation, and deployment are
+skipped. Missing/unavailable history, normative documents, code/infrastructure,
+and unknown inputs retain every local runtime gate. Choose `CHECK_MODE=runtime`
+in Jenkins to force those gates. Per-command JSON/logs and timings are archived
+under `ci-checks/`; see the [verification workflow](../docs/runbooks/VERIFICATION-WORKFLOW.md)
+for scope, limits, and the distinction from root full/release assurance.
 
 Binary rollback does **not** roll back database migrations. Use only compatible
 schema changes or follow the [backup and restore runbook](../docs/runbooks/BACKUP-RESTORE.md)

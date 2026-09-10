@@ -3,24 +3,21 @@ set -euo pipefail
 export CARGO_HOME=/cache CARGO_TARGET_DIR=/target
 case "${1:?check, build or maintain}" in
   check)
+    rm -rf /target/ci-assurance /target/ci-backend
     /opt/mainframe-env/docker/ci.sh maintain
     python3 /opt/mainframe-env/docker/storage.py check /state /cache /target
     python3 /opt/mainframe-env/tools/supply_chain.py verify-jenkins --home "$JENKINS_HOME"
-    rm -rf /target/ci-assurance /target/ci-backend
-    cargo fmt --all -- --check
-    python3 -B tools/supply_chain.py check
-    cargo deny check
-    python3 -B tools/run_tooling_tests.py
-    cargo +1.95.0 check --workspace --all-targets --all-features --locked
-    /opt/mainframe-env/docker/test-workspace.sh
-    cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
-    python3 -B tools/ci_assurance.py plan --event manual --ref refs/heads/main \
-      --output /target/ci-assurance/plan.json
-    tools/jenkins/postgres_parity.sh run
+    python3 -B docker/ci_plan.py plan
+    python3 -B docker/ci_plan.py check
     ;;
   build)
     python3 /opt/mainframe-env/docker/storage.py check /target /releases
-    cargo build --locked --release -p mainframe-env-server --bin mainframe-env-server
+    [[ "$(python3 -B docker/ci_plan.py build-required)" == true ]] || {
+      echo 'The verified plan does not require a runtime build.' >&2
+      exit 1
+    }
+    python3 -B tools/ci_assurance.py record --output /target/ci-assurance \
+      --gate build-server -- cargo build --locked --release -p mainframe-env-server --bin mainframe-env-server
     ;;
   maintain)
     # Only remove disposable compiler output, and only between builds under flock.

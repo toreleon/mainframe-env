@@ -36,7 +36,25 @@ environment. A skipped external test receives no evidence credit.
 7. Keep implementation, release promotion, publication, and deployment as
    separate decisions.
 
-## Local quality floor
+## Verification scope
+
+For every change, keep dependency/license policy and relevant documentation
+checks. During development, select the narrowest meaningful test for the changed
+behavior; expand only when a changed boundary or unresolved failure requires it.
+The following is a command inventory for applicable gates, not a request to run
+the entire list after every edit, commit, or PR operation. CI owns the selected
+integration run; full/release and explicitly requested acceptance gates remain
+required. See [the workflow](docs/runbooks/VERIFICATION-WORKFLOW.md).
+
+| Change | Development validation |
+|---|---|
+| Prose/navigation | Documentation checks and policy; no unrelated runtime/oracle suite |
+| Python/shell tooling | Affected tooling tests, shell syntax, source-input policy, docs |
+| Rust behavior | Focused regression and affected package tests/lints |
+| Shared/durable/public boundary | Affected consumers, compatibility, failure/recovery, backend parity |
+| Oracle adapter, fixture, or semantic evidence | Relevant deterministic pilot first; required licensed/promotion gate at its acceptance boundary |
+
+## Validation command inventory
 
 ```bash
 cargo fmt --all -- --check

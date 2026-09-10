@@ -1,6 +1,6 @@
 {
   "counts": {
-    "markdown_documents": 186,
+    "markdown_documents": 188,
     "navigation_groups": 5,
     "normative_documents": 39,
     "xtask_commands": 163
@@ -10,7 +10,7 @@
       "normative": false,
       "path": "AGENTS.md",
       "relative_links": 5,
-      "sha256": "sha256:e3b117979558e6749bb33adc5c28376dfc83d10a17d2b13bfa855b2207bf2967",
+      "sha256": "sha256:aeef2ea23a85d685d90ea673a56d30ab3014db3b39d3112f3a80409ff6cbe04b",
       "title": "Repository Guidelines",
       "xtask_commands": 1
     },
@@ -18,15 +18,15 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:3494b2c72d0a5df11d45aa3fb00cce8bca7ca59d53af809a1b480831971ac929",
+      "sha256": "sha256:5523bc7577565299c1bf0100d499066cceed184fabfa426865188c5d257d0405",
       "title": "Changelog",
       "xtask_commands": 1
     },
     {
       "normative": false,
       "path": "CONTRIBUTING.md",
-      "relative_links": 6,
-      "sha256": "sha256:5d7272bbf22f8caa039ac09c6597255b854148c1d08730cca7db32a1cb9f2f09",
+      "relative_links": 7,
+      "sha256": "sha256:cba993e4be66085e85dedb4c73c2118ec269b77c6120f4279715b6ba2a02df5b",
       "title": "Contributing to mainframe-env",
       "xtask_commands": 4
     },
@@ -297,8 +297,8 @@
     {
       "normative": false,
       "path": "docker/README.md",
-      "relative_links": 9,
-      "sha256": "sha256:46d85edbde74208c19af3b8ab76efc0c0ba5b12ded3b1e35560fed7d31565602",
+      "relative_links": 10,
+      "sha256": "sha256:bbdbc75c53c382edfdfc3511d8eafd5265472c751d2f2a16f9c11f1d6c3bfafa",
       "title": "Docker development environment",
       "xtask_commands": 1
     },
@@ -1388,6 +1388,14 @@
     },
     {
       "normative": false,
+      "path": "docs/research/CI-AGENT-FEEDBACK.md",
+      "relative_links": 6,
+      "sha256": "sha256:78e312d6c5915df1b8565c1fdbb9f790ac8c3aeb06bd8937ee3c35b205ae636c",
+      "title": "CI and agent feedback cost review",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
       "path": "docs/research/IBM-OFFICIAL-COVERAGE-ROADMAP.md",
       "relative_links": 13,
       "sha256": "sha256:b96d0f880dde7758acfbce29df2e8a2e45b07cc19367e282305140a432c57824",
@@ -1461,8 +1469,8 @@
     {
       "normative": false,
       "path": "docs/runbooks/IBM-DOCS-CACHE.md",
-      "relative_links": 2,
-      "sha256": "sha256:50768a1b848cc3b975a907f447b7c0f8c61be8e6b81b783ff0c43b4b38813895",
+      "relative_links": 3,
+      "sha256": "sha256:ad1bf599b738f4485907657a2ff0b03d2dccc5d696eb6ba6ab709eeb64ad0781",
       "title": "IBM documentation cache",
       "xtask_commands": 0
     },
@@ -1480,6 +1488,14 @@
       "relative_links": 2,
       "sha256": "sha256:ed955abceb7726503493f609f5573d351c96a89782daee7ce16126f52e36537b",
       "title": "Core-server operations",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "docs/runbooks/VERIFICATION-WORKFLOW.md",
+      "relative_links": 3,
+      "sha256": "sha256:b54c6cdb546705dcfd291b540a3b4415145df0488284c4f5671a61ba8c7426e3",
+      "title": "Verification workflow",
       "xtask_commands": 0
     },
     {
