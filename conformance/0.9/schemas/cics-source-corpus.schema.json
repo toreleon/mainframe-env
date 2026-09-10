@@ -87,7 +87,7 @@
           "$ref": "#/$defs/prefixed-sha256"
         },
         "topic_count": {
-          "const": 172
+          "const": 173
         },
         "total_bytes": {
           "type": "integer",
@@ -117,10 +117,10 @@
           "const": 58
         },
         "manual_topics": {
-          "const": 5
+          "const": 6
         },
         "html_topics": {
-          "const": 172
+          "const": 173
         },
         "source_gaps_pending_review": {
           "const": 3
@@ -165,8 +165,8 @@
     },
     "manual_topics": {
       "type": "array",
-      "minItems": 5,
-      "maxItems": 5,
+      "minItems": 6,
+      "maxItems": 6,
       "items": {
         "oneOf": [
           {
@@ -257,6 +257,7 @@
           "enum": [
             "dpl-command-restrictions",
             "legacy-monitoring-successor",
+            "legacy-monitoring-module-context",
             "threadsafe-command-list",
             "exec-interface-identity-and-availability",
             "pinned-eibfn-command-table"
@@ -346,7 +347,7 @@
         "topic_sources": {
           "type": "array",
           "minItems": 2,
-          "maxItems": 4,
+          "maxItems": 5,
           "uniqueItems": true,
           "items": {
             "$ref": "#/$defs/topic-path"

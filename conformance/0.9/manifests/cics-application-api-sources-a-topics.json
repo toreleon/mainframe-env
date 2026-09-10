@@ -12,8 +12,8 @@
   "target_version": "0.9.0",
   "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a",
   "toc_url": "https://www.ibm.com/docs/api/v1/toc/cics-ts/6.x?lang=en",
-  "topic_count": 172,
-  "topic_manifest_digest": "625f699b56a7d84ffb4892af287cb45a10c0d9cd808320fa76496c02bb894b60",
+  "topic_count": 173,
+  "topic_manifest_digest": "344e912ef28b1d9ba4a1a00b4613865d759c3e337ac809ccb23fd4f4358652d5",
   "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
   "topics": [
     {
@@ -923,6 +923,12 @@
       "topic_path": "SSJL4D_6.x/reference-diagnostics/eib/dfhp4_eibfields.html"
     },
     {
+      "bytes": 1847,
+      "last_modified": "2026-03-19",
+      "sha256": "1067e330e46667f52c4ae07002e73d1b13b35f0db8f1a69fbd3809eab5f2d109",
+      "topic_path": "SSJL4D_6.x/reference-diagnostics/modules/dfhs3c001248.html"
+    },
+    {
       "bytes": 26202,
       "last_modified": "2026-01-16",
       "sha256": "0b996b8c9ddaeb10cc92d8031d9e970ac026b249f548a2e0c87b35e14973e322",
@@ -1049,5 +1055,5 @@
       "topic_path": "SSJL4D_6.x/tuning/connections/dfht17k.html"
     }
   ],
-  "total_bytes": 5205593
+  "total_bytes": 5207440
 }

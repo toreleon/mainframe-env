@@ -57,8 +57,8 @@ MAX_TOPIC_BYTES = 2 * 1024 * 1024
 MAX_HTML_TOPICS = 256
 EXPECTED_MAPPED_TOPICS = 109
 EXPECTED_LINKED_TOPICS = 58
-EXPECTED_MANUAL_TOPICS = 5
-EXPECTED_HTML_TOPICS = 172
+EXPECTED_MANUAL_TOPICS = 6
+EXPECTED_HTML_TOPICS = 173
 HEX = frozenset("0123456789abcdef")
 MANIFEST_FIELDS = {
     "baseline_id",
@@ -97,6 +97,12 @@ MANUAL_TOPICS = [
         "role": "compatibility-context-candidate",
         "applies_to_rows": [ROW_TRACEID],
         "reason": "legacy-monitoring-successor",
+    },
+    {
+        "topic_path": "SSJL4D_6.x/reference-diagnostics/modules/dfhs3c001248.html",
+        "role": "compatibility-context-candidate",
+        "applies_to_rows": [ROW_TRACEID],
+        "reason": "legacy-monitoring-module-context",
     },
     {
         "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_threadsafelist.html",
@@ -386,6 +392,7 @@ def gap_records() -> list[dict[str, Any]]:
                 "SSJL4D_6.x/reference-applications/commands-api/dfhp4_monitor.html",
                 "SSJL4D_6.x/reference-diagnostics/components/dfhs34k.html",
                 "SSJL4D_6.x/reference-diagnostics/eib/dfha8mf.html",
+                "SSJL4D_6.x/reference-diagnostics/modules/dfhs3c001248.html",
             ],
         },
     ]

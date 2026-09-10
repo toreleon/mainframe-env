@@ -71,8 +71,8 @@ class CicsApplicationSourcesTests(unittest.TestCase):
                 "mapping_rows": 88,
                 "mapped_command_topics": 109,
                 "linked_context_topics": 58,
-                "manual_topics": 5,
-                "html_topics": 172,
+                "manual_topics": 6,
+                "html_topics": 173,
                 "source_gaps_pending_review": 3,
             },
         )
@@ -84,7 +84,7 @@ class CicsApplicationSourcesTests(unittest.TestCase):
         self.assertFalse(mapped & manual)
         self.assertFalse(linked & manual)
         self.assertEqual(mapped | linked | manual, manifest_paths)
-        self.assertEqual(len(manifest_paths), 172)
+        self.assertEqual(len(manifest_paths), 173)
 
     def test_mapped_topics_and_gaps_remain_bound_to_the_accepted_map(self):
         mapping = self.mapping()
@@ -130,7 +130,7 @@ class CicsApplicationSourcesTests(unittest.TestCase):
         )
         self.assertEqual(
             corpus["corpus_sha256"],
-            "sha256:b5248c48d498c2c82cf67ad0280a5f3419e50a8a0730f13d2929be84e3f808e0",
+            "sha256:54806ff4096b6d9b2a5c7b7f8bf398a938db22277be70beedaa02d16e0992b92",
         )
         self.assertEqual(
             corpus["topic_manifest"]["file_sha256"],
@@ -143,6 +143,7 @@ class CicsApplicationSourcesTests(unittest.TestCase):
 
     def test_corpus_is_html_only_and_gaps_remain_candidates(self):
         corpus = self.corpus()
+        dfhcmp = "SSJL4D_6.x/reference-diagnostics/modules/dfhs3c001248.html"
         self.assertNotIn("external_publications", corpus)
         self.assertNotIn("external_publications", corpus["counts"])
         for gap in corpus["source_gaps"]:
@@ -151,6 +152,17 @@ class CicsApplicationSourcesTests(unittest.TestCase):
             )
             self.assertEqual(gap["state"], "pending-review")
             self.assertTrue(all(path.endswith(".html") for path in gap["topic_sources"]))
+        trace_gap = next(row for row in corpus["source_gaps"] if row["label"] == "ENTER TRACEID")
+        self.assertIn(dfhcmp, trace_gap["topic_sources"])
+        self.assertIn(
+            {
+                "topic_path": dfhcmp,
+                "role": "compatibility-context-candidate",
+                "applies_to_rows": [sources.ROW_TRACEID],
+                "reason": "legacy-monitoring-module-context",
+            },
+            corpus["manual_topics"],
+        )
 
     def test_link_normalization_accepts_only_canonical_current_product_topics(self):
         source = "SSJL4D_6.x/reference-applications/commands-api/example.html"
