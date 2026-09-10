@@ -80,7 +80,10 @@ through `conformance/tools/browser_fetch.py` before publishing verified,
 content-addressed cache entries. The corpus is still a machine candidate:
 `CICSMESSAGE`, `DUMP` and `ENTER TRACEID` remain pending source review, and no
 syntax, option, condition, applicability or handler decision follows from
-corpus membership.
+corpus membership. The zero-credit
+[`browser verification receipt`](../../conformance/0.9/cics/application-api-sources-a-browser-verification.json)
+binds a direct Chrome reproduction of all 173 topic identities to the manifest;
+it is source-freshness evidence, not semantic authority.
 
 ## Frozen families
 

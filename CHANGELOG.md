@@ -44,7 +44,8 @@ All notable changes to mainframe-env are documented here.
   explicit source gaps without retaining IBM publication bodies in Git.
 - Added the zero-credit, HTML-only `sources-a` corpus: 109 mapped CICS command
   pages, 58 bounded one-hop context pages and six manual context topics, with
-  all raw IBM topic and navigation bytes kept outside Git.
+  all 173 topic identities reproduced through Chrome and all raw IBM topic and
+  navigation bytes kept outside Git.
 - Added a reviewed COBOL numeric `MOVE` pilot and corrected floating-insertion,
   capacity, sign, and overflow behavior found by that review.
 - Added cost-aware local Jenkins assurance, exact-candidate command receipts,

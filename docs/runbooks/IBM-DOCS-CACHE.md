@@ -95,7 +95,10 @@ The first command checks the manifest topics and TOC. The second also
 reconstructs the one-hop link closure. Both are offline. A corpus generation
 run is different: it uses `conformance/tools/browser_fetch.py` to obtain fresh
 content-endpoint bytes through a Chrome DevTools port and only then publishes
-the verified bytes to the content-addressed cache.
+the verified bytes to the content-addressed cache. The committed
+`application-api-sources-a-browser-verification.json` receipt records the
+separate direct-Chrome reproduction of all 173 topic byte counts and SHA-256
+identities; it grants no semantic or coverage credit.
 
 ## Reverify immutable baseline pins
 
