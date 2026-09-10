@@ -151,6 +151,15 @@ link, restarts the container, and checks the application's reported readiness.
 An unhealthy candidate restores and checks the previous binary; a failed first
 deployment stops the application. A failed build never reaches deployment.
 
+`CHECK_MODE=auto` narrows prose-only changes relative to the last successful
+ancestor commit: dependency/license policy, documentation, and Python/shell
+tooling still run, while runtime tests, release compilation, and deployment are
+skipped. Missing/unavailable history, normative documents, code/infrastructure,
+and unknown inputs retain every local runtime gate. Choose `CHECK_MODE=runtime`
+in Jenkins to force those gates. Per-command JSON/logs and timings are archived
+under `ci-checks/`; see the [verification workflow](../docs/runbooks/VERIFICATION-WORKFLOW.md)
+for scope, limits, and the distinction from root full/release assurance.
+
 Binary rollback does **not** roll back database migrations. Use only compatible
 schema changes or follow the [backup and restore runbook](../docs/runbooks/BACKUP-RESTORE.md)
 before a migration. The original root `Jenkinsfile` remains the full assurance

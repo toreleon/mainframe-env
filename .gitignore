@@ -22,6 +22,7 @@ __pycache__/
 /*.log
 /screenlog.*
 /ci-backend/
+/ci-checks/
 /deployment.json
 /mainframe-env*.db
 /mainframe-env*.db-shm
