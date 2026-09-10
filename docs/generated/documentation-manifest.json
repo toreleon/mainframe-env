@@ -1,24 +1,32 @@
 {
   "counts": {
-    "markdown_documents": 184,
+    "markdown_documents": 186,
     "navigation_groups": 5,
     "normative_documents": 39,
-    "xtask_commands": 161
+    "xtask_commands": 163
   },
   "documents": [
     {
       "normative": false,
+      "path": "AGENTS.md",
+      "relative_links": 4,
+      "sha256": "sha256:1dbc299fd6e5a621042663f90eab2f501079c3794ebb534184c93717a7229e60",
+      "title": "Repository Guidelines",
+      "xtask_commands": 1
+    },
+    {
+      "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:243be287670350af12562b60814a33a6f5ad761836c5d17e863ad0ca580ee249",
+      "sha256": "sha256:c7de5b65005210c5fbc5af0277cb9718f18900837cd8137da5ea0a1b4eb02751",
       "title": "Changelog",
       "xtask_commands": 1
     },
     {
       "normative": false,
       "path": "CONTRIBUTING.md",
-      "relative_links": 5,
-      "sha256": "sha256:1bc221148808ab8462dae0ccf6dd9911aab0080ca1b2f201b848c969be4595ae",
+      "relative_links": 6,
+      "sha256": "sha256:1454c51407e3ef5f56bd4896aef65472633ed0699baf1e3f221df0c8ff32af90",
       "title": "Contributing to mainframe-env",
       "xtask_commands": 4
     },
@@ -289,10 +297,10 @@
     {
       "normative": false,
       "path": "docker/README.md",
-      "relative_links": 7,
-      "sha256": "sha256:d1f1d5acc786dc7da6c103b83f82d4fcff1fae6ed795cea743b83b91344e5c36",
+      "relative_links": 9,
+      "sha256": "sha256:bb0d521ccb6d6ead96608397fd34ba40bb012989e3226cec99144476d89b0273",
       "title": "Docker development environment",
-      "xtask_commands": 0
+      "xtask_commands": 1
     },
     {
       "applies_from": "mainframe-env 0.1.0",
@@ -1398,7 +1406,7 @@
       "normative": false,
       "path": "docs/research/publication-source-probe.md",
       "relative_links": 0,
-      "sha256": "sha256:8258234cbadce177a102fd6a8a5720dda349aa353b6b4679bc8581d26d0971da",
+      "sha256": "sha256:76e2111e5a597c4293c7d71cfbc9d68155c0932a1bbd8e42b73a6757fa0e1618",
       "title": "Publication source probe",
       "xtask_commands": 0
     },
@@ -1449,6 +1457,14 @@
       "sha256": "sha256:6a30bb6285bbc95f793b5633a394bb3a0dbcb2858f847dfd4a052240c94767dc",
       "title": "CI supply-chain inputs",
       "xtask_commands": 1
+    },
+    {
+      "normative": false,
+      "path": "docs/runbooks/IBM-DOCS-CACHE.md",
+      "relative_links": 2,
+      "sha256": "sha256:5dcbd15e0ee90a36ae4762ec9f4eb10a728f60ff33a13204ecace1202ccf39b8",
+      "title": "IBM documentation cache",
+      "xtask_commands": 0
     },
     {
       "normative": false,

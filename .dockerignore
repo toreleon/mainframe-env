@@ -1,3 +1,4 @@
+# Minimal source allowlist; large host builds and release bundles are not build inputs.
 **
 !docker/
 !docker/**
@@ -7,6 +8,17 @@
 !tools/jenkins/
 !tools/jenkins/controller-plugins.lock.json
 !rust-toolchain.toml
+
+# Re-exclude local files beneath the allowed source directories.
+**/.git/
+**/__pycache__/
+**/*.py[cod]
+**/.DS_Store
+**/._*
+**/*.swp
+**/*.swo
+**/*~
+**/*.tmp
 **/.env
 **/.env.*
 **/secrets/

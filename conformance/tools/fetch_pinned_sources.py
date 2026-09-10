@@ -54,7 +54,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-import tempfile
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -64,7 +63,7 @@ import docs_api
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 INDEX = Path("conformance/0.2/catalogs/index.json")
-DEFAULT_CACHE = Path(tempfile.gettempdir()) / "cobolgrammar" / "topic-cache"
+DEFAULT_CACHE = docs_api.default_cache()
 
 STALE_READ = "stale-read"
 REPUBLISHED = "republished"

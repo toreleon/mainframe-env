@@ -64,7 +64,6 @@ import argparse
 import json
 import re
 import sys
-import tempfile
 import urllib.parse
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
@@ -75,7 +74,7 @@ import docs_api
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 COMPONENT = re.compile(r"^[a-z][a-z0-9-]*:")
-DEFAULT_CACHE = Path(tempfile.gettempdir()) / "cobolgrammar" / "topic-cache"
+DEFAULT_CACHE = docs_api.default_cache()
 
 #: The three prefixes the JCL Statement column prints a statement behind, and
 #: the whole vocabulary of that column: `// DD`, `//* comment`, `/*`, `//`. The

@@ -25,7 +25,9 @@ environment. A skipped external test receives no evidence credit.
 
 1. Start from a clean branch and preserve unrelated user changes.
 2. Identify the owning contract, provider, schema, and recovery boundary before
-   editing.
+   editing. For IBM language/subsystem semantics, first search and read the
+   relevant verified [cached IBM sources](docs/runbooks/IBM-DOCS-CACHE.md), then
+   cite baseline/topic and catalog rows in the PR. Report source gaps explicitly.
 3. Add a focused negative regression before or with a defect fix.
 4. Regenerate derived files through `cargo xtask`; do not hand-edit generated
    Rust, catalogs, ledgers, or receipts.
@@ -57,6 +59,21 @@ silently waive a rejected dependency.
 CI input changes must follow the reviewed process in
 `docs/runbooks/CI-SUPPLY-CHAIN.md`. Floating actions, container tags, ambient
 package installs, and unreviewed Jenkins plugins are rejected mechanically.
+
+## Working-tree hygiene
+
+Keep generated builds in `target/`, local bundles in `dist/`, and runtime state
+in the ignored paths listed in `.gitignore`. Put personal exclusions in
+`.git/info/exclude`; share repository-wide rules in `.gitignore`. Sanitized
+environment templates such as `.env.example` and shared VS Code settings may
+be committed. Python bytecode, local credentials, and service databases must
+stay untracked.
+
+Preserve both Cargo lockfiles, fuzz seed corpora, conformance fixtures/evidence,
+and reviewed `release/` records. Avoid broad extension rules that hide these
+inputs. Inspect ignored files before cleanup: local audit workspaces, release
+bundles, and unsupported offline experiments can contain useful work. Cleanup
+should remove only identified disposable artifacts, not every ignored file.
 
 ## Public and durable changes
 

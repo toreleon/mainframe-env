@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added persistent Docker IBM-documentation caching, verified offline search/read
+  commands, and a cache-first source-review workflow for semantic development.
+- Added repository contributor guidelines in `AGENTS.md` covering structure,
+  development commands, coding conventions, tests, and pull request expectations.
+- Required Docker execution for development tools and added `docker/dev exec`
+  for noninteractive container commands from the desktop workflow.
 - Added ADR-0011 and the first typed-HIR vertical slices: resolved COBOL
   arithmetic plans, typed CICS file/unit-of-work plans, versioned executable
   dialect identities, and bounded canonical plan codecs.
@@ -37,6 +43,8 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Organized shared Git/Docker ignore rules for generated output, runtime state,
+  environment secrets, and local tooling while retaining templates and evidence.
 - Advanced decimal assignment to a policy-bearing `@2` contract with explicit
   arithmetic context, COBOL numeric-storage ABI, receiver-update, condition,
   and rounding behavior. The exact `@1` compatibility route remains readable,

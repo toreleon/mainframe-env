@@ -209,7 +209,7 @@ before recording anything, and classifies by `lastModifiedDate` against the pin:
 
 So three<!--f:tools.failing_resolutions--> of the four resolutions fail and one
 does not. `UNEXPLAINED` at
-`conformance/tools/fetch_pinned_sources.py:76<!--f:tools.unexplained_line-->` is
+`conformance/tools/fetch_pinned_sources.py:75<!--f:tools.unexplained_line-->` is
 the list, and a baseline reads
 `differs` when any topic lands in it — or when the manifest digest moves with no
 topic reporting a mismatch at all, which is the manifest disagreeing with itself
@@ -1004,7 +1004,7 @@ gone.
   **Three<!--f:tools.failing_resolutions--> of its four resolutions fail a run,
   not one.**
   `UNEXPLAINED = (REPUBLISHED, SAME_DATE, UNDATED)` at
-  `conformance/tools/fetch_pinned_sources.py:76<!--f:tools.unexplained_line-->` is
+  `conformance/tools/fetch_pinned_sources.py:75<!--f:tools.unexplained_line-->` is
   what `topics_unexplained`
   counts and what decides `differs`: `republished`, `same-date-different-bytes`
   and `undated-difference` each fail; only `stale-read` does not. The
