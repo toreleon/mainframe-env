@@ -83,6 +83,9 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Anchored authentication-session expiry and rotation to the shared durable
+  clock so wall-clock regressions cannot revoke valid sessions or bypass the
+  cross-node per-user quota fence.
 - Applied the idempotent PostgreSQL executable-artifact migration from both
   store entry points so fresh shared stores can persist schema-v2 metadata.
 - Directed Docker development temporaries to executable target storage so

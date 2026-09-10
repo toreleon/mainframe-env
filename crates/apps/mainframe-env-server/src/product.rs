@@ -793,7 +793,7 @@ impl ProductServer {
                 .map_err(store_error)?;
         }
         let mut sessions = BTreeMap::new();
-        let now_tick = session_tick()?;
+        let now_tick = jes_clock.now_tick().map_err(store_error)?;
         let active_principals = racf.active_principal_epochs()?;
         let stored_sessions = store
             .list_provider_state(AUTH_SESSION_NAMESPACE, MAX_AUTH_SESSIONS)
@@ -4401,7 +4401,7 @@ impl ProductServer {
             if index.sessions.get(&key) != Some(&session.user) {
                 return Err(HostProblem::InfrastructureFailure);
             }
-            let now_tick = session_tick()?;
+            let now_tick = self.jes_tick()?;
             let principal = PrincipalId::new(&session.user, InvocationLimits::default())
                 .map_err(|_| HostProblem::Unauthorized)?;
             let valid_principal = self
@@ -4450,7 +4450,7 @@ impl ProductServer {
     }
 
     fn create_session(&self, verified: &VerifiedAuthentication) -> Result<String, HostProblem> {
-        let now_tick = session_tick()?;
+        let now_tick = self.jes_tick()?;
         self.cleanup_auth_sessions(now_tick)?;
         const MAX_ATTEMPTS: usize = 4;
         for _ in 0..MAX_ATTEMPTS {
@@ -4546,7 +4546,7 @@ impl ProductServer {
             if index.sessions.get(&old_key) != Some(&old_session.user) {
                 return Err(HostProblem::InfrastructureFailure);
             }
-            let now_tick = session_tick()?;
+            let now_tick = self.jes_tick()?;
             let principal = PrincipalId::new(&old_session.user, InvocationLimits::default())
                 .map_err(|_| HostProblem::Unauthorized)?;
             if old_session.expired(now_tick)
@@ -5605,6 +5605,7 @@ fn current_gateway_call_context() -> Option<GatewayCallContext> {
     GATEWAY_CALL_CONTEXT.with(|current| current.borrow().clone())
 }
 
+#[cfg(test)]
 fn session_tick() -> Result<u64, HostProblem> {
     u64::try_from(
         SystemTime::now()
@@ -6572,6 +6573,52 @@ mod tests {
     }
 
     #[test]
+    fn auth_sessions_use_the_durable_clock_across_wall_clock_regression() {
+        let durable_tick = session_tick().unwrap().saturating_add(1_000_000);
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let platform: Arc<dyn PlatformStore> = store.clone();
+        let first = ProductServer::open_with_clock(
+            config(),
+            platform,
+            Arc::new(ManualJesClock::new(durable_tick)),
+        )
+        .unwrap();
+        first.bootstrap_identity("IBMUSER", b"TESTPASS").unwrap();
+        let verified = first.verify("IBMUSER", b"TESTPASS").unwrap();
+        let token = first.create_session(&verified).unwrap();
+        let key = auth_session_key(&token);
+        let stored = store
+            .get_provider_state(AUTH_SESSION_NAMESPACE, &key)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            decode_auth_session(&stored).unwrap().issued_tick,
+            durable_tick
+        );
+        drop(first);
+
+        let platform: Arc<dyn PlatformStore> = store;
+        let reopened = ProductServer::open_with_clock(
+            config(),
+            platform,
+            Arc::new(ManualJesClock::new(durable_tick)),
+        )
+        .unwrap();
+        assert_eq!(
+            reopened
+                .principal(Authentication::Bearer(token.clone()))
+                .unwrap(),
+            "IBMUSER"
+        );
+        let (user, rotated) = reopened.rotate_session(&token).unwrap();
+        assert_eq!(user, "IBMUSER");
+        assert_eq!(
+            reopened.principal(Authentication::Bearer(rotated)).unwrap(),
+            "IBMUSER"
+        );
+    }
+
+    #[test]
     fn bearer_sessions_store_only_hashes_expire_and_follow_principal_epoch() {
         let server = ProductServer::memory(config()).unwrap();
         server.bootstrap_identity("IBMUSER", b"TESTPASS").unwrap();
@@ -6799,21 +6846,10 @@ mod tests {
     #[test]
     fn shared_store_session_quota_is_atomically_fenced_across_servers() {
         let store = Arc::new(MemoryStore::new(Default::default()));
-        let first = ProductServer::open(
-            config(),
-            store.clone(),
-            Arc::new(MemorySecretResolver::default()),
-            default_program_router(),
-        )
-        .unwrap();
+        let clock = Arc::new(ManualJesClock::new(100));
+        let first = ProductServer::open_with_clock(config(), store.clone(), clock.clone()).unwrap();
         first.bootstrap_identity("IBMUSER", b"TESTPASS").unwrap();
-        let second = ProductServer::open(
-            config(),
-            store,
-            Arc::new(MemorySecretResolver::default()),
-            default_program_router(),
-        )
-        .unwrap();
+        let second = ProductServer::open_with_clock(config(), store, clock).unwrap();
         let first_verified = first.verify("IBMUSER", b"TESTPASS").unwrap();
         let second_verified = first_verified.clone();
         for _ in 0..(MAX_AUTH_SESSIONS_PER_USER - 1) {
