@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:b8ed1988e273d534e93d99d97c7c4cbe838e64e7eded36d05ee6bbbe7acd6afe",
+      "sha256": "sha256:8425a335a4622c0c06b94b569a5e3c1b815933a9f8e4e62a3fb21e3477bec97e",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -541,7 +541,7 @@
       "path": "docs/contracts/DURABLE-STORAGE-PROFILE.md",
       "relative_links": 0,
       "scope": "PostgreSQL quotas, shared immutable artifacts, and local publication durability",
-      "sha256": "sha256:3349ded5cb83df3e7ca8d20efd4b052aff9fa0360b899934dbf7d18f8ba3ab65",
+      "sha256": "sha256:0604bb711feefd94c4440780f88fe8cf8fa03d95bbbd02285ca9fd6ac1f683f0",
       "status": "Implemented",
       "title": "Durable storage profile",
       "xtask_commands": 0
@@ -1430,7 +1430,7 @@
       "normative": false,
       "path": "docs/runbooks/BACKUP-RESTORE.md",
       "relative_links": 0,
-      "sha256": "sha256:7ad9b2555627a0ed777acf8388768c03a0747f39d7744f6d8de0fadf2839282c",
+      "sha256": "sha256:360379077bc8af895ae7b71c334244592ff91a81194fabfd34f37fcf22dc2304",
       "title": "Backup and restore",
       "xtask_commands": 0
     },
@@ -1438,7 +1438,7 @@
       "normative": false,
       "path": "docs/runbooks/CAPACITY-AND-RECOVERY.md",
       "relative_links": 2,
-      "sha256": "sha256:054e3f9dea59b65861b882398555c43a41da98f1a0bd65582accfe97060f1061",
+      "sha256": "sha256:eab3913a9514fa2323c37aa9090f0ffca5d3f8d71b6974244adcc9da882e85fc",
       "title": "Capacity and recovery",
       "xtask_commands": 0
     },

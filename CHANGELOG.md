@@ -83,6 +83,8 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Applied the idempotent PostgreSQL executable-artifact migration from both
+  store entry points so fresh shared stores can persist schema-v2 metadata.
 - Directed Docker development temporaries to executable target storage so
   Rustdoc can compile and run contract doctests while `/tmp` remains `noexec`.
 - Kept disposable PostgreSQL parity state inside the Docker development

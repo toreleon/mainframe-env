@@ -16,9 +16,9 @@ process exit, wait until that lease expires;
 the next server advances the same durable clock and reclaims with a higher
 epoch. Never edit a lease ID, epoch, heartbeat, or clock record by hand.
 
-After process failure, reopen the store at migration head
-`0001-durable-state`. Running JES work returns to queued state until its attempt
-limit, expired work leases are reclaimable only with a higher durable fencing
+After process failure, reopen SQLite at `0002-retention-lifecycle` or
+PostgreSQL at `0003-executable-artifact-metadata`. Running JES work returns to
+queued state until its attempt limit, expired work leases are reclaimable only with a higher durable fencing
 epoch, and queued work at its deadline moves directly to dead letter. Suspended
 CICS sessions stay suspended. Incomplete effects remain explicit intents with
 their typed capability, dispatch owner, attempt, creation tick,

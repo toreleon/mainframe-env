@@ -47,6 +47,14 @@ impl PostgresArtifactStore {
             .execute(&pool),
         )?
         .map_err(infrastructure)?;
+        block_on(
+            &runtime,
+            sqlx::raw_sql(include_str!(
+                "../migrations/postgres/0003-executable-artifact-metadata.sql"
+            ))
+            .execute(&pool),
+        )?
+        .map_err(infrastructure)?;
         block_on(&runtime, async {
             initialize_quota(
                 &pool,

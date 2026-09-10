@@ -96,6 +96,14 @@ impl PostgresStateStore {
             .execute(&pool),
         )?
         .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
+        block_on(
+            &runtime,
+            sqlx::raw_sql(include_str!(
+                "../migrations/postgres/0003-executable-artifact-metadata.sql"
+            ))
+            .execute(&pool),
+        )?
+        .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
         block_on(&runtime, async {
             initialize_quota(
                 &pool,

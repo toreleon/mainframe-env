@@ -15,6 +15,13 @@ def require(path: Path, fragments: tuple[str, ...]) -> str:
 
 
 def check(root: Path) -> None:
+    require(
+        root / "crates/stores/mainframe-env-store/src/lib.rs",
+        (
+            'SQLITE_MIGRATION_HEAD: &str = "0002-retention-lifecycle"',
+            'POSTGRES_MIGRATION_HEAD: &str = "0003-executable-artifact-metadata"',
+        ),
+    )
     postgres = require(
         root / "crates/stores/mainframe-env-store/src/postgres.rs",
         (
@@ -28,7 +35,7 @@ def check(root: Path) -> None:
     if postgres.count('"SELECT COUNT(*) FROM provider_state"') != 1:
         raise ValueError("PostgreSQL provider-state counting escaped startup reconciliation")
 
-    require(
+    artifact_store = require(
         root / "crates/stores/mainframe-env-store/src/postgres_artifact.rs",
         (
             "pub struct PostgresArtifactStore",
@@ -38,9 +45,23 @@ def check(root: Path) -> None:
             "validation::artifact(&record)",
         ),
     )
+    if postgres.count('"../migrations/postgres/0003-executable-artifact-metadata.sql"') != 1:
+        raise ValueError("PostgreSQL state startup escaped artifact migration head")
+    if artifact_store.count('"../migrations/postgres/0003-executable-artifact-metadata.sql"') != 1:
+        raise ValueError("PostgreSQL artifact startup escaped artifact migration head")
     require(
         root / "crates/stores/mainframe-env-store/migrations/postgres/0001-durable-state.sql",
         ("CREATE TABLE IF NOT EXISTS store_quota", "CREATE TABLE IF NOT EXISTS artifact_object"),
+    )
+    require(
+        root
+        / "crates/stores/mainframe-env-store/migrations/postgres/0003-executable-artifact-metadata.sql",
+        (
+            "LOCK TABLE artifact_object IN ACCESS EXCLUSIVE MODE",
+            "ADD COLUMN IF NOT EXISTS executable_metadata BYTEA",
+            "artifact_object_schema_version_v2_check",
+            "CHECK(schema_version IN (1, 2))",
+        ),
     )
     local = require(
         root / "crates/stores/mainframe-env-store/src/local_artifact.rs",
