@@ -83,6 +83,8 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Directed Docker development temporaries to executable target storage so
+  Rustdoc can compile and run contract doctests while `/tmp` remains `noexec`.
 - Corrected typed ADD/COMPUTE receiver-local `SIZE ERROR` commits, resolved
   `ADD CORRESPONDING` by relative qualifiers with bilateral uniqueness and
   subordinate-item exclusions, and made selected-table compatibility preserve

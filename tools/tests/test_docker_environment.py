@@ -22,6 +22,11 @@ deploy = load('deploy')
 
 
 class DockerStorageTests(unittest.TestCase):
+    def test_development_tmpdir_is_executable_target_storage(self):
+        compose = (ROOT / 'docker' / 'compose.yaml').read_text()
+        self.assertIn('TMPDIR: /target', compose)
+        self.assertNotIn('TMPDIR: /tmp', compose)
+
     def test_rejects_large_filesystem_even_when_almost_empty(self):
         stats = types.SimpleNamespace(f_blocks=100_000_000_000, f_frsize=1,
                                       f_bavail=99_000_000_000)
