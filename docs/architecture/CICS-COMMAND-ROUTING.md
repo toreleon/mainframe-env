@@ -61,14 +61,16 @@ differential credit.
 
 The next source boundary is
 [`application-api-sources-a-corpus.json`](../../conformance/0.9/cics/application-api-sources-a-corpus.json).
-It binds the accepted map to a 172-topic
+It binds the accepted map to a 173-topic
 [`topic manifest`](../../conformance/0.9/manifests/cics-application-api-sources-a-topics.json):
-109 mapped command pages, 58 non-recursive one-hop context pages and five
+109 mapped command pages, 58 non-recursive one-hop context pages and six
 explicit manual context topics. The command-summary body is excluded as
 navigation because its pinned TOC projection is already authoritative. Current
 HTML topics retain the legacy EIBFN identities and provide replacement context,
 but do not turn `DUMP TRANSACTION`, `ENTER TRACENUM` or `MONITOR` into aliases
-for the legacy commands.
+for the legacy commands. The manual set includes the current `DFHCMP` module
+topic, which identifies the old `ENTER TRACEID` monitoring path without
+supplying the command's complete semantics.
 
 `python3 -B conformance/0.9/tools/fetch_cics_application_sources.py --check`
 validates committed metadata offline. Supplying `--cache /ibm-docs/topic-cache`

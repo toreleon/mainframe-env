@@ -83,7 +83,7 @@ execution evidence. The current CICS `sources-a` mapping has three explicit
 command-summary gaps; supplemental sources must remain separately identified
 and reviewed rather than being aliased to similarly named commands.
 
-The registered `cics-application-api-sources-a` scope currently contains 172
+The registered `cics-application-api-sources-a` scope currently contains 173
 HTML topics. Verify the pinned topics, TOC and full source closure with:
 
 ```bash
