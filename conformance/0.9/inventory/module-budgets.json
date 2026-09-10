@@ -42,7 +42,7 @@
     },
     {
       "path": "crates/apps/mainframe-env-server/src/product.rs",
-      "max_production_lines": 6494,
+      "max_production_lines": 6484,
       "responsibility": "Product construction, dependency assembly, application publication, JES control, and HTTP route behavior converge here.",
       "split_boundary": "Extract bootstrap/construction, publication, JES operations, and route-family adapters around the Product state owner."
     },
@@ -186,7 +186,7 @@
     },
     {
       "path": "crates/stores/mainframe-env-store/src/postgres.rs",
-      "max_production_lines": 2346,
+      "max_production_lines": 2340,
       "responsibility": "The PostgreSQL adapter owns provider-state CRUD, quotas, logical time, exact retention archives and observations, dependency validation, and atomic transactions.",
       "split_boundary": "Extract PostgreSQL retention archive, observation, and dependency-validation repositories from core provider-state persistence while retaining one transaction authority."
     },

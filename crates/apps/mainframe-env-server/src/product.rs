@@ -5605,17 +5605,6 @@ fn current_gateway_call_context() -> Option<GatewayCallContext> {
     GATEWAY_CALL_CONTEXT.with(|current| current.borrow().clone())
 }
 
-#[cfg(test)]
-fn session_tick() -> Result<u64, HostProblem> {
-    u64::try_from(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|_| HostProblem::InfrastructureFailure)?
-            .as_millis(),
-    )
-    .map_err(|_| HostProblem::ResourceExhausted)
-}
-
 fn auth_session_key(token: &str) -> String {
     let mut digest = Sha256::new();
     digest.update(b"mainframe-env.auth-session-token@2\0");
@@ -6518,6 +6507,16 @@ mod tests {
     use mainframe_env_store_api::{RetentionRequest, RetentionStore, WorkStore};
     use std::sync::Barrier;
     use tower::ServiceExt;
+
+    fn session_tick() -> Result<u64, HostProblem> {
+        u64::try_from(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_err(|_| HostProblem::InfrastructureFailure)?
+                .as_millis(),
+        )
+        .map_err(|_| HostProblem::ResourceExhausted)
+    }
 
     #[test]
     fn system_clock_provider_emits_bounded_utc_shapes() {

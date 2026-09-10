@@ -83,6 +83,8 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Moved the authentication wall-clock fixture wholly behind the server test
+  boundary and tightened the reviewed product-module production-line ceiling.
 - Anchored authentication-session expiry and rotation to the shared durable
   clock so wall-clock regressions cannot revoke valid sessions or bypass the
   cross-node per-user quota fence.
