@@ -10,7 +10,7 @@
       "normative": false,
       "path": "AGENTS.md",
       "relative_links": 5,
-      "sha256": "sha256:9703d968dd15766c42d95499fc6fae4783626bf087348150f0a14988673f4194",
+      "sha256": "sha256:e3b117979558e6749bb33adc5c28376dfc83d10a17d2b13bfa855b2207bf2967",
       "title": "Repository Guidelines",
       "xtask_commands": 1
     },
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:be61bda76ce11501a3cd31865e22cdb417172baa3b65677d9bd96619b2a8fc6d",
+      "sha256": "sha256:3494b2c72d0a5df11d45aa3fb00cce8bca7ca59d53af809a1b480831971ac929",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -351,9 +351,9 @@
       "normative": true,
       "owner": "CICS provider maintainers",
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
-      "relative_links": 9,
+      "relative_links": 15,
       "scope": "typed CICS operation descriptors, generated routing families, and provider semantic modules",
-      "sha256": "sha256:f6865931ae5fcedc044c2f55c2db9dc5c0c896cd48be31f4ed9c4f2161c5b321",
+      "sha256": "sha256:b42cd8e03deba6801c4a1536cdb44cbb45a9e005974fd6d2a75d135bc0a1f33c",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -966,7 +966,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/0.9.0.md",
       "relative_links": 10,
-      "sha256": "sha256:e0a4873e846005118a2f19b15c4398e85ebe76a17838838d563c658443268f88",
+      "sha256": "sha256:af586cd359482e1ba7702bba11621a59119d99cf57e4864efada4aed41ed98c7",
       "title": "mainframe-env 0.9.0 — Complete CICS application API",
       "xtask_commands": 0
     },
@@ -1070,7 +1070,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:872b35b4e3b3e8b4a34e06def7b4034121ee8875b5e3793da6d34249e571c8fc",
+      "sha256": "sha256:f05fe7a5e8eb2f99dcda20de2e2cde2e213722dfa756347d6c52e1550f557ee9",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },
@@ -1462,7 +1462,7 @@
       "normative": false,
       "path": "docs/runbooks/IBM-DOCS-CACHE.md",
       "relative_links": 2,
-      "sha256": "sha256:b56a6a2e78219454e1f49d9f60b2efa643cabb59886e6e41eaa672562c3b6f7b",
+      "sha256": "sha256:50768a1b848cc3b975a907f447b7c0f8c61be8e6b81b783ff0c43b4b38813895",
       "title": "IBM documentation cache",
       "xtask_commands": 0
     },

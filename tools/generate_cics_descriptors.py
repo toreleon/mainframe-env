@@ -17,13 +17,19 @@ OUTPUT_PATH = Path("crates/providers/mainframe-env-cics/src/generated/command_de
 HOST_OUTPUT_PATH = Path(
     "crates/contracts/mainframe-env-host-api/src/generated/cics_application_commands.rs"
 )
+CONTRACT_OUTPUT_PATH = Path(
+    "conformance/0.9/generated/cics-application-command-contracts.json"
+)
 SCHEMA_VERSION = "mainframe-env.cics-command-descriptors@2"
+CONTRACT_SCHEMA_VERSION = "mainframe-env.cics-application-command-contracts@1"
 OFFICIAL_SCHEMA_VERSION = "mainframe-env.official-catalog@1"
 OFFICIAL_BASELINE = "ibm-cics-ts-6x-2026-08-31"
 OFFICIAL_CATALOG_DIGEST = (
     "sha256:fccd2a8e5cc24dd08aeb32754daf14ed80e9f1b20b5d9e762a1b0cfe429ceeba"
 )
 APPLICATION_DIGEST_DOMAIN = b"mainframe-env.cics-application-command-identities@2\0"
+CONTRACT_DIGEST_DOMAIN = b"mainframe-env.cics-application-command-contracts@1\0"
+SOURCE_REVIEW_DIGEST_DOMAIN = b"mainframe-env.cics-source-review@2\0"
 IDENTIFIER = re.compile(r"^[A-Z][A-Za-z0-9]*$")
 FAMILY_ID = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
 EIBFN = re.compile(r"^[0-9A-F]{4}$")
@@ -98,6 +104,56 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ),
     ("Xctl", "api", "program-control", True, f"{OFFICIAL_BASELINE}:api-commands:0263"),
 ]
+
+CONTRACT_BATCHES = (
+    (
+        "sources-a",
+        1,
+        88,
+        Path("conformance/0.9/generated/cics-application-api-sources-a-candidates.json"),
+        Path("conformance/0.9/cics/application-api-sources-a-review.json"),
+    ),
+    (
+        "sources-b",
+        89,
+        176,
+        Path("conformance/0.9/generated/cics-application-api-sources-b-candidates.json"),
+        Path("conformance/0.9/cics/application-api-sources-b-review.json"),
+    ),
+    (
+        "sources-c",
+        177,
+        263,
+        Path("conformance/0.9/generated/cics-application-api-sources-c-candidates.json"),
+        Path("conformance/0.9/cics/application-api-sources-c-review.json"),
+    ),
+)
+SOURCE_DIMENSIONS = (
+    ("syntax", "grammar", "source-syntax"),
+    ("options", "option-legality", "source-option"),
+    ("operand-directions", "operand-direction", "source-operand-direction"),
+    ("conditions", "conditions", "source-condition"),
+    ("execution-context", "context-applicability", "source-context"),
+)
+CONTRACT_DIMENSIONS = (
+    "grammar",
+    "option-legality",
+    "operand-direction",
+    "option-bounds",
+    "resource-key",
+    "capability-intent",
+    "eib-response",
+    "conditions",
+    "context-applicability",
+    "effect-class",
+    "cancellation",
+    "audit",
+    "recovery",
+)
+ACCEPTED_SOURCE_REVIEWS = {
+    "auto-accepted",
+    "auto-accepted-with-bounded-ambiguities",
+}
 
 
 class DescriptorError(ValueError):
@@ -420,6 +476,455 @@ def application_identity_digest(commands: list[dict[str, Any]]) -> str:
     return f"sha256:{hasher.hexdigest()}"
 
 
+def _file_sha256(path: Path) -> str:
+    try:
+        source = path.read_bytes()
+    except OSError as error:
+        raise DescriptorError(f"{path}: {error}") from error
+    return f"sha256:{hashlib.sha256(source).hexdigest()}"
+
+
+def _canonical_json(value: Any) -> bytes:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+
+
+def contract_digest(contract: dict[str, Any]) -> str:
+    """Return the logical digest of a generated application-command contract batch."""
+    payload = {key: value for key, value in contract.items() if key != "contract_sha256"}
+    hasher = hashlib.sha256()
+    hasher.update(CONTRACT_DIGEST_DOMAIN)
+    hasher.update(_canonical_json(payload))
+    return f"sha256:{hasher.hexdigest()}"
+
+
+def _source_review_digest(review: dict[str, Any]) -> str:
+    payload = {key: value for key, value in review.items() if key != "review_sha256"}
+    canonical = json.dumps(
+        payload,
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    return f"sha256:{hashlib.sha256(SOURCE_REVIEW_DIGEST_DOMAIN + canonical).hexdigest()}"
+
+
+def _source_review_is_current(
+    root: Path,
+    review: dict[str, Any],
+    projection_sha256: str,
+) -> bool:
+    try:
+        if review.get("review_sha256") != _source_review_digest(review):
+            return False
+        if _object(review.get("inputs"), "source review inputs").get(
+            "candidate_projection_sha256"
+        ) != projection_sha256:
+            return False
+        if any(
+            review.get(field) is not False
+            for field in ("semantic_authority", "execution_authority", "automatic_registration")
+        ):
+            return False
+        if any(
+            review.get(field) != 0
+            for field in ("coverage_credit", "semantic_credit", "differential_credit")
+        ):
+            return False
+        authority = _object(review.get("review_authority"), "source review authority")
+        if authority.get("automatic_acceptance") is not True or authority.get(
+            "manual_approval"
+        ) is not False:
+            return False
+        for binding_name in ("schema", "checker", "independent_verifier"):
+            binding = _object(
+                _object(review.get("review_contract"), "source review contract").get(
+                    binding_name
+                ),
+                f"source review {binding_name}",
+            )
+            relative = Path(_text(binding.get("path"), f"source review {binding_name} path"))
+            if relative.is_absolute() or ".." in relative.parts:
+                return False
+            if binding.get("file_sha256") != _file_sha256(root / relative):
+                return False
+        status = review.get("review_status")
+        blocking = _object(review.get("counts"), "source review counts").get(
+            "blocking_findings"
+        )
+        if status in ACCEPTED_SOURCE_REVIEWS and blocking != 0:
+            return False
+        if status == "blocked" and (not isinstance(blocking, int) or blocking < 1):
+            return False
+    except (DescriptorError, KeyError, TypeError):
+        return False
+    return True
+
+
+def _source_verification_status(
+    review_status: str,
+    projection_state: str,
+    bounded_ambiguity: bool,
+) -> str:
+    if projection_state == "not-projected":
+        return "not-projected"
+    if review_status == "auto-accepted-with-bounded-ambiguities" and bounded_ambiguity:
+        if projection_state in {
+            "projected",
+            "declared-absent",
+            "source-backed-not-applicable",
+        }:
+            return "verified-with-bounded-ambiguity"
+    accepted = review_status in ACCEPTED_SOURCE_REVIEWS
+    if projection_state == "projected":
+        return "verified" if accepted else "projected-unverified"
+    if projection_state == "declared-absent":
+        return "verified-absent" if accepted else "projected-absent-unverified"
+    if projection_state == "source-backed-not-applicable":
+        return "not-applicable" if accepted else "projected-not-applicable-unverified"
+    if projection_state == "conflicting":
+        return "ambiguous"
+    if projection_state in {"source-gap", "unmatched"}:
+        return projection_state
+    raise DescriptorError(f"unknown CICS source projection state {projection_state}")
+
+
+def _source_fact_groups(candidates: list[Any], expected_kind: str, label: str) -> list[dict[str, Any]]:
+    groups: dict[bytes, dict[str, Any]] = {}
+    seen_ids: set[str] = set()
+    for index, raw_candidate in enumerate(candidates):
+        candidate = _object(raw_candidate, f"{label}.candidates[{index}]")
+        kind = _text(candidate.get("kind"), f"{label}.candidates[{index}].kind")
+        candidate_id = _text(
+            candidate.get("candidate_id"), f"{label}.candidates[{index}].candidate_id"
+        )
+        if candidate_id in seen_ids:
+            raise DescriptorError(f"duplicate source candidate {candidate_id}")
+        seen_ids.add(candidate_id)
+        if kind != expected_kind:
+            # Global context candidates are intentionally projected into several
+            # source dimensions. Only execution-context consumes them as facts.
+            if kind == "source-context":
+                continue
+            raise DescriptorError(f"unexpected {kind} candidate in {label}")
+        value = _object(
+            candidate.get("candidate_value"), f"{label}.candidates[{index}].candidate_value"
+        )
+        key = _canonical_json(value)
+        group = groups.setdefault(key, {"value": value, "candidate_ids": []})
+        group["candidate_ids"].append(candidate_id)
+    facts = []
+    for key in sorted(groups):
+        group = groups[key]
+        group["candidate_ids"].sort()
+        facts.append(group)
+    return facts
+
+
+def _load_source_batch(
+    root: Path,
+    batch_id: str,
+    start: int,
+    end: int,
+    projection_relative: Path,
+    review_relative: Path,
+    commands: list[dict[str, Any]],
+) -> tuple[dict[str, Any], dict[str, dict[str, Any]], dict[str, Any]]:
+    projection_path = root / projection_relative
+    review_path = root / review_relative
+    if not projection_path.is_file():
+        if review_path.exists():
+            raise DescriptorError(f"{review_relative} exists without {projection_relative}")
+        return {"projection": None, "review": None}, {}, {
+            "status": "not-projected",
+            "unlocated_candidate_ambiguity": False,
+            "ambiguity_issue_ids": frozenset(),
+            "verified_candidates": 0,
+            "ambiguous_candidates": 0,
+        }
+
+    projection = _read_json(projection_path)
+    rows = _array(projection.get("rows"), f"{batch_id} source rows")
+    expected_commands = commands[start - 1 : end]
+    if len(rows) != len(expected_commands):
+        raise DescriptorError(
+            f"{batch_id} source projection must cover exactly rows {start:04d}-{end:04d}"
+        )
+    rows_by_id: dict[str, dict[str, Any]] = {}
+    for offset, (raw_row, command) in enumerate(zip(rows, expected_commands, strict=True), start):
+        row = _object(raw_row, f"{batch_id} source row {offset:04d}")
+        identity = {
+            "official_row": row.get("official_row"),
+            "label": row.get("label"),
+            "eibfn": row.get("eibfn"),
+        }
+        if identity != command:
+            raise DescriptorError(f"{batch_id} source row {offset:04d} identity differs")
+        dimensions = _array(row.get("dimensions"), f"{batch_id} source row dimensions")
+        if [dimension.get("name") for dimension in dimensions if isinstance(dimension, dict)] != [
+            source_name for source_name, _, _ in SOURCE_DIMENSIONS
+        ]:
+            raise DescriptorError(f"{batch_id} source row {offset:04d} dimensions differ")
+        rows_by_id[command["official_row"]] = row
+
+    projection_sha256 = _file_sha256(projection_path)
+    review_binding: dict[str, Any] | None = None
+    review_status = "not-reviewed"
+    unlocated_candidate_ambiguity = False
+    ambiguity_issue_ids: frozenset[str] = frozenset()
+    verified_candidates = 0
+    ambiguous_candidates = 0
+    if review_path.is_file():
+        review = _read_json(review_path)
+        review_status = _text(review.get("review_status"), f"{batch_id} review_status")
+        if review_status not in ACCEPTED_SOURCE_REVIEWS | {"blocked"}:
+            raise DescriptorError(f"{batch_id} review status is unsupported")
+        if not _source_review_is_current(root, review, projection_sha256):
+            review_status = "stale"
+        else:
+            candidate_dispositions = _object(
+                review.get("candidate_dispositions"), f"{batch_id} candidate dispositions"
+            )
+            verified_candidates = _integer(
+                _object(
+                    candidate_dispositions.get("verified"),
+                    f"{batch_id} verified candidates",
+                ).get("count"),
+                f"{batch_id} verified candidate count",
+            )
+            product_candidates = _object(
+                candidate_dispositions.get("product-ambiguity"),
+                f"{batch_id} product candidate ambiguities",
+            )
+            ambiguous_candidates = _integer(
+                product_candidates.get("count"),
+                f"{batch_id} product candidate ambiguity count",
+            )
+            if review_status == "auto-accepted-with-bounded-ambiguities":
+                unlocated_candidate_ambiguity = ambiguous_candidates > 0
+                ambiguity_issue_ids = frozenset(
+                    _text(issue_id, f"{batch_id} ambiguity issue id")
+                    for issue_id in _array(
+                        review.get("blocker_ids"), f"{batch_id} blocker ids"
+                    )
+                )
+        review_binding = {
+            "path": review_relative.as_posix(),
+            "file_sha256": _file_sha256(review_path),
+            "review_status": review_status,
+        }
+    return (
+        {
+            "projection": {
+                "path": projection_relative.as_posix(),
+                "file_sha256": projection_sha256,
+            },
+            "review": review_binding,
+        },
+        rows_by_id,
+        {
+            "status": review_status,
+            "unlocated_candidate_ambiguity": unlocated_candidate_ambiguity,
+            "ambiguity_issue_ids": ambiguity_issue_ids,
+            "verified_candidates": verified_candidates,
+            "ambiguous_candidates": ambiguous_candidates,
+        },
+    )
+
+
+def build_contracts(root: Path = ROOT) -> dict[str, Any]:
+    """Build the zero-credit 263-row contract scaffold in three source batches."""
+    catalog = load_catalog(root)
+    commands = catalog["_application_commands"]
+    existing_runtime = {
+        row["official_row"]: row["operation"]
+        for row in catalog["_runtime_operations"]
+        if row["interface"] == "api"
+    }
+    if len(existing_runtime) != 23:
+        raise DescriptorError("CICS application runtime baseline must remain exactly 23 rows")
+    fact_groups = 0
+    source_candidate_references = 0
+    projected_commands = 0
+    reviewed_commands = 0
+    ambiguous_commands = 0
+    verified_candidates = 0
+    ambiguous_candidates = 0
+    batches = []
+    for batch_id, start, end, projection_path, review_path in CONTRACT_BATCHES:
+        binding, source_rows, review = _load_source_batch(
+            root,
+            batch_id,
+            start,
+            end,
+            projection_path,
+            review_path,
+            commands,
+        )
+        review_status = review["status"]
+        verified_candidates += review["verified_candidates"]
+        ambiguous_candidates += review["ambiguous_candidates"]
+        batch_commands = []
+        for command in commands[start - 1 : end]:
+            source_row = source_rows.get(command["official_row"])
+            dimensions = []
+            row_issue_ids: set[str] = set()
+            if source_row is None:
+                for _, contract_name, _ in SOURCE_DIMENSIONS:
+                    dimensions.append(
+                        {
+                            "name": contract_name,
+                            "source_projection_state": "not-projected",
+                            "verification_status": "not-projected",
+                            "facts": [],
+                            "issue_ids": [],
+                        }
+                    )
+                source_status = "not-projected"
+            else:
+                projected_commands += 1
+                for raw_dimension, (source_name, contract_name, candidate_kind) in zip(
+                    source_row["dimensions"], SOURCE_DIMENSIONS, strict=True
+                ):
+                    dimension = _object(raw_dimension, f"{command['official_row']} {source_name}")
+                    projection_state = _text(
+                        dimension.get("state"), f"{command['official_row']} {source_name} state"
+                    )
+                    facts = _source_fact_groups(
+                        _array(
+                            dimension.get("candidates"),
+                            f"{command['official_row']} {source_name} candidates",
+                        ),
+                        candidate_kind,
+                        f"{command['official_row']} {source_name}",
+                    )
+                    issue_ids = []
+                    for raw_issue in _array(
+                        dimension.get("issues"),
+                        f"{command['official_row']} {source_name} issues",
+                    ):
+                        issue = _object(raw_issue, f"{command['official_row']} source issue")
+                        issue_id = _text(issue.get("issue_id"), "source issue id")
+                        issue_ids.append(issue_id)
+                        row_issue_ids.add(issue_id)
+                    issue_ids.sort()
+                    bounded_ambiguity = review["unlocated_candidate_ambiguity"] or bool(
+                        set(issue_ids) & review["ambiguity_issue_ids"]
+                    )
+                    dimensions.append(
+                        {
+                            "name": contract_name,
+                            "source_projection_state": projection_state,
+                            "verification_status": _source_verification_status(
+                                review_status, projection_state, bounded_ambiguity
+                            ),
+                            "facts": facts,
+                            "issue_ids": issue_ids,
+                        }
+                    )
+                    fact_groups += len(facts)
+                    source_candidate_references += sum(
+                        len(fact["candidate_ids"]) for fact in facts
+                    )
+                resolved_source = all(
+                    dimension["verification_status"]
+                    in {"verified", "verified-absent", "not-applicable"}
+                    for dimension in dimensions
+                )
+                if review_status in ACCEPTED_SOURCE_REVIEWS and resolved_source:
+                    source_status = "verified"
+                    reviewed_commands += 1
+                elif review_status == "auto-accepted-with-bounded-ambiguities":
+                    source_status = "bounded-ambiguity"
+                    ambiguous_commands += 1
+                elif review_status == "blocked":
+                    source_status = "blocked-review"
+                elif review_status == "stale":
+                    source_status = "stale-review"
+                else:
+                    source_status = "projected-unreviewed"
+
+            resolved = {
+                dimension["name"]
+                for dimension in dimensions
+                if dimension["verification_status"]
+                in {"verified", "verified-absent", "not-applicable"}
+            }
+            unresolved = [name for name in CONTRACT_DIMENSIONS if name not in resolved]
+            existing_operation = existing_runtime.get(command["official_row"])
+            batch_commands.append(
+                {
+                    **command,
+                    "source_status": source_status,
+                    "implementation_status": (
+                        "existing-runtime" if existing_operation is not None else "unimplemented"
+                    ),
+                    "registration_status": (
+                        "existing-runtime" if existing_operation is not None else "unregistered"
+                    ),
+                    "existing_runtime_operation": existing_operation,
+                    "source_dimensions": dimensions,
+                    "unresolved_dimensions": unresolved,
+                    "source_issue_ids": sorted(row_issue_ids),
+                }
+            )
+        batches.append(
+            {
+                "batch_id": batch_id,
+                "ordinal_start": start,
+                "ordinal_end": end,
+                "command_count": end - start + 1,
+                "source_input": binding,
+                "commands": batch_commands,
+            }
+        )
+
+    descriptor_path = root / CATALOG_PATH
+    artifact: dict[str, Any] = {
+        "schema_version": CONTRACT_SCHEMA_VERSION,
+        "target_version": "0.9.0",
+        "work_package": "CIC-901.command-contract",
+        "status": "generated-scaffold",
+        "automatic_registration": False,
+        "semantic_authority": False,
+        "coverage_credit": 0,
+        "semantic_credit": 0,
+        "differential_credit": 0,
+        "inputs": {
+            "command_descriptors": {
+                "path": CATALOG_PATH.as_posix(),
+                "file_sha256": _file_sha256(descriptor_path),
+                "application_identity_set_sha256": application_identity_digest(commands),
+            }
+        },
+        "contract_dimensions": list(CONTRACT_DIMENSIONS),
+        "counts": {
+            "batches": len(batches),
+            "commands": len(commands),
+            "source_projected_commands": projected_commands,
+            "source_reviewed_commands": reviewed_commands,
+            "source_ambiguous_commands": ambiguous_commands,
+            "source_verified_candidates": verified_candidates,
+            "source_ambiguous_candidates": ambiguous_candidates,
+            "source_fact_groups": fact_groups,
+            "source_candidate_references": source_candidate_references,
+            "implemented_commands": len(existing_runtime),
+            "registered_commands": len(existing_runtime),
+        },
+        "batches": batches,
+    }
+    artifact["contract_sha256"] = contract_digest(artifact)
+    return artifact
+
+
+def render_contracts(root: Path = ROOT) -> str:
+    return json.dumps(build_contracts(root), indent=2, ensure_ascii=False) + "\n"
+
+
 def _rust_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=True)
 
@@ -517,6 +1022,7 @@ def rendered_outputs(root: Path = ROOT) -> dict[Path, str]:
     return {
         OUTPUT_PATH: render_provider(root),
         HOST_OUTPUT_PATH: render_host(root),
+        CONTRACT_OUTPUT_PATH: render_contracts(root),
     }
 
 
@@ -551,7 +1057,7 @@ def main() -> None:
         generate()
         print(
             "cics-command-descriptors: generated "
-            f"{OUTPUT_PATH} and {HOST_OUTPUT_PATH}"
+            f"{OUTPUT_PATH}, {HOST_OUTPUT_PATH}, and {CONTRACT_OUTPUT_PATH}"
         )
 
 

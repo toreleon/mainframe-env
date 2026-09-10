@@ -47,7 +47,8 @@ conditions, family ownership, handlers or registration. The map has 88 row
 dispositions, 117 row-to-page edges and 109 unique pages. It records
 `CICSMESSAGE`, `DUMP` and `ENTER TRACEID` as source gaps because the pinned
 command-summary node contains no matching command page; similarly named
-commands with different EIBFN values are not aliases.
+commands with different EIBFN values are not aliases. Five supplemental HTML
+topics close these map-stage gaps for the later independent verification.
 
 `python3 -B tools/generate_cics_source_map.py --toc -` reads the exact pinned
 TOC bytes from standard input and writes only the bounded metadata projection
@@ -77,13 +78,67 @@ validates committed metadata offline. Supplying `--cache /ibm-docs/topic-cache`
 additionally verifies all topic and TOC bodies, re-derives the one-hop closure
 and never opens the browser. Generation fetches fresh content-endpoint bytes
 through `conformance/tools/browser_fetch.py` before publishing verified,
-content-addressed cache entries. The corpus is still a machine candidate:
-`CICSMESSAGE`, `DUMP` and `ENTER TRACEID` remain pending source review, and no
-syntax, option, condition, applicability or handler decision follows from
-corpus membership. The zero-credit
+content-addressed cache entries. Corpus membership alone makes no syntax,
+option, condition, applicability or handler decision. The zero-credit
 [`browser verification receipt`](../../conformance/0.9/cics/application-api-sources-a-browser-verification.json)
 binds a direct Chrome reproduction of all 173 topic identities to the manifest;
 it is source-freshness evidence, not semantic authority.
+
+The completed projection child is defined by
+[`application-api-sources-a-extraction.json`](../../conformance/0.9/cics/application-api-sources-a-extraction.json)
+and materialized as
+[`cics-application-api-sources-a-candidates.json`](../../conformance/0.9/generated/cics-application-api-sources-a-candidates.json).
+The exact plan file is SHA-256
+`09f49b1e424c04ec7b0c0c4a1d696e3e623a6b2969428378cbeb05f87b57b147`,
+its domain-separated logical digest is
+`86e9b93a1c0bf1caac892eb8d4ab75e956458a77c2683ec58b74de8fa4925b05`,
+and the projector implementation is SHA-256
+`3bed782bbe61b061ada5ce3bd6b44fab842c4b9415bb7c88c071082c4cd139a5`.
+The projection digest is
+`e7739cf6e364f347bb67a870e7f5de6c0024661a00a9bf41d2ebd5a1ecb4aa02`.
+
+The projector accounts for all 88 rows through 440 ordered dimension records
+and 6,033 candidates. Its source-shape inventory contains 111 syntax diagrams,
+112 SVG parts, 895 top-level option terms, and 344 top-level conditions. The
+resulting dimension states are 422 projected, 14 declared absent and four
+source-backed not applicable, with no source-gap, unmatched or conflicting
+dimension. Candidate values contain only bounded symbolic metadata,
+structural locators, and fragment hashes; publication text, semantic
+acceptance, handler registration, and coverage credit remain outside this
+authority.
+
+The no-cache projector check validates the committed identities, shape,
+canonical encoding, and logical digest. The cache-backed form additionally
+regenerates the complete output from all digest-pinned HTML bodies and compares
+it byte for byte. Neither form fetches documentation or accepts its own
+interpretation; the independent `sources-a-review` child verifies objective
+source facts, while the later command contract owns semantics.
+
+That review child has a compact
+[`receipt`](../../conformance/0.9/cics/application-api-sources-a-review.json),
+[`schema`](../../conformance/0.9/schemas/cics-source-review.schema.json),
+[`independent verifier`](../../conformance/0.9/tools/verify_cics_application_sources.py),
+and [`checker`](../../conformance/0.9/tools/review_cics_application_sources.py).
+It derives expected facts from cached HTML before reading the projection,
+auto-accepts clear facts, and records only dynamic counts, digests and exact
+ambiguity IDs. The ordinary check fails on missing source facts, reprojection
+findings or mismatches; no manual approval bypass exists. The workflow grants
+zero coverage, semantic or differential credit. It passes for all 88 rows and
+6,033 candidates across 178 topics: structural coverage is 2,017/2,017, with
+5,672 verified candidates, 361 bounded candidate ambiguities, two bounded
+target-equivalence issues and no blocking finding.
+
+A focused official-IBM HTML search through the user's Chrome found no exact
+current-product `DUMP` or `ENTER TRACEID` command page. No PDF was used. Five
+supplemental HTML topics provide authority-bounded objective evidence, so source
+verification accepts both rows while preserving their two target-equivalence
+issues; it does not inherit `DUMP TRANSACTION`, `ENTER TRACENUM` or `MONITOR`
+semantics. The zero-credit 263-row contract scaffold now exists in 88/88/87
+batches: `sources-a` facts are populated, `sources-b` and `sources-c` are
+explicitly not projected, and 23 existing runtime commands remain distinct from
+240 unimplemented rows. Next, project `sources-b`/`sources-c`, enrich the
+contract, and implement vertical family slices; release, deployment and
+Docker-in-Docker remain out of scope.
 
 ## Frozen families
 
@@ -143,6 +198,9 @@ records the hard limits and exact legacy ceiling policy.
 python3 -B tools/generate_cics_descriptors.py --check
 python3 -B tools/generate_cics_source_map.py --check
 python3 -B conformance/0.9/tools/fetch_cics_application_sources.py --check
+python3 -B conformance/0.9/tools/extract_cics_application_sources.py --check
+python3 -B conformance/0.9/tools/extract_cics_application_sources.py --cache /ibm-docs/topic-cache --check
+python3 -B conformance/0.9/tools/review_cics_application_sources.py --check
 python3 -B -m unittest tools.tests.test_cics_descriptors tools.tests.test_cics_source_map tools.tests.test_module_boundaries
 cargo test -p mainframe-env-host-api -p mainframe-env-cics --all-features --locked
 cargo xtask architecture-fast --check

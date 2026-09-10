@@ -7449,6 +7449,15 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         &json(&cics_descriptor_catalog)?,
         &cics_descriptor_catalog,
     )?;
+    let cics_contract_catalog =
+        root.join("conformance/0.9/generated/cics-application-command-contracts.json");
+    let cics_contract_schema =
+        root.join("conformance/0.9/schemas/cics-application-command-contracts.schema.json");
+    validate_schema_instance(
+        &json(&cics_contract_schema)?,
+        &json(&cics_contract_catalog)?,
+        &cics_contract_catalog,
+    )?;
     let status = Command::new("python3")
         .arg("-B")
         .arg(&cics_descriptors)
@@ -7531,6 +7540,42 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         status.success(),
         "CICS sources-a corpus freshness guard failed",
     )?;
+    let cics_source_extraction =
+        root.join("conformance/0.9/cics/application-api-sources-a-extraction.json");
+    let cics_source_extraction_schema =
+        root.join("conformance/0.9/schemas/cics-source-extraction.schema.json");
+    validate_schema_instance(
+        &json(&cics_source_extraction_schema)?,
+        &json(&cics_source_extraction)?,
+        &cics_source_extraction,
+    )?;
+    let cics_source_candidates =
+        root.join("conformance/0.9/generated/cics-application-api-sources-a-candidates.json");
+    let cics_source_candidates_schema =
+        root.join("conformance/0.9/schemas/cics-source-candidates.schema.json");
+    validate_schema_instance(
+        &json(&cics_source_candidates_schema)?,
+        &json(&cics_source_candidates)?,
+        &cics_source_candidates,
+    )?;
+    let cics_source_projector =
+        root.join("conformance/0.9/tools/extract_cics_application_sources.py");
+    require(
+        cics_source_projector.is_file(),
+        "CICS sources-a projector is missing",
+    )?;
+    let status = Command::new("python3")
+        .arg("-B")
+        .arg(&cics_source_projector)
+        .arg("--check")
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("CICS sources-a projection freshness guard: {error}"))?;
+    require(
+        status.success(),
+        "CICS sources-a projection freshness guard failed",
+    )?;
+    check_cics_source_review(root)?;
     let module_boundaries = root.join("tools/check_module_boundaries.py");
     require(
         module_boundaries.is_file(),
@@ -7562,6 +7607,29 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         "typed semantic boundary architecture guard failed",
     )?;
     Ok(())
+}
+
+fn check_cics_source_review(root: &Path) -> TaskResult {
+    let review = root.join("conformance/0.9/cics/application-api-sources-a-review.json");
+    let schema = root.join("conformance/0.9/schemas/cics-source-review.schema.json");
+    validate_schema_instance(&json(&schema)?, &json(&review)?, &review)?;
+
+    let checker = root.join("conformance/0.9/tools/review_cics_application_sources.py");
+    require(
+        checker.is_file(),
+        "CICS sources-a review checker is missing",
+    )?;
+    let status = Command::new("python3")
+        .arg("-B")
+        .arg(&checker)
+        .arg("--check")
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("CICS sources-a review freshness guard: {error}"))?;
+    require(
+        status.success(),
+        "CICS sources-a review freshness guard failed",
+    )
 }
 
 fn check_declared_dependency_graph(root: &Path) -> TaskResult {
@@ -14575,6 +14643,46 @@ mod tests {
         assert!(check_dataset_oracle_receipt(&root, Some(simulation)).is_err());
         let local_certification = root.join("conformance/0.6/evidence/dataset-certification.json");
         assert!(check_dataset_oracle_receipt(&root, Some(local_certification)).is_err());
+    }
+
+    #[test]
+    fn blocked_cics_source_review_fails_the_ordinary_check() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = env::temp_dir().join(format!(
+            "mainframe-env-cics-source-review-{}-{nonce}",
+            std::process::id()
+        ));
+        let review = root.join("conformance/0.9/cics/application-api-sources-a-review.json");
+        let schema = root.join("conformance/0.9/schemas/cics-source-review.schema.json");
+        let checker = root.join("conformance/0.9/tools/review_cics_application_sources.py");
+        for path in [&review, &schema, &checker] {
+            fs::create_dir_all(path.parent().expect("parent")).expect("create parent");
+        }
+        fs::write(&review, br#"{"review_status":"blocked"}"#).expect("blocked review");
+        fs::write(
+            &schema,
+            br#"{
+                "$schema":"https://json-schema.org/draft/2020-12/schema",
+                "type":"object",
+                "additionalProperties":false,
+                "required":["review_status"],
+                "properties":{"review_status":{"const":"blocked"}}
+            }"#,
+        )
+        .expect("review schema");
+        fs::write(
+            &checker,
+            b"import sys\nraise SystemExit(1 if sys.argv[1:] == ['--check'] else 2)\n",
+        )
+        .expect("review checker");
+
+        let error = check_cics_source_review(&root)
+            .expect_err("blocked automatic review must fail the ordinary check");
+        assert!(error.contains("freshness guard failed"));
+        fs::remove_dir_all(root).expect("clean up");
     }
 
     /// The two halves of a served topic, joined only at run time.

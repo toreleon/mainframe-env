@@ -46,6 +46,18 @@ All notable changes to mainframe-env are documented here.
   pages, 58 bounded one-hop context pages and six manual context topics, with
   all 173 topic identities reproduced through Chrome and all raw IBM topic and
   navigation bytes kept outside Git.
+- Added the zero-credit `sources-a` structural projection for all 88 first-slice
+  rows: 440 dimension records and 6,033 bounded candidates, with no source-gap,
+  unmatched, conflicting, reprojection, or mismatch finding.
+- Added compact automatic `sources-a` verification: an implementation-independent
+  HTML verifier checks 173 manifest topics plus five Chrome-captured supplements,
+  auto-accepts 5,672 objective candidates, and retains 361 candidate-level and two
+  issue-level authority-bounded ambiguities. No per-candidate manual ledger, PDF,
+  semantic, coverage or differential credit is involved.
+- Added the zero-credit 263-command contract scaffold in deterministic 88/88/87
+  batches. It carries verified `sources-a` facts, leaves `sources-b`/`sources-c`
+  explicitly unprojected, and preserves the truthful 23-command existing runtime
+  baseline without registering any of the remaining 240 commands.
 - Added a reviewed COBOL numeric `MOVE` pilot and corrected floating-insertion,
   capacity, sign, and overflow behavior found by that review.
 - Added cost-aware local Jenkins assurance, exact-candidate command receipts,

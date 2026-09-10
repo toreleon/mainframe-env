@@ -81,7 +81,8 @@ Do not commit topic bodies, automatically accept extracted semantics, silently
 repin changed bytes, or treat cache presence as behavioral or licensed
 execution evidence. The current CICS `sources-a` mapping has three explicit
 command-summary gaps; supplemental sources must remain separately identified
-and reviewed rather than being aliased to similarly named commands.
+and independently verified rather than being aliased to similarly named
+commands.
 
 The registered `cics-application-api-sources-a` scope currently contains 173
 HTML topics. Verify the pinned topics, TOC and full source closure with:
@@ -99,6 +100,47 @@ the verified bytes to the content-addressed cache. The committed
 `application-api-sources-a-browser-verification.json` receipt records the
 separate direct-Chrome reproduction of all 173 topic byte counts and SHA-256
 identities; it grants no semantic or coverage credit.
+
+Five authority-bounded HTML supplements close the three map-stage gaps. They
+have no TOC claim and are verified separately:
+
+```bash
+docker/dev exec python3 -B conformance/0.9/tools/cache_cics_application_source_supplements.py --check --cache /ibm-docs/topic-cache
+```
+
+## Reproduce the CICS sources-a structural projection
+
+The committed projection can be checked without mounting the documentation
+cache:
+
+```bash
+docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --check
+```
+
+This form verifies the exact plan, map, corpus, manifest, browser receipt,
+projector identity, candidate structure, canonical encoding, counts, blockers,
+and projection digest. To re-read every pinned HTML body and regenerate the
+candidate bytes before comparing them to Git, use the cache-backed form:
+
+```bash
+docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --cache /ibm-docs/topic-cache --check
+```
+
+Both forms are offline and preserve the zero-credit boundary. The projection
+contains structural locators, fragment hashes, and bounded symbolic values,
+not IBM publication text. It has no source-gap, unmatched, conflicting,
+reprojection, or mismatch finding; two target-equivalence ambiguities remain
+explicit for the authority-bounded `DUMP` and `ENTER TRACEID` sources. Verify
+the projection independently and refresh its compact automatic receipt with:
+
+```bash
+docker/dev exec python3 -B conformance/0.9/tools/review_cics_application_sources.py --check --cache /ibm-docs/topic-cache
+```
+
+If a later check needs another HTML topic, add and reproduce it through the
+user's Chrome before regenerating; do not fetch implicitly from the projector
+or substitute a PDF. These checks use the existing development container only:
+they neither nest Docker nor perform release or licensed execution work.
 
 ## Reverify immutable baseline pins
 

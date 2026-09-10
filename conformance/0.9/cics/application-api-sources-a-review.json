@@ -1,0 +1,114 @@
+{
+  "automatic_registration": false,
+  "blocker_ids": [
+    "cics-a-issue-0056-target-equivalence-ambiguity-39578a23b923",
+    "cics-a-issue-0065-target-equivalence-ambiguity-be32f68f0835"
+  ],
+  "candidate_dispositions": {
+    "mismatch": {
+      "candidate_ids_sha256": "sha256:ab1547e5a38cc16e0cfd977df33e0c0db0ae55ebfcb5f8008d54e47c237681af",
+      "count": 0
+    },
+    "product-ambiguity": {
+      "candidate_ids_sha256": "sha256:41d295d567f6e47e4fc79aee93117315629f529107c91427f5c3db5f09b252d1",
+      "count": 361
+    },
+    "requires-reprojection": {
+      "candidate_ids_sha256": "sha256:ab1547e5a38cc16e0cfd977df33e0c0db0ae55ebfcb5f8008d54e47c237681af",
+      "count": 0
+    },
+    "verified": {
+      "candidate_ids_sha256": "sha256:d84c17839a8d053e78b1174b8dc2847142efe75d9046f68d12d75c6ed2357ee9",
+      "count": 5672
+    }
+  },
+  "counts": {
+    "blocking_findings": 0,
+    "candidate_kinds": {
+      "source-condition": 853,
+      "source-context": 2220,
+      "source-operand-direction": 1796,
+      "source-option": 1046,
+      "source-syntax": 118
+    },
+    "candidates": 6033,
+    "issues": 2,
+    "rows": 88,
+    "topics": 178,
+    "unique_evidence_fragments": 3111
+  },
+  "coverage_credit": 0,
+  "differential_credit": 0,
+  "execution_authority": false,
+  "independent_verification_sha256": "sha256:d7a0ca6b5eed603986d674918e72c5bb6f4e488d7fc7b1478b59aeddaf61cefb",
+  "inputs": {
+    "candidate_projection_sha256": "sha256:bc5b90bee49d24b9378d41efeb53b27ce18cdc14446f2e34e28b42094d8e9f9f",
+    "extraction_plan_sha256": "sha256:09f49b1e424c04ec7b0c0c4a1d696e3e623a6b2969428378cbeb05f87b57b147",
+    "source_map_sha256": "sha256:42ec28acc106501d834164bb3896fb0ef3b2a84d1b9028d307c21f6d3573c9a0",
+    "source_supplements_sha256": "sha256:a66a5e8e1879845a331642f19f5daf38ab775332100bf59d10f59eb07607dc16",
+    "topic_manifest_sha256": "sha256:ab7120009fb0f2a9d121ffdf518d05960ee006e74f1d28026858cafd6c5467de"
+  },
+  "issue_dispositions": {
+    "mismatch": {
+      "count": 0,
+      "issue_ids_sha256": "sha256:ab1547e5a38cc16e0cfd977df33e0c0db0ae55ebfcb5f8008d54e47c237681af"
+    },
+    "product-ambiguity": {
+      "count": 2,
+      "issue_ids_sha256": "sha256:53505234fb80258969bba8ab09bbeadfb9893bb53cf3a12b2025834254d906f6"
+    },
+    "requires-reprojection": {
+      "count": 0,
+      "issue_ids_sha256": "sha256:ab1547e5a38cc16e0cfd977df33e0c0db0ae55ebfcb5f8008d54e47c237681af"
+    },
+    "verified": {
+      "count": 0,
+      "issue_ids_sha256": "sha256:ab1547e5a38cc16e0cfd977df33e0c0db0ae55ebfcb5f8008d54e47c237681af"
+    }
+  },
+  "review_authority": {
+    "automatic_acceptance": true,
+    "kind": "independent-deterministic-verifier",
+    "manual_approval": false,
+    "source_derived_before_projection": true
+  },
+  "review_contract": {
+    "checker": {
+      "file_sha256": "sha256:bd3b790fcd2216a2dcb96d22d30bfc0bca4d145b84f71f7d0d5de7c5af7d8db1",
+      "path": "conformance/0.9/tools/review_cics_application_sources.py",
+      "version": "cics-source-auto-review-checker@2"
+    },
+    "independent_verifier": {
+      "file_sha256": "sha256:3dcec4f2b1e03588eabecd490d35448f49e76b7956b34a08c3d03675e9da4e22",
+      "path": "conformance/0.9/tools/verify_cics_application_sources.py",
+      "version": "cics-source-independent-verifier@1"
+    },
+    "schema": {
+      "file_sha256": "sha256:d2664f39233bf3c583e3eed28ebacc67e48e6040dd6427d9887f878732aaf8e6",
+      "path": "conformance/0.9/schemas/cics-source-review.schema.json"
+    }
+  },
+  "review_sha256": "sha256:60d7dda00109327fb5472836cd6bab0cfb52ff223cc1b58cc65fc02323e3d8a7",
+  "review_status": "auto-accepted-with-bounded-ambiguities",
+  "schema_version": "mainframe-env.cics-source-review@2",
+  "semantic_authority": false,
+  "semantic_credit": 0,
+  "structural_coverage": {
+    "expected": 2017,
+    "expected_by_kind": {
+      "source-condition": 853,
+      "source-option": 1046,
+      "source-syntax": 118
+    },
+    "extra": 0,
+    "missing": 0,
+    "projected": 2017,
+    "projected_by_kind": {
+      "source-condition": 853,
+      "source-option": 1046,
+      "source-syntax": 118
+    }
+  },
+  "target_version": "0.9.0",
+  "work_package": "CIC-901.sources-a-review"
+}
