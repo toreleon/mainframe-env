@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the zero-credit CICS sources-a command-summary mapping.
+"""Generate zero-credit CICS application command-summary source maps.
 
 The IBM table of contents is an external input.  The repository retains only a
 bounded projection of its command-summary children and a row-to-topic mapping;
@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from dataclasses import dataclass
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
@@ -100,6 +101,187 @@ COMBINED_LABELS = {
     "GET COUNTER": "GET COUNTER and GET DCOUNTER",
     "GET DCOUNTER": "GET COUNTER and GET DCOUNTER",
 }
+
+
+@dataclass(frozen=True)
+class BatchConfig:
+    batch_id: str
+    first_index: int
+    row_count: int
+    map_path: Path
+    work_package: str
+    source_gaps: frozenset[str]
+    variant_counts: dict[str, int]
+    variant_topic_labels: dict[str, tuple[str, ...]]
+    shared_labels: dict[str, str]
+    combined_labels: dict[str, str]
+    aliased_labels: dict[str, str]
+    expected_counts: dict[str, Any]
+
+
+SOURCES_A = BatchConfig(
+    batch_id="sources-a",
+    first_index=0,
+    row_count=EXPECTED_ROW_COUNT,
+    map_path=MAP_PATH,
+    work_package=WORK_PACKAGE,
+    source_gaps=SOURCE_GAPS,
+    variant_counts=EXPECTED_VARIANT_COUNTS,
+    variant_topic_labels={},
+    shared_labels=SHARED_LABELS,
+    combined_labels=COMBINED_LABELS,
+    aliased_labels={},
+    expected_counts={
+        "row_count": 88,
+        "resolved_row_count": 85,
+        "source_gap_count": 3,
+        "edge_count": 117,
+        "unique_topic_count": 109,
+        "multi_topic_row_count": 9,
+        "shared_topic_count": 7,
+        "selection_kind_counts": {
+            "exact": 61,
+            "variant-set": 9,
+            "shared-page": 9,
+            "combined-page": 6,
+            "source-gap": 3,
+        },
+    },
+)
+
+SOURCES_B = BatchConfig(
+    batch_id="sources-b",
+    first_index=88,
+    row_count=88,
+    map_path=Path("conformance/0.9/cics/application-api-sources-b-map.json"),
+    work_package="CIC-901.sources-b-map",
+    source_gaps=frozenset(),
+    variant_counts={
+        "GETNEXT CONTAINER": 2,
+        "ISSUE COPY": 1,
+        "ISSUE DISCONNECT": 2,
+        "ISSUE SIGNAL": 2,
+        "MOVE CONTAINER": 2,
+        "PUT CONTAINER": 2,
+        "RECEIVE": 20,
+        "RECEIVE MAP": 2,
+    },
+    variant_topic_labels={
+        "RECEIVE MAP": ("RECEIVE MAP", "RECEIVE MAP MAPPINGDEV"),
+    },
+    shared_labels={
+        "LINK ACQACTIVITY": "LINK ACTIVITY",
+        "LINK ACTIVITY": "LINK ACTIVITY",
+        "RESUME ACQACTIVITY": "RESUME",
+        "RESUME ACQPROCESS": "RESUME",
+        "RESUME ACTIVITY": "RESUME",
+    },
+    combined_labels={
+        "QUERY COUNTER": "QUERY COUNTER and QUERY DCOUNTER",
+        "QUERY DCOUNTER": "QUERY COUNTER and QUERY DCOUNTER",
+    },
+    aliased_labels={},
+    expected_counts={
+        "row_count": 88,
+        "resolved_row_count": 88,
+        "source_gap_count": 0,
+        "edge_count": 113,
+        "unique_topic_count": 109,
+        "multi_topic_row_count": 7,
+        "shared_topic_count": 3,
+        "selection_kind_counts": {
+            "exact": 73,
+            "variant-set": 8,
+            "shared-page": 5,
+            "combined-page": 2,
+            "source-gap": 0,
+        },
+    },
+)
+
+SOURCES_C = BatchConfig(
+    batch_id="sources-c",
+    first_index=176,
+    row_count=87,
+    map_path=Path("conformance/0.9/cics/application-api-sources-c-map.json"),
+    work_package="CIC-901.sources-c-map",
+    source_gaps=frozenset({"SET ASSOCIATION USERCORRDATA", "TRACE"}),
+    variant_counts={
+        "SEND": 26,
+        "SEND MAP": 2,
+        "SEND TEXT": 3,
+        "SIGNON": 2,
+        "START": 2,
+        "STARTBROWSE CONTAINER": 2,
+        "SYNCPOINT": 2,
+        "WAIT CONVID": 1,
+        "WEB ENDBROWSE": 3,
+        "WEB READ": 3,
+        "WEB READNEXT": 3,
+        "WEB RECEIVE": 2,
+        "WEB SEND": 2,
+        "WEB STARTBROWSE": 3,
+        "WEB WRITE": 1,
+    },
+    variant_topic_labels={
+        "SEND MAP": ("SEND MAP", "SEND MAP MAPPINGDEV"),
+        "SEND TEXT": ("SEND TEXT", "SEND TEXT MAPPED", "SEND TEXT NOEDIT"),
+        "SIGNON": ("SIGNON", "SIGNON TOKEN"),
+        "START": ("START", "START CHANNEL"),
+        "SYNCPOINT": ("SYNCPOINT", "SYNCPOINT ROLLBACK"),
+        "WEB ENDBROWSE": (
+            "WEB ENDBROWSE FORMFIELD",
+            "WEB ENDBROWSE HTTPHEADER",
+            "WEB ENDBROWSE QUERYPARM",
+        ),
+        "WEB READ": ("WEB READ FORMFIELD", "WEB READ HTTPHEADER", "WEB READ QUERYPARM"),
+        "WEB READNEXT": (
+            "WEB READNEXT FORMFIELD",
+            "WEB READNEXT HTTPHEADER",
+            "WEB READNEXT QUERYPARM",
+        ),
+        "WEB STARTBROWSE": (
+            "WEB STARTBROWSE FORMFIELD",
+            "WEB STARTBROWSE HTTPHEADER",
+            "WEB STARTBROWSE QUERYPARM",
+        ),
+        "WEB WRITE": ("WEB WRITE HTTPHEADER",),
+    },
+    shared_labels={
+        "RUN ACQACTIVITY": "RUN",
+        "RUN ACQPROCESS": "RUN",
+        "RUN ACTIVITY": "RUN",
+        "SUSPEND ACQACTIVITY": "SUSPEND (BTS)",
+        "SUSPEND ACQPROCESS": "SUSPEND (BTS)",
+        "SUSPEND ACTIVITY": "SUSPEND (BTS)",
+    },
+    combined_labels={
+        "REWIND COUNTER": "REWIND COUNTER and REWIND DCOUNTER",
+        "REWIND DCOUNTER": "REWIND COUNTER and REWIND DCOUNTER",
+        "UPDATE COUNTER": "UPDATE COUNTER and UPDATE DCOUNTER",
+        "UPDATE DCOUNTER": "UPDATE COUNTER and UPDATE DCOUNTER",
+    },
+    aliased_labels={"WAIT": "GDS WAIT", "WRITE FILE": "WRITE"},
+    expected_counts={
+        "row_count": 87,
+        "resolved_row_count": 85,
+        "source_gap_count": 2,
+        "edge_count": 127,
+        "unique_topic_count": 121,
+        "multi_topic_row_count": 13,
+        "shared_topic_count": 4,
+        "selection_kind_counts": {
+            "exact": 58,
+            "variant-set": 15,
+            "shared-page": 6,
+            "combined-page": 4,
+            "aliased-page": 2,
+            "source-gap": 2,
+        },
+    },
+)
+
+BATCHES = {config.batch_id: config for config in (SOURCES_A, SOURCES_B, SOURCES_C)}
 
 
 class SourceMapError(ValueError):
@@ -311,33 +493,44 @@ def validate_projection(projection: dict[str, Any]) -> None:
 
 
 def selected_topics(
-    label: str, topics: list[dict[str, Any]]
+    label: str, topics: list[dict[str, Any]], config: BatchConfig = SOURCES_A
 ) -> tuple[str, str, str, list[dict[str, Any]]]:
     by_label: dict[str, list[dict[str, Any]]] = {}
     for topic in topics:
         by_label.setdefault(topic["label"], []).append(topic)
 
-    if label in SOURCE_GAPS:
+    if label in config.source_gaps:
         return "source-gap", "no-command-summary-node", "source-gap", []
-    if label in SHARED_LABELS:
-        selected = by_label.get(SHARED_LABELS[label], [])
+    if label in config.shared_labels:
+        selected = by_label.get(config.shared_labels[label], [])
         kind, rationale, role = "shared-page", "shared-command-form", "shared"
-    elif label in COMBINED_LABELS:
-        selected = by_label.get(COMBINED_LABELS[label], [])
+    elif label in config.combined_labels:
+        selected = by_label.get(config.combined_labels[label], [])
         kind, rationale, role = "combined-page", "combined-command-page", "combined"
-    elif label in VARIANT_LABELS:
-        selected = [
-            topic
-            for topic in topics
-            if topic["label"] == label
-            or topic["label"].startswith(f"{label} (")
-            or topic["label"].startswith(f"{label}:")
-        ]
+    elif label in config.aliased_labels:
+        selected = by_label.get(config.aliased_labels[label], [])
+        kind, rationale, role = "aliased-page", "catalog-label-alias", "alias"
+    elif label in config.variant_counts:
+        explicit = config.variant_topic_labels.get(label)
+        if explicit is None:
+            selected = [
+                topic
+                for topic in topics
+                if topic["label"] == label
+                or topic["label"].startswith(f"{label} (")
+                or topic["label"].startswith(f"{label}:")
+            ]
+        else:
+            selected = [
+                topic
+                for topic_label in explicit
+                for topic in by_label.get(topic_label, [])
+            ]
         kind, rationale, role = "variant-set", "qualified-variant-set", "variant"
     else:
         selected = by_label.get(label, [])
         kind, rationale, role = "exact", "exact-toc-label", "primary"
-    expected_count = EXPECTED_VARIANT_COUNTS[label] if kind == "variant-set" else 1
+    expected_count = config.variant_counts[label] if kind == "variant-set" else 1
     if len(selected) != expected_count:
         raise SourceMapError(
             f"{label} {kind} mapping has {len(selected)} topics; expected {expected_count}"
@@ -362,16 +555,28 @@ def map_core(mapping: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def build_mapping(root: Path, projection: dict[str, Any]) -> dict[str, Any]:
+def batch_config(batch_id: str) -> BatchConfig:
+    try:
+        return BATCHES[batch_id]
+    except KeyError as error:
+        raise SourceMapError(f"unknown source-map batch {batch_id!r}") from error
+
+
+def build_mapping(
+    root: Path, projection: dict[str, Any], batch_id: str = "sources-a"
+) -> dict[str, Any]:
     validate_projection(projection)
+    config = batch_config(batch_id)
     catalog = descriptors.load_catalog(root)
     descriptor_path = root / descriptors.CATALOG_PATH
     descriptor_sha256 = f"sha256:{hashlib.sha256(descriptor_path.read_bytes()).hexdigest()}"
-    commands = catalog["_application_commands"][:EXPECTED_ROW_COUNT]
+    commands = catalog["_application_commands"][
+        config.first_index : config.first_index + config.row_count
+    ]
     rows = []
     for command in commands:
         kind, rationale, state, topics = selected_topics(
-            command["label"], projection["topics"]
+            command["label"], projection["topics"], config
         )
         rows.append(
             {
@@ -389,6 +594,10 @@ def build_mapping(root: Path, projection: dict[str, Any]) -> dict[str, Any]:
         topic["topic_path"] for row in rows for topic in row["topics"]
     )
     kind_counts = Counter(row["selection_kind"] for row in rows)
+    selection_kinds = ["exact", "variant-set", "shared-page", "combined-page"]
+    if config.aliased_labels:
+        selection_kinds.append("aliased-page")
+    selection_kinds.append("source-gap")
     counts = {
         "row_count": len(rows),
         "resolved_row_count": sum(row["state"] == "mapped" for row in rows),
@@ -398,32 +607,16 @@ def build_mapping(root: Path, projection: dict[str, Any]) -> dict[str, Any]:
         "multi_topic_row_count": sum(len(row["topics"]) > 1 for row in rows),
         "shared_topic_count": sum(count > 1 for count in topic_usage.values()),
         "selection_kind_counts": {
-            key: kind_counts[key]
-            for key in [
-                "exact",
-                "variant-set",
-                "shared-page",
-                "combined-page",
-                "source-gap",
-            ]
+            key: kind_counts[key] for key in selection_kinds
         },
     }
-    expected_counts = {
-        "row_count": EXPECTED_ROW_COUNT,
-        "resolved_row_count": EXPECTED_RESOLVED_ROWS,
-        "source_gap_count": EXPECTED_SOURCE_GAPS,
-        "edge_count": EXPECTED_EDGES,
-        "unique_topic_count": EXPECTED_UNIQUE_TOPICS,
-        "multi_topic_row_count": EXPECTED_MULTI_TOPIC_ROWS,
-        "shared_topic_count": EXPECTED_SHARED_TOPICS,
-    }
-    if any(counts[key] != value for key, value in expected_counts.items()):
-        raise SourceMapError(f"sources-a mapping counts differ: {counts}")
+    if counts != config.expected_counts:
+        raise SourceMapError(f"{batch_id} mapping counts differ: {counts}")
 
     mapping: dict[str, Any] = {
         "schema_version": MAP_SCHEMA_VERSION,
         "target_version": TARGET_VERSION,
-        "work_package": WORK_PACKAGE,
+        "work_package": config.work_package,
         "status": "candidate",
         "semantic_authority": False,
         "automatic_registration": False,
@@ -446,7 +639,7 @@ def build_mapping(root: Path, projection: dict[str, Any]) -> dict[str, Any]:
         "row_range": {
             "first": commands[0]["official_row"],
             "last": commands[-1]["official_row"],
-            "count": EXPECTED_ROW_COUNT,
+            "count": config.row_count,
         },
         "counts": counts,
         "mapping_digest_definition": MAP_DIGEST_DEFINITION,
@@ -457,40 +650,65 @@ def build_mapping(root: Path, projection: dict[str, Any]) -> dict[str, Any]:
     return mapping
 
 
-def validate_mapping(root: Path, mapping: dict[str, Any], projection: dict[str, Any]) -> None:
-    expected = build_mapping(root, projection)
+def validate_mapping(
+    root: Path,
+    mapping: dict[str, Any],
+    projection: dict[str, Any],
+    batch_id: str = "sources-a",
+) -> None:
+    config = batch_config(batch_id)
+    expected = build_mapping(root, projection, batch_id)
     if mapping != expected:
-        raise SourceMapError(f"{MAP_PATH} differs from the deterministic mapping")
+        raise SourceMapError(f"{config.map_path} differs from the deterministic mapping")
     if mapping["mapping_sha256"] != canonical_digest(MAP_DOMAIN, map_core(mapping)):
-        raise SourceMapError("sources-a mapping digest differs")
+        raise SourceMapError(f"{batch_id} mapping digest differs")
 
 
-def write_outputs(root: Path, projection: dict[str, Any]) -> None:
-    mapping = build_mapping(root, projection)
-    for relative, value in [
-        (TOC_PROJECTION_PATH, projection),
-        (MAP_PATH, mapping),
-    ]:
+def write_outputs(
+    root: Path,
+    projection: dict[str, Any],
+    batch_ids: Iterable[str] = ("sources-a",),
+    *,
+    write_projection: bool = True,
+) -> None:
+    outputs = [
+        (batch_config(batch_id).map_path, build_mapping(root, projection, batch_id))
+        for batch_id in batch_ids
+    ]
+    if write_projection:
+        outputs.insert(0, (TOC_PROJECTION_PATH, projection))
+    for relative, value in outputs:
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(pretty(value))
 
 
-def check(root: Path = ROOT, external_toc: bytes | None = None) -> None:
+def check(
+    root: Path = ROOT,
+    external_toc: bytes | None = None,
+    batch_id: str = "sources-a",
+) -> None:
+    config = batch_config(batch_id)
     projection = read_json(root / TOC_PROJECTION_PATH)
     validate_projection(projection)
     if external_toc is not None:
         from_source = projection_from_toc(external_toc)
         if from_source != projection:
             raise SourceMapError("committed TOC projection differs from the pinned source")
-    mapping = read_json(root / MAP_PATH)
-    validate_mapping(root, mapping, projection)
+    mapping = read_json(root / config.map_path)
+    validate_mapping(root, mapping, projection, batch_id)
     for relative, value in [
         (TOC_PROJECTION_PATH, projection),
-        (MAP_PATH, mapping),
+        (config.map_path, mapping),
     ]:
         if (root / relative).read_text() != pretty(value):
             raise SourceMapError(f"{relative} is not canonical generated JSON")
+
+
+def check_batch(
+    root: Path, batch_id: str, external_toc: bytes | None = None
+) -> None:
+    check(root, external_toc, batch_id)
 
 
 def read_toc(argument: str) -> bytes:
@@ -517,23 +735,38 @@ def main() -> None:
         metavar="PATH|-",
         help="external pinned IBM TOC JSON; use - to read stdin",
     )
+    parser.add_argument(
+        "--batch",
+        choices=[*BATCHES, "all"],
+        default="sources-a",
+        help="source-map batch to generate or check (default: sources-a)",
+    )
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     try:
         body = read_toc(args.toc) if args.toc else None
+        batch_ids = tuple(BATCHES) if args.batch == "all" else (args.batch,)
         if args.check:
-            check(ROOT, body)
-            print("cics-sources-a-map: pass")
+            for batch_id in batch_ids:
+                check(ROOT, body, batch_id)
+            print(f"cics-source-map ({args.batch}): pass")
         else:
-            if body is None:
-                parser.error("--toc is required when generating")
-            projection = projection_from_toc(body)
-            write_outputs(ROOT, projection)
-            print(
-                f"cics-sources-a-map: generated {TOC_PROJECTION_PATH} and {MAP_PATH}"
+            projection = (
+                projection_from_toc(body)
+                if body is not None
+                else read_json(ROOT / TOC_PROJECTION_PATH)
             )
+            validate_projection(projection)
+            write_outputs(
+                ROOT,
+                projection,
+                batch_ids,
+                write_projection=body is not None,
+            )
+            generated = ", ".join(str(batch_config(item).map_path) for item in batch_ids)
+            print(f"cics-source-map: generated {generated}")
     except (OSError, SourceMapError, descriptors.DescriptorError) as error:
-        parser.exit(1, f"cics-sources-a-map: {error}\n")
+        parser.exit(1, f"cics-source-map: {error}\n")
 
 
 if __name__ == "__main__":

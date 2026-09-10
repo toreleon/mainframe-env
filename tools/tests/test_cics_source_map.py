@@ -14,6 +14,7 @@ ROOT = TOOL.parent.parent
 sys.path.insert(0, str(TOOL.parent))
 SPEC = importlib.util.spec_from_file_location("generate_cics_source_map", TOOL)
 source_map = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = source_map
 SPEC.loader.exec_module(source_map)
 
 
@@ -23,7 +24,7 @@ class CicsSourceMapTests(unittest.TestCase):
             source_map.descriptors.CATALOG_PATH,
             Path("conformance/0.2/catalogs/cics.json"),
             source_map.TOC_PROJECTION_PATH,
-            source_map.MAP_PATH,
+            *(config.map_path for config in source_map.BATCHES.values()),
         ]:
             target = root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -34,6 +35,9 @@ class CicsSourceMapTests(unittest.TestCase):
 
     def projection(self, root: Path = ROOT) -> dict:
         return json.loads((root / source_map.TOC_PROJECTION_PATH).read_text())
+
+    def batch_mapping(self, batch_id: str, root: Path = ROOT) -> dict:
+        return json.loads((root / source_map.batch_config(batch_id).map_path).read_text())
 
     def write(self, root: Path, relative: Path, value: object) -> None:
         (root / relative).write_text(json.dumps(value, indent=2) + "\n")
@@ -79,6 +83,105 @@ class CicsSourceMapTests(unittest.TestCase):
         mapped = {row["label"]: row for row in self.mapping()["rows"]}
         self.assertEqual(mapped["DUMP TRANSACTION"]["eibfn"], "7E02")
         self.assertEqual(mapped["ENTER TRACENUM"]["eibfn"], "4802")
+
+    def test_sources_b_and_c_cover_the_remaining_catalog_rows(self):
+        expected = {
+            "sources-b": {
+                "row_count": 88,
+                "resolved_row_count": 88,
+                "source_gap_count": 0,
+                "edge_count": 113,
+                "unique_topic_count": 109,
+                "multi_topic_row_count": 7,
+                "shared_topic_count": 3,
+                "selection_kind_counts": {
+                    "exact": 73,
+                    "variant-set": 8,
+                    "shared-page": 5,
+                    "combined-page": 2,
+                    "source-gap": 0,
+                },
+            },
+            "sources-c": {
+                "row_count": 87,
+                "resolved_row_count": 85,
+                "source_gap_count": 2,
+                "edge_count": 127,
+                "unique_topic_count": 121,
+                "multi_topic_row_count": 13,
+                "shared_topic_count": 4,
+                "selection_kind_counts": {
+                    "exact": 58,
+                    "variant-set": 15,
+                    "shared-page": 6,
+                    "combined-page": 4,
+                    "aliased-page": 2,
+                    "source-gap": 2,
+                },
+            },
+        }
+        all_rows = []
+        for batch_id in source_map.BATCHES:
+            source_map.check_batch(ROOT, batch_id)
+            mapping = self.batch_mapping(batch_id)
+            all_rows.extend(row["official_row"] for row in mapping["rows"])
+            if batch_id in expected:
+                self.assertEqual(mapping["counts"], expected[batch_id])
+        self.assertEqual(
+            all_rows,
+            [
+                f"ibm-cics-ts-6x-2026-08-31:api-commands:{ordinal:04d}"
+                for ordinal in range(1, 264)
+            ],
+        )
+
+    def test_sources_b_and_c_gaps_variants_and_aliases_are_explicit(self):
+        b_rows = {
+            row["label"]: row for row in self.batch_mapping("sources-b")["rows"]
+        }
+        c_rows = {
+            row["label"]: row for row in self.batch_mapping("sources-c")["rows"]
+        }
+        self.assertEqual(
+            b_rows["LINK ACQACTIVITY"]["topics"][0]["topic_path"],
+            b_rows["LINK ACTIVITY"]["topics"][0]["topic_path"],
+        )
+        self.assertEqual(b_rows["LINK ACTIVITY"]["selection_kind"], "shared-page")
+        self.assertEqual(b_rows["LINK ACTIVITY"]["topics"][0]["role"], "shared")
+        self.assertEqual(
+            [row["label"] for row in c_rows.values() if row["state"] == "source-gap"],
+            ["SET ASSOCIATION USERCORRDATA", "TRACE"],
+        )
+        self.assertEqual(len(b_rows["RECEIVE"]["topics"]), 20)
+        self.assertEqual(len(c_rows["SEND"]["topics"]), 26)
+        self.assertEqual(
+            [topic["toc_label"] for topic in c_rows["START"]["topics"]],
+            ["START", "START CHANNEL"],
+        )
+        self.assertEqual(
+            (
+                c_rows["WAIT"]["selection_kind"],
+                c_rows["WAIT"]["topics"][0]["toc_label"],
+            ),
+            ("aliased-page", "GDS WAIT"),
+        )
+        self.assertEqual(
+            (
+                c_rows["WRITE FILE"]["selection_kind"],
+                c_rows["WRITE FILE"]["topics"][0]["toc_label"],
+            ),
+            ("aliased-page", "WRITE"),
+        )
+
+    def test_batch_specific_check_rejects_cross_batch_content(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.fixture(root)
+            mapping = self.batch_mapping("sources-b", root)
+            mapping["rows"][0]["official_row"] = mapping["rows"][1]["official_row"]
+            self.write(root, source_map.SOURCES_B.map_path, mapping)
+            with self.assertRaises(source_map.SourceMapError):
+                source_map.check_batch(root, "sources-b")
 
     def test_shared_combined_and_variant_page_shapes_are_explicit(self):
         rows = {row["label"]: row for row in self.mapping()["rows"]}

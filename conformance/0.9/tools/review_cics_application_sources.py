@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate and enforce the automatic CICS sources-a source review.
+"""Generate and enforce an automatic CICS application-source batch review.
 
 The review is derived from a separate HTML verifier. Clear evidence is
 accepted automatically. Missing source, source reprojection, or a
@@ -22,16 +22,19 @@ from typing import Any, Iterable
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import verify_cics_application_sources as independent  # noqa: E402
+from cics_application_source_batches import SourceBatch, source_batch  # noqa: E402
 
 
-REVIEW_PATH = Path("conformance/0.9/cics/application-api-sources-a-review.json")
+DEFAULT_BATCH = source_batch("a")
+# Backwards-compatible alias for focused sources-a tests and callers.
+REVIEW_PATH = DEFAULT_BATCH.review_path
 SCHEMA_PATH = Path("conformance/0.9/schemas/cics-source-review.schema.json")
 CHECKER_PATH = Path("conformance/0.9/tools/review_cics_application_sources.py")
 VERIFIER_PATH = Path("conformance/0.9/tools/verify_cics_application_sources.py")
 
 SCHEMA_VERSION = "mainframe-env.cics-source-review@2"
 TARGET_VERSION = "0.9.0"
-WORK_PACKAGE = "CIC-901.sources-a-review"
+WORK_PACKAGE = DEFAULT_BATCH.review_work_package
 CHECKER_VERSION = "cics-source-auto-review-checker@2"
 REVIEW_DOMAIN = b"mainframe-env.cics-source-review@2\0"
 CATEGORIES = independent.CATEGORIES
@@ -100,6 +103,8 @@ def _blocking_count(report: dict[str, Any]) -> int:
         for name in BLOCKING_CATEGORIES
     ) + int(report["structural_coverage"]["missing"]) + int(
         report["structural_coverage"]["extra"]
+    ) + int(report["applicability_coverage"]["missing"]) + int(
+        report["applicability_coverage"]["extra"]
     )
 
 
@@ -118,8 +123,10 @@ def _assert_verifier_report(report: dict[str, Any]) -> None:
         "inputs",
         "counts",
         "structural_coverage",
+        "applicability_coverage",
         "candidate_categories",
         "issue_categories",
+        "ambiguity_scope",
         "findings",
         "report_sha256",
     }
@@ -163,8 +170,10 @@ def build_receipt(
     cache: Path | None = None,
     *,
     report: dict[str, Any] | None = None,
+    batch: str | SourceBatch = DEFAULT_BATCH,
 ) -> dict[str, Any]:
-    source_report = report or independent.verify(root, cache)
+    config = source_batch(batch)
+    source_report = report or independent.verify(root, cache, batch=config)
     _assert_verifier_report(source_report)
     blockers = _blocking_count(source_report)
     ambiguities = (
@@ -175,7 +184,7 @@ def build_receipt(
     receipt: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "target_version": TARGET_VERSION,
-        "work_package": WORK_PACKAGE,
+        "work_package": config.review_work_package,
         "review_status": (
             "auto-accepted-with-bounded-ambiguities"
             if accepted and ambiguities
@@ -220,6 +229,7 @@ def build_receipt(
             "blocking_findings": blockers,
         },
         "structural_coverage": source_report["structural_coverage"],
+        "applicability_coverage": source_report["applicability_coverage"],
         "candidate_dispositions": {
             category: compact_category(source_report["candidate_categories"][category], "candidate_ids")
             for category in CATEGORIES
@@ -228,6 +238,7 @@ def build_receipt(
             category: compact_category(source_report["issue_categories"][category], "issue_ids")
             for category in CATEGORIES
         },
+        "ambiguity_scope": source_report["ambiguity_scope"],
         "blocker_ids": sorted(
             {
                 str(finding["issue_id"])
@@ -289,9 +300,11 @@ def check_committed(
     cache: Path | None = None,
     *,
     require_accepted: bool = True,
+    batch: str | SourceBatch = DEFAULT_BATCH,
 ) -> dict[str, Any]:
-    expected = build_receipt(root, cache)
-    path = root / REVIEW_PATH
+    config = source_batch(batch)
+    expected = build_receipt(root, cache, batch=config)
+    path = root / config.review_path
     receipt = read_object(path)
     validate_receipt(receipt, expected, require_accepted=require_accepted)
     if path.read_text(encoding="utf-8") != pretty(receipt):
@@ -299,9 +312,14 @@ def check_committed(
     return receipt
 
 
-def write_receipt(root: Path = ROOT, cache: Path | None = None) -> dict[str, Any]:
-    receipt = build_receipt(root, cache)
-    output = root / REVIEW_PATH
+def write_receipt(
+    root: Path = ROOT,
+    cache: Path | None = None,
+    batch: str | SourceBatch = DEFAULT_BATCH,
+) -> dict[str, Any]:
+    config = source_batch(batch)
+    receipt = build_receipt(root, cache, batch=config)
+    output = root / config.review_path
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(pretty(receipt), encoding="utf-8")
     return receipt
@@ -316,21 +334,27 @@ def main(argv: Iterable[str] | None = None) -> int:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--generate", action="store_true")
     mode.add_argument("--check", action="store_true")
+    parser.add_argument("--batch", choices=("a", "b", "c"), default="a")
     parser.add_argument("--cache", type=Path, default=default_cache())
     args = parser.parse_args(list(argv) if argv is not None else None)
     try:
         if args.generate:
-            receipt = write_receipt(ROOT, args.cache)
+            receipt = write_receipt(ROOT, args.cache, args.batch)
             print(
-                "cics-sources-a-auto-review: generated "
+                f"cics-sources-{args.batch}-auto-review: generated "
                 f"status={receipt['review_status']} "
                 f"candidates={receipt['counts']['candidates']} "
                 f"blockers={receipt['counts']['blocking_findings']}"
             )
             return 0
-        receipt = check_committed(ROOT, args.cache, require_accepted=True)
+        receipt = check_committed(
+            ROOT,
+            args.cache,
+            require_accepted=True,
+            batch=args.batch,
+        )
         print(
-            "cics-sources-a-auto-review: accepted "
+            f"cics-sources-{args.batch}-auto-review: accepted "
             f"rows={receipt['counts']['rows']} "
             f"candidates={receipt['counts']['candidates']}"
         )
@@ -343,7 +367,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         KeyError,
         TypeError,
     ) as error:
-        parser.exit(1, f"cics-sources-a-auto-review: {error}\n")
+        parser.exit(1, f"cics-sources-{args.batch}-auto-review: {error}\n")
 
 
 if __name__ == "__main__":

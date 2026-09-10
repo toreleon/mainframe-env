@@ -3,10 +3,12 @@
 import copy
 import hashlib
 import importlib.util
+import io
 import json
 from pathlib import Path
 import shutil
 import sys
+import tarfile
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -288,6 +290,107 @@ class CicsApplicationSourcesTests(unittest.TestCase):
             sources, "derive_linked_topics", return_value=([], [])
         ), self.assertRaisesRegex(sources.CorpusError, "closure"):
             sources.check(ROOT, Path(temporary))
+
+    def test_later_batch_corpora_are_fresh_and_close_every_map_gap(self):
+        expected = {
+            "b": {
+                "mapping_rows": 88,
+                "mapped_command_topics": 109,
+                "linked_context_topics": 63,
+                "manual_topics": 4,
+                "html_topics": 176,
+                "mapping_source_gaps": 0,
+                "source_gaps_unresolved": 0,
+                "supplemental_topics": 0,
+            },
+            "c": {
+                "mapping_rows": 87,
+                "mapped_command_topics": 121,
+                "linked_context_topics": 95,
+                "manual_topics": 8,
+                "html_topics": 224,
+                "mapping_source_gaps": 2,
+                "source_gaps_unresolved": 0,
+                "supplemental_topics": 1,
+            },
+        }
+        for batch, counts in expected.items():
+            with self.subTest(batch=batch), patch.object(
+                sources, "fetch_binary", side_effect=AssertionError("browser forbidden")
+            ):
+                sources.check(ROOT, batch=batch)
+            corpus = json.loads(
+                (ROOT / sources.source_batches.source_batch(batch).corpus_path).read_text()
+            )
+            mapping = json.loads(
+                (ROOT / sources.source_batches.source_batch(batch).map_path).read_text()
+            )
+            self.assertEqual(corpus["counts"], counts)
+            self.assertEqual(
+                set(corpus["mapped_command_topics"]),
+                {
+                    topic["topic_path"]
+                    for row in mapping["rows"]
+                    for topic in row["topics"]
+                },
+            )
+            self.assertFalse(corpus["semantic_authority"])
+            self.assertEqual(corpus["coverage_credit"], 0)
+
+    def test_sources_c_binds_target_and_cross_product_gap_evidence(self):
+        corpus = json.loads(
+            (ROOT / sources.source_batches.source_batch("c").corpus_path).read_text()
+        )
+        self.assertEqual(
+            [row["state"] for row in corpus["source_resolutions"]],
+            ["target-product-authority", "cross-product-evidence"],
+        )
+        [trace] = corpus["supplemental_topics"]
+        self.assertEqual(trace["topic_path"], sources.TRACE_TOPIC)
+        self.assertEqual(trace["bytes"], 20495)
+        self.assertEqual(
+            trace["sha256"],
+            "28e56eef7556509f9a473ae573f6295a56c170ae9a1dd79041c18b15fafd9c83",
+        )
+        self.assertFalse(trace["target_product_authority"])
+        self.assertEqual(
+            corpus["source_resolutions"][0]["target_topic_sources"],
+            [sources.ASSOCIATION_TOPIC],
+        )
+
+    def test_browser_capture_archive_is_identity_checked(self):
+        topic = "SSJL4D_6.x/reference-applications/commands-api/example.html"
+        body = (
+            b'<h1 class="topictitle1">Example</h1>'
+            b'<div id="lastModifiedDate">Last Updated: 2026-09-10</div>'
+        )
+
+        def archive(sha256: str) -> io.BytesIO:
+            metadata = json.dumps(
+                [
+                    {
+                        "topic_path": topic,
+                        "bytes": len(body),
+                        "sha256": sha256,
+                    }
+                ]
+            ).encode()
+            stream = io.BytesIO()
+            with tarfile.open(fileobj=stream, mode="w") as output:
+                for name, value in [
+                    ("browser-meta.json", metadata),
+                    (sources.docs_api._key(topic), body),
+                ]:
+                    info = tarfile.TarInfo(name)
+                    info.size = len(value)
+                    output.addfile(info, io.BytesIO(value))
+            stream.seek(0)
+            return stream
+
+        digest = hashlib.sha256(body).hexdigest()
+        self.assertEqual(sources.read_browser_capture(archive(digest)), {topic: body})
+        with self.assertRaisesRegex(sources.CorpusError, "identity differs"):
+            sources.read_browser_capture(archive("0" * 64))
 
 
 if __name__ == "__main__":

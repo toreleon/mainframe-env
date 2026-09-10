@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Project the pinned CIC-901 sources-a HTML into zero-credit review candidates.
+"""Project a pinned CIC-901 application-source batch into review candidates.
 
 The extractor is deliberately offline.  It reads digest-pinned IBM topic bodies
 from the external documentation cache and writes only structural locators,
@@ -28,30 +28,29 @@ sys.path.insert(0, str(ROOT / "tools"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import docs_api  # noqa: E402
 import ibm_docs  # noqa: E402
+from cics_application_source_batches import (  # noqa: E402
+    SourceBatch,
+    source_batch,
+    source_batch_for_row,
+)
 import fetch_cics_application_sources as source_corpus  # noqa: E402
 
 
-MAP_PATH = Path("conformance/0.9/cics/application-api-sources-a-map.json")
-CORPUS_PATH = Path("conformance/0.9/cics/application-api-sources-a-corpus.json")
-MANIFEST_PATH = Path(
-    "conformance/0.9/manifests/cics-application-api-sources-a-topics.json"
-)
-PLAN_PATH = Path("conformance/0.9/cics/application-api-sources-a-extraction.json")
-OUTPUT_PATH = Path(
-    "conformance/0.9/generated/cics-application-api-sources-a-candidates.json"
-)
-BROWSER_RECEIPT_PATH = Path(
-    "conformance/0.9/cics/application-api-sources-a-browser-verification.json"
-)
-SUPPLEMENTS_PATH = Path(
-    "conformance/0.9/cics/application-api-sources-a-supplements.json"
-)
+DEFAULT_BATCH = source_batch("a")
+# Backwards-compatible aliases for focused sources-a tests and callers.
+MAP_PATH = DEFAULT_BATCH.map_path
+CORPUS_PATH = DEFAULT_BATCH.corpus_path
+MANIFEST_PATH = DEFAULT_BATCH.manifest_path
+PLAN_PATH = DEFAULT_BATCH.plan_path
+OUTPUT_PATH = DEFAULT_BATCH.projection_path
+BROWSER_RECEIPT_PATH = DEFAULT_BATCH.browser_receipt_path
+SUPPLEMENTS_PATH = DEFAULT_BATCH.supplements_path
 
 TARGET_VERSION = "0.9.0"
-WORK_PACKAGE = "CIC-901.sources-a-project"
+WORK_PACKAGE = DEFAULT_BATCH.project_work_package
 PLAN_SCHEMA = "mainframe-env.cics-source-extraction@1"
 OUTPUT_SCHEMA = "mainframe-env.cics-source-candidates@1"
-CACHE_SCOPE = "cics-application-api-sources-a"
+CACHE_SCOPE = DEFAULT_BATCH.cache_scope
 PRODUCT = "SSJL4D_6.x"
 TARGET_AUTHORITY = "target-product-authority"
 SUPPLEMENT_AUTHORITY = {
@@ -67,6 +66,23 @@ SUPPLEMENT_AUTHORITY = {
 PLAN_DOMAIN = b"mainframe-env.cics-source-extraction@1\0"
 OUTPUT_DOMAIN = b"mainframe-env.cics-source-candidates@1\0"
 FRAGMENT_DOMAIN = b"mainframe-env.cics-source-fragment@1\0"
+CONDITION_NAME_DOMAIN = b"mainframe-env.cics-condition-name-authority@1\0"
+CONDITION_NAME_PROFILE = "cics-eibresp-condition-name@1"
+CONDITION_NAME_OPTION = "CONDITION-NAME"
+CONDITION_NAME_TOPIC = (
+    "SSJL4D_6.x/reference-diagnostics/eib/dfhp4_eibfields.html"
+)
+CONDITION_NAME_TABLE = "dfhp4au__table_nt5_kw4_b1c"
+CONDITION_NAME_DIGEST_DEFINITION = (
+    "SHA-256 over ASCII domain mainframe-env.cics-condition-name-authority@1, "
+    "one NUL byte (0x00), then UTF-8 compact JSON of the lexicographically "
+    "sorted condition-name array"
+)
+CONDITION_PAIR_DIGEST_DEFINITION = (
+    "SHA-256 over ASCII domain mainframe-env.cics-condition-name-authority@1, "
+    "one NUL byte (0x00), then ASCII 'pairs', one NUL byte (0x00), then UTF-8 "
+    "compact JSON of lexicographically name-sorted [name,code] pairs"
+)
 FRAGMENT_DIGEST_DEFINITION = (
     "SHA-256 over ASCII domain mainframe-env.cics-source-fragment@1, one NUL "
     "byte (0x00), then UTF-8 order-preserving whitespace-normalized visible "
@@ -375,6 +391,16 @@ def _semantic_tokens(node: Node) -> list[SyntaxToken]:
         names = classes(child)
         kind = next((TOKEN_CLASSES[name] for name in TOKEN_CLASSES if name in names), None)
         value = child.text()
+        if kind == "keyword" and value == "condition":
+            # IBM renders the HANDLE/IGNORE CONDITION name placeholder with a
+            # syntaxkwd class even though the option definition and prose make
+            # it a metavariable.  Keep real names such as ERROR out of command
+            # identity and let the condition-clause profile validate them.
+            kind = "variable"
+        elif kind == "keyword" and value == "today":
+            # DEFINE TIMER uses this lowercase label for the default date when
+            # ON is omitted; it is not an accepted TODAY option.
+            kind = "fragment"
         if kind and value:
             found.append(SyntaxToken(kind, value, child))
     return found
@@ -443,11 +469,24 @@ def syntax_diagrams(section: Section) -> list[SyntaxDiagram]:
             for node in walk(container)
             if node.tag == "svg" and "syntaxdiagram" in classes(node)
         ]
-        if len(headings) != 1:
-            raise ProjectionError("syntax diagram does not have exactly one title")
-        heading = headings[0]
-        title = heading.text()
-        title_id = heading.attrs.get("id", "")
+        if len(headings) > 1:
+            raise ProjectionError("syntax diagram has multiple titles")
+        fragment_names = [
+            node
+            for node in walk(container)
+            if node.tag == "span" and "fragmentname" in classes(node)
+        ]
+        if headings:
+            title = headings[0].text()
+            title_id = headings[0].attrs.get("id", "")
+        elif len(fragment_names) == 1:
+            title = fragment_names[0].text()
+            title_id = fragment_names[0].attrs.get("id") or structural_path(container)
+        elif container.attrs.get("id"):
+            title = container.attrs["id"]
+            title_id = container.attrs["id"]
+        else:
+            raise ProjectionError("untitled syntax fragment lacks a stable identity")
         if not title or not title_id:
             raise ProjectionError("syntax diagram title or id is empty")
         if not pieces:
@@ -594,7 +633,53 @@ def one_hop_anchors(root: Node, source: str) -> list[str]:
     )
 
 
+def compatibility_successor_anchor(
+    root: Node, source: str, available_topics: set[str]
+) -> Node | None:
+    text = root.text().casefold()
+    if "supported for compatibility" not in text or "superseded" not in text:
+        return None
+    matches = [
+        node
+        for node in walk(root)
+        if node.tag == "a"
+        and normalize(node.text()).casefold() != "cics command summary"
+        and (reference := linked_reference(node.attrs.get("href", ""), source))
+        is not None
+        and reference[0] in available_topics
+    ]
+    if len(matches) != 1:
+        raise ProjectionError(f"compatibility successor is not unique: {source}")
+    return matches[0]
+
+
 def exact_target_fragment(root: Node, fragment: str, topic_path: str) -> Node:
+    def title_article(titles: list[Node]) -> Node | None:
+        if len(titles) != 1:
+            return None
+        current = titles[0].parent
+        while current is not None and current.tag != "article":
+            current = current.parent
+        return current
+
+    def common_article_parent(articles: list[Node]) -> Node | None:
+        if len(articles) < 2:
+            return None
+        chains: list[list[Node]] = []
+        for article in articles:
+            chain: list[Node] = []
+            current = article.parent
+            while current is not None:
+                chain.append(current)
+                current = current.parent
+            chains.append(list(reversed(chain)))
+        common: Node | None = None
+        for values in zip(*chains):
+            if any(value is not values[0] for value in values[1:]):
+                break
+            common = values[0]
+        return common if common is not None and common.tag != "root" else None
+
     if fragment:
         matches = [node for node in walk(root) if node.attrs.get("id") == fragment]
         if len(matches) == 1:
@@ -611,17 +696,28 @@ def exact_target_fragment(root: Node, fragment: str, topic_path: str) -> Node:
             and "topictitle1" in classes(node)
             and node.attrs.get("id", "").startswith(fragment + "__")
         ]
-        articles = [node for node in walk(root) if node.tag == "article"]
-        if not matches and len(topic_titles) == 1 and len(articles) == 1:
-            return articles[0]
+        article = title_article(topic_titles)
+        if not matches and article is not None:
+            return article
         else:
             raise ProjectionError(
                 f"one-hop target anchor is not unique: {topic_path}#{fragment}"
             )
     articles = [node for node in walk(root) if node.tag == "article"]
-    if len(articles) != 1:
-        raise ProjectionError(f"one-hop target topic root is not unique: {topic_path}")
-    return articles[0]
+    if len(articles) == 1:
+        return articles[0]
+    titles = [
+        node
+        for node in walk(root)
+        if node.tag == "h1" and "topictitle1" in classes(node)
+    ]
+    article = title_article(titles)
+    if article is not None:
+        return article
+    container = common_article_parent(articles)
+    if container is not None:
+        return container
+    raise ProjectionError(f"one-hop target topic root is not unique: {topic_path}")
 
 
 PLAN_KEYS = (
@@ -657,6 +753,7 @@ OUTPUT_KEYS = (
     "differential_credit",
     "inputs",
     "extractor",
+    "condition_name_authority",
     "counts",
     "rows",
     "blocking_issues",
@@ -677,6 +774,7 @@ DIRECT_SOURCE_ROLES = {
     "variant": "variant-command",
     "shared": "shared-command",
     "combined": "combined-command",
+    "alias": "alias-command",
 }
 MANUAL_SOURCE_ROLES = {
     "global-command-format": "common-command-format",
@@ -687,9 +785,11 @@ MANUAL_SOURCE_ROLES = {
     "gap-eibfn-identity": "gap-identity",
     "traceid-monitor-compatibility": "compatibility-context",
     "traceid-dfhcmp-compatibility": "compatibility-context",
+    "global-response-codes": "response-code-context",
 }
 SUPPLEMENT_SOURCE_ROLES = {
     "cross-product-explicit-compatibility": "cross-product-compatibility",
+    "cross-product-command-reference": "cross-product-compatibility",
     "target-product-version-compatibility": "version-compatibility-context",
     "target-platform-interface-example": "target-platform-example",
 }
@@ -729,26 +829,45 @@ def authority_boundary(source_product: str, explicit: str | None = None) -> str:
     return next(iter(allowed))
 
 
-def validate_plan(plan: dict[str, Any]) -> None:
+def validate_plan(
+    plan: dict[str, Any], batch: str | SourceBatch = DEFAULT_BATCH
+) -> None:
+    config = source_batch(batch)
     if tuple(plan) != PLAN_KEYS:
         raise ProjectionError("extraction plan fields or ordering differ")
+    inputs = plan.get("inputs", {})
     if (
         plan.get("schema_version") != PLAN_SCHEMA
         or plan.get("target_version") != TARGET_VERSION
-        or plan.get("work_package") != WORK_PACKAGE
+        or plan.get("work_package") != config.project_work_package
         or plan.get("status") != "candidate-plan"
         or plan.get("semantic_authority") is not False
         or plan.get("automatic_registration") is not False
         or plan.get("coverage_credit") != 0
         or plan.get("differential_credit") != 0
         or tuple(plan.get("dimensions", [])) != DIMENSIONS
-        or plan.get("inputs", {}).get("cache_scope") != CACHE_SCOPE
-        or plan.get("inputs", {}).get("supplements", {}).get("path")
-        != SUPPLEMENTS_PATH.as_posix()
+        or inputs.get("mapping", {}).get("path") != config.map_path.as_posix()
+        or inputs.get("corpus", {}).get("path") != config.corpus_path.as_posix()
+        or inputs.get("topic_manifest", {}).get("path")
+        != config.manifest_path.as_posix()
+        or inputs.get("cache_scope") != config.cache_scope
         or plan.get("extraction_sha256")
         != canonical_digest(plan, PLAN_DOMAIN, "extraction_sha256")
     ):
         raise ProjectionError("extraction plan identity or digest differs")
+    if config.supplements_path is None:
+        if "supplements" in inputs:
+            raise ProjectionError("batch unexpectedly declares source supplements")
+    elif inputs.get("supplements", {}).get("path") != config.supplements_path.as_posix():
+        raise ProjectionError("source supplement binding differs")
+    if config.browser_receipt_path is None:
+        if "browser_verification" in inputs:
+            raise ProjectionError("batch unexpectedly declares a browser receipt")
+    elif (
+        inputs.get("browser_verification", {}).get("path")
+        != config.browser_receipt_path.as_posix()
+    ):
+        raise ProjectionError("browser receipt binding differs")
     bounds = plan.get("bounds")
     expected = plan.get("expected_shape")
     if not isinstance(bounds, dict) or not isinstance(expected, dict):
@@ -769,32 +888,48 @@ def validate_plan(plan: dict[str, Any]) -> None:
     if bounds["max_link_depth"] != 1 or expected.get("dimensions_per_row") != 5:
         raise ProjectionError("extraction depth or row-dimension shape differs")
     resolutions = plan.get("source_resolutions")
-    expected_rows = {
-        "ibm-cics-ts-6x-2026-08-31:api-commands:0027",
-        "ibm-cics-ts-6x-2026-08-31:api-commands:0056",
-        "ibm-cics-ts-6x-2026-08-31:api-commands:0065",
-    }
-    if (
-        not isinstance(resolutions, list)
-        or {row.get("official_row") for row in resolutions} != expected_rows
+    if not isinstance(resolutions, list) or any(
+        not isinstance(row, dict)
+        or not config.contains_row(str(row.get("official_row", "")))
+        for row in resolutions
     ):
         raise ProjectionError("source-resolution rows differ")
-    direct = {
-        row["official_row"]: row.get("direct_supplement_topic")
-        for row in resolutions
-        if row.get("resolution") == "authority-bounded-projection"
-    }
-    if direct != {
-        "ibm-cics-ts-6x-2026-08-31:api-commands:0056": (
-            "SSNAQ8_11.1.0/reference-api/r_dump.html"
-        ),
-        "ibm-cics-ts-6x-2026-08-31:api-commands:0065": (
-            "SSNAQ8_11.1.0/reference-api/r_enter.html"
-        ),
-    }:
-        raise ProjectionError("supplement direct-product bindings differ")
+    if config.name != "a":
+        if any(
+            row.get("direct_supplement_topic")
+            and row.get("direct_supplement_topic")
+            not in (
+                row.get("supplement_topics", [])
+                + row.get("target_context_topics", [])
+            )
+            for row in resolutions
+        ):
+            raise ProjectionError("direct resolved topic is outside its row closure")
+    else:
+        expected_rows = {
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0027",
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0056",
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0065",
+        }
+        if {row.get("official_row") for row in resolutions} != expected_rows:
+            raise ProjectionError("sources-a resolution rows differ")
+        direct = {
+            row["official_row"]: row.get("direct_supplement_topic")
+            for row in resolutions
+            if row.get("resolution") == "authority-bounded-projection"
+        }
+        if direct != {
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0056": (
+                "SSNAQ8_11.1.0/reference-api/r_dump.html"
+            ),
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0065": (
+                "SSNAQ8_11.1.0/reference-api/r_enter.html"
+            ),
+        }:
+            raise ProjectionError("supplement direct-product bindings differ")
     if any(
-        row.get("resolution") == "authority-bounded-projection"
+        row.get("resolution")
+        in {"authority-bounded-projection", "target-product-projection"}
         and row.get("no_one_hop") is not True
         for row in resolutions
     ):
@@ -806,8 +941,12 @@ def validate_plan(plan: dict[str, Any]) -> None:
             raise ProjectionError("source resolution assigns a foreign target topic")
         if set(target_topics) & set(supplement_topics):
             raise ProjectionError("source resolution aliases target and supplement topics")
-        if resolution["resolution"] == "authority-bounded-projection" and (
+        if resolution["resolution"] in {
+            "authority-bounded-projection",
+            "target-product-projection",
+        } and (
             resolution["direct_supplement_topic"] not in supplement_topics
+            and resolution["direct_supplement_topic"] not in target_topics
             or not {
                 item["topic_path"]
                 for item in resolution.get("context_fragments", [])
@@ -818,7 +957,9 @@ def validate_plan(plan: dict[str, Any]) -> None:
 
 
 def _input_files(
-    root: Path, plan: dict[str, Any]
+    root: Path,
+    plan: dict[str, Any],
+    batch: str | SourceBatch = DEFAULT_BATCH,
 ) -> tuple[
     dict[str, Any],
     dict[str, Any],
@@ -826,53 +967,90 @@ def _input_files(
     dict[str, Any],
     dict[str, Any],
 ]:
+    config = source_batch(batch)
     inputs = plan["inputs"]
     mapping_path = root / inputs["mapping"]["path"]
     corpus_path = root / inputs["corpus"]["path"]
     manifest_path = root / inputs["topic_manifest"]["path"]
-    receipt_path = root / inputs["browser_verification"]["path"]
-    supplements_path = root / inputs["supplements"]["path"]
     mapping = read_json(mapping_path)
     corpus = read_json(corpus_path)
     manifest = read_json(manifest_path)
-    receipt = read_json(receipt_path)
-    supplements = read_json(supplements_path)
     if (
         mapping.get("mapping_sha256") != inputs["mapping"]["sha256"]
         or corpus.get("corpus_sha256") != inputs["corpus"]["sha256"]
         or file_sha256(manifest_path) != inputs["topic_manifest"]["file_sha256"]
         or "sha256:" + str(manifest.get("topic_manifest_digest"))
         != inputs["topic_manifest"]["topic_manifest_sha256"]
-        or file_sha256(receipt_path)
-        != inputs["browser_verification"]["file_sha256"]
-        or receipt.get("observation", {}).get("identity_sha256")
-        != inputs["browser_verification"]["identity_sha256"]
-        or file_sha256(supplements_path)
-        != inputs["supplements"]["file_sha256"]
-        or supplements.get("supplements_sha256")
-        != inputs["supplements"]["supplements_sha256"]
     ):
         raise ProjectionError("an extraction-plan input identity differs")
+    rows = mapping.get("rows", [])
+    if (
+        not isinstance(rows, list)
+        or len(rows) != config.row_count
+        or any(not config.contains_row(str(row.get("official_row", ""))) for row in rows)
+    ):
+        raise ProjectionError("source-map row range differs from the selected batch")
+    receipt: dict[str, Any] = {}
+    if config.browser_receipt_path is not None:
+        receipt_path = root / inputs["browser_verification"]["path"]
+        receipt = read_json(receipt_path)
+        if (
+            file_sha256(receipt_path)
+            != inputs["browser_verification"]["file_sha256"]
+            or receipt.get("observation", {}).get("identity_sha256")
+            != inputs["browser_verification"]["identity_sha256"]
+        ):
+            raise ProjectionError("an extraction-plan browser identity differs")
+    supplements: dict[str, Any] = {"topics": [], "source_resolutions": []}
+    if config.supplements_path is not None:
+        supplements_path = root / inputs["supplements"]["path"]
+        supplements = read_json(supplements_path)
+        if (
+            file_sha256(supplements_path)
+            != inputs["supplements"]["file_sha256"]
+            or supplements.get("supplements_sha256")
+            != inputs["supplements"]["supplements_sha256"]
+        ):
+            raise ProjectionError("an extraction-plan input identity differs: supplement")
     planned_resolutions = {
         row["official_row"]: row for row in plan["source_resolutions"]
     }
+    resolution_contract = supplements if config.supplements_path is not None else corpus
     received_resolutions = {
-        row["official_row"]: row for row in supplements.get("source_resolutions", [])
+        row["official_row"]: row
+        for row in resolution_contract.get("source_resolutions", [])
     }
-    if set(planned_resolutions) != set(received_resolutions):
-        raise ProjectionError("supplement resolution rows differ from the extraction plan")
-    for official_row, planned in planned_resolutions.items():
+    expected_resolution_rows = (
+        set(planned_resolutions)
+        if config.name == "a"
+        else {
+            official_row
+            for official_row, planned in planned_resolutions.items()
+            if planned.get("supplement_topics")
+            or planned.get("direct_supplement_topic")
+        }
+    )
+    if set(received_resolutions) != expected_resolution_rows:
+        raise ProjectionError("source resolution contract differs from the extraction plan")
+    for official_row in sorted(expected_resolution_rows):
+        planned = planned_resolutions[official_row]
         received = received_resolutions[official_row]
         if (
             (planned["label"], planned["eibfn"])
             != (received.get("label"), received.get("eibfn"))
-            or planned["target_context_topics"]
-            != received.get("target_topic_sources")
             or planned.get("supplement_topics", [])
             != received.get("supplemental_topic_sources")
         ):
             raise ProjectionError(
                 f"supplement resolution binding differs: {official_row}"
+            )
+        received_targets = received.get("target_topic_sources")
+        if (
+            received_targets is not None
+            and planned["target_context_topics"] != received_targets
+        ):
+            raise ProjectionError(
+                f"supplement target binding differs: {official_row}"
             )
     return mapping, corpus, manifest, receipt, supplements
 
@@ -899,8 +1077,12 @@ def _validate_unique_structural_paths(root: Node, topic_path: str) -> None:
 
 
 def load_cached_documents(
-    cache: Path, manifest: dict[str, Any], plan: dict[str, Any]
+    cache: Path,
+    manifest: dict[str, Any],
+    plan: dict[str, Any],
+    batch: str | SourceBatch = DEFAULT_BATCH,
 ) -> tuple[dict[str, bytes], dict[str, Node], dict[str, dict[str, Any]]]:
+    config = source_batch(batch)
     bounds = plan["bounds"]
     entries = manifest.get("topics")
     if (
@@ -909,7 +1091,7 @@ def load_cached_documents(
         or len(entries) > bounds["max_topics"]
     ):
         raise ProjectionError("topic manifest count differs from the extraction plan")
-    pins, tocs = ibm_docs.select(*ibm_docs.load_pins(), CACHE_SCOPE, None)
+    pins, tocs = ibm_docs.select(*ibm_docs.load_pins(), config.cache_scope, None)
     by_topic = {pin.topic: pin for pin in pins}
     expected_paths = {entry["topic_path"] for entry in entries}
     if set(by_topic) != expected_paths:
@@ -999,6 +1181,67 @@ def load_supplement_documents(
     return bodies, roots, metadata
 
 
+def load_corpus_supplement_documents(
+    cache: Path,
+    corpus: dict[str, Any],
+    plan: dict[str, Any],
+) -> tuple[dict[str, bytes], dict[str, Node], dict[str, dict[str, Any]]]:
+    """Load checker-bound direct topics carried by the selected batch corpus."""
+
+    declared = {
+        topic
+        for resolution in plan["source_resolutions"]
+        for topic in resolution.get("supplement_topics", [])
+        if topic.split("/", 1)[0] != PRODUCT
+    }
+    entries = corpus.get("supplemental_topics", [])
+    if not isinstance(entries, list) or {
+        entry.get("topic_path") for entry in entries
+    } != declared:
+        raise ProjectionError("corpus supplement topic set differs from the plan")
+    bodies: dict[str, bytes] = {}
+    roots: dict[str, Node] = {}
+    metadata: dict[str, dict[str, Any]] = {}
+    for entry in entries:
+        path = entry["topic_path"]
+        product_id = entry.get("product_key")
+        boundary = entry.get("target_authority_boundary")
+        role = SUPPLEMENT_SOURCE_ROLES.get(entry.get("source_role"))
+        if (
+            not isinstance(product_id, str)
+            or not path.startswith(product_id + "/")
+            or role is None
+            or entry.get("target_product_authority") is not False
+            or entry.get("semantic_authority") is not False
+            or entry.get("coverage_credit") != 0
+        ):
+            raise ProjectionError(f"corpus supplement boundary differs: {path}")
+        authority_boundary(product_id, boundary)
+        pin = ibm_docs.Pin(
+            path,
+            entry["content_url"],
+            entry["sha256"],
+            entry["bytes"],
+            (),
+        )
+        if entry.get("cache_key") != pin.key:
+            raise ProjectionError(f"corpus supplement cache key differs: {path}")
+        body = ibm_docs.cached_body(cache, pin)
+        root = parse_html(body)
+        if _max_depth(root) > plan["bounds"]["max_dom_depth"]:
+            raise ProjectionError(f"supplement DOM depth exceeds its bound: {path}")
+        _validate_unique_structural_paths(root, path)
+        bodies[path] = body
+        roots[path] = root
+        metadata[path] = {
+            **entry,
+            "source_product": product_id,
+            "target_authority_boundary": boundary,
+            "projected_source_role": role,
+        }
+    return bodies, roots, metadata
+
+
 def make_evidence(
     topic_path: str,
     topic_sha256: str,
@@ -1056,8 +1299,9 @@ def make_candidate(
     suffix = hashlib.sha256(
         json.dumps(core, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()[:12]
+    prefix = source_batch_for_row(official_row).candidate_id_prefix
     return {
-        "candidate_id": f"cics-a-{number}-{dimension}-{suffix}",
+        "candidate_id": f"{prefix}-{number}-{dimension}-{suffix}",
         "kind": kind,
         "key": key,
         "candidate_value": candidate_value,
@@ -1105,7 +1349,10 @@ def make_issue(
         json.dumps(core, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()[:12]
     return {
-        "issue_id": f"cics-a-issue-{number}-{code}-{suffix}",
+        "issue_id": (
+            f"{source_batch_for_row(official_row).candidate_id_prefix}-issue-"
+            f"{number}-{code}-{suffix}"
+        ),
         "code": code,
         "blocking": True,
         "official_row": official_row,
@@ -1130,6 +1377,8 @@ def _coalesce_by_identity(
 
 
 def _option_name(term: str) -> str | None:
+    if re.match(r"^condition(?:\s*\(|$)", normalize(term), re.IGNORECASE):
+        return CONDITION_NAME_OPTION
     match = re.match(r"^([A-Z][A-Z0-9-]{0,31})\b", term)
     return match.group(1) if match else None
 
@@ -1142,7 +1391,9 @@ def _symbolic_option_stack(values: Iterable[str]) -> list[str]:
     ]
 
 
-def _symbolic_condition_term(value: str, depth: int) -> str:
+def _symbolic_condition_term(
+    value: str, depth: int, response_codes: dict[str, int] | None = None
+) -> str:
     normalized = normalize(value)
     response = re.match(r"^([0-9]{1,5})\s+([A-Z][A-Z0-9-]{0,31})\b", normalized)
     if response:
@@ -1152,7 +1403,9 @@ def _symbolic_condition_term(value: str, depth: int) -> str:
         return f"RESP2-{response2.group(1)}"
     symbol = re.match(r"^([A-Z][A-Z0-9-]{0,31})\b", normalized)
     if symbol:
-        return f"SYMBOL-{symbol.group(1)}"
+        name = symbol.group(1)
+        code = (response_codes or {}).get(name)
+        return f"RESP-{code}-{name}" if code is not None else f"SYMBOL-{name}"
     return f"FRAGMENT-{fragment_sha256(normalized)[:12].upper()}"
 
 
@@ -1191,8 +1444,16 @@ def _argument_markers(node: Node) -> list[str]:
         for marker in markers:
             if marker not in values:
                 values.append(marker)
-    if not values and not _non_operand_annotation(node.text()):
-        for marker in _markers_in_text(node.text()):
+    if not values:
+        raw = normalize(node.text())
+        operand = re.match(r"^[A-Z][A-Z0-9-]{0,31}\s*\(([^)]*)\)", raw)
+        marker_source = operand.group(1) if operand is not None else raw
+        markers = (
+            _markers_in_text(marker_source)
+            if operand is not None or not _non_operand_annotation(raw)
+            else []
+        )
+        for marker in markers:
             if marker not in values:
                 values.append(marker)
     return values or ["none"]
@@ -1271,6 +1532,38 @@ def _syntax_items_for_row(
     discriminators = _row_discriminators(siblings)
     selected = discriminators[row["official_row"]]
     sibling_only = set().union(*discriminators.values()) - selected
+
+    def choice_branches(item: SyntaxItem) -> set[tuple[Node, Node]]:
+        result: set[tuple[Node, Node]] = set()
+        for token in item.tokens:
+            current = token.node.parent
+            branch = token.node
+            while current is not None and current is not diagram.node:
+                if "groupchoice" in classes(current):
+                    result.add((current, branch))
+                branch = current
+                current = current.parent
+        return result
+
+    forbidden_branches = {
+        branch
+        for item in items
+        if {
+            match.group(0)
+            for token in item.tokens
+            if token.kind == "keyword"
+            for match in [re.match(r"^[A-Z][A-Z0-9-]*", token.value)]
+            if match is not None
+        }
+        & sibling_only
+        for _, branch in choice_branches(item)
+    }
+    narrowed_choices = {
+        parent
+        for item in items
+        for parent, branch in choice_branches(item)
+        if branch in forbidden_branches
+    }
     result: list[SyntaxItem] = []
     for item in items:
         names = {
@@ -1280,10 +1573,39 @@ def _syntax_items_for_row(
             for match in [re.match(r"^[A-Z][A-Z0-9-]*", token.value)]
             if match is not None
         }
-        if names & sibling_only:
+        branches = choice_branches(item)
+        if names & sibling_only or any(
+            branch in forbidden_branches for _, branch in branches
+        ):
             continue
-        result.append(item)
+        relation = (
+            "required"
+            if item.relation == "alternative"
+            and (
+                bool(names & selected)
+                or any(parent in narrowed_choices for parent, _ in branches)
+            )
+            else item.relation
+        )
+        result.append(SyntaxItem(relation, item.tokens, item.node))
     return result
+
+
+def _syntax_option_name(
+    item: SyntaxItem, documented_options: set[str]
+) -> str | None:
+    """Bind an operand to the documented option, never the command prefix."""
+
+    leading = _option_name("".join(token.value for token in item.tokens))
+    if leading in documented_options:
+        return leading
+    matches = [
+        option
+        for token in item.tokens
+        if token.kind == "keyword"
+        and (option := _option_name(token.value)) in documented_options
+    ]
+    return matches[-1] if matches else None
 
 
 def _reject_supplement_alias(
@@ -1415,6 +1737,139 @@ def _manual_nodes(selector: dict[str, Any], root: Node) -> list[tuple[dict[str, 
     return found
 
 
+def _response_code_map(
+    plan: dict[str, Any], roots: dict[str, Node]
+) -> dict[str, int]:
+    selectors = [
+        selector
+        for selector in plan["manual_context_selectors"]
+        if selector["id"] == "global-response-codes"
+    ]
+    if not selectors:
+        return {}
+    if len(selectors) != 1:
+        raise ProjectionError("response-code selector is not unique")
+    selector = selectors[0]
+    result: dict[str, int] = {}
+    for _, table in _manual_nodes(selector, roots[selector["topic_path"]]):
+        for row in (node for node in walk(table) if node.tag == "tr"):
+            cells = _cells(row)
+            if len(cells) < 2:
+                continue
+            name = normalize(cells[0].text()).upper()
+            code_text = normalize(cells[1].text())
+            if re.fullmatch(r"[A-Z][A-Z0-9-]{0,31}", name) is None or not code_text.isdigit():
+                continue
+            code = int(code_text)
+            if not 0 <= code <= 255 or (name in result and result[name] != code):
+                raise ProjectionError(f"response-code table conflicts for {name}")
+            result[name] = code
+    if not result:
+        raise ProjectionError("response-code table is empty")
+    return result
+
+
+def _condition_name_authority(
+    roots: dict[str, Node],
+    metadata: dict[str, dict[str, Any]],
+    response_codes: dict[str, int],
+) -> dict[str, Any]:
+    root = roots.get(CONDITION_NAME_TOPIC)
+    if root is None or CONDITION_NAME_TOPIC not in metadata:
+        raise ProjectionError("EIBRESP condition-name authority is outside source closure")
+    tables = [
+        node
+        for node in walk(root)
+        if node.tag == "table" and node.attrs.get("id") == CONDITION_NAME_TABLE
+    ]
+    if len(tables) != 1:
+        raise ProjectionError("EIBRESP condition-name table locator is not unique")
+    name_to_code: dict[str, int] = {}
+    for row in (node for node in walk(tables[0]) if node.tag == "tr"):
+        cells = _cells(row)
+        for offset in (0, 2):
+            if len(cells) <= offset + 1:
+                continue
+            code_text = normalize(cells[offset].text())
+            name = normalize(cells[offset + 1].text()).upper()
+            if not code_text.isdigit() or not re.fullmatch(
+                r"[A-Z][A-Z0-9-]{0,31}", name
+            ):
+                continue
+            code = int(code_text)
+            if not 0 <= code <= 255 or (
+                name in name_to_code and name_to_code[name] != code
+            ):
+                raise ProjectionError(f"EIBRESP condition-name table conflicts for {name}")
+            name_to_code[name] = code
+    if not name_to_code:
+        raise ProjectionError("EIBRESP condition-name table is empty")
+    for name in set(name_to_code) & set(response_codes):
+        if name_to_code[name] != response_codes[name]:
+            raise ProjectionError(
+                f"EIBRESP and response-table codes conflict for {name}"
+            )
+    allowed_names = sorted(name_to_code)
+    names_encoded = json.dumps(
+        allowed_names, ensure_ascii=True, sort_keys=False, separators=(",", ":")
+    ).encode("utf-8")
+    condition_pairs = [[name, name_to_code[name]] for name in allowed_names]
+    pairs_encoded = json.dumps(
+        condition_pairs, ensure_ascii=True, sort_keys=False, separators=(",", ":")
+    ).encode("utf-8")
+    return {
+        "profile": CONDITION_NAME_PROFILE,
+        "topic_path": CONDITION_NAME_TOPIC,
+        "topic_sha256": "sha256:" + metadata[CONDITION_NAME_TOPIC]["sha256"],
+        "table_id": CONDITION_NAME_TABLE,
+        "allowed_names": allowed_names,
+        "conditions": [
+            {"name": name, "code": name_to_code[name]} for name in allowed_names
+        ],
+        "allowed_names_digest_definition": CONDITION_NAME_DIGEST_DEFINITION,
+        "allowed_names_sha256": "sha256:"
+        + hashlib.sha256(CONDITION_NAME_DOMAIN + names_encoded).hexdigest(),
+        "conditions_digest_definition": CONDITION_PAIR_DIGEST_DEFINITION,
+        "conditions_sha256": "sha256:"
+        + hashlib.sha256(
+            CONDITION_NAME_DOMAIN + b"pairs\0" + pairs_encoded
+        ).hexdigest(),
+    }
+
+
+def _dynamic_condition_clause(
+    group: DefinitionGroup, root: Node, arguments: list[str]
+) -> dict[str, Any]:
+    if _option_name(group.stack[0]) != CONDITION_NAME_OPTION:
+        return {}
+    limits = [
+        node
+        for node in walk(root)
+        if node.tag == "p"
+        and re.search(
+            r"cannot include\s+more\s+than\s+(?:16|sixteen)\s+conditions",
+            normalize(node.text()),
+            re.IGNORECASE,
+        )
+    ]
+    if len(limits) != 1:
+        raise ProjectionError("dynamic condition occurrence limit is not unique")
+    if set(arguments) == {"label"}:
+        label_operand = "optional"
+    elif arguments == ["none"]:
+        label_operand = "forbidden"
+    else:
+        raise ProjectionError("dynamic condition label shape differs")
+    return {
+        "dynamic_name_profile": CONDITION_NAME_PROFILE,
+        "minimum_occurrences": 1,
+        "maximum_occurrences": 16,
+        "label_operand": label_operand,
+        "occurrence_limit_fragment_sha256": "sha256:"
+        + fragment_sha256(normalized_fragment(limits[0])),
+    }
+
+
 def _source_resolution_context_node(root: Node, selector: str) -> Node:
     if selector == "unique-article-root":
         matches = [node for node in walk(root) if node.tag == "article"]
@@ -1450,39 +1905,630 @@ def _source_resolution_context_node(root: Node, selector: str) -> Node:
     return matches[0]
 
 
-def _inputs_for_projection(root: Path, plan: dict[str, Any]) -> dict[str, Any]:
-    mapping = root / MAP_PATH
-    corpus = root / CORPUS_PATH
-    manifest = root / MANIFEST_PATH
-    extraction = root / PLAN_PATH
-    supplements = root / SUPPLEMENTS_PATH
+THREADSAFE_LABEL_ALIASES = {
+    "DELETE FILE": "DELETE",
+    "ENDBROWSE FILE": "ENDBR",
+    "READ FILE": "READ",
+    "READNEXT FILE": "READNEXT",
+    "READPREV FILE": "READPREV",
+    "REQUEST ENCRYPTPTKT": "REQUEST ENCYRPTPTKT",
+    "RESETBROWSE FILE": "RESETBR",
+    "REWRITE FILE": "REWRITE",
+    "STARTBROWSE FILE": "STARTBR",
+    "UNLOCK FILE": "UNLOCK",
+    "WRITE FILE": "WRITE",
+}
+THREADSAFE_FORM_ALIASES = {
+    "WEB ENDBROWSE": (
+        "WEB ENDBROWSE FORMFIELD",
+        "WEB ENDBROWSE HTTPHEADER",
+        "WEB ENDBROWSE QUERYPARM",
+    ),
+    "WEB READ": (
+        "WEB READ FORMFIELD",
+        "WEB READ HTTPHEADER",
+        "WEB READ QUERYPARM",
+    ),
+    "WEB READNEXT": (
+        "WEB READNEXT FORMFIELD",
+        "WEB READNEXT HTTPHEADER",
+        "WEB READNEXT QUERYPARM",
+    ),
+    "WEB STARTBROWSE": (
+        "WEB STARTBROWSE FORMFIELD",
+        "WEB STARTBROWSE HTTPHEADER",
+        "WEB STARTBROWSE QUERYPARM",
+    ),
+    "WEB WRITE": ("WEB WRITE HTTPHEADER",),
+}
+
+# The DPL page qualifies only the APPC forms in its table by principal
+# facility.  These catalog rows are the APPC forms/variant unions evidenced by
+# the pinned command pages; the other ISSUE/SEND forms in the table remain
+# ordinary table restrictions.
+DPL_APPC_PRINCIPAL_FACILITY_LABELS = frozenset(
+    {
+        "CONNECT PROCESS",
+        "CONVERSE",
+        "EXTRACT ATTRIBUTES",
+        "EXTRACT PROCESS",
+        "FREE",
+        "ISSUE ABEND",
+        "ISSUE CONFIRMATION",
+        "ISSUE ERROR",
+        "ISSUE PREPARE",
+        "ISSUE SIGNAL",
+        "RECEIVE",
+        "SEND",
+        "WAIT TERMINAL",
+    }
+)
+
+THREADSAFE_FILE_COMMANDS = frozenset(
+    {
+        "DELETE",
+        "ENDBR",
+        "READ",
+        "READNEXT",
+        "READPREV",
+        "RESETBR",
+        "REWRITE",
+        "STARTBR",
+        "UNLOCK",
+        "WRITE FILE",
+    }
+)
+THREADSAFE_QUEUE_COMMANDS = frozenset(
+    {"DELETEQ TD", "DELETEQ TS", "READQ TD", "READQ TS", "WRITEQ TD", "WRITEQ TS"}
+)
+THREADSAFE_PROFILE_PREDICATES = {
+    "program-link-locality": {
+        "threadsafe_when": ["resource-local", "resource-remote-ipic"],
+        "not_threadsafe_when": ["resource-remote-non-ipic"],
+    },
+    "file-control-storage-and-locality": {
+        "threadsafe_when": [
+            "resource-local",
+            "resource-remote-ipic",
+            "file-vsam-rls",
+            "file-coupling-facility-data-table",
+            "file-shared-data-table-read-or-browse",
+        ],
+        "not_threadsafe_when": [
+            "resource-remote-non-ipic",
+            "file-bdam",
+            "file-shared-data-table-update",
+            "file-nsr",
+        ],
+    },
+    "queue-control-locality": {
+        "threadsafe_when": ["resource-local", "resource-remote-ipic"],
+        "not_threadsafe_when": ["resource-remote-non-ipic"],
+    },
+    "enq-locality": {
+        "threadsafe_when": ["resource-definition-local"],
+        "not_threadsafe_when": ["resource-definition-global"],
+    },
+    "deq-locality": {
+        "threadsafe_when": ["resource-definition-local"],
+        "not_threadsafe_when": ["resource-definition-global"],
+    },
+    "write-operator-reply-key9": {
+        "threadsafe_when": ["not-reply-from-key9-tcb"],
+        "not_threadsafe_when": ["reply-from-key9-tcb"],
+    },
+}
+
+LANGUAGE_PROFILE_BY_LABEL = {
+    **{
+        label: "assembler-and-c-only"
+        for label in (
+            "GDS ALLOCATE",
+            "GDS ASSIGN",
+            "GDS CONNECT PROCESS",
+            "GDS EXTRACT ATTRIBUTES",
+            "GDS EXTRACT PROCESS",
+            "GDS FREE",
+            "GDS ISSUE ABEND",
+            "GDS ISSUE CONFIRMATION",
+            "GDS ISSUE ERROR",
+            "GDS ISSUE PREPARE",
+            "GDS ISSUE SIGNAL",
+            "GDS RECEIVE",
+            "WAIT",
+        )
+    },
+    **{
+        label: "non-le-amode64-assembler-only"
+        for label in ("FREEMAIN64", "GETMAIN64", "GET64 CONTAINER", "PUT64 CONTAINER")
+    },
+    **{
+        label: "cobol-pli-non-amode64-assembler-only"
+        for label in (
+            "HANDLE AID",
+            "HANDLE CONDITION",
+            "IGNORE CONDITION",
+            "POP HANDLE",
+            "PUSH HANDLE",
+        )
+    },
+}
+
+OPTION_LEGALITY_PATTERNS = tuple(
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in (
+        r"\bif (?:you )?specif(?:y|ied)\b.{0,320}\b(?:must|cannot|may not|need not|required)\b",
+        r"\b(?:must|cannot|may not|must not)\b.{0,240}\b(?:specif(?:y|ied)|used|combined)\b",
+        r"\b(?:mutually exclusive|cannot be used together|not valid with|only valid with|required with)\b",
+        r"\b(?:must|required|cannot|may not|must not|need not|only|unless|either|should)\b",
+    )
+)
+
+CONTEXT_PREDICATE_PATTERNS = tuple(
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in (
+        r"\b(?:is|are) threadsafe (?:when|if|only)\b",
+        r"\b(?:is|are) non-threadsafe (?:when|if)\b",
+        r"\bvalid only\b",
+        r"\b(?:for use|supported|available) only\b",
+        r"\bnot available when\b",
+        r"\bcannot be used (?:from|when|in)\b",
+        r"\bonly\b.{0,160}\bwhen\b",
+    )
+)
+
+
+def _cells(row: Node) -> list[Node]:
+    return [child for child in row.children if child.tag in {"td", "th"}]
+
+
+def _dpl_server_applicability(label: str, node: Node) -> dict[str, Any]:
+    """Return the row outcome from the complete pinned DPL server section."""
+
+    section_text = normalize(node.text()).upper()
+    if node.tag == "section":
+        required_prose = (
+            "ANY OF THE EXEC CICS WEB COMMANDS",
+            "RESP2 VALUE OF 1",
+            "EXTRACT TCPIP",
+            "EXTRACT CERTIFICATE",
+            "RESP2 VALUE OF 5",
+            "APPC COMMANDS LISTED ARE PROHIBITED ONLY WHEN",
+            "PRINCIPAL FACILITY",
+        )
+        if any(value not in section_text for value in required_prose):
+            raise ProjectionError("DPL server prose contract differs")
+
+    if label.startswith("WEB ") or label in {"EXTRACT TCPIP", "EXTRACT CERTIFICATE"}:
+        response2 = 5 if label in {
+            "WEB EXTRACT",
+            "EXTRACT TCPIP",
+            "EXTRACT CERTIFICATE",
+        } else 1
+        return {
+            "dpl_server": "restricted",
+            "dpl_restriction": {
+                "kind": "prohibited",
+                "source_kind": "prose",
+                "table_command": "WEB" if label.startswith("WEB ") else label,
+                "prohibited_options": [],
+                "requirement": "none",
+                "restriction_predicates": [],
+                "condition": "INVREQ",
+                "resp2": response2,
+            },
+        }
+
+    matches: list[tuple[str, str]] = []
+    for row in (item for item in walk(node) if item.tag == "tr"):
+        cells = _cells(row)
+        if len(cells) < 2:
+            continue
+        command = normalize(cells[0].text()).upper()
+        options = normalize(cells[1].text()).upper()
+        if not command or command == "COMMAND":
+            continue
+        if label == command or (
+            command in {"ISSUE", "SEND"} and label.startswith(command + " ")
+        ):
+            matches.append((command, options))
+    if not matches:
+        return {"dpl_server": "allowed"}
+    command, options = max(matches, key=lambda item: len(item[0]))
+    suffix = label[len(command) :].strip()
+    option_values = sorted(
+        set(re.findall(r"[A-Z][A-Z0-9-]*(?:\([A-Z]+\))?", options))
+    )
+    if command in {"ISSUE", "SEND"} and suffix:
+        if suffix.split()[0] not in {value.split("(", 1)[0] for value in option_values}:
+            return {"dpl_server": "allowed"}
+        kind = "prohibited"
+        prohibited: list[str] = []
+        requirement = "none"
+    elif "SYNCONRETURN" in options:
+        kind = "conditional"
+        prohibited = []
+        requirement = "synconreturn-required"
+    elif options.startswith("TERMID"):
+        kind = "conditional"
+        prohibited = ["TERMID"]
+        requirement = "termid-not-intersystem-session"
+    elif options == "ALL":
+        kind = "prohibited"
+        prohibited = []
+        requirement = "none"
+    else:
+        kind = "option-restricted"
+        prohibited = option_values
+        requirement = "none"
+
+    restriction_predicates: list[str] = []
+    if label in DPL_APPC_PRINCIPAL_FACILITY_LABELS:
+        kind = "conditional"
+        restriction_predicates.append("principal-facility")
+        if label == "CONNECT PROCESS":
+            restriction_predicates.append(
+                "connect-process-principal-facility-error-is-dpl"
+            )
     return {
+        "dpl_server": "restricted",
+        "dpl_restriction": {
+            "kind": kind,
+            "source_kind": "table",
+            "table_command": command,
+            "prohibited_options": prohibited,
+            "requirement": requirement,
+            "restriction_predicates": restriction_predicates,
+            **(
+                {"restriction_match": "any-of"}
+                if prohibited and restriction_predicates
+                else {}
+            ),
+            "condition": "INVREQ",
+            "resp2": 200,
+        },
+    }
+
+
+def _threadsafe_names(node: Node) -> dict[str, str]:
+    names: dict[str, str] = {}
+    for item in walk(node):
+        if item.tag != "li":
+            continue
+        value = normalize(item.text(exclude_tags=frozenset({"ul", "ol"}))).upper()
+        conditional = "*" in value or (
+            "THREADSAFE IF" in value and "NON-THREADSAFE IF" in value
+        )
+        value = re.sub(r"\s*\([^)]*\).*$", "", value)
+        value = value.replace("*", "").strip()
+        if not value or len(value) > 80:
+            continue
+        parts = [part.strip() for part in value.split(" AND ")]
+        if all(re.fullmatch(r"[A-Z][A-Z0-9 ]*", part) for part in parts):
+            for part in parts:
+                names[part] = "conditional" if conditional else "yes"
+    return names
+
+
+def _threadsafe_condition(label: str) -> dict[str, Any]:
+    source_label = THREADSAFE_LABEL_ALIASES.get(label, label)
+    if source_label == "LINK":
+        profile = "program-link-locality"
+    elif source_label in THREADSAFE_FILE_COMMANDS | {"WRITE"}:
+        profile = "file-control-storage-and-locality"
+    elif source_label in THREADSAFE_QUEUE_COMMANDS:
+        profile = "queue-control-locality"
+    elif source_label == "ENQ":
+        profile = "enq-locality"
+    elif source_label == "DEQ":
+        profile = "deq-locality"
+    elif source_label == "WRITE OPERATOR":
+        profile = "write-operator-reply-key9"
+    else:
+        raise ProjectionError(f"conditional threadsafe command lacks a profile: {label}")
+    return {"profile": profile, **THREADSAFE_PROFILE_PREDICATES[profile]}
+
+
+def _threadsafe_applicability(
+    label: str, node: Node, row_state: str
+) -> dict[str, Any]:
+    if row_state == "source-gap":
+        return {"threadsafe": "not-applicable"}
+    names = _threadsafe_names(node)
+    wanted = THREADSAFE_FORM_ALIASES.get(
+        label, (THREADSAFE_LABEL_ALIASES.get(label, label),)
+    )
+    statuses = {
+        names.get(re.sub(r"\s*\(CHANNEL\)$", "", item), "no")
+        for item in wanted
+    }
+    status = next(iter(statuses)) if len(statuses) == 1 else "conditional"
+    result: dict[str, Any] = {"threadsafe": status}
+    if status == "conditional":
+        result["threadsafe_condition"] = _threadsafe_condition(label)
+    return result
+
+
+def _language_profile(node: Node) -> str | None:
+    text = normalize(node.text()).lower()
+    if re.search(r"assembler-language and c programs only", text):
+        return "assembler-and-c-only"
+    if (
+        "for use only in non-language environment" in text
+        and "amode(64) assembler" in text
+        and "application programs" in text
+    ):
+        return "non-le-amode64-assembler-only"
+    if (
+        "supported only in cobol" in text
+        and "pl/i" in text
+        and "assembler language applications" in text
+        and "not amode(64) assembler" in text
+    ):
+        return "cobol-pli-non-amode64-assembler-only"
+    return None
+
+
+def _language_nodes(root: Node) -> list[Node]:
+    return [
+        node
+        for node in walk(root)
+        if _language_profile(node) is not None
+        and (
+            (node.tag == "p" and "shortdesc" in classes(node))
+            or (
+                node.tag == "div"
+                and "cds--inline-notification__subtitle" in classes(node)
+            )
+        )
+    ]
+
+
+def _language_applicability(profile: str) -> dict[str, Any]:
+    return {
+        "cobol": (
+            "allowed"
+            if profile
+            in {
+                "exec-cics-all-supported-languages",
+                "cobol-pli-non-amode64-assembler-only",
+            }
+            else "not-applicable"
+        ),
+        "language_restriction": {"profile": profile},
+    }
+
+
+def _option_legality_descriptions(group: DefinitionGroup) -> list[Node]:
+    return [
+        description
+        for description in group.descriptions
+        if any(
+            pattern.search(normalized_fragment(description))
+            for pattern in OPTION_LEGALITY_PATTERNS
+        )
+    ]
+
+
+def _section_title(node: Node) -> str | None:
+    current = node.parent
+    while current is not None:
+        if current.tag == "section":
+            heading = next(
+                (
+                    child
+                    for child in current.children
+                    if child.tag == "h2" and "sectiontitle" in classes(child)
+                ),
+                None,
+            )
+            return normalize(heading.text()) if heading is not None else None
+        current = current.parent
+    return None
+
+
+def _is_context_predicate(node: Node) -> bool:
+    if node.tag != "p" or _section_title(node) not in {
+        "Syntax",
+        "Description",
+        "Rules",
+    }:
+        return False
+    text = normalized_fragment(node)
+    return any(pattern.search(text) for pattern in CONTEXT_PREDICATE_PATTERNS)
+
+
+def _mapped_dpl_predicate_nodes(label: str, root: Node) -> list[Node]:
+    if label != "GDS EXTRACT ATTRIBUTES":
+        return []
+    return [
+        node
+        for node in walk(root)
+        if node.tag == "td"
+        and normalize(node.text()).casefold() == "invreq for a dpl server program."
+    ]
+
+
+def _syntax_head(
+    tokens: list[dict[str, Any]], documented_options: set[str]
+) -> str:
+    head_parts: list[str] = []
+    for token in tokens:
+        if token["kind"] != "keyword":
+            break
+        value = str(token["value"])
+        prefix = value.split("(", 1)[0].strip()
+        words = prefix.split()
+        if "(" in value and words and words[-1] in documented_options:
+            if words[:-1]:
+                head_parts.extend(words[:-1])
+            elif not head_parts:
+                head_parts.append(prefix)
+            break
+        if prefix:
+            head_parts.append(prefix)
+        if "(" in value:
+            break
+    return normalize(" ".join(head_parts)).upper()
+
+
+def _syntax_identity(
+    label: str, syntax_head: str, tokens: list[dict[str, Any]]
+) -> tuple[str, list[dict[str, str]]]:
+    if label == "WAIT" and syntax_head == "GDS WAIT":
+        return "documented-alias", []
+    option_relations: dict[str, set[str]] = {}
+    for token in tokens:
+        prefix = str(token["value"]).split("(", 1)[0]
+        if token["kind"] != "keyword" or not prefix:
+            continue
+        option_relations.setdefault(prefix.split()[-1], set()).add(
+            str(token["relation"])
+        )
+
+    def present_in_every_retained_branch(name: str) -> bool:
+        all_branches: dict[str, set[str]] = {}
+        name_branches: dict[str, set[str]] = {}
+        for token in tokens:
+            if token["kind"] != "keyword":
+                continue
+            prefix = str(token["value"]).split("(", 1)[0]
+            token_name = prefix.split()[-1] if prefix else ""
+            parts = str(token.get("group_path", "")).split("/")
+            for index, part in enumerate(parts[:-1]):
+                if not part.startswith("groupchoice["):
+                    continue
+                choice = "/".join(parts[: index + 1])
+                branch = "/".join(parts[: index + 2])
+                all_branches.setdefault(choice, set()).add(branch)
+                if token_name == name:
+                    name_branches.setdefault(choice, set()).add(branch)
+        return any(
+            len(branches) > 1 and name_branches.get(choice) == branches
+            for choice, branches in all_branches.items()
+        )
+    if syntax_head == label:
+        relation = "exact"
+    elif label.startswith(syntax_head + " ") or syntax_head.startswith(label + " "):
+        relation = "catalog-qualified"
+    else:
+        return "continuation", []
+    suffix = label[len(syntax_head) :].strip().split()
+    discriminators = [
+        {"name": value, "state": "present"}
+        for value in suffix
+        if option_relations.get(value) == {"required"}
+        or present_in_every_retained_branch(value)
+    ]
+    if label == "ASKTIME":
+        discriminators.append({"name": "ABSTIME", "state": "absent"})
+    if label == "ASKTIME ABSTIME":
+        if "ABSTIME" not in option_relations:
+            raise ProjectionError("ASKTIME ABSTIME discriminator is absent")
+        discriminators = [{"name": "ABSTIME", "state": "present"}]
+    return relation, discriminators
+
+
+def _manual_context_value(
+    selector_id: str,
+    association: str,
+    row: dict[str, Any],
+    node: Node,
+    resolution: dict[str, Any] | None,
+    dimension: str,
+    fragment: dict[str, Any],
+) -> dict[str, Any]:
+    value: dict[str, Any] = {
+        "type": "context",
+        "selector_id": selector_id,
+        "association": association,
+    }
+    label = str(row["label"])
+    not_applicable = row["state"] == "source-gap" and (
+        resolution is None or resolution.get("resolution") == "target-internal-only"
+    )
+    if (
+        selector_id == "global-command-format"
+        and dimension == "execution-context"
+        and fragment.get("heading_id") == "dfhp4kt__title__2"
+    ):
+        applicability = {
+            "local_task": "not-applicable" if not_applicable else "allowed"
+        }
+        if not_applicable:
+            applicability.update(
+                {
+                    "cobol": "not-applicable",
+                    "language_restriction": {"profile": "internal-only"},
+                }
+            )
+        elif label not in LANGUAGE_PROFILE_BY_LABEL:
+            applicability.update(
+                _language_applicability("exec-cics-all-supported-languages")
+            )
+        value["applicability"] = applicability
+    elif (
+        selector_id == "dpl-server-restrictions"
+        and dimension == "execution-context"
+        and node.tag == "section"
+    ):
+        if label != "GDS EXTRACT ATTRIBUTES":
+            value["applicability"] = (
+                {"dpl_server": "not-applicable"}
+                if not_applicable
+                else _dpl_server_applicability(label, node)
+            )
+    elif (
+        selector_id == "threadsafe-command-list"
+        and dimension == "execution-context"
+        and node.tag == "section"
+    ):
+        value["applicability"] = _threadsafe_applicability(
+            label, node, "source-gap" if not_applicable else "mapped"
+        )
+    return value
+
+
+def _inputs_for_projection(
+    root: Path,
+    plan: dict[str, Any],
+    batch: str | SourceBatch = DEFAULT_BATCH,
+) -> dict[str, Any]:
+    config = source_batch(batch)
+    mapping = root / config.map_path
+    corpus = root / config.corpus_path
+    manifest = root / config.manifest_path
+    extraction = root / config.plan_path
+    result = {
         "source_map": {
-            "path": str(MAP_PATH),
+            "path": str(config.map_path),
             "file_sha256": file_sha256(mapping),
             "logical_sha256": plan["inputs"]["mapping"]["sha256"],
         },
         "source_corpus": {
-            "path": str(CORPUS_PATH),
+            "path": str(config.corpus_path),
             "file_sha256": file_sha256(corpus),
             "logical_sha256": plan["inputs"]["corpus"]["sha256"],
         },
         "topic_manifest": {
-            "path": str(MANIFEST_PATH),
+            "path": str(config.manifest_path),
             "file_sha256": file_sha256(manifest),
             "logical_sha256": plan["inputs"]["topic_manifest"]["topic_manifest_sha256"],
         },
         "extraction_plan": {
-            "path": str(PLAN_PATH),
+            "path": str(config.plan_path),
             "file_sha256": file_sha256(extraction),
             "logical_sha256": plan["extraction_sha256"],
         },
-        "source_supplements": {
-            "path": str(SUPPLEMENTS_PATH),
+    }
+    if config.supplements_path is not None:
+        supplements = root / config.supplements_path
+        result["source_supplements"] = {
+            "path": str(config.supplements_path),
             "file_sha256": file_sha256(supplements),
             "logical_sha256": plan["inputs"]["supplements"]["supplements_sha256"],
-        },
-    }
+        }
+    return result
 
 
 def _assert_expected_shape(
@@ -1491,7 +2537,9 @@ def _assert_expected_shape(
     manifest: dict[str, Any],
     roots: dict[str, Node],
     plan: dict[str, Any],
+    batch: str | SourceBatch = DEFAULT_BATCH,
 ) -> dict[str, int]:
+    config = source_batch(batch)
     expected = plan["expected_shape"]
     rows = mapping.get("rows", [])
     mapped = [row for row in rows if row.get("state") == "mapped"]
@@ -1549,7 +2597,8 @@ def _assert_expected_shape(
             {
                 resolution["direct_supplement_topic"]
                 for resolution in plan["source_resolutions"]
-                if resolution["resolution"] == "authority-bounded-projection"
+                if resolution["resolution"]
+                in {"authority-bounded-projection", "target-product-projection"}
             }
         ),
         "supplement_context_topics": len(
@@ -1561,6 +2610,8 @@ def _assert_expected_shape(
             }
         ),
     }
+    if actual["mapping_rows"] != config.row_count:
+        raise ProjectionError("pinned source row count differs from the selected batch")
     if actual != expected:
         raise ProjectionError(f"pinned source shape differs: expected={expected} actual={actual}")
     return {
@@ -1579,9 +2630,13 @@ def build_projection(
     manifest: dict[str, Any],
     roots: dict[str, Node],
     metadata: dict[str, dict[str, Any]],
+    batch: str | SourceBatch = DEFAULT_BATCH,
 ) -> dict[str, Any]:
-    validate_plan(plan)
-    shape_counts = _assert_expected_shape(mapping, corpus, manifest, roots, plan)
+    config = source_batch(batch)
+    validate_plan(plan, config)
+    shape_counts = _assert_expected_shape(
+        mapping, corpus, manifest, roots, plan, config
+    )
     bounds = plan["bounds"]
     exceptions = {
         (row.get("official_row"), row["topic_path"], row["dimension"]): row
@@ -1590,6 +2645,10 @@ def build_projection(
     resolution_plan = {
         row["official_row"]: row for row in plan["source_resolutions"]
     }
+    response_codes = _response_code_map(plan, roots)
+    condition_name_authority = _condition_name_authority(
+        roots, metadata, response_codes
+    )
     mapped_rows = [row for row in mapping["rows"] if row["state"] == "mapped"]
     rows_by_topic: dict[str, list[dict[str, Any]]] = {}
     for row in mapped_rows:
@@ -1613,11 +2672,13 @@ def build_projection(
         }
         primary = {name: False for name in DIMENSIONS}
         topic_roles: dict[str, str] = {}
+        language_candidate_count = 0
 
         direct_topics = list(row.get("topics", []))
         if (
             resolution is not None
-            and resolution["resolution"] == "authority-bounded-projection"
+            and resolution["resolution"]
+            in {"authority-bounded-projection", "target-product-projection"}
         ):
             direct_topics.append(
                 {
@@ -1633,8 +2694,144 @@ def build_projection(
                 else DIRECT_SOURCE_ROLES[topic["role"]]
             )
             topic_roles.setdefault(path, role)
+            for language_node in _language_nodes(roots[path]):
+                profile = _language_profile(language_node)
+                if profile is None:
+                    continue
+                expected_profile = LANGUAGE_PROFILE_BY_LABEL.get(str(row["label"]))
+                if profile != expected_profile:
+                    raise ProjectionError(
+                        f"language applicability inventory differs: {official_row}:{profile}"
+                    )
+                language_evidence = make_evidence(
+                    path,
+                    metadata[path]["sha256"],
+                    role,
+                    _section_id_for(language_node),
+                    language_node,
+                    bounds,
+                )
+                language_candidate = make_candidate(
+                    official_row,
+                    "execution-context",
+                    "source-context",
+                    "mapped-language-applicability",
+                    {
+                        "type": "context",
+                        "selector_id": "mapped-language-applicability",
+                        "association": "mapping-topic-edge",
+                        "applicability": _language_applicability(profile),
+                    },
+                    language_evidence,
+                )
+                dimensions["execution-context"]["candidates"].append(
+                    language_candidate
+                )
+                primary["execution-context"] = True
+                language_candidate_count += 1
+
+            for dpl_node in _mapped_dpl_predicate_nodes(
+                str(row["label"]), roots[path]
+            ):
+                dpl_evidence = make_evidence(
+                    path,
+                    metadata[path]["sha256"],
+                    role,
+                    _section_id_for(dpl_node),
+                    dpl_node,
+                    bounds,
+                )
+                dpl_candidate = make_candidate(
+                    official_row,
+                    "execution-context",
+                    "source-context",
+                    "mapped-dpl-applicability",
+                    {
+                        "type": "context",
+                        "selector_id": "mapped-dpl-applicability",
+                        "association": "mapping-topic-edge",
+                        "applicability": {"dpl_server": "restricted"},
+                        "predicate_id": dpl_evidence["fragment_sha256"],
+                        "predicate_state": "bounded",
+                    },
+                    dpl_evidence,
+                )
+                dimensions["execution-context"]["candidates"].append(dpl_candidate)
+                dimensions["execution-context"]["issues"].append(
+                    make_issue(
+                        official_row,
+                        "execution-context",
+                        "context-predicate-not-structured",
+                        [dpl_candidate],
+                        [dpl_evidence],
+                    )
+                )
+                primary["execution-context"] = True
+
+            for predicate_node in (
+                node for node in walk(roots[path]) if _is_context_predicate(node)
+            ):
+                if _language_profile(predicate_node) is not None:
+                    continue
+                predicate_evidence = make_evidence(
+                    path,
+                    metadata[path]["sha256"],
+                    role,
+                    _section_id_for(predicate_node),
+                    predicate_node,
+                    bounds,
+                )
+                predicate_candidate = make_candidate(
+                    official_row,
+                    "execution-context",
+                    "source-context",
+                    "mapped-context-predicate",
+                    {
+                        "type": "context",
+                        "selector_id": "mapped-context-predicate",
+                        "association": "mapping-topic-edge",
+                        "predicate_id": predicate_evidence["fragment_sha256"],
+                        "predicate_state": "bounded",
+                    },
+                    predicate_evidence,
+                )
+                dimensions["execution-context"]["candidates"].append(
+                    predicate_candidate
+                )
+                dimensions["execution-context"]["issues"].append(
+                    make_issue(
+                        official_row,
+                        "execution-context",
+                        "context-predicate-not-structured",
+                        [predicate_candidate],
+                        [predicate_evidence],
+                    )
+                )
+                primary["execution-context"] = True
+
             sections = direct_sections(roots[path])
             siblings = rows_by_topic.get(path, [row])
+            condition_sibling_only = (
+                set().union(*_row_discriminators(siblings).values())
+                - _row_discriminators(siblings)[official_row]
+                if row.get("selection_kind") == "shared-page" and len(siblings) > 1
+                else set()
+            )
+            option_section = sections.get("Options")
+            option_groups = (
+                [
+                    group
+                    for group in definition_groups(option_section)
+                    if _group_applies(row, siblings, group)
+                ]
+                if option_section is not None
+                else []
+            )
+            documented_options = {
+                name
+                for group in option_groups
+                if (name := _option_name(group.stack[0])) is not None
+            }
 
             syntax = sections.get("Syntax")
             if syntax is not None:
@@ -1646,9 +2843,40 @@ def build_projection(
                 if row.get("selection_kind") == "combined-page" and len(chosen) != 1:
                     issue = make_issue(official_row, "syntax", "unresolved-syntax-diagram")
                     dimensions["syntax"]["issues"].append(issue)
-                for diagram_ordinal, diagram in chosen:
+                selected_items_by_ordinal = {
+                    ordinal: _syntax_items_for_row(row, siblings, diagram)
+                    for ordinal, diagram in chosen
+                }
+                if row.get("selection_kind") == "shared-page" and len(siblings) > 1:
+                    selected_option_names = {
+                        name
+                        for ordinal, _ in chosen
+                        for item in selected_items_by_ordinal[ordinal]
+                        if (name := _syntax_option_name(item, documented_options))
+                        is not None
+                    }
+                    all_syntax_option_names = {
+                        name
+                        for _, diagram in chosen
+                        for item in syntax_items(diagram)
+                        if (name := _syntax_option_name(item, documented_options))
+                        is not None
+                    }
+                    option_groups = [
+                        group
+                        for group in option_groups
+                        if (name := _option_name(group.stack[0])) is None
+                        or name not in all_syntax_option_names
+                        or name in selected_option_names
+                    ]
+                    documented_options = {
+                        name
+                        for group in option_groups
+                        if (name := _option_name(group.stack[0])) is not None
+                    }
+                for panel_index, (diagram_ordinal, diagram) in enumerate(chosen, 1):
                     variant = f"diagram-{diagram_ordinal:04d}"
-                    selected_items = _syntax_items_for_row(row, siblings, diagram)
+                    selected_items = selected_items_by_ordinal[diagram_ordinal]
                     tokens = [
                         {
                             "kind": token.kind,
@@ -1667,6 +2895,19 @@ def build_projection(
                     structure = json.dumps(
                         tokens, ensure_ascii=True, sort_keys=True, separators=(",", ":")
                     )
+                    syntax_head = _syntax_head(tokens, documented_options)
+                    if not syntax_head:
+                        raise ProjectionError(
+                            f"syntax command head is empty: {path}:{variant}"
+                        )
+                    identity_relation, identity_discriminators = _syntax_identity(
+                        str(row["label"]), syntax_head, tokens
+                    )
+                    panel_role = (
+                        "continuation"
+                        if identity_relation == "continuation"
+                        else "command-head"
+                    )
                     evidence = make_evidence(
                         path,
                         metadata[path]["sha256"],
@@ -1683,6 +2924,14 @@ def build_projection(
                         {
                             "type": "syntax",
                             "variant": variant,
+                            "syntax_head": syntax_head,
+                            "panel": {
+                                "index": panel_index,
+                                "total": len(chosen),
+                                "role": panel_role,
+                            },
+                            "identity_relation": identity_relation,
+                            "identity_discriminators": identity_discriminators,
                             "tokens": tokens,
                             "structure_sha256": "sha256:" + fragment_sha256(structure),
                         },
@@ -1690,9 +2939,23 @@ def build_projection(
                     )
                     dimensions["syntax"]["candidates"].append(candidate)
                     primary["syntax"] = True
+                    if panel_role == "continuation":
+                        dimensions["syntax"]["issues"].append(
+                            make_issue(
+                                official_row,
+                                "syntax",
+                                "syntax-panel-composition-unresolved",
+                                [candidate],
+                                [evidence],
+                            )
+                        )
 
                     for item in selected_items:
-                        name = _option_name("".join(token.value for token in item.tokens))
+                        name = _syntax_option_name(item, documented_options)
+                        if name == CONDITION_NAME_OPTION:
+                            # The condition symbol selects a control-flow rule;
+                            # it is not a data-area operand direction.
+                            continue
                         markers = [
                             marker
                             for token in item.tokens
@@ -1730,17 +2993,15 @@ def build_projection(
                             dimensions["operand-directions"]["candidates"].append(direction)
                             primary["operand-directions"] = True
 
-            options = sections.get("Options")
+            options = option_section
             if options is not None:
-                groups = definition_groups(options)
-                for group in groups:
-                    if not _group_applies(row, siblings, group):
-                        continue
+                for group in option_groups:
                     name = _option_name(group.stack[0])
                     if name is None:
                         continue
                     arguments = _argument_markers(group.term)
                     stack = _symbolic_option_stack(group.stack)
+                    legality_descriptions = _option_legality_descriptions(group)
                     if (
                         len(arguments) > 16
                         or len(group.descriptions) > 64
@@ -1756,24 +3017,56 @@ def build_projection(
                         group.term,
                         bounds,
                     )
+                    candidate_value = {
+                        "type": "option",
+                        "term": name,
+                        "arguments": arguments,
+                        "definition_count": len(group.descriptions),
+                        "description_fragment_sha256s": [
+                            "sha256:"
+                            + fragment_sha256(normalized_fragment(description))
+                            for description in group.descriptions
+                        ],
+                        "option_legality": (
+                            "bounded-prose"
+                            if legality_descriptions
+                            else "structural"
+                        ),
+                        "depth": group.depth,
+                        "stack": stack,
+                        **_dynamic_condition_clause(group, roots[path], arguments),
+                    }
                     candidate = make_candidate(
                         official_row,
                         "options",
                         "source-option",
                         name,
-                        {
-                            "type": "option",
-                            "term": name,
-                            "arguments": arguments,
-                            "definition_count": len(group.descriptions),
-                            "depth": group.depth,
-                            "stack": stack,
-                        },
+                        candidate_value,
                         evidence,
                     )
                     dimensions["options"]["candidates"].append(candidate)
                     primary["options"] = True
-                    for marker in arguments:
+                    for description in legality_descriptions:
+                        legality_evidence = make_evidence(
+                            path,
+                            metadata[path]["sha256"],
+                            role,
+                            options.section_id,
+                            description,
+                            bounds,
+                        )
+                        dimensions["options"]["issues"].append(
+                            make_issue(
+                                official_row,
+                                "options",
+                                "prose-option-legality-not-structured",
+                                [candidate],
+                                [legality_evidence],
+                            )
+                        )
+                    for marker in (
+                        [] if name == CONDITION_NAME_OPTION else arguments
+                    ):
                         direction = make_candidate(
                             official_row,
                             "operand-directions",
@@ -1794,7 +3087,7 @@ def build_projection(
             if conditions is not None:
                 for group in definition_groups(conditions):
                     stack = [
-                        _symbolic_condition_term(value, depth)
+                        _symbolic_condition_term(value, depth, response_codes)
                         for depth, value in enumerate(group.stack)
                     ]
                     name = stack[-1]
@@ -1823,12 +3116,47 @@ def build_projection(
                             "type": "condition",
                             "condition_stack": stack,
                             "definition_count": len(group.descriptions),
+                            "trigger_fragment_sha256s": [
+                                "sha256:"
+                                + fragment_sha256(normalized_fragment(description))
+                                for description in group.descriptions
+                            ],
                             "depth": group.depth,
                         },
                         evidence,
                     )
                     dimensions["conditions"]["candidates"].append(candidate)
                     primary["conditions"] = True
+                    if group.depth > 0 and condition_sibling_only:
+                        matching_descriptions = [
+                            description
+                            for description in group.descriptions
+                            if any(
+                                re.search(
+                                    rf"\b{re.escape(name)}\b",
+                                    normalized_fragment(description).upper(),
+                                )
+                                for name in condition_sibling_only
+                            )
+                        ]
+                        if matching_descriptions:
+                            condition_evidence = make_evidence(
+                                path,
+                                metadata[path]["sha256"],
+                                role,
+                                conditions.section_id,
+                                matching_descriptions[0],
+                                bounds,
+                            )
+                            dimensions["conditions"]["issues"].append(
+                                make_issue(
+                                    official_row,
+                                    "conditions",
+                                    "shared-condition-applicability-unresolved",
+                                    [candidate],
+                                    [condition_evidence],
+                                )
+                            )
 
             if syntax is not None:
                 for child in syntax.node.children:
@@ -1861,7 +3189,11 @@ def build_projection(
 
             allowed_sections = {"Syntax", "Description", "Rules", "Options", "Conditions"}
             anchors: list[tuple[Node, str, str, str]] = []
-            if path.split("/", 1)[0] == PRODUCT:
+            if path.split("/", 1)[0] == PRODUCT and not (
+                resolution is not None
+                and resolution.get("no_one_hop") is True
+                and path == resolution.get("direct_supplement_topic")
+            ):
                 for title, section in sections.items():
                     if title not in allowed_sections:
                         continue
@@ -1951,12 +3283,21 @@ def build_projection(
                         candidate["kind"] != "source-context"
                         for candidate in dimensions[dimension]["candidates"]
                     )
-                _reject_supplement_alias(
-                    official_row,
-                    path,
-                    dimensions["syntax"]["candidates"],
-                    resolution["forbidden_alias_tokens"],
-                )
+                forbidden_aliases = resolution.get("forbidden_alias_tokens", [])
+                if forbidden_aliases:
+                    _reject_supplement_alias(
+                        official_row,
+                        path,
+                        dimensions["syntax"]["candidates"],
+                        forbidden_aliases,
+                    )
+
+        expected_language_profile = LANGUAGE_PROFILE_BY_LABEL.get(str(row["label"]))
+        if expected_language_profile is not None and language_candidate_count != 1:
+            raise ProjectionError(
+                f"language applicability evidence count differs: "
+                f"{official_row}:{language_candidate_count}"
+            )
 
         for selector in plan["manual_context_selectors"]:
             applies = selector["applies_to"]
@@ -1964,7 +3305,7 @@ def build_projection(
                 continue
             path = selector["topic_path"]
             role = MANUAL_SOURCE_ROLES[selector["id"]]
-            for _, node in _manual_nodes(selector, roots[path]):
+            for fragment, node in _manual_nodes(selector, roots[path]):
                 evidence = make_evidence(
                     path,
                     metadata[path]["sha256"],
@@ -1981,11 +3322,15 @@ def build_projection(
                         dimension,
                         "source-context",
                         selector["id"],
-                        {
-                            "type": "context",
-                            "selector_id": selector["id"],
-                            "association": selector["association"],
-                        },
+                        _manual_context_value(
+                            selector["id"],
+                            selector["association"],
+                            row,
+                            node,
+                            resolution,
+                            dimension,
+                            fragment,
+                        ),
                         evidence,
                     )
                     dimensions[dimension]["candidates"].append(candidate)
@@ -2028,17 +3373,67 @@ def build_projection(
                 dimensions["execution-context"]["candidates"].append(candidate)
                 topic_roles[path] = role
 
+        semantic_dimensions = (
+            "syntax",
+            "options",
+            "operand-directions",
+            "conditions",
+        )
+        if row["state"] == "mapped" and not any(
+            primary[dimension] for dimension in semantic_dimensions
+        ):
+            successor_evidence = []
+            for topic in direct_topics:
+                path = topic["topic_path"]
+                anchor = compatibility_successor_anchor(
+                    roots[path], path, set(roots)
+                )
+                if anchor is None:
+                    continue
+                successor_evidence.append(
+                    make_evidence(
+                        path,
+                        metadata[path]["sha256"],
+                        DIRECT_SOURCE_ROLES[topic["role"]],
+                        _section_id_for(anchor),
+                        anchor,
+                        bounds,
+                    )
+                )
+            if successor_evidence:
+                dimensions["syntax"]["issues"].append(
+                    make_issue(
+                        official_row,
+                        "syntax",
+                        "compatibility-successor-not-equivalent",
+                        evidence=successor_evidence,
+                        affected_dimensions=semantic_dimensions,
+                    )
+                )
+
         if row["state"] == "source-gap":
-            if resolution is None or (resolution["label"], resolution["eibfn"]) != (
+            if resolution is None:
+                for dimension in DIMENSIONS:
+                    issue = make_issue(official_row, dimension, "source-gap")
+                    dimensions[dimension] = {
+                        "name": dimension,
+                        "state": "source-gap",
+                        "candidates": [],
+                        "issues": [issue],
+                    }
+            elif (resolution["label"], resolution["eibfn"]) != (
                 row["label"],
                 row["eibfn"],
             ):
                 raise ProjectionError(f"source resolution differs: {official_row}")
-            for path in resolution["target_context_topics"]:
-                topic_roles.setdefault(path, "gap-identity")
-            for path in resolution.get("supplement_topics", []):
-                topic_roles.setdefault(path, metadata[path]["projected_source_role"])
-            if resolution["resolution"] == "target-internal-only":
+            if resolution is not None:
+                for path in resolution["target_context_topics"]:
+                    topic_roles.setdefault(path, "gap-identity")
+                for path in resolution.get("supplement_topics", []):
+                    topic_roles.setdefault(path, metadata[path]["projected_source_role"])
+            if resolution is None:
+                pass
+            elif resolution["resolution"] == "target-internal-only":
                 for dimension in resolution["non_applicable_dimensions"]:
                     dimensions[dimension] = {
                         "name": dimension,
@@ -2051,25 +3446,34 @@ def build_projection(
                         f"internal-only row lacks target execution context: {official_row}"
                     )
                 dimensions["execution-context"]["state"] = "projected"
-            elif resolution["resolution"] == "authority-bounded-projection":
+            elif resolution["resolution"] in {
+                "authority-bounded-projection",
+                "target-product-projection",
+            }:
                 affected = resolution["authority_bounded_dimensions"]
                 for dimension in DIMENSIONS:
-                    dimensions[dimension]["state"] = "projected"
-                issue_dimension = resolution["ambiguity_issue_dimension"]
-                evidence = [
-                    candidate["evidence"]
-                    for dimension in affected
-                    for candidate in dimensions[dimension]["candidates"]
-                ]
-                issue = make_issue(
-                    official_row,
-                    issue_dimension,
-                    "target-equivalence-ambiguity",
-                    dimensions[issue_dimension]["candidates"],
-                    evidence,
-                    affected_dimensions=affected,
-                )
-                dimensions[issue_dimension]["issues"].append(issue)
+                    dimensions[dimension]["state"] = (
+                        "projected"
+                        if resolution["resolution"] == "authority-bounded-projection"
+                        or dimensions[dimension]["candidates"]
+                        else "declared-absent"
+                    )
+                if resolution["resolution"] == "authority-bounded-projection":
+                    issue_dimension = resolution["ambiguity_issue_dimension"]
+                    evidence = [
+                        candidate["evidence"]
+                        for dimension in affected
+                        for candidate in dimensions[dimension]["candidates"]
+                    ]
+                    issue = make_issue(
+                        official_row,
+                        issue_dimension,
+                        "target-equivalence-ambiguity",
+                        dimensions[issue_dimension]["candidates"],
+                        evidence,
+                        affected_dimensions=affected,
+                    )
+                    dimensions[issue_dimension]["issues"].append(issue)
             else:
                 raise ProjectionError(
                     f"unsupported source resolution: {official_row}"
@@ -2135,19 +3539,13 @@ def build_projection(
                         conflict_contract_drift.append(
                             (official_row, "missing-declared", signature)
                         )
-                    for signature in sorted(
-                        set(detected_conflicts) - set(expected_by_signature)
-                    ):
-                        conflict_contract_drift.append(
-                            (official_row, "undeclared", signature)
-                        )
                     if detected_conflicts:
                         for signature in sorted(detected_conflicts):
                             conflict = expected_by_signature.get(signature)
                             selected = detected_conflicts[signature]
                             if (
-                                conflict is None
-                                or conflict.get("resolution")
+                                conflict is not None
+                                and conflict.get("resolution")
                                 != "options-definition-over-syntax-metavariable"
                             ):
                                 raise ProjectionError(
@@ -2184,13 +3582,19 @@ def build_projection(
                                 for candidate in candidates
                                 if candidate["candidate_id"] not in loser_ids
                             ]
-                            matched_conflicts.add(conflict["id"])
+                            if conflict is not None:
+                                matched_conflicts.add(conflict["id"])
                     if unknown_candidates:
                         dimensions[dimension]["state"] = "unmatched"
                         continue
+                automatically_absent = (
+                    config.name != "a"
+                    and dimension != "execution-context"
+                    and not primary[dimension]
+                )
                 if primary[dimension]:
                     dimensions[dimension]["state"] = "projected"
-                elif declared:
+                elif declared or automatically_absent:
                     dimensions[dimension]["state"] = "declared-absent"
                     dimensions[dimension]["candidates"] = []
                 elif candidates and dimension == "execution-context":
@@ -2242,7 +3646,7 @@ def build_projection(
                 and not (
                     resolution is not None
                     and resolution["resolution"]
-                    == "authority-bounded-projection"
+                    in {"authority-bounded-projection", "target-product-projection"}
                     and dimension["name"]
                     in resolution["authority_bounded_dimensions"]
                 )
@@ -2274,7 +3678,7 @@ def build_projection(
             }
             for path, role in sorted(topic_roles.items())
         ]
-        if not bindings or len(bindings) > 32:
+        if (not bindings and row["state"] != "source-gap") or len(bindings) > 128:
             raise ProjectionError(f"row topic binding count is invalid: {official_row}")
         projected_rows.append(
             {
@@ -2328,14 +3732,14 @@ def build_projection(
     result: dict[str, Any] = {
         "schema_version": OUTPUT_SCHEMA,
         "target_version": TARGET_VERSION,
-        "work_package": WORK_PACKAGE,
+        "work_package": config.project_work_package,
         "status": "candidate",
         "review_status": "unreviewed",
         "semantic_authority": False,
         "automatic_registration": False,
         "coverage_credit": 0,
         "differential_credit": 0,
-        "inputs": _inputs_for_projection(root, plan),
+        "inputs": _inputs_for_projection(root, plan, config),
         "extractor": {
             "name": "cics-dita-source-projector",
             "version": "cics-dita-source-projector@1",
@@ -2343,6 +3747,7 @@ def build_projection(
             "implementation_sha256": file_sha256(Path(__file__)),
             "fragment_digest_definition": FRAGMENT_DIGEST_DEFINITION,
         },
+        "condition_name_authority": condition_name_authority,
         "counts": counts,
         "rows": projected_rows,
         "blocking_issues": blocking_issues,
@@ -2355,29 +3760,61 @@ def build_projection(
     return result
 
 
-def project_from_cache(root: Path, cache: Path) -> dict[str, Any]:
+def project_from_cache(
+    root: Path,
+    cache: Path,
+    batch: str | SourceBatch = DEFAULT_BATCH,
+) -> dict[str, Any]:
+    config = source_batch(batch)
     # Recompute the upstream map/corpus contracts before trusting their
     # embedded logical digests.  This remains offline: the corpus checker reads
     # only committed identities and the selected external cache scope.
-    source_corpus.check(root, cache)
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    import cache_cics_application_source_supplements as supplement_sources
-
-    supplements = supplement_sources.check(root, cache)
-    plan = read_json(root / PLAN_PATH)
-    validate_plan(plan)
-    mapping, corpus, manifest, _, bound_supplements = _input_files(root, plan)
-    if supplements != bound_supplements:
-        raise ProjectionError("dedicated supplement check returned different receipt")
-    _, roots, metadata = load_cached_documents(cache, manifest, plan)
-    _, supplement_roots, supplement_metadata = load_supplement_documents(
-        cache, supplements, plan
+    source_corpus.check(root, cache, batch=config.name)
+    plan = read_json(root / config.plan_path)
+    validate_plan(plan, config)
+    mapping, corpus, manifest, _, bound_supplements = _input_files(
+        root, plan, config
     )
-    if set(roots) & set(supplement_roots):
-        raise ProjectionError("supplement topic aliases the target corpus")
-    roots.update(supplement_roots)
-    metadata.update(supplement_metadata)
-    return build_projection(root, plan, mapping, corpus, manifest, roots, metadata)
+    _, roots, metadata = load_cached_documents(cache, manifest, plan, config)
+    if config.supplements_path is not None:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import cache_cics_application_source_supplements as supplement_sources
+
+        supplements = supplement_sources.check(root, cache)
+        if supplements != bound_supplements:
+            raise ProjectionError("dedicated supplement check returned different receipt")
+        _, supplement_roots, supplement_metadata = load_supplement_documents(
+            cache, supplements, plan
+        )
+        if set(roots) & set(supplement_roots):
+            raise ProjectionError("supplement topic aliases the target corpus")
+        roots.update(supplement_roots)
+        metadata.update(supplement_metadata)
+    else:
+        _, supplement_roots, supplement_metadata = load_corpus_supplement_documents(
+            cache, corpus, plan
+        )
+        if set(roots) & set(supplement_roots):
+            raise ProjectionError("corpus supplement topic aliases the target corpus")
+        roots.update(supplement_roots)
+        metadata.update(supplement_metadata)
+    for resolution in plan["source_resolutions"]:
+        path = resolution.get("direct_supplement_topic")
+        if not path or path not in metadata or path.split("/", 1)[0] != PRODUCT:
+            continue
+        metadata[path].update(
+            {
+                "source_product": PRODUCT,
+                "target_authority_boundary": TARGET_AUTHORITY,
+                "projected_source_role": "primary-command",
+                "allowed_evidence_dimensions": resolution[
+                    "authority_bounded_dimensions"
+                ],
+            }
+        )
+    return build_projection(
+        root, plan, mapping, corpus, manifest, roots, metadata, config
+    )
 
 
 def _reject_publication_fields(value: Any) -> None:
@@ -2394,28 +3831,32 @@ def _reject_publication_fields(value: Any) -> None:
             _reject_publication_fields(child)
 
 
-def check_committed(root: Path = ROOT) -> dict[str, Any]:
+def check_committed(
+    root: Path = ROOT,
+    batch: str | SourceBatch = DEFAULT_BATCH,
+) -> dict[str, Any]:
     """Validate committed identities and structure without requiring source bytes."""
 
-    source_corpus.check(root)
-    plan = read_json(root / PLAN_PATH)
-    validate_plan(plan)
-    mapping, _, manifest, _, supplements = _input_files(root, plan)
-    output_path = root / OUTPUT_PATH
+    config = source_batch(batch)
+    source_corpus.check(root, batch=config.name)
+    plan = read_json(root / config.plan_path)
+    validate_plan(plan, config)
+    mapping, corpus, manifest, _, supplements = _input_files(root, plan, config)
+    output_path = root / config.projection_path
     output = read_json(output_path)
     if tuple(output) != OUTPUT_KEYS:
         raise ProjectionError("candidate projection fields or ordering differ")
     if (
         output.get("schema_version") != OUTPUT_SCHEMA
         or output.get("target_version") != TARGET_VERSION
-        or output.get("work_package") != WORK_PACKAGE
+        or output.get("work_package") != config.project_work_package
         or output.get("status") != "candidate"
         or output.get("review_status") != "unreviewed"
         or output.get("semantic_authority") is not False
         or output.get("automatic_registration") is not False
         or output.get("coverage_credit") != 0
         or output.get("differential_credit") != 0
-        or output.get("inputs") != _inputs_for_projection(root, plan)
+        or output.get("inputs") != _inputs_for_projection(root, plan, config)
         or output.get("projection_digest_definition")
         != PROJECTION_DIGEST_DEFINITION
         or output.get("projection_sha256")
@@ -2439,7 +3880,10 @@ def check_committed(root: Path = ROOT) -> dict[str, Any]:
         raise ProjectionError("candidate row count differs from the source map")
     pins = {item["topic_path"]: item["sha256"] for item in manifest["topics"]}
     supplement_entries: dict[str, dict[str, Any]] = {}
-    for item in supplements["topics"]:
+    for item in [
+        *supplements["topics"],
+        *corpus.get("supplemental_topics", []),
+    ]:
         path = item["topic_path"]
         if path in pins:
             raise ProjectionError(f"supplement aliases a target corpus topic: {path}")
@@ -2578,6 +4022,7 @@ def check_committed(root: Path = ROOT) -> dict[str, Any]:
 
 def main(argv: Iterable[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--batch", choices=("a", "b", "c"), default="a")
     parser.add_argument("--cache", type=docs_api.retrieval_path)
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args(list(argv) if argv is not None else None)
@@ -2585,21 +4030,24 @@ def main(argv: Iterable[str] | None = None) -> int:
         if args.cache is None:
             if not args.check:
                 parser.error("--cache is required when generating the projection")
-            result = check_committed(ROOT)
+            result = check_committed(ROOT, args.batch)
             print(
-                f"cics-sources-a-project: committed pass "
+                f"cics-sources-{args.batch}-project: committed pass "
                 f"rows={result['counts']['rows']} "
                 f"candidates={result['counts']['candidates']}"
             )
             return 0
-        result = project_from_cache(ROOT, args.cache)
+        config = source_batch(args.batch)
+        result = project_from_cache(ROOT, args.cache, config)
         rendered = pretty(result)
-        output = ROOT / OUTPUT_PATH
+        output = ROOT / config.projection_path
         if args.check:
             if not output.is_file() or output.read_text(encoding="utf-8") != rendered:
-                raise ProjectionError(f"stale CICS sources-a candidate projection: {output}")
+                raise ProjectionError(
+                    f"stale CICS sources-{args.batch} candidate projection: {output}"
+                )
             print(
-                f"cics-sources-a-project: pass rows={result['counts']['rows']} "
+                f"cics-sources-{args.batch}-project: pass rows={result['counts']['rows']} "
                 f"candidates={result['counts']['candidates']} "
                 f"blocking={result['counts']['blocking_issues']}"
             )
@@ -2607,12 +4055,13 @@ def main(argv: Iterable[str] | None = None) -> int:
             output.parent.mkdir(parents=True, exist_ok=True)
             output.write_text(rendered, encoding="utf-8")
             print(
-                f"cics-sources-a-project: generated {OUTPUT_PATH} "
+                f"cics-sources-{args.batch}-project: generated "
+                f"{config.projection_path} "
                 f"candidates={result['counts']['candidates']}"
             )
         return 0
     except (OSError, ProjectionError, ValueError) as error:
-        parser.exit(1, f"cics-sources-a-project: {error}\n")
+        parser.exit(1, f"cics-sources-{args.batch}-project: {error}\n")
 
 
 if __name__ == "__main__":

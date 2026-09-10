@@ -80,6 +80,12 @@ def verification_report() -> dict:
                 "source-syntax": 0,
             },
         },
+        "applicability_coverage": {
+            "expected": 0,
+            "projected": 0,
+            "missing": 0,
+            "extra": 0,
+        },
         "candidate_categories": {
             "verified": category(["candidate-1"]),
             "requires-reprojection": category([]),
@@ -92,6 +98,7 @@ def verification_report() -> dict:
             "product-ambiguity": category([], issue=True),
             "mismatch": category([], issue=True),
         },
+        "ambiguity_scope": [],
         "findings": [],
     }
     report["report_sha256"] = module.independent.report_digest(report)
@@ -103,6 +110,24 @@ def refresh(report: dict) -> None:
 
 
 class AutomaticCicsSourceReviewTests(unittest.TestCase):
+    def test_applicability_coverage_bound_is_exactly_four_fields_per_batch_row(self) -> None:
+        schema = json.loads(
+            (module.ROOT / module.SCHEMA_PATH).read_text(encoding="utf-8")
+        )
+        properties = schema["$defs"]["applicability-coverage"]["properties"]
+        self.assertEqual(
+            {name: value["maximum"] for name, value in properties.items()},
+            {"expected": 352, "projected": 352, "missing": 352, "extra": 352},
+        )
+        for batch in "abc":
+            review = json.loads(
+                (
+                    module.ROOT
+                    / module.source_batch(batch).review_path
+                ).read_text(encoding="utf-8")
+            )
+            self.assertLessEqual(review["applicability_coverage"]["expected"], 352)
+
     def test_clear_independent_report_is_auto_accepted_without_human_fields(self) -> None:
         receipt = module.build_receipt(module.ROOT, report=verification_report())
         self.assertEqual(receipt["review_status"], "auto-accepted")
@@ -151,6 +176,9 @@ class AutomaticCicsSourceReviewTests(unittest.TestCase):
                 "reason_code": "target-equivalence-ambiguity",
             }
         ]
+        report["ambiguity_scope"] = [
+            {"official_row": "test:0001", "dimensions": ["execution-context"]}
+        ]
         refresh(report)
         receipt = module.build_receipt(module.ROOT, report=report)
         self.assertEqual(receipt["review_status"], "auto-accepted-with-bounded-ambiguities")
@@ -187,6 +215,9 @@ class AutomaticCicsSourceReviewTests(unittest.TestCase):
                 "category": "product-ambiguity",
                 "reason_code": "missing-exact-source",
             }
+        ]
+        report["ambiguity_scope"] = [
+            {"official_row": "test:0001", "dimensions": ["execution-context"]}
         ]
         refresh(report)
         receipt = module.build_receipt(module.ROOT, report=report)

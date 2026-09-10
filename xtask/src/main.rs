@@ -7479,6 +7479,8 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
     for relative in [
         "conformance/0.9/cics/command-summary-topics.json",
         "conformance/0.9/cics/application-api-sources-a-map.json",
+        "conformance/0.9/cics/application-api-sources-b-map.json",
+        "conformance/0.9/cics/application-api-sources-c-map.json",
     ] {
         let artifact = root.join(relative);
         validate_schema_instance(
@@ -7490,28 +7492,30 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
     let status = Command::new("python3")
         .arg("-B")
         .arg(&cics_source_map)
+        .args(["--batch", "all"])
         .arg("--check")
         .current_dir(root)
         .status()
-        .map_err(|error| format!("CICS sources-a map freshness guard: {error}"))?;
-    require(
-        status.success(),
-        "CICS sources-a map freshness guard failed",
-    )?;
+        .map_err(|error| format!("CICS source-map freshness guard: {error}"))?;
+    require(status.success(), "CICS source-map freshness guard failed")?;
     let cics_source_corpus = root.join("conformance/0.9/tools/fetch_cics_application_sources.py");
     require(
         cics_source_corpus.is_file(),
-        "CICS sources-a corpus generator is missing",
+        "CICS source corpus generator is missing",
     )?;
-    let cics_source_corpus_path =
-        root.join("conformance/0.9/cics/application-api-sources-a-corpus.json");
     let cics_source_corpus_schema =
         root.join("conformance/0.9/schemas/cics-source-corpus.schema.json");
-    validate_schema_instance(
-        &json(&cics_source_corpus_schema)?,
-        &json(&cics_source_corpus_path)?,
-        &cics_source_corpus_path,
-    )?;
+    let topic_manifest_schema = root.join("conformance/0.2/schemas/topic-manifest.schema.json");
+    for batch in ["a", "b", "c"] {
+        let corpus = root.join(format!(
+            "conformance/0.9/cics/application-api-sources-{batch}-corpus.json"
+        ));
+        validate_schema_instance(&json(&cics_source_corpus_schema)?, &json(&corpus)?, &corpus)?;
+        let manifest = root.join(format!(
+            "conformance/0.9/manifests/cics-application-api-sources-{batch}-topics.json"
+        ));
+        validate_schema_instance(&json(&topic_manifest_schema)?, &json(&manifest)?, &manifest)?;
+    }
     let cics_browser_receipt =
         root.join("conformance/0.9/cics/application-api-sources-a-browser-verification.json");
     let cics_browser_receipt_schema =
@@ -7521,60 +7525,57 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         &json(&cics_browser_receipt)?,
         &cics_browser_receipt,
     )?;
-    let cics_source_manifest =
-        root.join("conformance/0.9/manifests/cics-application-api-sources-a-topics.json");
-    let topic_manifest_schema = root.join("conformance/0.2/schemas/topic-manifest.schema.json");
-    validate_schema_instance(
-        &json(&topic_manifest_schema)?,
-        &json(&cics_source_manifest)?,
-        &cics_source_manifest,
-    )?;
     let status = Command::new("python3")
         .arg("-B")
         .arg(&cics_source_corpus)
+        .args(["--batch", "all"])
         .arg("--check")
         .current_dir(root)
         .status()
-        .map_err(|error| format!("CICS sources-a corpus freshness guard: {error}"))?;
+        .map_err(|error| format!("CICS source corpus freshness guard: {error}"))?;
     require(
         status.success(),
-        "CICS sources-a corpus freshness guard failed",
+        "CICS source corpus freshness guard failed",
     )?;
-    let cics_source_extraction =
-        root.join("conformance/0.9/cics/application-api-sources-a-extraction.json");
     let cics_source_extraction_schema =
         root.join("conformance/0.9/schemas/cics-source-extraction.schema.json");
-    validate_schema_instance(
-        &json(&cics_source_extraction_schema)?,
-        &json(&cics_source_extraction)?,
-        &cics_source_extraction,
-    )?;
-    let cics_source_candidates =
-        root.join("conformance/0.9/generated/cics-application-api-sources-a-candidates.json");
     let cics_source_candidates_schema =
         root.join("conformance/0.9/schemas/cics-source-candidates.schema.json");
-    validate_schema_instance(
-        &json(&cics_source_candidates_schema)?,
-        &json(&cics_source_candidates)?,
-        &cics_source_candidates,
-    )?;
     let cics_source_projector =
         root.join("conformance/0.9/tools/extract_cics_application_sources.py");
     require(
         cics_source_projector.is_file(),
-        "CICS sources-a projector is missing",
+        "CICS source projector is missing",
     )?;
-    let status = Command::new("python3")
-        .arg("-B")
-        .arg(&cics_source_projector)
-        .arg("--check")
-        .current_dir(root)
-        .status()
-        .map_err(|error| format!("CICS sources-a projection freshness guard: {error}"))?;
-    require(
-        status.success(),
-        "CICS sources-a projection freshness guard failed",
-    )?;
+    for batch in ["a", "b", "c"] {
+        let extraction = root.join(format!(
+            "conformance/0.9/cics/application-api-sources-{batch}-extraction.json"
+        ));
+        validate_schema_instance(
+            &json(&cics_source_extraction_schema)?,
+            &json(&extraction)?,
+            &extraction,
+        )?;
+        let candidates = root.join(format!(
+            "conformance/0.9/generated/cics-application-api-sources-{batch}-candidates.json"
+        ));
+        validate_schema_instance(
+            &json(&cics_source_candidates_schema)?,
+            &json(&candidates)?,
+            &candidates,
+        )?;
+        let status = Command::new("python3")
+            .arg("-B")
+            .arg(&cics_source_projector)
+            .args(["--batch", batch, "--check"])
+            .current_dir(root)
+            .status()
+            .map_err(|error| format!("CICS sources-{batch} projection freshness guard: {error}"))?;
+        require(
+            status.success(),
+            &format!("CICS sources-{batch} projection freshness guard failed"),
+        )?;
+    }
     check_cics_source_review(root)?;
     let module_boundaries = root.join("tools/check_module_boundaries.py");
     require(
@@ -7610,7 +7611,16 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
 }
 
 fn check_cics_source_review(root: &Path) -> TaskResult {
-    let review = root.join("conformance/0.9/cics/application-api-sources-a-review.json");
+    for batch in ["a", "b", "c"] {
+        check_cics_source_review_batch(root, batch)?;
+    }
+    Ok(())
+}
+
+fn check_cics_source_review_batch(root: &Path, batch: &str) -> TaskResult {
+    let review = root.join(format!(
+        "conformance/0.9/cics/application-api-sources-{batch}-review.json"
+    ));
     let schema = root.join("conformance/0.9/schemas/cics-source-review.schema.json");
     validate_schema_instance(&json(&schema)?, &json(&review)?, &review)?;
 
@@ -7622,13 +7632,13 @@ fn check_cics_source_review(root: &Path) -> TaskResult {
     let status = Command::new("python3")
         .arg("-B")
         .arg(&checker)
-        .arg("--check")
+        .args(["--batch", batch, "--check"])
         .current_dir(root)
         .status()
-        .map_err(|error| format!("CICS sources-a review freshness guard: {error}"))?;
+        .map_err(|error| format!("CICS sources-{batch} review freshness guard: {error}"))?;
     require(
         status.success(),
-        "CICS sources-a review freshness guard failed",
+        &format!("CICS sources-{batch} review freshness guard failed"),
     )
 }
 
@@ -14679,7 +14689,7 @@ mod tests {
         )
         .expect("review checker");
 
-        let error = check_cics_source_review(&root)
+        let error = check_cics_source_review_batch(&root, "a")
             .expect_err("blocked automatic review must fail the ordinary check");
         assert!(error.contains("freshness guard failed"));
         fs::remove_dir_all(root).expect("clean up");

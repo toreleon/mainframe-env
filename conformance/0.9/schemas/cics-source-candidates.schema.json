@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://mainframe-env.invalid/schemas/cics-source-candidates@1",
-  "title": "CIC-901 sources-a machine review candidates",
-  "description": "A bounded 88-row, five-dimension projection of source identities and structured candidate values. Publication prose, semantic acceptance, registration, and coverage credit are forbidden.",
+  "title": "CIC-901 application-source batch candidates",
+  "description": "A bounded 87/88-row, five-dimension projection of source identities and structured candidate values. Publication prose, semantic acceptance, registration, and coverage credit are forbidden.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -17,6 +17,7 @@
     "differential_credit",
     "inputs",
     "extractor",
+    "condition_name_authority",
     "counts",
     "rows",
     "blocking_issues",
@@ -31,7 +32,7 @@
       "const": "0.9.0"
     },
     "work_package": {
-      "const": "CIC-901.sources-a-project"
+      "enum": ["CIC-901.sources-a-project", "CIC-901.sources-b-project", "CIC-901.sources-c-project"]
     },
     "status": {
       "const": "candidate"
@@ -82,6 +83,9 @@
         }
       }
     },
+    "condition_name_authority": {
+      "$ref": "#/$defs/condition-name-authority"
+    },
     "counts": {
       "type": "object",
       "additionalProperties": false,
@@ -103,10 +107,10 @@
       ],
       "properties": {
         "rows": {
-          "const": 88
+          "type": "integer", "minimum": 87, "maximum": 88
         },
         "dimension_records": {
-          "const": 440
+          "type": "integer", "minimum": 435, "maximum": 440
         },
         "candidates": {
           "type": "integer",
@@ -115,7 +119,7 @@
         },
         "blocking_issues": {
           "type": "integer",
-          "minimum": 1,
+          "minimum": 0,
           "maximum": 28160
         },
         "projected_dimensions": {
@@ -139,28 +143,28 @@
         "syntax_diagrams": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 111
+          "maximum": 512
         },
         "syntax_svg_parts": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 112
+          "maximum": 1024
         },
         "top_level_option_terms": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 895
+          "maximum": 4096
         },
         "top_level_condition_terms": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 344
+          "maximum": 4096
         }
       }
     },
     "rows": {
       "type": "array",
-      "minItems": 88,
+      "minItems": 87,
       "maxItems": 88,
       "uniqueItems": true,
       "items": {
@@ -169,7 +173,7 @@
     },
     "blocking_issues": {
       "type": "array",
-      "minItems": 1,
+      "minItems": 0,
       "maxItems": 28160,
       "uniqueItems": true,
       "items": {
@@ -184,6 +188,58 @@
     }
   },
   "$defs": {
+    "condition-name-authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "topic_path",
+        "topic_sha256",
+        "table_id",
+        "allowed_names",
+        "conditions",
+        "allowed_names_digest_definition",
+        "allowed_names_sha256",
+        "conditions_digest_definition",
+        "conditions_sha256"
+      ],
+      "properties": {
+        "profile": {"const": "cics-eibresp-condition-name@1"},
+        "topic_path": {"const": "SSJL4D_6.x/reference-diagnostics/eib/dfhp4_eibfields.html"},
+        "topic_sha256": {"$ref": "#/$defs/prefixed-sha256"},
+        "table_id": {"const": "dfhp4au__table_nt5_kw4_b1c"},
+        "allowed_names": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/bounded-term"}
+        },
+        "conditions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "code"],
+            "properties": {
+              "name": {"$ref": "#/$defs/bounded-term"},
+              "code": {"type": "integer", "minimum": 0, "maximum": 255}
+            }
+          }
+        },
+        "allowed_names_digest_definition": {
+          "const": "SHA-256 over ASCII domain mainframe-env.cics-condition-name-authority@1, one NUL byte (0x00), then UTF-8 compact JSON of the lexicographically sorted condition-name array"
+        },
+        "allowed_names_sha256": {"$ref": "#/$defs/prefixed-sha256"},
+        "conditions_digest_definition": {
+          "const": "SHA-256 over ASCII domain mainframe-env.cics-condition-name-authority@1, one NUL byte (0x00), then ASCII 'pairs', one NUL byte (0x00), then UTF-8 compact JSON of lexicographically name-sorted [name,code] pairs"
+        },
+        "conditions_sha256": {"$ref": "#/$defs/prefixed-sha256"}
+      }
+    },
     "prefixed-sha256": {
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$"
@@ -194,7 +250,7 @@
     },
     "official-row": {
       "type": "string",
-      "pattern": "^ibm-cics-ts-6x-2026-08-31:api-commands:(?:000[1-9]|00[1-7][0-9]|008[0-8])$"
+      "pattern": "^ibm-cics-ts-6x-2026-08-31:api-commands:(?:000[1-9]|00[1-9][0-9]|01[0-9]{2}|02[0-5][0-9]|026[0-3])$"
     },
     "topic-path": {
       "type": "string",
@@ -250,13 +306,7 @@
     "inputs": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "source_map",
-        "source_corpus",
-        "topic_manifest",
-        "extraction_plan"
-        ,"source_supplements"
-      ],
+      "required": ["source_map", "source_corpus", "topic_manifest", "extraction_plan"],
       "properties": {
         "source_map": {
           "allOf": [
@@ -266,7 +316,7 @@
             {
               "properties": {
                 "path": {
-                  "const": "conformance/0.9/cics/application-api-sources-a-map.json"
+                  "pattern": "^conformance/0\\.9/cics/application-api-sources-[abc]-map\\.json$"
                 }
               }
             }
@@ -280,7 +330,7 @@
             {
               "properties": {
                 "path": {
-                  "const": "conformance/0.9/cics/application-api-sources-a-corpus.json"
+                  "pattern": "^conformance/0\\.9/cics/application-api-sources-[abc]-corpus\\.json$"
                 }
               }
             }
@@ -294,7 +344,7 @@
             {
               "properties": {
                 "path": {
-                  "const": "conformance/0.9/manifests/cics-application-api-sources-a-topics.json"
+                  "pattern": "^conformance/0\\.9/manifests/cics-application-api-sources-[abc]-topics\\.json$"
                 }
               }
             }
@@ -308,7 +358,7 @@
             {
               "properties": {
                 "path": {
-                  "const": "conformance/0.9/cics/application-api-sources-a-extraction.json"
+                  "pattern": "^conformance/0\\.9/cics/application-api-sources-[abc]-extraction\\.json$"
                 }
               }
             }
@@ -320,7 +370,7 @@
             {
               "properties": {
                 "path": {
-                  "const": "conformance/0.9/cics/application-api-sources-a-supplements.json"
+                  "pattern": "^conformance/0\\.9/cics/application-api-sources-[abc]-supplements\\.json$"
                 }
               }
             }
@@ -354,6 +404,7 @@
         "variant-command",
         "shared-command",
         "combined-command",
+        "alias-command",
         "one-hop-context",
         "manual-context",
         "common-command-format",
@@ -364,6 +415,7 @@
         "cross-product-compatibility",
         "version-compatibility-context",
         "target-platform-example"
+        ,"response-code-context"
       ]
     },
     "row": {
@@ -401,8 +453,8 @@
         },
         "topics": {
           "type": "array",
-          "minItems": 1,
-          "maxItems": 32,
+          "minItems": 0,
+          "maxItems": 128,
           "uniqueItems": true,
           "items": {
             "$ref": "#/$defs/topic-binding"
@@ -517,7 +569,7 @@
         },
         "issues": {
           "type": "array",
-          "maxItems": 64,
+          "maxItems": 128,
           "uniqueItems": true,
           "items": {
             "$ref": "#/$defs/blocking-issue"
@@ -603,7 +655,7 @@
       "properties": {
         "candidate_id": {
           "type": "string",
-          "pattern": "^cics-a-[0-9]{4}-[a-z-]+-[0-9a-f]{12}$"
+          "pattern": "^cics-[abc]-[0-9]{4}-[a-z-]+-[0-9a-f]{12}$"
         },
         "kind": {
           "enum": [
@@ -787,6 +839,10 @@
       "required": [
         "type",
         "variant",
+        "syntax_head",
+        "panel",
+        "identity_relation",
+        "identity_discriminators",
         "tokens",
         "structure_sha256"
       ],
@@ -797,6 +853,37 @@
         "variant": {
           "type": "string",
           "pattern": "^diagram-[0-9]{4}$"
+        },
+        "syntax_head": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9 ()/-]{0,79}$"
+        },
+        "panel": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["index", "total", "role"],
+          "properties": {
+            "index": {"type": "integer", "minimum": 1, "maximum": 32},
+            "total": {"type": "integer", "minimum": 1, "maximum": 32},
+            "role": {"enum": ["command-head", "continuation"]}
+          }
+        },
+        "identity_relation": {
+          "enum": ["exact", "catalog-qualified", "documented-alias", "continuation"]
+        },
+        "identity_discriminators": {
+          "type": "array",
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "state"],
+            "properties": {
+              "name": {"$ref": "#/$defs/bounded-term"},
+              "state": {"enum": ["present", "absent"]}
+            }
+          }
         },
         "tokens": {
           "type": "array",
@@ -882,6 +969,8 @@
         "term",
         "arguments",
         "definition_count",
+        "description_fragment_sha256s",
+        "option_legality",
         "depth",
         "stack"
       ],
@@ -905,6 +994,15 @@
           "minimum": 1,
           "maximum": 64
         },
+        "description_fragment_sha256s": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {"$ref": "#/$defs/prefixed-sha256"}
+        },
+        "option_legality": {
+          "enum": ["structural", "bounded-prose"]
+        },
         "depth": {
           "type": "integer",
           "minimum": 0,
@@ -912,8 +1010,41 @@
         },
         "stack": {
           "$ref": "#/$defs/term-stack"
+        },
+        "dynamic_name_profile": {"const": "cics-eibresp-condition-name@1"},
+        "minimum_occurrences": {"const": 1},
+        "maximum_occurrences": {"const": 16},
+        "label_operand": {"enum": ["optional", "forbidden"]},
+        "occurrence_limit_fragment_sha256": {"$ref": "#/$defs/prefixed-sha256"}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"term": {"const": "CONDITION-NAME"}},
+            "required": ["term"]
+          },
+          "then": {
+            "required": [
+              "dynamic_name_profile",
+              "minimum_occurrences",
+              "maximum_occurrences",
+              "label_operand",
+              "occurrence_limit_fragment_sha256"
+            ]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {"required": ["dynamic_name_profile"]},
+                {"required": ["minimum_occurrences"]},
+                {"required": ["maximum_occurrences"]},
+                {"required": ["label_operand"]},
+                {"required": ["occurrence_limit_fragment_sha256"]}
+              ]
+            }
+          }
         }
-      }
+      ]
     },
     "direction-value": {
       "type": "object",
@@ -952,6 +1083,7 @@
         "type",
         "condition_stack",
         "definition_count",
+        "trigger_fragment_sha256s",
         "depth"
       ],
       "properties": {
@@ -965,6 +1097,12 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 64
+        },
+        "trigger_fragment_sha256s": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {"$ref": "#/$defs/prefixed-sha256"}
         },
         "depth": {
           "type": "integer",
@@ -992,6 +1130,9 @@
             "mapped-option-operand-directions",
             "mapped-condition-definitions",
             "mapped-inline-execution-context",
+            "mapped-context-predicate",
+            "mapped-dpl-applicability",
+            "mapped-language-applicability",
             "mapped-one-hop-context",
             "global-command-format",
             "global-command-argument-values",
@@ -1001,6 +1142,7 @@
             "gap-eibfn-identity",
             "traceid-monitor-compatibility",
             "traceid-dfhcmp-compatibility",
+            "global-response-codes",
             "source-resolution-context"
           ]
         },
@@ -1016,9 +1158,118 @@
             "official-row-to-command-table-row-and-notes",
             "official-row-to-api-table-row-by-label-and-eibfn",
             "compatibility-context-only-no-command-alias",
+            "condition-name-to-response-code",
             "exact-topic-root-no-link-expansion",
             "mapped-inline-execution-context",
+            "mapped-context-predicate",
+            "mapped-dpl-applicability",
             "mapped-one-hop-context"
+          ]
+        },
+        "applicability": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "local_task": {"enum": ["allowed", "not-applicable"]},
+            "dpl_server": {"enum": ["allowed", "restricted", "not-applicable"]},
+            "threadsafe": {"enum": ["yes", "conditional", "no", "not-listed", "not-applicable"]},
+            "cobol": {"enum": ["allowed", "not-applicable", "conditional"]},
+            "dpl_restriction": {"$ref": "#/$defs/dpl-restriction"},
+            "threadsafe_condition": {"$ref": "#/$defs/threadsafe-condition"},
+            "language_restriction": {"$ref": "#/$defs/language-restriction"}
+          }
+        },
+        "predicate_id": {"$ref": "#/$defs/prefixed-sha256"},
+        "predicate_state": {"const": "bounded"}
+      }
+    },
+    "dpl-restriction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "source_kind", "table_command", "prohibited_options", "requirement", "restriction_predicates", "condition", "resp2"],
+      "properties": {
+        "kind": {"enum": ["prohibited", "option-restricted", "conditional"]},
+        "source_kind": {"enum": ["table", "prose"]},
+        "table_command": {"type": "string", "pattern": "^[A-Z][A-Z0-9 ]{0,63}$"},
+        "prohibited_options": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9]*(?:\\([A-Z]+\\))?$"}
+        },
+        "requirement": {"enum": ["none", "synconreturn-required", "termid-not-intersystem-session"]},
+        "restriction_predicates": {
+          "type": "array",
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {"enum": ["principal-facility", "connect-process-principal-facility-error-is-dpl"]}
+        },
+        "restriction_match": {"const": "any-of"},
+        "condition": {"const": "INVREQ"},
+        "resp2": {"enum": [1, 5, 200]}
+      }
+    },
+    "threadsafe-condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "threadsafe_when", "not_threadsafe_when"],
+      "properties": {
+        "profile": {
+          "enum": [
+            "program-link-locality",
+            "file-control-storage-and-locality",
+            "queue-control-locality",
+            "enq-locality",
+            "deq-locality",
+            "write-operator-reply-key9"
+          ]
+        },
+        "threadsafe_when": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/threadsafe-predicate"}
+        },
+        "not_threadsafe_when": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/threadsafe-predicate"}
+        }
+      }
+    },
+    "threadsafe-predicate": {
+      "enum": [
+        "resource-local",
+        "resource-remote-ipic",
+        "resource-remote-non-ipic",
+        "file-vsam-rls",
+        "file-coupling-facility-data-table",
+        "file-shared-data-table-read-or-browse",
+        "file-bdam",
+        "file-shared-data-table-update",
+        "file-nsr",
+        "resource-definition-local",
+        "resource-definition-global",
+        "not-reply-from-key9-tcb",
+        "reply-from-key9-tcb"
+      ]
+    },
+    "language-restriction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile"],
+      "properties": {
+        "profile": {
+          "enum": [
+            "exec-cics-all-supported-languages",
+            "assembler-and-c-only",
+            "non-le-amode64-assembler-only",
+            "cobol-pli-non-amode64-assembler-only",
+            "internal-only"
           ]
         }
       }
@@ -1032,6 +1283,9 @@
         {
           "enum": [
             "mapped-inline-execution-context",
+            "mapped-context-predicate",
+            "mapped-dpl-applicability",
+            "mapped-language-applicability",
             "global-command-format",
             "global-command-argument-values",
             "dpl-server-restrictions",
@@ -1040,6 +1294,7 @@
             "gap-eibfn-identity",
             "traceid-monitor-compatibility",
             "traceid-dfhcmp-compatibility",
+            "global-response-codes",
             "source-resolution-context"
           ]
         },
@@ -1113,9 +1368,11 @@
             "dt",
             "dd",
             "li",
-            "tr",
-            "table",
+                        "tr",
+                        "td",
+                        "table",
             "section",
+            "span",
             "ul"
           ]
         },
@@ -1183,7 +1440,7 @@
       "properties": {
         "issue_id": {
           "type": "string",
-          "pattern": "^cics-a-issue-[0-9]{4}-[a-z-]+-[0-9a-f]{12}$"
+          "pattern": "^cics-[abc]-issue-[0-9]{4}-[a-z-]+-[0-9a-f]{12}$"
         },
         "code": {
           "enum": [
@@ -1201,7 +1458,11 @@
             "variant-union-unresolved",
             "internal-use-conflict",
             "compatibility-successor-not-equivalent"
-            ,"target-equivalence-ambiguity"
+            ,"target-equivalence-ambiguity",
+            "syntax-panel-composition-unresolved",
+            "prose-option-legality-not-structured",
+            "context-predicate-not-structured",
+            "shared-condition-applicability-unresolved"
           ]
         },
         "blocking": {
@@ -1219,7 +1480,7 @@
           "uniqueItems": true,
           "items": {
             "type": "string",
-            "pattern": "^cics-a-[0-9]{4}-[a-z-]+-[0-9a-f]{12}$"
+            "pattern": "^cics-[abc]-[0-9]{4}-[a-z-]+-[0-9a-f]{12}$"
           }
         },
         "evidence": {

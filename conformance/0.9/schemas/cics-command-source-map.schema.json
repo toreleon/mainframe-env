@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://mainframe-env.invalid/schemas/cics-command-source-map@1",
   "title": "CICS command-summary projection and zero-credit source mapping",
-  "description": "Strict schemas for the bounded IBM TOC projection and the CIC-901.sources-a row-to-topic candidate mapping. Neither artifact contains command semantics or grants coverage.",
+  "description": "Strict schemas for the bounded IBM TOC projection and the three CIC-901 application row-to-topic candidate maps. Neither artifact contains command semantics or grants coverage.",
   "type": "object",
   "oneOf": [
     {
@@ -156,7 +156,8 @@
             "primary",
             "variant",
             "shared",
-            "combined"
+            "combined",
+            "alias"
           ]
         }
       }
@@ -199,6 +200,7 @@
             "variant-set",
             "shared-page",
             "combined-page",
+            "aliased-page",
             "source-gap"
           ]
         },
@@ -208,6 +210,7 @@
             "qualified-variant-set",
             "shared-command-form",
             "combined-command-page",
+            "catalog-label-alias",
             "no-command-summary-node"
           ]
         },
@@ -309,12 +312,46 @@
                 "const": "qualified-variant-set"
               },
               "topics": {
-                "minItems": 2,
+                "minItems": 1,
                 "items": {
                   "type": "object",
                   "properties": {
                     "role": {
                       "const": "variant"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "selection_kind": {
+                "const": "aliased-page"
+              }
+            },
+            "required": [
+              "selection_kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "state": {
+                "const": "mapped"
+              },
+              "rationale": {
+                "const": "catalog-label-alias"
+              },
+              "topics": {
+                "minItems": 1,
+                "maxItems": 1,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "const": "alias"
                     }
                   }
                 }
@@ -450,13 +487,17 @@
       ],
       "properties": {
         "first": {
-          "const": "ibm-cics-ts-6x-2026-08-31:api-commands:0001"
+          "type": "string",
+          "pattern": "^ibm-cics-ts-6x-2026-08-31:api-commands:[0-9]{4}$"
         },
         "last": {
-          "const": "ibm-cics-ts-6x-2026-08-31:api-commands:0088"
+          "type": "string",
+          "pattern": "^ibm-cics-ts-6x-2026-08-31:api-commands:[0-9]{4}$"
         },
         "count": {
-          "const": 88
+          "type": "integer",
+          "minimum": 87,
+          "maximum": 88
         }
       }
     },
@@ -475,25 +516,39 @@
       ],
       "properties": {
         "row_count": {
-          "const": 88
+          "type": "integer",
+          "minimum": 87,
+          "maximum": 88
         },
         "resolved_row_count": {
-          "const": 85
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 88
         },
         "source_gap_count": {
-          "const": 3
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 88
         },
         "edge_count": {
-          "const": 117
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 512
         },
         "unique_topic_count": {
-          "const": 109
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 345
         },
         "multi_topic_row_count": {
-          "const": 9
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 88
         },
         "shared_topic_count": {
-          "const": 7
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 345
         },
         "selection_kind_counts": {
           "type": "object",
@@ -507,19 +562,34 @@
           ],
           "properties": {
             "exact": {
-              "const": 61
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 88
             },
             "variant-set": {
-              "const": 9
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 88
             },
             "shared-page": {
-              "const": 9
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 88
             },
             "combined-page": {
-              "const": 6
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 88
+            },
+            "aliased-page": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 88
             },
             "source-gap": {
-              "const": 3
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 88
             }
           }
         }
@@ -553,7 +623,11 @@
           "const": "0.9.0"
         },
         "work_package": {
-          "const": "CIC-901.sources-a-map"
+          "enum": [
+            "CIC-901.sources-a-map",
+            "CIC-901.sources-b-map",
+            "CIC-901.sources-c-map"
+          ]
         },
         "status": {
           "const": "candidate"
@@ -590,13 +664,75 @@
         },
         "rows": {
           "type": "array",
-          "minItems": 88,
+          "minItems": 87,
           "maxItems": 88,
           "items": {
             "$ref": "#/$defs/mapping-row"
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "work_package": {"const": "CIC-901.sources-a-map"}
+            },
+            "required": ["work_package"]
+          },
+          "then": {
+            "properties": {
+              "row_range": {
+                "properties": {
+                  "first": {"const": "ibm-cics-ts-6x-2026-08-31:api-commands:0001"},
+                  "last": {"const": "ibm-cics-ts-6x-2026-08-31:api-commands:0088"},
+                  "count": {"const": 88}
+                }
+              },
+              "rows": {"minItems": 88, "maxItems": 88}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "work_package": {"const": "CIC-901.sources-b-map"}
+            },
+            "required": ["work_package"]
+          },
+          "then": {
+            "properties": {
+              "row_range": {
+                "properties": {
+                  "first": {"const": "ibm-cics-ts-6x-2026-08-31:api-commands:0089"},
+                  "last": {"const": "ibm-cics-ts-6x-2026-08-31:api-commands:0176"},
+                  "count": {"const": 88}
+                }
+              },
+              "rows": {"minItems": 88, "maxItems": 88}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "work_package": {"const": "CIC-901.sources-c-map"}
+            },
+            "required": ["work_package"]
+          },
+          "then": {
+            "properties": {
+              "row_range": {
+                "properties": {
+                  "first": {"const": "ibm-cics-ts-6x-2026-08-31:api-commands:0177"},
+                  "last": {"const": "ibm-cics-ts-6x-2026-08-31:api-commands:0263"},
+                  "count": {"const": 87}
+                }
+              },
+              "rows": {"minItems": 87, "maxItems": 87}
+            }
+          }
+        }
+      ]
     }
   }
 }

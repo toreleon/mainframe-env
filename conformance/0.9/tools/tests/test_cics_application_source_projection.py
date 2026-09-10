@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import importlib.util
 import json
 import re
@@ -149,6 +150,20 @@ class DefinitionTests(unittest.TestCase):
         with self.assertRaisesRegex(module.ProjectionError, "no preceding term"):
             module.definition_groups(module.direct_sections(root)["Options"])
 
+    def test_plain_text_operand_survives_a_trailing_only_annotation(self) -> None:
+        root = module.parse_html("<dl><dt>TOKEN(data-area) (RLS only)</dt></dl>")
+        term = next(node for node in module.walk(root) if node.tag == "dt")
+        self.assertEqual(module._argument_markers(term), ["data-area"])
+
+    def test_condition_symbol_uses_only_pinned_response_codes(self) -> None:
+        codes = {"INVREQ": 16, "LENGERR": 22, "NOTAUTH": 70}
+        self.assertEqual(
+            module._symbolic_condition_term("INVREQ", 0, codes), "RESP-16-INVREQ"
+        )
+        self.assertEqual(
+            module._symbolic_condition_term("UNKNOWN", 0, codes), "SYMBOL-UNKNOWN"
+        )
+
 
 class SyntaxTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -161,6 +176,26 @@ class SyntaxTests(unittest.TestCase):
         self.assertEqual(
             [(token.kind, token.value) for token in sysid.tokens],
             [("keyword", "SYSID("), ("variable", "systemname"), ("delimiter", ")")],
+        )
+
+    def test_dynamic_condition_and_timer_default_are_not_literal_keywords(self) -> None:
+        root = module.parse_html(
+            """<svg><g>
+            <text class="syntaxkwd">condition</text>
+            <text class="syntaxkwd">today</text>
+            <text class="syntaxkwd">NATLANG</text>
+            <text class="syntaxkwd">'en'</text>
+            </g></svg>"""
+        )
+        tokens = module._semantic_tokens(root)
+        self.assertEqual(
+            [(token.kind, token.value) for token in tokens],
+            [
+                ("variable", "condition"),
+                ("fragment", "today"),
+                ("keyword", "NATLANG"),
+                ("keyword", "'en'"),
+            ],
         )
 
     def test_required_optional_and_alternative_relations_are_structural(self) -> None:
@@ -184,6 +219,22 @@ class SyntaxTests(unittest.TestCase):
             module.syntax_group_path(partner.tokens[0], self.diagram),
         )
         self.assertEqual(module.syntax_piece_ordinal(profile.tokens[0], self.diagram), 1)
+
+    def test_compound_command_prefix_is_not_an_operand_option(self) -> None:
+        node = module.Node("g", {})
+        item = module.SyntaxItem(
+            "required",
+            (
+                module.SyntaxToken("keyword", "SET", node),
+                module.SyntaxToken("keyword", "ASSOCIATION", node),
+                module.SyntaxToken("keyword", "USERCORRDATA(", node),
+                module.SyntaxToken("variable", "data-value", node),
+            ),
+            node,
+        )
+        self.assertEqual(
+            module._syntax_option_name(item, {"USERCORRDATA"}), "USERCORRDATA"
+        )
 
     def test_multiple_svg_pieces_share_one_diagram_title(self) -> None:
         body = SYNTAX_HTML.replace("</svg>", "</svg><svg class='syntaxdiagram'><g class='diagram'><g class='boxed groupcomp'><g><text class='syntaxkwd'>SECOND</text></g></g></g></svg>")
@@ -219,7 +270,7 @@ class SyntaxTests(unittest.TestCase):
         root = module.parse_html(
             '<section><h2 id="s" class="sectiontitle">Syntax</h2><div class="syntaxdiagram"><svg class="syntaxdiagram"></svg></div></section>'
         )
-        with self.assertRaisesRegex(module.ProjectionError, "exactly one title"):
+        with self.assertRaisesRegex(module.ProjectionError, "stable identity"):
             module.syntax_diagrams(module.direct_sections(root)["Syntax"])
 
     def test_shared_asktime_syntax_does_not_leak_abstime_to_bare_row(self) -> None:
@@ -257,12 +308,290 @@ class SyntaxTests(unittest.TestCase):
         self.assertNotIn("ABSTIME(", [token.value for item in bare for token in item.tokens])
         self.assertIn("ABSTIME(", [token.value for item in abstime for token in item.tokens])
 
+    def test_shared_acquire_prunes_the_complete_sibling_choice_branch(self) -> None:
+        root = module.parse_html(
+            """<section><h2 id="s" class="sectiontitle">Syntax</h2>
+            <div class="syntaxdiagram"><h3 id="d" class="syntaxdiagram-title">ACQUIRE</h3>
+            <svg class="syntaxdiagram"><g class="diagram"><g class="groupcomp">
+              <g class="boxed groupcomp"><g class="unboxed syntaxkwd">
+                <g><text class="syntaxkwd">ACQUIRE</text></g></g></g>
+              <g class="groupchoice">
+                <g class="groupseq">
+                  <g class="boxed groupcomp"><g class="unboxed syntaxkwd">
+                    <g><text class="syntaxkwd">PROCESS(</text></g>
+                    <g><text class="syntaxvar">data-value</text></g>
+                    <g><text class="syntaxdelim">)</text></g></g></g>
+                  <g class="boxed groupcomp"><g class="unboxed syntaxkwd">
+                    <g><text class="syntaxkwd">PROCESSTYPE(</text></g>
+                    <g><text class="syntaxvar">data-value</text></g>
+                    <g><text class="syntaxdelim">)</text></g></g></g>
+                </g>
+                <g class="boxed groupcomp"><g class="unboxed syntaxkwd">
+                  <g><text class="syntaxkwd">ACTIVITYID(</text></g>
+                  <g><text class="syntaxvar">data-value</text></g>
+                  <g><text class="syntaxdelim">)</text></g></g></g>
+              </g>
+            </g></g></svg></div></section>"""
+        )
+        diagram = module.syntax_diagrams(module.direct_sections(root)["Syntax"])[0]
+        rows = [
+            {
+                "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0002",
+                "label": "ACQUIRE ACTIVITYID",
+                "selection_kind": "shared-page",
+            },
+            {
+                "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0003",
+                "label": "ACQUIRE PROCESS",
+                "selection_kind": "shared-page",
+            },
+        ]
+        activity = module._syntax_items_for_row(rows[0], rows, diagram)
+        process = module._syntax_items_for_row(rows[1], rows, diagram)
+        activity_tokens = [token.value for item in activity for token in item.tokens]
+        process_tokens = [token.value for item in process for token in item.tokens]
+        self.assertEqual(
+            [value for value in activity_tokens if value.endswith("(")],
+            ["ACTIVITYID("],
+        )
+        self.assertEqual(
+            [value for value in process_tokens if value.endswith("(")],
+            ["PROCESS(", "PROCESSTYPE("],
+        )
+        activity_item = next(
+            item for item in activity if item.tokens[0].value == "ACTIVITYID("
+        )
+        self.assertEqual(activity_item.relation, "required")
+
 
 class SupplementBoundaryTests(unittest.TestCase):
     def test_uppercase_nested_enum_is_not_an_operand_marker(self) -> None:
         root = module.parse_html("<dl><dt>HOSTNAME</dt></dl>")
         term = next(node for node in module.walk(root) if node.tag == "dt")
         self.assertEqual(module._argument_markers(term), ["none"])
+
+    def test_dpl_table_does_not_prefix_match_distinct_command_families(self) -> None:
+        root = module.parse_html(
+            """<table><tbody>
+            <tr><td>FREE</td><td>all</td></tr>
+            <tr><td>LINK</td><td>INPUTMSG INPUTMSGLEN</td></tr>
+            <tr><td>RECEIVE</td><td>all</td></tr>
+            <tr><td>START</td><td>TERMID where intersystem</td></tr>
+            <tr><td>SEND</td><td>MAP TEXT</td></tr>
+            <tr><td>WAIT TERMINAL</td><td>all</td></tr>
+            </tbody></table>"""
+        )
+        table = next(node for node in module.walk(root) if node.tag == "table")
+        for label in (
+            "FREE CHILD",
+            "LINK ACQACTIVITY",
+            "RECEIVE MAP",
+            "RECEIVE PARTN",
+            "START ATTACH",
+            "START BREXIT",
+        ):
+            self.assertEqual(
+                module._dpl_server_applicability(label, table),
+                {"dpl_server": "allowed"},
+            )
+        self.assertEqual(
+            module._dpl_server_applicability("SEND MAP", table)["dpl_server"],
+            "restricted",
+        )
+        send = module._dpl_server_applicability("SEND", table)["dpl_restriction"]
+        self.assertEqual(send["kind"], "conditional")
+        self.assertEqual(send["prohibited_options"], ["MAP", "TEXT"])
+        self.assertEqual(send["restriction_predicates"], ["principal-facility"])
+        self.assertEqual(send["restriction_match"], "any-of")
+        wait = module._dpl_server_applicability("WAIT TERMINAL", table)[
+            "dpl_restriction"
+        ]
+        self.assertEqual(wait["kind"], "conditional")
+        self.assertEqual(wait["restriction_predicates"], ["principal-facility"])
+
+    def test_threadsafe_source_typo_has_one_narrow_catalog_alias(self) -> None:
+        root = module.parse_html("<ul><li>REQUEST ENCYRPTPTKT</li></ul>")
+        item = next(node for node in module.walk(root) if node.tag == "ul")
+        self.assertEqual(
+            module._threadsafe_applicability(
+                "REQUEST ENCRYPTPTKT", item, "mapped"
+            ),
+            {"threadsafe": "yes"},
+        )
+
+    def test_threadsafe_web_family_requires_every_pinned_form(self) -> None:
+        root = module.parse_html(
+            """<ul><li>WEB READ FORMFIELD</li><li>WEB READ HTTPHEADER</li>
+            <li>WEB READ QUERYPARM</li><li>WEB WRITE HTTPHEADER</li></ul>"""
+        )
+        item = next(node for node in module.walk(root) if node.tag == "ul")
+        self.assertEqual(
+            module._threadsafe_applicability("WEB READ", item, "mapped"),
+            {"threadsafe": "yes"},
+        )
+        self.assertEqual(
+            module._threadsafe_applicability("WEB WRITE", item, "mapped"),
+            {"threadsafe": "yes"},
+        )
+        self.assertEqual(
+            module._threadsafe_applicability("CICSMESSAGE", item, "source-gap"),
+            {"threadsafe": "not-applicable"},
+        )
+
+    def test_dpl_prose_and_principal_facility_are_structured(self) -> None:
+        root = module.parse_html(
+            """<section><p>Any of the EXEC CICS WEB commands fail with a RESP2
+            value of 1. WEB EXTRACT, EXTRACT TCPIP and EXTRACT CERTIFICATE fail
+            with a RESP2 value of 5. APPC commands listed are prohibited only
+            when they refer to the principal facility.</p><table><tbody>
+            <tr><td>CONNECT PROCESS</td><td>all</td></tr>
+            <tr><td>RECEIVE</td><td>all</td></tr>
+            </tbody></table></section>"""
+        )
+        section = next(node for node in module.walk(root) if node.tag == "section")
+        web = module._dpl_server_applicability("WEB CLOSE", section)
+        extract = module._dpl_server_applicability("WEB EXTRACT", section)
+        connect = module._dpl_server_applicability("CONNECT PROCESS", section)
+        self.assertEqual(web["dpl_restriction"]["resp2"], 1)
+        self.assertEqual(extract["dpl_restriction"]["resp2"], 5)
+        self.assertEqual(connect["dpl_restriction"]["kind"], "conditional")
+        self.assertEqual(
+            connect["dpl_restriction"]["restriction_predicates"],
+            [
+                "principal-facility",
+                "connect-process-principal-facility-error-is-dpl",
+            ],
+        )
+
+    def test_conditional_threadsafe_profile_preserves_predicates(self) -> None:
+        root = module.parse_html("<ul><li>READ *</li><li>ABEND</li></ul>")
+        item = next(node for node in module.walk(root) if node.tag == "ul")
+        read = module._threadsafe_applicability("READ FILE", item, "mapped")
+        self.assertEqual(read["threadsafe"], "conditional")
+        self.assertEqual(
+            read["threadsafe_condition"]["profile"],
+            "file-control-storage-and-locality",
+        )
+        self.assertIn(
+            "file-nsr", read["threadsafe_condition"]["not_threadsafe_when"]
+        )
+        self.assertEqual(
+            module._threadsafe_applicability("ABEND", item, "mapped"),
+            {"threadsafe": "yes"},
+        )
+
+    def test_language_profiles_are_exact_and_bounded(self) -> None:
+        gds = module.parse_html(
+            "<p class='shortdesc'>APPC basic conversation "
+            "(assembler-language and C programs only).</p>"
+        )
+        node = next(module.walk(gds))
+        self.assertEqual(module._language_profile(node), "assembler-and-c-only")
+        self.assertEqual(
+            module._language_applicability("assembler-and-c-only")["cobol"],
+            "not-applicable",
+        )
+
+    def test_readq_ts_dependency_is_bounded_from_description_fragment(self) -> None:
+        root = module.parse_html(
+            "<section><h2 class='sectiontitle' id='options'>Options</h2><dl>"
+            "<dt>LENGTH(data-area)</dt><dd>If you specify the SET option, the "
+            "LENGTH must be specified.</dd></dl></section>"
+        )
+        section = next(node for node in module.walk(root) if node.tag == "section")
+        group = module.definition_groups(
+            module.Section("Options", "options", section)
+        )[0]
+        self.assertEqual(len(module._option_legality_descriptions(group)), 1)
+
+    def test_syntax_head_excludes_valued_catalog_discriminator(self) -> None:
+        cases = (
+            (
+                "ACQUIRE ACTIVITYID",
+                [
+                    {"kind": "keyword", "value": "ACQUIRE", "relation": "required"},
+                    {"kind": "keyword", "value": "ACTIVITYID(", "relation": "required"},
+                ],
+                {"PROCESSTYPE", "ACTIVITYID"},
+                "ACQUIRE",
+                [{"name": "ACTIVITYID", "state": "present"}],
+            ),
+            (
+                "SEND MAP",
+                [{"kind": "keyword", "value": "SEND MAP(", "relation": "required"}],
+                {"MAP"},
+                "SEND",
+                [{"name": "MAP", "state": "present"}],
+            ),
+            (
+                "WRITE FILE",
+                [{"kind": "keyword", "value": "WRITE FILE(", "relation": "required"}],
+                {"FILE"},
+                "WRITE",
+                [{"name": "FILE", "state": "present"}],
+            ),
+        )
+        for label, tokens, options, head, discriminators in cases:
+            actual = module._syntax_head(tokens, options)
+            self.assertEqual(actual, head)
+            self.assertEqual(
+                module._syntax_identity(label, actual, tokens)[1], discriminators
+            )
+        self.assertEqual(
+            module._syntax_identity(
+                "ACQUIRE ACTIVITYID",
+                "ACQUIRE",
+                [
+                    {"kind": "keyword", "value": "ACQUIRE", "relation": "required"},
+                    {"kind": "keyword", "value": "ACTIVITYID(", "relation": "alternative"},
+                ],
+            )[1],
+            [],
+        )
+        address_tokens = [
+            {
+                "kind": "keyword",
+                "value": "ADDRESS",
+                "relation": "required",
+                "group_path": "groupcomp[1]",
+            },
+            {
+                "kind": "keyword",
+                "value": "SET(",
+                "relation": "required",
+                "group_path": "groupchoice[2]/groupseq[1]/groupcomp[1]",
+            },
+            {
+                "kind": "keyword",
+                "value": "USING(",
+                "relation": "required",
+                "group_path": "groupchoice[2]/groupseq[1]/groupcomp[2]",
+            },
+            {
+                "kind": "keyword",
+                "value": "SET(",
+                "relation": "alternative",
+                "group_path": "groupchoice[2]/groupseq[2]/groupcomp[1]",
+            },
+            {
+                "kind": "keyword",
+                "value": "USING(",
+                "relation": "alternative",
+                "group_path": "groupchoice[2]/groupseq[2]/groupcomp[2]",
+            },
+        ]
+        self.assertEqual(
+            module._syntax_identity("ADDRESS SET", "ADDRESS", address_tokens)[1],
+            [{"name": "SET", "state": "present"}],
+        )
+        self.assertEqual(
+            module._syntax_identity(
+                "WAIT",
+                "GDS WAIT",
+                [{"kind": "keyword", "value": "GDS WAIT", "relation": "required"}],
+            )[0],
+            "documented-alias",
+        )
 
     def test_supplement_aliasing_is_rejected(self) -> None:
         candidate = {
@@ -454,7 +783,7 @@ class RepositoryProjectionTests(unittest.TestCase):
             {
                 "rows": 88,
                 "dimension_records": 440,
-                "blocking_issues": 2,
+                "blocking_issues": 304,
                 "projected_dimensions": 422,
                 "declared_absent_dimensions": 14,
                 "source_gap_dimensions": 0,
@@ -490,6 +819,74 @@ class RepositoryProjectionTests(unittest.TestCase):
         self.assertEqual(
             self.output_path.read_text(encoding="utf-8"), module.pretty(self.output)
         )
+
+    def test_eibresp_condition_authority_and_dynamic_clauses_are_exact(self) -> None:
+        authority = self.output["condition_name_authority"]
+        pairs = [[item["name"], item["code"]] for item in authority["conditions"]]
+        self.assertEqual(len(pairs), 121)
+        self.assertEqual(pairs, sorted(pairs))
+        self.assertEqual(authority["allowed_names"], [name for name, _ in pairs])
+        self.assertEqual(
+            hashlib.sha256(
+                json.dumps(pairs, separators=(",", ":")).encode("utf-8")
+            ).hexdigest(),
+            "33e16a2f60928dbd2168e1e3ad6e5e5b441fdca1c493c55b493d6452bf4d27e0",
+        )
+        by_name = dict(pairs)
+        self.assertEqual(
+            {name: by_name[name] for name in ("NORMAL", "ERROR", "BUSY")},
+            {"NORMAL": 0, "ERROR": 1, "BUSY": 128},
+        )
+        self.assertEqual(
+            set(range(129)) - set(by_name.values()),
+            {67, 68, 73, 74, 76, 77, 78, 79},
+        )
+
+        batch_b_path = (
+            self.root
+            / "conformance/0.9/generated/cics-application-api-sources-b-candidates.json"
+        )
+        batch_b = json.loads(batch_b_path.read_text(encoding="utf-8"))
+        rows = {row["label"]: row for row in batch_b["rows"]}
+        for label, label_operand in (
+            ("HANDLE CONDITION", "optional"),
+            ("IGNORE CONDITION", "forbidden"),
+        ):
+            syntax = next(
+                candidate["candidate_value"]
+                for dimension in rows[label]["dimensions"]
+                if dimension["name"] == "syntax"
+                for candidate in dimension["candidates"]
+                if candidate["kind"] == "source-syntax"
+            )
+            self.assertEqual(syntax["syntax_head"], label)
+            condition = next(
+                token for token in syntax["tokens"] if token["value"] == "condition"
+            )
+            self.assertEqual(condition["kind"], "variable")
+            dynamic = next(
+                candidate["candidate_value"]
+                for dimension in rows[label]["dimensions"]
+                if dimension["name"] == "options"
+                for candidate in dimension["candidates"]
+                if candidate["candidate_value"].get("dynamic_name_profile")
+            )
+            self.assertEqual(dynamic["term"], "CONDITION-NAME")
+            self.assertEqual(dynamic["minimum_occurrences"], 1)
+            self.assertEqual(dynamic["maximum_occurrences"], 16)
+            self.assertEqual(dynamic["label_operand"], label_operand)
+
+        timer = next(row for row in self.output["rows"] if row["label"] == "DEFINE TIMER")
+        timer_tokens = [
+            token
+            for dimension in timer["dimensions"]
+            for candidate in dimension["candidates"]
+            if candidate["kind"] == "source-syntax"
+            for token in candidate["candidate_value"]["tokens"]
+            if token["value"].casefold() == "today"
+        ]
+        self.assertTrue(timer_tokens)
+        self.assertTrue(all(token["kind"] == "fragment" for token in timer_tokens))
 
     def test_every_candidate_traces_to_a_pinned_topic_and_unique_identity(self) -> None:
         pins = {item["topic_path"]: item["sha256"] for item in self.manifest["topics"]}
@@ -551,6 +948,9 @@ class RepositoryProjectionTests(unittest.TestCase):
             counts,
             {
                 "target-equivalence-ambiguity": 2,
+                "prose-option-legality-not-structured": 266,
+                "context-predicate-not-structured": 11,
+                "shared-condition-applicability-unresolved": 25,
             },
         )
 
@@ -581,6 +981,7 @@ class RepositoryProjectionTests(unittest.TestCase):
                 issue
                 for dimension in row["dimensions"]
                 for issue in dimension["issues"]
+                if issue["code"] == "target-equivalence-ambiguity"
             ]
             self.assertEqual(len(issues), 1)
             self.assertEqual(issues[0]["code"], "target-equivalence-ambiguity")
@@ -617,10 +1018,50 @@ class RepositoryProjectionTests(unittest.TestCase):
         abstime = rows["0010"]
         self.assertEqual(bare["dimensions"][1]["state"], "declared-absent")
         self.assertEqual(bare["dimensions"][2]["state"], "declared-absent")
-        bare_values = json.dumps(bare["dimensions"], sort_keys=True)
-        abstime_values = json.dumps(abstime["dimensions"], sort_keys=True)
-        self.assertNotIn("ABSTIME", bare_values)
-        self.assertIn("ABSTIME", abstime_values)
+        bare_syntax = next(
+            candidate["candidate_value"]
+            for candidate in bare["dimensions"][0]["candidates"]
+            if candidate["kind"] == "source-syntax"
+        )
+        abstime_syntax = next(
+            candidate["candidate_value"]
+            for candidate in abstime["dimensions"][0]["candidates"]
+            if candidate["kind"] == "source-syntax"
+        )
+        self.assertNotIn("ABSTIME", [token["value"] for token in bare_syntax["tokens"]])
+        self.assertIn(
+            {"name": "ABSTIME", "state": "absent"},
+            bare_syntax["identity_discriminators"],
+        )
+        self.assertIn(
+            {"name": "ABSTIME", "state": "present"},
+            abstime_syntax["identity_discriminators"],
+        )
+
+    def test_acquire_options_and_directions_follow_the_selected_syntax_branch(self) -> None:
+        rows = {
+            row["official_row"].rsplit(":", 1)[-1]: row for row in self.output["rows"]
+        }
+        expected = {
+            "0002": {"ACTIVITYID"},
+            "0003": {"PROCESS", "PROCESSTYPE"},
+        }
+        for number, names in expected.items():
+            row = rows[number]
+            options = {
+                candidate["key"]
+                for dimension in row["dimensions"]
+                for candidate in dimension["candidates"]
+                if candidate["kind"] == "source-option"
+            }
+            directions = {
+                candidate["key"]
+                for dimension in row["dimensions"]
+                for candidate in dimension["candidates"]
+                if candidate["kind"] == "source-operand-direction"
+            }
+            self.assertEqual(options, names)
+            self.assertEqual(directions, names)
 
     def test_generated_candidate_values_contain_no_publication_prose_fields(self) -> None:
         forbidden = {"text", "html", "quote", "excerpt", "description", "interpretation"}

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://mainframe-env.invalid/schemas/cics-source-extraction@1",
-  "title": "CIC-901 sources-a deterministic extraction plan",
+  "title": "CIC-901 application-source batch extraction plan",
   "description": "Strict zero-credit selectors for five source dimensions; publication prose and semantic acceptance are outside this artifact.",
   "type": "object",
   "additionalProperties": false,
@@ -29,7 +29,7 @@
   "properties": {
     "schema_version": {"const": "mainframe-env.cics-source-extraction@1"},
     "target_version": {"const": "0.9.0"},
-    "work_package": {"const": "CIC-901.sources-a-project"},
+    "work_package": {"enum": ["CIC-901.sources-a-project", "CIC-901.sources-b-project", "CIC-901.sources-c-project"]},
     "status": {"const": "candidate-plan"},
     "semantic_authority": {"const": false},
     "automatic_registration": {"const": false},
@@ -48,29 +48,25 @@
     },
     "section_exceptions": {
       "type": "array",
-      "minItems": 18,
-      "maxItems": 18,
+      "maxItems": 440,
       "uniqueItems": true,
       "items": {"$ref": "#/$defs/section-exception"}
     },
     "manual_context_selectors": {
       "type": "array",
-      "minItems": 8,
-      "maxItems": 8,
+      "maxItems": 32,
       "uniqueItems": true,
       "items": {"$ref": "#/$defs/manual-selector"}
     },
     "conflict_expectations": {
       "type": "array",
-      "minItems": 10,
-      "maxItems": 10,
+      "maxItems": 440,
       "uniqueItems": true,
       "items": {"$ref": "#/$defs/conflict-expectation"}
     },
     "source_resolutions": {
       "type": "array",
-      "minItems": 3,
-      "maxItems": 3,
+      "maxItems": 88,
       "uniqueItems": true,
       "items": {"$ref": "#/$defs/source-resolution"}
     },
@@ -83,7 +79,7 @@
     "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "row": {
       "type": "string",
-      "pattern": "^ibm-cics-ts-6x-2026-08-31:api-commands:(?:000[1-9]|00[1-7][0-9]|008[0-8])$"
+      "pattern": "^ibm-cics-ts-6x-2026-08-31:api-commands:(?:000[1-9]|00[1-9][0-9]|01[0-9]{2}|02[0-5][0-9]|026[0-3])$"
     },
     "topic": {
       "type": "string",
@@ -94,9 +90,16 @@
       "enum": [
         "SSNAQ8_11.1.0/reference-api/r_dump.html",
         "SSNAQ8_11.1.0/reference-api/r_enter.html",
+        "SSNAQ8_11.1.0/reference-api/r_set_trace.html",
         "SSGMCP_5.5.0/reference/commands-api/dfhp4_entertracenum.html",
         "SSGMCP_5.5.0/reference/resources/transaction/dfha4_attributes.html",
         "SSXJAJ_14.1.0/com.ibm.faultanalyzer.doc_14.1/idiug166.html"
+      ]
+    },
+    "resolution-topic": {
+      "oneOf": [
+        {"$ref": "#/$defs/topic"},
+        {"$ref": "#/$defs/supplement-topic"}
       ]
     },
     "dimension": {
@@ -129,7 +132,7 @@
       "additionalProperties": false,
       "required": ["path", "file_sha256", "topic_manifest_sha256"],
       "properties": {
-        "path": {"const": "conformance/0.9/manifests/cics-application-api-sources-a-topics.json"},
+        "path": {"type": "string", "pattern": "^conformance/0\\.9/manifests/cics-application-api-sources-[abc]-topics\\.json$"},
         "file_sha256": {"$ref": "#/$defs/sha256"},
         "topic_manifest_sha256": {"$ref": "#/$defs/sha256"}
       }
@@ -149,7 +152,7 @@
       "additionalProperties": false,
       "required": ["path", "file_sha256", "supplements_sha256"],
       "properties": {
-        "path": {"const": "conformance/0.9/cics/application-api-sources-a-supplements.json"},
+        "path": {"type": "string", "pattern": "^conformance/0\\.9/cics/application-api-sources-[abc]-supplements\\.json$"},
         "file_sha256": {"$ref": "#/$defs/sha256"},
         "supplements_sha256": {"$ref": "#/$defs/sha256"}
       }
@@ -157,24 +160,24 @@
     "inputs": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["mapping", "corpus", "topic_manifest", "browser_verification", "supplements", "cache_scope"],
+      "required": ["mapping", "corpus", "topic_manifest", "cache_scope"],
       "properties": {
         "mapping": {
           "allOf": [
             {"$ref": "#/$defs/identity-input"},
-            {"properties": {"path": {"const": "conformance/0.9/cics/application-api-sources-a-map.json"}}}
+            {"properties": {"path": {"pattern": "^conformance/0\\.9/cics/application-api-sources-[abc]-map\\.json$"}}}
           ]
         },
         "corpus": {
           "allOf": [
             {"$ref": "#/$defs/identity-input"},
-            {"properties": {"path": {"const": "conformance/0.9/cics/application-api-sources-a-corpus.json"}}}
+            {"properties": {"path": {"pattern": "^conformance/0\\.9/cics/application-api-sources-[abc]-corpus\\.json$"}}}
           ]
         },
         "topic_manifest": {"$ref": "#/$defs/manifest-input"},
         "browser_verification": {"$ref": "#/$defs/browser-input"},
         "supplements": {"$ref": "#/$defs/supplement-input"},
-        "cache_scope": {"const": "cics-application-api-sources-a"}
+        "cache_scope": {"enum": ["cics-application-api-sources-a", "cics-application-api-sources-b", "cics-application-api-sources-c"]}
       }
     },
     "bounds": {
@@ -209,24 +212,24 @@
         "supplement_direct_topics", "supplement_context_topics"
       ],
       "properties": {
-        "mapping_rows": {"const": 88},
-        "mapped_rows": {"const": 85},
-        "source_gap_rows": {"const": 3},
-        "mapping_edges": {"const": 117},
-        "mapped_command_topics": {"const": 109},
-        "linked_context_topics": {"const": 58},
-        "manual_topics": {"const": 6},
-        "manifest_topics": {"const": 173},
-        "browser_verified_topics": {"const": 173},
+        "mapping_rows": {"type": "integer", "minimum": 87, "maximum": 88},
+        "mapped_rows": {"type": "integer", "minimum": 0, "maximum": 88},
+        "source_gap_rows": {"type": "integer", "minimum": 0, "maximum": 88},
+        "mapping_edges": {"type": "integer", "minimum": 0, "maximum": 512},
+        "mapped_command_topics": {"type": "integer", "minimum": 0, "maximum": 256},
+        "linked_context_topics": {"type": "integer", "minimum": 0, "maximum": 256},
+        "manual_topics": {"type": "integer", "minimum": 0, "maximum": 64},
+        "manifest_topics": {"type": "integer", "minimum": 1, "maximum": 256},
+        "browser_verified_topics": {"type": "integer", "minimum": 1, "maximum": 256},
         "dimensions_per_row": {"const": 5},
-        "syntax_section_topics": {"const": 107},
-        "syntax_diagrams": {"const": 111},
-        "multiple_syntax_diagram_topics": {"const": 4},
-        "options_section_topics": {"const": 108},
-        "conditions_section_topics": {"const": 97}
-        ,"supplement_topics": {"const": 5}
-        ,"supplement_direct_topics": {"const": 2}
-        ,"supplement_context_topics": {"const": 3}
+        "syntax_section_topics": {"type": "integer", "minimum": 0, "maximum": 256},
+        "syntax_diagrams": {"type": "integer", "minimum": 0, "maximum": 512},
+        "multiple_syntax_diagram_topics": {"type": "integer", "minimum": 0, "maximum": 256},
+        "options_section_topics": {"type": "integer", "minimum": 0, "maximum": 256},
+        "conditions_section_topics": {"type": "integer", "minimum": 0, "maximum": 256}
+        ,"supplement_topics": {"type": "integer", "minimum": 0, "maximum": 32}
+        ,"supplement_direct_topics": {"type": "integer", "minimum": 0, "maximum": 32}
+        ,"supplement_context_topics": {"type": "integer", "minimum": 0, "maximum": 32}
       }
     },
     "selector-profile": {
@@ -397,11 +400,12 @@
           "enum": [
             "global-command-format", "global-command-argument-values", "dpl-server-restrictions",
             "threadsafe-command-list", "gap-exec-interface-classification", "gap-eibfn-identity",
-            "traceid-monitor-compatibility", "traceid-dfhcmp-compatibility"
+            "traceid-monitor-compatibility", "traceid-dfhcmp-compatibility",
+            "global-response-codes"
           ]
         },
         "source_role": {
-          "enum": ["one-hop-context-candidate", "execution-context-candidate", "gap-classification-candidate", "gap-identity-candidate", "compatibility-context-candidate"]
+          "enum": ["one-hop-context-candidate", "execution-context-candidate", "gap-classification-candidate", "gap-identity-candidate", "compatibility-context-candidate", "condition-contract-candidate"]
         },
         "topic_path": {"$ref": "#/$defs/topic"},
         "applies_to": {"$ref": "#/$defs/applies-to"},
@@ -419,7 +423,8 @@
             "catalog-label-to-command-and-option-table-row", "catalog-label-to-list-item",
             "official-row-to-command-table-row-and-notes",
             "official-row-to-api-table-row-by-label-and-eibfn",
-            "compatibility-context-only-no-command-alias"
+            "compatibility-context-only-no-command-alias",
+            "condition-name-to-response-code"
           ]
         }
       }
@@ -427,9 +432,9 @@
     "applies-to": {
       "type": "object", "additionalProperties": false, "required": ["kind"],
       "properties": {
-        "kind": {"enum": ["all-sources-a-rows", "specific-rows"]},
+        "kind": {"enum": ["all-sources-a-rows", "all-sources-b-rows", "all-sources-c-rows", "specific-rows"]},
         "official_rows": {
-          "type": "array", "minItems": 1, "maxItems": 3, "uniqueItems": true,
+          "type": "array", "minItems": 1, "maxItems": 88, "uniqueItems": true,
           "items": {"$ref": "#/$defs/row"}
         }
       },
@@ -511,28 +516,22 @@
         "target_context_topics", "supplement_topics", "context_fragments"
       ],
       "properties": {
-        "official_row": {
-          "enum": [
-            "ibm-cics-ts-6x-2026-08-31:api-commands:0027",
-            "ibm-cics-ts-6x-2026-08-31:api-commands:0056",
-            "ibm-cics-ts-6x-2026-08-31:api-commands:0065"
-          ]
-        },
-        "label": {"enum": ["CICSMESSAGE", "DUMP", "ENTER TRACEID"]},
-        "eibfn": {"enum": ["6C12", "1C02", "1A04"]},
+        "official_row": {"$ref": "#/$defs/row"},
+        "label": {"type": "string", "pattern": "^[A-Z][A-Z0-9 -]{0,79}$"},
+        "eibfn": {"type": "string", "pattern": "^[0-9A-F]{4}$"},
         "resolution": {
-          "enum": ["target-internal-only", "authority-bounded-projection"]
+          "enum": ["target-internal-only", "target-product-projection", "authority-bounded-projection"]
         },
         "target_context_topics": {
-          "type": "array", "minItems": 2, "maxItems": 5, "uniqueItems": true,
+          "type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true,
           "items": {"$ref": "#/$defs/topic"}
         },
         "supplement_topics": {
-          "type": "array", "maxItems": 3, "uniqueItems": true,
-          "items": {"$ref": "#/$defs/supplement-topic"}
+          "type": "array", "maxItems": 8, "uniqueItems": true,
+          "items": {"$ref": "#/$defs/resolution-topic"}
         },
         "context_fragments": {
-          "type": "array", "maxItems": 2, "uniqueItems": true,
+          "type": "array", "maxItems": 8, "uniqueItems": true,
           "items": {
             "type": "object", "additionalProperties": false,
             "required": ["topic_path", "selector"],
@@ -560,10 +559,10 @@
           ],
           "items": false
         },
-        "direct_supplement_topic": {"$ref": "#/$defs/supplement-topic"},
+        "direct_supplement_topic": {"$ref": "#/$defs/resolution-topic"},
         "forbidden_alias_tokens": {
-          "type": "array", "minItems": 1, "maxItems": 1,
-          "items": {"enum": ["TRANSACTION", "TRACENUM"]}
+          "type": "array", "minItems": 1, "maxItems": 8,
+          "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]{0,31}$"}
         },
         "no_one_hop": {"const": true}
         ,"authority_bounded_dimensions": {
@@ -595,6 +594,14 @@
               "authority_bounded_dimensions", "ambiguity_issue_dimension"
             ],
             "properties": {"supplement_topics": {"minItems": 1}}
+          }
+        },
+        {
+          "if": {"properties": {"resolution": {"const": "target-product-projection"}}},
+          "then": {
+            "required": [
+              "direct_supplement_topic", "no_one_hop", "authority_bounded_dimensions"
+            ]
           }
         }
       ]

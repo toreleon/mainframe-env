@@ -16,6 +16,28 @@
       "coverage_credit": 0
     },
     {
+      "scope_id": "cics-application-api-sources-b",
+      "subsystem": "cics",
+      "baseline_id": "ibm-cics-ts-6x-application-api-sources-b-2026-09-10",
+      "manifest": "conformance/0.9/manifests/cics-application-api-sources-b-topics.json",
+      "manifest_sha256": "sha256:8acb506c0e5d6084235d94f5bb015d66c37b7f792a85713bcb3c7d0fb6b563ba",
+      "topic_count": 176,
+      "topic_manifest_sha256": "sha256:f83402cda836bdd16fddd9dd6073fc3689f18f5968ff08e5b0c9929deb5288fc",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
+      "scope_id": "cics-application-api-sources-c",
+      "subsystem": "cics",
+      "baseline_id": "ibm-cics-ts-6x-application-api-sources-c-2026-09-10",
+      "manifest": "conformance/0.9/manifests/cics-application-api-sources-c-topics.json",
+      "manifest_sha256": "sha256:6a84b58f232d41cf4cd2f483ceaa640beb0fea77e0ac5e557839e5a5858c47bc",
+      "topic_count": 224,
+      "topic_manifest_sha256": "sha256:717396f5e8cd0e9fbc21c91c569afce84e6f7f632dfbec574d3fd62bf5a85871",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
       "scope_id": "cics-file-uow-pilot",
       "subsystem": "cics",
       "baseline_id": "ibm-cics-ts-6x-file-uow-pilot-2026-09-08",

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://mainframe-env.invalid/schemas/cics-source-review.schema.json",
-  "title": "CICS sources-a compact automatic verification receipt",
+  "title": "CICS application-source batch automatic verification receipt",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -21,15 +21,17 @@
     "independent_verification_sha256",
     "counts",
     "structural_coverage",
+    "applicability_coverage",
     "candidate_dispositions",
     "issue_dispositions",
+    "ambiguity_scope",
     "blocker_ids",
     "review_sha256"
   ],
   "properties": {
     "schema_version": {"const": "mainframe-env.cics-source-review@2"},
     "target_version": {"const": "0.9.0"},
-    "work_package": {"const": "CIC-901.sources-a-review"},
+    "work_package": {"enum": ["CIC-901.sources-a-review", "CIC-901.sources-b-review", "CIC-901.sources-c-review"]},
     "review_status": {
       "enum": ["auto-accepted", "auto-accepted-with-bounded-ambiguities", "blocked"]
     },
@@ -60,13 +62,14 @@
       "additionalProperties": false,
       "required": [
         "source_map_sha256",
+        "source_corpus_sha256",
         "topic_manifest_sha256",
         "extraction_plan_sha256",
-        "candidate_projection_sha256",
-        "source_supplements_sha256"
+        "candidate_projection_sha256"
       ],
       "properties": {
         "source_map_sha256": {"$ref": "#/$defs/sha256"},
+        "source_corpus_sha256": {"$ref": "#/$defs/sha256"},
         "topic_manifest_sha256": {"$ref": "#/$defs/sha256"},
         "extraction_plan_sha256": {"$ref": "#/$defs/sha256"},
         "candidate_projection_sha256": {"$ref": "#/$defs/sha256"},
@@ -144,8 +147,15 @@
       }
     },
     "structural_coverage": {"$ref": "#/$defs/structural-coverage"},
+    "applicability_coverage": {"$ref": "#/$defs/applicability-coverage"},
     "candidate_dispositions": {"$ref": "#/$defs/candidate-categories"},
     "issue_dispositions": {"$ref": "#/$defs/issue-categories"},
+    "ambiguity_scope": {
+      "type": "array",
+      "maxItems": 88,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/ambiguity-row"}
+    },
     "blocker_ids": {
       "type": "array",
       "maxItems": 20000,
@@ -160,8 +170,12 @@
       "then": {
         "properties": {
           "blocker_ids": {"maxItems": 0},
+          "ambiguity_scope": {"maxItems": 0},
           "counts": {"properties": {"blocking_findings": {"const": 0}}},
           "structural_coverage": {
+            "properties": {"missing": {"const": 0}, "extra": {"const": 0}}
+          },
+          "applicability_coverage": {
             "properties": {"missing": {"const": 0}, "extra": {"const": 0}}
           }
         }
@@ -183,9 +197,12 @@
       },
       "then": {
         "properties": {
-          "blocker_ids": {"minItems": 1},
+          "ambiguity_scope": {"minItems": 1},
           "counts": {"properties": {"blocking_findings": {"const": 0}}},
           "structural_coverage": {
+            "properties": {"missing": {"const": 0}, "extra": {"const": 0}}
+          },
+          "applicability_coverage": {
             "properties": {"missing": {"const": 0}, "extra": {"const": 0}}
           }
         }
@@ -194,6 +211,24 @@
   ],
   "$defs": {
     "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "ambiguity-row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["official_row", "dimensions"],
+      "properties": {
+        "official_row": {
+          "type": "string",
+          "pattern": "^ibm-cics-ts-6x-2026-08-31:api-commands:(?:000[1-9]|00[1-9][0-9]|01[0-9]{2}|02[0-5][0-9]|026[0-3])$"
+        },
+        "dimensions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {"enum": ["syntax", "options", "operand-directions", "conditions", "execution-context"]}
+        }
+      }
+    },
     "file-binding": {
       "type": "object",
       "additionalProperties": false,
@@ -243,6 +278,17 @@
         "extra": {"type": "integer", "minimum": 0},
         "expected_by_kind": {"$ref": "#/$defs/kind-counts"},
         "projected_by_kind": {"$ref": "#/$defs/kind-counts"}
+      }
+    },
+    "applicability-coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expected", "projected", "missing", "extra"],
+      "properties": {
+        "expected": {"type": "integer", "minimum": 0, "maximum": 352},
+        "projected": {"type": "integer", "minimum": 0, "maximum": 352},
+        "missing": {"type": "integer", "minimum": 0, "maximum": 352},
+        "extra": {"type": "integer", "minimum": 0, "maximum": 352}
       }
     },
     "candidate-category": {
