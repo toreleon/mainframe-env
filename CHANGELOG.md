@@ -36,28 +36,23 @@ All notable changes to mainframe-env are documented here.
 - Added a docs-driven CICS file/unit-of-work conformance pilot with reviewed
   rules, exact per-obligation observations, memory/SQLite execution, restart
   faults, and a fail-closed licensed-capture adapter.
-- Added a zero-credit, non-registering host-API projection for all 263 pinned
-  CICS application-command identities and EIB function codes while retaining
-  the existing 23 API and two SPI compatibility runtime operations unchanged.
-- Added a digest-bound, zero-credit mapping from the first 88 CICS application
-  rows to 109 command-summary pages, preserving shared/variant pages and three
-  explicit source gaps without retaining IBM publication bodies in Git.
-- Added the zero-credit, HTML-only `sources-a` corpus: 109 mapped CICS command
-  pages, 58 bounded one-hop context pages and six manual context topics, with
-  all 173 topic identities reproduced through Chrome and all raw IBM topic and
-  navigation bytes kept outside Git.
-- Added the zero-credit `sources-a` structural projection for all 88 first-slice
-  rows: 440 dimension records and 6,033 bounded candidates, with no source-gap,
-  unmatched, conflicting, reprojection, or mismatch finding.
-- Added compact automatic `sources-a` verification: an implementation-independent
-  HTML verifier checks 173 manifest topics plus five Chrome-captured supplements,
-  auto-accepts 5,672 objective candidates, and retains 361 candidate-level and two
-  issue-level authority-bounded ambiguities. No per-candidate manual ledger, PDF,
-  semantic, coverage or differential credit is involved.
-- Added the zero-credit 263-command contract scaffold in deterministic 88/88/87
-  batches. It carries verified `sources-a` facts, leaves `sources-b`/`sources-c`
-  explicitly unprojected, and preserves the truthful 23-command existing runtime
-  baseline without registering any of the remaining 240 commands.
+- Added digest-bound, HTML-only IBM source mapping, corpus projection, extraction,
+  and implementation-independent automatic verification for all 263 CICS
+  application commands in deterministic 88/88/87 batches. The accepted receipts
+  contain 18,070 candidates: 16,307 objectively verified and 1,763 retained as
+  bounded product ambiguity, with raw IBM publication bodies kept outside Git.
+- Added the frozen-with-bounded-ambiguities CIC-901 command contract and generated
+  263-row compiler registry. The registry explicitly separates three typed runtime
+  handlers, 20 legacy compatibility handlers, and 240 unready handlers; automatic
+  registration remains disabled and no default handler exists. The contract
+  binds one 121-name EIBRESP condition authority and truthfully classifies the
+  participant boundary as two known mutating rows, 260 bounded-effect rows, one
+  explicit UOW boundary, and 261 bounded-UOW rows.
+- Added candidate-aware EXEC CICS compiler recognition and fail-closed validation
+  for source-reviewed command heads, COBOL applicability, option value shapes,
+  discriminators, dependencies, alternatives, exclusions, and known source bounds.
+  This seals only the non-release CIC-901 implementation boundary; it grants no new
+  execution, coverage, or differential credit to unready commands.
 - Added a reviewed COBOL numeric `MOVE` pilot and corrected floating-insertion,
   capacity, sign, and overflow behavior found by that review.
 - Added cost-aware local Jenkins assurance, exact-candidate command receipts,
@@ -219,6 +214,13 @@ All notable changes to mainframe-env are documented here.
   readiness probes before release receipts can be written.
 - Corrected RACF flat/nested syntax value handling and added generated-path
   regressions.
+- Corrected EXEC CICS condition-policy precedence so `RESP` continues to update
+  its response area when combined with `NOHANDLE`, while `RESP2` still requires
+  `RESP`, on both typed and legacy interpreter paths.
+- Bound the existing time handler to `ASKTIME ABSTIME`, whose packed-decimal
+  output it implements, and kept bare `ASKTIME` unready until EIBDATE/EIBTIME
+  updates exist. Preserved only exact `INQUIRE PROGRAM` legacy SPI compatibility
+  through a generated compiler descriptor without exposing other SPI commands.
 - Corrected Jenkins checkout/temp storage, tool selection, parameter handling,
   shell portability, and release-target selection.
 

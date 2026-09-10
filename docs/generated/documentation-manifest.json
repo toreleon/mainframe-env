@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:5523bc7577565299c1bf0100d499066cceed184fabfa426865188c5d257d0405",
+      "sha256": "sha256:4186ab444b55312437fcfff2291c9d59cfc2ec16bcba272f96e75c6fd9be65e0",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -966,7 +966,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/0.9.0.md",
       "relative_links": 10,
-      "sha256": "sha256:af586cd359482e1ba7702bba11621a59119d99cf57e4864efada4aed41ed98c7",
+      "sha256": "sha256:b8877b09d46addb40a746cc3227b80e7a4fedb467c33fadbb6e83a48edeaeb79",
       "title": "mainframe-env 0.9.0 — Complete CICS application API",
       "xtask_commands": 0
     },
@@ -1070,7 +1070,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:f05fe7a5e8eb2f99dcda20de2e2cde2e213722dfa756347d6c52e1550f557ee9",
+      "sha256": "sha256:8498634e5fc961ff6a840c2367fca6b8a338871124ceecaeb2053833cbe18399",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },
