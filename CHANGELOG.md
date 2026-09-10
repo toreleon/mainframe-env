@@ -6,6 +6,9 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added a VS Code Dev Container that reuses the capped Compose stack, persistent
+  build/IBM caches, PostgreSQL, and Jenkins, with remote Rust tooling and
+  per-command Cargo locking for a long-lived editor session.
 - Added persistent Docker IBM-documentation caching, verified offline search/read
   commands, and a cache-first source-review workflow for semantic development.
 - Added repository contributor guidelines in `AGENTS.md` covering structure,

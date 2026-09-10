@@ -58,7 +58,8 @@ def inventory_from_paths(paths: Iterable[str]) -> TestInventory:
             else:
                 shell_tests.append(raw)
         if (("tools" in path.parts or path.parts[0] == "docker")
-                and (path.suffix in {".sh", ".bash"} or raw == "docker/dev")):
+                and (path.suffix in {".sh", ".bash"} or raw == "docker/dev"
+                     or path.parts[:2] == ("docker", "dev-bin"))):
             shell_tools.append(raw)
     return TestInventory(tuple(python_tests), tuple(shell_tests), tuple(shell_tools))
 

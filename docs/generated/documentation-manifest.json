@@ -10,7 +10,7 @@
       "normative": false,
       "path": "AGENTS.md",
       "relative_links": 5,
-      "sha256": "sha256:e16fc1446ec232e4938cc8c0549629281e20cf78f3baa3a9f3763e4f8fce901b",
+      "sha256": "sha256:6945dab24b359ffd076f8a402ed81e4e064a16bda18a202fc17e04781d46c9ce",
       "title": "Repository Guidelines",
       "xtask_commands": 1
     },
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:99db62e52b0523adc7fcba7c5958a4e898979b61d1602e6bc2aba31fb08919c2",
+      "sha256": "sha256:c7f6828f0ea9da6549bcc6ba9f1d9e5465e5b383dd1e56ad8321a75176adb778",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -26,7 +26,7 @@
       "normative": false,
       "path": "CONTRIBUTING.md",
       "relative_links": 7,
-      "sha256": "sha256:2ea952ffc0628f8bc32c1f2880049799b010f7d8b80deb840e8378c4f45d88ec",
+      "sha256": "sha256:8c45aaaf247e27b9eb000e07338a157057d48e81c6e842eae924338e3c38ae95",
       "title": "Contributing to mainframe-env",
       "xtask_commands": 4
     },
@@ -298,7 +298,7 @@
       "normative": false,
       "path": "docker/README.md",
       "relative_links": 10,
-      "sha256": "sha256:35c2d0c153656e2bd26ec257ff0791ee83880d3286faf5644d9c48619fa747fe",
+      "sha256": "sha256:9d2ae32affea92106af2c90f979dda355f6d06f6a0d60006d080140dfc63a5ae",
       "title": "Docker development environment",
       "xtask_commands": 1
     },

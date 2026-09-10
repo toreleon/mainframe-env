@@ -11,6 +11,18 @@ changing a public or durable boundary.
 ## Development setup
 
 The repository pins Rust in `rust-toolchain.toml` and commits `Cargo.lock`.
+The supported interactive workspace is the VS Code Dev Container:
+
+```bash
+docker/dev init
+docker/dev vscode
+```
+
+Choose **Dev Containers: Reopen in Container** when VS Code opens. The wrapper
+binds VS Code to the dedicated capped Colima daemon. Once attached, the terminal,
+Rust Analyzer, debugger, Cargo, and project Python run in Linux at `/workspace`.
+Run the commands below directly there. Host/Codex Desktop sessions must retain
+the `docker/dev cargo` or `docker/dev exec` prefix.
 
 ```bash
 cargo build --workspace --all-features --locked

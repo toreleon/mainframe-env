@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Serialize Cargo with wrapper/cleanup commands while allowing nested Cargo.
+set -euo pipefail
+real_cargo=/usr/local/cargo/bin/cargo
+if [[ "${MAINFRAME_ENV_CARGO_LOCK_HELD:-0}" == 1 ]]; then
+  exec "$real_cargo" "$@"
+fi
+exec flock /cache/build.lock env MAINFRAME_ENV_CARGO_LOCK_HELD=1 "$real_cargo" "$@"
