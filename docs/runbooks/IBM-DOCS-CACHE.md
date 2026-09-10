@@ -83,6 +83,20 @@ execution evidence. The current CICS `sources-a` mapping has three explicit
 command-summary gaps; supplemental sources must remain separately identified
 and reviewed rather than being aliased to similarly named commands.
 
+The registered `cics-application-api-sources-a` scope currently contains 172
+HTML topics. Verify the pinned topics, TOC and full source closure with:
+
+```bash
+docker/dev docs status --scope cics-application-api-sources-a
+docker/dev exec python3 -B conformance/0.9/tools/fetch_cics_application_sources.py --check --cache /ibm-docs/topic-cache
+```
+
+The first command checks the manifest topics and TOC. The second also
+reconstructs the one-hop link closure. Both are offline. A corpus generation
+run is different: it uses `conformance/tools/browser_fetch.py` to obtain fresh
+content-endpoint bytes through a Chrome DevTools port and only then publishes
+the verified bytes to the content-addressed cache.
+
 ## Reverify immutable baseline pins
 
 The network-capable re-verifier remains scoped to immutable baselines in the

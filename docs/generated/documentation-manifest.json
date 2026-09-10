@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:43cf02ed93b7572b2b914105dff47c599fc00df7ce33749e26fb7a00419aefee",
+      "sha256": "sha256:52522b131c4b16e44977fced1b68db4e8823cd67db2b40167b72cbf82bb7cc74",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -351,9 +351,9 @@
       "normative": true,
       "owner": "CICS provider maintainers",
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
-      "relative_links": 6,
+      "relative_links": 8,
       "scope": "typed CICS operation descriptors, generated routing families, and provider semantic modules",
-      "sha256": "sha256:14ada5e4d8de15b85e83f2d1f1974e959a44af85146c63d988d2177730afab87",
+      "sha256": "sha256:5e75ffc1319f27132375572719cd48b00b6d2cef37cb3b6c6f1e3cd55d2ea444",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -965,8 +965,8 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/0.9.0.md",
-      "relative_links": 11,
-      "sha256": "sha256:b36a3f6b6099210cc6aece43733e01e37d6c5836ddb45d3f1f882db51e431842",
+      "relative_links": 10,
+      "sha256": "sha256:34f08609accd12f85fc5eb3777064876dd37f64b1776b2175decd68fa05040d5",
       "title": "mainframe-env 0.9.0 — Complete CICS application API",
       "xtask_commands": 0
     },
@@ -1069,8 +1069,8 @@
     {
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
-      "relative_links": 81,
-      "sha256": "sha256:0345f54dd0505872cc06d8f997fdeea23cb67b1183be8fec4ee4fd2c23a7d0ae",
+      "relative_links": 80,
+      "sha256": "sha256:39071a8bf0368fb086503b87c5408ff5794d984cb63f5a7e30201fc486816246",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },
@@ -1462,7 +1462,7 @@
       "normative": false,
       "path": "docs/runbooks/IBM-DOCS-CACHE.md",
       "relative_links": 2,
-      "sha256": "sha256:23701523a6b64f2291b997c20d105102ae890d70e899baa7b1a60a5d1ac04332",
+      "sha256": "sha256:1fe8c3b36722263d2d5653cfc415cd5fd891d3f507892a9967d9516a1b45e5bd",
       "title": "IBM documentation cache",
       "xtask_commands": 0
     },

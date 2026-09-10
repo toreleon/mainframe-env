@@ -59,6 +59,27 @@ source. Raw TOC and topic bodies remain outside the repository. The map's
 candidate status cannot register behavior or grant semantic, execution or
 differential credit.
 
+The next source boundary is
+[`application-api-sources-a-corpus.json`](../../conformance/0.9/cics/application-api-sources-a-corpus.json).
+It binds the accepted map to a 172-topic
+[`topic manifest`](../../conformance/0.9/manifests/cics-application-api-sources-a-topics.json):
+109 mapped command pages, 58 non-recursive one-hop context pages and five
+explicit manual context topics. The command-summary body is excluded as
+navigation because its pinned TOC projection is already authoritative. Current
+HTML topics retain the legacy EIBFN identities and provide replacement context,
+but do not turn `DUMP TRANSACTION`, `ENTER TRACENUM` or `MONITOR` into aliases
+for the legacy commands.
+
+`python3 -B conformance/0.9/tools/fetch_cics_application_sources.py --check`
+validates committed metadata offline. Supplying `--cache /ibm-docs/topic-cache`
+additionally verifies all topic and TOC bodies, re-derives the one-hop closure
+and never opens the browser. Generation fetches fresh content-endpoint bytes
+through `conformance/tools/browser_fetch.py` before publishing verified,
+content-addressed cache entries. The corpus is still a machine candidate:
+`CICSMESSAGE`, `DUMP` and `ENTER TRACEID` remain pending source review, and no
+syntax, option, condition, applicability or handler decision follows from
+corpus membership.
+
 ## Frozen families
 
 | Family | Owns |
@@ -116,6 +137,7 @@ records the hard limits and exact legacy ceiling policy.
 ```bash
 python3 -B tools/generate_cics_descriptors.py --check
 python3 -B tools/generate_cics_source_map.py --check
+python3 -B conformance/0.9/tools/fetch_cics_application_sources.py --check
 python3 -B -m unittest tools.tests.test_cics_descriptors tools.tests.test_cics_source_map tools.tests.test_module_boundaries
 cargo test -p mainframe-env-host-api -p mainframe-env-cics --all-features --locked
 cargo xtask architecture-fast --check

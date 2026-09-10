@@ -42,6 +42,9 @@ All notable changes to mainframe-env are documented here.
 - Added a digest-bound, zero-credit mapping from the first 88 CICS application
   rows to 109 command-summary pages, preserving shared/variant pages and three
   explicit source gaps without retaining IBM publication bodies in Git.
+- Added the zero-credit, HTML-only `sources-a` corpus: 109 mapped CICS command
+  pages, 58 bounded one-hop context pages and five manual context topics, with
+  all raw IBM topic and navigation bytes kept outside Git.
 - Added a reviewed COBOL numeric `MOVE` pilot and corrected floating-insertion,
   capacity, sign, and overflow behavior found by that review.
 - Added cost-aware local Jenkins assurance, exact-candidate command receipts,
