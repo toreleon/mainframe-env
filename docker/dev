@@ -11,7 +11,7 @@ action="${1:-help}"
 [[ $# == 0 ]] || shift
 if [[ "$action" == init ]]; then exec "$repo/docker/bootstrap-macos.sh" "$@"; fi
 if [[ "$action" == help ]]; then
-  echo 'Usage: docker/dev init|up|shell|exec COMMAND [args...]|cargo [args...]|test|status|logs|clean|down|stop'
+  echo 'Usage: docker/dev init|up|shell|exec COMMAND [args...]|cargo [args...]|test|docs [args...]|import-ibm-cache DIRECTORY|status|logs|clean|down|stop'
   exit 0
 fi
 reserve=3221225472
@@ -36,6 +36,13 @@ case "$action" in
     "${dc[@]}" run --rm -T dev "$@"
     ;;
   cargo) "${dc[@]}" run --rm dev cargo "$@" ;;
+  docs) "${dc[@]}" run --rm -T dev python3 /workspace/conformance/tools/ibm_docs.py "$@" ;;
+  import-ibm-cache)
+    [[ $# == 1 && -d "$1" ]] || { echo 'Usage: docker/dev import-ibm-cache DIRECTORY' >&2; exit 2; }
+    # Stream a host cache without adding a macOS temporary directory to VM mounts.
+    COPYFILE_DISABLE=1 tar -C "$1" -cf - . |
+      "${dc[@]}" run --rm -T dev python3 /workspace/conformance/tools/ibm_docs.py import
+    ;;
   test) "${dc[@]}" run --rm dev /opt/mainframe-env/docker/test-workspace.sh "$@" ;;
   status)
     "${dc[@]}" ps -a

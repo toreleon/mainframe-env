@@ -99,6 +99,7 @@ is neither copied into the image nor used by container builds.
 | Source bind at `/workspace` | Editable working tree | Host-owned; source edits persist |
 | `dev-cargo`, `dev-target` | Development downloads and compilation | Reused; disposable |
 | `dev-output`, `dev-postgres` | Container `dist` and parity scratch data | Persistent; separate from host outputs |
+| `ibm-docs` at `/ibm-docs` | Verified IBM publication cache for development | Persistent; never pruned by `clean` |
 | Source bind at `/source` | Jenkins Git checkout source | Read-only |
 | `ci-cargo`, `ci-target` | Jenkins downloads and compilation | Reused; disposable |
 | `jenkins-home` | Credentials, jobs, checkouts, logs, JVM temporary files | 5 build records; 2 archived receipts |
@@ -120,6 +121,16 @@ active Docker context or prune another Docker Desktop installation. Jenkins has
 control of this dedicated daemon through its socket, so this job must only build
 trusted local repository code. The source bind is deliberately limited to this
 checkout, and the SSH agent and whole-home mounts are disabled.
+
+## Cached IBM sources
+
+For IBM semantic development, import the existing documentation cache once with
+`docker/dev import-ibm-cache "$TMPDIR/cobolgrammar/topic-cache"`. Then use
+`docker/dev docs status`, `docker/dev docs search "ADD statement" --subsystem cobol`,
+and `docker/dev docs read TOPIC_PATH`. The development container supplies
+`MAINFRAME_ENV_IBM_DOCS_CACHE=/ibm-docs/topic-cache`; existing fetch/audit tools use
+that persistent location. See [the IBM cache runbook](../docs/runbooks/IBM-DOCS-CACHE.md)
+for source verification, missing topics, and provenance requirements.
 
 ## CI and deployment
 

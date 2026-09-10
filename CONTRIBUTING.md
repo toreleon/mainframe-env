@@ -25,7 +25,9 @@ environment. A skipped external test receives no evidence credit.
 
 1. Start from a clean branch and preserve unrelated user changes.
 2. Identify the owning contract, provider, schema, and recovery boundary before
-   editing.
+   editing. For IBM language/subsystem semantics, first search and read the
+   relevant verified [cached IBM sources](docs/runbooks/IBM-DOCS-CACHE.md), then
+   cite baseline/topic and catalog rows in the PR. Report source gaps explicitly.
 3. Add a focused negative regression before or with a defect fix.
 4. Regenerate derived files through `cargo xtask`; do not hand-edit generated
    Rust, catalogs, ledgers, or receipts.

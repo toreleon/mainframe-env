@@ -3,8 +3,8 @@ set -euo pipefail
 mkdir -p /cache /target
 dev_uid="${DEV_UID:-1000}"
 dev_gid="${DEV_GID:-1000}"
-mkdir -p /cache/home
-chown "$dev_uid:$dev_gid" /cache /cache/home /target /workspace/dist /workspace/.postgres
+mkdir -p /cache/home /ibm-docs/topic-cache
+chown "$dev_uid:$dev_gid" /cache /cache/home /target /workspace/dist /workspace/.postgres /ibm-docs /ibm-docs/topic-cache
 export HOME=/cache/home
 export CARGO_HOME=/cache CARGO_TARGET_DIR=/target
 # Separate development and CI cache volumes; serialize writers to each cache.
