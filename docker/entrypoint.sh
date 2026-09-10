@@ -14,8 +14,9 @@ if ! getent passwd "$dev_uid" >/dev/null; then
   useradd --no-create-home --uid "$dev_uid" --gid "$dev_gid" \
     --home-dir /cache/home --shell /bin/bash "devuser$dev_uid"
 fi
-mkdir -p /cache/home
-chown "$dev_uid:$dev_gid" /cache /cache/home /target /workspace/dist /workspace/.postgres
+mkdir -p /cache/home /ibm-docs/topic-cache
+chown "$dev_uid:$dev_gid" /cache /cache/home /target /workspace/dist /workspace/.postgres \
+  /ibm-docs /ibm-docs/topic-cache
 export HOME=/cache/home
 export CARGO_HOME=/cache CARGO_TARGET_DIR=/target
 # Separate development and CI cache volumes; serialize writers to each cache.

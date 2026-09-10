@@ -34,6 +34,24 @@ class DockerStorageTests(unittest.TestCase):
         self.assertIn('getent passwd "$dev_uid"', entrypoint)
         self.assertIn('useradd --no-create-home --uid "$dev_uid"', entrypoint)
 
+    def test_ibm_docs_cache_is_persistent_and_development_only(self):
+        compose = (ROOT / 'docker' / 'compose.yaml').read_text()
+        dev = (ROOT / 'docker' / 'dev').read_text()
+        entrypoint = (ROOT / 'docker' / 'entrypoint.sh').read_text()
+        dev_service = compose.split('  dev:\n', 1)[1].split('\n  jenkins:', 1)[0]
+        jenkins_service = compose.split('  jenkins:\n', 1)[1].split('\n  postgres:', 1)[0]
+        self.assertIn('MAINFRAME_ENV_IBM_DOCS_CACHE: /ibm-docs/topic-cache', dev_service)
+        self.assertIn('- ibm-docs:/ibm-docs', dev_service)
+        self.assertNotIn('MAINFRAME_ENV_IBM_DOCS_CACHE', jenkins_service)
+        self.assertNotIn('ibm-docs:/ibm-docs', jenkins_service)
+        self.assertEqual(compose.count('- ibm-docs:/ibm-docs'), 1)
+        self.assertIn('  ibm-docs:', compose)
+        self.assertIn('docs) "${dc[@]}" run --rm -T dev', dev)
+        self.assertIn('import-ibm-cache)', dev)
+        self.assertIn('ibm_docs.py import "$@"', dev)
+        self.assertIn('/ibm-docs/topic-cache', entrypoint)
+        self.assertIn('TMPDIR: /target', compose)
+
     def test_rejects_large_filesystem_even_when_almost_empty(self):
         stats = types.SimpleNamespace(f_blocks=100_000_000_000, f_frsize=1,
                                       f_bavail=99_000_000_000)

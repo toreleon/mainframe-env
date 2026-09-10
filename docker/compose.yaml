@@ -21,6 +21,7 @@ services:
     environment:
       DEV_UID: ${MAINFRAME_ENV_UID:-1000}
       DEV_GID: ${MAINFRAME_ENV_GID:-1000}
+      MAINFRAME_ENV_IBM_DOCS_CACHE: /ibm-docs/topic-cache
       <<: &cargo-env
         CARGO_HOME: /cache
         CARGO_TARGET_DIR: /target
@@ -41,6 +42,7 @@ services:
       - dev-cargo:/cache
       - dev-output:/workspace/dist
       - dev-postgres:/workspace/.postgres
+      - ibm-docs:/ibm-docs
     tmpfs: [/tmp:size=512m, /run:size=16m]
     mem_limit: 6g
     cpus: 3
@@ -145,6 +147,7 @@ volumes:
   dev-target:
   dev-output:
   dev-postgres:
+  ibm-docs:
   ci-cargo:
   ci-target:
   jenkins-home:
