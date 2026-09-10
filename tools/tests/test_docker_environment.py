@@ -27,6 +27,13 @@ class DockerStorageTests(unittest.TestCase):
         self.assertIn('TMPDIR: /target', compose)
         self.assertNotIn('TMPDIR: /tmp', compose)
 
+    def test_development_identity_is_materialized_for_postgres_tools(self):
+        entrypoint = (ROOT / 'docker' / 'entrypoint.sh').read_text()
+        self.assertIn('getent group "$dev_gid"', entrypoint)
+        self.assertIn('groupadd --gid "$dev_gid"', entrypoint)
+        self.assertIn('getent passwd "$dev_uid"', entrypoint)
+        self.assertIn('useradd --no-create-home --uid "$dev_uid"', entrypoint)
+
     def test_rejects_large_filesystem_even_when_almost_empty(self):
         stats = types.SimpleNamespace(f_blocks=100_000_000_000, f_frsize=1,
                                       f_bavail=99_000_000_000)

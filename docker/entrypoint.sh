@@ -3,6 +3,17 @@ set -euo pipefail
 mkdir -p /cache /target
 dev_uid="${DEV_UID:-1000}"
 dev_gid="${DEV_GID:-1000}"
+[[ "$dev_uid" =~ ^[1-9][0-9]*$ && "$dev_gid" =~ ^[1-9][0-9]*$ ]] || {
+  echo 'DEV_UID and DEV_GID must be positive decimal identifiers' >&2
+  exit 1
+}
+if ! getent group "$dev_gid" >/dev/null; then
+  groupadd --gid "$dev_gid" "devgroup$dev_gid"
+fi
+if ! getent passwd "$dev_uid" >/dev/null; then
+  useradd --no-create-home --uid "$dev_uid" --gid "$dev_gid" \
+    --home-dir /cache/home --shell /bin/bash "devuser$dev_uid"
+fi
 mkdir -p /cache/home
 chown "$dev_uid:$dev_gid" /cache /cache/home /target /workspace/dist /workspace/.postgres
 export HOME=/cache/home
