@@ -1,6 +1,6 @@
 {
   "counts": {
-    "markdown_documents": 185,
+    "markdown_documents": 186,
     "navigation_groups": 5,
     "normative_documents": 39,
     "xtask_commands": 163
@@ -9,8 +9,8 @@
     {
       "normative": false,
       "path": "AGENTS.md",
-      "relative_links": 4,
-      "sha256": "sha256:306df7c8faf2662c9c48c8e1a6000d07a4c779d4570ad059881001993b6dc2f9",
+      "relative_links": 5,
+      "sha256": "sha256:9703d968dd15766c42d95499fc6fae4783626bf087348150f0a14988673f4194",
       "title": "Repository Guidelines",
       "xtask_commands": 1
     },
@@ -18,15 +18,15 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:b6ebede5cf3fa84ff245a073274949308b74ca12402af511cd3a133df9c8967f",
+      "sha256": "sha256:43cf02ed93b7572b2b914105dff47c599fc00df7ce33749e26fb7a00419aefee",
       "title": "Changelog",
       "xtask_commands": 1
     },
     {
       "normative": false,
       "path": "CONTRIBUTING.md",
-      "relative_links": 5,
-      "sha256": "sha256:e6b838465bc67081ef70692ebc73c920b7e49da9fb6dbebb8bcaaf5d18628991",
+      "relative_links": 6,
+      "sha256": "sha256:5d7272bbf22f8caa039ac09c6597255b854148c1d08730cca7db32a1cb9f2f09",
       "title": "Contributing to mainframe-env",
       "xtask_commands": 4
     },
@@ -297,8 +297,8 @@
     {
       "normative": false,
       "path": "docker/README.md",
-      "relative_links": 8,
-      "sha256": "sha256:8e984c24fb7a12f79454e927b504416efb365d54e65a203dd83bb2f97fbd61bc",
+      "relative_links": 9,
+      "sha256": "sha256:46d85edbde74208c19af3b8ab76efc0c0ba5b12ded3b1e35560fed7d31565602",
       "title": "Docker development environment",
       "xtask_commands": 1
     },
@@ -966,7 +966,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/0.9.0.md",
       "relative_links": 11,
-      "sha256": "sha256:4ddcb7121ef016e732adeec3059513f1e57b1d7fe5f6708dc4f278fe2addb3f4",
+      "sha256": "sha256:b36a3f6b6099210cc6aece43733e01e37d6c5836ddb45d3f1f882db51e431842",
       "title": "mainframe-env 0.9.0 — Complete CICS application API",
       "xtask_commands": 0
     },
@@ -1070,7 +1070,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 81,
-      "sha256": "sha256:d1f5dda3ccf13564a2ce2037bf470586c206f7e6cb1f5d10e0d1ef788469b423",
+      "sha256": "sha256:0345f54dd0505872cc06d8f997fdeea23cb67b1183be8fec4ee4fd2c23a7d0ae",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },
@@ -1406,7 +1406,7 @@
       "normative": false,
       "path": "docs/research/publication-source-probe.md",
       "relative_links": 0,
-      "sha256": "sha256:8258234cbadce177a102fd6a8a5720dda349aa353b6b4679bc8581d26d0971da",
+      "sha256": "sha256:76e2111e5a597c4293c7d71cfbc9d68155c0932a1bbd8e42b73a6757fa0e1618",
       "title": "Publication source probe",
       "xtask_commands": 0
     },
@@ -1457,6 +1457,14 @@
       "sha256": "sha256:6a30bb6285bbc95f793b5633a394bb3a0dbcb2858f847dfd4a052240c94767dc",
       "title": "CI supply-chain inputs",
       "xtask_commands": 1
+    },
+    {
+      "normative": false,
+      "path": "docs/runbooks/IBM-DOCS-CACHE.md",
+      "relative_links": 2,
+      "sha256": "sha256:23701523a6b64f2291b997c20d105102ae890d70e899baa7b1a60a5d1ac04332",
+      "title": "IBM documentation cache",
+      "xtask_commands": 0
     },
     {
       "normative": false,

@@ -6,6 +6,8 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added persistent Docker IBM-documentation caching, verified offline search/read
+  commands, and a cache-first source-review workflow for semantic development.
 - Added repository contributor guidelines in `AGENTS.md` covering structure,
   development commands, coding conventions, tests, and pull request expectations.
 - Required Docker execution for development tools and added `docker/dev exec`

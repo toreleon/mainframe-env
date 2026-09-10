@@ -99,6 +99,7 @@ is neither copied into the image nor used by container builds.
 | Source bind at `/workspace` | Editable working tree | Host-owned; source edits persist |
 | `dev-cargo`, `dev-target` | Development downloads and compilation | Reused; disposable |
 | `dev-output`, `dev-postgres` | Container `dist` and parity scratch data | Persistent; separate from host outputs |
+| `ibm-docs` at `/ibm-docs` | Digest-pinned IBM publication cache for development | Persistent; never pruned by `clean` |
 | Source bind at `/source` | Jenkins Git checkout source | Read-only |
 | `ci-cargo`, `ci-target` | Jenkins downloads and compilation | Reused; disposable |
 | `jenkins-home` | Credentials, jobs, checkouts, logs, JVM temporary files | 5 build records; 2 archived receipts |
@@ -120,6 +121,23 @@ active Docker context or prune another Docker Desktop installation. Jenkins has
 control of this dedicated daemon through its socket, so this job must only build
 trusted local repository code. The source bind is deliberately limited to this
 checkout, and the SSH agent and whole-home mounts are disabled.
+
+## Cached IBM sources
+
+For IBM semantic development, import and verify only the source scope needed:
+
+```bash
+docker/dev import-ibm-cache "$TMPDIR/cobolgrammar/topic-cache" --scope ibm-cics-ts-6x-2026-08-31
+docker/dev docs status --scope ibm-cics-ts-6x-2026-08-31
+docker/dev docs search "CICS command" --subsystem cics
+docker/dev docs read TOPIC_PATH --sha256 DIGEST
+```
+
+The cache volume is mounted only by the development service. Topic and TOC
+bytes must match explicit pins; the cache reader has no network path and grants
+no semantic or licensed-execution credit. This uses the normal host-driven
+development container, not nested Docker or another runner. See the
+[IBM documentation cache runbook](../docs/runbooks/IBM-DOCS-CACHE.md).
 
 ## CI and deployment
 
