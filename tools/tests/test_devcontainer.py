@@ -14,6 +14,7 @@ class DevContainerTests(unittest.TestCase):
         self.wrapper = (ROOT / 'docker/dev').read_text()
         self.entrypoint = (ROOT / 'docker/entrypoint.sh').read_text()
         self.cargo = (ROOT / 'docker/dev-bin/cargo').read_text()
+        self.codex = (ROOT / 'docker/dev-bin/codex').read_text()
         self.codex_config = (ROOT / 'docker/codex-container.toml').read_text()
         self.dockerfile = (ROOT / 'docker/toolchain.Dockerfile').read_text()
         self.base_compose = (ROOT / 'docker/compose.yaml').read_text()
@@ -98,6 +99,8 @@ class DevContainerTests(unittest.TestCase):
         self.assertIn('flock /cache/build.lock', self.cargo)
         self.assertIn('MAINFRAME_ENV_CARGO_LOCK_HELD', self.cargo)
         self.assertIn('/usr/local/cargo/bin/cargo', self.cargo)
+        self.assertIn('openai.chatgpt-*/bin/linux-*/codex', self.codex)
+        self.assertIn('exec "$candidate" "$@"', self.codex)
 
 
 if __name__ == '__main__':

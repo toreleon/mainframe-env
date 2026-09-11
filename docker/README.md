@@ -47,7 +47,8 @@ Docker from inside it. Automatic Rust
 Analyzer checks on save are disabled to avoid duplicate workspace builds; run a
 focused test/check explicitly. `cargo` resolves to a small reentrant lock wrapper,
 so IDE and terminal builds serialize with `docker/dev clean` while nested Cargo
-from `xtask` can proceed.
+from `xtask` can proceed. `codex` resolves to the Linux CLI bundled with the
+remote OpenAI extension, so it needs no separate Node/npm installation.
 
 Docker is the single sandbox boundary for this trusted repository. The image's
 `/etc/codex/config.toml` disables Codex's nested Linux sandbox and interactive
