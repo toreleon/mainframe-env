@@ -1,0 +1,17 @@
+services:
+  dev:
+    profiles: !reset []
+    command: [/bin/sh, -c, "while sleep 1000; do :; done"]
+    environment:
+      MAINFRAME_ENV_DEV_CONTAINER: '1'
+      HOME: /home/developer
+    depends_on:
+      postgres:
+        condition: service_healthy
+    cap_add: [SYS_PTRACE]
+    security_opt: [seccomp:unconfined]
+    volumes:
+      - dev-vscode-home:/home/developer
+
+volumes:
+  dev-vscode-home:

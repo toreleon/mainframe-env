@@ -17,7 +17,41 @@ docker/dev test
 docker/dev shell
 ```
 
-For Codex desktop work, keep editing this shared checkout and run development
+## VS Code Dev Container
+
+The preferred interactive workflow reuses this Compose stack rather than
+creating another development image or cache:
+
+```bash
+docker/dev init
+docker/dev vscode
+```
+
+Choose **Dev Containers: Reopen in Container** in the new window. Always launch
+this repository through `docker/dev vscode`: it supplies VS Code with the
+dedicated Colima socket and refuses initialization through an uncapped/default
+Docker daemon. VS Code 1.136 or later plus the Dev Containers extension is
+required on the host; this device already has both.
+
+The attached workspace is `/workspace`. Run `cargo`, project Python, and shell
+tools directly in its terminal; do not invoke `docker/dev` or nested Docker from
+inside it. Rust Analyzer and CodeLLDB run remotely in Linux. Automatic Rust
+Analyzer checks on save are disabled to avoid duplicate workspace builds; run a
+focused test/check explicitly. `cargo` resolves to a small reentrant lock wrapper,
+so IDE and terminal builds serialize with `docker/dev clean` while nested Cargo
+from `xtask` can proceed.
+
+The launch command starts the existing PostgreSQL/Jenkins stack; Dev Containers
+then starts and attaches to `dev` without rebuilding Jenkins. It shares
+`dev-cargo`, `dev-target`, `dev-output`, `dev-postgres`, and `ibm-docs`
+with the wrapper and adds only a persistent `dev-vscode-home` volume for the
+remote editor. All remain inside the same capped Docker disk. It does not mount
+the Docker socket or application secrets into the editor container. Closing VS
+Code leaves services running; use `docker/dev down` or `docker/dev stop` from a
+host terminal when desired. Rebuild the Dev Container after image, Compose, or
+`.devcontainer` changes.
+
+For Codex Desktop work, keep editing this shared checkout and run development
 commands through the wrapper. `AGENTS.md` requires container execution for
 builds, tests, linters, generators, and dependency tools:
 
