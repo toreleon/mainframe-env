@@ -24,10 +24,13 @@ creating another development image or cache:
 
 ```bash
 docker/dev init
+docker/dev up
 docker/dev vscode
 ```
 
-Choose **Dev Containers: Reopen in Container** in the new window. Always launch
+Run `up` once from `main` and after infrastructure changes; feature checkouts do
+not rebuild or replace Jenkins when opening the editor. Choose **Dev Containers:
+Reopen in Container** in the new window. Always launch
 this repository through `docker/dev vscode`: it supplies VS Code with the
 dedicated Colima socket and refuses initialization through an uncapped/default
 Docker daemon. VS Code 1.136 or later plus the Dev Containers extension is
@@ -41,8 +44,9 @@ focused test/check explicitly. `cargo` resolves to a small reentrant lock wrappe
 so IDE and terminal builds serialize with `docker/dev clean` while nested Cargo
 from `xtask` can proceed.
 
-The launch command starts the existing PostgreSQL/Jenkins stack; Dev Containers
-then starts and attaches to `dev` without rebuilding Jenkins. It shares
+The launch command ensures PostgreSQL is healthy without rebuilding services;
+Dev Containers then starts and attaches to `dev`. Jenkins and the deployed server
+remain separate long-lived services managed from `main`. The editor shares
 `dev-cargo`, `dev-target`, `dev-output`, `dev-postgres`, and `ibm-docs`
 with the wrapper and adds only a persistent `dev-vscode-home` volume for the
 remote editor. All remain inside the same capped Docker disk. It does not mount

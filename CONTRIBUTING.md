@@ -15,10 +15,12 @@ The supported interactive workspace is the VS Code Dev Container:
 
 ```bash
 docker/dev init
+docker/dev up
 docker/dev vscode
 ```
 
-Choose **Dev Containers: Reopen in Container** when VS Code opens. The wrapper
+Run `up` initially from `main` and after infrastructure changes. Choose **Dev
+Containers: Reopen in Container** when VS Code opens. The wrapper
 binds VS Code to the dedicated capped Colima daemon. Once attached, the terminal,
 Rust Analyzer, debugger, Cargo, and project Python run in Linux at `/workspace`.
 Run the commands below directly there. Host/Codex Desktop sessions must retain

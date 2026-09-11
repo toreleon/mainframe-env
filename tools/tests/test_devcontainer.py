@@ -51,6 +51,9 @@ class DevContainerTests(unittest.TestCase):
         self.assertIn('incoming_docker_host="${DOCKER_HOST:-}"', self.wrapper)
         self.assertIn('[[ "$incoming_docker_host" == "$docker_socket" ]]', self.wrapper)
         self.assertIn('exec code --new-window "$repo"', self.wrapper)
+        vscode = self.wrapper.split('  vscode)', 1)[1].split('  devcontainer-init)', 1)[0]
+        self.assertNotIn('start_stack', vscode)
+        self.assertIn('up -d --no-build --wait', vscode)
 
     def test_long_lived_entrypoint_releases_lock_and_cargo_reacquires_it(self):
         branch = self.entrypoint.split(
