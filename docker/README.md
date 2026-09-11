@@ -36,13 +36,21 @@ dedicated Colima socket and refuses initialization through an uncapped/default
 Docker daemon. VS Code 1.136 or later plus the Dev Containers extension is
 required on the host; this device already has both.
 
-The attached workspace is `/workspace`. Run `cargo`, project Python, and shell
-tools directly in its terminal; do not invoke `docker/dev` or nested Docker from
-inside it. Rust Analyzer and CodeLLDB run remotely in Linux. Automatic Rust
+The attached workspace is `/workspace`. The OpenAI Codex extension, Rust
+Analyzer, and CodeLLDB run remotely in Linux. Sign in to Codex once in that
+window; its state persists in the capped `dev-vscode-home` volume. Run `cargo`,
+project Python, and shell tools directly; do not invoke `docker/dev` or nested
+Docker from inside it. Automatic Rust
 Analyzer checks on save are disabled to avoid duplicate workspace builds; run a
 focused test/check explicitly. `cargo` resolves to a small reentrant lock wrapper,
 so IDE and terminal builds serialize with `docker/dev clean` while nested Cargo
 from `xtask` can proceed.
+
+Docker is the single sandbox boundary for this trusted repository. The image's
+`/etc/codex/config.toml` disables Codex's nested Linux sandbox and interactive
+approval prompts. The container mounts the checkout and capped development
+volumes, but no host Docker socket or application secrets. Use the host Codex
+Desktop workflow below only for maintenance that cannot run in the remote editor.
 
 The launch command ensures PostgreSQL is healthy without rebuilding services;
 Dev Containers then starts and attaches to `dev`. Jenkins and the deployed server
@@ -55,7 +63,7 @@ Code leaves services running; use `docker/dev down` or `docker/dev stop` from a
 host terminal when desired. Rebuild the Dev Container after image, Compose, or
 `.devcontainer` changes.
 
-For Codex Desktop work, keep editing this shared checkout and run development
+For host Codex Desktop work, keep editing this shared checkout and run development
 commands through the wrapper. `AGENTS.md` requires container execution for
 builds, tests, linters, generators, and dependency tools:
 

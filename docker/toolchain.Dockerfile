@@ -27,5 +27,6 @@ RUN useradd --create-home --uid 1000 developer \
     && git config --system --add safe.directory /source \
     && git config --system --add safe.directory /workspace
 COPY docker/ /opt/mainframe-env/docker/
+COPY docker/codex-container.toml /etc/codex/config.toml
 WORKDIR /workspace
 CMD ["bash"]

@@ -2,14 +2,13 @@
 
 ## Development Environment
 
-Use VS Code Dev Container for work; open it with
-`docker/dev vscode`. Inside it (`MAINFRAME_ENV_DEV_CONTAINER=1`), run Cargo and
-Python. From a host/Codex Desktop session, use `docker/dev cargo`,
+Use Codex in the VS Code Dev Container; open it with `docker/dev vscode`.
+Inside it (`MAINFRAME_ENV_DEV_CONTAINER=1`), run Cargo and Python directly.
+From a host/Codex Desktop session, use `docker/dev cargo`,
 `docker/dev test`, or `docker/dev exec`. Host Cargo/rustc/project Python is
 prohibited, and Docker must never be nested.
 
-Host editing, Git, and Docker management are allowed. Repair Docker and verify
-the checkout mount.
+Host editing, Git, and Docker management are allowed. Repair Docker; verify mounts.
 
 ## IBM Sources Before Semantic Changes
 

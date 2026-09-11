@@ -10,7 +10,13 @@ if [[ "${MAINFRAME_ENV_DEV_CONTAINER:-0}" == 1 ]]; then
   usermod --uid "$dev_uid" --gid "$dev_gid" developer
 fi
 mkdir -p "$dev_home"
+if [[ "${MAINFRAME_ENV_DEV_CONTAINER:-0}" == 1 ]]; then
+  mkdir -p "$dev_home/.codex"
+fi
 chown "$dev_uid:$dev_gid" /cache /cache/home /target /workspace/dist /workspace/.postgres /ibm-docs /ibm-docs/topic-cache "$dev_home"
+if [[ "${MAINFRAME_ENV_DEV_CONTAINER:-0}" == 1 ]]; then
+  chown "$dev_uid:$dev_gid" "$dev_home/.codex"
+fi
 export HOME="$dev_home"
 export CARGO_HOME=/cache CARGO_TARGET_DIR=/target
 # Separate development and CI cache volumes; serialize writers to each cache.
