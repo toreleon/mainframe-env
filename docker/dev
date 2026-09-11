@@ -42,7 +42,11 @@ case "$action" in
       echo 'Install the VS Code Dev Containers extension first.' >&2
       exit 1
     }
-    start_stack
+    docker --host "$docker_socket" image inspect mainframe-env-toolchain:dev >/dev/null || {
+      echo 'Run `docker/dev up` from main once before opening a feature checkout.' >&2
+      exit 1
+    }
+    "${dc[@]}" up -d --no-build --wait --wait-timeout 180 postgres
     export DOCKER_HOST="$docker_socket"
     exec code --new-window "$repo"
     ;;
