@@ -55,7 +55,7 @@ fi
 
 workspace="${WORKSPACE:?WORKSPACE must be set}"
 state="$workspace/.postgres"
-# The Docker development profile mounts `.postgres` as a bounded scratch
+# Development runs use `.postgres` as a bounded scratch
 # volume. A mount point cannot itself be removed, so use one owned child while
 # retaining the historical Jenkins path on ordinary workspaces.
 if command -v mountpoint >/dev/null 2>&1 && mountpoint -q "$state"; then

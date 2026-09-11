@@ -40,7 +40,6 @@ __pycache__/
 !.env.*.sample
 !.env.*.template
 /secrets/
-/docker/secrets/
 /config/tls/*.key
 /config/tls/*-key.pem
 /config/tls/*-private.pem

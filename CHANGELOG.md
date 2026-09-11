@@ -6,12 +6,10 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
-- Added persistent Docker IBM-documentation caching, verified offline search/read
-  commands, and a cache-first source-review workflow for semantic development.
+- Added verified offline IBM-documentation search/read commands and a cache-first
+  source-review workflow for semantic development.
 - Added repository contributor guidelines in `AGENTS.md` covering structure,
   development commands, coding conventions, tests, and pull request expectations.
-- Required Docker execution for development tools and added `docker/dev exec`
-  for noninteractive container commands from the desktop workflow.
 - Added ADR-0011 and the first typed-HIR vertical slices: resolved COBOL
   arithmetic plans, typed CICS file/unit-of-work plans, versioned executable
   dialect identities, and bounded canonical plan codecs.
@@ -22,9 +20,6 @@ All notable changes to mainframe-env are documented here.
 - Added a reviewed, pinned-source COBOL arithmetic pilot with independent
   golden bytes and typed-plan observations for `SIZE ERROR`, relative
   qualification, numeric-edited eligibility, and the no-pair no-op.
-- Added a Docker development stack with an isolated, capped macOS VM, pinned
-  toolchain images, separate Cargo caches, PostgreSQL persistence, and automatic
-  Jenkins CI/local deployment with readiness checks and binary rollback.
 - Added persistent bounded COBOL-parser and IR-decoder fuzzing, Loom schedule
   models with a negative concurrency mutant, and instrumented critical-package
   coverage reporting as receipt-backed full CI gates.
@@ -60,10 +55,10 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
-- Scoped local Docker CI to the last successful ancestor, preserving policy/docs
+- Scoped local CI to the last successful ancestor, preserving policy/docs
   checks while skipping runtime rebuild/deployment for prose-only changes. Added
   per-command timings, bounded stage timeouts, and focused agent verification rules.
-- Organized shared Git/Docker ignore rules for generated output, runtime state,
+- Organized shared Git ignore rules for generated output, runtime state,
   environment secrets, and local tooling while retaining templates and evidence.
 - Advanced decimal assignment to a policy-bearing `@2` contract with explicit
   arithmetic context, COBOL numeric-storage ABI, receiver-update, condition,
@@ -85,7 +80,7 @@ All notable changes to mainframe-env are documented here.
   payload and bind COBOL arithmetic/display-sign/LP options to payload config,
   while historical `@2` artifacts retain their original bytes and contract.
 - Made the release-smoke rejection test cover development hosts that are not
-  advertised release targets, including native Linux ARM Docker environments.
+  advertised release targets, including native Linux ARM environments.
 - Updated the 0.9 CICS implementation plan to require the integrated 28-finding
   hardening baseline, bounded family slices, per-slice security/recovery,
   explicit backend validation, and early licensed-campaign planning.
@@ -112,12 +107,6 @@ All notable changes to mainframe-env are documented here.
   cross-node per-user quota fence.
 - Applied the idempotent PostgreSQL executable-artifact migration from both
   store entry points so fresh shared stores can persist schema-v2 metadata.
-- Directed Docker development temporaries to executable target storage so
-  Rustdoc can compile and run contract doctests while `/tmp` remains `noexec`.
-- Kept disposable PostgreSQL parity state inside the Docker development
-  scratch mount instead of attempting to remove the mount point itself.
-- Materialized the host UID/GID in development containers so PostgreSQL's
-  process-safety checks can resolve the effective user during parity runs.
 - Corrected typed ADD/COMPUTE receiver-local `SIZE ERROR` commits, resolved
   `ADD CORRESPONDING` by relative qualifiers with bilateral uniqueness and
   subordinate-item exclusions, and made selected-table compatibility preserve
@@ -157,8 +146,8 @@ All notable changes to mainframe-env are documented here.
   parity stage so every environment-gated PostgreSQL correctness test is run.
 - Kept full development certification runnable while preserving stable
   release-artifact checks behind an explicit release-candidate promotion.
-- Required the archive CLI to verify the locked offline/Docker runtime before
-  granting reproducibility credit.
+- Required the archive CLI to verify its locked offline runtime before granting
+  reproducibility credit.
 - Kept Jenkins test temporaries below the excluded Cargo target tree so
   parallel fixtures cannot be mistaken for candidate repository contents.
 - Moved synchronous z/OSMF backend calls to a bounded four-worker lane and

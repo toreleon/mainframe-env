@@ -36,8 +36,6 @@ class ToolingTestDiscoveryTests(unittest.TestCase):
             "conformance/1.7/tools/tests/test_nested.py": "import unittest\n",
             "conformance/1.8/tools/tests/parser_test.sh": "#!/usr/bin/env bash\ntrue\n",
             "tools/jenkins/helper.sh": "#!/usr/bin/env bash\ntrue\n",
-            "docker/entrypoint.sh": "#!/usr/bin/env bash\ntrue\n",
-            "docker/dev": "#!/usr/bin/env bash\ntrue\n",
             "tests/test_not_tooling.py": "import unittest\n",
             "tools/tests/test_untracked.py": "import unittest\n",
         }
@@ -54,7 +52,7 @@ class ToolingTestDiscoveryTests(unittest.TestCase):
         )
         self.assertEqual(
             inventory.shell_tools,
-            ("conformance/1.8/tools/tests/parser_test.sh", "docker/dev", "docker/entrypoint.sh", "tools/jenkins/helper.sh"),
+            ("conformance/1.8/tools/tests/parser_test.sh", "tools/jenkins/helper.sh"),
         )
 
     def test_discovered_files_execute_and_report_nonempty_cases(self):

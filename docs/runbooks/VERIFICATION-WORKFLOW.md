@@ -3,7 +3,7 @@
 Use enough evidence to establish the changed behavior and its affected boundaries.
 Avoid turning each edit into a new full certification campaign. Explicit task,
 release, promotion, and conformance acceptance requirements remain mandatory.
-All project commands run through the Docker wrapper from the intended checkout.
+Run project commands directly from the intended checkout with the pinned tools.
 
 ## Agent development loop
 
@@ -36,33 +36,10 @@ repair or new evidence justifies retrying. Required gates must not be waived.
 
 ## CI ownership
 
-The Docker job uses `CHECK_MODE=auto` by default. It compares the candidate with
-the last successful commit from a clean committed checkout; dirty/untracked
-source is refused. The planner is for CI snapshots, not an uncommitted edit loop.
-It takes the comparison from
-`GIT_PREVIOUS_SUCCESSFUL_COMMIT`, validates ancestry, and keeps the complete local
-runtime checks when the base is missing/unavailable or paths are unclassified.
-Normative contract/architecture/decision/compatibility/release prose and every
-registered normative document retain runtime validation. A changed, missing, or
-malformed normative registry also prevents narrowing. A later prose commit cannot
-hide an intervening failed code
-change. `CHECK_MODE=runtime` explicitly requests all existing local runtime gates.
-
-| Local change selection | Checks | Application action |
-|---|---|---|
-| Prose only or no changes since success | Source/dependency/license policy, docs, Python/shell tooling | Skip release build and deployment |
-| Runtime, infrastructure, normative, unknown, missing base, or explicit runtime mode | Above plus Rust formatting, MSRV, workspace tests, Clippy, all PostgreSQL parity gates | Build and deploy only after checks pass |
-
-This first optimization keeps the existing runtime gate set intact. PostgreSQL
-family selection and package/consumer selection are later work. The local job is
-not the root `Jenkinsfile` full/release profile, and its plan explicitly grants no
-full, release, or licensed credit. The root assurance pipeline is unchanged.
-
-Local checks have a 30-minute timeout, release compilation 15 minutes, deployment
-3 minutes, and the whole job 60 minutes. These are failure limits, not speed claims
-or permission to accept incomplete validation. A timeout remains a failed/aborted
-run. Builds stay serialized; automatically aborting a combined CI/deploy job could
-interrupt deployment or recovery.
+The root `Jenkinsfile` owns candidate-bound CI, full assurance, and release gates.
+It refuses dirty or untracked source, records each selected command, and grants no
+licensed credit without the corresponding protected execution evidence. A later
+prose commit cannot hide an intervening failed code change.
 
 ## Timing and caches
 
@@ -73,11 +50,9 @@ its own `build-server` timing. The current five-build/two-artifact retention sta
 bounded. Download/compiler caches are reusable computation; test receipts are
 evidence and cannot substitute for required candidate checks.
 
-Keep existing dev/CI volume separation and the storage cap. Avoid routine
-`docker/dev clean`, toolchain changes, alternate build flags, or parallel full
-Cargo invocations just to seek reassurance. Cleanup is for measured pressure;
-cache/parallelism changes need elapsed-time and peak-storage measurements first.
+Avoid routine cache deletion, toolchain changes, alternate build flags, or
+parallel full Cargo invocations just to seek reassurance. Cleanup is for measured
+pressure; cache and parallelism changes need elapsed-time and peak-storage
+measurements first.
 
-See the [research and rollout notes](../research/CI-AGENT-FEEDBACK.md),
-[Docker guide](../../docker/README.md), and
-[IBM cache guide](IBM-DOCS-CACHE.md).
+See the [IBM cache guide](IBM-DOCS-CACHE.md).

@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
-"""Create a byte-reproducible gzip archive in one immutable GNU-tar image."""
+"""Create a byte-reproducible gzip archive with the Python standard library."""
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
 import os
 from pathlib import Path
 import re
 import shutil
-import subprocess
-import sys
+import tarfile
 import tempfile
 
 
-REPRODUCIBLE_ARCHIVE_IMAGE = "docker.io/library/debian@sha256:5ae3c39ebd15e229dcedd5cee596b2497182493d41ff162e824ba13fc1b2b867"
-REPRODUCIBLE_ARCHIVE_PLATFORM = "linux/amd64"
 MAX_FILES = 200_000
 MAX_BYTES = 4 * 1024 * 1024 * 1024
 SAFE_ROOT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,191}\Z")
@@ -22,17 +20,6 @@ SAFE_ROOT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,191}\Z")
 
 class ArchiveError(RuntimeError):
     pass
-
-
-def _verify_archive_runtime() -> None:
-    checker = Path(__file__).with_name("supply_chain.py")
-    try:
-        subprocess.run(
-            [sys.executable, "-B", str(checker), "check", "--runtime", "offline"],
-            check=True,
-        )
-    except (OSError, subprocess.CalledProcessError) as error:
-        raise ArchiveError("the locked archive runtime verification failed") from error
 
 
 def _digest(path: Path) -> str:
@@ -76,57 +63,40 @@ def _perturb_mtimes(root: Path, tick: int) -> None:
             os.utime(path, (tick, tick), follow_symlinks=False)
 
 
-def _run_container(input_directory: Path, output_directory: Path, member: str) -> None:
-    for path in (input_directory, output_directory):
-        if any(character in str(path) for character in (",", "\n", "\r")):
-            raise ArchiveError("container mount path contains an unsupported character")
-    command = [
-        "docker",
-        "run",
-        "--rm",
-        "--pull=always",
-        "--platform",
-        REPRODUCIBLE_ARCHIVE_PLATFORM,
-        "--network",
-        "none",
-        "--read-only",
-        "--cap-drop",
-        "ALL",
-        "--security-opt",
-        "no-new-privileges",
-        "--user",
-        f"{os.getuid()}:{os.getgid()}",
-        "--mount",
-        f"type=bind,source={input_directory},target=/input,readonly",
-        "--mount",
-        f"type=bind,source={output_directory},target=/output",
-        "--env",
-        f"ARCHIVE_MEMBER={member}",
-        REPRODUCIBLE_ARCHIVE_IMAGE,
-        "sh",
-        "-ceu",
-        """
-test "$(tar --version | sed -n '1p')" = 'tar (GNU tar) 1.34'
-test "$(gzip --version | sed -n '1p')" = 'gzip 1.12'
-cd /input
-LC_ALL=C TZ=UTC tar \
-  --format=ustar \
-  --sort=name \
-  --mtime=@0 \
-  --numeric-owner \
-  --owner=0 \
-  --group=0 \
-  --mode='u+rwX,go+rX,go-w' \
-  --no-acls \
-  --no-selinux \
-  --no-xattrs \
-  -cf - -- "$ARCHIVE_MEMBER" | gzip -9 -n > /output/archive.tar.gz
-""",
+def _normalized(info: tarfile.TarInfo) -> tarfile.TarInfo:
+    info.uid = 0
+    info.gid = 0
+    info.uname = ""
+    info.gname = ""
+    info.mtime = 0
+    if info.isdir():
+        info.mode = 0o755
+    elif info.isfile():
+        info.mode = 0o755 if info.mode & 0o111 else 0o644
+    elif info.issym():
+        info.mode = 0o777
+    return info
+
+
+def _run_archive(input_directory: Path, output_directory: Path, member: str) -> None:
+    root = input_directory if member == "." else input_directory / member
+    entries = [
+        root,
+        *sorted(root.rglob("*"), key=lambda path: path.relative_to(root).as_posix()),
     ]
-    try:
-        subprocess.run(command, check=True)
-    except (OSError, subprocess.CalledProcessError) as error:
-        raise ArchiveError("the pinned GNU-tar archive environment failed") from error
+    destination = output_directory / "archive.tar.gz"
+    with destination.open("wb") as raw:
+        with gzip.GzipFile(
+            filename="", mode="wb", compresslevel=9, mtime=0, fileobj=raw
+        ) as compressed:
+            with tarfile.open(fileobj=compressed, mode="w", format=tarfile.USTAR_FORMAT) as archive:
+                for path in entries:
+                    relative = path.relative_to(root).as_posix()
+                    if member == ".":
+                        name = "." if relative == "." else f"./{relative}"
+                    else:
+                        name = member if relative == "." else f"{member}/{relative}"
+                    archive.add(path, arcname=name, recursive=False, filter=_normalized)
 
 
 def _install_immutable(candidate: Path, destination: Path, expected_digest: str) -> None:
@@ -155,7 +125,9 @@ def create_archive(source: Path, output: Path, root_name: str | None = None) -> 
         raise ArchiveError("archive output must not contain its source")
     _validate_tree(source)
 
-    with tempfile.TemporaryDirectory(prefix="reproducible-archive.", dir=output.parent) as temporary:
+    with tempfile.TemporaryDirectory(
+        prefix="reproducible-archive.", dir=output.parent
+    ) as temporary:
         temporary_root = Path(temporary)
         candidates: list[Path] = []
         for run, tick in ((1, 1), (2, 2_000_000_000)):
@@ -175,7 +147,7 @@ def create_archive(source: Path, output: Path, root_name: str | None = None) -> 
                 shutil.copytree(source, copied, symlinks=True)
                 mounted_input = input_root
             _perturb_mtimes(copied, tick)
-            _run_container(mounted_input, output_root, member)
+            _run_archive(mounted_input, output_root, member)
             candidate = output_root / "archive.tar.gz"
             if not candidate.is_file() or candidate.stat().st_size == 0:
                 raise ArchiveError("archive environment did not produce an archive")
@@ -206,9 +178,8 @@ def main() -> int:
     parser.add_argument("--root-name")
     args = parser.parse_args()
     try:
-        _verify_archive_runtime()
         digest = create_archive(args.source, args.output, args.root_name)
-    except (ArchiveError, OSError) as error:
+    except (ArchiveError, OSError, tarfile.TarError) as error:
         parser.exit(1, f"reproducible archive: {error}\n")
     print(f"sha256:{digest}  {args.output}")
     return 0

@@ -89,7 +89,7 @@ stay untracked.
 
 Preserve both Cargo lockfiles, fuzz seed corpora, conformance fixtures/evidence,
 and reviewed `release/` records. Avoid broad extension rules that hide these
-inputs. Inspect ignored files before cleanup: local audit workspaces, release
+inputs. Inspect ignored files before cleanup: local audit directories, release
 bundles, and unsupported offline experiments can contain useful work. Cleanup
 should remove only identified disposable artifacts, not every ignored file.
 

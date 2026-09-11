@@ -34,7 +34,7 @@ into three disjoint source authorities:
   and [review](../../conformance/0.9/cics/application-api-sources-c-review.json).
 
 Each batch binds a topic manifest and extraction plan to content-addressed HTML
-bodies in `/ibm-docs/topic-cache`. Fresh bodies are obtained through the
+bodies in `$MAINFRAME_ENV_IBM_DOCS_CACHE`. Fresh bodies are obtained through the
 repository browser-fetch bridge and the user's Chrome session; PDF is not a
 source path. The projector emits structural facts and fragment hashes, while
 the independent verifier reparses the pinned HTML before comparing the
@@ -159,19 +159,19 @@ records the hard limits and exact legacy ceiling policy.
 ## Verification
 
 ```bash
-docker/dev exec python3 -B tools/generate_cics_descriptors.py --check
-docker/dev exec python3 -B tools/generate_cics_source_map.py --batch all --check
-docker/dev exec python3 -B conformance/0.9/tools/fetch_cics_application_sources.py --batch all --cache /ibm-docs/topic-cache --check
-docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch a --cache /ibm-docs/topic-cache --check
-docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch b --cache /ibm-docs/topic-cache --check
-docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch c --cache /ibm-docs/topic-cache --check
-docker/dev exec python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch a --cache /ibm-docs/topic-cache
-docker/dev exec python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch b --cache /ibm-docs/topic-cache
-docker/dev exec python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch c --cache /ibm-docs/topic-cache
-docker/dev exec python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch a --cache /ibm-docs/topic-cache --check
-docker/dev exec python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch b --cache /ibm-docs/topic-cache --check
-docker/dev exec python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch c --cache /ibm-docs/topic-cache --check
-docker/dev exec python3 -B -m unittest tools.tests.test_cics_descriptors tools.tests.test_cics_source_map tools.tests.test_module_boundaries
-docker/dev cargo test -p mainframe-env-host-api -p mainframe-env-cics --all-features --locked
-docker/dev cargo xtask architecture-fast --check
+python3 -B tools/generate_cics_descriptors.py --check
+python3 -B tools/generate_cics_source_map.py --batch all --check
+python3 -B conformance/0.9/tools/fetch_cics_application_sources.py --batch all --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch a --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch b --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch c --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch a --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
+python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch b --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
+python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch c --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
+python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch a --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch b --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch c --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B -m unittest tools.tests.test_cics_descriptors tools.tests.test_cics_source_map tools.tests.test_module_boundaries
+cargo test -p mainframe-env-host-api -p mainframe-env-cics --all-features --locked
+cargo xtask architecture-fast --check
 ```

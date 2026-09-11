@@ -47,7 +47,7 @@ candidate selected by an application discriminator.
 CIC-901 carries zero execution, coverage, semantic, conformance, and licensed
 differential credit. It establishes the source-backed contract needed for
 CIC-902–CIC-905 vertical family slices; it does not make 0.9.0 release-ready.
-Do not add release automation, Docker-in-Docker, or a broad licensed campaign
+Do not add release automation, nested environment orchestration, or a broad licensed campaign
 at this boundary. Licensed evidence remains mandatory at the full 0.9
 completion gate after the applicable executable families exist.
 

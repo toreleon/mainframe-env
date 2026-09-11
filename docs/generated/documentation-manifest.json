@@ -1,16 +1,16 @@
 {
   "counts": {
-    "markdown_documents": 188,
+    "markdown_documents": 186,
     "navigation_groups": 5,
     "normative_documents": 39,
-    "xtask_commands": 163
+    "xtask_commands": 162
   },
   "documents": [
     {
       "normative": false,
       "path": "AGENTS.md",
       "relative_links": 5,
-      "sha256": "sha256:aeef2ea23a85d685d90ea673a56d30ab3014db3b39d3112f3a80409ff6cbe04b",
+      "sha256": "sha256:71842bd07f1ffbe61aebdf5ff0e2ee6ab34366b31de55fdffb839fbcd4072933",
       "title": "Repository Guidelines",
       "xtask_commands": 1
     },
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:4186ab444b55312437fcfff2291c9d59cfc2ec16bcba272f96e75c6fd9be65e0",
+      "sha256": "sha256:7f8cba2db1a8548171ea50189b394139c05ee7a7d8830ca5ffba76f4ffe39b27",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -26,15 +26,15 @@
       "normative": false,
       "path": "CONTRIBUTING.md",
       "relative_links": 7,
-      "sha256": "sha256:cba993e4be66085e85dedb4c73c2118ec269b77c6120f4279715b6ba2a02df5b",
+      "sha256": "sha256:da1ed546ed6c2f41d2e3e6a346f9ca8410c445d37b3cb2f198c83b571ec8bebc",
       "title": "Contributing to mainframe-env",
       "xtask_commands": 4
     },
     {
       "normative": false,
       "path": "README.md",
-      "relative_links": 22,
-      "sha256": "sha256:62d9cf21bd469c4870c7ac56e2bdf9b1837665d7bed8a7a4e9065e08952bc5fe",
+      "relative_links": 21,
+      "sha256": "sha256:de9b8f1741ef04426a311cc172ed84bdbc04175f32f4f737cd4caa1188573f68",
       "title": "mainframe-env",
       "xtask_commands": 4
     },
@@ -295,14 +295,6 @@
       "xtask_commands": 1
     },
     {
-      "normative": false,
-      "path": "docker/README.md",
-      "relative_links": 10,
-      "sha256": "sha256:bbdbc75c53c382edfdfc3511d8eafd5265472c751d2f2a16f9c11f1d6c3bfafa",
-      "title": "Docker development environment",
-      "xtask_commands": 1
-    },
-    {
       "applies_from": "mainframe-env 0.1.0",
       "normative": true,
       "owner": "repository owner",
@@ -353,7 +345,7 @@
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
       "relative_links": 20,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:2e0f6f75408c32ad9ae17139734f695b7b4225b0eefc3a453bbc15d8fd92c79d",
+      "sha256": "sha256:1dac1bf309dcdf026700d6b9418f825bc0cfd218ce21d458b5c1a74aa651bfb2",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -966,7 +958,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/0.9.0.md",
       "relative_links": 10,
-      "sha256": "sha256:b8877b09d46addb40a746cc3227b80e7a4fedb467c33fadbb6e83a48edeaeb79",
+      "sha256": "sha256:b8f7176ff9a9c8c122f9ffee05dbadfa4164640cd3c5bfa1e287e5c55531f377",
       "title": "mainframe-env 0.9.0 — Complete CICS application API",
       "xtask_commands": 0
     },
@@ -1070,7 +1062,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:8498634e5fc961ff6a840c2367fca6b8a338871124ceecaeb2053833cbe18399",
+      "sha256": "sha256:0b020834deff2af7f5f4574c17116df16b82925c657d5442c6c55b1aacc63d38",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },
@@ -1134,7 +1126,7 @@
       "normative": false,
       "path": "docs/delivery/hardening/54-assurance-tiers.md",
       "relative_links": 0,
-      "sha256": "sha256:5725bd9089f7953311d5b3f19483b790da2eb178491f7aca9f28ed3d561e7669",
+      "sha256": "sha256:aba623bcc8c97e046bc3a5374ffd54da2376687e0da7271bc5f3f3ad63761af2",
       "title": "#54 — selected PR gates and explicit full campaigns",
       "xtask_commands": 0
     },
@@ -1310,7 +1302,7 @@
       "normative": false,
       "path": "docs/prompts/coverage-versions/IMPLEMENT_0_9_0.md",
       "relative_links": 6,
-      "sha256": "sha256:f1520faf5c97548cef82401534fe587ee9727b6085195b6d8546a5e5591d8034",
+      "sha256": "sha256:adf27fa935ff03e68f2ae178084d64f6c9b561f77abffa042c192a9c97573279",
       "title": "Execution Prompt — Implement mainframe-env 0.9.0",
       "xtask_commands": 0
     },
@@ -1388,14 +1380,6 @@
     },
     {
       "normative": false,
-      "path": "docs/research/CI-AGENT-FEEDBACK.md",
-      "relative_links": 6,
-      "sha256": "sha256:78e312d6c5915df1b8565c1fdbb9f790ac8c3aeb06bd8937ee3c35b205ae636c",
-      "title": "CI and agent feedback cost review",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
       "path": "docs/research/IBM-OFFICIAL-COVERAGE-ROADMAP.md",
       "relative_links": 13,
       "sha256": "sha256:b96d0f880dde7758acfbce29df2e8a2e45b07cc19367e282305140a432c57824",
@@ -1461,8 +1445,8 @@
     {
       "normative": false,
       "path": "docs/runbooks/CI-SUPPLY-CHAIN.md",
-      "relative_links": 1,
-      "sha256": "sha256:6a30bb6285bbc95f793b5633a394bb3a0dbcb2858f847dfd4a052240c94767dc",
+      "relative_links": 0,
+      "sha256": "sha256:616ea9f5b00f2dfb2c8898bbb667c7bb72dfc863746790f19a1008f904f6e1a9",
       "title": "CI supply-chain inputs",
       "xtask_commands": 1
     },
@@ -1470,15 +1454,15 @@
       "normative": false,
       "path": "docs/runbooks/IBM-DOCS-CACHE.md",
       "relative_links": 3,
-      "sha256": "sha256:72d9d8d18f4e1279dc82978c41e305a4e6d55961366a55eabea6e1c1b707b19d",
+      "sha256": "sha256:37302bab0348eab33739ad6289d93ed0bdebc84455cdde4413ca9b0633dde479",
       "title": "IBM documentation cache",
       "xtask_commands": 0
     },
     {
       "normative": false,
       "path": "docs/runbooks/JENKINS-LOCAL.md",
-      "relative_links": 2,
-      "sha256": "sha256:f4b394d5e6a5b12dd6da0af122888f7db1ba9698f17cee6b7378bd90ab1c6c4d",
+      "relative_links": 1,
+      "sha256": "sha256:52f128bbba1e79186c5e84483c0668aee1e53e8a9edfa7395580d6efe01682df",
       "title": "Local Jenkins CI",
       "xtask_commands": 0
     },
@@ -1493,8 +1477,8 @@
     {
       "normative": false,
       "path": "docs/runbooks/VERIFICATION-WORKFLOW.md",
-      "relative_links": 3,
-      "sha256": "sha256:b54c6cdb546705dcfd291b540a3b4415145df0488284c4f5671a61ba8c7426e3",
+      "relative_links": 1,
+      "sha256": "sha256:eb0337bc5a5467f2ec33eba0f3e6a86804543e98484eba0e1aa40a86af7c0ccc",
       "title": "Verification workflow",
       "xtask_commands": 0
     },
@@ -1669,6 +1653,7 @@
   ],
   "navigation": [
     {
+      "heading": "Architecture and contracts",
       "entries": [
         {
           "label": "Project charter",
@@ -1762,10 +1747,10 @@
           "label": "Release builder security model",
           "path": "docs/architecture/RELEASE-BUILDER.md"
         }
-      ],
-      "heading": "Architecture and contracts"
+      ]
     },
     {
+      "heading": "Architecture decisions",
       "entries": [
         {
           "label": "ADR-0001: Technology stack",
@@ -1816,10 +1801,10 @@
           "path": "docs/decisions/README.md"
         }
       ],
-      "heading": "Architecture decisions",
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."
     },
     {
+      "heading": "Delivery and development",
       "entries": [
         {
           "label": "Implementation roadmap",
@@ -1858,10 +1843,10 @@
           "path": "docs/prompts/coverage-versions/README.md"
         }
       ],
-      "heading": "Delivery and development",
       "note": "Version-specific status files and review reports describe candidates at a point in time. They are not automatically current product documentation."
     },
     {
+      "heading": "Operations",
       "entries": [
         {
           "label": "Core-server operations",
@@ -1891,10 +1876,10 @@
           "label": "Conformance family rollout",
           "path": "docs/runbooks/conformance-family-rollout.md"
         }
-      ],
-      "heading": "Operations"
+      ]
     },
     {
+      "heading": "Releases, reviews, and research",
       "entries": [
         {
           "label": "0.8 release notes",
@@ -1920,8 +1905,7 @@
           "label": "CICS behavioral pilot",
           "path": "docs/research/cics-behavioral-conformance-pilot.md"
         }
-      ],
-      "heading": "Releases, reviews, and research"
+      ]
     }
   ],
   "package_topology": {

@@ -2,18 +2,18 @@
 
 Use pinned IBM sources before implementing or reviewing language and subsystem
 semantics. The repository retains manifests, catalog locators and independently
-reviewed rule projections; IBM publication bodies remain outside Git and
-container images.
+reviewed rule projections; IBM publication bodies remain outside Git.
 
 ## Provision a verified scope
 
-The development container stores verified bodies in the persistent `ibm-docs`
-volume at `/ibm-docs/topic-cache`. Import an existing external cache one scope
-at a time:
+Choose an absolute external cache directory and import an existing source one
+scope at a time:
 
 ```bash
-docker/dev import-ibm-cache "$TMPDIR/cobolgrammar/topic-cache" --scope ibm-cics-ts-6x-2026-08-31
-docker/dev docs status --scope ibm-cics-ts-6x-2026-08-31
+export MAINFRAME_ENV_IBM_DOCS_CACHE=/absolute/path/to/topic-cache
+tar -C "$TMPDIR/cobolgrammar/topic-cache" -cf - . |
+  python3 -B conformance/tools/ibm_docs.py import --scope ibm-cics-ts-6x-2026-08-31
+python3 -B conformance/tools/ibm_docs.py status --scope ibm-cics-ts-6x-2026-08-31
 ```
 
 Pass the actual directory if the cache was created elsewhere. Import accepts
@@ -30,23 +30,20 @@ baseline and later source-review scope. Import limits are 10,000 expected
 entries, 64 MiB per entry and 512 MiB of topic bodies. A registered manifest is
 limited to 9,999 topics so its TOC can fit the entry bound.
 
-The source directory is preserved. Docker `clean`, `down`, VM restarts and
-ordinary development-container removal preserve the named volume. Jenkins,
-runtime services and deployed applications do not mount it. These commands use
-the existing host-driven `docker compose run` path; they do not start a runner,
-nest Docker or perform a release.
+The source directory is preserved. The external cache is caller-owned and is
+never mounted by Jenkins, runtime services, or deployed applications. These
+commands do not start a runner or perform a release.
 
 `MAINFRAME_ENV_IBM_DOCS_CACHE` sets the shared default used by the offline
-reader and verification tools. Docker supplies `/ibm-docs/topic-cache`;
-explicit `--cache` still takes precedence, and host-side callers retain the
-legacy temporary-directory default when the variable is unset.
+reader and verification tools. Explicit `--cache` takes precedence, and callers
+retain the legacy temporary-directory default when the variable is unset.
 
 ## Use before semantic changes
 
 ```bash
-docker/dev docs search "ADD statement" --subsystem cobol
-docker/dev docs read SS6SG3_6.5/lr/ref/rlpsadd.html --lines 60
-docker/dev docs read SS6SG3_6.5/lr/ref/rlpsadd.html --start-line 61 --lines 60
+python3 -B conformance/tools/ibm_docs.py search "ADD statement" --subsystem cobol
+python3 -B conformance/tools/ibm_docs.py read SS6SG3_6.5/lr/ref/rlpsadd.html --lines 60
+python3 -B conformance/tools/ibm_docs.py read SS6SG3_6.5/lr/ref/rlpsadd.html --start-line 61 --lines 60
 ```
 
 Search ranks verified headings before topic paths and body text, and prints the
@@ -54,7 +51,7 @@ topic digest and source scopes. If one topic path has multiple pinned snapshots,
 select the exact result explicitly:
 
 ```bash
-docker/dev docs read TOPIC_PATH --sha256 DIGEST --lines 60
+python3 -B conformance/tools/ibm_docs.py read TOPIC_PATH --sha256 DIGEST --lines 60
 ```
 
 `status` verifies both topic and TOC bytes. `read` verifies the selected body
@@ -108,10 +105,10 @@ HTML topics for `sources-a`, `sources-b`, and `sources-c`. Verify every pinned
 topic, TOC, and full one-hop source closure with:
 
 ```bash
-docker/dev docs status --scope cics-application-api-sources-a
-docker/dev docs status --scope cics-application-api-sources-b
-docker/dev docs status --scope cics-application-api-sources-c
-docker/dev exec python3 -B conformance/0.9/tools/fetch_cics_application_sources.py --batch all --check --cache /ibm-docs/topic-cache
+python3 -B conformance/tools/ibm_docs.py status --scope cics-application-api-sources-a
+python3 -B conformance/tools/ibm_docs.py status --scope cics-application-api-sources-b
+python3 -B conformance/tools/ibm_docs.py status --scope cics-application-api-sources-c
+python3 -B conformance/0.9/tools/fetch_cics_application_sources.py --batch all --check --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
 ```
 
 The first command checks the manifest topics and TOC. The second also
@@ -128,7 +125,7 @@ Five authority-bounded HTML supplements close the three map-stage gaps. They
 have no TOC claim and are verified separately:
 
 ```bash
-docker/dev exec python3 -B conformance/0.9/tools/cache_cics_application_source_supplements.py --check --cache /ibm-docs/topic-cache
+python3 -B conformance/0.9/tools/cache_cics_application_source_supplements.py --check --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
 ```
 
 ## Reproduce the CICS application structural projections
@@ -137,9 +134,9 @@ The committed projection can be checked without mounting the documentation
 cache:
 
 ```bash
-docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch a --check
-docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch b --check
-docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch c --check
+python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch a --check
+python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch b --check
+python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch c --check
 ```
 
 This form verifies the exact plan, map, corpus, manifest, browser receipt,
@@ -148,9 +145,9 @@ and projection digest. To re-read every pinned HTML body and regenerate the
 candidate bytes before comparing them to Git, use the cache-backed form:
 
 ```bash
-docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch a --cache /ibm-docs/topic-cache --check
-docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch b --cache /ibm-docs/topic-cache --check
-docker/dev exec python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch c --cache /ibm-docs/topic-cache --check
+python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch a --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch b --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch c --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
 ```
 
 Both forms are offline and preserve the zero-credit boundary. The projection
@@ -162,19 +159,18 @@ independent verifier directly before checking each compact automatic receipt;
 this keeps extraction and verification implementations separate:
 
 ```bash
-docker/dev exec python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch a --cache /ibm-docs/topic-cache
-docker/dev exec python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch b --cache /ibm-docs/topic-cache
-docker/dev exec python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch c --cache /ibm-docs/topic-cache
-docker/dev exec python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch a --check --cache /ibm-docs/topic-cache
-docker/dev exec python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch b --check --cache /ibm-docs/topic-cache
-docker/dev exec python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch c --check --cache /ibm-docs/topic-cache
+python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch a --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
+python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch b --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
+python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch c --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
+python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch a --check --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
+python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch b --check --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
+python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch c --check --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
 ```
 
 If a later check needs another HTML topic, add and reproduce it through the
 user's Chrome Browser-Control session before regenerating; do not fetch
 implicitly from the projector, use native CUA, or substitute a PDF. These
-checks use the existing development container only:
-they neither nest Docker nor perform release or licensed execution work.
+checks neither perform release nor licensed execution work.
 
 ## Reverify immutable baseline pins
 
@@ -182,7 +178,7 @@ The network-capable re-verifier remains scoped to immutable baselines in the
 0.2 index:
 
 ```bash
-docker/dev exec python3 conformance/tools/fetch_pinned_sources.py --subsystem cobol
+python3 conformance/tools/fetch_pinned_sources.py --subsystem cobol
 ```
 
 It writes findings outside Git and never updates a reviewed baseline. A network

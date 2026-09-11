@@ -28,14 +28,11 @@ SAFE_ID = re.compile(r"[a-z0-9][a-z0-9-]{0,127}\Z")
 SAFE_VERSION = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,191}\Z")
 ACTION = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@[0-9a-f]{40}\Z")
 IMAGE = re.compile(r"[^\s@]+@sha256:[0-9a-f]{64}\Z")
-ARCHIVE_IMAGE_DECLARATION = re.compile(
-    r'^REPRODUCIBLE_ARCHIVE_IMAGE = "([^"\s]+@sha256:[0-9a-f]{64})"$'
-)
 MAX_JSON_BYTES = 1024 * 1024
 MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
 MAX_TREE_FILES = 200_000
 MAX_TREE_BYTES = 4 * 1024 * 1024 * 1024
-CI_PATH_PREFIXES = (".github/workflows/", "tools/", "docker/")
+CI_PATH_PREFIXES = (".github/workflows/", "tools/")
 CI_PATHS = {"Jenkinsfile", "tools/package_offline_cargo_bundle.sh"}
 INSTALL_COMMAND = re.compile(
     r"^\s*(?:sudo\s+)?(?:apt(?:-get)?\s+install|apk\s+add|brew\s+install|"
@@ -124,7 +121,6 @@ def validate_ci_lock(root: Path) -> dict:
         "cargo-deny",
         "cargo-fuzz",
         "cargo-llvm-cov",
-        "docker",
         "git",
         "github-cli",
         "java",
@@ -225,31 +221,8 @@ def scan_external_inputs(root: Path, tracked: list[str]) -> dict[str, list[str]]
             raise SupplyChainError(f"tracked CI file is missing or too large: {relative}")
         text = path.read_text(encoding="utf-8")
         is_workflow = relative.startswith(".github/workflows/") and relative.endswith((".yml", ".yaml"))
-        is_compose = relative == "docker/compose.yaml"
-        if is_compose:
-            # Local output tags are allowed only beside their reviewed build
-            # recipe. They cannot silently become mutable registry inputs.
-            recipes = load_json(root / 'docker/inputs.lock.json')['local_images']
-            for block in re.split(r'^  [a-z][a-z0-9-]*:\s*$', text, flags=re.MULTILINE):
-                image = re.search(r'^    image: (\S+)\s*$', block, re.MULTILINE)
-                if image and not IMAGE.fullmatch(image.group(1)):
-                    coordinate = image.group(1)
-                    require(coordinate in recipes, f'unreviewed local image: {coordinate}')
-                    recipe = recipes[coordinate]
-                    require(recipe in tracked, f'untracked container recipe: {recipe}')
-                    require(re.search(r'^    build:\s*$', block, re.MULTILINE) is not None
-                            and f'      dockerfile: {recipe}\n' in block
-                            and '      context: ..\n' in block,
-                            f'local image lacks its reviewed build recipe: {coordinate}')
         for number, line in enumerate(text.splitlines(), 1):
             stripped = line.strip()
-            archive_image = ARCHIVE_IMAGE_DECLARATION.fullmatch(stripped)
-            if archive_image:
-                images.add(archive_image.group(1))
-            if is_compose:
-                image = re.match(r'image:\s*(\S+)', stripped)
-                if image and IMAGE.fullmatch(image.group(1)):
-                    images.add(image.group(1))
             if is_workflow:
                 use = re.match(r"-?\s*uses:\s*['\"]?([^'\"#\s]+)", stripped)
                 if use:
@@ -264,13 +237,6 @@ def scan_external_inputs(root: Path, tracked: list[str]) -> dict[str, list[str]]
                 runner = re.match(r"runs-on:\s*(.+)", stripped)
                 if runner:
                     require("self-hosted" in runner.group(1), f"mutable hosted runner at {relative}:{number}")
-            if relative.lower().endswith(("dockerfile", ".dockerfile")):
-                base = re.match(r"FROM\s+(?:--platform=\S+\s+)?(\S+)", stripped, re.IGNORECASE)
-                if base:
-                    require(IMAGE.fullmatch(base.group(1)) is not None, f"mutable base image at {relative}:{number}")
-                    images.add(base.group(1))
-            if re.search(r"\b(?:docker|podman)\s+(?:build|run)\b", stripped):
-                raise SupplyChainError(f"container command needs structured digest validation at {relative}:{number}")
             if INSTALL_COMMAND.match(stripped):
                 installers.add(f"{relative}:{number}:{stripped}")
     return {
@@ -280,35 +246,10 @@ def scan_external_inputs(root: Path, tracked: list[str]) -> dict[str, list[str]]
     }
 
 
-def validate_docker_inputs(root: Path, ci_lock: dict) -> None:
-    lock = load_json(root / 'docker/inputs.lock.json')
-    exact_keys(lock, {'schema_version', 'recorded_on', 'local_images', 'sources'}, 'Docker input lock')
-    require(lock['schema_version'] == 1, 'bad Docker input schema')
-    require(lock['local_images'] == {
-        'mainframe-env-runtime:dev': 'docker/runtime.Dockerfile',
-        'mainframe-env-toolchain:dev': 'docker/toolchain.Dockerfile',
-    }, 'Docker local image recipes drifted')
-    require(isinstance(lock['sources'], list), 'Docker sources must be a list')
-    sources = {}
-    for source in lock['sources']:
-        exact_keys(source, {'name', 'version', 'url', 'sha256'}, 'Docker source')
-        require(source['name'] not in sources, 'duplicate Docker source')
-        require(SAFE_VERSION.fullmatch(source['version']) is not None, 'invalid Docker source version')
-        require(source['url'].startswith('https://'), 'Docker source must use HTTPS')
-        require(SHA256.fullmatch(source['sha256']) is not None, 'Docker source hash is not SHA-256')
-        sources[source['name']] = source
-    require(set(sources) == {'git', 'postgresql', 'bison', 'flex'}, 'Docker source closure differs')
-    for name in ('git', 'postgresql'):
-        require(sources[name]['version'] == ci_lock['tools'][name]['version'],
-                f'Docker {name} differs from the CI tool lock')
-
-
 def check_repository(root: Path = ROOT) -> tuple[dict, dict]:
     ci_lock = validate_ci_lock(root)
     jenkins_lock = validate_jenkins_lock(root)
     tracked = tracked_files(root)
-    if 'docker/inputs.lock.json' in tracked:
-        validate_docker_inputs(root, ci_lock)
     require(not (set(ci_lock["unsupported_local_inputs"]) & set(tracked)), "an explicitly unsupported local CI input became tracked")
     observed = scan_external_inputs(root, tracked)
     require(observed == ci_lock["tracked_remote_inputs"], "tracked remote CI inputs differ from their lock")
@@ -400,13 +341,6 @@ def verify_runtime(ci_lock: dict, scope: str) -> None:
         git = command_output(["git", "--version"])
         match = re.search(r"git version ([0-9]+\.[0-9]+\.[0-9]+)", git)
         require(match is not None and match.group(1) == tools["git"]["version"], f"Git must be exactly {tools['git']['version']}")
-    if scope in {"offline", "all"}:
-        docker = command_output(["docker", "--version"])
-        match = re.search(r"Docker version ([0-9]+\.[0-9]+\.[0-9]+),", docker)
-        require(
-            match is not None and match.group(1) == tools["docker"]["version"],
-            f"Docker must be exactly {tools['docker']['version']}",
-        )
     if scope in {"ci", "offline", "all"}:
         verify_rust("workspace", ci_lock["rust"]["workspace"])
         verify_active_rust(ci_lock["rust"]["workspace"])
@@ -617,13 +551,10 @@ def offline_record(root: Path, vendor: Path) -> dict:
     require(re.fullmatch(r"[0-9a-f]{40}", revision) is not None, "offline source revision is invalid")
     tools = {
         "cargo": executable_identity("cargo", ["cargo", "-Vv"]),
-        "docker": executable_identity("docker", ["docker", "--version"]),
         "git": executable_identity("git", ["git", "--version"]),
         "python": executable_identity("python", [sys.executable, "--version"], sys.executable),
         "rustc": executable_identity("rustc", ["rustc", "-Vv"]),
     }
-    archive_images = ci_lock["tracked_remote_inputs"]["container_images"]
-    require(len(archive_images) == 1, "offline archive environment lock differs")
     return {
         "schema_version": "mainframe-env.offline-build-inputs@2",
         "source_revision": revision,
@@ -631,10 +562,9 @@ def offline_record(root: Path, vendor: Path) -> dict:
         "vendor": tree_identity(vendor),
         "tools": tools,
         "archive_environment": {
-            "image": archive_images[0],
-            "platform": "linux/amd64",
-            "tar": "GNU tar 1.34",
-            "gzip": "gzip 1.12",
+            "implementation": "python-standard-library",
+            "format": "ustar",
+            "compression": "gzip",
         },
         "jenkins_controller_version": jenkins_lock["controller"]["version"],
     }
