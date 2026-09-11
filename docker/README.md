@@ -34,7 +34,10 @@ Reopen in Container** in the new window. Always launch
 this repository through `docker/dev vscode`: it supplies VS Code with the
 dedicated Colima socket and refuses initialization through an uncapped/default
 Docker daemon. VS Code 1.136 or later plus the Dev Containers extension is
-required on the host; this device already has both.
+required on the host; this device already has both. The wrapper generates an
+ignored, device-local Compose override for UID/GID. Compose resolves the checkout
+and capped-volume paths even when VS Code was already running before the wrapper
+opened the remote window.
 
 The attached workspace is `/workspace`. The OpenAI Codex extension, Rust
 Analyzer, and CodeLLDB run remotely in Linux. Sign in to Codex once in that

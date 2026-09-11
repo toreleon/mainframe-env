@@ -28,6 +28,14 @@ start_stack() {
   "${dc[@]}" --profile runtime create server
   "${dc[@]}" up -d --wait --wait-timeout 180 jenkins
 }
+write_devcontainer_override() {
+  local override temporary
+  override="$repo/.devcontainer/compose.local.yaml"
+  temporary="$(mktemp "$override.XXXXXX")"
+  printf "services:\n  dev:\n    environment:\n      DEV_UID: '%s'\n      DEV_GID: '%s'\n" \
+    "$MAINFRAME_ENV_UID" "$MAINFRAME_ENV_GID" > "$temporary"
+  mv "$temporary" "$override"
+}
 case "$action" in
   vscode)
     [[ "${MAINFRAME_ENV_DEV_CONTAINER:-0}" != 1 ]] || {
@@ -46,6 +54,7 @@ case "$action" in
       echo 'Run `docker/dev up` from main once before opening a feature checkout.' >&2
       exit 1
     }
+    write_devcontainer_override
     "${dc[@]}" up -d --no-build --wait --wait-timeout 180 postgres
     export DOCKER_HOST="$docker_socket"
     exec code --new-window "$repo"
@@ -55,6 +64,7 @@ case "$action" in
       echo 'Open this workspace with `docker/dev vscode` so VS Code uses the capped Docker daemon.' >&2
       exit 1
     }
+    write_devcontainer_override
     docker --host "$docker_socket" info >/dev/null
     ;;
   up)

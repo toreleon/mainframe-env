@@ -16,10 +16,13 @@ class DevContainerTests(unittest.TestCase):
         self.cargo = (ROOT / 'docker/dev-bin/cargo').read_text()
         self.codex_config = (ROOT / 'docker/codex-container.toml').read_text()
         self.dockerfile = (ROOT / 'docker/toolchain.Dockerfile').read_text()
+        self.base_compose = (ROOT / 'docker/compose.yaml').read_text()
+        self.ignore = (ROOT / '.gitignore').read_text()
 
     def test_reuses_compose_services_and_never_stops_the_shared_stack_on_close(self):
         self.assertEqual(self.config['dockerComposeFile'],
-                         ['../docker/compose.yaml', 'compose.yaml'])
+                         ['../docker/compose.yaml', 'compose.yaml',
+                          'compose.local.yaml'])
         self.assertEqual(self.config['service'], 'dev')
         self.assertEqual(self.config['runServices'], ['postgres'])
         self.assertEqual(self.config['workspaceFolder'], '/workspace')
@@ -46,11 +49,24 @@ class DevContainerTests(unittest.TestCase):
         self.assertIn('SYS_PTRACE', self.compose)
         self.assertNotIn('/var/run/docker.sock', self.compose)
         self.assertNotIn('/Users/', self.compose)
-        base = (ROOT / 'docker/compose.yaml').read_text()
         for required in ('mem_limit: 6g', 'cpus: 3', 'pids_limit: 512',
                          'dev-cargo:/cache', 'dev-target:/target',
                          'ibm-docs:/ibm-docs'):
-            self.assertIn(required, base)
+            self.assertIn(required, self.base_compose)
+
+    def test_compose_can_resolve_from_an_existing_vscode_process(self):
+        self.assertNotIn(':?Run docker/dev', self.base_compose)
+        self.assertIn('source: ${MAINFRAME_ENV_SOURCE:-..}', self.base_compose)
+        self.assertIn(
+            '${MAINFRAME_ENV_SECRETS:-/Volumes/MainframeEnvDocker/secrets}',
+            self.base_compose,
+        )
+        self.assertIn('DEV_UID: ${MAINFRAME_ENV_UID:-1000}', self.base_compose)
+        self.assertIn('DEV_GID: ${MAINFRAME_ENV_GID:-1000}', self.base_compose)
+        self.assertIn('write_devcontainer_override', self.wrapper)
+        self.assertIn("DEV_UID: '%s'", self.wrapper)
+        self.assertIn("DEV_GID: '%s'", self.wrapper)
+        self.assertIn('/.devcontainer/compose.local.yaml', self.ignore)
 
     def test_codex_uses_docker_as_the_single_sandbox(self):
         self.assertIn('sandbox_mode = "danger-full-access"', self.codex_config)
@@ -66,6 +82,7 @@ class DevContainerTests(unittest.TestCase):
                          '${localWorkspaceFolder}/docker/dev devcontainer-init')
         self.assertIn('incoming_docker_host="${DOCKER_HOST:-}"', self.wrapper)
         self.assertIn('[[ "$incoming_docker_host" == "$docker_socket" ]]', self.wrapper)
+        self.assertEqual(self.wrapper.count('write_devcontainer_override\n'), 2)
         self.assertIn('exec code --new-window "$repo"', self.wrapper)
         vscode = self.wrapper.split('  vscode)', 1)[1].split('  devcontainer-init)', 1)[0]
         self.assertNotIn('start_stack', vscode)

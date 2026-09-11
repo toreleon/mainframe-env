@@ -2,7 +2,8 @@
   "name": "mainframe-env",
   "dockerComposeFile": [
     "../docker/compose.yaml",
-    "compose.yaml"
+    "compose.yaml",
+    "compose.local.yaml"
   ],
   "service": "dev",
   "runServices": [

@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:838b76da9f786728a6ac894261152c482409598ccacb2099ecc0e0af8e153d96",
+      "sha256": "sha256:91884022bf18c597efc7cac87953e1d7f611dda99e21ab05bb602d4ea4ebd05f",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -298,7 +298,7 @@
       "normative": false,
       "path": "docker/README.md",
       "relative_links": 10,
-      "sha256": "sha256:a4e4eaa8773a7c44b7df904d137c8828752d44cbf83efbd07cb1124ae43cbc80",
+      "sha256": "sha256:51124a4e08ad3ead26848258d43ee73c09a8783b80ab29cd16e23c7d69932d8e",
       "title": "Docker development environment",
       "xtask_commands": 1
     },
