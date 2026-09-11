@@ -13,7 +13,7 @@ services:
       context: ..
       dockerfile: docker/toolchain.Dockerfile
       additional_contexts:
-        jenkins-seed: ${MAINFRAME_ENV_JENKINS_SEED:-/Volumes/MainframeEnvDocker/jenkins-seed}
+        jenkins-seed: ${MAINFRAME_ENV_JENKINS_SEED:?Run docker/dev init}
     profiles: [dev]
     init: true
     working_dir: /workspace
@@ -33,7 +33,7 @@ services:
         PYTHONDONTWRITEBYTECODE: '1'
     volumes:
       - type: bind
-        source: ${MAINFRAME_ENV_SOURCE:-..}
+        source: ${MAINFRAME_ENV_SOURCE:?Run docker/dev}
         target: /workspace
       # Mask the large host target, even for tools that ignore CARGO_TARGET_DIR.
       - dev-target:/workspace/target
@@ -54,7 +54,7 @@ services:
       context: ..
       dockerfile: docker/toolchain.Dockerfile
       additional_contexts:
-        jenkins-seed: ${MAINFRAME_ENV_JENKINS_SEED:-/Volumes/MainframeEnvDocker/jenkins-seed}
+        jenkins-seed: ${MAINFRAME_ENV_JENKINS_SEED:?Run docker/dev init}
     container_name: mainframe-env-jenkins
     init: true
     restart: unless-stopped
@@ -73,7 +73,7 @@ services:
       - ci-target:/target
       - releases:/releases
       - type: bind
-        source: ${MAINFRAME_ENV_SOURCE:-..}
+        source: ${MAINFRAME_ENV_SOURCE:?Run docker/dev}
         target: /source
         read_only: true
       - /var/run/docker.sock:/var/run/docker.sock
@@ -155,10 +155,10 @@ volumes:
 
 secrets:
   github_credentials:
-    file: ${MAINFRAME_ENV_SECRETS:-/Volumes/MainframeEnvDocker/secrets}/github_credentials
+    file: ${MAINFRAME_ENV_SECRETS:?Run docker/dev}/github_credentials
   jenkins_password:
-    file: ${MAINFRAME_ENV_SECRETS:-/Volumes/MainframeEnvDocker/secrets}/jenkins_password
+    file: ${MAINFRAME_ENV_SECRETS:?Run docker/dev}/jenkins_password
   postgres_password:
-    file: ${MAINFRAME_ENV_SECRETS:-/Volumes/MainframeEnvDocker/secrets}/postgres_password
+    file: ${MAINFRAME_ENV_SECRETS:?Run docker/dev}/postgres_password
   admin_password:
-    file: ${MAINFRAME_ENV_SECRETS:-/Volumes/MainframeEnvDocker/secrets}/admin_password
+    file: ${MAINFRAME_ENV_SECRETS:?Run docker/dev}/admin_password

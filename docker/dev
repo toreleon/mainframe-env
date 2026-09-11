@@ -7,12 +7,11 @@ export COLIMA_HOME="$volume/colima" XDG_CACHE_HOME="$volume/cache"
 export MAINFRAME_ENV_SOURCE="$repo" MAINFRAME_ENV_SECRETS="$volume/secrets"
 export MAINFRAME_ENV_JENKINS_SEED="$volume/jenkins-seed"
 export MAINFRAME_ENV_UID="$(id -u)" MAINFRAME_ENV_GID="$(id -g)"
-incoming_docker_host="${DOCKER_HOST:-}"
 action="${1:-help}"
 [[ $# == 0 ]] || shift
 if [[ "$action" == init ]]; then exec "$repo/docker/bootstrap-macos.sh" "$@"; fi
 if [[ "$action" == help ]]; then
-  echo 'Usage: docker/dev init|up|vscode|devcontainer-init|shell|exec COMMAND [args...]|cargo [args...]|test|docs [args...]|import-ibm-cache DIRECTORY|status|logs|clean|down|stop'
+  echo 'Usage: docker/dev init|up|shell|exec COMMAND [args...]|cargo [args...]|test|docs [args...]|import-ibm-cache DIRECTORY|status|logs|clean|down|stop'
   exit 0
 fi
 reserve=3221225472
@@ -21,54 +20,13 @@ python3 "$repo/docker/storage.py" host "$volume" --minimum-free-bytes "$reserve"
 docker_socket="unix://$COLIMA_HOME/mainframe-env/docker.sock"
 unset DOCKER_CONTEXT DOCKER_HOST
 dc=(docker --host "$docker_socket" compose -p mainframe-env -f "$repo/docker/compose.yaml")
-start_stack() {
-  "${dc[@]}" --profile runtime build
-  docker --host "$docker_socket" builder prune -f --keep-storage 2GB
-  "${dc[@]}" up -d --wait --wait-timeout 180 postgres
-  "${dc[@]}" --profile runtime create server
-  "${dc[@]}" up -d --wait --wait-timeout 180 jenkins
-}
-write_devcontainer_override() {
-  local override temporary
-  override="$repo/.devcontainer/compose.local.yaml"
-  temporary="$(mktemp "$override.XXXXXX")"
-  printf "services:\n  dev:\n    environment:\n      DEV_UID: '%s'\n      DEV_GID: '%s'\n" \
-    "$MAINFRAME_ENV_UID" "$MAINFRAME_ENV_GID" > "$temporary"
-  mv "$temporary" "$override"
-}
 case "$action" in
-  vscode)
-    [[ "${MAINFRAME_ENV_DEV_CONTAINER:-0}" != 1 ]] || {
-      echo 'VS Code is already attached to the development container.' >&2
-      exit 1
-    }
-    command -v code >/dev/null 2>&1 || {
-      echo 'VS Code CLI `code` is required.' >&2
-      exit 1
-    }
-    code --list-extensions | grep -qx 'ms-vscode-remote.remote-containers' || {
-      echo 'Install the VS Code Dev Containers extension first.' >&2
-      exit 1
-    }
-    docker --host "$docker_socket" image inspect mainframe-env-toolchain:dev >/dev/null || {
-      echo 'Run `docker/dev up` from main once before opening a feature checkout.' >&2
-      exit 1
-    }
-    write_devcontainer_override
-    "${dc[@]}" up -d --no-build --wait --wait-timeout 180 postgres
-    export DOCKER_HOST="$docker_socket"
-    exec code --new-window "$repo"
-    ;;
-  devcontainer-init)
-    [[ "$incoming_docker_host" == "$docker_socket" ]] || {
-      echo 'Open this workspace with `docker/dev vscode` so VS Code uses the capped Docker daemon.' >&2
-      exit 1
-    }
-    write_devcontainer_override
-    docker --host "$docker_socket" info >/dev/null
-    ;;
   up)
-    start_stack
+    "${dc[@]}" --profile runtime build
+    docker --host "$docker_socket" builder prune -f --keep-storage 2GB
+    "${dc[@]}" up -d --wait --wait-timeout 180 postgres
+    "${dc[@]}" --profile runtime create server
+    "${dc[@]}" up -d --wait --wait-timeout 180 jenkins
     echo 'Jenkins: http://127.0.0.1:18080 (admin; password in /Volumes/MainframeEnvDocker/secrets/jenkins_password)'
     echo 'The first successful main build starts the application at http://127.0.0.1:10443/zosmf/info.'
     ;;

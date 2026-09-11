@@ -17,57 +17,7 @@ docker/dev test
 docker/dev shell
 ```
 
-## VS Code Dev Container
-
-The preferred interactive workflow reuses this Compose stack rather than
-creating another development image or cache:
-
-```bash
-docker/dev init
-docker/dev up
-docker/dev vscode
-```
-
-Run `up` once from `main` and after infrastructure changes; feature checkouts do
-not rebuild or replace Jenkins when opening the editor. Choose **Dev Containers:
-Reopen in Container** in the new window. Always launch
-this repository through `docker/dev vscode`: it supplies VS Code with the
-dedicated Colima socket and refuses initialization through an uncapped/default
-Docker daemon. VS Code 1.136 or later plus the Dev Containers extension is
-required on the host; this device already has both. The wrapper generates an
-ignored, device-local Compose override for UID/GID. Compose resolves the checkout
-and capped-volume paths even when VS Code was already running before the wrapper
-opened the remote window.
-
-The attached workspace is `/workspace`. The OpenAI Codex extension, Rust
-Analyzer, and CodeLLDB run remotely in Linux. Sign in to Codex once in that
-window; its state persists in the capped `dev-vscode-home` volume. Run `cargo`,
-project Python, and shell tools directly; do not invoke `docker/dev` or nested
-Docker from inside it. Automatic Rust
-Analyzer checks on save are disabled to avoid duplicate workspace builds; run a
-focused test/check explicitly. `cargo` resolves to a small reentrant lock wrapper,
-so IDE and terminal builds serialize with `docker/dev clean` while nested Cargo
-from `xtask` can proceed. `codex` resolves to the Linux CLI bundled with the
-remote OpenAI extension, so it needs no separate Node/npm installation.
-
-Docker is the single sandbox boundary for this trusted repository. The image's
-`/etc/codex/config.toml` disables Codex's nested Linux sandbox and interactive
-approval prompts. The container mounts the checkout and capped development
-volumes, but no host Docker socket or application secrets. Use the host Codex
-Desktop workflow below only for maintenance that cannot run in the remote editor.
-
-The launch command ensures PostgreSQL is healthy without rebuilding services;
-Dev Containers then starts and attaches to `dev`. Jenkins and the deployed server
-remain separate long-lived services managed from `main`. The editor shares
-`dev-cargo`, `dev-target`, `dev-output`, `dev-postgres`, and `ibm-docs`
-with the wrapper and adds only a persistent `dev-vscode-home` volume for the
-remote editor. All remain inside the same capped Docker disk. It does not mount
-the Docker socket or application secrets into the editor container. Closing VS
-Code leaves services running; use `docker/dev down` or `docker/dev stop` from a
-host terminal when desired. Rebuild the Dev Container after image, Compose, or
-`.devcontainer` changes.
-
-For host Codex Desktop work, keep editing this shared checkout and run development
+For Codex desktop work, keep editing this shared checkout and run development
 commands through the wrapper. `AGENTS.md` requires container execution for
 builds, tests, linters, generators, and dependency tools:
 
