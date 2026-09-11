@@ -19,4 +19,5 @@ pub use postgres::PostgresStateStore;
 pub use postgres_artifact::PostgresArtifactStore;
 pub use sqlite::SqliteStateStore;
 
-pub const SQL_MIGRATION_HEAD: &str = "0002-retention-lifecycle";
+pub const SQLITE_MIGRATION_HEAD: &str = "0002-retention-lifecycle";
+pub const POSTGRES_MIGRATION_HEAD: &str = "0003-executable-artifact-metadata";

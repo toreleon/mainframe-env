@@ -1,70 +1,1548 @@
 {
-  "schema_version": "mainframe-env.cics-command-descriptors@1",
+  "schema_version": "mainframe-env.cics-command-descriptors@2",
   "target_version": "0.9.0",
   "official_catalog": "conformance/0.2/catalogs/cics.json",
-  "command_count": 25,
-  "families": [
-    {
-      "id": "task-control",
-      "rust_variant": "TaskControl",
-      "responsibility": "Task context, condition and abend handlers, assignment, retrieval, and pseudo-conversation return."
-    },
-    {
-      "id": "time",
-      "rust_variant": "Time",
-      "responsibility": "Clock acquisition and deterministic CICS absolute-time formatting."
-    },
-    {
-      "id": "program-control",
-      "rust_variant": "ProgramControl",
-      "responsibility": "Program inquiry, LINK, and XCTL transfer semantics."
-    },
-    {
-      "id": "terminal-control",
-      "rust_variant": "TerminalControl",
-      "responsibility": "BMS and text send/receive terminal semantics."
-    },
-    {
-      "id": "file-control",
-      "rust_variant": "FileControl",
-      "responsibility": "File status, keyed record, and browse semantics."
-    },
-    {
-      "id": "queue-control",
-      "rust_variant": "QueueControl",
-      "responsibility": "Transient-data queue write semantics."
-    },
-    {
-      "id": "recovery",
-      "rust_variant": "Recovery",
-      "responsibility": "Unit-of-work commit, rollback, and reconciliation semantics."
-    }
-  ],
-  "commands": [
-    {"operation": "Abend", "syntax": "ABEND", "family": "task-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0001"},
-    {"operation": "Asktime", "syntax": "ASKTIME", "family": "time", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0009"},
-    {"operation": "Assign", "syntax": "ASSIGN", "family": "task-control", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0011"},
-    {"operation": "Delete", "syntax": "DELETE", "family": "file-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0040"},
-    {"operation": "EndBrowse", "syntax": "ENDBR", "family": "file-control", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0058"},
-    {"operation": "FormatTime", "syntax": "FORMATTIME", "family": "time", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0080"},
-    {"operation": "HandleAbend", "syntax": "HANDLE ABEND", "family": "task-control", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0097"},
-    {"operation": "HandleCondition", "syntax": "HANDLE CONDITION", "family": "task-control", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0099"},
-    {"operation": "Inquire", "syntax": "INQUIRE PROGRAM", "family": "program-control", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0155"},
-    {"operation": "Link", "syntax": "LINK", "family": "program-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0138"},
-    {"operation": "Read", "syntax": "READ", "family": "file-control", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0156"},
-    {"operation": "ReadNext", "syntax": "READNEXT", "family": "file-control", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0157"},
-    {"operation": "ReadPrev", "syntax": "READPREV", "family": "file-control", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0158"},
-    {"operation": "ReceiveMap", "syntax": "RECEIVE MAP", "family": "terminal-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0163"},
-    {"operation": "Retrieve", "syntax": "RETRIEVE", "family": "task-control", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0175"},
-    {"operation": "Return", "syntax": "RETURN", "family": "task-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0178"},
-    {"operation": "Rewrite", "syntax": "REWRITE", "family": "file-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0181"},
-    {"operation": "SendMap", "syntax": "SEND MAP", "family": "terminal-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0189"},
-    {"operation": "SendText", "syntax": "SEND TEXT", "family": "terminal-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0192"},
-    {"operation": "SetFileStatus", "syntax": "SET FILE", "family": "file-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0224"},
-    {"operation": "StartBrowse", "syntax": "STARTBR", "family": "file-control", "mutating": false, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0208"},
-    {"operation": "Syncpoint", "syntax": "SYNCPOINT", "family": "recovery", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0218"},
-    {"operation": "Write", "syntax": "WRITE FILE", "family": "file-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0253"},
-    {"operation": "WriteTransientData", "syntax": "WRITEQ TD", "family": "queue-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0257"},
-    {"operation": "Xctl", "syntax": "XCTL", "family": "program-control", "mutating": true, "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0263"}
-  ]
+  "official_catalog_sha256": "sha256:fccd2a8e5cc24dd08aeb32754daf14ed80e9f1b20b5d9e762a1b0cfe429ceeba",
+  "application_catalog": {
+    "unit": "api-commands",
+    "command_count": 263,
+    "automatic_registration": false,
+    "generated_coverage_credit": 0,
+    "commands": [
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0001",
+        "label": "ABEND",
+        "eibfn": "0E0C"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0002",
+        "label": "ACQUIRE ACTIVITYID",
+        "eibfn": "3410"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0003",
+        "label": "ACQUIRE PROCESS",
+        "eibfn": "340E"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0004",
+        "label": "ADD SUBEVENT",
+        "eibfn": "3608"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0005",
+        "label": "ADDRESS",
+        "eibfn": "0202"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0006",
+        "label": "ADDRESS SET",
+        "eibfn": "0210"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0007",
+        "label": "ALLOCATE",
+        "eibfn": "0420"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0008",
+        "label": "GDS ALLOCATE",
+        "eibfn": "2402"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0009",
+        "label": "ASKTIME",
+        "eibfn": "1002"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0010",
+        "label": "ASKTIME ABSTIME",
+        "eibfn": "4A02"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0011",
+        "label": "ASSIGN",
+        "eibfn": "0208"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0012",
+        "label": "GDS ASSIGN",
+        "eibfn": "2404"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0013",
+        "label": "BIF DEEDIT",
+        "eibfn": "2002"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0014",
+        "label": "BIF DIGEST",
+        "eibfn": "2020"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0015",
+        "label": "BUILD ATTACH",
+        "eibfn": "0426"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0016",
+        "label": "CANCEL",
+        "eibfn": "100C"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0017",
+        "label": "CANCEL ACQACTIVITY",
+        "eibfn": "342E"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0018",
+        "label": "CANCEL ACQPROCESS",
+        "eibfn": "341E"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0019",
+        "label": "CANCEL ACTIVITY",
+        "eibfn": "341C"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0020",
+        "label": "CHANGE PASSWORD",
+        "eibfn": "7408"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0021",
+        "label": "CHANGE PHRASE",
+        "eibfn": "740C"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0022",
+        "label": "CHANGE TASK",
+        "eibfn": "5E06"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0023",
+        "label": "CHECK ACQACTIVITY",
+        "eibfn": "343A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0024",
+        "label": "CHECK ACQPROCESS",
+        "eibfn": "3438"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0025",
+        "label": "CHECK ACTIVITY",
+        "eibfn": "341A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0026",
+        "label": "CHECK TIMER",
+        "eibfn": "3618"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0027",
+        "label": "CICSMESSAGE",
+        "eibfn": "6C12"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0028",
+        "label": "CONNECT PROCESS",
+        "eibfn": "0432"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0029",
+        "label": "GDS CONNECT PROCESS",
+        "eibfn": "240C"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0030",
+        "label": "CONVERSE",
+        "eibfn": "0406"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0031",
+        "label": "CONVERTTIME",
+        "eibfn": "4A06"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0032",
+        "label": "DEFINE ACTIVITY",
+        "eibfn": "3402"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0033",
+        "label": "DEFINE COMPOSITE EVENT",
+        "eibfn": "3602"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0034",
+        "label": "DEFINE COUNTER",
+        "eibfn": "2004"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0035",
+        "label": "DEFINE DCOUNTER",
+        "eibfn": "2014"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0036",
+        "label": "DEFINE INPUT EVENT",
+        "eibfn": "3602"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0037",
+        "label": "DEFINE PROCESS",
+        "eibfn": "3404"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0038",
+        "label": "DEFINE TIMER",
+        "eibfn": "3614"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0039",
+        "label": "DELAY",
+        "eibfn": "1004"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0040",
+        "label": "DELETE",
+        "eibfn": "0608"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0041",
+        "label": "DELETE ACTIVITY",
+        "eibfn": "3428"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0042",
+        "label": "DELETE CHANNEL",
+        "eibfn": "3458"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0043",
+        "label": "DELETE CONTAINER",
+        "eibfn": "3412"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0044",
+        "label": "DELETE COUNTER",
+        "eibfn": "200A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0045",
+        "label": "DELETE DCOUNTER",
+        "eibfn": "201A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0046",
+        "label": "DELETE EVENT",
+        "eibfn": "3604"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0047",
+        "label": "DELETE TIMER",
+        "eibfn": "3616"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0048",
+        "label": "DELETEQ TD",
+        "eibfn": "0806"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0049",
+        "label": "DELETEQ TS",
+        "eibfn": "0A06"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0050",
+        "label": "DEQ",
+        "eibfn": "1206"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0051",
+        "label": "DOCUMENT CREATE",
+        "eibfn": "3C02"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0052",
+        "label": "DOCUMENT DELETE",
+        "eibfn": "3C10"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0053",
+        "label": "DOCUMENT INSERT",
+        "eibfn": "3C04"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0054",
+        "label": "DOCUMENT RETRIEVE",
+        "eibfn": "3C06"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0055",
+        "label": "DOCUMENT SET",
+        "eibfn": "3C08"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0056",
+        "label": "DUMP",
+        "eibfn": "1C02"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0057",
+        "label": "DUMP TRANSACTION",
+        "eibfn": "7E02"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0058",
+        "label": "ENDBR",
+        "eibfn": "0612"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0059",
+        "label": "ENDBROWSE ACTIVITY",
+        "eibfn": "9624"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0060",
+        "label": "ENDBROWSE CONTAINER",
+        "eibfn": "962A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0061",
+        "label": "ENDBROWSE EVENT",
+        "eibfn": "9630"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0062",
+        "label": "ENDBROWSE PROCESS",
+        "eibfn": "9636"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0063",
+        "label": "ENDBROWSE TIMER",
+        "eibfn": "963E"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0064",
+        "label": "ENQ",
+        "eibfn": "1204"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0065",
+        "label": "ENTER TRACEID",
+        "eibfn": "1A04"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0066",
+        "label": "ENTER TRACENUM",
+        "eibfn": "4802"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0067",
+        "label": "EXTRACT ATTACH",
+        "eibfn": "0428"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0068",
+        "label": "EXTRACT ATTRIBUTES",
+        "eibfn": "043E"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0069",
+        "label": "GDS EXTRACT ATTRIBUTES",
+        "eibfn": "241C"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0070",
+        "label": "EXTRACT CERTIFICATE",
+        "eibfn": "3E10"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0071",
+        "label": "EXTRACT LOGONMSG",
+        "eibfn": "043C"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0072",
+        "label": "EXTRACT PROCESS",
+        "eibfn": "042E"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0073",
+        "label": "GDS EXTRACT PROCESS",
+        "eibfn": "2406"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0074",
+        "label": "EXTRACT TCPIP",
+        "eibfn": "3E0E"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0075",
+        "label": "EXTRACT TCT",
+        "eibfn": "042A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0076",
+        "label": "EXTRACT WEB",
+        "eibfn": "3810"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0077",
+        "label": "FETCH ANY",
+        "eibfn": "3444"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0078",
+        "label": "FETCH CHILD",
+        "eibfn": "3442"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0079",
+        "label": "FORCE TIMER",
+        "eibfn": "361A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0080",
+        "label": "FORMATTIME",
+        "eibfn": "4A04"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0081",
+        "label": "FREE",
+        "eibfn": "0422"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0082",
+        "label": "GDS FREE",
+        "eibfn": "2408"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0083",
+        "label": "FREE CHILD",
+        "eibfn": "3446"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0084",
+        "label": "FREEMAIN",
+        "eibfn": "0C04"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0085",
+        "label": "FREEMAIN64",
+        "eibfn": "0C14"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0086",
+        "label": "GET CONTAINER",
+        "eibfn": "3414"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0087",
+        "label": "GET COUNTER",
+        "eibfn": "2006"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0088",
+        "label": "GET DCOUNTER",
+        "eibfn": "2016"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0089",
+        "label": "GETNEXT ACTIVITY",
+        "eibfn": "9622"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0090",
+        "label": "GETNEXT CONTAINER",
+        "eibfn": "9628"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0091",
+        "label": "GETNEXT EVENT",
+        "eibfn": "962E"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0092",
+        "label": "GETNEXT PROCESS",
+        "eibfn": "9634"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0093",
+        "label": "GETNEXT TIMER",
+        "eibfn": "963C"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0094",
+        "label": "GETMAIN",
+        "eibfn": "0C02"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0095",
+        "label": "GETMAIN64",
+        "eibfn": "0C12"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0096",
+        "label": "GET64 CONTAINER",
+        "eibfn": "3454"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0097",
+        "label": "HANDLE ABEND",
+        "eibfn": "0E0E"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0098",
+        "label": "HANDLE AID",
+        "eibfn": "0206"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0099",
+        "label": "HANDLE CONDITION",
+        "eibfn": "0204"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0100",
+        "label": "IGNORE CONDITION",
+        "eibfn": "020A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0101",
+        "label": "INQUIRE ACTIVITYID",
+        "eibfn": "9612"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0102",
+        "label": "INQUIRE CONTAINER",
+        "eibfn": "9614"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0103",
+        "label": "INQUIRE EVENT",
+        "eibfn": "9616"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0104",
+        "label": "INQUIRE PROCESS",
+        "eibfn": "9618"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0105",
+        "label": "INQUIRE TIMER",
+        "eibfn": "9638"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0106",
+        "label": "INVOKE APPLICATION",
+        "eibfn": "0E10"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0107",
+        "label": "INVOKE SERVICE",
+        "eibfn": "C002"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0108",
+        "label": "ISSUE ABEND",
+        "eibfn": "0430"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0109",
+        "label": "GDS ISSUE ABEND",
+        "eibfn": "240A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0110",
+        "label": "ISSUE ABORT",
+        "eibfn": "1E08"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0111",
+        "label": "ISSUE ADD",
+        "eibfn": "1E02"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0112",
+        "label": "ISSUE CONFIRMATION",
+        "eibfn": "0434"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0113",
+        "label": "GDS ISSUE CONFIRMATION",
+        "eibfn": "240E"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0114",
+        "label": "ISSUE COPY",
+        "eibfn": "040A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0115",
+        "label": "ISSUE DISCONNECT",
+        "eibfn": "0414"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0116",
+        "label": "ISSUE END",
+        "eibfn": "1E0C"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0117",
+        "label": "ISSUE ENDFILE",
+        "eibfn": "041A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0118",
+        "label": "ISSUE ENDOUTPUT",
+        "eibfn": "0416"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0119",
+        "label": "ISSUE EODS",
+        "eibfn": "0408"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0120",
+        "label": "ISSUE ERASE",
+        "eibfn": "1E04"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0121",
+        "label": "ISSUE ERASEAUP",
+        "eibfn": "0418"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0122",
+        "label": "ISSUE ERROR",
+        "eibfn": "0436"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0123",
+        "label": "GDS ISSUE ERROR",
+        "eibfn": "2410"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0124",
+        "label": "ISSUE LOAD",
+        "eibfn": "040E"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0125",
+        "label": "ISSUE NOTE",
+        "eibfn": "1E10"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0126",
+        "label": "ISSUE PASS",
+        "eibfn": "043A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0127",
+        "label": "ISSUE PREPARE",
+        "eibfn": "0438"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0128",
+        "label": "GDS ISSUE PREPARE",
+        "eibfn": "241A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0129",
+        "label": "ISSUE PRINT",
+        "eibfn": "041C"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0130",
+        "label": "ISSUE QUERY",
+        "eibfn": "1E0A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0131",
+        "label": "ISSUE RECEIVE",
+        "eibfn": "1E0E"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0132",
+        "label": "ISSUE REPLACE",
+        "eibfn": "1E06"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0133",
+        "label": "ISSUE RESET",
+        "eibfn": "0412"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0134",
+        "label": "ISSUE SEND",
+        "eibfn": "1E14"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0135",
+        "label": "GDS ISSUE SIGNAL",
+        "eibfn": "2412"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0136",
+        "label": "ISSUE SIGNAL",
+        "eibfn": "041E"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0137",
+        "label": "ISSUE WAIT",
+        "eibfn": "1E12"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0138",
+        "label": "LINK",
+        "eibfn": "0E02"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0139",
+        "label": "LINK ACQACTIVITY",
+        "eibfn": "3432"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0140",
+        "label": "LINK ACQPROCESS",
+        "eibfn": "342A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0141",
+        "label": "LINK ACTIVITY",
+        "eibfn": "342C"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0142",
+        "label": "LOAD",
+        "eibfn": "0E06"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0143",
+        "label": "MONITOR",
+        "eibfn": "4804"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0144",
+        "label": "MOVE CONTAINER",
+        "eibfn": "3440"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0145",
+        "label": "POINT",
+        "eibfn": "0424"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0146",
+        "label": "POP HANDLE",
+        "eibfn": "020E"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0147",
+        "label": "POST",
+        "eibfn": "1006"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0148",
+        "label": "PURGE MESSAGE",
+        "eibfn": "180A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0149",
+        "label": "PUSH HANDLE",
+        "eibfn": "020C"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0150",
+        "label": "PUT CONTAINER",
+        "eibfn": "3416"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0151",
+        "label": "PUT64 CONTAINER",
+        "eibfn": "3456"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0152",
+        "label": "QUERY CHANNEL",
+        "eibfn": "345A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0153",
+        "label": "QUERY COUNTER",
+        "eibfn": "200E"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0154",
+        "label": "QUERY DCOUNTER",
+        "eibfn": "201E"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0155",
+        "label": "QUERY SECURITY",
+        "eibfn": "6A02"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0156",
+        "label": "READ",
+        "eibfn": "0602"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0157",
+        "label": "READNEXT",
+        "eibfn": "060E"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0158",
+        "label": "READPREV",
+        "eibfn": "0610"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0159",
+        "label": "READQ TD",
+        "eibfn": "0804"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0160",
+        "label": "READQ TS",
+        "eibfn": "0A04"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0161",
+        "label": "RECEIVE",
+        "eibfn": "0402"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0162",
+        "label": "GDS RECEIVE",
+        "eibfn": "2414"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0163",
+        "label": "RECEIVE MAP",
+        "eibfn": "1802"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0164",
+        "label": "RECEIVE PARTN",
+        "eibfn": "180E"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0165",
+        "label": "RELEASE",
+        "eibfn": "0E0A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0166",
+        "label": "REMOVE SUBEVENT",
+        "eibfn": "360A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0167",
+        "label": "REQUEST ENCRYPTPTKT",
+        "eibfn": "7414"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0168",
+        "label": "REQUEST PASSTICKET",
+        "eibfn": "7410"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0169",
+        "label": "RESET ACQPROCESS",
+        "eibfn": "343C"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0170",
+        "label": "RESET ACTIVITY",
+        "eibfn": "3418"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0171",
+        "label": "RESETBR",
+        "eibfn": "0614"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0172",
+        "label": "RESUME ACQACTIVITY",
+        "eibfn": "3436"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0173",
+        "label": "RESUME ACQPROCESS",
+        "eibfn": "3426"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0174",
+        "label": "RESUME ACTIVITY",
+        "eibfn": "3424"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0175",
+        "label": "RETRIEVE",
+        "eibfn": "100A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0176",
+        "label": "RETRIEVE REATTACH EVENT",
+        "eibfn": "3610"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0177",
+        "label": "RETRIEVE SUBEVENT",
+        "eibfn": "3612"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0178",
+        "label": "RETURN",
+        "eibfn": "0E08"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0179",
+        "label": "REWIND COUNTER",
+        "eibfn": "200C"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0180",
+        "label": "REWIND DCOUNTER",
+        "eibfn": "201C"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0181",
+        "label": "REWRITE",
+        "eibfn": "0606"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0182",
+        "label": "ROUTE",
+        "eibfn": "180C"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0183",
+        "label": "RUN ACQACTIVITY",
+        "eibfn": "3430"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0184",
+        "label": "RUN ACQPROCESS",
+        "eibfn": "3408"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0185",
+        "label": "RUN ACTIVITY",
+        "eibfn": "3406"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0186",
+        "label": "RUN TRANSID",
+        "eibfn": "343E"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0187",
+        "label": "SEND",
+        "eibfn": "0404"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0188",
+        "label": "SEND CONTROL",
+        "eibfn": "1812"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0189",
+        "label": "SEND MAP",
+        "eibfn": "1804"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0190",
+        "label": "SEND PAGE",
+        "eibfn": "1808"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0191",
+        "label": "SEND PARTNSET",
+        "eibfn": "1810"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0192",
+        "label": "SEND TEXT",
+        "eibfn": "1806"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0193",
+        "label": "SET ASSOCIATION USERCORRDATA",
+        "eibfn": "C404"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0194",
+        "label": "SIGNAL EVENT",
+        "eibfn": "2802"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0195",
+        "label": "SIGNOFF",
+        "eibfn": "7404"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0196",
+        "label": "SIGNON",
+        "eibfn": "7402"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0197",
+        "label": "SOAPFAULT ADD",
+        "eibfn": "C006"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0198",
+        "label": "SOAPFAULT CREATE",
+        "eibfn": "C004"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0199",
+        "label": "SOAPFAULT DELETE",
+        "eibfn": "C008"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0200",
+        "label": "SPOOLCLOSE",
+        "eibfn": "5610"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0201",
+        "label": "SPOOLOPEN INPUT",
+        "eibfn": "5602"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0202",
+        "label": "SPOOLOPEN OUTPUT",
+        "eibfn": "5602"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0203",
+        "label": "SPOOLREAD",
+        "eibfn": "5604"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0204",
+        "label": "SPOOLWRITE",
+        "eibfn": "5606"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0205",
+        "label": "START",
+        "eibfn": "1008"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0206",
+        "label": "START ATTACH",
+        "eibfn": "1008"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0207",
+        "label": "START BREXIT",
+        "eibfn": "1008"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0208",
+        "label": "STARTBR",
+        "eibfn": "060C"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0209",
+        "label": "STARTBROWSE ACTIVITY",
+        "eibfn": "9620"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0210",
+        "label": "STARTBROWSE CONTAINER",
+        "eibfn": "9626"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0211",
+        "label": "STARTBROWSE EVENT",
+        "eibfn": "962C"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0212",
+        "label": "STARTBROWSE PROCESS",
+        "eibfn": "9632"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0213",
+        "label": "STARTBROWSE TIMER",
+        "eibfn": "963A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0214",
+        "label": "SUSPEND",
+        "eibfn": "1208"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0215",
+        "label": "SUSPEND ACQACTIVITY",
+        "eibfn": "3434"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0216",
+        "label": "SUSPEND ACQPROCESS",
+        "eibfn": "3422"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0217",
+        "label": "SUSPEND ACTIVITY",
+        "eibfn": "3420"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0218",
+        "label": "SYNCPOINT",
+        "eibfn": "1602"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0219",
+        "label": "TEST EVENT",
+        "eibfn": "360E"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0220",
+        "label": "TRACE",
+        "eibfn": "1A02"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0221",
+        "label": "TRANSFORM DATATOJSON",
+        "eibfn": "2606"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0222",
+        "label": "TRANSFORM DATATOXML",
+        "eibfn": "2602"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0223",
+        "label": "TRANSFORM JSONTODATA",
+        "eibfn": "2608"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0224",
+        "label": "TRANSFORM XMLTODATA",
+        "eibfn": "2604"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0225",
+        "label": "UNLOCK",
+        "eibfn": "060A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0226",
+        "label": "UPDATE COUNTER",
+        "eibfn": "2008"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0227",
+        "label": "UPDATE DCOUNTER",
+        "eibfn": "2018"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0228",
+        "label": "VERIFY PASSWORD",
+        "eibfn": "7406"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0229",
+        "label": "VERIFY PHRASE",
+        "eibfn": "740A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0230",
+        "label": "VERIFY TOKEN",
+        "eibfn": "740E"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0231",
+        "label": "WAIT",
+        "eibfn": "2418"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0232",
+        "label": "WAIT CONVID",
+        "eibfn": "042C"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0233",
+        "label": "WAIT EVENT",
+        "eibfn": "1202"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0234",
+        "label": "WAIT EXTERNAL",
+        "eibfn": "5E22"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0235",
+        "label": "WAIT JOURNALNAME",
+        "eibfn": "1408"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0236",
+        "label": "WAIT JOURNALNUM",
+        "eibfn": "1404"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0237",
+        "label": "WAIT SIGNAL",
+        "eibfn": "0410"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0238",
+        "label": "WAIT TERMINAL",
+        "eibfn": "040C"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0239",
+        "label": "WAITCICS",
+        "eibfn": "5E32"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0240",
+        "label": "WEB CLOSE",
+        "eibfn": "381A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0241",
+        "label": "WEB CONVERSE",
+        "eibfn": "381C"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0242",
+        "label": "WEB ENDBROWSE",
+        "eibfn": "380C"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0243",
+        "label": "WEB EXTRACT",
+        "eibfn": "3810"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0244",
+        "label": "WEB OPEN",
+        "eibfn": "3818"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0245",
+        "label": "WEB PARSE URL",
+        "eibfn": "3816"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0246",
+        "label": "WEB READ",
+        "eibfn": "3806"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0247",
+        "label": "WEB READNEXT",
+        "eibfn": "380A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0248",
+        "label": "WEB RECEIVE",
+        "eibfn": "3802"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0249",
+        "label": "WEB RETRIEVE",
+        "eibfn": "3814"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0250",
+        "label": "WEB SEND",
+        "eibfn": "3804"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0251",
+        "label": "WEB STARTBROWSE",
+        "eibfn": "3808"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0252",
+        "label": "WEB WRITE",
+        "eibfn": "380E"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0253",
+        "label": "WRITE FILE",
+        "eibfn": "0604"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0254",
+        "label": "WRITE JOURNALNAME",
+        "eibfn": "1406"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0255",
+        "label": "WRITE JOURNALNUM",
+        "eibfn": "1402"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0256",
+        "label": "WRITE OPERATOR",
+        "eibfn": "6C02"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0257",
+        "label": "WRITEQ TD",
+        "eibfn": "0802"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0258",
+        "label": "WRITEQ TS",
+        "eibfn": "0A02"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0259",
+        "label": "WSACONTEXT BUILD",
+        "eibfn": "C00A"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0260",
+        "label": "WSACONTEXT DELETE",
+        "eibfn": "C00D"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0261",
+        "label": "WSACONTEXT GET",
+        "eibfn": "C00C"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0262",
+        "label": "WSAEPR CREATE",
+        "eibfn": "C010"
+      },
+      {
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0263",
+        "label": "XCTL",
+        "eibfn": "0E04"
+      }
+    ]
+  },
+  "runtime": {
+    "operation_count": 25,
+    "api_operation_count": 23,
+    "spi_compatibility_operation_count": 2,
+    "families": [
+      {
+        "id": "task-control",
+        "rust_variant": "TaskControl",
+        "responsibility": "Task context, condition and abend handlers, assignment, retrieval, and pseudo-conversation return."
+      },
+      {
+        "id": "time",
+        "rust_variant": "Time",
+        "responsibility": "Clock acquisition and deterministic CICS absolute-time formatting."
+      },
+      {
+        "id": "program-control",
+        "rust_variant": "ProgramControl",
+        "responsibility": "Program inquiry, LINK, and XCTL transfer semantics."
+      },
+      {
+        "id": "terminal-control",
+        "rust_variant": "TerminalControl",
+        "responsibility": "BMS and text send/receive terminal semantics."
+      },
+      {
+        "id": "file-control",
+        "rust_variant": "FileControl",
+        "responsibility": "File status, keyed record, and browse semantics."
+      },
+      {
+        "id": "queue-control",
+        "rust_variant": "QueueControl",
+        "responsibility": "Transient-data queue write semantics."
+      },
+      {
+        "id": "recovery",
+        "rust_variant": "Recovery",
+        "responsibility": "Unit-of-work commit, rollback, and reconciliation semantics."
+      }
+    ],
+    "operations": [
+      {
+        "operation": "Abend",
+        "interface": "api",
+        "family": "task-control",
+        "mutating": true,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0001"
+      },
+      {
+        "operation": "Asktime",
+        "interface": "api",
+        "family": "time",
+        "mutating": false,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0010"
+      },
+      {
+        "operation": "Assign",
+        "interface": "api",
+        "family": "task-control",
+        "mutating": false,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0011"
+      },
+      {
+        "operation": "Delete",
+        "interface": "api",
+        "family": "file-control",
+        "mutating": true,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0040"
+      },
+      {
+        "operation": "EndBrowse",
+        "interface": "api",
+        "family": "file-control",
+        "mutating": false,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0058"
+      },
+      {
+        "operation": "FormatTime",
+        "interface": "api",
+        "family": "time",
+        "mutating": false,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0080"
+      },
+      {
+        "operation": "HandleAbend",
+        "interface": "api",
+        "family": "task-control",
+        "mutating": false,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0097"
+      },
+      {
+        "operation": "HandleCondition",
+        "interface": "api",
+        "family": "task-control",
+        "mutating": false,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0099"
+      },
+      {
+        "operation": "Inquire",
+        "interface": "spi-compatibility",
+        "family": "program-control",
+        "mutating": false,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0155"
+      },
+      {
+        "operation": "Link",
+        "interface": "api",
+        "family": "program-control",
+        "mutating": true,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0138"
+      },
+      {
+        "operation": "Read",
+        "interface": "api",
+        "family": "file-control",
+        "mutating": false,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0156"
+      },
+      {
+        "operation": "ReadNext",
+        "interface": "api",
+        "family": "file-control",
+        "mutating": false,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0157"
+      },
+      {
+        "operation": "ReadPrev",
+        "interface": "api",
+        "family": "file-control",
+        "mutating": false,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0158"
+      },
+      {
+        "operation": "ReceiveMap",
+        "interface": "api",
+        "family": "terminal-control",
+        "mutating": true,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0163"
+      },
+      {
+        "operation": "Retrieve",
+        "interface": "api",
+        "family": "task-control",
+        "mutating": false,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0175"
+      },
+      {
+        "operation": "Return",
+        "interface": "api",
+        "family": "task-control",
+        "mutating": true,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0178"
+      },
+      {
+        "operation": "Rewrite",
+        "interface": "api",
+        "family": "file-control",
+        "mutating": true,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0181"
+      },
+      {
+        "operation": "SendMap",
+        "interface": "api",
+        "family": "terminal-control",
+        "mutating": true,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0189"
+      },
+      {
+        "operation": "SendText",
+        "interface": "api",
+        "family": "terminal-control",
+        "mutating": true,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0192"
+      },
+      {
+        "operation": "SetFileStatus",
+        "interface": "spi-compatibility",
+        "family": "file-control",
+        "mutating": true,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0224"
+      },
+      {
+        "operation": "StartBrowse",
+        "interface": "api",
+        "family": "file-control",
+        "mutating": false,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0208"
+      },
+      {
+        "operation": "Syncpoint",
+        "interface": "api",
+        "family": "recovery",
+        "mutating": true,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0218"
+      },
+      {
+        "operation": "Write",
+        "interface": "api",
+        "family": "file-control",
+        "mutating": true,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0253"
+      },
+      {
+        "operation": "WriteTransientData",
+        "interface": "api",
+        "family": "queue-control",
+        "mutating": true,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0257"
+      },
+      {
+        "operation": "Xctl",
+        "interface": "api",
+        "family": "program-control",
+        "mutating": true,
+        "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0263"
+      }
+    ]
+  }
 }

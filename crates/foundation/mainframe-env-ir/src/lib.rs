@@ -21,7 +21,17 @@ pub use catalog::{
     cobol_layout_definition_identity, cobol_layout_definition_schema,
 };
 pub use cics_descriptor::{
-    CICS_EXECUTABLE_DESCRIPTORS, CICS_RUNTIME_IMPORT, CicsExecutableDescriptor,
+    CICS_APPLICATION_CONDITION_AUTHORITY_SHA256, CICS_APPLICATION_CONDITION_NAMES,
+    CICS_APPLICATION_CONDITION_NAMES_SHA256, CICS_APPLICATION_REGISTRY,
+    CICS_APPLICATION_REGISTRY_FROZEN, CICS_APPLICATION_REGISTRY_SHA256,
+    CICS_EXECUTABLE_DESCRIPTORS, CICS_RUNTIME_IMPORT, CicsApplicationCobolApplicability,
+    CicsApplicationConditionClauseDescriptor, CicsApplicationConditionLabelOperand,
+    CicsApplicationConstraintStatus, CicsApplicationHandlerReadiness,
+    CicsApplicationOptionAlternative, CicsApplicationOptionDependency,
+    CicsApplicationOptionDescriptor, CicsApplicationOptionDirection,
+    CicsApplicationOptionValueShape, CicsApplicationRegistryDescriptor,
+    CicsApplicationRegistryMatch, CicsExecutableDescriptor,
+    cics_application_registry_candidates_for_tokens, cics_application_registry_for_tokens,
     cics_executable_descriptor, cics_executable_descriptor_for_identity,
 };
 pub use cics_plan::{

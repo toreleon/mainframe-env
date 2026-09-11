@@ -53,7 +53,18 @@ if [[ "$action" == check ]]; then
   exit 0
 fi
 
-state="${WORKSPACE:?WORKSPACE must be set}/.postgres"
+workspace="${WORKSPACE:?WORKSPACE must be set}"
+state="$workspace/.postgres"
+# Development runs use `.postgres` as a bounded scratch
+# volume. A mount point cannot itself be removed, so use one owned child while
+# retaining the historical Jenkins path on ordinary workspaces.
+if command -v mountpoint >/dev/null 2>&1 && mountpoint -q "$state"; then
+  state="$state/parity"
+fi
+case "$state/" in
+  "$workspace/.postgres/"*) ;;
+  *) echo "unsafe PostgreSQL parity state path: $state" >&2; exit 1 ;;
+esac
 data="$state/data"
 socket="$state/socket"
 log="$state/postgres.log"

@@ -6,15 +6,10 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
-- Added a VS Code Dev Container that reuses the capped Compose stack, persistent
-  build/IBM caches, PostgreSQL, and Jenkins, with remote Rust tooling and
-  per-command Cargo locking for a long-lived editor session.
-- Added persistent Docker IBM-documentation caching, verified offline search/read
-  commands, and a cache-first source-review workflow for semantic development.
+- Added verified offline IBM-documentation search/read commands and a cache-first
+  source-review workflow for semantic development.
 - Added repository contributor guidelines in `AGENTS.md` covering structure,
   development commands, coding conventions, tests, and pull request expectations.
-- Required Docker execution for development tools and added `docker/dev exec`
-  for noninteractive container commands from the desktop workflow.
 - Added ADR-0011 and the first typed-HIR vertical slices: resolved COBOL
   arithmetic plans, typed CICS file/unit-of-work plans, versioned executable
   dialect identities, and bounded canonical plan codecs.
@@ -25,9 +20,6 @@ All notable changes to mainframe-env are documented here.
 - Added a reviewed, pinned-source COBOL arithmetic pilot with independent
   golden bytes and typed-plan observations for `SIZE ERROR`, relative
   qualification, numeric-edited eligibility, and the no-pair no-op.
-- Added a Docker development stack with an isolated, capped macOS VM, pinned
-  toolchain images, separate Cargo caches, PostgreSQL persistence, and automatic
-  Jenkins CI/local deployment with readiness checks and binary rollback.
 - Added persistent bounded COBOL-parser and IR-decoder fuzzing, Loom schedule
   models with a negative concurrency mutant, and instrumented critical-package
   coverage reporting as receipt-backed full CI gates.
@@ -39,6 +31,23 @@ All notable changes to mainframe-env are documented here.
 - Added a docs-driven CICS file/unit-of-work conformance pilot with reviewed
   rules, exact per-obligation observations, memory/SQLite execution, restart
   faults, and a fail-closed licensed-capture adapter.
+- Added digest-bound, HTML-only IBM source mapping, corpus projection, extraction,
+  and implementation-independent automatic verification for all 263 CICS
+  application commands in deterministic 88/88/87 batches. The accepted receipts
+  contain 18,070 candidates: 16,307 objectively verified and 1,763 retained as
+  bounded product ambiguity, with raw IBM publication bodies kept outside Git.
+- Added the frozen-with-bounded-ambiguities CIC-901 command contract and generated
+  263-row compiler registry. The registry explicitly separates three typed runtime
+  handlers, 20 legacy compatibility handlers, and 240 unready handlers; automatic
+  registration remains disabled and no default handler exists. The contract
+  binds one 121-name EIBRESP condition authority and truthfully classifies the
+  participant boundary as two known mutating rows, 260 bounded-effect rows, one
+  explicit UOW boundary, and 261 bounded-UOW rows.
+- Added candidate-aware EXEC CICS compiler recognition and fail-closed validation
+  for source-reviewed command heads, COBOL applicability, option value shapes,
+  discriminators, dependencies, alternatives, exclusions, and known source bounds.
+  This seals only the non-release CIC-901 implementation boundary; it grants no new
+  execution, coverage, or differential credit to unready commands.
 - Added a reviewed COBOL numeric `MOVE` pilot and corrected floating-insertion,
   capacity, sign, and overflow behavior found by that review.
 - Added cost-aware local Jenkins assurance, exact-candidate command receipts,
@@ -46,14 +55,10 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
-- Made the VS Code Dev Container the primary Codex workspace, with persistent
-  Codex state and Docker as the single capped sandbox boundary. Compose now
-  resolves correctly when the wrapper reuses an existing VS Code process, and
-  exposes the extension-bundled Codex CLI directly in container terminals.
-- Scoped local Docker CI to the last successful ancestor, preserving policy/docs
+- Scoped local CI to the last successful ancestor, preserving policy/docs
   checks while skipping runtime rebuild/deployment for prose-only changes. Added
   per-command timings, bounded stage timeouts, and focused agent verification rules.
-- Organized shared Git/Docker ignore rules for generated output, runtime state,
+- Organized shared Git ignore rules for generated output, runtime state,
   environment secrets, and local tooling while retaining templates and evidence.
 - Advanced decimal assignment to a policy-bearing `@2` contract with explicit
   arithmetic context, COBOL numeric-storage ABI, receiver-update, condition,
@@ -75,7 +80,7 @@ All notable changes to mainframe-env are documented here.
   payload and bind COBOL arithmetic/display-sign/LP options to payload config,
   while historical `@2` artifacts retain their original bytes and contract.
 - Made the release-smoke rejection test cover development hosts that are not
-  advertised release targets, including native Linux ARM Docker environments.
+  advertised release targets, including native Linux ARM environments.
 - Updated the 0.9 CICS implementation plan to require the integrated 28-finding
   hardening baseline, bounded family slices, per-slice security/recovery,
   explicit backend validation, and early licensed-campaign planning.
@@ -95,6 +100,13 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Moved the authentication wall-clock fixture wholly behind the server test
+  boundary and tightened the reviewed product-module production-line ceiling.
+- Anchored authentication-session expiry and rotation to the shared durable
+  clock so wall-clock regressions cannot revoke valid sessions or bypass the
+  cross-node per-user quota fence.
+- Applied the idempotent PostgreSQL executable-artifact migration from both
+  store entry points so fresh shared stores can persist schema-v2 metadata.
 - Corrected typed ADD/COMPUTE receiver-local `SIZE ERROR` commits, resolved
   `ADD CORRESPONDING` by relative qualifiers with bilateral uniqueness and
   subordinate-item exclusions, and made selected-table compatibility preserve
@@ -134,8 +146,8 @@ All notable changes to mainframe-env are documented here.
   parity stage so every environment-gated PostgreSQL correctness test is run.
 - Kept full development certification runnable while preserving stable
   release-artifact checks behind an explicit release-candidate promotion.
-- Required the archive CLI to verify the locked offline/Docker runtime before
-  granting reproducibility credit.
+- Required the archive CLI to verify its locked offline runtime before granting
+  reproducibility credit.
 - Kept Jenkins test temporaries below the excluded Cargo target tree so
   parallel fixtures cannot be mistaken for candidate repository contents.
 - Moved synchronous z/OSMF backend calls to a bounded four-worker lane and
@@ -191,6 +203,13 @@ All notable changes to mainframe-env are documented here.
   readiness probes before release receipts can be written.
 - Corrected RACF flat/nested syntax value handling and added generated-path
   regressions.
+- Corrected EXEC CICS condition-policy precedence so `RESP` continues to update
+  its response area when combined with `NOHANDLE`, while `RESP2` still requires
+  `RESP`, on both typed and legacy interpreter paths.
+- Bound the existing time handler to `ASKTIME ABSTIME`, whose packed-decimal
+  output it implements, and kept bare `ASKTIME` unready until EIBDATE/EIBTIME
+  updates exist. Preserved only exact `INQUIRE PROGRAM` legacy SPI compatibility
+  through a generated compiler descriptor without exposing other SPI commands.
 - Corrected Jenkins checkout/temp storage, tool selection, parameter handling,
   shell portability, and release-target selection.
 

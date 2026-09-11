@@ -1,0 +1,1077 @@
+{
+  "baseline_id": "ibm-cics-ts-6x-application-api-sources-b-2026-09-10",
+  "book_href": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_commandsummary.html",
+  "book_label": "CICS application API sources-b HTML topic corpus",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "coverage_credit": 0,
+  "product": "SSJL4D_6.x",
+  "retained_in_repository": false,
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "snapshot_date": "2026-09-10",
+  "subsystem": "cics",
+  "target_version": "0.9.0",
+  "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/cics-ts/6.x?lang=en",
+  "topic_count": 176,
+  "topic_manifest_digest": "f83402cda836bdd16fddd9dd6073fc3689f18f5968ff08e5b0c9929deb5288fc",
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topics": [
+    {
+      "bytes": 5473,
+      "last_modified": "2026-01-16",
+      "sha256": "3ccd6a92bcd1f664b3caef9b8275bd620b6a9b3eab57022d83670be48add36fe",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp365.html"
+    },
+    {
+      "bytes": 9224,
+      "last_modified": "2026-01-16",
+      "sha256": "04873e1506217889bd9493091defa7f10a3ec33cc23e1a0b6dec7b9a770816b9",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp370.html"
+    },
+    {
+      "bytes": 11121,
+      "last_modified": "2026-05-20",
+      "sha256": "1ca20494e0ff11efc12073511fb76ddd50bb384f0eaafd2a613e88349c579e31",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp378.html"
+    },
+    {
+      "bytes": 6888,
+      "last_modified": "2026-05-20",
+      "sha256": "0af1c5cb355c245db62c2e90e93e0f5866b72987e706e79d0cd16eed127a7640",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp37p.html"
+    },
+    {
+      "bytes": 2687,
+      "last_modified": "2026-01-16",
+      "sha256": "069f925a61451bf606ef1317629733ab85498c66b9f2d1f60d09e488269cbdac",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp37t.html"
+    },
+    {
+      "bytes": 7586,
+      "last_modified": "2026-02-19",
+      "sha256": "537c7a4f7efcd4ce072e4068aa58016b53f0de02ce8c9208a188de1c881667e5",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp37u.html"
+    },
+    {
+      "bytes": 7457,
+      "last_modified": "2026-01-16",
+      "sha256": "7fb2b1aa8552c959e2b6dedcff6f56df4a808826b39fae24b0e0327b523eb295",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp37v.html"
+    },
+    {
+      "bytes": 7692,
+      "last_modified": "2026-05-20",
+      "sha256": "57fa12cf5e963f48e302b1cacf0f714a4c7ededce2f5885624c1601b01e4ae15",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp386.html"
+    },
+    {
+      "bytes": 8347,
+      "last_modified": "2026-02-19",
+      "sha256": "3191b10648f8b56733a387057fd43cd40b0e9b52d511525cec09ab0123fc7a29",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3_ch20.html"
+    },
+    {
+      "bytes": 9291,
+      "last_modified": "2026-01-16",
+      "sha256": "b4e6da7fef3f2e887102229f5b7efbc484b5410b318d4f972a70b7ecef39dee0",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3_ch_desif.html"
+    },
+    {
+      "bytes": 9128,
+      "last_modified": "2026-08-26",
+      "sha256": "b7fd446bf8e04c6d018c163a5c0d1138b3c4805c36aeec51d447672485a040e2",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3_ch_ifcons.html"
+    },
+    {
+      "bytes": 9468,
+      "last_modified": "2026-08-26",
+      "sha256": "b9e5299b4617c15832325423c77d72788a673cb056d6bc64408f51122598206d",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3_ch_scopeif.html"
+    },
+    {
+      "bytes": 7010,
+      "last_modified": "2026-01-16",
+      "sha256": "f31b03d76c8151d4368e6947667689f864e549f936c9c0e76095b1413e9d3709",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3_dcprep.html"
+    },
+    {
+      "bytes": 8289,
+      "last_modified": "2026-01-16",
+      "sha256": "bd7e789366280b7be9245dfbc752923d2f82ea3eb9f4db5ba5bd5beaae69ad5c",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3_exc_handlecondition.html"
+    },
+    {
+      "bytes": 8972,
+      "last_modified": "2026-01-16",
+      "sha256": "7027d19072b6f30c43072d38b713f8eef0648eeeb7b94f33c5db5b5f3fbbe033",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3_exc_pushpophandle.html"
+    },
+    {
+      "bytes": 7369,
+      "last_modified": "2026-01-16",
+      "sha256": "5a7963549e34b9f73086e7f11f05dc221547fe9a27e3b9dd7bfbd1f1a6fc6bd9",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3a8.html"
+    },
+    {
+      "bytes": 7976,
+      "last_modified": "2026-08-26",
+      "sha256": "27b982f7f34a06c0a12b58e7fa0d238149aafa1d26f2bffe421d9b673409b1b5",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3ak.html"
+    },
+    {
+      "bytes": 11331,
+      "last_modified": "2026-01-16",
+      "sha256": "15437f723e698bf2e69bc0e5688daabf69e0b66aaf1369ee119bd6630892ef7e",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3c00237.html"
+    },
+    {
+      "bytes": 7087,
+      "last_modified": "2026-01-16",
+      "sha256": "c51f6e831ce47d1d249e15062db71f9db897b038c37cc7f7946eace121ffc86a",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3kb.html"
+    },
+    {
+      "bytes": 5659,
+      "last_modified": "2026-01-16",
+      "sha256": "75fb037c6a82c049d8a788d3744922ea803cc593b73abf44c4f4e746563d42d5",
+      "topic_path": "SSJL4D_6.x/applications/designing/dfhp3m9.html"
+    },
+    {
+      "bytes": 16734,
+      "last_modified": "2026-02-19",
+      "sha256": "b61d304e2227f2007f072ef24c83fed49b8a2876ea1e85b208927d18f8db08d4",
+      "topic_path": "SSJL4D_6.x/applications/developing/assembler/dfhp3_assem_prog.html"
+    },
+    {
+      "bytes": 8297,
+      "last_modified": "2026-01-16",
+      "sha256": "781022f95a85f1b8aff0cb31a1a18a6291b2fb00d922dbba6a2a96c10ad51de4",
+      "topic_path": "SSJL4D_6.x/applications/developing/bts/dfhp90i.html"
+    },
+    {
+      "bytes": 6711,
+      "last_modified": "2026-01-16",
+      "sha256": "5859a903f2312057d2c9ce17368b6aa2d01dd1eb909686bf7f13f48567a448a9",
+      "topic_path": "SSJL4D_6.x/applications/developing/bts/dfhp93t.html"
+    },
+    {
+      "bytes": 9311,
+      "last_modified": "2026-01-16",
+      "sha256": "7c790d1653e876bf733dbc74cda8ee697b97694c52e7521bd750e3edaccff12b",
+      "topic_path": "SSJL4D_6.x/applications/developing/bts/dfhp94z.html"
+    },
+    {
+      "bytes": 15288,
+      "last_modified": "2026-08-26",
+      "sha256": "e9ecebaa845860a50e04ca4b5d593c32967894d2a91b5abf1f1448cc7fc3d3a2",
+      "topic_path": "SSJL4D_6.x/applications/developing/cloud/invoke_application.html"
+    },
+    {
+      "bytes": 23176,
+      "last_modified": "2026-01-16",
+      "sha256": "370c20bbc905dffb1162f207caa9aec981749529ab8f6c1eb1d89dcf69d97a23",
+      "topic_path": "SSJL4D_6.x/applications/developing/connections/dfhp622.html"
+    },
+    {
+      "bytes": 12594,
+      "last_modified": "2026-08-26",
+      "sha256": "696848138be7136cbc4857381281c0cb608e64c4537b72c2c7c81e14bd97cf0b",
+      "topic_path": "SSJL4D_6.x/applications/developing/interfaces/dfhtm4b.html"
+    },
+    {
+      "bytes": 11582,
+      "last_modified": "2026-02-19",
+      "sha256": "d787407c06a3550ffbe7bf5060811e2106b421fff7cb8140538cbb32a159fc7f",
+      "topic_path": "SSJL4D_6.x/applications/developing/web-services/dfhws_create_app.html"
+    },
+    {
+      "bytes": 10673,
+      "last_modified": "2026-01-16",
+      "sha256": "373f1dbaf77d1bf87cd6333e46ec1d7976cbf9a7d69de14e3be0f052a4c789c1",
+      "topic_path": "SSJL4D_6.x/applications/developing/web/dfhtl_urioutbound.html"
+    },
+    {
+      "bytes": 6594,
+      "last_modified": "2026-05-20",
+      "sha256": "a2a8c3f92c92a4896afbb4cb2b79fe9a809c4a8d42f82ac85c049a64f96c90b4",
+      "topic_path": "SSJL4D_6.x/applications/developing/writing_services.html"
+    },
+    {
+      "bytes": 6941,
+      "last_modified": "2026-08-26",
+      "sha256": "19e653ab943c60c67aa280991d5d705b1f840a9d73a82a25c3d1c772bf3bf206",
+      "topic_path": "SSJL4D_6.x/configuring/cics/dfha2_setup_cfdt_server.html"
+    },
+    {
+      "bytes": 35895,
+      "last_modified": "2026-02-19",
+      "sha256": "cd3efdf801328faa3dff3a4129b5ad35fb477641576fd0814f01b258185d0f72",
+      "topic_path": "SSJL4D_6.x/fundamentals/system/cics-dsas.html"
+    },
+    {
+      "bytes": 7457,
+      "last_modified": "2026-07-23",
+      "sha256": "ca7bdd9e3e38b47bfbb3c60fcb7eb8688d08ce00df4b1a96e9a70679bf72f5b8",
+      "topic_path": "SSJL4D_6.x/fundamentals/system/instruction-execution-protection.html"
+    },
+    {
+      "bytes": 21342,
+      "last_modified": "2026-01-16",
+      "sha256": "5ee1bb377b289ea365c467c12150fac26a3bc7269a1c5248ae2561c949f8a0df",
+      "topic_path": "SSJL4D_6.x/fundamentals/web/dfhtl_uricomp.html"
+    },
+    {
+      "bytes": 6569,
+      "last_modified": "2026-01-16",
+      "sha256": "9439d9e76068e410744cda28a9dd44c7e81a7b0b91d7260c40103f4e51b8857d",
+      "topic_path": "SSJL4D_6.x/monitoring/cics/dfht3_mon_anemps.html"
+    },
+    {
+      "bytes": 179167,
+      "last_modified": "2026-01-16",
+      "sha256": "4c3fc95c18540c56a993770d06ed82a61ac2eec2886c0d24e46c055b2b2bd38c",
+      "topic_path": "SSJL4D_6.x/reference-applications/bms/dfhp47g.html"
+    },
+    {
+      "bytes": 192492,
+      "last_modified": "2026-08-26",
+      "sha256": "40c601ced8628a0cea4ea0a9ec2ee7bac0452314d9df2f7979bc7cd2c7b0afef",
+      "topic_path": "SSJL4D_6.x/reference-applications/bms/dfhp47j.html"
+    },
+    {
+      "bytes": 45983,
+      "last_modified": "2026-08-26",
+      "sha256": "a9034f346d4b726d001d402228462c41535b3dba143749cbc91c58e3dc6c29bb",
+      "topic_path": "SSJL4D_6.x/reference-applications/bms/dfhp4_bmsconstants.html"
+    },
+    {
+      "bytes": 3958,
+      "last_modified": "2026-01-16",
+      "sha256": "9edde63087ca92dd40cb709b95d86293a00c820ab11e379b2170746092297f24",
+      "topic_path": "SSJL4D_6.x/reference-applications/bms/dfhp4_bmsmacros.html"
+    },
+    {
+      "bytes": 16018,
+      "last_modified": "2026-02-19",
+      "sha256": "d88e2001f397f2f9577ce6321b28aeae209cb072ee85b66469e21a4e5efa4425",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_apiformat.html"
+    },
+    {
+      "bytes": 33874,
+      "last_modified": "2026-02-19",
+      "sha256": "44e85f97788be382d70df61dd7059ba079f26a0da4dff8e40e31751cf3c68e70",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_argumentvalues.html"
+    },
+    {
+      "bytes": 18101,
+      "last_modified": "2026-07-23",
+      "sha256": "d04d29525fbe2ec6b762cc4eb2622a21fc297613dbadc99d8a7b319b50571c88",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_cancel.html"
+    },
+    {
+      "bytes": 18217,
+      "last_modified": "2026-08-26",
+      "sha256": "c2bc7b268e2e906abb52a8e93d9a78a09fc22d19d635298bd783fb002de4f6bd",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_freemain.html"
+    },
+    {
+      "bytes": 16672,
+      "last_modified": "2026-08-26",
+      "sha256": "0fff6a28a72a46895fe5ca3760229a75a25d018c80053c79e646ffb9e0d93d2f",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_freemain64.html"
+    },
+    {
+      "bytes": 14228,
+      "last_modified": "2026-08-26",
+      "sha256": "3c8407c316508f04b7d7446ee3c634e6a5f6f9fc86a78b43a57756640543d70e",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdsissueabend.html"
+    },
+    {
+      "bytes": 14580,
+      "last_modified": "2026-08-26",
+      "sha256": "19ca5eef4cf4e6ba54c16d0020cd27b8d86a859f25fc3fbbbaee88fd73093789",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdsissueconfirmation.html"
+    },
+    {
+      "bytes": 14118,
+      "last_modified": "2026-08-26",
+      "sha256": "366916438f4e2ede56f4e8e2763d89f77249c9e51e00c043ff6441999d1653e5",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdsissueerror.html"
+    },
+    {
+      "bytes": 14358,
+      "last_modified": "2026-08-26",
+      "sha256": "2d931ad6d389ad1a2d4c8f31673c5b3aa90cf31ddebe9ba6de775511cae152de",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdsissueprepare.html"
+    },
+    {
+      "bytes": 14179,
+      "last_modified": "2026-08-26",
+      "sha256": "69f5b6db5b48a28d35b6facdd0b4b7fcab22063a187f6072dbedd725a01d1f4c",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdsissuesignal.html"
+    },
+    {
+      "bytes": 25414,
+      "last_modified": "2026-08-26",
+      "sha256": "61912afe7606b5dee8b43447b5f1b1b90055c7287249ab05d0f45ad850c039a9",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_gdsreceive.html"
+    },
+    {
+      "bytes": 43370,
+      "last_modified": "2026-08-26",
+      "sha256": "d379e6fe60e5c47c4cdc790629c7525b8e2c81c6c6a76c1a21f228dc18931e16",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_get64container.html"
+    },
+    {
+      "bytes": 42913,
+      "last_modified": "2026-08-26",
+      "sha256": "a7cabe581f65570ab751c82ad00520777b84bafbbecceef52d067c33196269aa",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_getmain.html"
+    },
+    {
+      "bytes": 37104,
+      "last_modified": "2026-07-23",
+      "sha256": "3df90f5932a9b3d23dd9e71b5da382953e67e35c4f6428f5250edf18ac10c0ee",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_getmain64.html"
+    },
+    {
+      "bytes": 11533,
+      "last_modified": "2026-07-23",
+      "sha256": "6476a6ed3663499675fe9a3e63ddfc97098d2da97cf7ef6deb394f90d3dc053a",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_getnextcontainerchannel.html"
+    },
+    {
+      "bytes": 16538,
+      "last_modified": "2026-08-26",
+      "sha256": "ce4dcfcec9e0f6faf3e4016fe21f72265c1ae2e7e279eb2ee86284088223607e",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_handleabend.html"
+    },
+    {
+      "bytes": 39370,
+      "last_modified": "2026-08-26",
+      "sha256": "a5270e56450bf8fda4bde93427d7345c9e3e590d36ecae03d3c0dee50a1ac627",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_handleaid.html"
+    },
+    {
+      "bytes": 15152,
+      "last_modified": "2026-08-26",
+      "sha256": "4355374497f90dc693ddc5eab4c90231b433e3580613ef4201c7975bb61bf7ba",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_handlecondition.html"
+    },
+    {
+      "bytes": 9526,
+      "last_modified": "2026-07-23",
+      "sha256": "e846c044f3325b379f23ee4ac53b0a2a10c0018f3af1bfd4d4b04f7f1a156891",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_ignorecondition.html"
+    },
+    {
+      "bytes": 34009,
+      "last_modified": "2026-07-23",
+      "sha256": "bb3ae579baa513fb2f08fdf61f464b047d319ac7ce8153c25c696e65a985cadc",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_invokeapplication.html"
+    },
+    {
+      "bytes": 40779,
+      "last_modified": "2026-07-23",
+      "sha256": "a1c4d3df178606b1bca4cd3ab486254f86f5b0a6d84e46e1b0abe4a70789fc3c",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_invokeservice.html"
+    },
+    {
+      "bytes": 12650,
+      "last_modified": "2026-08-26",
+      "sha256": "10103ed20eb91c32428d3df3f68549f3eb3130945ac963255a6265401105a025",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issueabend.html"
+    },
+    {
+      "bytes": 27184,
+      "last_modified": "2026-08-26",
+      "sha256": "ec68732da8fa3c11089f2e956565087e6c5f7ffb772ba97400527b6aeb2cd400",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issueabort.html"
+    },
+    {
+      "bytes": 28064,
+      "last_modified": "2026-07-23",
+      "sha256": "a5001110b291833185b8ee97fbaf92b57e0efd76d390927e34f1059eaed1992e",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issueadd.html"
+    },
+    {
+      "bytes": 13144,
+      "last_modified": "2026-08-26",
+      "sha256": "0f5198ab73872d2df8bb881133d595efa765e002e35b27f7eaf3dcf675e30be6",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issueconfirmation.html"
+    },
+    {
+      "bytes": 12658,
+      "last_modified": "2026-08-26",
+      "sha256": "5dbb492e27c785e28f50bad277640a3193a4f90b367c1a36da9812d8af6683b8",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuecopy3270logical.html"
+    },
+    {
+      "bytes": 8906,
+      "last_modified": "2026-08-26",
+      "sha256": "c5697183645d15b3306b6c040e20680d5451bdd796f6e09688b53647b063a290",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuedisconnectdefault.html"
+    },
+    {
+      "bytes": 8868,
+      "last_modified": "2026-08-26",
+      "sha256": "f7d945ea466cdb9a004f3cbb9fe9bdba98d0053aa9da6ff29701177edfa40e09",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuedisconnectlutype61.html"
+    },
+    {
+      "bytes": 27171,
+      "last_modified": "2026-08-26",
+      "sha256": "83514aab164f60599d3cf58acae481721a7f4e6bb993222da2fd5619fd1391a8",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issueend.html"
+    },
+    {
+      "bytes": 8312,
+      "last_modified": "2026-08-26",
+      "sha256": "2d173fcd208f67e81db2eb208524d7c3143f741d84bdd97ca59c99b01b19e224",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issueendfile.html"
+    },
+    {
+      "bytes": 8296,
+      "last_modified": "2026-08-26",
+      "sha256": "34a567cd30e7f4b816c8186a837b7f5af707949aa0f32bc1014deaab4b84ef56",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issueendoutput.html"
+    },
+    {
+      "bytes": 6621,
+      "last_modified": "2026-07-23",
+      "sha256": "8a09f3a74c458d3aedf1294ad213646d2a4441d6aca6d9b073e8a848d3a31d0f",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issueeods.html"
+    },
+    {
+      "bytes": 27986,
+      "last_modified": "2026-08-26",
+      "sha256": "1e77e836e5403cf303296dca54cc2f54f4a4e2f3ea48f59b72d9c6c1172e3cfa",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issueerase.html"
+    },
+    {
+      "bytes": 9753,
+      "last_modified": "2026-08-26",
+      "sha256": "368c098d49fc2ac69e9516cc0a226a95b67cbe04e43dcdb6dd41bb36da2fcbfd",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issueeraseaup.html"
+    },
+    {
+      "bytes": 13401,
+      "last_modified": "2026-08-26",
+      "sha256": "8853c7ca2c430e58b70372fc952f9bb0f01b0d87a64cbe4d4a33da2c76fd829a",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issueerror.html"
+    },
+    {
+      "bytes": 9956,
+      "last_modified": "2026-08-26",
+      "sha256": "71044e772faee37400ec110514f5b3dc7e34ab9f95f778226d14ccaf4e93e591",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issueload.html"
+    },
+    {
+      "bytes": 16151,
+      "last_modified": "2026-08-26",
+      "sha256": "3c4617a73c33bf10d6499ffb061343b37d5a6dc540d6972fcf02ebd6559cc35d",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuenote.html"
+    },
+    {
+      "bytes": 20192,
+      "last_modified": "2026-08-26",
+      "sha256": "2b4fd4acfa3485a857180ff9124110b36185402308e8f0e4a72ed296d3baaeae",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuepass.html"
+    },
+    {
+      "bytes": 13131,
+      "last_modified": "2026-08-26",
+      "sha256": "c8249eedcf48c0dfe8569da500889418578d8a84cdd1ccd47bd449129dd9886b",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issueprepare.html"
+    },
+    {
+      "bytes": 7583,
+      "last_modified": "2026-08-26",
+      "sha256": "8bc85764e0251728947cc257369bc9127e07d69cd7517e9401ce13a7d5c8ef94",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issueprint.html"
+    },
+    {
+      "bytes": 15290,
+      "last_modified": "2026-08-26",
+      "sha256": "2487b7e13e0eebff4ced7070907862a371c831fdf14b687d36a0fc3902669955",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuequery.html"
+    },
+    {
+      "bytes": 15302,
+      "last_modified": "2026-08-26",
+      "sha256": "d6003e65b1c201940e7b93e401ccf4aa7e4189076f60e8ecda5300ed9e8cf279",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuereceive.html"
+    },
+    {
+      "bytes": 32435,
+      "last_modified": "2026-08-26",
+      "sha256": "0d755ac8a7d3baa54e5f0e7103547fda9503f3afbe07e46718ffc3710ce3b838",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuereplace.html"
+    },
+    {
+      "bytes": 1607,
+      "last_modified": "2026-07-23",
+      "sha256": "450e6df3f4238250dfb3538ffe601610451da4b115e52bbc05bfcfa07bff0f10",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuereset.html"
+    },
+    {
+      "bytes": 35171,
+      "last_modified": "2026-08-26",
+      "sha256": "e83080cf9b75d5ec8399feaf4dbed371a2fc293698115ad8fe740cb78bee014f",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuesend.html"
+    },
+    {
+      "bytes": 12961,
+      "last_modified": "2026-08-26",
+      "sha256": "27e96414c6b41db7f66e413b21628139c9dbf5b74cd95cb88276ed84b0e99433",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuesignalappc.html"
+    },
+    {
+      "bytes": 10974,
+      "last_modified": "2026-08-26",
+      "sha256": "187e87e28d0b4fd582a384c5daa8f5b426c6ce84ae4300d69cb6139fc3b4ad2b",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuesignallutype61.html"
+    },
+    {
+      "bytes": 27212,
+      "last_modified": "2026-08-26",
+      "sha256": "a2902eb5fa9b02edfed606d8878f7582daa29b1b837d87fda43413cc91ae974d",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_issuewait.html"
+    },
+    {
+      "bytes": 61911,
+      "last_modified": "2026-07-23",
+      "sha256": "d807cf1927db6f307fc9e55053465bb0caaa400dcd45181ca62add5e9fa6380e",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_link.html"
+    },
+    {
+      "bytes": 23418,
+      "last_modified": "2026-08-26",
+      "sha256": "514329d0e65daff38c8144d288b18fc8ee608aadcea6e7723eb9d71937266cd4",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_load.html"
+    },
+    {
+      "bytes": 22171,
+      "last_modified": "2026-08-26",
+      "sha256": "32d2a44aef75acfe338a79d991b513d82c87599f040a1fd75fb1e6a0543f4f02",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_monitor.html"
+    },
+    {
+      "bytes": 19700,
+      "last_modified": "2026-08-26",
+      "sha256": "c0a3a4f796978d7611724a99fe985c3db108dbfccd6ffa2ae2e4132ba1a083f6",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_movecontainerchannel.html"
+    },
+    {
+      "bytes": 10208,
+      "last_modified": "2026-07-23",
+      "sha256": "77af73cfdcd7d60a81bab663236dd8903e17500bc965a0844dab73a96e4dd334",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_point.html"
+    },
+    {
+      "bytes": 9587,
+      "last_modified": "2026-08-26",
+      "sha256": "73f11954246a7448bcefe7ff1f0fa55ecc3f9877c7658824ac491d8a6c8a4f7e",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_pophandle.html"
+    },
+    {
+      "bytes": 36523,
+      "last_modified": "2026-08-26",
+      "sha256": "88e3a9d9873b15515cfc7722de03fb8180b635551aea97cf819f9d544c44e2f9",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_post.html"
+    },
+    {
+      "bytes": 6794,
+      "last_modified": "2026-08-26",
+      "sha256": "5e742d2abc92990142252e6bb6ac5f037252e06f14b769fac0d0aa24c24ba1fa",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_purgemessage.html"
+    },
+    {
+      "bytes": 8956,
+      "last_modified": "2026-07-23",
+      "sha256": "09c6ba45b2ca6b18930ac13375ecf3526efcaac21a602dd8607fbd129fd0e199",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_pushhandle.html"
+    },
+    {
+      "bytes": 38075,
+      "last_modified": "2026-08-26",
+      "sha256": "a96acc368bcf733acfe09776fdde862f4ccd5a11b2b1faee692892acb6e3dd2d",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_put64container.html"
+    },
+    {
+      "bytes": 39181,
+      "last_modified": "2026-08-26",
+      "sha256": "84782737176e49a7425b71052bc2564d1600a64baa2229a72e6ffaa5aa087869",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_putcontainerchannel.html"
+    },
+    {
+      "bytes": 8011,
+      "last_modified": "2026-08-26",
+      "sha256": "9949db7ddbfd5d2dfd6e192bb5500a582863cf54c1dbb1fb519ac8889381f012",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_querychannel.html"
+    },
+    {
+      "bytes": 41531,
+      "last_modified": "2026-08-26",
+      "sha256": "c6d6ab036e5c41a7a56ac7fe4e635e2fdcaa16654baf25d23046fd19d03e5967",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_querycounter.html"
+    },
+    {
+      "bytes": 57624,
+      "last_modified": "2026-07-23",
+      "sha256": "572bbc96a2dccbcc6ae29804c614f761efa65594a80eb155b9c99d736a092024",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_querysecurity.html"
+    },
+    {
+      "bytes": 86348,
+      "last_modified": "2026-08-26",
+      "sha256": "856ac1174cf34f27670cd6d50d2c4fa647e9fe5695a8dad50c54b1092cf4bad1",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_read.html"
+    },
+    {
+      "bytes": 69774,
+      "last_modified": "2026-08-26",
+      "sha256": "f72929a541bfe74947544cb3810f940b25f8a5b35e2299ccea135088f72067ce",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_readnext.html"
+    },
+    {
+      "bytes": 64433,
+      "last_modified": "2026-08-26",
+      "sha256": "f0ce4b309ab7b3869225fac927e6a717c925dd4d34fbbc6a7493c05b726820ab",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_readprev.html"
+    },
+    {
+      "bytes": 26078,
+      "last_modified": "2026-07-23",
+      "sha256": "7e4cadddf9c9d6503d7d1f0db3af02d1b71bcaf89eb96821b6c47ac6193ed546",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_readqtd.html"
+    },
+    {
+      "bytes": 35403,
+      "last_modified": "2026-07-23",
+      "sha256": "8aaff3c1adb6ee51cc39d203b6baa0d4836b2e15784cc1b039f3098434f99706",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_readqts.html"
+    },
+    {
+      "bytes": 25521,
+      "last_modified": "2026-07-23",
+      "sha256": "69d5ba0fa13f2deadda4725b4ba94a2e91afe963685aad4426f6aa44e9c1c3a5",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_receive2260.html"
+    },
+    {
+      "bytes": 31124,
+      "last_modified": "2026-08-26",
+      "sha256": "c3b62932d94b0c748235f1b0a496c2834a0cc3768cf07fa066348591c28e6c57",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_receive2980.html"
+    },
+    {
+      "bytes": 29453,
+      "last_modified": "2026-08-26",
+      "sha256": "41f5cb19eec7ca9cb28deb2c41fad4a7044362e438f1a97331864849bb225ee6",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_receive3270logical.html"
+    },
+    {
+      "bytes": 24784,
+      "last_modified": "2026-08-26",
+      "sha256": "af72732f525f626b9af6c0ff9020190df761df53cf89af134da2c1e21f28746b",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_receive36003601.html"
+    },
+    {
+      "bytes": 23515,
+      "last_modified": "2026-08-26",
+      "sha256": "31e1a47e3a8963fa7d9736f1e842111072f05dd6d11d3004315bd51e2e773bb5",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_receive36003614.html"
+    },
+    {
+      "bytes": 23025,
+      "last_modified": "2026-08-26",
+      "sha256": "c754666c82575a64e337808efdb141b7018b8c2b90efaf7e9bcca653803bdb85",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_receive3600pipeline.html"
+    },
+    {
+      "bytes": 24819,
+      "last_modified": "2026-08-26",
+      "sha256": "f84e963c339f5e09667debd1405e63371279f4c906ae45c590bd8d66f3dccce2",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_receive3650.html"
+    },
+    {
+      "bytes": 23736,
+      "last_modified": "2026-08-26",
+      "sha256": "62e3ae665c9d8fdef2aabbcaa65476cdb87d8a53ed62b44a5f39b53fbfed3f50",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_receive3767.html"
+    },
+    {
+      "bytes": 24684,
+      "last_modified": "2026-08-26",
+      "sha256": "b1230e15d9b6f7a08d6bfa868660dc7036c0d641f9f906d86466bea88d1f0bf6",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_receive3770.html"
+    },
+    {
+      "bytes": 30096,
+      "last_modified": "2026-07-23",
+      "sha256": "ae9af8a1092ddaf3b3624e0acc61ac96920eb40c108c8474ea733ca32fe0cc70",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_receive37903270display.html"
+    },
+    {
+      "bytes": 25022,
+      "last_modified": "2026-08-26",
+      "sha256": "5603b8f95c05e5e6f69e521c49c69f0080bdd58dae5fb2bb11f76f38d87567b1",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_receive3790ffinquiry.html"
+    },
+    {
+      "bytes": 28185,
+      "last_modified": "2026-08-26",
+      "sha256": "2230157051a7f8d490d86765cc01dc468dd5af7efb9da8caa5463ad7229937e0",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_receiveappc.html"
+    },
+    {
+      "bytes": 29519,
+      "last_modified": "2026-08-26",
+      "sha256": "1daa54be1069eb37735e23eeda6b086d85ee1129cc57f34ce4f9ce74f2d369a4",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_receivelutype23.html"
+    },
+    {
+      "bytes": 24698,
+      "last_modified": "2026-08-26",
+      "sha256": "ead735698092b2357684a8df8c497e4a3bbeaba0b993a7aea26e9bc56695ec4c",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_receivelutype4.html"
+    },
+    {
+      "bytes": 25882,
+      "last_modified": "2026-08-26",
+      "sha256": "4b2ec3d3f894a10ce405e910fcbc937f45a959f19e7c151d9438bfab251bf1e3",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_receivelutype61.html"
+    },
+    {
+      "bytes": 32942,
+      "last_modified": "2026-07-23",
+      "sha256": "7611d9cf7da0e0f20245a4ed025cf033c3406b82a9db403718053981a413ffaa",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_receivemap.html"
+    },
+    {
+      "bytes": 22054,
+      "last_modified": "2026-07-23",
+      "sha256": "725508653a4d00cf29342e2ac58667a06881fa9920ce19d4a9d0947d4010f596",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_receivemapmappingdev.html"
+    },
+    {
+      "bytes": 28927,
+      "last_modified": "2026-07-23",
+      "sha256": "72031444dc37f1dac6d8e798ab013182b1e4c8c71af5f6cf4151835ca14e12bf",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_receivemro.html"
+    },
+    {
+      "bytes": 19708,
+      "last_modified": "2026-07-23",
+      "sha256": "c8b051088d863e68bde89a0b0c993846c3629a8884f203ac9108cb2a289cd9df",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_receivenonvtamdefault.html"
+    },
+    {
+      "bytes": 13949,
+      "last_modified": "2026-02-19",
+      "sha256": "27e5d94770217561df36ec08835ebc7c17f10a2b24c238e97d839b7147102d2c",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_receivenonvtamopts.html"
+    },
+    {
+      "bytes": 20887,
+      "last_modified": "2026-07-23",
+      "sha256": "55f42adddc8b4aba65cd474531ffaca3a51d76716927a5432f9d49505d4a30f3",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_receivepartn.html"
+    },
+    {
+      "bytes": 23162,
+      "last_modified": "2026-08-26",
+      "sha256": "79337a5af432da9aa7d349183ad8782ed766846db41a3a2e8dd2a36d7aebbf35",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_receivevtamdefault.html"
+    },
+    {
+      "bytes": 13201,
+      "last_modified": "2026-08-26",
+      "sha256": "bc51b743d0f1648ec9bfc568e33b85205761afe40807d0c0a62e683617b7e9c1",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_receivevtamopts.html"
+    },
+    {
+      "bytes": 11653,
+      "last_modified": "2026-08-26",
+      "sha256": "4f4abf26879e8876481696c1911f93f562a3fc6e75e63414f89bf826696dc944",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_release.html"
+    },
+    {
+      "bytes": 22695,
+      "last_modified": "2026-08-26",
+      "sha256": "01f6330864f897f885d4c2400a73053ffbf97661db7aa4f47aa35840e0fdebfc",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_requestencryptptkt.html"
+    },
+    {
+      "bytes": 23385,
+      "last_modified": "2026-07-23",
+      "sha256": "b2f06e79f3ff04bf949d2d0caaed380a34b0ee240b0ed58c2bda64e3eddfda7e",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_requestpassticket.html"
+    },
+    {
+      "bytes": 36823,
+      "last_modified": "2026-08-26",
+      "sha256": "3ebbeae60e68b1576f248fceb155ec9ae6da6e623534adad3666dab12069b07a",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_resetbr.html"
+    },
+    {
+      "bytes": 29740,
+      "last_modified": "2026-07-23",
+      "sha256": "9b8003d1a5772e588b0c16105086c160e5d5c2601742ad70da1669d461635c1a",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_retrieve.html"
+    },
+    {
+      "bytes": 16379,
+      "last_modified": "2026-08-26",
+      "sha256": "8489c7a36f482d771c350731e3df82fa514523dcf5d098c7b0fbbc640978ab83",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_threadsafelist.html"
+    },
+    {
+      "bytes": 15057,
+      "last_modified": "2026-08-26",
+      "sha256": "876fcb9d192b532072cdc2d95e5b3a0f76a5196307fefd99a72cba8d912bbdd3",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-api/dfhp4_translatedcode.html"
+    },
+    {
+      "bytes": 19126,
+      "last_modified": "2026-07-23",
+      "sha256": "ec17a7fa02900abc6995c958e6c1045f566369fa932c56c281915f5da2ad5dc2",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-bts/dfhp4-getnexttimer.html"
+    },
+    {
+      "bytes": 25072,
+      "last_modified": "2026-08-26",
+      "sha256": "e486de8019489b85dbcf0b0f343849d0cc088a331c03054db7329aa1da58ad16",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_getcontainerbts.html"
+    },
+    {
+      "bytes": 14618,
+      "last_modified": "2026-08-26",
+      "sha256": "7f6311218b9232eb7a807d31a05526a6bb417c95d1fe15d300872c7f9c2c34d6",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_getnextactivity.html"
+    },
+    {
+      "bytes": 10287,
+      "last_modified": "2026-08-26",
+      "sha256": "e818120b35e36308002200c1d83ee1df3a6ac1eb4ad35509e0a78494f2d159c3",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_getnextcontainer.html"
+    },
+    {
+      "bytes": 20768,
+      "last_modified": "2026-08-26",
+      "sha256": "1d3bfc2c662c3dd20926245bb79ce0622178cb4a8eba5ac424bbb97b31eb8e84",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_getnextevent.html"
+    },
+    {
+      "bytes": 11367,
+      "last_modified": "2026-08-26",
+      "sha256": "bd2606ad49d3d4288d38e6c5e4eb1a37a710232435072ee8a221418844ca869d",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_getnextprocess.html"
+    },
+    {
+      "bytes": 37515,
+      "last_modified": "2026-08-26",
+      "sha256": "3577aa0007bfda7f229ff19fa2b1872b6e77ba5dad19e1d4e67ebf4063f7b37d",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_inquireactivityid.html"
+    },
+    {
+      "bytes": 20691,
+      "last_modified": "2026-08-26",
+      "sha256": "d551edea0d0039551271c01ff29f515393b9fddc9bab6d6580007d026d5253d8",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_inquirecontainer.html"
+    },
+    {
+      "bytes": 22928,
+      "last_modified": "2026-08-26",
+      "sha256": "972ebb40939722e87638da8d8a7d724232bbe6706a9974af6b49fa31c6f7de75",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_inquireevent.html"
+    },
+    {
+      "bytes": 11101,
+      "last_modified": "2026-08-26",
+      "sha256": "b59438ad6914a2ca2455ca4bb7302b7c8e1f625972995c8a566878c2bdd5d6da",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_inquireprocess.html"
+    },
+    {
+      "bytes": 18237,
+      "last_modified": "2026-08-26",
+      "sha256": "fc4f94a00c72517aa24077de301323870f84fb570c648eccd7082a0b2fef35d6",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_inquiretimer.html"
+    },
+    {
+      "bytes": 17410,
+      "last_modified": "2026-08-26",
+      "sha256": "3b85be529e49d33d514057795bc6de5f48100e2cdde9fb9e434ccddd54dd66f7",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_linkacqprocess.html"
+    },
+    {
+      "bytes": 20038,
+      "last_modified": "2026-08-26",
+      "sha256": "8a945284d9ad2688e290fa2488ef5f0ee1f8d1e6ea287bcd3ad3e85727066994",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_linkactivity.html"
+    },
+    {
+      "bytes": 20956,
+      "last_modified": "2026-08-26",
+      "sha256": "cf00e409a219ba27f7646cebbd04503dd5411deb293be0bbf6afdbf66b9ceaee",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_movecontainerbts.html"
+    },
+    {
+      "bytes": 22305,
+      "last_modified": "2026-08-26",
+      "sha256": "76a379f3ad71c30fb362671f071374e1bff3b6a6b71c4912282cb10b6c77ed67",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_putcontainerbts.html"
+    },
+    {
+      "bytes": 9034,
+      "last_modified": "2026-08-26",
+      "sha256": "c036bc724c9726756a3a6b03cd9db5acea8833cc7384732cf7dc8190b052c236",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_removesubevent.html"
+    },
+    {
+      "bytes": 9924,
+      "last_modified": "2026-08-26",
+      "sha256": "d6c44056558e34b0d36cf64352ea4476d726f8ed59d29d4758f9eb760293bf76",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_resetacqprocess.html"
+    },
+    {
+      "bytes": 10289,
+      "last_modified": "2026-08-26",
+      "sha256": "23be3b9d5d3688eaa723a6acc1429065ad58b37ffb2959706cd1baa4ff187e52",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_resetactivity.html"
+    },
+    {
+      "bytes": 12652,
+      "last_modified": "2026-08-26",
+      "sha256": "350da29cf791bb80915ba22880a6919b1f313e89cf858440013031a993f2eb7f",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_resume.html"
+    },
+    {
+      "bytes": 13967,
+      "last_modified": "2026-08-26",
+      "sha256": "ebf0ec8e216c228d2d79fb8ebaa56e9b2ffc2837ddfab826b00794bc0965a141",
+      "topic_path": "SSJL4D_6.x/reference-applications/commands-bts/dfhp4_retrievereattachevent.html"
+    },
+    {
+      "bytes": 12588,
+      "last_modified": "2026-01-16",
+      "sha256": "9afa5efba8568c4ee0ea2e47076ea75444ba1fe4a1c14cb06cbec63f466a2611",
+      "topic_path": "SSJL4D_6.x/reference-connectivity/connections/dfhp637.html"
+    },
+    {
+      "bytes": 115497,
+      "last_modified": "2026-06-29",
+      "sha256": "a342c35cc115f34f07c0f596f24dc203f3e51e2ec765da5954e4c4c0f3eed8e7",
+      "topic_path": "SSJL4D_6.x/reference-diagnostics/eib/dfhp4_eibfields.html"
+    },
+    {
+      "bytes": 41730,
+      "last_modified": "2026-07-23",
+      "sha256": "57539dc40fa06aa78da3b435a22c1955fa750d30a47f865341d9bc6e78417c8d",
+      "topic_path": "SSJL4D_6.x/reference-security/command-security-resource-reference.html"
+    },
+    {
+      "bytes": 69079,
+      "last_modified": "2026-08-26",
+      "sha256": "bd6847b2ff51ffc1a3d7f1d7cbabf995f9fe9a68ae622ef5f77002030ca1c214",
+      "topic_path": "SSJL4D_6.x/reference-system-management/monitoring/dfht3_mon_perfclass_dfhtask.html"
+    },
+    {
+      "bytes": 42770,
+      "last_modified": "2026-08-26",
+      "sha256": "79d52965acfe0dd368599209587bbe3dbfcf49f432ffce831d6a250285f2ae41",
+      "topic_path": "SSJL4D_6.x/reference-system-management/resources/macros/mct/emp.html"
+    },
+    {
+      "bytes": 200065,
+      "last_modified": "2026-08-26",
+      "sha256": "03d0dc445c72a2de89b7fe0ba4b5e19fd650f13539bacc4ee638040c2f1eb2ac",
+      "topic_path": "SSJL4D_6.x/reference-system-management/resources/transaction/dfha4_summary.html"
+    },
+    {
+      "bytes": 19923,
+      "last_modified": "2026-07-23",
+      "sha256": "557efca353b4e41bca666d95367759482d83e3f2d7282d33ec718119811dcee1",
+      "topic_path": "SSJL4D_6.x/reference-system-management/statistics/ref-security-statistics-global.html"
+    },
+    {
+      "bytes": 6690,
+      "last_modified": "2026-08-26",
+      "sha256": "7c82da6c736c6e86694f53eea504851a70bcb8a92b48ef504d2b262e5a4c52e8",
+      "topic_path": "SSJL4D_6.x/reference-system-programming/user-exits/dfha3mj.html"
+    },
+    {
+      "bytes": 30761,
+      "last_modified": "2026-06-29",
+      "sha256": "5b4815929f90e6557bb17057b3c8037c75f334deef1d8a6c885293ecceb4422c",
+      "topic_path": "SSJL4D_6.x/security/api-spi/config-cics-api-restrict-file.html"
+    },
+    {
+      "bytes": 5785,
+      "last_modified": "2026-01-16",
+      "sha256": "561343b685af5acc4567090cb9702e0475132e222f543640589d533f320b9d77",
+      "topic_path": "SSJL4D_6.x/security/cics/application-security.html"
+    },
+    {
+      "bytes": 6475,
+      "last_modified": "2026-01-16",
+      "sha256": "fb75de46c36d6839fbf5ded6f3c3c68ad085a38eded959532334340e91fbf693",
+      "topic_path": "SSJL4D_6.x/security/cics/passtickets.html"
+    },
+    {
+      "bytes": 4874,
+      "last_modified": "2026-08-26",
+      "sha256": "065435e4cd50190b83ea881dc16f3faeddc5a237bf68e5f58dd0eb5712fb3d99",
+      "topic_path": "SSJL4D_6.x/security/racf/dfht5k8.html"
+    },
+    {
+      "bytes": 6895,
+      "last_modified": "2026-01-16",
+      "sha256": "78c08ca2f65f2858536001a52fad75ca6257638dd1486eafa25d3e0c3d71831a",
+      "topic_path": "SSJL4D_6.x/security/resources/security-implement-passtickets.html"
+    },
+    {
+      "bytes": 8667,
+      "last_modified": "2026-08-26",
+      "sha256": "9e3fa5a921e0b449cf3204d25e26b5a292841348bfb056593d4ad60f1af67cfc",
+      "topic_path": "SSJL4D_6.x/system-programming/cics/dfha356.html"
+    },
+    {
+      "bytes": 13658,
+      "last_modified": "2026-08-26",
+      "sha256": "70e9bbd55d42fb45f04b947b443aeffc34ba0df5473536abdf57ae3347723560",
+      "topic_path": "SSJL4D_6.x/system-programming/cics/dfha3lz.html"
+    },
+    {
+      "bytes": 4848,
+      "last_modified": "2026-01-16",
+      "sha256": "81f101e030365400b431ecf68250dfcabc5673e1acbf05010c9285bf590e3b25",
+      "topic_path": "SSJL4D_6.x/system-programming/intro/dfha80x.html"
+    },
+    {
+      "bytes": 3734,
+      "last_modified": "2026-01-16",
+      "sha256": "2f48a2465baa9fc0160419c1c68c59a4d17e03cd4ea067b77a6ead4bfc506167",
+      "topic_path": "SSJL4D_6.x/troubleshooting/cics/dfht2k7.html"
+    },
+    {
+      "bytes": 61712,
+      "last_modified": "2026-06-29",
+      "sha256": "b07229031a6b7b9d622586842457c3c71f06fc9fe087a5dfd3a334f621e2e5a5",
+      "topic_path": "SSJL4D_6.x/troubleshooting/java/troubleshooting_web_ref.html"
+    },
+    {
+      "bytes": 11071,
+      "last_modified": "2026-08-26",
+      "sha256": "d615e2b46fa153ae647d923811bb60c5e880e87efc54f0228294bf4dccdc1c36",
+      "topic_path": "SSJL4D_6.x/tuning/web/dfht3_connpool.html"
+    },
+    {
+      "bytes": 17639,
+      "last_modified": "2026-08-26",
+      "sha256": "84be6c78331743225961304dabc481e4e4ea4981ef84a30e7de57c669f11a8cb",
+      "topic_path": "SSJL4D_6.x/upgrading/process/upgrade_apps.html"
+    }
+  ],
+  "total_bytes": 4122948
+}

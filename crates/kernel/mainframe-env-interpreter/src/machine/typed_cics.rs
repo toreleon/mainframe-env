@@ -253,18 +253,7 @@ pub(super) fn execute_legacy(
             )?,
         );
     }
-    let condition_policy = if args.iter().any(|arg| arg.eq_ignore_ascii_case("NOHANDLE")) {
-        CicsConditionPolicy::NoHandle
-    } else if let Some(response) = arguments.get("RESP") {
-        CicsConditionPolicy::Respond {
-            response_field: String::from_utf8_lossy(response.bytes()).into_owned(),
-            response2_field: arguments
-                .get("RESP2")
-                .map(|value| String::from_utf8_lossy(value.bytes()).into_owned()),
-        }
-    } else {
-        CicsConditionPolicy::Default
-    };
+    let condition_policy = legacy_condition_policy(args, &arguments)?;
     let mut mutation = operation
         .is_mutating()
         .then(|| machine.mutation())
@@ -297,6 +286,31 @@ pub(super) fn execute_legacy(
             no_handle: args.iter().any(|argument| argument == "NOHANDLE"),
         },
     )
+}
+
+fn legacy_condition_policy(
+    args: &[String],
+    arguments: &BTreeMap<String, BoundedPayload>,
+) -> Result<CicsConditionPolicy, MachineProblem> {
+    let response = arguments.get("RESP");
+    if response.is_none() && arguments.contains_key("RESP2") {
+        return Err(MachineProblem::UnsupportedForm);
+    }
+    if let Some(response) = response {
+        // IBM's common command format defines RESP as implying NOHANDLE while
+        // still updating the response area. Preserve that binding when the
+        // redundant NOHANDLE keyword is also present.
+        Ok(CicsConditionPolicy::Respond {
+            response_field: String::from_utf8_lossy(response.bytes()).into_owned(),
+            response2_field: arguments
+                .get("RESP2")
+                .map(|value| String::from_utf8_lossy(value.bytes()).into_owned()),
+        })
+    } else if args.iter().any(|arg| arg.eq_ignore_ascii_case("NOHANDLE")) {
+        Ok(CicsConditionPolicy::NoHandle)
+    } else {
+        Ok(CicsConditionPolicy::Default)
+    }
 }
 
 pub(super) fn write_target(
@@ -772,6 +786,43 @@ mod tests {
             }],
             condition: CicsCondition::Default,
         }
+    }
+
+    #[test]
+    fn legacy_resp_binding_takes_precedence_over_nohandle() {
+        let tokens = [
+            "EXEC", "CICS", "ASKTIME", "NOHANDLE", "RESP", "(", "RESP-X", ")", "RESP2", "(",
+            "RESP2-X", ")", "END-EXEC",
+        ]
+        .map(str::to_string);
+        let arguments = legacy_arguments(&tokens).expect("legacy arguments");
+        assert_eq!(
+            legacy_condition_policy(&tokens, &arguments),
+            Ok(CicsConditionPolicy::Respond {
+                response_field: "RESP-X".into(),
+                response2_field: Some("RESP2-X".into()),
+            })
+        );
+
+        let nohandle = ["EXEC", "CICS", "ASKTIME", "NOHANDLE", "END-EXEC"].map(str::to_string);
+        let arguments = legacy_arguments(&nohandle).expect("legacy arguments");
+        assert_eq!(
+            legacy_condition_policy(&nohandle, &arguments),
+            Ok(CicsConditionPolicy::NoHandle)
+        );
+    }
+
+    #[test]
+    fn legacy_resp2_without_resp_fails_closed() {
+        let tokens = [
+            "EXEC", "CICS", "ASKTIME", "RESP2", "(", "RESP2-X", ")", "END-EXEC",
+        ]
+        .map(str::to_string);
+        let arguments = legacy_arguments(&tokens).expect("legacy arguments");
+        assert_eq!(
+            legacy_condition_policy(&tokens, &arguments),
+            Err(MachineProblem::UnsupportedForm)
+        );
     }
 
     fn module(

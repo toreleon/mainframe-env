@@ -129,6 +129,9 @@ class SelectionTests(unittest.TestCase):
             'writable_probe_requires_provider_state_dml_and_rolls_everything_back',
             postgres,
         )
+        self.assertIn('mountpoint -q "$state"', postgres)
+        self.assertIn('state="$state/parity"', postgres)
+        self.assertIn('"$workspace/.postgres/"*', postgres)
         self.assertIn('postgres_parity.sh list', pipeline)
 
     @patch.object(ci,'identity',return_value={'candidate':'a'*40,'tree':'b'*40})

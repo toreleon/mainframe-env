@@ -2,26 +2,106 @@
 
 Status: **Implemented**
 Owner: **CICS provider maintainers**
-Scope: **typed CICS operation descriptors, generated routing families, and provider semantic modules**
+Scope: **source-reviewed application-command contracts, generated registry shapes, and existing provider routes**
 Applies from: **mainframe-env 0.9.0 development**
 
 ## Authorities
 
-The readable command authority is
-[`conformance/0.9/cics/command-descriptors.json`](../../conformance/0.9/cics/command-descriptors.json),
+The readable identity authority is
+[`command-descriptors.json`](../../conformance/0.9/cics/command-descriptors.json),
 validated by
 [`cics-command-descriptors.schema.json`](../../conformance/0.9/schemas/cics-command-descriptors.schema.json).
-Every descriptor binds one typed `CicsOperation` to one row in the pinned
-official CICS catalog, records whether the existing host contract treats it as
-mutating, and assigns exactly one stable semantic family.
+Its `application_catalog` contains the 263 mandatory `api-commands` row IDs,
+official labels and two-byte EIB function codes. The separate `runtime`
+collection retains 23 API operations and two explicit SPI compatibility
+operations; it does not enlarge the application denominator or make the SPI
+operations application-registry routes.
 
-`python3 -B tools/generate_cics_descriptors.py` deterministically writes the
-Rust descriptor module. Use `--check` to compare bytes without writing. The
-freshness check and the module-boundary guard both run in
-`cargo xtask architecture-fast --check`; hand-editing generated Rust or
-changing the catalog without regeneration fails the gate.
+Objective command facts come from digest-pinned IBM CICS TS 6.x HTML, divided
+into three disjoint source authorities:
 
-## Frozen families
+- `sources-a` covers rows `0001`–`0088`: [map](../../conformance/0.9/cics/application-api-sources-a-map.json),
+  [corpus](../../conformance/0.9/cics/application-api-sources-a-corpus.json),
+  [projection](../../conformance/0.9/generated/cics-application-api-sources-a-candidates.json),
+  and [review](../../conformance/0.9/cics/application-api-sources-a-review.json).
+- `sources-b` covers rows `0089`–`0176`: [map](../../conformance/0.9/cics/application-api-sources-b-map.json),
+  [corpus](../../conformance/0.9/cics/application-api-sources-b-corpus.json),
+  [projection](../../conformance/0.9/generated/cics-application-api-sources-b-candidates.json),
+  and [review](../../conformance/0.9/cics/application-api-sources-b-review.json).
+- `sources-c` covers rows `0177`–`0263`: [map](../../conformance/0.9/cics/application-api-sources-c-map.json),
+  [corpus](../../conformance/0.9/cics/application-api-sources-c-corpus.json),
+  [projection](../../conformance/0.9/generated/cics-application-api-sources-c-candidates.json),
+  and [review](../../conformance/0.9/cics/application-api-sources-c-review.json).
+
+Each batch binds a topic manifest and extraction plan to content-addressed HTML
+bodies in `$MAINFRAME_ENV_IBM_DOCS_CACHE`. Fresh bodies are obtained through the
+repository browser-fetch bridge and the user's Chrome session; PDF is not a
+source path. The projector emits structural facts and fragment hashes, while
+the independent verifier reparses the pinned HTML before comparing the
+projection. Reviews auto-accept objective matches, fail on source or
+reprojection gaps, and retain row-and-dimension bounded ambiguities. There is no
+human-only approval gate. Source projection and review alone grant no coverage,
+semantic, execution or differential credit.
+
+The semantic authority produced from all three accepted reviews is
+[`cics-application-command-contracts.json`](../../conformance/0.9/generated/cics-application-command-contracts.json),
+validated by its
+[`schema`](../../conformance/0.9/schemas/cics-application-command-contracts.schema.json).
+It freezes a 263-row contract across grammar, option legality and direction,
+bounds, resource and capability intent, EIB/RESP/RESP2 and conditions,
+applicability, effect, cancellation, audit and recovery. Its status is
+`frozen-with-bounded-ambiguities`: all rows are closed as either source-resolved,
+bounded, or not applicable, but bounded dimensions are not represented as
+resolved. The contract explicitly has `execution_authority=false` and zero
+coverage, semantic and differential credit.
+
+The contract also binds one 121-name EIBRESP authority for dynamic
+`HANDLE CONDITION` and `IGNORE CONDITION` clauses. Its early participant view
+records two known mutating rows, 260 bounded-effect rows, one explicit UOW
+boundary and 261 bounded-UOW rows. Those values describe current contract
+certainty; they are not execution or conformance counts.
+
+The same generator emits the compact
+[`CICS application IR registry`](../../crates/foundation/mainframe-env-ir/src/generated/cics_application_registry.rs).
+It contains all 263 API registry shapes with deterministic recognition,
+option-shape, family, EIBFN and handler identities. Readiness is deliberately
+split:
+
+- 3 `typed-runtime` API routes (`READ`, `REWRITE`, and `SYNCPOINT`);
+- 20 `legacy-compatibility` API routes that remain on the pre-existing raw
+  compatibility path; and
+- 240 `unready` rows that are recognized but fail explicitly as unsupported.
+
+The 23 existing API routes are the only advertised application commands.
+`ASKTIME ABSTIME` is the advertised time form because the existing handler
+returns its packed-decimal destination; bare `ASKTIME` remains unready until
+the runtime also implements its distinct EIBDATE/EIBTIME update contract.
+`automatic_registration` remains false, the default handler is null, and an
+unready row cannot reach a generic-success fallback. The application registry
+does not accept or dispatch SPI or FEPI identities. A separate generated,
+compiler-only compatibility descriptor admits exactly `INQUIRE PROGRAM` to the
+pre-existing raw `Inquire` route; it is bound to SPI row `0155`, excluded from
+the 263-row registry and its digest, and does not admit `SET FILE`, other
+`INQUIRE` forms, or unknown options. The two retained SPI compatibility
+operations otherwise remain confined to the separate legacy runtime
+collection; SPI/FEPI completion belongs to 0.10.
+
+[`tools/generate_cics_descriptors.py`](../../tools/generate_cics_descriptors.py)
+deterministically writes the provider descriptors, host-API identity table,
+263-row contract, compact IR registry, and the isolated compiler-only
+`INQUIRE PROGRAM` SPI compatibility descriptor. `--check` compares all
+generated outputs without writing. Schema, freshness, digest and
+module-boundary checks run under `cargo xtask architecture-fast --check`;
+hand-editing a generated artifact or changing an authority without
+regeneration fails the gate.
+
+CIC-901 is therefore an incremental, non-release architecture boundary. It
+freezes source-backed contracts and fail-closed registry shape so CIC-902 and
+later work can implement vertical semantic families on the shared runtime. It
+does not claim that 263 commands execute, satisfy conformance, pass licensed
+differentials, or make 0.9.0 release-ready.
+
+## Existing runtime families
 
 | Family | Owns |
 |---|---|
@@ -33,8 +113,12 @@ changing the catalog without regeneration fails the gate.
 | `queue-control` | transient-data queue writes |
 | `recovery` | SYNCPOINT coordination, rollback, and subsystem unit-of-work completion |
 
-`CicsService::invoke_run` selects the generated descriptor first and routes on
-its family. Each family has a real reviewed implementation module under
+This table describes the seven families already present in the 25-row runtime
+collection. The 263-row application registry also assigns every row a
+deterministic future family owner, but that assignment is routing shape rather
+than an executable handler. `CicsService::invoke_run` selects an existing
+runtime descriptor first and routes on its family. Each existing runtime family
+has a reviewed implementation module under
 `crates/providers/mainframe-env-cics/src/handlers/`; no command is dispatched by
 an ad hoc keyword match in the service monolith. The service retains the shared
 session/run state, authorization boundary, durable compare-and-swap primitives,
@@ -53,7 +137,12 @@ store, unit-of-work protocol, or condition authority.
 
 ## Change contract
 
-Adding or changing a typed CICS command requires one reviewable change that:
+Adding an identity to the application projection requires a reviewed change to
+the pinned official denominator and regeneration. It never updates
+`CicsOperation`, dispatch or coverage by itself.
+
+Adding or changing an executable typed CICS command requires one reviewable
+change that:
 
 1. updates the readable descriptor catalog and its official row binding;
 2. regenerates the Rust descriptor module;
@@ -71,7 +160,18 @@ records the hard limits and exact legacy ceiling policy.
 
 ```bash
 python3 -B tools/generate_cics_descriptors.py --check
-python3 -B -m unittest tools.tests.test_cics_descriptors tools.tests.test_module_boundaries
-cargo test -p mainframe-env-cics --all-features --locked
+python3 -B tools/generate_cics_source_map.py --batch all --check
+python3 -B conformance/0.9/tools/fetch_cics_application_sources.py --batch all --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch a --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch b --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/0.9/tools/extract_cics_application_sources.py --batch c --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch a --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
+python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch b --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
+python3 -B conformance/0.9/tools/verify_cics_application_sources.py --batch c --cache $MAINFRAME_ENV_IBM_DOCS_CACHE
+python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch a --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch b --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B conformance/0.9/tools/review_cics_application_sources.py --batch c --cache $MAINFRAME_ENV_IBM_DOCS_CACHE --check
+python3 -B -m unittest tools.tests.test_cics_descriptors tools.tests.test_cics_source_map tools.tests.test_module_boundaries
+cargo test -p mainframe-env-host-api -p mainframe-env-cics --all-features --locked
 cargo xtask architecture-fast --check
 ```

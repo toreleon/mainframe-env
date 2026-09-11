@@ -36,14 +36,7 @@ class SupplyChainTests(unittest.TestCase):
             ci_lock["tracked_remote_inputs"],
             {
                 "github_actions": [],
-                "container_images": [
-                    "docker.io/jenkins/jenkins@sha256:c1e4c349365f6d16d88595b2c5f7e8ff39b8ae1d061f62420bac193b4b9616d0",
-                    "docker.io/library/debian@sha256:5ae3c39ebd15e229dcedd5cee596b2497182493d41ff162e824ba13fc1b2b867",
-                    "docker.io/library/docker@sha256:51e23845f5caff1e688a2fae003b0c69d635c9200ad544731db1593731df1d3a",
-                    "docker.io/library/postgres@sha256:1c59e2c3c818eaa0f0628f695b36e7c9e362d6b219b36a54a32df645cbd7e1af",
-                    "docker.io/library/python@sha256:3cd9086bdb30f7c9bc08a3fa621d9842e0d3f6f9291aeb4677e0547817c10b12",
-                    "docker.io/library/rust@sha256:82150a52ec202c1b14d7817e14516c392bb7f5cfebd88f1ed531cb37ebd39922",
-                ],
+                "container_images": [],
                 "package_install_commands": [],
             },
         )
@@ -79,26 +72,6 @@ class SupplyChainTests(unittest.TestCase):
                 observed["package_install_commands"],
                 ["tools/jenkins/setup.sh:2:brew install jenkins-lts"],
             )
-
-    def test_compose_local_tags_require_their_tracked_build_recipe(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            (root / 'docker').mkdir()
-            compose = root / 'docker/compose.yaml'
-            recipe = 'docker/runtime.Dockerfile'
-            (root / recipe).write_text('FROM example/base@sha256:' + 'a' * 64 + '\n')
-            (root / 'docker/inputs.lock.json').write_text(json.dumps({
-                'local_images': {'mainframe-env-runtime:dev': recipe}}))
-            text = ('services:\n  server:\n    image: mainframe-env-runtime:dev\n'
-                    '    build:\n      context: ..\n      dockerfile: docker/runtime.Dockerfile\n')
-            compose.write_text(text)
-            tracked = ['docker/compose.yaml', recipe]
-            supply_chain.scan_external_inputs(root, tracked)
-            for bad in (text.replace('    build:', '    ignored:'),
-                        text.replace('mainframe-env-runtime:dev', 'postgres:latest')):
-                compose.write_text(bad)
-                with self.assertRaises(supply_chain.SupplyChainError):
-                    supply_chain.scan_external_inputs(root, tracked)
 
     def test_jenkins_artifacts_are_hash_version_and_closure_bound(self):
         with tempfile.TemporaryDirectory() as temporary:

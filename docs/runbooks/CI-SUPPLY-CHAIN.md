@@ -1,9 +1,7 @@
 # CI supply-chain inputs
 
-`Jenkinsfile` is the full assurance and release CI workflow. The separate
-`docker/Jenkinsfile` supplies local development CI/CD; see the
-[Docker guide](../../docker/README.md). Their executable inputs are
-governed by two reviewed locks:
+`Jenkinsfile` is the full assurance and release CI workflow. Its executable
+inputs are governed by two reviewed locks:
 
 - `tools/ci-inputs.lock.json` fixes the workspace and MSRV toolchains by
   release and compiler/Cargo commit, fixes every separately installed CI tool
@@ -15,14 +13,9 @@ governed by two reviewed locks:
 `tools/supply_chain.py check` enumerates files with `git ls-files`. A tracked
 GitHub action must use a 40-hex commit, a tracked container must use an
 `@sha256:` digest, and tracked CI cannot install ambient packages. The current
-inventory contains no GitHub actions or package-install commands. It includes
-the archive image and Docker development base/service images pinned by digest.
-`docker/inputs.lock.json` additionally binds the Git, PostgreSQL, Bison, and Flex
-source archives by SHA-256 and identifies the two locally built image recipes.
-Compose's local output tags are accepted only alongside their tracked build
-recipe; external service images still require digests. The Jenkins controller, plugins,
-Rust toolchains, Cargo dependencies, archive image, and host tools are locked
-inputs.
+inventory contains no GitHub actions, container images, or package-install
+commands. The Jenkins controller, plugins, Rust toolchains, Cargo dependencies,
+and host tools are locked inputs.
 
 ## Deliberately unsupported local files
 
@@ -36,7 +29,7 @@ workstations, but they are not in Git and are not CI or release authority:
 - `tools/offline_dev_assets/`.
 
 The lock records those names and the validator requires them to remain
-untracked. Their container tags, package commands, and behavior are therefore
+untracked. Their remote inputs, package commands, and behavior are therefore
 not claimed as pinned. Promoting any of them requires deliberately adding the
 files, replacing every mutable input, updating the tracked-input inventory,
 and reviewing the resulting workflow. Historical GitHub Actions evidence under
@@ -85,7 +78,7 @@ and verification before the old key is retired.
 
 The host must already provide the exact versions in `tools/ci-inputs.lock.json`.
 The lock currently requires Rust/Cargo 1.98.0, Rust/Cargo 1.95.0 for MSRV,
-Python 3.12.13, Git 2.50.1, Docker 29.4.3, Java 21.0.12.1, cargo-deny 0.20.2,
+Python 3.12.13, Git 2.50.1, Java 21.0.12.1, cargo-deny 0.20.2,
 cargo-fuzz 0.13.2, cargo-llvm-cov 0.9.1, PostgreSQL 18.6, and GitHub CLI
 2.92.0. The fuzz compiler is additionally pinned as nightly-2026-09-01 by its
 rustc and Cargo commits. Install Cargo tools only from their immutable locked
@@ -109,15 +102,14 @@ scope. Each resulting archive contains:
 - the two reviewed lock files; and
 - `SUPPLY-CHAIN/BUILD-INPUTS.json`, which binds the tag commit, Cargo lock,
   Rust toolchain file, CI locks, complete vendored-tree bytes and modes, and the
-  versions plus executable SHA-256 values of Cargo, rustc, Git, Python, and the
-  container runtime.
+  versions plus executable SHA-256 values of Cargo, rustc, Git, and Python.
 
-The record also binds the exact Linux/amd64 container image digest and the GNU
-tar 1.34/gzip 1.12 pair inside it. Packaging copies the source tree into two
-clean directories with deliberately different mtimes, normalizes member order,
-time, ownership, mode, extended metadata, and gzip headers, and requires both
-archives to have the same SHA-256 before publishing either. Existing local or
-GitHub assets are retained only when their bytes match; different bytes fail
+The record binds the exact Python executable used by the deterministic archive
+implementation. Packaging copies the source tree into two clean directories
+with deliberately different mtimes, normalizes member order, time, ownership,
+mode, and gzip headers, and requires both archives to have the same SHA-256
+before publishing either. Existing local or GitHub assets are retained only
+when their bytes match; different bytes fail
 closed and are never clobbered.
 
 ## Reviewed updates

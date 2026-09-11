@@ -58,6 +58,14 @@ fn postgres_quota_and_shared_artifact_contract() {
         .unwrap();
     assert_eq!(server_version / 10_000, 18);
 
+    // The artifact store must bring a fresh database to its own migration head;
+    // subsequent state-store opens prove that migration is safely repeatable.
+    let left = Arc::new(PostgresArtifactStore::open(&url, 1024, 2).unwrap());
+    let right = Arc::new(PostgresArtifactStore::open(&url, 1024, 2).unwrap());
+    let empty_health = left.health().unwrap();
+    assert!(empty_health.ready());
+    assert_eq!(empty_health.object_headroom(), Some(2));
+
     let stores = (0..32)
         .map(|_| Arc::new(PostgresStateStore::open(&url, 1024, 8).unwrap()))
         .collect::<Vec<_>>();
@@ -140,11 +148,6 @@ fn postgres_quota_and_shared_artifact_contract() {
             .is_none()
     );
 
-    let left = Arc::new(PostgresArtifactStore::open(&url, 1024, 2).unwrap());
-    let right = Arc::new(PostgresArtifactStore::open(&url, 1024, 2).unwrap());
-    let empty_health = left.health().unwrap();
-    assert!(empty_health.ready());
-    assert_eq!(empty_health.object_headroom(), Some(2));
     let left_record = artifact(b"shared", "application/x-left");
     let right_record = artifact(b"shared", "application/x-right");
     let shared_id = left_record.artifact.clone();

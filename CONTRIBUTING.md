@@ -11,22 +11,6 @@ changing a public or durable boundary.
 ## Development setup
 
 The repository pins Rust in `rust-toolchain.toml` and commits `Cargo.lock`.
-The supported interactive workspace is the VS Code Dev Container:
-
-```bash
-docker/dev init
-docker/dev up
-docker/dev vscode
-```
-
-Run `up` initially from `main` and after infrastructure changes. Choose **Dev
-Containers: Reopen in Container** when VS Code opens. The wrapper
-binds VS Code to the dedicated capped Colima daemon. Once attached, the terminal,
-Codex, Rust Analyzer, debugger, Cargo, and project Python run in Linux at
-`/workspace`. Sign in to Codex once in the remote VS Code window; its state
-persists in the capped editor-home volume. Run the commands below directly there.
-Host/Codex Desktop sessions must retain the `docker/dev cargo` or
-`docker/dev exec` prefix.
 
 ```bash
 cargo build --workspace --all-features --locked
@@ -41,7 +25,7 @@ environment. A skipped external test receives no evidence credit.
 
 1. Start from a clean branch and preserve unrelated user changes.
 2. Identify the owning contract, provider, schema, and recovery boundary before
-   editing. For IBM language/subsystem semantics, first search and read the
+   editing. For IBM language or subsystem semantics, first search and read the
    relevant verified [cached IBM sources](docs/runbooks/IBM-DOCS-CACHE.md), then
    cite baseline/topic and catalog rows in the PR. Report source gaps explicitly.
 3. Add a focused negative regression before or with a defect fix.
@@ -105,7 +89,7 @@ stay untracked.
 
 Preserve both Cargo lockfiles, fuzz seed corpora, conformance fixtures/evidence,
 and reviewed `release/` records. Avoid broad extension rules that hide these
-inputs. Inspect ignored files before cleanup: local audit workspaces, release
+inputs. Inspect ignored files before cleanup: local audit directories, release
 bundles, and unsupported offline experiments can contain useful work. Cleanup
 should remove only identified disposable artifacts, not every ignored file.
 

@@ -1,9 +1,0 @@
-{
-  "recommendations": [
-    "ms-vscode-remote.remote-containers",
-    "openai.chatgpt",
-    "rust-lang.rust-analyzer",
-    "tamasfe.even-better-toml",
-    "vadimcn.vscode-lldb"
-  ]
-}

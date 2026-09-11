@@ -82,16 +82,10 @@ impl PostgresStateStore {
         .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
         block_on(
             &runtime,
-            sqlx::raw_sql(include_str!(
-                "../migrations/postgres/0001-durable-state.sql"
-            ))
-            .execute(&pool),
-        )?
-        .map_err(|error| StoreError::Infrastructure(error.to_string()))?;
-        block_on(
-            &runtime,
-            sqlx::raw_sql(include_str!(
-                "../migrations/postgres/0002-retention-lifecycle.sql"
+            sqlx::raw_sql(concat!(
+                include_str!("../migrations/postgres/0001-durable-state.sql"),
+                include_str!("../migrations/postgres/0002-retention-lifecycle.sql"),
+                include_str!("../migrations/postgres/0003-executable-artifact-metadata.sql"),
             ))
             .execute(&pool),
         )?

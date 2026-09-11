@@ -2,7 +2,7 @@ import hashlib
 import importlib.util
 from pathlib import Path
 import shutil
-import subprocess
+import tarfile
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -23,31 +23,6 @@ publish = load("publish_release_assets", "tools/publish_release_assets.py")
 
 
 class ReproducibleArchiveTests(unittest.TestCase):
-    def test_cli_archive_runtime_is_locked_before_reproduction(self):
-        with patch.object(archive.subprocess, "run") as run:
-            archive._verify_archive_runtime()
-        run.assert_called_once_with(
-            [
-                archive.sys.executable,
-                "-B",
-                str(ROOT / "tools/supply_chain.py"),
-                "check",
-                "--runtime",
-                "offline",
-            ],
-            check=True,
-        )
-
-        with patch.object(
-            archive.subprocess,
-            "run",
-            side_effect=subprocess.CalledProcessError(1, ["supply-chain"]),
-        ):
-            with self.assertRaisesRegex(
-                archive.ArchiveError, "locked archive runtime verification failed"
-            ):
-                archive._verify_archive_runtime()
-
     def test_two_clean_mtime_distinct_stages_must_match_before_immutable_publish(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -57,12 +32,12 @@ class ReproducibleArchiveTests(unittest.TestCase):
             output = root / "result.tar.gz"
             mtimes = []
 
-            def fake_container(input_directory, output_directory, member):
+            def fake_archive(input_directory, output_directory, member):
                 self.assertEqual(member, ".")
                 mtimes.append((input_directory / "payload").stat().st_mtime_ns)
                 (output_directory / "archive.tar.gz").write_bytes(b"same archive")
 
-            with patch.object(archive, "_run_container", side_effect=fake_container):
+            with patch.object(archive, "_run_archive", side_effect=fake_archive):
                 digest = archive.create_archive(source, output)
                 self.assertEqual(digest, hashlib.sha256(b"same archive").hexdigest())
                 self.assertEqual(len(mtimes), 2)
@@ -89,30 +64,30 @@ class ReproducibleArchiveTests(unittest.TestCase):
                 calls += 1
                 (output / "archive.tar.gz").write_bytes(str(calls).encode())
 
-            with patch.object(archive, "_run_container", side_effect=divergent):
+            with patch.object(archive, "_run_archive", side_effect=divergent):
                 with self.assertRaises(archive.ArchiveError):
                     archive.create_archive(source, root / "different.tar.gz")
             (source / "escape").symlink_to(root)
             with self.assertRaises(archive.ArchiveError):
                 archive.create_archive(source, root / "escape.tar.gz")
 
-    def test_container_coordinate_and_archive_flags_are_frozen(self):
-        self.assertRegex(
-            archive.REPRODUCIBLE_ARCHIVE_IMAGE,
-            r"@sha256:[0-9a-f]{64}$",
-        )
-        source = (ROOT / "tools/reproducible_archive.py").read_text()
-        for control in [
-            "--pull=always",
-            "--network",
-            "--read-only",
-            "--cap-drop",
-            "--sort=name",
-            "--mtime=@0",
-            "--numeric-owner",
-            "gzip -9 -n",
-        ]:
-            self.assertIn(control, source)
+    def test_archive_metadata_is_normalized(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            source.mkdir()
+            (source / "payload").write_bytes(b"stable\n")
+            output = root / "result.tar.gz"
+            archive.create_archive(source, output)
+            with tarfile.open(output, "r:gz") as value:
+                members = value.getmembers()
+            self.assertEqual(
+                [member.name for member in members], [".", "./payload"]
+            )
+            for member in members:
+                self.assertEqual(member.uid, 0)
+                self.assertEqual(member.gid, 0)
+                self.assertEqual(member.mtime, 0)
 
 
 class ImmutablePublicationTests(unittest.TestCase):
@@ -159,7 +134,7 @@ class ImmutablePublicationTests(unittest.TestCase):
         self.assertIn("--gate archive-reproduction", pipeline)
         self.assertIn("git archive --format=tar HEAD", pipeline)
         self.assertIn("--root-name mainframe-env-source", pipeline)
-        self.assertIn('"--runtime", "offline"', archive.__loader__.get_source(archive.__name__))
+        self.assertIn("tarfile.USTAR_FORMAT", archive.__loader__.get_source(archive.__name__))
 
 
 if __name__ == "__main__":

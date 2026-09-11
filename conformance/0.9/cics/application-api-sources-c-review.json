@@ -1,0 +1,1115 @@
+{
+  "ambiguity_scope": [
+    {
+      "dimensions": [
+        "execution-context",
+        "operand-directions",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0178"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0179"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0180"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0181"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0182"
+    },
+    {
+      "dimensions": [
+        "conditions",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0183"
+    },
+    {
+      "dimensions": [
+        "conditions",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0184"
+    },
+    {
+      "dimensions": [
+        "conditions",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0185"
+    },
+    {
+      "dimensions": [
+        "operand-directions"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0186"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0187"
+    },
+    {
+      "dimensions": [
+        "operand-directions",
+        "options",
+        "syntax"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0188"
+    },
+    {
+      "dimensions": [
+        "operand-directions",
+        "options",
+        "syntax"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0189"
+    },
+    {
+      "dimensions": [
+        "operand-directions",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0190"
+    },
+    {
+      "dimensions": [
+        "operand-directions",
+        "options",
+        "syntax"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0192"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0194"
+    },
+    {
+      "dimensions": [
+        "operand-directions",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0196"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0197"
+    },
+    {
+      "dimensions": [
+        "operand-directions",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0198"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0201"
+    },
+    {
+      "dimensions": [
+        "operand-directions",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0202"
+    },
+    {
+      "dimensions": [
+        "operand-directions"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0203"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0204"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0205"
+    },
+    {
+      "dimensions": [
+        "execution-context",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0208"
+    },
+    {
+      "dimensions": [
+        "operand-directions"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0209"
+    },
+    {
+      "dimensions": [
+        "operand-directions",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0210"
+    },
+    {
+      "dimensions": [
+        "operand-directions"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0211"
+    },
+    {
+      "dimensions": [
+        "operand-directions"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0212"
+    },
+    {
+      "dimensions": [
+        "operand-directions"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0213"
+    },
+    {
+      "dimensions": [
+        "conditions"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0215"
+    },
+    {
+      "dimensions": [
+        "conditions"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0216"
+    },
+    {
+      "dimensions": [
+        "conditions"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0217"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0218"
+    },
+    {
+      "dimensions": [
+        "conditions",
+        "operand-directions",
+        "options",
+        "syntax"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0220"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0221"
+    },
+    {
+      "dimensions": [
+        "operand-directions",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0222"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0223"
+    },
+    {
+      "dimensions": [
+        "operand-directions",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0224"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0225"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0226"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0227"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0229"
+    },
+    {
+      "dimensions": [
+        "operand-directions",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0230"
+    },
+    {
+      "dimensions": [
+        "operand-directions",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0231"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0232"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0233"
+    },
+    {
+      "dimensions": [
+        "execution-context",
+        "operand-directions",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0234"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0235"
+    },
+    {
+      "dimensions": [
+        "conditions",
+        "operand-directions",
+        "options",
+        "syntax"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0236"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0238"
+    },
+    {
+      "dimensions": [
+        "operand-directions",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0239"
+    },
+    {
+      "dimensions": [
+        "syntax"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0241"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0242"
+    },
+    {
+      "dimensions": [
+        "operand-directions",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0243"
+    },
+    {
+      "dimensions": [
+        "options",
+        "syntax"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0244"
+    },
+    {
+      "dimensions": [
+        "operand-directions",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0245"
+    },
+    {
+      "dimensions": [
+        "execution-context",
+        "operand-directions",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0246"
+    },
+    {
+      "dimensions": [
+        "operand-directions",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0247"
+    },
+    {
+      "dimensions": [
+        "execution-context",
+        "operand-directions",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0248"
+    },
+    {
+      "dimensions": [
+        "operand-directions",
+        "options",
+        "syntax"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0250"
+    },
+    {
+      "dimensions": [
+        "operand-directions",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0251"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0252"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0253"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0254"
+    },
+    {
+      "dimensions": [
+        "conditions",
+        "operand-directions",
+        "options",
+        "syntax"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0255"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0256"
+    },
+    {
+      "dimensions": [
+        "execution-context",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0257"
+    },
+    {
+      "dimensions": [
+        "execution-context",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0258"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0259"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0260"
+    },
+    {
+      "dimensions": [
+        "operand-directions",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0261"
+    },
+    {
+      "dimensions": [
+        "operand-directions",
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0262"
+    },
+    {
+      "dimensions": [
+        "options"
+      ],
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0263"
+    }
+  ],
+  "applicability_coverage": {
+    "expected": 348,
+    "extra": 0,
+    "missing": 0,
+    "projected": 348
+  },
+  "automatic_registration": false,
+  "blocker_ids": [
+    "cics-c-issue-0178-context-predicate-not-structured-9f32064ab8d8",
+    "cics-c-issue-0178-prose-option-legality-not-structured-0f49041953c1",
+    "cics-c-issue-0178-prose-option-legality-not-structured-a83398572102",
+    "cics-c-issue-0178-prose-option-legality-not-structured-beb2bf391821",
+    "cics-c-issue-0178-prose-option-legality-not-structured-d839d6b337c2",
+    "cics-c-issue-0178-prose-option-legality-not-structured-d8d7b885be97",
+    "cics-c-issue-0179-prose-option-legality-not-structured-5aabcfbbb9c1",
+    "cics-c-issue-0179-prose-option-legality-not-structured-5ed48a8c2faf",
+    "cics-c-issue-0180-prose-option-legality-not-structured-3f43c4816f9a",
+    "cics-c-issue-0180-prose-option-legality-not-structured-ace57920546f",
+    "cics-c-issue-0181-prose-option-legality-not-structured-c4ce1301303d",
+    "cics-c-issue-0181-prose-option-legality-not-structured-fd6aed6253cf",
+    "cics-c-issue-0182-prose-option-legality-not-structured-00bb7e9ebfbd",
+    "cics-c-issue-0182-prose-option-legality-not-structured-18d93ae9a9ed",
+    "cics-c-issue-0182-prose-option-legality-not-structured-2dc988bb7ace",
+    "cics-c-issue-0182-prose-option-legality-not-structured-35b9a4f8271e",
+    "cics-c-issue-0182-prose-option-legality-not-structured-5b21130c744b",
+    "cics-c-issue-0182-prose-option-legality-not-structured-9db7d128f64a",
+    "cics-c-issue-0182-prose-option-legality-not-structured-c464dd3b5fa0",
+    "cics-c-issue-0182-prose-option-legality-not-structured-da79ee8cde0b",
+    "cics-c-issue-0183-prose-option-legality-not-structured-cbe171003c03",
+    "cics-c-issue-0183-shared-condition-applicability-unresolved-168596f102c1",
+    "cics-c-issue-0183-shared-condition-applicability-unresolved-40bd35a6734c",
+    "cics-c-issue-0183-shared-condition-applicability-unresolved-4f64a60dd322",
+    "cics-c-issue-0183-shared-condition-applicability-unresolved-5efb546a61b5",
+    "cics-c-issue-0183-shared-condition-applicability-unresolved-7483f384cc07",
+    "cics-c-issue-0183-shared-condition-applicability-unresolved-96a274c59722",
+    "cics-c-issue-0183-shared-condition-applicability-unresolved-a1a163049007",
+    "cics-c-issue-0183-shared-condition-applicability-unresolved-b36a73423a7b",
+    "cics-c-issue-0183-shared-condition-applicability-unresolved-c1947278176f",
+    "cics-c-issue-0183-shared-condition-applicability-unresolved-cf57ccbe8c05",
+    "cics-c-issue-0183-shared-condition-applicability-unresolved-e781b099e9ae",
+    "cics-c-issue-0183-shared-condition-applicability-unresolved-ee10bbfd2081",
+    "cics-c-issue-0183-shared-condition-applicability-unresolved-f4ca1d97ee5f",
+    "cics-c-issue-0184-prose-option-legality-not-structured-7c62fd272cf3",
+    "cics-c-issue-0184-shared-condition-applicability-unresolved-05ea4f0f911e",
+    "cics-c-issue-0184-shared-condition-applicability-unresolved-28ebca514e4d",
+    "cics-c-issue-0184-shared-condition-applicability-unresolved-325bc148088c",
+    "cics-c-issue-0184-shared-condition-applicability-unresolved-5e7abe2d54f6",
+    "cics-c-issue-0184-shared-condition-applicability-unresolved-792ba4f4301f",
+    "cics-c-issue-0184-shared-condition-applicability-unresolved-868e7ca9fc03",
+    "cics-c-issue-0184-shared-condition-applicability-unresolved-907947523a2f",
+    "cics-c-issue-0184-shared-condition-applicability-unresolved-c4bf98c5c180",
+    "cics-c-issue-0184-shared-condition-applicability-unresolved-c7bf10cff849",
+    "cics-c-issue-0184-shared-condition-applicability-unresolved-e302417dd9d6",
+    "cics-c-issue-0184-shared-condition-applicability-unresolved-f4f3864e1f16",
+    "cics-c-issue-0184-shared-condition-applicability-unresolved-f8b9dc02dba4",
+    "cics-c-issue-0185-prose-option-legality-not-structured-25d3d203c83e",
+    "cics-c-issue-0185-prose-option-legality-not-structured-8f5e606f3f2b",
+    "cics-c-issue-0185-shared-condition-applicability-unresolved-76c80416d1df",
+    "cics-c-issue-0185-shared-condition-applicability-unresolved-f354bbb6f638",
+    "cics-c-issue-0187-prose-option-legality-not-structured-00976f542e4e",
+    "cics-c-issue-0187-prose-option-legality-not-structured-043ee4a47579",
+    "cics-c-issue-0187-prose-option-legality-not-structured-051155e9e4ee",
+    "cics-c-issue-0187-prose-option-legality-not-structured-067faaf81578",
+    "cics-c-issue-0187-prose-option-legality-not-structured-07ec40f16860",
+    "cics-c-issue-0187-prose-option-legality-not-structured-0cd9600408bc",
+    "cics-c-issue-0187-prose-option-legality-not-structured-0fa9b99408c5",
+    "cics-c-issue-0187-prose-option-legality-not-structured-14008ead5956",
+    "cics-c-issue-0187-prose-option-legality-not-structured-15f6b9db050f",
+    "cics-c-issue-0187-prose-option-legality-not-structured-17d84949e94d",
+    "cics-c-issue-0187-prose-option-legality-not-structured-218cca25e642",
+    "cics-c-issue-0187-prose-option-legality-not-structured-2d0d97343246",
+    "cics-c-issue-0187-prose-option-legality-not-structured-2ecfcc114ba8",
+    "cics-c-issue-0187-prose-option-legality-not-structured-2fac1f49691d",
+    "cics-c-issue-0187-prose-option-legality-not-structured-34d6338042e3",
+    "cics-c-issue-0187-prose-option-legality-not-structured-385cb8845bd2",
+    "cics-c-issue-0187-prose-option-legality-not-structured-3a34d710e98d",
+    "cics-c-issue-0187-prose-option-legality-not-structured-3c7b99b49de3",
+    "cics-c-issue-0187-prose-option-legality-not-structured-3cf67c20e94b",
+    "cics-c-issue-0187-prose-option-legality-not-structured-3f34716c9e95",
+    "cics-c-issue-0187-prose-option-legality-not-structured-433684e410ee",
+    "cics-c-issue-0187-prose-option-legality-not-structured-43fb31152648",
+    "cics-c-issue-0187-prose-option-legality-not-structured-4671771f9f03",
+    "cics-c-issue-0187-prose-option-legality-not-structured-47c208ef2279",
+    "cics-c-issue-0187-prose-option-legality-not-structured-4835244d6fe1",
+    "cics-c-issue-0187-prose-option-legality-not-structured-4bbab1215153",
+    "cics-c-issue-0187-prose-option-legality-not-structured-4c573814894a",
+    "cics-c-issue-0187-prose-option-legality-not-structured-4f41bcfd3ed9",
+    "cics-c-issue-0187-prose-option-legality-not-structured-4f6c884ce436",
+    "cics-c-issue-0187-prose-option-legality-not-structured-5251ea26aad9",
+    "cics-c-issue-0187-prose-option-legality-not-structured-55ec28835435",
+    "cics-c-issue-0187-prose-option-legality-not-structured-576d657688c2",
+    "cics-c-issue-0187-prose-option-legality-not-structured-5eaefb6817df",
+    "cics-c-issue-0187-prose-option-legality-not-structured-5f66095bb8e1",
+    "cics-c-issue-0187-prose-option-legality-not-structured-5fe72efbd07c",
+    "cics-c-issue-0187-prose-option-legality-not-structured-62bb5ffcac4a",
+    "cics-c-issue-0187-prose-option-legality-not-structured-65bdfae9f509",
+    "cics-c-issue-0187-prose-option-legality-not-structured-66132f7378e9",
+    "cics-c-issue-0187-prose-option-legality-not-structured-664cdc08a050",
+    "cics-c-issue-0187-prose-option-legality-not-structured-6ae0110b702d",
+    "cics-c-issue-0187-prose-option-legality-not-structured-6ec02437af42",
+    "cics-c-issue-0187-prose-option-legality-not-structured-7808ffedb946",
+    "cics-c-issue-0187-prose-option-legality-not-structured-7827b70452b8",
+    "cics-c-issue-0187-prose-option-legality-not-structured-7bd7a1676345",
+    "cics-c-issue-0187-prose-option-legality-not-structured-800942ae3dbe",
+    "cics-c-issue-0187-prose-option-legality-not-structured-824ee85516f6",
+    "cics-c-issue-0187-prose-option-legality-not-structured-82e25636ac18",
+    "cics-c-issue-0187-prose-option-legality-not-structured-851167c6a77c",
+    "cics-c-issue-0187-prose-option-legality-not-structured-878031c02348",
+    "cics-c-issue-0187-prose-option-legality-not-structured-8ada221e86e5",
+    "cics-c-issue-0187-prose-option-legality-not-structured-8fe85b28bb26",
+    "cics-c-issue-0187-prose-option-legality-not-structured-8ff534c2e4fb",
+    "cics-c-issue-0187-prose-option-legality-not-structured-92df831a8afc",
+    "cics-c-issue-0187-prose-option-legality-not-structured-96f6c6def99a",
+    "cics-c-issue-0187-prose-option-legality-not-structured-9c0ed36c5afd",
+    "cics-c-issue-0187-prose-option-legality-not-structured-9d9973096107",
+    "cics-c-issue-0187-prose-option-legality-not-structured-9e03df5f32d7",
+    "cics-c-issue-0187-prose-option-legality-not-structured-a8d8bb666e3d",
+    "cics-c-issue-0187-prose-option-legality-not-structured-a8eebf8388f5",
+    "cics-c-issue-0187-prose-option-legality-not-structured-aeeb90113936",
+    "cics-c-issue-0187-prose-option-legality-not-structured-b222f76222d5",
+    "cics-c-issue-0187-prose-option-legality-not-structured-b47d0b435a36",
+    "cics-c-issue-0187-prose-option-legality-not-structured-b6b221dc30a2",
+    "cics-c-issue-0187-prose-option-legality-not-structured-bd7cb158a39b",
+    "cics-c-issue-0187-prose-option-legality-not-structured-c1ed1062c90c",
+    "cics-c-issue-0187-prose-option-legality-not-structured-c270ad5e2e1c",
+    "cics-c-issue-0187-prose-option-legality-not-structured-c49b0241599f",
+    "cics-c-issue-0187-prose-option-legality-not-structured-c4f49395bed5",
+    "cics-c-issue-0187-prose-option-legality-not-structured-c6e489589670",
+    "cics-c-issue-0187-prose-option-legality-not-structured-c86271ec0b7c",
+    "cics-c-issue-0187-prose-option-legality-not-structured-c96c49334ddd",
+    "cics-c-issue-0187-prose-option-legality-not-structured-c9bac9c92848",
+    "cics-c-issue-0187-prose-option-legality-not-structured-ca9a96c7990e",
+    "cics-c-issue-0187-prose-option-legality-not-structured-ceae6aef650d",
+    "cics-c-issue-0187-prose-option-legality-not-structured-d0f25509de92",
+    "cics-c-issue-0187-prose-option-legality-not-structured-d1f9cebc560f",
+    "cics-c-issue-0187-prose-option-legality-not-structured-d4d97bbd07c4",
+    "cics-c-issue-0187-prose-option-legality-not-structured-d60e8ee1814a",
+    "cics-c-issue-0187-prose-option-legality-not-structured-d8df036ee919",
+    "cics-c-issue-0187-prose-option-legality-not-structured-da08e5f00e37",
+    "cics-c-issue-0187-prose-option-legality-not-structured-db56ad05a1b7",
+    "cics-c-issue-0187-prose-option-legality-not-structured-dba7a26da7da",
+    "cics-c-issue-0187-prose-option-legality-not-structured-dbbe66b60b47",
+    "cics-c-issue-0187-prose-option-legality-not-structured-dcf76cef7e3a",
+    "cics-c-issue-0187-prose-option-legality-not-structured-dd8de7b10908",
+    "cics-c-issue-0187-prose-option-legality-not-structured-df9f74228929",
+    "cics-c-issue-0187-prose-option-legality-not-structured-e6f40c4ab042",
+    "cics-c-issue-0187-prose-option-legality-not-structured-ea53804ca3b0",
+    "cics-c-issue-0187-prose-option-legality-not-structured-eb14de139ae8",
+    "cics-c-issue-0187-prose-option-legality-not-structured-ecc46447d5ad",
+    "cics-c-issue-0187-prose-option-legality-not-structured-ef9481471a46",
+    "cics-c-issue-0187-prose-option-legality-not-structured-f23d9a6bf0bc",
+    "cics-c-issue-0187-prose-option-legality-not-structured-f7cb9142dc18",
+    "cics-c-issue-0187-prose-option-legality-not-structured-f97662a370fc",
+    "cics-c-issue-0187-prose-option-legality-not-structured-fbff8f77d6ec",
+    "cics-c-issue-0187-prose-option-legality-not-structured-fe201d7b62ef",
+    "cics-c-issue-0187-prose-option-legality-not-structured-fee7de58c3e2",
+    "cics-c-issue-0188-prose-option-legality-not-structured-4295ded82bd4",
+    "cics-c-issue-0188-prose-option-legality-not-structured-4acf97af040b",
+    "cics-c-issue-0188-prose-option-legality-not-structured-5412d6009a7c",
+    "cics-c-issue-0188-prose-option-legality-not-structured-6bb4341364ce",
+    "cics-c-issue-0188-prose-option-legality-not-structured-7ad4fb05abba",
+    "cics-c-issue-0188-prose-option-legality-not-structured-99bab0becc21",
+    "cics-c-issue-0188-prose-option-legality-not-structured-c48da63cd6e3",
+    "cics-c-issue-0188-prose-option-legality-not-structured-d33836f760e2",
+    "cics-c-issue-0188-prose-option-legality-not-structured-fe12aaa29ab2",
+    "cics-c-issue-0188-syntax-panel-composition-unresolved-49e82ec5b2ad",
+    "cics-c-issue-0188-syntax-panel-composition-unresolved-aca995d6a6e8",
+    "cics-c-issue-0188-syntax-panel-composition-unresolved-cc193c24fc1d",
+    "cics-c-issue-0189-prose-option-legality-not-structured-026eb79a0835",
+    "cics-c-issue-0189-prose-option-legality-not-structured-0373e7627e04",
+    "cics-c-issue-0189-prose-option-legality-not-structured-13e344cdea75",
+    "cics-c-issue-0189-prose-option-legality-not-structured-19371a2f4b39",
+    "cics-c-issue-0189-prose-option-legality-not-structured-1a075f255ca6",
+    "cics-c-issue-0189-prose-option-legality-not-structured-3da829b95029",
+    "cics-c-issue-0189-prose-option-legality-not-structured-429a10d5b677",
+    "cics-c-issue-0189-prose-option-legality-not-structured-4a4b5b81a822",
+    "cics-c-issue-0189-prose-option-legality-not-structured-5831ec028620",
+    "cics-c-issue-0189-prose-option-legality-not-structured-59fe839901f8",
+    "cics-c-issue-0189-prose-option-legality-not-structured-68ab8c2d37e6",
+    "cics-c-issue-0189-prose-option-legality-not-structured-6d16ddb66b5b",
+    "cics-c-issue-0189-prose-option-legality-not-structured-6f3d5660ba01",
+    "cics-c-issue-0189-prose-option-legality-not-structured-71e8a41d7b63",
+    "cics-c-issue-0189-prose-option-legality-not-structured-7345073f84cc",
+    "cics-c-issue-0189-prose-option-legality-not-structured-73d0093e3b0e",
+    "cics-c-issue-0189-prose-option-legality-not-structured-7c3fa8100e01",
+    "cics-c-issue-0189-prose-option-legality-not-structured-88198ef8d22a",
+    "cics-c-issue-0189-prose-option-legality-not-structured-8c690370733e",
+    "cics-c-issue-0189-prose-option-legality-not-structured-95651ecd9a70",
+    "cics-c-issue-0189-prose-option-legality-not-structured-a086805666c7",
+    "cics-c-issue-0189-prose-option-legality-not-structured-a6bc4c404887",
+    "cics-c-issue-0189-prose-option-legality-not-structured-aa3c02dec78c",
+    "cics-c-issue-0189-prose-option-legality-not-structured-d3f51ef0e026",
+    "cics-c-issue-0189-prose-option-legality-not-structured-d6aa797494e7",
+    "cics-c-issue-0189-prose-option-legality-not-structured-d8ccf8fc6c29",
+    "cics-c-issue-0189-prose-option-legality-not-structured-dfb372b13b2c",
+    "cics-c-issue-0189-syntax-panel-composition-unresolved-6fa1c5d1fa5e",
+    "cics-c-issue-0189-syntax-panel-composition-unresolved-c66e9f46279a",
+    "cics-c-issue-0189-syntax-panel-composition-unresolved-cfa4378e9a25",
+    "cics-c-issue-0190-prose-option-legality-not-structured-1781ee3556d8",
+    "cics-c-issue-0190-prose-option-legality-not-structured-31712337fad6",
+    "cics-c-issue-0190-prose-option-legality-not-structured-81260bc7adbf",
+    "cics-c-issue-0190-prose-option-legality-not-structured-d482421003b3",
+    "cics-c-issue-0190-prose-option-legality-not-structured-ea02a2c20dde",
+    "cics-c-issue-0190-prose-option-legality-not-structured-ffe265c09e05",
+    "cics-c-issue-0192-prose-option-legality-not-structured-0ec5cf3a2df0",
+    "cics-c-issue-0192-prose-option-legality-not-structured-14247533c302",
+    "cics-c-issue-0192-prose-option-legality-not-structured-171c13629db5",
+    "cics-c-issue-0192-prose-option-legality-not-structured-24b59e449bf6",
+    "cics-c-issue-0192-prose-option-legality-not-structured-4e4c5e7d6a98",
+    "cics-c-issue-0192-prose-option-legality-not-structured-526bd9cb45d8",
+    "cics-c-issue-0192-prose-option-legality-not-structured-5b65cee4aadd",
+    "cics-c-issue-0192-prose-option-legality-not-structured-687d054e4c02",
+    "cics-c-issue-0192-prose-option-legality-not-structured-6b40db5d573d",
+    "cics-c-issue-0192-prose-option-legality-not-structured-6df624c85135",
+    "cics-c-issue-0192-prose-option-legality-not-structured-6eb071de00bd",
+    "cics-c-issue-0192-prose-option-legality-not-structured-6ff23036831e",
+    "cics-c-issue-0192-prose-option-legality-not-structured-74092f50982f",
+    "cics-c-issue-0192-prose-option-legality-not-structured-829aa3cd82bb",
+    "cics-c-issue-0192-prose-option-legality-not-structured-8bd1f2f112a0",
+    "cics-c-issue-0192-prose-option-legality-not-structured-94f3636caa65",
+    "cics-c-issue-0192-prose-option-legality-not-structured-999b8efed2a0",
+    "cics-c-issue-0192-prose-option-legality-not-structured-a014958a1038",
+    "cics-c-issue-0192-prose-option-legality-not-structured-aa9751f2f972",
+    "cics-c-issue-0192-prose-option-legality-not-structured-af6f5a5eca6d",
+    "cics-c-issue-0192-prose-option-legality-not-structured-b589e9022fac",
+    "cics-c-issue-0192-prose-option-legality-not-structured-ba947ad9529f",
+    "cics-c-issue-0192-prose-option-legality-not-structured-ce85436c9501",
+    "cics-c-issue-0192-prose-option-legality-not-structured-df248ecad560",
+    "cics-c-issue-0192-prose-option-legality-not-structured-e05858bdc4e2",
+    "cics-c-issue-0192-prose-option-legality-not-structured-fe0baeb493a0",
+    "cics-c-issue-0192-syntax-panel-composition-unresolved-5c9b01687b26",
+    "cics-c-issue-0192-syntax-panel-composition-unresolved-ba1b01ccc904",
+    "cics-c-issue-0194-prose-option-legality-not-structured-08bf57a6151b",
+    "cics-c-issue-0196-prose-option-legality-not-structured-0403ab687825",
+    "cics-c-issue-0196-prose-option-legality-not-structured-1b88bc1210c8",
+    "cics-c-issue-0196-prose-option-legality-not-structured-228efd91284c",
+    "cics-c-issue-0196-prose-option-legality-not-structured-46fa9efca22d",
+    "cics-c-issue-0196-prose-option-legality-not-structured-4e79d5c522f2",
+    "cics-c-issue-0196-prose-option-legality-not-structured-5cb7fc0ee192",
+    "cics-c-issue-0196-prose-option-legality-not-structured-943815581793",
+    "cics-c-issue-0196-prose-option-legality-not-structured-ce8b4f513b80",
+    "cics-c-issue-0196-prose-option-legality-not-structured-d624df59126c",
+    "cics-c-issue-0196-prose-option-legality-not-structured-d65be9e28485",
+    "cics-c-issue-0196-prose-option-legality-not-structured-de3d7eaa125d",
+    "cics-c-issue-0196-prose-option-legality-not-structured-e46f2d17aae1",
+    "cics-c-issue-0196-prose-option-legality-not-structured-ec336c984204",
+    "cics-c-issue-0196-prose-option-legality-not-structured-f677eac64ba3",
+    "cics-c-issue-0197-prose-option-legality-not-structured-08848b744f51",
+    "cics-c-issue-0197-prose-option-legality-not-structured-5f05390201b1",
+    "cics-c-issue-0197-prose-option-legality-not-structured-932e68b330bb",
+    "cics-c-issue-0198-prose-option-legality-not-structured-027e12115853",
+    "cics-c-issue-0198-prose-option-legality-not-structured-027e8d66325f",
+    "cics-c-issue-0198-prose-option-legality-not-structured-09b610ded6fe",
+    "cics-c-issue-0198-prose-option-legality-not-structured-1e53d94aa3dd",
+    "cics-c-issue-0198-prose-option-legality-not-structured-374b7690cb1b",
+    "cics-c-issue-0198-prose-option-legality-not-structured-42206c2ba03b",
+    "cics-c-issue-0198-prose-option-legality-not-structured-7aab52b68550",
+    "cics-c-issue-0198-prose-option-legality-not-structured-c3d8b267d4ea",
+    "cics-c-issue-0198-prose-option-legality-not-structured-d078e083a849",
+    "cics-c-issue-0198-prose-option-legality-not-structured-d4be89a55a50",
+    "cics-c-issue-0198-prose-option-legality-not-structured-d4cd4393d730",
+    "cics-c-issue-0198-prose-option-legality-not-structured-dfe3ab3d0071",
+    "cics-c-issue-0201-prose-option-legality-not-structured-5914fc39f970",
+    "cics-c-issue-0202-prose-option-legality-not-structured-10b885ffa9bf",
+    "cics-c-issue-0202-prose-option-legality-not-structured-4d22da37a76b",
+    "cics-c-issue-0202-prose-option-legality-not-structured-610170695d97",
+    "cics-c-issue-0202-prose-option-legality-not-structured-e935fac9bde9",
+    "cics-c-issue-0202-prose-option-legality-not-structured-f3d5de33e53b",
+    "cics-c-issue-0204-prose-option-legality-not-structured-44c258a34c75",
+    "cics-c-issue-0205-prose-option-legality-not-structured-30c84b57964d",
+    "cics-c-issue-0205-prose-option-legality-not-structured-56264a832ffb",
+    "cics-c-issue-0205-prose-option-legality-not-structured-5c4d06c0d9da",
+    "cics-c-issue-0205-prose-option-legality-not-structured-72bc2870f956",
+    "cics-c-issue-0205-prose-option-legality-not-structured-937435a06913",
+    "cics-c-issue-0205-prose-option-legality-not-structured-98dd61cac5e1",
+    "cics-c-issue-0205-prose-option-legality-not-structured-afa7d2cb318c",
+    "cics-c-issue-0205-prose-option-legality-not-structured-c03406da8741",
+    "cics-c-issue-0205-prose-option-legality-not-structured-cd4eae9a7f11",
+    "cics-c-issue-0205-prose-option-legality-not-structured-ddb5c20ff278",
+    "cics-c-issue-0205-prose-option-legality-not-structured-ed8ed1aae6ea",
+    "cics-c-issue-0208-context-predicate-not-structured-d55ded9e312c",
+    "cics-c-issue-0208-prose-option-legality-not-structured-2bc08a5835bf",
+    "cics-c-issue-0208-prose-option-legality-not-structured-52b40d1dbeab",
+    "cics-c-issue-0208-prose-option-legality-not-structured-8cac091ca272",
+    "cics-c-issue-0208-prose-option-legality-not-structured-ab301f55d9be",
+    "cics-c-issue-0208-prose-option-legality-not-structured-b26fd69f36d8",
+    "cics-c-issue-0208-prose-option-legality-not-structured-c2250232704e",
+    "cics-c-issue-0208-prose-option-legality-not-structured-c2ecd042787b",
+    "cics-c-issue-0210-prose-option-legality-not-structured-ab88c58bf0e3",
+    "cics-c-issue-0215-shared-condition-applicability-unresolved-22336bad489e",
+    "cics-c-issue-0215-shared-condition-applicability-unresolved-54e4854e38df",
+    "cics-c-issue-0215-shared-condition-applicability-unresolved-84bed8cb75a3",
+    "cics-c-issue-0215-shared-condition-applicability-unresolved-87ae29b4e315",
+    "cics-c-issue-0215-shared-condition-applicability-unresolved-90e19ecd7f7f",
+    "cics-c-issue-0215-shared-condition-applicability-unresolved-f672f5b5e53d",
+    "cics-c-issue-0216-shared-condition-applicability-unresolved-3a90a101a0e5",
+    "cics-c-issue-0216-shared-condition-applicability-unresolved-4623df66e57d",
+    "cics-c-issue-0216-shared-condition-applicability-unresolved-57296a68bd9a",
+    "cics-c-issue-0216-shared-condition-applicability-unresolved-7e01ff39f5ee",
+    "cics-c-issue-0216-shared-condition-applicability-unresolved-ea44cba44781",
+    "cics-c-issue-0217-shared-condition-applicability-unresolved-5c3d0d8ec39d",
+    "cics-c-issue-0217-shared-condition-applicability-unresolved-d91bfc650caf",
+    "cics-c-issue-0218-prose-option-legality-not-structured-c79e40612b02",
+    "cics-c-issue-0220-prose-option-legality-not-structured-2bba24f4ea2c",
+    "cics-c-issue-0220-prose-option-legality-not-structured-544a48eb32d4",
+    "cics-c-issue-0220-prose-option-legality-not-structured-70265f2b3811",
+    "cics-c-issue-0220-prose-option-legality-not-structured-a4202bcea58b",
+    "cics-c-issue-0220-prose-option-legality-not-structured-d97a2b11d153",
+    "cics-c-issue-0220-prose-option-legality-not-structured-e789c05aed7e",
+    "cics-c-issue-0220-target-equivalence-ambiguity-5b7d6dd62995",
+    "cics-c-issue-0221-prose-option-legality-not-structured-12b4d6f4c827",
+    "cics-c-issue-0221-prose-option-legality-not-structured-7fb029c6f603",
+    "cics-c-issue-0221-prose-option-legality-not-structured-ad9247704e45",
+    "cics-c-issue-0221-prose-option-legality-not-structured-d739aea0f217",
+    "cics-c-issue-0222-prose-option-legality-not-structured-36c8ca60f73c",
+    "cics-c-issue-0222-prose-option-legality-not-structured-c2debc0ef83c",
+    "cics-c-issue-0222-prose-option-legality-not-structured-e2afcb778c10",
+    "cics-c-issue-0222-prose-option-legality-not-structured-ec7a284f91c3",
+    "cics-c-issue-0223-prose-option-legality-not-structured-18e4d57a6894",
+    "cics-c-issue-0223-prose-option-legality-not-structured-2cdbd9aafa4e",
+    "cics-c-issue-0223-prose-option-legality-not-structured-e2fb0186f9ad",
+    "cics-c-issue-0223-prose-option-legality-not-structured-f3afe7a157d7",
+    "cics-c-issue-0224-prose-option-legality-not-structured-46b642e49781",
+    "cics-c-issue-0224-prose-option-legality-not-structured-4a0679dd5a84",
+    "cics-c-issue-0224-prose-option-legality-not-structured-719fedf604db",
+    "cics-c-issue-0224-prose-option-legality-not-structured-8c2aefd2b9f6",
+    "cics-c-issue-0224-prose-option-legality-not-structured-9ff34d5a78a9",
+    "cics-c-issue-0224-prose-option-legality-not-structured-bdb8104e03e9",
+    "cics-c-issue-0224-prose-option-legality-not-structured-dac17d422e31",
+    "cics-c-issue-0225-prose-option-legality-not-structured-0ab6c0cf4d1b",
+    "cics-c-issue-0226-prose-option-legality-not-structured-3dcd3e810c40",
+    "cics-c-issue-0226-prose-option-legality-not-structured-418e2fb63989",
+    "cics-c-issue-0226-prose-option-legality-not-structured-e5ed956e5a6e",
+    "cics-c-issue-0227-prose-option-legality-not-structured-ba064354803c",
+    "cics-c-issue-0227-prose-option-legality-not-structured-cb12f2ea1dd1",
+    "cics-c-issue-0227-prose-option-legality-not-structured-d742e1ab0965",
+    "cics-c-issue-0229-prose-option-legality-not-structured-f653f12afeb8",
+    "cics-c-issue-0230-prose-option-legality-not-structured-91716cd628f8",
+    "cics-c-issue-0230-prose-option-legality-not-structured-926bdf69a0d1",
+    "cics-c-issue-0230-prose-option-legality-not-structured-975a3dd7e3ad",
+    "cics-c-issue-0230-prose-option-legality-not-structured-c98a8af4b173",
+    "cics-c-issue-0230-prose-option-legality-not-structured-d0ac841d492c",
+    "cics-c-issue-0230-prose-option-legality-not-structured-e701e01ab102",
+    "cics-c-issue-0231-prose-option-legality-not-structured-4cda7bec9741",
+    "cics-c-issue-0232-prose-option-legality-not-structured-50f290039b93",
+    "cics-c-issue-0233-prose-option-legality-not-structured-ccf36cd67a4f",
+    "cics-c-issue-0234-context-predicate-not-structured-cd5178bb0cfa",
+    "cics-c-issue-0234-prose-option-legality-not-structured-097d82f0e39d",
+    "cics-c-issue-0234-prose-option-legality-not-structured-ce5df27718dd",
+    "cics-c-issue-0235-prose-option-legality-not-structured-39db23ba89a5",
+    "cics-c-issue-0236-compatibility-successor-not-equivalent-939f7995ed13",
+    "cics-c-issue-0238-prose-option-legality-not-structured-604f2b826320",
+    "cics-c-issue-0239-prose-option-legality-not-structured-0879835be67b",
+    "cics-c-issue-0239-prose-option-legality-not-structured-71796de06a72",
+    "cics-c-issue-0241-syntax-panel-composition-unresolved-37a96bb32b54",
+    "cics-c-issue-0241-syntax-panel-composition-unresolved-42af76155025",
+    "cics-c-issue-0241-syntax-panel-composition-unresolved-d37c47ea4479",
+    "cics-c-issue-0242-prose-option-legality-not-structured-1c715f5af736",
+    "cics-c-issue-0243-prose-option-legality-not-structured-19608805421f",
+    "cics-c-issue-0243-prose-option-legality-not-structured-8edfdd72a1fb",
+    "cics-c-issue-0243-prose-option-legality-not-structured-f60b1b5db84f",
+    "cics-c-issue-0244-prose-option-legality-not-structured-058015e35072",
+    "cics-c-issue-0244-prose-option-legality-not-structured-3d592b9f1eac",
+    "cics-c-issue-0244-prose-option-legality-not-structured-77cf30f195e9",
+    "cics-c-issue-0244-prose-option-legality-not-structured-8854eb29611b",
+    "cics-c-issue-0244-prose-option-legality-not-structured-95fb90381307",
+    "cics-c-issue-0244-prose-option-legality-not-structured-aa0f5172ab5b",
+    "cics-c-issue-0244-prose-option-legality-not-structured-b41f0668791c",
+    "cics-c-issue-0244-prose-option-legality-not-structured-d7425c41db25",
+    "cics-c-issue-0244-syntax-panel-composition-unresolved-c23d6582253e",
+    "cics-c-issue-0244-syntax-panel-composition-unresolved-f699ebe6705b",
+    "cics-c-issue-0245-prose-option-legality-not-structured-0095ae8a6465",
+    "cics-c-issue-0245-prose-option-legality-not-structured-89acef63fdf1",
+    "cics-c-issue-0245-prose-option-legality-not-structured-9a0bb80eb275",
+    "cics-c-issue-0246-context-predicate-not-structured-6073a4d2eaa8",
+    "cics-c-issue-0246-context-predicate-not-structured-a5ba4437b995",
+    "cics-c-issue-0246-context-predicate-not-structured-e3ba3e52403a",
+    "cics-c-issue-0246-prose-option-legality-not-structured-60d9f6976041",
+    "cics-c-issue-0246-prose-option-legality-not-structured-881745ba13a1",
+    "cics-c-issue-0246-prose-option-legality-not-structured-da0c38a43ac0",
+    "cics-c-issue-0246-prose-option-legality-not-structured-dff39db476be",
+    "cics-c-issue-0246-prose-option-legality-not-structured-f22e115e0be0",
+    "cics-c-issue-0246-prose-option-legality-not-structured-f80b68685b8a",
+    "cics-c-issue-0247-prose-option-legality-not-structured-0bb86a57e491",
+    "cics-c-issue-0248-context-predicate-not-structured-6318e188937c",
+    "cics-c-issue-0248-prose-option-legality-not-structured-046e06a73d8d",
+    "cics-c-issue-0248-prose-option-legality-not-structured-050eb33dfca4",
+    "cics-c-issue-0248-prose-option-legality-not-structured-0cf742132c22",
+    "cics-c-issue-0248-prose-option-legality-not-structured-0e6646c71768",
+    "cics-c-issue-0248-prose-option-legality-not-structured-19c6957e409c",
+    "cics-c-issue-0248-prose-option-legality-not-structured-2ae92d62fcf5",
+    "cics-c-issue-0248-prose-option-legality-not-structured-32e3aca65eee",
+    "cics-c-issue-0248-prose-option-legality-not-structured-41f6b1f227e8",
+    "cics-c-issue-0248-prose-option-legality-not-structured-45a8ac90e634",
+    "cics-c-issue-0248-prose-option-legality-not-structured-55eb3f182d3f",
+    "cics-c-issue-0248-prose-option-legality-not-structured-5c5865444639",
+    "cics-c-issue-0248-prose-option-legality-not-structured-6d94aac7f38c",
+    "cics-c-issue-0248-prose-option-legality-not-structured-758d95a7b5f0",
+    "cics-c-issue-0248-prose-option-legality-not-structured-89cfa49dc300",
+    "cics-c-issue-0248-prose-option-legality-not-structured-8a84c05b8024",
+    "cics-c-issue-0248-prose-option-legality-not-structured-934edce6db5a",
+    "cics-c-issue-0248-prose-option-legality-not-structured-e57b2dad8ea4",
+    "cics-c-issue-0248-prose-option-legality-not-structured-e91baf16cfeb",
+    "cics-c-issue-0248-prose-option-legality-not-structured-fd1a7d9f81d2",
+    "cics-c-issue-0250-prose-option-legality-not-structured-029dad1d9751",
+    "cics-c-issue-0250-prose-option-legality-not-structured-02c047cc6e2f",
+    "cics-c-issue-0250-prose-option-legality-not-structured-0523d829983a",
+    "cics-c-issue-0250-prose-option-legality-not-structured-06ca70694133",
+    "cics-c-issue-0250-prose-option-legality-not-structured-13dcfda6bc5b",
+    "cics-c-issue-0250-prose-option-legality-not-structured-36081ee5ecda",
+    "cics-c-issue-0250-prose-option-legality-not-structured-438ee6a73e2f",
+    "cics-c-issue-0250-prose-option-legality-not-structured-468b7186226e",
+    "cics-c-issue-0250-prose-option-legality-not-structured-4932ce4d69ef",
+    "cics-c-issue-0250-prose-option-legality-not-structured-4d4669361013",
+    "cics-c-issue-0250-prose-option-legality-not-structured-4ef607bf3ed5",
+    "cics-c-issue-0250-prose-option-legality-not-structured-4ff52ac7f7ae",
+    "cics-c-issue-0250-prose-option-legality-not-structured-5149a9816dda",
+    "cics-c-issue-0250-prose-option-legality-not-structured-5b3c78ebe393",
+    "cics-c-issue-0250-prose-option-legality-not-structured-64b3edc3c7f9",
+    "cics-c-issue-0250-prose-option-legality-not-structured-778675dfae60",
+    "cics-c-issue-0250-prose-option-legality-not-structured-77e7df6bd335",
+    "cics-c-issue-0250-prose-option-legality-not-structured-783ef3f30af7",
+    "cics-c-issue-0250-prose-option-legality-not-structured-799355ff96c6",
+    "cics-c-issue-0250-prose-option-legality-not-structured-7a5f3768f850",
+    "cics-c-issue-0250-prose-option-legality-not-structured-86c6a143ac25",
+    "cics-c-issue-0250-prose-option-legality-not-structured-887c9ae04785",
+    "cics-c-issue-0250-prose-option-legality-not-structured-8fd48f180436",
+    "cics-c-issue-0250-prose-option-legality-not-structured-92e405a1ed00",
+    "cics-c-issue-0250-prose-option-legality-not-structured-92f139c987f7",
+    "cics-c-issue-0250-prose-option-legality-not-structured-937ece5c6365",
+    "cics-c-issue-0250-prose-option-legality-not-structured-9aa89767fc3c",
+    "cics-c-issue-0250-prose-option-legality-not-structured-9bfc34984186",
+    "cics-c-issue-0250-prose-option-legality-not-structured-9dc878e48564",
+    "cics-c-issue-0250-prose-option-legality-not-structured-a396fd9f8ff1",
+    "cics-c-issue-0250-prose-option-legality-not-structured-b721640cc1e5",
+    "cics-c-issue-0250-prose-option-legality-not-structured-c28997b5818b",
+    "cics-c-issue-0250-prose-option-legality-not-structured-c49788ac9bb9",
+    "cics-c-issue-0250-prose-option-legality-not-structured-d5b9dae8c324",
+    "cics-c-issue-0250-prose-option-legality-not-structured-efd2796dc1ec",
+    "cics-c-issue-0250-prose-option-legality-not-structured-f1e942361b88",
+    "cics-c-issue-0250-prose-option-legality-not-structured-f94ad9645dd0",
+    "cics-c-issue-0250-prose-option-legality-not-structured-fa82babde54c",
+    "cics-c-issue-0250-prose-option-legality-not-structured-fccf4cd42e60",
+    "cics-c-issue-0250-syntax-panel-composition-unresolved-cdb48443a1bb",
+    "cics-c-issue-0250-syntax-panel-composition-unresolved-d69aadc417e5",
+    "cics-c-issue-0251-prose-option-legality-not-structured-0e54205ba92c",
+    "cics-c-issue-0251-prose-option-legality-not-structured-39dbb894a324",
+    "cics-c-issue-0251-prose-option-legality-not-structured-5bb872d7974d",
+    "cics-c-issue-0251-prose-option-legality-not-structured-6ebf57d366f2",
+    "cics-c-issue-0251-prose-option-legality-not-structured-b2c36e379e1c",
+    "cics-c-issue-0251-prose-option-legality-not-structured-d34e09d137d2",
+    "cics-c-issue-0251-prose-option-legality-not-structured-ec908f6559dd",
+    "cics-c-issue-0252-prose-option-legality-not-structured-316a90e3370d",
+    "cics-c-issue-0252-prose-option-legality-not-structured-bb2a7910b389",
+    "cics-c-issue-0252-prose-option-legality-not-structured-d44fef4f7f38",
+    "cics-c-issue-0253-prose-option-legality-not-structured-216e64d2711b",
+    "cics-c-issue-0253-prose-option-legality-not-structured-3dd09acfa58e",
+    "cics-c-issue-0253-prose-option-legality-not-structured-4768e3c16ade",
+    "cics-c-issue-0253-prose-option-legality-not-structured-81bdfb0834a8",
+    "cics-c-issue-0253-prose-option-legality-not-structured-ce0d8255791c",
+    "cics-c-issue-0253-prose-option-legality-not-structured-f512eba706c7",
+    "cics-c-issue-0254-prose-option-legality-not-structured-12731fb2a08f",
+    "cics-c-issue-0254-prose-option-legality-not-structured-41cd289b248f",
+    "cics-c-issue-0254-prose-option-legality-not-structured-92b4a470fdb9",
+    "cics-c-issue-0254-prose-option-legality-not-structured-9fb3ba3ff722",
+    "cics-c-issue-0254-prose-option-legality-not-structured-bc88e56261f2",
+    "cics-c-issue-0254-prose-option-legality-not-structured-e5d281552bc8",
+    "cics-c-issue-0255-compatibility-successor-not-equivalent-eb97a3c4ed7e",
+    "cics-c-issue-0256-prose-option-legality-not-structured-386ec558454f",
+    "cics-c-issue-0256-prose-option-legality-not-structured-3c5dd39cfa60",
+    "cics-c-issue-0256-prose-option-legality-not-structured-6e9937224373",
+    "cics-c-issue-0256-prose-option-legality-not-structured-6ef714544538",
+    "cics-c-issue-0256-prose-option-legality-not-structured-76a183ae9967",
+    "cics-c-issue-0256-prose-option-legality-not-structured-7aacb4b25347",
+    "cics-c-issue-0256-prose-option-legality-not-structured-9d0f308bd0b2",
+    "cics-c-issue-0256-prose-option-legality-not-structured-beb44092b656",
+    "cics-c-issue-0256-prose-option-legality-not-structured-d7319952cde7",
+    "cics-c-issue-0256-prose-option-legality-not-structured-f5d4065e03fc",
+    "cics-c-issue-0257-context-predicate-not-structured-e184bd1033b1",
+    "cics-c-issue-0257-prose-option-legality-not-structured-062337a72753",
+    "cics-c-issue-0257-prose-option-legality-not-structured-d48545221a60",
+    "cics-c-issue-0258-context-predicate-not-structured-9acbfc1afedb",
+    "cics-c-issue-0258-prose-option-legality-not-structured-0e9201706753",
+    "cics-c-issue-0258-prose-option-legality-not-structured-219ac9f15762",
+    "cics-c-issue-0258-prose-option-legality-not-structured-59592e299b9b",
+    "cics-c-issue-0258-prose-option-legality-not-structured-646dc35f1055",
+    "cics-c-issue-0258-prose-option-legality-not-structured-6f3cc6b5be7e",
+    "cics-c-issue-0258-prose-option-legality-not-structured-7dac6f00c7a6",
+    "cics-c-issue-0258-prose-option-legality-not-structured-f1d7ac02bc31",
+    "cics-c-issue-0258-prose-option-legality-not-structured-fe1662b44a52",
+    "cics-c-issue-0259-prose-option-legality-not-structured-266532eae792",
+    "cics-c-issue-0259-prose-option-legality-not-structured-61be1b8d5536",
+    "cics-c-issue-0259-prose-option-legality-not-structured-a537332ddf3f",
+    "cics-c-issue-0259-prose-option-legality-not-structured-a7c464a2c221",
+    "cics-c-issue-0259-prose-option-legality-not-structured-e39f5b1f9977",
+    "cics-c-issue-0259-prose-option-legality-not-structured-e677592c1066",
+    "cics-c-issue-0260-prose-option-legality-not-structured-dfb6db9f5aac",
+    "cics-c-issue-0261-prose-option-legality-not-structured-1036c11af45b",
+    "cics-c-issue-0261-prose-option-legality-not-structured-490b469516b3",
+    "cics-c-issue-0261-prose-option-legality-not-structured-55f04ce700a6",
+    "cics-c-issue-0261-prose-option-legality-not-structured-60d3ce5dcb9d",
+    "cics-c-issue-0261-prose-option-legality-not-structured-78b6cbd5ca0a",
+    "cics-c-issue-0261-prose-option-legality-not-structured-7ae7da745d67",
+    "cics-c-issue-0261-prose-option-legality-not-structured-8202c870dfd4",
+    "cics-c-issue-0261-prose-option-legality-not-structured-ad4ca19af93f",
+    "cics-c-issue-0261-prose-option-legality-not-structured-b0e63640abc9",
+    "cics-c-issue-0261-prose-option-legality-not-structured-c1661c733b8c",
+    "cics-c-issue-0261-prose-option-legality-not-structured-c53eef4d907f",
+    "cics-c-issue-0261-prose-option-legality-not-structured-ddd26b7983f6",
+    "cics-c-issue-0262-prose-option-legality-not-structured-0f7547b9f85d",
+    "cics-c-issue-0262-prose-option-legality-not-structured-36fb0c0073db",
+    "cics-c-issue-0262-prose-option-legality-not-structured-56e256a9b957",
+    "cics-c-issue-0262-prose-option-legality-not-structured-96172793d3d8",
+    "cics-c-issue-0262-prose-option-legality-not-structured-ad2f656d4202",
+    "cics-c-issue-0262-prose-option-legality-not-structured-cfe209774bc3",
+    "cics-c-issue-0263-prose-option-legality-not-structured-05eacaa9fe4e",
+    "cics-c-issue-0263-prose-option-legality-not-structured-ced324b5b193"
+  ],
+  "candidate_dispositions": {
+    "mismatch": {
+      "candidate_ids_sha256": "sha256:ab1547e5a38cc16e0cfd977df33e0c0db0ae55ebfcb5f8008d54e47c237681af",
+      "count": 0
+    },
+    "product-ambiguity": {
+      "candidate_ids_sha256": "sha256:fb0820420218a4471589401930b97ae88d107c46f0736d792e3e1ed38bcfe930",
+      "count": 630
+    },
+    "requires-reprojection": {
+      "candidate_ids_sha256": "sha256:ab1547e5a38cc16e0cfd977df33e0c0db0ae55ebfcb5f8008d54e47c237681af",
+      "count": 0
+    },
+    "verified": {
+      "candidate_ids_sha256": "sha256:8a03728a99ca27271a33e4500a77d2ac4f2b0e905925e28f55b8d2aa3e0da2a5",
+      "count": 6379
+    }
+  },
+  "counts": {
+    "blocking_findings": 0,
+    "candidate_kinds": {
+      "source-condition": 1750,
+      "source-context": 2414,
+      "source-operand-direction": 1656,
+      "source-option": 1046,
+      "source-syntax": 143
+    },
+    "candidates": 7009,
+    "issues": 509,
+    "rows": 87,
+    "topics": 225,
+    "unique_evidence_fragments": 4040
+  },
+  "coverage_credit": 0,
+  "differential_credit": 0,
+  "execution_authority": false,
+  "independent_verification_sha256": "sha256:b1220f570c42ad15ab36c9398e52667db1a308746e3c11d13291e0637a085f4b",
+  "inputs": {
+    "candidate_projection_sha256": "sha256:828f942b652262830b9d2ce73604fcd9978e0767e26f021cc74f59f9fed13b33",
+    "extraction_plan_sha256": "sha256:cab0ab3b3baf1abb0b9a4c2bd07525692d3026a8e864abe1a1cdbee24d723c22",
+    "source_corpus_sha256": "sha256:85df7da9e5e6548e6cbeba4349fb84c8dcc0f6e7bfe4198301cabb0503043502",
+    "source_map_sha256": "sha256:6af1ce4e3fd7326b3240a6c5a9fdb2afca1ca4fe4daae3ac10b89f7f93f50145",
+    "topic_manifest_sha256": "sha256:6a84b58f232d41cf4cd2f483ceaa640beb0fea77e0ac5e557839e5a5858c47bc"
+  },
+  "issue_dispositions": {
+    "mismatch": {
+      "count": 0,
+      "issue_ids_sha256": "sha256:ab1547e5a38cc16e0cfd977df33e0c0db0ae55ebfcb5f8008d54e47c237681af"
+    },
+    "product-ambiguity": {
+      "count": 509,
+      "issue_ids_sha256": "sha256:acd7ad6d899751dcfa13b132abcb39ec4b9c88d96b2451080054676c7557dc41"
+    },
+    "requires-reprojection": {
+      "count": 0,
+      "issue_ids_sha256": "sha256:ab1547e5a38cc16e0cfd977df33e0c0db0ae55ebfcb5f8008d54e47c237681af"
+    },
+    "verified": {
+      "count": 0,
+      "issue_ids_sha256": "sha256:ab1547e5a38cc16e0cfd977df33e0c0db0ae55ebfcb5f8008d54e47c237681af"
+    }
+  },
+  "review_authority": {
+    "automatic_acceptance": true,
+    "kind": "independent-deterministic-verifier",
+    "manual_approval": false,
+    "source_derived_before_projection": true
+  },
+  "review_contract": {
+    "checker": {
+      "file_sha256": "sha256:9fd6e113b8b12d4e257b8c79c9a73d901619ff717c9ac354b0e031051cdd06d9",
+      "path": "conformance/0.9/tools/review_cics_application_sources.py",
+      "version": "cics-source-auto-review-checker@2"
+    },
+    "independent_verifier": {
+      "file_sha256": "sha256:87bce93b7afc6a7d653d82b640789416464452415e3f08e673aee92eb740de8a",
+      "path": "conformance/0.9/tools/verify_cics_application_sources.py",
+      "version": "cics-source-independent-verifier@1"
+    },
+    "schema": {
+      "file_sha256": "sha256:896491ea3fc3443b2934943a684edad7dbd5b482e74029d562d5e29e49480133",
+      "path": "conformance/0.9/schemas/cics-source-review.schema.json"
+    }
+  },
+  "review_sha256": "sha256:b62ba10bf18685740cea2aa9e229f4e3f455a113eabb9edbb4ecd58ef112f369",
+  "review_status": "auto-accepted-with-bounded-ambiguities",
+  "schema_version": "mainframe-env.cics-source-review@2",
+  "semantic_authority": false,
+  "semantic_credit": 0,
+  "structural_coverage": {
+    "expected": 2939,
+    "expected_by_kind": {
+      "source-condition": 1750,
+      "source-option": 1046,
+      "source-syntax": 143
+    },
+    "extra": 0,
+    "missing": 0,
+    "projected": 2939,
+    "projected_by_kind": {
+      "source-condition": 1750,
+      "source-option": 1046,
+      "source-syntax": 143
+    }
+  },
+  "target_version": "0.9.0",
+  "work_package": "CIC-901.sources-c-review"
+}

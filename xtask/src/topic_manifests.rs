@@ -1,4 +1,4 @@
-//! The nine committed topic manifests, checked against the pins that name them.
+//! Every committed topic manifest, checked against the explicit pin that names it.
 //!
 //! `conformance/0.2/catalogs/index.json` stopped pinning a file's bytes when the
 //! baselines moved onto documentation topics: a `documentation-topics` source
@@ -18,6 +18,9 @@ use super::*;
 const INDEX_PATH: &str = "conformance/0.2/catalogs/index.json";
 const MANIFEST_DIRECTORY: &str = "conformance/0.2/manifests";
 const MANIFEST_PREFIX: &str = "conformance/0.2/manifests/";
+const LATER_REGISTRY_PATH: &str = "conformance/0.9/manifests/index.json";
+const LATER_MANIFEST_DIRECTORY: &str = "conformance/0.9/manifests";
+const LATER_MANIFEST_PREFIX: &str = "conformance/0.9/manifests/";
 
 /// The one definition of `topic_manifest_digest`, stated the same way the
 /// manifest schema states it as a `const` and `conformance/tools/docs_api.py`
@@ -127,6 +130,77 @@ pub(super) fn check(root: &Path) -> TaskResult {
     require(
         present == pinned,
         "conformance/0.2/manifests holds a manifest no baseline pins, or is missing one",
+    )?;
+    check_later_registry(root)
+}
+
+fn check_later_registry(root: &Path) -> TaskResult {
+    let registry_path = root.join(LATER_REGISTRY_PATH);
+    let registry = json(&registry_path)?;
+    let registry_schema = root.join("conformance/0.9/schemas/topic-manifest-registry.schema.json");
+    validate_schema_instance(&json(&registry_schema)?, &registry, &registry_path)?;
+    let manifest_schema = root.join("conformance/0.2/schemas/topic-manifest.schema.json");
+    let mut pinned = BTreeSet::new();
+    let mut scopes = BTreeSet::new();
+    for entry in array(&registry, "manifests", &registry_path)? {
+        let scope = text(entry, "scope_id", &registry_path)?;
+        require(
+            scopes.insert(scope.to_string()),
+            &format!("later topic manifest scope {scope} is repeated"),
+        )?;
+        let relative = text(entry, "manifest", &registry_path)?;
+        require(
+            pinned.insert(relative.to_string()),
+            &format!("later topic manifest {relative} is registered twice"),
+        )?;
+        let path = later_manifest_path(root, relative, scope)?;
+        let manifest_sha256 = format!(
+            "sha256:{:x}",
+            Sha256::digest(
+                fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?
+            )
+        );
+        let manifest = json(&path)?;
+        validate_schema_instance(&json(&manifest_schema)?, &manifest, &path)?;
+        let digest = recompute(&manifest, &path)?;
+        require(
+            text(&manifest, "schema_version", &path)? == "mainframe-env.topic-manifest@1"
+                && text(&manifest, "target_version", &path)? == "0.9.0"
+                && text(&manifest, "baseline_id", &path)?
+                    == text(entry, "baseline_id", &registry_path)?
+                && text(&manifest, "subsystem", &path)?
+                    == text(entry, "subsystem", &registry_path)?
+                && text(&manifest, "topic_manifest_digest", &path)? == digest
+                && text(entry, "manifest_sha256", &registry_path)? == manifest_sha256
+                && text(entry, "topic_manifest_sha256", &registry_path)?
+                    == format!("sha256:{digest}")
+                && entry["topic_count"].as_u64()
+                    == Some(array(&manifest, "topics", &path)?.len() as u64)
+                && entry["coverage_credit"].as_u64() == Some(0)
+                && entry["semantic_authority"] == Value::Bool(false)
+                && manifest["coverage_credit"].as_u64() == Some(0)
+                && manifest["retained_in_repository"] == Value::Bool(false),
+            &format!("later topic manifest {relative} disagrees with scope {scope}"),
+        )?;
+    }
+    let directory = root.join(LATER_MANIFEST_DIRECTORY);
+    let mut present = BTreeSet::new();
+    for entry in
+        fs::read_dir(&directory).map_err(|error| format!("{}: {error}", directory.display()))?
+    {
+        let path = entry.map_err(|error| error.to_string())?.path();
+        if path.file_name() == Some(OsStr::new("index.json")) {
+            continue;
+        }
+        let name = path
+            .file_name()
+            .and_then(OsStr::to_str)
+            .ok_or_else(|| format!("{} has an unreadable name", path.display()))?;
+        present.insert(format!("{LATER_MANIFEST_PREFIX}{name}"));
+    }
+    require(
+        present == pinned,
+        "conformance/0.9/manifests holds an unregistered manifest or is missing one",
     )
 }
 
@@ -178,6 +252,18 @@ fn manifest_path(root: &Path, relative: &str, owner: &str) -> TaskResult<PathBuf
             && !relative.contains("..")
             && relative[MANIFEST_PREFIX.len()..].find('/').is_none(),
         &format!("{owner} names an unsafe topic manifest path {relative}"),
+    )?;
+    Ok(root.join(relative))
+}
+
+fn later_manifest_path(root: &Path, relative: &str, owner: &str) -> TaskResult<PathBuf> {
+    require(
+        relative.starts_with(LATER_MANIFEST_PREFIX)
+            && relative.ends_with(".json")
+            && !relative.contains("..")
+            && relative[LATER_MANIFEST_PREFIX.len()..].find('/').is_none()
+            && relative != LATER_REGISTRY_PATH,
+        &format!("{owner} names an unsafe later topic manifest path {relative}"),
     )?;
     Ok(root.join(relative))
 }

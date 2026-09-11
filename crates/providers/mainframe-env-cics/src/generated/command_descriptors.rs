@@ -32,8 +32,8 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
     },
     CicsCommandDescriptor {
         operation: CicsOperation::Asktime,
-        syntax: "ASKTIME",
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0009",
+        syntax: "ASKTIME ABSTIME",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0010",
         family: CicsCommandFamily::Time,
         mutating: false,
     },

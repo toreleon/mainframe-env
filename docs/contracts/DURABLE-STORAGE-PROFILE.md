@@ -21,6 +21,23 @@ recorded/actual count. A missing row, incompatible maximum, negative count,
 count drift, or legacy count above the maximum fails closed. Deployments must
 drain pre-quota writers before upgrading.
 
+## Migration and compatibility
+
+The SQLite state profile is at `0002-retention-lifecycle`. The PostgreSQL
+profile is at `0003-executable-artifact-metadata`: the state adapter applies
+`0001`, `0002`, then `0003`, while the shared-artifact adapter applies its
+relevant `0001` and `0003` migrations. Both adapters may race at startup;
+`0003` takes an access-exclusive table lock and rechecks its versioned
+constraint marker, so exactly one compatible schema remains.
+
+PostgreSQL schema-v1 artifact rows remain readable. New artifact publications
+use schema v2 and persist the bounded executable metadata envelope. Before the
+first v2-capable startup, drain older writers and take a database backup. The
+expand migration is idempotent but is not a promise that an old binary can
+safely resume writes: rollback requires stopping admission and restoring the
+pre-migration backup. Never drop `executable_metadata` while any installed
+artifact or durable continuation can reference its manifest.
+
 ## Shared immutable artifacts
 
 The PostgreSQL product profile uses the dedicated `artifact_object` table,
