@@ -48,7 +48,8 @@ All notable changes to mainframe-env are documented here.
 
 - Made the VS Code Dev Container the primary Codex workspace, with persistent
   Codex state and Docker as the single capped sandbox boundary. Compose now
-  resolves correctly when the wrapper reuses an existing VS Code process.
+  resolves correctly when the wrapper reuses an existing VS Code process, and
+  exposes the extension-bundled Codex CLI directly in container terminals.
 - Scoped local Docker CI to the last successful ancestor, preserving policy/docs
   checks while skipping runtime rebuild/deployment for prose-only changes. Added
   per-command timings, bounded stage timeouts, and focused agent verification rules.
