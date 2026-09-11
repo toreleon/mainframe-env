@@ -1,0 +1,5 @@
+# Docker is the single sandbox boundary for this trusted repository. It exposes
+# only the checkout and capped development volumes, without the host Docker
+# socket or application secrets. Avoid a second Linux sandbox layer.
+sandbox_mode = "danger-full-access"
+approval_policy = "never"

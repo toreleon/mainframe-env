@@ -20,11 +20,13 @@
   "customizations": {
     "vscode": {
       "extensions": [
+        "openai.chatgpt",
         "rust-lang.rust-analyzer",
         "tamasfe.even-better-toml",
         "vadimcn.vscode-lldb"
       ],
       "settings": {
+        "chatgpt.openOnStartup": true,
         "rust-analyzer.checkOnSave": false,
         "rust-analyzer.cargo.extraEnv": {
           "CARGO_HOME": "/cache",

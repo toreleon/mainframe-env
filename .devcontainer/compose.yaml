@@ -5,6 +5,7 @@ services:
     environment:
       MAINFRAME_ENV_DEV_CONTAINER: '1'
       HOME: /home/developer
+      CODEX_HOME: /home/developer/.codex
     depends_on:
       postgres:
         condition: service_healthy
