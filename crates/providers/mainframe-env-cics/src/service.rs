@@ -4669,13 +4669,17 @@ mod tests {
                 ("APPLICATION".into(), argument(b"APPLICATION-OUT")),
                 ("APPLID".into(), argument(b"APP-OUT")),
                 ("CHANNEL".into(), argument(b"CHANNEL-OUT")),
+                ("CWALENG".into(), argument(b"CWA-LENGTH-OUT")),
                 ("MAJORVERSION".into(), argument(b"MAJOR-OUT")),
                 ("MICROVERSION".into(), argument(b"MICRO-OUT")),
                 ("MINORVERSION".into(), argument(b"MINOR-OUT")),
                 ("OPERATION".into(), argument(b"OPERATION-OUT")),
+                ("OPERKEYS".into(), argument(b"OPERKEYS-OUT")),
                 ("PLATFORM".into(), argument(b"PLATFORM-OUT")),
+                ("RESTART".into(), argument(b"RESTART-OUT")),
                 ("SYSID".into(), argument(b"SYS-OUT")),
                 ("TASKPRIORITY".into(), argument(b"PRIORITY-OUT")),
+                ("TWALENG".into(), argument(b"TWA-LENGTH-OUT")),
                 ("USERID".into(), argument(b"USER-OUT")),
             ]),
             3,
@@ -4686,6 +4690,7 @@ mod tests {
         assert_eq!(assigned.outputs["APPLICATION"].bytes(), &[b' '; 64]);
         assert_eq!(assigned.outputs["APPLID"].bytes(), b"MEAPPL");
         assert_eq!(assigned.outputs["CHANNEL"].bytes(), &[b' '; 16]);
+        assert_eq!(assigned.outputs["CWALENG"].bytes(), b"0");
         for name in ["MAJORVERSION", "MICROVERSION", "MINORVERSION"] {
             assert_eq!(
                 assigned.outputs[name].schema(),
@@ -4694,13 +4699,16 @@ mod tests {
             assert_eq!(assigned.outputs[name].bytes(), b"-1");
         }
         assert_eq!(assigned.outputs["OPERATION"].bytes(), &[b' '; 64]);
+        assert_eq!(assigned.outputs["OPERKEYS"].bytes(), &[0; 8]);
         assert_eq!(assigned.outputs["PLATFORM"].bytes(), &[b' '; 64]);
+        assert_eq!(assigned.outputs["RESTART"].bytes(), &[0]);
         assert_eq!(assigned.outputs["SYSID"].bytes(), b"MESYS");
         assert_eq!(
             assigned.outputs["TASKPRIORITY"].schema(),
             "mainframe-env.cics.decimal@1"
         );
         assert_eq!(assigned.outputs["TASKPRIORITY"].bytes(), b"0");
+        assert_eq!(assigned.outputs["TWALENG"].bytes(), b"0");
         assert_eq!(assigned.outputs["USERID"].bytes(), b"IBMUSER");
 
         for (sequence, name, value) in [
@@ -4721,6 +4729,40 @@ mod tests {
                 Err(HostProblem::Malformed)
             );
         }
+
+        let too_many = request(
+            CicsOperation::Assign,
+            BTreeMap::from(
+                [
+                    "APPLICATION",
+                    "APPLID",
+                    "CHANNEL",
+                    "CWALENG",
+                    "MAJORVERSION",
+                    "MICROVERSION",
+                    "MINORVERSION",
+                    "OPERATION",
+                    "OPERKEYS",
+                    "PLATFORM",
+                    "RESP",
+                    "RESP2",
+                    "RESTART",
+                    "SYSID",
+                    "TASKPRIORITY",
+                    "TWALENG",
+                    "USERID",
+                ]
+                .map(|name| (name.into(), argument(b"OUT"))),
+            ),
+            33,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, too_many.clone(), 33),
+                too_many,
+            ),
+            Err(HostProblem::Malformed)
+        );
 
         let inquire = request(
             CicsOperation::Inquire,
@@ -4804,13 +4846,17 @@ mod tests {
                 ("APPLICATION".into(), argument(b"APPLICATION-OUT")),
                 ("APPLID".into(), argument(b"APP-OUT")),
                 ("CHANNEL".into(), argument(b"CHANNEL-OUT")),
+                ("CWALENG".into(), argument(b"CWA-LENGTH-OUT")),
                 ("MAJORVERSION".into(), argument(b"MAJOR-OUT")),
                 ("MICROVERSION".into(), argument(b"MICRO-OUT")),
                 ("MINORVERSION".into(), argument(b"MINOR-OUT")),
                 ("OPERATION".into(), argument(b"OPERATION-OUT")),
+                ("OPERKEYS".into(), argument(b"OPERKEYS-OUT")),
                 ("PLATFORM".into(), argument(b"PLATFORM-OUT")),
+                ("RESTART".into(), argument(b"RESTART-OUT")),
                 ("SYSID".into(), argument(b"SYS-OUT")),
                 ("TASKPRIORITY".into(), argument(b"PRIORITY-OUT")),
+                ("TWALENG".into(), argument(b"TWA-LENGTH-OUT")),
                 ("USERID".into(), argument(b"USER-OUT")),
             ]),
             1,
@@ -4822,13 +4868,17 @@ mod tests {
         assert_eq!(response.outputs["APPLICATION"].bytes(), &[b' '; 64]);
         assert_eq!(response.outputs["APPLID"].bytes(), b"ME01");
         assert_eq!(response.outputs["CHANNEL"].bytes(), &[b' '; 16]);
+        assert_eq!(response.outputs["CWALENG"].bytes(), b"0");
         for name in ["MAJORVERSION", "MICROVERSION", "MINORVERSION"] {
             assert_eq!(response.outputs[name].bytes(), b"-1");
         }
         assert_eq!(response.outputs["OPERATION"].bytes(), &[b' '; 64]);
+        assert_eq!(response.outputs["OPERKEYS"].bytes(), &[0; 8]);
         assert_eq!(response.outputs["PLATFORM"].bytes(), &[b' '; 64]);
+        assert_eq!(response.outputs["RESTART"].bytes(), &[0]);
         assert_eq!(response.outputs["SYSID"].bytes(), b"S001");
         assert_eq!(response.outputs["TASKPRIORITY"].bytes(), b"0");
+        assert_eq!(response.outputs["TWALENG"].bytes(), b"0");
         assert_eq!(response.outputs["USERID"].bytes(), b"IBMUSER");
     }
 

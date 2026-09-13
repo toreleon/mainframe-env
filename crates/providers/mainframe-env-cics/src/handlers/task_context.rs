@@ -51,6 +51,16 @@ pub(in crate::service) fn assign(
             response.outputs.insert(name.into(), decimal_payload(-1)?);
         }
     }
+    for name in ["CWALENG", "TWALENG"] {
+        if request.arguments.contains_key(name) {
+            response.outputs.insert(name.into(), decimal_payload(0)?);
+        }
+    }
+    for (name, value) in [("OPERKEYS", vec![0; 8]), ("RESTART", vec![0])] {
+        if request.arguments.contains_key(name) {
+            response.outputs.insert(name.into(), bounded(value)?);
+        }
+    }
     Ok(response)
 }
 
@@ -59,26 +69,32 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "APPLICATION",
         "APPLID",
         "CHANNEL",
+        "CWALENG",
         "MAJORVERSION",
         "MICROVERSION",
         "MINORVERSION",
         "OPTION.NOHANDLE",
         "OPERATION",
+        "OPERKEYS",
         "PLATFORM",
         "RESP",
         "RESP2",
+        "RESTART",
         "SYSID",
         "TASKPRIORITY",
+        "TWALENG",
         "USERID",
     ];
-    if request.arguments.iter().any(|(name, value)| {
-        !allowed.contains(&name.as_str())
-            || if name == "OPTION.NOHANDLE" {
-                value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
-            } else {
-                value.schema() != "mainframe-env.cics.argument@1"
-            }
-    }) {
+    if request.arguments.len() > 16
+        || request.arguments.iter().any(|(name, value)| {
+            !allowed.contains(&name.as_str())
+                || if name == "OPTION.NOHANDLE" {
+                    value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+                } else {
+                    value.schema() != "mainframe-env.cics.argument@1"
+                }
+        })
+    {
         return Err(HostProblem::Malformed);
     }
     Ok(())

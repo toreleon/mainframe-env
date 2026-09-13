@@ -9735,7 +9735,7 @@ mod tests {
     #[test]
     fn online_task_scheduling_yields_once_and_retains_changed_priority() {
         let limits = SourceLimits::default();
-        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. SCHEDULE.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PRIORITY-X PIC S9(4) COMP VALUE 200.\n01 OBSERVED-PRIORITY PIC S9(4) COMP.\n01 APPLICATION-X PIC X(64).\n01 APPL-X PIC X(8).\n01 CHANNEL-X PIC X(16).\n01 MAJOR-X PIC S9(9) COMP.\n01 MICRO-X PIC S9(9) COMP.\n01 MINOR-X PIC S9(9) COMP.\n01 OPERATION-X PIC X(64).\n01 PLATFORM-X PIC X(64).\n01 SYS-X PIC X(4).\n01 USER-X PIC X(8).\n01 ASSIGN-FN PIC X(2).\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS CHANGE TASK PRIORITY(PRIORITY-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS ASSIGN APPLICATION(APPLICATION-X) APPLID(APPL-X) CHANNEL(CHANNEL-X) MAJORVERSION(MAJOR-X) MICROVERSION(MICRO-X) MINORVERSION(MINOR-X) OPERATION(OPERATION-X) PLATFORM(PLATFORM-X) SYSID(SYS-X) TASKPRIORITY(OBSERVED-PRIORITY) USERID(USER-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO ASSIGN-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. SCHEDULE.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PRIORITY-X PIC S9(4) COMP VALUE 200.\n01 OBSERVED-PRIORITY PIC S9(4) COMP.\n01 APPLICATION-X PIC X(64).\n01 APPL-X PIC X(8).\n01 CHANNEL-X PIC X(16).\n01 CWA-LENGTH-X PIC S9(4) COMP.\n01 MAJOR-X PIC S9(9) COMP.\n01 MICRO-X PIC S9(9) COMP.\n01 MINOR-X PIC S9(9) COMP.\n01 OPERATION-X PIC X(64).\n01 OPERKEYS-X PIC X(8).\n01 PLATFORM-X PIC X(64).\n01 RESTART-X PIC X.\n01 SYS-X PIC X(4).\n01 TWA-LENGTH-X PIC S9(4) COMP.\n01 USER-X PIC X(8).\n01 ASSIGN-FN PIC X(2).\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS CHANGE TASK PRIORITY(PRIORITY-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS ASSIGN APPLICATION(APPLICATION-X) APPLID(APPL-X) CHANNEL(CHANNEL-X) MAJORVERSION(MAJOR-X) MICROVERSION(MICRO-X) MINORVERSION(MINOR-X) OPERATION(OPERATION-X) PLATFORM(PLATFORM-X) SYSID(SYS-X) TASKPRIORITY(OBSERVED-PRIORITY) USERID(USER-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS ASSIGN CWALENG(CWA-LENGTH-X) OPERKEYS(OPERKEYS-X) RESTART(RESTART-X) TWALENG(TWA-LENGTH-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO ASSIGN-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
         let path = LogicalPath::new("SCHEDULE.cbl", limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
             &path,
@@ -9904,6 +9904,7 @@ mod tests {
         );
         assert_eq!(restored.variable("APPL-X").unwrap().bytes(), b"ME01    ");
         assert_eq!(restored.variable("CHANNEL-X").unwrap().bytes(), &[b' '; 16]);
+        assert_eq!(restored.variable("CWA-LENGTH-X").unwrap().bytes(), &[0; 2]);
         assert_eq!(restored.variable("MAJOR-X").unwrap().bytes(), &[0xff; 4]);
         assert_eq!(restored.variable("MICRO-X").unwrap().bytes(), &[0xff; 4]);
         assert_eq!(restored.variable("MINOR-X").unwrap().bytes(), &[0xff; 4]);
@@ -9911,11 +9912,14 @@ mod tests {
             restored.variable("OPERATION-X").unwrap().bytes(),
             &[b' '; 64]
         );
+        assert_eq!(restored.variable("OPERKEYS-X").unwrap().bytes(), &[0; 8]);
         assert_eq!(
             restored.variable("PLATFORM-X").unwrap().bytes(),
             &[b' '; 64]
         );
+        assert_eq!(restored.variable("RESTART-X").unwrap().bytes(), &[0]);
         assert_eq!(restored.variable("SYS-X").unwrap().bytes(), b"S001");
+        assert_eq!(restored.variable("TWA-LENGTH-X").unwrap().bytes(), &[0; 2]);
         assert_eq!(restored.variable("USER-X").unwrap().bytes(), b"IBMUSER ");
         assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0; 4]);
         assert_eq!(restored.variable("RESP2-X").unwrap().bytes(), &[0; 4]);
@@ -9952,6 +9956,7 @@ mod tests {
                 (1, mainframe_env_execution_api::AuditDecision::Success),
                 (2, mainframe_env_execution_api::AuditDecision::Success),
                 (3, mainframe_env_execution_api::AuditDecision::Success),
+                (4, mainframe_env_execution_api::AuditDecision::Success),
             ]
         );
     }

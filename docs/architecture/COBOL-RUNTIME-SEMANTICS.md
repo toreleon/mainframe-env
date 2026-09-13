@@ -62,11 +62,13 @@ contract explicitly permits it.
   current TASKPRIORITY from owned invocation context. Because no CICS
   application, platform, operation, version, or channel context is currently
   bound, their source-defined absence values are returned as fixed blanks or
-  fullword `-1`; product installation names are not reinterpreted as IBM
-  application context. Output references resolve before dispatch, and numeric
-  fields require their exact halfword/fullword binary shapes. Other source-valid
-  ASSIGN options remain rejected until their terminal, program-level, or
-  failure context has an owned runtime representation.
+  fullword `-1`; absent CWA/TWA lengths are zero, compatibility OPERKEYS are
+  eight null bytes, and unsupported emergency task restart remains `X'00'`.
+  Product installation names are not reinterpreted as IBM application context.
+  Output references resolve before dispatch, numeric and fixed binary fields
+  require their exact shapes, and no command can exceed IBM's 16-option limit.
+  Other source-valid ASSIGN options remain rejected until their terminal,
+  program-level, or failure context has an owned runtime representation.
 - Terminal execution outcomes carry an explicit transaction-dump disposition.
   CICS ABEND results translate the provider's typed `ABEND.DUMP` metadata to
   requested or suppressed while retained responses from before that metadata

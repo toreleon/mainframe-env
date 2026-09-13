@@ -18,6 +18,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 type Clauses = BTreeMap<String, Vec<String>>;
 
+mod assign_validation;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) struct CicsLegacySpiCompatibilityDescriptor {
     pub(super) official_row: &'static str,
@@ -449,41 +451,7 @@ fn validate_candidate(
     }
 
     if descriptor.runtime_operation == Some("Assign") {
-        for name in [
-            "APPLICATION",
-            "APPLID",
-            "CHANNEL",
-            "MAJORVERSION",
-            "MICROVERSION",
-            "MINORVERSION",
-            "OPERATION",
-            "PLATFORM",
-            "SYSID",
-            "TASKPRIORITY",
-            "USERID",
-        ] {
-            let Some(value) = clauses.get(name) else {
-                continue;
-            };
-            let target = complete_data_reference(value, semantic).map_err(|_| {
-                format!("CICS ASSIGN option {name} requires one writable data area")
-            })?;
-            require_writable(&target).map_err(|_| {
-                format!("CICS ASSIGN option {name} requires one writable data area")
-            })?;
-            if name == "TASKPRIORITY"
-                && (target.usage != CobolUsage::Binary || target.length != 2 || target.scale != 0)
-            {
-                return Err("CICS ASSIGN TASKPRIORITY requires a halfword binary data area".into());
-            }
-            if matches!(name, "MAJORVERSION" | "MICROVERSION" | "MINORVERSION")
-                && (target.usage != CobolUsage::Binary || target.length != 4 || target.scale != 0)
-            {
-                return Err(format!(
-                    "CICS ASSIGN {name} requires a fullword binary data area"
-                ));
-            }
-        }
+        assign_validation::validate(clauses, present, semantic)?;
     }
 
     if let Some(name) = descriptor

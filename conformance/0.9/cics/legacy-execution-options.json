@@ -17,7 +17,7 @@
     {
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0011",
       "runtime_operation": "Assign",
-      "execution_options": ["APPLICATION", "APPLID", "CHANNEL", "MAJORVERSION", "MICROVERSION", "MINORVERSION", "NOHANDLE", "OPERATION", "PLATFORM", "RESP", "RESP2", "SYSID", "TASKPRIORITY", "USERID"]
+      "execution_options": ["APPLICATION", "APPLID", "CHANNEL", "CWALENG", "MAJORVERSION", "MICROVERSION", "MINORVERSION", "NOHANDLE", "OPERATION", "OPERKEYS", "PLATFORM", "RESP", "RESP2", "RESTART", "SYSID", "TASKPRIORITY", "TWALENG", "USERID"]
     },
     {
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0040",
