@@ -21,6 +21,7 @@ pub enum CicsOperation {
     EndBrowse,
     FormatTime,
     HandleAbend,
+    /// Install or deactivate one bounded set of reviewed condition handlers.
     HandleCondition,
     /// Ignore one bounded set of reviewed EIBRESP conditions for this program level.
     IgnoreCondition,

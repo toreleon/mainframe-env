@@ -150,6 +150,7 @@ pub enum HirCicsOperation {
     ChangeTask,
     Deq,
     Enq,
+    HandleCondition,
     IgnoreCondition,
     PopHandle,
     PushHandle,
@@ -175,6 +176,7 @@ pub enum HirCicsOperandName {
     SetPointer,
     UsingAddress,
     UsingPointer,
+    /// Canonical condition specifications for HANDLE or IGNORE.
     Conditions,
 }
 
@@ -2209,7 +2211,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 20);
+        assert_eq!(legacy.len(), 19);
         assert!(
             legacy.iter().all(|descriptor| {
                 descriptor.advertised && descriptor.runtime_operation.is_some()
@@ -2218,7 +2220,12 @@ mod tests {
         assert!(legacy.iter().all(|descriptor| {
             !matches!(
                 descriptor.label_tokens,
-                ["DEQ"] | ["ENQ"] | ["READ"] | ["REWRITE"] | ["SYNCPOINT"]
+                ["DEQ"]
+                    | ["ENQ"]
+                    | ["HANDLE", "CONDITION"]
+                    | ["READ"]
+                    | ["REWRITE"]
+                    | ["SYNCPOINT"]
             )
         }));
     }
@@ -2453,9 +2460,19 @@ mod tests {
         let statement = hir
             .statements
             .iter()
-            .find(|statement| statement.kind == StatementKind::ExecCics)
-            .expect("EXEC CICS statement");
-        assert!(statement.resolved.is_none());
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed HANDLE CONDITION");
+        assert_eq!(statement.operation, HirCicsOperation::HandleCondition);
+        assert_eq!(
+            statement.operands,
+            vec![HirCicsNamedOperand {
+                name: HirCicsOperandName::Conditions,
+                value: HirCicsValue::Literal("ERROR\tERR-HANDLER\nLENGERR\t".into()),
+            }]
+        );
 
         let ignore = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSIGN. PROCEDURE DIVISION. EXEC CICS IGNORE CONDITION ERROR LENGERR END-EXEC. STOP RUN.",

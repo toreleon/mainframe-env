@@ -52,7 +52,7 @@ pub(crate) fn respond(
                     None,
                     Vec::new(),
                 )
-            } else if name == "ENQBUSY" {
+            } else if name == "ENQBUSY" || run.ignored_conditions.contains("ERROR") {
                 service.response(
                     run,
                     CicsDisposition::Ignored,
@@ -60,6 +60,17 @@ pub(crate) fn respond(
                     response,
                     response2,
                     None,
+                    None,
+                    Vec::new(),
+                )
+            } else if let Some(target) = run.handlers.get("ERROR") {
+                service.response(
+                    run,
+                    CicsDisposition::Handler,
+                    name,
+                    response,
+                    response2,
+                    Some(target.clone()),
                     None,
                     Vec::new(),
                 )

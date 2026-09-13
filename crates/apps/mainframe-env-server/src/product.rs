@@ -10614,6 +10614,149 @@ mod tests {
     }
 
     #[test]
+    fn online_handle_condition_routes_multiple_and_deactivates_specific_exit() {
+        let limits = SourceLimits::default();
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. HCOND.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 FIRST-FN PIC X(2).\n01 SECOND-FN PIC X(2).\n01 FIRST-RESP PIC S9(9) COMP.\n01 SECOND-RESP PIC S9(9) COMP.\n01 SPECIFIC-HIT PIC 9 VALUE 0.\n01 GENERAL-HIT PIC 9 VALUE 0.\n01 UNEXPECTED-HIT PIC 9 VALUE 0.\nPROCEDURE DIVISION.\nEXEC CICS HANDLE CONDITION ERROR(GENERAL-HANDLER) INVREQ(SPECIFIC-HANDLER) LENGERR END-EXEC.\nMOVE EIBFN TO FIRST-FN.\nEXEC CICS POP HANDLE END-EXEC.\nMOVE 9 TO UNEXPECTED-HIT.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\nSPECIFIC-HANDLER.\nMOVE 1 TO SPECIFIC-HIT.\nMOVE EIBRESP TO FIRST-RESP.\nEXEC CICS HANDLE CONDITION INVREQ END-EXEC.\nMOVE EIBFN TO SECOND-FN.\nEXEC CICS POP HANDLE END-EXEC.\nMOVE 9 TO UNEXPECTED-HIT.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\nGENERAL-HANDLER.\nMOVE 1 TO GENERAL-HIT.\nMOVE EIBRESP TO SECOND-RESP.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let path = LogicalPath::new("HCOND.cbl", limits.max_path_bytes).unwrap();
+        let bundle = SourceBundle::new(
+            &path,
+            vec![
+                SourceFile::input(
+                    "HCOND.cbl",
+                    source.to_vec(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("HANDLE CONDITION fixture did not publish");
+        };
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "HCOND".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("HC00".into(), "HCOND".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "HCOND".into(),
+                    map: "HCOND".into(),
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("handle-condition", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "HC00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "HC00",
+                24,
+                80,
+                "handle-condition-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "HCOND", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "HCOND", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(
+            restored.variable("FIRST-FN").unwrap().bytes(),
+            &[0x02, 0x04]
+        );
+        assert_eq!(
+            restored.variable("SECOND-FN").unwrap().bytes(),
+            &[0x02, 0x04]
+        );
+        assert_eq!(
+            restored.variable("FIRST-RESP").unwrap().bytes(),
+            &[0, 0, 0, 16]
+        );
+        assert_eq!(
+            restored.variable("SECOND-RESP").unwrap().bytes(),
+            &[0, 0, 0, 16]
+        );
+        assert_eq!(restored.variable("SPECIFIC-HIT").unwrap().bytes(), b"1");
+        assert_eq!(restored.variable("GENERAL-HIT").unwrap().bytes(), b"1");
+        assert_eq!(restored.variable("UNEXPECTED-HIT").unwrap().bytes(), b"0");
+        assert_eq!(
+            server
+                .store
+                .audit_records(&invocation.execution_id, 1, 32)
+                .unwrap()
+                .into_iter()
+                .filter(|record| record.capability.as_str() == "host.cics.execute")
+                .map(|record| (record.effect_sequence, record.decision))
+                .collect::<Vec<_>>(),
+            (1..=5)
+                .map(|sequence| {
+                    (
+                        sequence,
+                        mainframe_env_execution_api::AuditDecision::Success,
+                    )
+                })
+                .collect::<Vec<_>>()
+        );
+        server
+            .run_online_exchange(&session, &principal, "HCOND", 3)
+            .unwrap();
+        assert!(server.online_exchange(&session).unwrap().is_none());
+    }
+
+    #[test]
     fn online_enqueue_wait_remains_durably_resumable_until_dequeue() {
         let limits = SourceLimits::default();
         let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. WAITENQ.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 LOCK-NAME PIC X(4) VALUE 'LOCK'.\nPROCEDURE DIVISION.\nEXEC CICS ENQ RESOURCE(LOCK-NAME) LENGTH(4) UOW END-EXEC.\nDISPLAY 'ACQUIRED'.\nSTOP RUN.\n";

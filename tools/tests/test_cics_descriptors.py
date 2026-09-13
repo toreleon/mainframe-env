@@ -151,8 +151,8 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertEqual(contracts["coverage_credit"], 0)
         self.assertEqual(contracts["semantic_credit"], 0)
         self.assertEqual(contracts["counts"]["runtime_backed_commands"], 32)
-        self.assertEqual(contracts["counts"]["typed_runtime_commands"], 12)
-        self.assertEqual(contracts["counts"]["legacy_compatibility_commands"], 20)
+        self.assertEqual(contracts["counts"]["typed_runtime_commands"], 13)
+        self.assertEqual(contracts["counts"]["legacy_compatibility_commands"], 19)
         self.assertEqual(contracts["counts"]["advertised_commands"], 32)
         contract_rows = [
             command for batch in contracts["batches"] for command in batch["commands"]
@@ -192,8 +192,8 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertIn("CICS_APPLICATION_REGISTRY_FROZEN", ir_registry)
         self.assertIn("CICS_APPLICATION_REGISTRY_SHA256", ir_registry)
         self.assertEqual(contracts["registry"]["shape_commands"], 263)
-        self.assertEqual(contracts["registry"]["typed_handlers"], 12)
-        self.assertEqual(contracts["registry"]["legacy_compatibility_handlers"], 20)
+        self.assertEqual(contracts["registry"]["typed_handlers"], 13)
+        self.assertEqual(contracts["registry"]["legacy_compatibility_handlers"], 19)
         self.assertEqual(contracts["registry"]["advertised_commands"], 32)
         self.assertEqual(contracts["registry"]["unready_handlers"], 231)
         self.assertIsNone(contracts["registry"]["default_handler"])
@@ -498,7 +498,7 @@ class CicsDescriptorTests(unittest.TestCase):
             for operation in catalog["_runtime_operations"]
             if operation["legacy_execution_options"]
         ]
-        self.assertEqual(len(legacy), 20)
+        self.assertEqual(len(legacy), 19)
         self.assertTrue(
             all(
                 operation["interface"] == "api"
@@ -587,9 +587,9 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertTrue(all(":api-commands:" in row["official_row"] for row in rows))
         self.assertFalse(any(":spi-" in row["official_row"] for row in rows))
         self.assertFalse(any(":fepi-" in row["official_row"] for row in rows))
-        self.assertEqual(sum(row["readiness"] == "typed-runtime" for row in registry), 12)
+        self.assertEqual(sum(row["readiness"] == "typed-runtime" for row in registry), 13)
         self.assertEqual(
-            sum(row["readiness"] == "legacy-compatibility" for row in registry), 20
+            sum(row["readiness"] == "legacy-compatibility" for row in registry), 19
         )
         self.assertEqual(sum(row["advertised"] for row in registry), 32)
         self.assertEqual(sum(row["readiness"] == "unready" for row in registry), 231)
@@ -600,7 +600,7 @@ class CicsDescriptorTests(unittest.TestCase):
             sum(row["contract"]["effect"]["mutating"] is True for row in rows),
         )
         self.assertEqual(contracts["participant_contract"]["mutating_rows"], 5)
-        self.assertEqual(contracts["participant_contract"]["bounded_effect_rows"], 251)
+        self.assertEqual(contracts["participant_contract"]["bounded_effect_rows"], 250)
         self.assertEqual(contracts["participant_contract"]["explicit_uow_boundary_rows"], 1)
         self.assertFalse(
             contracts["participant_contract"]["unknown_outcome"]["automatic_redispatch"]
@@ -734,6 +734,7 @@ class CicsDescriptorTests(unittest.TestCase):
                 "memory-write",
                 "condition",
             },
+            "HANDLE CONDITION": {"memory-read", "memory-write", "condition"},
         }
         for label, typed_effects in expected_typed.items():
             effects = set(rows[label]["contract"]["effect"]["ir_effects"])
@@ -760,7 +761,7 @@ class CicsDescriptorTests(unittest.TestCase):
             ],
         )
 
-        for label in ("HANDLE ABEND", "HANDLE CONDITION", "ENDBR", "STARTBR"):
+        for label in ("HANDLE ABEND", "ENDBR", "STARTBR"):
             contract = rows[label]["contract"]
             self.assertEqual(contract["effect"]["status"], "bounded-ambiguity")
             self.assertIsNone(contract["effect"]["mutating"])
@@ -774,7 +775,7 @@ class CicsDescriptorTests(unittest.TestCase):
         ]
         self.assertEqual(
             sum("memory-read" in row["contract"]["effect"]["ir_effects"] for row in ready),
-            24,
+            25,
         )
         self.assertEqual(
             sum("memory-write" in row["contract"]["effect"]["ir_effects"] for row in ready),
@@ -902,6 +903,7 @@ class CicsDescriptorTests(unittest.TestCase):
                 "CHANGE TASK",
                 "DEQ",
                 "ENQ",
+                "HANDLE CONDITION",
                 "IGNORE CONDITION",
                 "POP HANDLE",
                 "PUSH HANDLE",

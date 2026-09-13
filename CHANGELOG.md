@@ -81,6 +81,10 @@ All notable changes to mainframe-env are documented here.
   Ignored failures continue with the EIB set, HANDLE CONDITION overrides the
   matching ignore, PUSH/POP preserves it, and hostile lists fail before task
   state changes.
+- Promoted CICS `HANDLE CONDITION` to typed execution for 1–16 generated
+  EIBRESP names. One command atomically installs or deactivates every selected
+  handler, specific actions precede generalized `ERROR`, and canonical or
+  legacy duplicates and malformed labels fail before task state changes.
 - Added the frozen-with-bounded-ambiguities CIC-901 command contract and generated
   263-row compiler registry. The registry explicitly separates three typed runtime
   handlers, 20 legacy compatibility handlers, and 240 unready handlers; automatic

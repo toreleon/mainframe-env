@@ -4466,6 +4466,20 @@ mod tests {
         .unwrap()
     }
 
+    fn condition_handlers(entries: &[(&str, &str)]) -> BoundedPayload {
+        BoundedPayload::new(
+            "mainframe-env.cics.condition-handlers@1",
+            entries
+                .iter()
+                .map(|(name, label)| format!("{name}\t{label}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+                .into_bytes(),
+            InvocationLimits::default(),
+        )
+        .unwrap()
+    }
+
     fn task_value(value: &[u8]) -> BoundedPayload {
         BoundedPayload::new(
             "mainframe-env.cics.storage-value@1",
@@ -5601,6 +5615,149 @@ mod tests {
                 Err(HostProblem::Malformed)
             );
         }
+    }
+
+    #[test]
+    fn handle_condition_applies_multiple_handlers_deactivation_and_error_fallback_atomically() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+        let invoke = |operation, arguments, sequence| {
+            let request = request(operation, arguments, sequence);
+            service.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), sequence),
+                request,
+            )
+        };
+        invoke(
+            CicsOperation::IgnoreCondition,
+            BTreeMap::from([("CONDITIONS".into(), condition_list(&["INVREQ", "LENGERR"]))]),
+            1,
+        )
+        .unwrap();
+        invoke(
+            CicsOperation::HandleCondition,
+            BTreeMap::from([(
+                "CONDITIONS".into(),
+                condition_handlers(&[
+                    ("ERROR", "GENERAL-HANDLER"),
+                    ("INVREQ", "SPECIFIC-HANDLER"),
+                    ("LENGERR", ""),
+                ]),
+            )]),
+            2,
+        )
+        .unwrap();
+
+        let pop = invoke(CicsOperation::PopHandle, BTreeMap::new(), 3).unwrap();
+        assert_eq!(
+            (
+                pop.disposition,
+                pop.condition.as_str(),
+                pop.target.as_deref()
+            ),
+            (CicsDisposition::Handler, "INVREQ", Some("SPECIFIC-HANDLER"))
+        );
+
+        let length_error = invoke(
+            CicsOperation::Enq,
+            BTreeMap::from([
+                ("RESOURCE".into(), enqueue_value(b"LOCK")),
+                ("LENGTH".into(), cics_decimal(0)),
+            ]),
+            4,
+        )
+        .unwrap();
+        assert_eq!(
+            (
+                length_error.disposition,
+                length_error.condition.as_str(),
+                length_error.response,
+                length_error.response2,
+                length_error.target.as_deref(),
+            ),
+            (
+                CicsDisposition::Handler,
+                "LENGERR",
+                22,
+                1,
+                Some("GENERAL-HANDLER"),
+            )
+        );
+
+        let invalid_service = CicsService::open(
+            authorities(),
+            Arc::new(MemoryStore::new(Default::default())),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        let (invalid_invocation, _) = registered(&invalid_service);
+        let seventeen = crate::generated::CICS_CONDITION_NAMES[..17]
+            .iter()
+            .map(|name| format!("{name}\t"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        for (sequence, schema, value) in [
+            (1, "mainframe-env.cics.condition-handlers@1", ""),
+            (2, "mainframe-env.cics.condition-handlers@1", "ERROR"),
+            (
+                3,
+                "mainframe-env.cics.condition-handlers@1",
+                "ERROR\tONE\nERROR\tTWO",
+            ),
+            (
+                4,
+                "mainframe-env.cics.condition-handlers@1",
+                "MADEUP\tHANDLER",
+            ),
+            (
+                5,
+                "mainframe-env.cics.condition-handlers@1",
+                "LENGERR\tTWO\nERROR\tONE",
+            ),
+            (
+                6,
+                "mainframe-env.cics.condition-handlers@1",
+                "ERROR\tlower-case",
+            ),
+            (7, "mainframe-env.cics.condition-handlers@1", &seventeen),
+            (8, "mainframe-env.cics.literal@1", "ERROR\tHANDLER"),
+        ] {
+            let malformed = request(
+                CicsOperation::HandleCondition,
+                BTreeMap::from([(
+                    "CONDITIONS".into(),
+                    BoundedPayload::new(
+                        schema,
+                        value.as_bytes().to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                )]),
+                sequence,
+            );
+            assert_eq!(
+                invalid_service.invoke(
+                    &effect(&invalid_invocation.run_unit_id, malformed.clone(), sequence,),
+                    malformed,
+                ),
+                Err(HostProblem::Malformed)
+            );
+        }
+        let duplicate_legacy = request(
+            CicsOperation::HandleCondition,
+            BTreeMap::from([
+                ("INVREQ".into(), argument(b"ONE")),
+                ("invreq".into(), argument(b"TWO")),
+            ]),
+            9,
+        );
+        assert_eq!(
+            invalid_service.invoke(
+                &effect(&invalid_invocation.run_unit_id, duplicate_legacy.clone(), 9),
+                duplicate_legacy,
+            ),
+            Err(HostProblem::Malformed)
+        );
     }
 
     #[test]

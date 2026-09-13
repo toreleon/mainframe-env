@@ -92,6 +92,16 @@ condition returns the ignored disposition so execution continues after EIB
 state is updated. HANDLE CONDITION for the same name removes that ignore, and
 the ignored set participates in the same PUSH/POP snapshot as label handlers.
 
+CICS HANDLE CONDITION carries one canonical `mainframe-env.cics.condition-handlers@1`
+payload containing 1–16 strictly name-ordered records. Each record is a reviewed
+EIBRESP name, a tab, and its optional COBOL label; an empty label deactivates
+the condition-specific handler and restores the default action. The complete
+payload is validated before any state changes. A labeled condition removes a
+matching ignore and replaces the prior handler. If an otherwise unhandled
+condition has a terminating default action, the generalized `ERROR` ignore or
+handler applies after the specific condition action and before abnormal
+termination.
+
 `CALL`, `INVOKE`, and LE callable services resolve through versioned typed ABI
 catalog entries. Names choose a registered program only after the ABI identity
 is known; no copybook, application, or program-name special case selects host

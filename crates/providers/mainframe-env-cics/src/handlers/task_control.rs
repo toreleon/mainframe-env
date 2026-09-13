@@ -572,19 +572,15 @@ fn handle_condition(
     run: &mut Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
-    let (condition, label) = request
-        .arguments
-        .iter()
-        .find(|(name, _)| !name.starts_with("OPTION."))
-        .map(|(name, value)| {
-            (
-                name.to_ascii_uppercase(),
-                String::from_utf8_lossy(value.bytes()).into_owned(),
-            )
-        })
-        .ok_or(HostProblem::Malformed)?;
-    run.ignored_conditions.remove(&condition);
-    run.handlers.insert(condition, label);
+    let handlers = condition_handlers(request)?;
+    for (condition, label) in handlers {
+        run.ignored_conditions.remove(&condition);
+        if label.is_empty() {
+            run.handlers.remove(&condition);
+        } else {
+            run.handlers.insert(condition, label);
+        }
+    }
     service.response(
         run,
         CicsDisposition::Complete,
@@ -595,6 +591,86 @@ fn handle_condition(
         None,
         Vec::new(),
     )
+}
+
+fn condition_handlers(request: &CicsRequest) -> Result<Vec<(String, String)>, HostProblem> {
+    if let Some(value) = request.arguments.get("CONDITIONS") {
+        let allowed = ["CONDITIONS", "OPTION.NOHANDLE", "RESP", "RESP2"];
+        if request.arguments.iter().any(|(name, value)| {
+            !allowed.contains(&name.as_str())
+                || name.starts_with("OPTION.") && !value.bytes().is_empty()
+        }) || value.schema() != "mainframe-env.cics.condition-handlers@1"
+        {
+            return Err(HostProblem::Malformed);
+        }
+        return parse_condition_handlers(value.bytes());
+    }
+
+    let mut names = BTreeSet::new();
+    let mut handlers: Vec<(String, String)> = Vec::new();
+    for (name, value) in &request.arguments {
+        if name.starts_with("OPTION.") {
+            if name != "OPTION.NOHANDLE" || !value.bytes().is_empty() {
+                return Err(HostProblem::Malformed);
+            }
+            continue;
+        }
+        if matches!(name.as_str(), "RESP" | "RESP2") {
+            continue;
+        }
+        let condition = name.to_ascii_uppercase();
+        if CICS_CONDITION_NAMES
+            .binary_search(&condition.as_str())
+            .is_err()
+            || !names.insert(condition.clone())
+            || value.schema() != "mainframe-env.cics.argument@1"
+        {
+            return Err(HostProblem::Malformed);
+        }
+        let label = std::str::from_utf8(value.bytes()).map_err(|_| HostProblem::Malformed)?;
+        if !valid_condition_label(label) {
+            return Err(HostProblem::Malformed);
+        }
+        handlers.push((condition, label.into()));
+    }
+    if matches!(handlers.len(), 1..=16) {
+        Ok(handlers)
+    } else {
+        Err(HostProblem::Malformed)
+    }
+}
+
+fn parse_condition_handlers(bytes: &[u8]) -> Result<Vec<(String, String)>, HostProblem> {
+    let text = std::str::from_utf8(bytes).map_err(|_| HostProblem::Malformed)?;
+    let mut names = BTreeSet::new();
+    let mut handlers: Vec<(String, String)> = Vec::new();
+    for entry in text.split('\n') {
+        let (name, label) = entry.split_once('\t').ok_or(HostProblem::Malformed)?;
+        if CICS_CONDITION_NAMES.binary_search(&name).is_err()
+            || !names.insert(name)
+            || !valid_condition_label(label)
+        {
+            return Err(HostProblem::Malformed);
+        }
+        handlers.push((name.into(), label.into()));
+    }
+    if matches!(handlers.len(), 1..=16)
+        && handlers
+            .windows(2)
+            .all(|pair| pair[0].0.as_str() < pair[1].0.as_str())
+    {
+        Ok(handlers)
+    } else {
+        Err(HostProblem::Malformed)
+    }
+}
+
+fn valid_condition_label(label: &str) -> bool {
+    label.len() <= InvocationLimits::default().max_identity_bytes
+        && (label.is_empty()
+            || label
+                .bytes()
+                .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'-'))
 }
 
 fn ignore_condition(
@@ -804,6 +880,12 @@ fn pop_handle_invreq(
             CicsDisposition::Handler,
             run.handlers.get("INVREQ").cloned(),
         ),
+        CicsConditionPolicy::Default if run.ignored_conditions.contains("ERROR") => {
+            (CicsDisposition::Ignored, None)
+        }
+        CicsConditionPolicy::Default if run.handlers.contains_key("ERROR") => {
+            (CicsDisposition::Handler, run.handlers.get("ERROR").cloned())
+        }
         CicsConditionPolicy::Default if run.abend_handler.is_some() => {
             let handler = run.abend_handler.take();
             run.cancelled_abend_handler.clone_from(&handler);

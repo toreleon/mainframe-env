@@ -40,11 +40,6 @@
       "execution_options": ["CANCEL", "LABEL", "NOHANDLE", "RESET", "RESP", "RESP2"]
     },
     {
-      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0099",
-      "runtime_operation": "HandleCondition",
-      "execution_options": ["NOHANDLE", "RESP", "RESP2"]
-    },
-    {
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0138",
       "runtime_operation": "Link",
       "execution_options": ["COMMAREA", "NOHANDLE", "PROGRAM", "RESP", "RESP2"]

@@ -255,6 +255,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::Suspend => CicsPlanOperation::Suspend,
         HirCicsOperation::Deq => CicsPlanOperation::Deq,
         HirCicsOperation::Enq => CicsPlanOperation::Enq,
+        HirCicsOperation::HandleCondition => CicsPlanOperation::HandleCondition,
         HirCicsOperation::IgnoreCondition => CicsPlanOperation::IgnoreCondition,
         HirCicsOperation::PopHandle => CicsPlanOperation::PopHandle,
         HirCicsOperation::PushHandle => CicsPlanOperation::PushHandle,
