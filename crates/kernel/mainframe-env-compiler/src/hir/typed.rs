@@ -2123,6 +2123,11 @@ mod tests {
                 "ACQUIRE ACTIVITYID('A1') PROCESSTYPE('PTYPE')",
                 "ACQUIRE ACTIVITYID has unknown or unreviewed top-level option PROCESSTYPE",
             ),
+            (
+                "ENQ RESOURCE('LOCK') UOW TASK",
+                "options TASK, UOW are mutually exclusive",
+            ),
+            ("DEQ UOW", "DEQ requires option RESOURCE"),
         ];
         for (command, expected) in cases {
             let source = format!(
@@ -2156,13 +2161,20 @@ mod tests {
 
     #[test]
     fn catalog_known_unready_cics_command_fails_before_legacy_lowering() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSWAIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X PIC X(8). PROCEDURE DIVISION. EXEC CICS ADDRESS SET(PTR-X) END-EXEC. STOP RUN.";
-        let analysis = analyze(source);
-        assert!(analysis.hir.is_none());
-        assert!(analysis.diagnostics.iter().any(|diagnostic| {
-            let message = diagnostic.public_message();
-            message.contains("ADDRESS SET") && message.contains("handler is unready")
-        }));
+        for (command, label) in [
+            ("ADDRESS SET(PTR-X)", "ADDRESS SET"),
+            ("ENQ RESOURCE('LOCK') MAXLIFETIME('UOW') NOSUSPEND", "ENQ"),
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSWAIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            assert!(analysis.hir.is_none());
+            assert!(analysis.diagnostics.iter().any(|diagnostic| {
+                let message = diagnostic.public_message();
+                message.contains(label) && message.contains("handler is unready")
+            }));
+        }
     }
 
     #[test]

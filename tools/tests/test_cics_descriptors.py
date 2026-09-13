@@ -519,6 +519,28 @@ class CicsDescriptorTests(unittest.TestCase):
                 operation["legacy_execution_options"],
             )
 
+    def test_enqueue_lifetime_forms_are_normalized_from_the_verified_syntax(self):
+        contracts = cics_descriptors.build_contracts(ROOT)
+        rows = {
+            command["label"]: command
+            for batch in contracts["batches"]
+            for command in batch["commands"]
+        }
+        for label in ("DEQ", "ENQ"):
+            options = rows[label]["contract"]["options"]
+            entries = {entry["name"]: entry for entry in options["entries"]}
+            self.assertEqual(entries["MAXLIFETIME"]["value_shape"], "value")
+            self.assertEqual(entries["MAXLIFETIME"]["directions"], ["input"])
+            self.assertEqual(entries["RESOURCE"]["directions"], ["input"])
+            self.assertEqual(entries["TASK"]["value_shape"], "flag")
+            self.assertEqual(entries["UOW"]["value_shape"], "flag")
+            self.assertIsNone(entries["LENGTH"]["source_max_value_bytes"])
+            self.assertEqual(options["constraints"]["required"], ["RESOURCE"])
+            self.assertIn(
+                ["MAXLIFETIME", "TASK", "UOW"],
+                options["constraints"]["mutual_exclusions"],
+            )
+
     def test_legacy_execution_options_reject_missing_nonlegacy_and_invalid_entries(self):
         mutations = {
             "missing": lambda routes: routes.pop(),
@@ -773,8 +795,8 @@ class CicsDescriptorTests(unittest.TestCase):
 
         self.assertEqual(exact("ASSIGN"), set())
         self.assertEqual(ambiguous("ASSIGN"), set())
-        self.assertEqual(ambiguous("DEQ"), {"RESOURCE"})
-        self.assertEqual(ambiguous("ENQ"), {"RESOURCE"})
+        self.assertEqual(exact("DEQ"), {"RESOURCE"})
+        self.assertEqual(exact("ENQ"), {"RESOURCE"})
         self.assertEqual(exact("GET COUNTER"), {"COUNTER", "POOL"})
         self.assertEqual(
             exact("TRANSFORM DATATOJSON"),

@@ -102,6 +102,11 @@ All notable changes to mainframe-env are documented here.
   removing a handwritten compiler allowlist and rejecting catalog/runtime
   drift during generation. The move also removed the unreachable `ASSIGN
   TRANSID` entry, which is absent from the pinned application-command syntax.
+- Normalized the verified ENQ/DEQ syntax so direct `UOW` and `TASK` lifetime
+  forms remain distinct flags from `MAXLIFETIME(cvda)`. The generated registry
+  now requires `RESOURCE`, resolves RESOURCE/MAXLIFETIME as inputs, and enforces
+  the three lifetime spellings as mutually exclusive without advertising the
+  still-unimplemented commands.
 - Added a blocking `missing_docs` ratchet for every contract crate, reduced the
   initial execution/store debt, and added runnable lifecycle/store examples.
 - Split Db2, IMS, and MQ durable state into independently versioned object,

@@ -323,6 +323,12 @@ POLICY_BINDINGS = {
 }
 
 TYPED_RUNTIME_OPERATIONS = frozenset({"Read", "Rewrite", "Syncpoint"})
+ENQUEUE_COMMAND_ROWS = frozenset(
+    {
+        f"{OFFICIAL_BASELINE}:api-commands:0050",
+        f"{OFFICIAL_BASELINE}:api-commands:0064",
+    }
+)
 COMPILER_SPI_COMPATIBILITY = {
     "operation": "Inquire",
     "official_row": f"{OFFICIAL_BASELINE}:spi-commands-unique:0155",
@@ -1181,7 +1187,9 @@ def _source_contract_status(dimension: dict[str, Any]) -> str:
     return "pending"
 
 
-def _top_level_source_option_names(dimensions: list[dict[str, Any]]) -> list[str]:
+def _top_level_source_option_names(
+    command: dict[str, Any], dimensions: list[dict[str, Any]]
+) -> list[str]:
     dimension = _source_dimension(dimensions, "option-legality")
     names = {
         _text(value.get("term"), "top-level option term")
@@ -1192,6 +1200,11 @@ def _top_level_source_option_names(dimensions: list[dict[str, Any]]) -> list[str
     }
     if dimension["source_projection_state"] != "source-backed-not-applicable":
         names.update(COMMON_COMMAND_OPTIONS)
+    if (
+        command["official_row"] in ENQUEUE_COMMAND_ROWS
+        and dimension["source_projection_state"] == "projected"
+    ):
+        names.update({"TASK", "UOW"})
     return sorted(names)
 
 
@@ -1397,12 +1410,18 @@ def _option_constraints(
     }
 
 
-def _option_contract(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
+def _option_contract(
+    command: dict[str, Any], dimensions: list[dict[str, Any]]
+) -> dict[str, Any]:
     option_dimension = _source_dimension(dimensions, "option-legality")
     direction_dimension = _source_dimension(dimensions, "operand-direction")
     applicable = (
         option_dimension["source_projection_state"]
         != "source-backed-not-applicable"
+    )
+    enqueue_source_projected = (
+        command["official_row"] in ENQUEUE_COMMAND_ROWS
+        and option_dimension["source_projection_state"] == "projected"
     )
     options: dict[str, dict[str, Any]] = {}
     condition_clause_values: list[dict[str, Any]] = []
@@ -1433,6 +1452,23 @@ def _option_contract(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
                 }
             )
             continue
+        stack = tuple(
+            _text(item, f"{name} option stack item")
+            for item in _array(value.get("stack"), f"{name} option stack")
+        )
+        markers = [
+            _text(marker, f"{name} argument marker")
+            for marker in _array(value.get("arguments"), f"{name} arguments")
+        ]
+        if (
+            enqueue_source_projected
+            and name == "MAXLIFETIME"
+            and len(stack) == 2
+            and stack[1] in {"TASK", "UOW"}
+        ):
+            name = stack[1]
+            stack = (name,)
+            markers = ["none"]
         entry = options.setdefault(
             name,
             {
@@ -1445,14 +1481,7 @@ def _option_contract(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
             },
         )
         entry["authorities"].add("command-source")
-        entry["markers"].update(
-            _text(marker, f"{name} argument marker")
-            for marker in _array(value.get("arguments"), f"{name} arguments")
-        )
-        stack = tuple(
-            _text(item, f"{name} option stack item")
-            for item in _array(value.get("stack"), f"{name} option stack")
-        )
+        entry["markers"].update(markers)
         if stack:
             entry["stacks"].add(stack)
         source_bound = _source_option_bound(value, name)
@@ -1467,6 +1496,13 @@ def _option_contract(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
         if value.get("type") != "operand-direction":
             continue
         name = _text(value.get("option"), "source operand option")
+        marker = _text(value.get("marker"), f"{name} direction marker")
+        direction = _text(value.get("direction"), f"{name} direction")
+        if enqueue_source_projected:
+            if name == "MAXLIFETIME" and marker == "none":
+                continue
+            if name in {"MAXLIFETIME", "RESOURCE"} and direction == "unknown":
+                direction = "input"
         entry = options.setdefault(
             name,
             {
@@ -1479,8 +1515,8 @@ def _option_contract(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
             },
         )
         entry["authorities"].add("command-source")
-        entry["markers"].add(_text(value.get("marker"), f"{name} direction marker"))
-        entry["directions"].add(_text(value.get("direction"), f"{name} direction"))
+        entry["markers"].add(marker)
+        entry["directions"].add(direction)
 
     if option_dimension["source_projection_state"] != "source-backed-not-applicable":
         for name, (markers, directions) in COMMON_COMMAND_OPTIONS.items():
@@ -1557,7 +1593,7 @@ def _option_contract(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
             else "resolved"
         )
     grammar = _grammar_contract(dimensions)
-    top_level_options = set(_top_level_source_option_names(dimensions))
+    top_level_options = set(_top_level_source_option_names(command, dimensions))
     option_status = _source_contract_status(option_dimension)
     source_entries = [
         entry for entry in options.values() if "command-source" in entry["authorities"]
@@ -1585,15 +1621,29 @@ def _option_contract(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
     if len(condition_clause_material) > 1:
         raise DescriptorError("dynamic condition clause facts conflict")
     condition_clauses = next(iter(condition_clause_material.values()), None)
+    constraints = _option_constraints(grammar, top_level_options, applicable, option_status)
+    if enqueue_source_projected:
+        constraints["required"] = ["RESOURCE"]
+        lifetime = {"members": ["MAXLIFETIME", "TASK", "UOW"], "required": False}
+        constraints["alternatives"] = [
+            *[group for group in constraints["alternatives"] if group != lifetime],
+            lifetime,
+        ]
+        constraints["mutual_exclusions"] = [
+            *[
+                group
+                for group in constraints["mutual_exclusions"]
+                if group != lifetime["members"]
+            ],
+            lifetime["members"],
+        ]
     return {
         "status": option_status,
         "direction_status": direction_status,
         "bounds_status": bounds_status,
         "entries": entries,
         "condition_clauses": condition_clauses,
-        "constraints": _option_constraints(
-            grammar, top_level_options, applicable, option_status
-        ),
+        "constraints": constraints,
         "unknown_option": "reject",
         "duplicate_option": "reject",
         "max_argument_count": HOST_LIMITS["max_argument_count"],
@@ -2151,7 +2201,7 @@ def _semantic_contract(
     family = _contract_family(command, runtime_operation)
     grammar = _grammar_contract(source_dimensions)
     source_not_applicable = grammar["status"] == "not-applicable"
-    options = _option_contract(source_dimensions)
+    options = _option_contract(command, source_dimensions)
     if options["condition_clauses"] is not None:
         if (
             condition_name_authority is None
@@ -2162,7 +2212,7 @@ def _semantic_contract(
             condition_name_authority["conditions_sha256"]
         )
     recognition = _recognition_contract(
-        command, grammar, set(_top_level_source_option_names(source_dimensions))
+        command, grammar, set(_top_level_source_option_names(command, source_dimensions))
     )
     # A catalog-qualified command form owns its qualifier even when IBM renders
     # the command and valued operand as one SVG keyword (for example, REQUEST
@@ -2787,7 +2837,7 @@ def _registry_row_material(
     source_dimensions: list[dict[str, Any]],
     semantic: dict[str, Any],
 ) -> dict[str, Any]:
-    top_level_names = set(_top_level_source_option_names(source_dimensions))
+    top_level_names = set(_top_level_source_option_names(command, source_dimensions))
     option_entries = {
         entry["name"]: entry for entry in semantic["options"]["entries"]
     }
@@ -3379,7 +3429,7 @@ def render_host(root: Path = ROOT) -> str:
 
 
 def _top_level_option_names(command: dict[str, Any]) -> list[str]:
-    return _top_level_source_option_names(command["source_dimensions"])
+    return _top_level_source_option_names(command, command["source_dimensions"])
 
 
 def _rust_string_slice(values: list[str]) -> str:

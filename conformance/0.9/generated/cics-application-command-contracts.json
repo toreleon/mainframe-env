@@ -791,7 +791,7 @@
       "web-control": 14,
       "web-service-control": 8
     },
-    "registry_sha256": "sha256:36cd3c0b3666d1e555779c783385a8bec9eb9fbac37f0011695d6d1a8638977b"
+    "registry_sha256": "sha256:5488c1cb28672bdda5741617a3fdc4f52fd3eabbd75d21f1953c3bcbe6e3cee9"
   },
   "counts": {
     "batches": 3,
@@ -86201,7 +86201,7 @@
             },
             {
               "name": "operand-direction",
-              "status": "bounded-ambiguity"
+              "status": "resolved"
             },
             {
               "name": "option-bounds",
@@ -86247,7 +86247,6 @@
           "unresolved_dimensions": [],
           "bounded_ambiguity_dimensions": [
             "option-legality",
-            "operand-direction",
             "option-bounds",
             "resource-key",
             "capability-intent",
@@ -86372,7 +86371,7 @@
             "option_sensitive_semantics": [],
             "options": {
               "status": "bounded-ambiguity",
-              "direction_status": "bounded-ambiguity",
+              "direction_status": "resolved",
               "bounds_status": "bounded-ambiguity",
               "entries": [
                 {
@@ -86403,27 +86402,16 @@
                     "command-source"
                   ],
                   "argument_markers": [
-                    "cvda",
-                    "none"
+                    "cvda"
                   ],
-                  "value_shape": "bounded-ambiguity",
+                  "value_shape": "value",
                   "directions": [
-                    "input",
-                    "none",
-                    "unknown"
+                    "input"
                   ],
-                  "direction_status": "bounded-ambiguity",
+                  "direction_status": "resolved",
                   "source_stacks": [
                     [
                       "MAXLIFETIME"
-                    ],
-                    [
-                      "MAXLIFETIME",
-                      "TASK"
-                    ],
-                    [
-                      "MAXLIFETIME",
-                      "UOW"
                     ]
                   ],
                   "bound_status": "bounded-ambiguity",
@@ -86458,10 +86446,9 @@
                   ],
                   "value_shape": "value",
                   "directions": [
-                    "input",
-                    "unknown"
+                    "input"
                   ],
-                  "direction_status": "bounded-ambiguity",
+                  "direction_status": "resolved",
                   "source_stacks": [
                     [
                       "RESOURCE"
@@ -86506,14 +86493,69 @@
                   "bound_status": "bounded-ambiguity",
                   "source_max_value_bytes": null,
                   "host_max_value_bytes": 1048576
+                },
+                {
+                  "name": "TASK",
+                  "authorities": [
+                    "command-source"
+                  ],
+                  "argument_markers": [
+                    "none"
+                  ],
+                  "value_shape": "flag",
+                  "directions": [
+                    "none"
+                  ],
+                  "direction_status": "resolved",
+                  "source_stacks": [
+                    [
+                      "TASK"
+                    ]
+                  ],
+                  "bound_status": "not-applicable",
+                  "source_max_value_bytes": null,
+                  "host_max_value_bytes": 0
+                },
+                {
+                  "name": "UOW",
+                  "authorities": [
+                    "command-source"
+                  ],
+                  "argument_markers": [
+                    "none"
+                  ],
+                  "value_shape": "flag",
+                  "directions": [
+                    "none"
+                  ],
+                  "direction_status": "resolved",
+                  "source_stacks": [
+                    [
+                      "UOW"
+                    ]
+                  ],
+                  "bound_status": "not-applicable",
+                  "source_max_value_bytes": null,
+                  "host_max_value_bytes": 0
                 }
               ],
               "condition_clauses": null,
               "constraints": {
                 "status": "bounded-ambiguity",
                 "source_scope": "syntax-diagram-only",
-                "required": [],
-                "alternatives": [],
+                "required": [
+                  "RESOURCE"
+                ],
+                "alternatives": [
+                  {
+                    "members": [
+                      "MAXLIFETIME",
+                      "TASK",
+                      "UOW"
+                    ],
+                    "required": false
+                  }
+                ],
                 "dependencies": [
                   {
                     "option": "RESP2",
@@ -86522,7 +86564,13 @@
                     ]
                   }
                 ],
-                "mutual_exclusions": []
+                "mutual_exclusions": [
+                  [
+                    "MAXLIFETIME",
+                    "TASK",
+                    "UOW"
+                  ]
+                ]
               },
               "unknown_option": "reject",
               "duplicate_option": "reject",
@@ -86671,16 +86719,15 @@
             "resource": {
               "status": "bounded-ambiguity",
               "scope": "bounded-ambiguity",
-              "selectors": [],
-              "ambiguous_selectors": [
+              "selectors": [
                 {
                   "option": "RESOURCE",
                   "directions": [
-                    "input",
-                    "unknown"
+                    "input"
                   ]
                 }
               ],
+              "ambiguous_selectors": [],
               "excluded_output_options": [],
               "selector_authority": "source-candidate-only",
               "selector_completeness": "bounded-ambiguity",
@@ -86740,7 +86787,7 @@
               "handler_sha256": "sha256:d16becf405a9a7b92a247f52f305d4333ca67fc71bcf8a6c7f40e1ab00ba6af3"
             }
           },
-          "row_contract_sha256": "sha256:2eca42c3e2c315717241cb221c22391426697c183c14b5e1675a2de0caee6b33"
+          "row_contract_sha256": "sha256:e0853f4cf626912b08ad0f3717f37eeb4bbc73c195ee23c0938277e48915001d"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0051",
@@ -105197,27 +105244,16 @@
                     "command-source"
                   ],
                   "argument_markers": [
-                    "cvda",
-                    "none"
+                    "cvda"
                   ],
-                  "value_shape": "bounded-ambiguity",
+                  "value_shape": "value",
                   "directions": [
-                    "input",
-                    "none",
-                    "unknown"
+                    "input"
                   ],
-                  "direction_status": "bounded-ambiguity",
+                  "direction_status": "resolved",
                   "source_stacks": [
                     [
                       "MAXLIFETIME"
-                    ],
-                    [
-                      "MAXLIFETIME",
-                      "TASK"
-                    ],
-                    [
-                      "MAXLIFETIME",
-                      "UOW"
                     ]
                   ],
                   "bound_status": "bounded-ambiguity",
@@ -105274,9 +105310,9 @@
                   ],
                   "value_shape": "value",
                   "directions": [
-                    "unknown"
+                    "input"
                   ],
-                  "direction_status": "bounded-ambiguity",
+                  "direction_status": "resolved",
                   "source_stacks": [
                     [
                       "RESOURCE"
@@ -105321,14 +105357,69 @@
                   "bound_status": "bounded-ambiguity",
                   "source_max_value_bytes": null,
                   "host_max_value_bytes": 1048576
+                },
+                {
+                  "name": "TASK",
+                  "authorities": [
+                    "command-source"
+                  ],
+                  "argument_markers": [
+                    "none"
+                  ],
+                  "value_shape": "flag",
+                  "directions": [
+                    "none"
+                  ],
+                  "direction_status": "resolved",
+                  "source_stacks": [
+                    [
+                      "TASK"
+                    ]
+                  ],
+                  "bound_status": "not-applicable",
+                  "source_max_value_bytes": null,
+                  "host_max_value_bytes": 0
+                },
+                {
+                  "name": "UOW",
+                  "authorities": [
+                    "command-source"
+                  ],
+                  "argument_markers": [
+                    "none"
+                  ],
+                  "value_shape": "flag",
+                  "directions": [
+                    "none"
+                  ],
+                  "direction_status": "resolved",
+                  "source_stacks": [
+                    [
+                      "UOW"
+                    ]
+                  ],
+                  "bound_status": "not-applicable",
+                  "source_max_value_bytes": null,
+                  "host_max_value_bytes": 0
                 }
               ],
               "condition_clauses": null,
               "constraints": {
                 "status": "bounded-ambiguity",
                 "source_scope": "syntax-diagram-only",
-                "required": [],
-                "alternatives": [],
+                "required": [
+                  "RESOURCE"
+                ],
+                "alternatives": [
+                  {
+                    "members": [
+                      "MAXLIFETIME",
+                      "TASK",
+                      "UOW"
+                    ],
+                    "required": false
+                  }
+                ],
                 "dependencies": [
                   {
                     "option": "RESP2",
@@ -105337,7 +105428,13 @@
                     ]
                   }
                 ],
-                "mutual_exclusions": []
+                "mutual_exclusions": [
+                  [
+                    "MAXLIFETIME",
+                    "TASK",
+                    "UOW"
+                  ]
+                ]
               },
               "unknown_option": "reject",
               "duplicate_option": "reject",
@@ -105506,15 +105603,15 @@
             "resource": {
               "status": "bounded-ambiguity",
               "scope": "bounded-ambiguity",
-              "selectors": [],
-              "ambiguous_selectors": [
+              "selectors": [
                 {
                   "option": "RESOURCE",
                   "directions": [
-                    "unknown"
+                    "input"
                   ]
                 }
               ],
+              "ambiguous_selectors": [],
               "excluded_output_options": [],
               "selector_authority": "source-candidate-only",
               "selector_completeness": "bounded-ambiguity",
@@ -105574,7 +105671,7 @@
               "handler_sha256": "sha256:07de22f2b19fc601f40b8e169af29a692ee5a1e3d312c36095c0a6753dcc59d7"
             }
           },
-          "row_contract_sha256": "sha256:9d4565f83ac7e2772d5706aa1d86ea3341bf0857bb2527de17da855267a4705e"
+          "row_contract_sha256": "sha256:1a7ae59fff57f7cbba7272378d688b659b4293c856ebd6144440ca6c6f086895"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0065",
@@ -446713,5 +446810,5 @@
       ]
     }
   ],
-  "contract_sha256": "sha256:6018da7b25320fbeff68bc57b9bf1ebae2dfa88b9c837ab582a4af8eebbe3d16"
+  "contract_sha256": "sha256:3c785fc6da3419c33e080536acfd3af4302e85a9e31a3c92278d6f6223b650c7"
 }
