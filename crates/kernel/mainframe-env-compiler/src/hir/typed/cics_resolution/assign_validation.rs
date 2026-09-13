@@ -24,6 +24,8 @@ pub(super) fn validate(
         "BRIDGE",
         "CHANNEL",
         "CWALENG",
+        "DEFSCRNHT",
+        "DEFSCRNWD",
         "INITPARM",
         "INITPARMLEN",
         "MAJORVERSION",
@@ -36,6 +38,8 @@ pub(super) fn validate(
         "PLATFORM",
         "PROGRAM",
         "RESTART",
+        "SCRNHT",
+        "SCRNWD",
         "SYSID",
         "TASKPRIORITY",
         "TCTUALENG",
@@ -63,8 +67,17 @@ pub(super) fn validate(
                 "CICS ASSIGN {name} requires a fullword binary data area"
             ));
         }
-        if matches!(name, "CWALENG" | "INITPARMLEN" | "TCTUALENG" | "TWALENG")
-            && (target.usage != CobolUsage::Binary || target.length != 2 || target.scale != 0)
+        if matches!(
+            name,
+            "CWALENG"
+                | "DEFSCRNHT"
+                | "DEFSCRNWD"
+                | "INITPARMLEN"
+                | "SCRNHT"
+                | "SCRNWD"
+                | "TCTUALENG"
+                | "TWALENG"
+        ) && (target.usage != CobolUsage::Binary || target.length != 2 || target.scale != 0)
         {
             return Err(format!(
                 "CICS ASSIGN {name} requires a halfword binary data area"

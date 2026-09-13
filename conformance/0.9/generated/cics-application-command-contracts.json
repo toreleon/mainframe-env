@@ -791,7 +791,7 @@
       "web-control": 14,
       "web-service-control": 8
     },
-    "registry_sha256": "sha256:9cea2ee02efe26e2b6c87c7b63994de63f149e4c05b60097747dfc2ec969faf2"
+    "registry_sha256": "sha256:20786ece1d3e952e6f94232316ba2128fac8728a0e6d164abf0d1c800a684ad0"
   },
   "counts": {
     "batches": 3,
@@ -25007,6 +25007,8 @@
                 "BRIDGE",
                 "CHANNEL",
                 "CWALENG",
+                "DEFSCRNHT",
+                "DEFSCRNWD",
                 "INITPARM",
                 "INITPARMLEN",
                 "MAJORVERSION",
@@ -25022,6 +25024,8 @@
                 "RESP",
                 "RESP2",
                 "RESTART",
+                "SCRNHT",
+                "SCRNWD",
                 "SYSID",
                 "TASKPRIORITY",
                 "TCTUALENG",
@@ -25029,10 +25033,10 @@
                 "USERID"
               ],
               "unready_result": null,
-              "handler_sha256": "sha256:6aa31f34127aaf8ac56d3c105081ef4c75f57a1b786abf307f6683a05647f5ee"
+              "handler_sha256": "sha256:83f8faf9c4d80727c159cde63b47bf191b24d1da098bd8fe553640fbd2b79330"
             }
           },
-          "row_contract_sha256": "sha256:4698925bc570802bbf20ce525dacc4a4beb28987fe820215086a3b09dc5bc821"
+          "row_contract_sha256": "sha256:fecf96047f6c317e58301d8e960f02943e7689702ee9c18bb0c2296f84378ad5"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0012",
@@ -446833,5 +446837,5 @@
       ]
     }
   ],
-  "contract_sha256": "sha256:fb8583f0978337ee99c04166329f2b2ffb7bfa881a65d883e906c35baac4cf48"
+  "contract_sha256": "sha256:9cdbbed7d51c17b5b0b14cca14bc90622eea79701a1f64eac9c689b4018cf689"
 }

@@ -35,11 +35,29 @@ pub(in crate::service) fn assign(
 ) -> Result<CicsResponse, HostProblem> {
     validate_assign_request(request)?;
     let dpl = assign_dpl_context(run)?;
-    let prohibited = dpl
-        && ["NEXTTRANSID", "OPSECURITY", "TCTUALENG"]
-            .iter()
-            .any(|name| request.arguments.contains_key(*name));
-    let mut response = if prohibited {
+    let screen_options = ["DEFSCRNHT", "DEFSCRNWD", "SCRNHT", "SCRNWD"];
+    let screen_requested = screen_options
+        .iter()
+        .any(|name| request.arguments.contains_key(*name));
+    let dimensions = if !dpl && screen_requested {
+        terminal_dimensions(service, run)?
+    } else {
+        None
+    };
+    let terminal_missing = !dpl && screen_requested && dimensions.is_none();
+    let dpl_prohibited = dpl
+        && [
+            "DEFSCRNHT",
+            "DEFSCRNWD",
+            "NEXTTRANSID",
+            "OPSECURITY",
+            "SCRNHT",
+            "SCRNWD",
+            "TCTUALENG",
+        ]
+        .iter()
+        .any(|name| request.arguments.contains_key(*name));
+    let mut response = if dpl_prohibited || terminal_missing {
         super::condition::respond(
             service,
             run,
@@ -47,7 +65,7 @@ pub(in crate::service) fn assign(
             HostProblem::Condition {
                 name: "INVREQ".into(),
                 response: 16,
-                response2: 200,
+                response2: if dpl_prohibited { 200 } else { 0 },
             },
         )?
     } else {
@@ -84,6 +102,20 @@ pub(in crate::service) fn assign(
             .outputs
             .insert("ABOFFSET".into(), decimal_payload(0)?);
     }
+    if let Some((rows, columns)) = dimensions {
+        for (name, value) in [
+            ("DEFSCRNHT", rows),
+            ("DEFSCRNWD", columns),
+            ("SCRNHT", rows),
+            ("SCRNWD", columns),
+        ] {
+            if request.arguments.contains_key(name) {
+                response
+                    .outputs
+                    .insert(name.into(), decimal_payload(i64::from(value))?);
+            }
+        }
+    }
     if request.arguments.contains_key("PROGRAM") {
         let program = run
             .current_program
@@ -116,7 +148,7 @@ pub(in crate::service) fn assign(
             response.outputs.insert(name.into(), decimal_payload(0)?);
         }
     }
-    if !prohibited && request.arguments.contains_key("NEXTTRANSID") {
+    if !dpl_prohibited && request.arguments.contains_key("NEXTTRANSID") {
         response
             .outputs
             .insert("NEXTTRANSID".into(), bounded(vec![b' '; 4])?);
@@ -145,17 +177,32 @@ pub(in crate::service) fn assign(
                 .insert(name.into(), bounded(vec![0; length])?);
         }
     }
-    if !prohibited && request.arguments.contains_key("TCTUALENG") {
+    if !dpl_prohibited && request.arguments.contains_key("TCTUALENG") {
         response
             .outputs
             .insert("TCTUALENG".into(), decimal_payload(0)?);
     }
-    if !prohibited && request.arguments.contains_key("OPSECURITY") {
+    if !dpl_prohibited && request.arguments.contains_key("OPSECURITY") {
         response
             .outputs
             .insert("OPSECURITY".into(), bounded(vec![0; 3])?);
     }
     Ok(response)
+}
+
+fn terminal_dimensions(
+    service: &CicsService,
+    run: &Run,
+) -> Result<Option<(u16, u16)>, HostProblem> {
+    let state = service.lock()?;
+    let session = state
+        .sessions
+        .get(&run.session)
+        .ok_or(HostProblem::InfrastructureFailure)?;
+    Ok((session.principal == run.invocation.principal.id().as_str()
+        && session.run_unit == run.invocation.run_unit_id.as_str()
+        && session.transaction == run.transaction)
+        .then_some((session.rows, session.columns)))
 }
 
 fn assign_dpl_context(run: &Run) -> Result<bool, HostProblem> {
@@ -184,6 +231,8 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "BRIDGE",
         "CHANNEL",
         "CWALENG",
+        "DEFSCRNHT",
+        "DEFSCRNWD",
         "INITPARM",
         "INITPARMLEN",
         "MAJORVERSION",
@@ -199,6 +248,8 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "RESP",
         "RESP2",
         "RESTART",
+        "SCRNHT",
+        "SCRNWD",
         "SYSID",
         "TASKPRIORITY",
         "TCTUALENG",

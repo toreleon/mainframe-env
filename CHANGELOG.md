@@ -69,7 +69,9 @@ All notable changes to mainframe-env are documented here.
   blanks because bridge-started tasks are outside the runtime. Compiled online
   tasks also receive exact zero ABOFFSET, PSW, and register diagnostics because
   no recoverable ASRA-class machine-check handoff exists. They observe these
-  values and priority changes through the durable selected route.
+  values, the durable terminal's current/default screen geometry, and priority
+  changes through the selected route. Screen options fail with local `INVREQ`
+  for nonterminal tasks and `INVREQ` 16/200 in DPL.
 - Added online continuation format `MEOM4`, which retains the current task
   priority and an optional staged program-transfer handoff. Readers preserve
   `MEOM3` priority rows and historical `MEOM2` rows without that field.

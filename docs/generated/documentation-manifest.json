@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:4334d63d8a596407c3eb0571605a245773005b6d8d718453304c323a3628fe9e",
+      "sha256": "sha256:46023cbbd7a0ca4f394c5d27d602ea74089d22c36c53892c40d19b70e817b43f",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -357,7 +357,7 @@
       "path": "docs/architecture/COBOL-RUNTIME-SEMANTICS.md",
       "relative_links": 0,
       "scope": "COBOL runtime semantic contracts",
-      "sha256": "sha256:2c7eb5c6800a29ee763c9c7e5f5a3bd6fb0d49dbc7ac5b1a30740047b0270599",
+      "sha256": "sha256:0c6bfc480bcc96405ec080bdd995306e8dd5096755013f995e1f5941e13ad7aa",
       "status": "Frozen for mainframe-env 0.4.0 implementation",
       "title": "COBOL runtime semantic contracts",
       "xtask_commands": 0
@@ -1062,7 +1062,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:cc0ecd58cad1174fe1dd17fa2dc25be067355c6b0e9e3b16c7894846f425a7ce",
+      "sha256": "sha256:425222720a3f24e76cac82e689dd41053a39867b9a5db491989999d794978ed2",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },

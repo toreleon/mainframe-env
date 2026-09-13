@@ -4776,6 +4776,40 @@ mod tests {
             assert_eq!(diagnostics.outputs[name].bytes(), vec![0; length]);
         }
 
+        let mut no_terminal = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("APPLID".into(), argument(b"APP-OUT")),
+                ("DEFSCRNHT".into(), argument(b"DEFAULT-HEIGHT-OUT")),
+                ("DEFSCRNWD".into(), argument(b"DEFAULT-WIDTH-OUT")),
+                ("SCRNHT".into(), argument(b"SCREEN-HEIGHT-OUT")),
+                ("SCRNWD".into(), argument(b"SCREEN-WIDTH-OUT")),
+            ]),
+            26,
+        );
+        no_terminal.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let no_terminal = service
+            .invoke(
+                &effect(&invocation.run_unit_id, no_terminal.clone(), 26),
+                no_terminal,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                no_terminal.condition.as_str(),
+                no_terminal.response,
+                no_terminal.response2
+            ),
+            ("INVREQ", 16, 0)
+        );
+        assert_eq!(no_terminal.outputs["APPLID"].bytes(), b"MEAPPL");
+        for name in ["DEFSCRNHT", "DEFSCRNWD", "SCRNHT", "SCRNWD"] {
+            assert!(!no_terminal.outputs.contains_key(name));
+        }
+
         let missing_program = request(
             CicsOperation::Assign,
             BTreeMap::from([("PROGRAM".into(), argument(b"PROGRAM-OUT"))]),
@@ -5065,8 +5099,12 @@ mod tests {
             CicsOperation::Assign,
             BTreeMap::from([
                 ("APPLID".into(), argument(b"APP-OUT")),
+                ("DEFSCRNHT".into(), argument(b"DEFAULT-HEIGHT-OUT")),
+                ("DEFSCRNWD".into(), argument(b"DEFAULT-WIDTH-OUT")),
                 ("NEXTTRANSID".into(), argument(b"NEXT-TRANS-OUT")),
                 ("OPSECURITY".into(), argument(b"OPSECURITY-OUT")),
+                ("SCRNHT".into(), argument(b"SCREEN-HEIGHT-OUT")),
+                ("SCRNWD".into(), argument(b"SCREEN-WIDTH-OUT")),
                 ("TCTUALENG".into(), argument(b"TCTUA-LENGTH-OUT")),
             ]),
             2,
@@ -5091,9 +5129,17 @@ mod tests {
             (CicsDisposition::Complete, "INVREQ", 16, 200)
         );
         assert_eq!(partial.outputs["APPLID"].bytes(), b"ME01");
-        assert!(!partial.outputs.contains_key("NEXTTRANSID"));
-        assert!(!partial.outputs.contains_key("OPSECURITY"));
-        assert!(!partial.outputs.contains_key("TCTUALENG"));
+        for name in [
+            "DEFSCRNHT",
+            "DEFSCRNWD",
+            "NEXTTRANSID",
+            "OPSECURITY",
+            "SCRNHT",
+            "SCRNWD",
+            "TCTUALENG",
+        ] {
+            assert!(!partial.outputs.contains_key(name));
+        }
 
         let prohibited = request(
             CicsOperation::Assign,
