@@ -83,8 +83,8 @@ contract explicitly permits it.
   zero and ASRAPSW/ASRAPSW16/ASRAREGS/ASRAREGS64 are their exact zero-filled
   widths; an explicit EXEC CICS ABEND is not treated as a processor fault.
   DEFSCRNHT/DEFSCRNWD and SCRNHT/SCRNWD come from the owned durable terminal
-  geometry. Nonterminal tasks receive `INVREQ`, while DPL returns the qualified
-  `INVREQ` 16/200 and leaves those receivers unchanged.
+  geometry. Nonterminal tasks receive `INVREQ` 16/5, while DPL returns the
+  qualified `INVREQ` 16/200 and leaves those receivers unchanged.
   FCI is `X'01'` for that terminal attachment and `X'00'` when none exists;
   DPL prohibits the option with the same 16/200 condition.
   LINKLEVEL is halfword one for a top-level local program and two for a DPL

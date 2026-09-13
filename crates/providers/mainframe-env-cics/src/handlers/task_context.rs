@@ -78,7 +78,7 @@ pub(in crate::service) fn assign(
             HostProblem::Condition {
                 name: "INVREQ".into(),
                 response: 16,
-                response2: if dpl_prohibited { 200 } else { 0 },
+                response2: if dpl_prohibited { 200 } else { 5 },
             },
         )?
     } else {

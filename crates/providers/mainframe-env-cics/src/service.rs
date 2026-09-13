@@ -4809,7 +4809,7 @@ mod tests {
                 no_terminal.response,
                 no_terminal.response2
             ),
-            ("INVREQ", 16, 0)
+            ("INVREQ", 16, 5)
         );
         assert_eq!(no_terminal.outputs["APPLID"].bytes(), b"MEAPPL");
         assert_eq!(no_terminal.outputs["FCI"].bytes(), &[0]);
