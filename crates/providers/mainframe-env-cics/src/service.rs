@@ -4757,6 +4757,7 @@ mod tests {
                 ("ASRAPSW16".into(), argument(b"ASRA-PSW16-OUT")),
                 ("ASRAREGS".into(), argument(b"ASRA-REGS-OUT")),
                 ("ASRAREGS64".into(), argument(b"ASRA-REGS64-OUT")),
+                ("LINKLEVEL".into(), argument(b"LINK-LEVEL-OUT")),
             ]),
             27,
         );
@@ -4767,6 +4768,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(diagnostics.outputs["ABOFFSET"].bytes(), b"0");
+        assert_eq!(diagnostics.outputs["LINKLEVEL"].bytes(), b"1");
         for (name, length) in [
             ("ASRAPSW", 8),
             ("ASRAPSW16", 16),
@@ -4821,6 +4823,33 @@ mod tests {
             service.invoke(
                 &effect(&invocation.run_unit_id, missing_program.clone(), 30),
                 missing_program,
+            ),
+            Err(HostProblem::InfrastructureFailure)
+        );
+
+        let mut nested_invocation = invocation_for("assign-nested", BTreeMap::new());
+        nested_invocation.parent_execution_id =
+            Some(ExecutionId::new("parent-execution", InvocationLimits::default()).unwrap());
+        let nested_session = SessionId::new("assign-nested", 64).unwrap();
+        service.create_session(&nested_session, 24, 80).unwrap();
+        service
+            .register_run(
+                nested_invocation.clone(),
+                &nested_session,
+                "MENU",
+                "ME01",
+                "S001",
+            )
+            .unwrap();
+        let nested_level = request(
+            CicsOperation::Assign,
+            BTreeMap::from([("LINKLEVEL".into(), argument(b"LINK-LEVEL-OUT"))]),
+            1,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&nested_invocation.run_unit_id, nested_level.clone(), 1),
+                nested_level,
             ),
             Err(HostProblem::InfrastructureFailure)
         );
@@ -5077,6 +5106,7 @@ mod tests {
                 ("ASRAPSW16".into(), argument(b"ASRA-PSW16-OUT")),
                 ("ASRAREGS".into(), argument(b"ASRA-REGS-OUT")),
                 ("ASRAREGS64".into(), argument(b"ASRA-REGS64-OUT")),
+                ("LINKLEVEL".into(), argument(b"LINK-LEVEL-OUT")),
             ]),
             5,
         );
@@ -5088,6 +5118,7 @@ mod tests {
             .unwrap();
         assert_eq!(diagnostics.condition, "NORMAL");
         assert_eq!(diagnostics.outputs["ABOFFSET"].bytes(), b"0");
+        assert_eq!(diagnostics.outputs["LINKLEVEL"].bytes(), b"2");
         for (name, length) in [
             ("ASRAPSW", 8),
             ("ASRAPSW16", 16),

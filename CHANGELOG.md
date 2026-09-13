@@ -73,7 +73,9 @@ All notable changes to mainframe-env are documented here.
   changes through the selected route. Screen options fail with local `INVREQ`
   for nonterminal tasks and `INVREQ` 16/200 in DPL; FCI distinguishes the
   supported terminal facility (`X'01'`) from no facility (`X'00'`) and is also
-  DPL-prohibited.
+  DPL-prohibited. LINKLEVEL returns one for a top-level local program and two
+  for a DPL target behind its level-one mirror; unmodeled deeper local stacks
+  fail closed.
 - Added online continuation format `MEOM4`, which retains the current task
   priority and an optional staged program-transfer handoff. Readers preserve
   `MEOM3` priority rows and historical `MEOM2` rows without that field.

@@ -29,6 +29,7 @@ pub(super) fn validate(
         "FCI",
         "INITPARM",
         "INITPARMLEN",
+        "LINKLEVEL",
         "MAJORVERSION",
         "MICROVERSION",
         "MINORVERSION",
@@ -74,6 +75,7 @@ pub(super) fn validate(
                 | "DEFSCRNHT"
                 | "DEFSCRNWD"
                 | "INITPARMLEN"
+                | "LINKLEVEL"
                 | "SCRNHT"
                 | "SCRNWD"
                 | "TCTUALENG"

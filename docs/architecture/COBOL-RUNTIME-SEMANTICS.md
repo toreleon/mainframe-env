@@ -87,6 +87,9 @@ contract explicitly permits it.
   `INVREQ` 16/200 and leaves those receivers unchanged.
   FCI is `X'01'` for that terminal attachment and `X'00'` when none exists;
   DPL prohibits the option with the same 16/200 condition.
+  LINKLEVEL is halfword one for a top-level local program and two for a DPL
+  target behind its level-one mirror. Deeper local program stacks require an
+  owned CICS link-depth context and otherwise fail closed.
   Other source-valid ASSIGN options remain rejected until their terminal,
   program-level, or failure context has an owned runtime representation.
 - Terminal execution outcomes carry an explicit transaction-dump disposition.

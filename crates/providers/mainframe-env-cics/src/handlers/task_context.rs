@@ -45,6 +45,11 @@ pub(in crate::service) fn assign(
         None
     };
     let terminal_missing = !dpl && screen_requested && dimensions.is_none();
+    let link_level = request
+        .arguments
+        .contains_key("LINKLEVEL")
+        .then(|| assign_link_level(run, dpl))
+        .transpose()?;
     let dpl_prohibited = dpl
         && [
             "DEFSCRNHT",
@@ -102,6 +107,11 @@ pub(in crate::service) fn assign(
         response
             .outputs
             .insert("ABOFFSET".into(), decimal_payload(0)?);
+    }
+    if let Some(link_level) = link_level {
+        response
+            .outputs
+            .insert("LINKLEVEL".into(), decimal_payload(link_level)?);
     }
     if let Some((rows, columns)) = dimensions {
         for (name, value) in [
@@ -211,6 +221,16 @@ fn terminal_dimensions(
         .then_some((session.rows, session.columns)))
 }
 
+fn assign_link_level(run: &Run, dpl: bool) -> Result<i64, HostProblem> {
+    if dpl {
+        Ok(2)
+    } else if run.invocation.parent_execution_id.is_none() {
+        Ok(1)
+    } else {
+        Err(HostProblem::InfrastructureFailure)
+    }
+}
+
 fn assign_dpl_context(run: &Run) -> Result<bool, HostProblem> {
     let Some(context) = run.invocation.bindings.get("cics.execution-context") else {
         return Ok(false);
@@ -242,6 +262,7 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "FCI",
         "INITPARM",
         "INITPARMLEN",
+        "LINKLEVEL",
         "MAJORVERSION",
         "MICROVERSION",
         "MINORVERSION",

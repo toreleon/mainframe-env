@@ -426,6 +426,7 @@ pub(super) fn execute_legacy(
             "FCI",
             "INITPARM",
             "INITPARMLEN",
+            "LINKLEVEL",
             "MAJORVERSION",
             "MICROVERSION",
             "MINORVERSION",
