@@ -71,7 +71,9 @@ All notable changes to mainframe-env are documented here.
   no recoverable ASRA-class machine-check handoff exists. They observe these
   values, the durable terminal's current/default screen geometry, and priority
   changes through the selected route. Screen options fail with local `INVREQ`
-  for nonterminal tasks and `INVREQ` 16/200 in DPL.
+  for nonterminal tasks and `INVREQ` 16/200 in DPL; FCI distinguishes the
+  supported terminal facility (`X'01'`) from no facility (`X'00'`) and is also
+  DPL-prohibited.
 - Added online continuation format `MEOM4`, which retains the current task
   priority and an optional staged program-transfer handoff. Readers preserve
   `MEOM3` priority rows and historical `MEOM2` rows without that field.

@@ -39,7 +39,7 @@ pub(in crate::service) fn assign(
     let screen_requested = screen_options
         .iter()
         .any(|name| request.arguments.contains_key(*name));
-    let dimensions = if !dpl && screen_requested {
+    let dimensions = if !dpl && (screen_requested || request.arguments.contains_key("FCI")) {
         terminal_dimensions(service, run)?
     } else {
         None
@@ -49,6 +49,7 @@ pub(in crate::service) fn assign(
         && [
             "DEFSCRNHT",
             "DEFSCRNWD",
+            "FCI",
             "NEXTTRANSID",
             "OPSECURITY",
             "SCRNHT",
@@ -115,6 +116,11 @@ pub(in crate::service) fn assign(
                     .insert(name.into(), decimal_payload(i64::from(value))?);
             }
         }
+    }
+    if !dpl_prohibited && request.arguments.contains_key("FCI") {
+        response
+            .outputs
+            .insert("FCI".into(), bounded(vec![u8::from(dimensions.is_some())])?);
     }
     if request.arguments.contains_key("PROGRAM") {
         let program = run
@@ -233,6 +239,7 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "CWALENG",
         "DEFSCRNHT",
         "DEFSCRNWD",
+        "FCI",
         "INITPARM",
         "INITPARMLEN",
         "MAJORVERSION",

@@ -26,6 +26,7 @@ pub(super) fn validate(
         "CWALENG",
         "DEFSCRNHT",
         "DEFSCRNWD",
+        "FCI",
         "INITPARM",
         "INITPARMLEN",
         "MAJORVERSION",
@@ -88,6 +89,7 @@ pub(super) fn validate(
             || (name == "ASRAREGS" && target.length != 64)
             || (name == "ASRAREGS64" && target.length != 128)
             || (name == "BRIDGE" && target.length != 4)
+            || (name == "FCI" && target.length != 1)
             || (name == "INITPARM" && target.length != 60)
             || (name == "OPERKEYS" && target.length != 8)
             || (name == "OPSECURITY" && target.length != 3)

@@ -85,6 +85,8 @@ contract explicitly permits it.
   DEFSCRNHT/DEFSCRNWD and SCRNHT/SCRNWD come from the owned durable terminal
   geometry. Nonterminal tasks receive `INVREQ`, while DPL returns the qualified
   `INVREQ` 16/200 and leaves those receivers unchanged.
+  FCI is `X'01'` for that terminal attachment and `X'00'` when none exists;
+  DPL prohibits the option with the same 16/200 condition.
   Other source-valid ASSIGN options remain rejected until their terminal,
   program-level, or failure context has an owned runtime representation.
 - Terminal execution outcomes carry an explicit transaction-dump disposition.

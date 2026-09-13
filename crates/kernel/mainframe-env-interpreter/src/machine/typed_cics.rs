@@ -423,6 +423,7 @@ pub(super) fn execute_legacy(
             "CWALENG",
             "DEFSCRNHT",
             "DEFSCRNWD",
+            "FCI",
             "INITPARM",
             "INITPARMLEN",
             "MAJORVERSION",
