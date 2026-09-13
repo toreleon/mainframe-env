@@ -2,7 +2,7 @@ use super::super::{
     CicsLimits, CicsService, DatasetUndo, DurableContinuation, Reader, Run, Session,
     argument_bytes, argument_optional, argument_text, bounded, field, mutation_problem,
 };
-use crate::generated::CICS_CONDITION_NAMES;
+use crate::generated::{CICS_AID_NAMES, CICS_CONDITION_NAMES};
 use mainframe_env_execution_api::{BoundedPayload, IdempotencyKey, Invocation, InvocationLimits};
 use mainframe_env_host_api::{
     AccessIntent, CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest, CicsResponse,
@@ -15,6 +15,7 @@ const MAX_HANDLE_STACK_DEPTH: usize = 64;
 #[derive(Clone)]
 pub(in crate::service) struct HandleFrame {
     handlers: BTreeMap<String, String>,
+    aid_handlers: BTreeMap<String, String>,
     ignored_conditions: BTreeSet<String>,
     abend_handler: Option<String>,
     cancelled_abend_handler: Option<String>,
@@ -73,6 +74,7 @@ pub(in crate::service) fn new_run_with_state(
         host_sequence: 0,
         outer_effect_key: None,
         handlers: BTreeMap::new(),
+        aid_handlers: BTreeMap::new(),
         ignored_conditions: BTreeSet::new(),
         abend_handler: None,
         cancelled_abend_handler: None,
@@ -209,6 +211,7 @@ pub(in crate::service) fn invoke(
             super::task_enqueue::invoke(service, run, request, retention_tick)
         }
         CicsOperation::HandleCondition => handle_condition(service, run, request),
+        CicsOperation::HandleAid => handle_aid(service, run, request),
         CicsOperation::HandleAbend => handle_abend(service, run, request),
         CicsOperation::IgnoreCondition => ignore_condition(service, run, request),
         CicsOperation::PopHandle => pop_handle(service, run, request),
@@ -593,6 +596,89 @@ fn handle_condition(
     )
 }
 
+fn handle_aid(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    validate_handle_aid_context(run)?;
+    let allowed = ["AIDS", "OPTION.NOHANDLE", "RESP", "RESP2"];
+    if request.arguments.iter().any(|(name, value)| {
+        !allowed.contains(&name.as_str())
+            || name.starts_with("OPTION.") && !value.bytes().is_empty()
+    }) {
+        return Err(HostProblem::Malformed);
+    }
+    let value = request
+        .arguments
+        .get("AIDS")
+        .ok_or(HostProblem::Malformed)?;
+    if value.schema() != "mainframe-env.cics.aid-handlers@1" {
+        return Err(HostProblem::Malformed);
+    }
+    for (name, label) in parse_aid_handlers(value.bytes())? {
+        run.aid_handlers.insert(name, label);
+    }
+    service.response(
+        run,
+        CicsDisposition::Complete,
+        "NORMAL",
+        0,
+        0,
+        None,
+        None,
+        Vec::new(),
+    )
+}
+
+fn validate_handle_aid_context(run: &Run) -> Result<(), HostProblem> {
+    let Some(context) = run.invocation.bindings.get("cics.execution-context") else {
+        return Ok(());
+    };
+    if context.schema() != "mainframe-env.cics.execution-context@1" {
+        return Err(HostProblem::Malformed);
+    }
+    match context.bytes() {
+        b"local" => Ok(()),
+        b"dpl-synconreturn" | b"dpl-without-synconreturn" | b"dpl-executionset-subset" => {
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 200,
+            })
+        }
+        _ => Err(HostProblem::Malformed),
+    }
+}
+
+fn parse_aid_handlers(bytes: &[u8]) -> Result<Vec<(String, String)>, HostProblem> {
+    let text = std::str::from_utf8(bytes).map_err(|_| HostProblem::Malformed)?;
+    if text.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut names = BTreeSet::new();
+    let mut handlers: Vec<(String, String)> = Vec::new();
+    for entry in text.split('\n') {
+        let (name, label) = entry.split_once('\t').ok_or(HostProblem::Malformed)?;
+        if CICS_AID_NAMES.binary_search(&name).is_err()
+            || !names.insert(name)
+            || !valid_condition_label(label)
+        {
+            return Err(HostProblem::Malformed);
+        }
+        handlers.push((name.into(), label.into()));
+    }
+    if handlers.len() <= 16
+        && handlers
+            .windows(2)
+            .all(|pair| pair[0].0.as_str() < pair[1].0.as_str())
+    {
+        Ok(handlers)
+    } else {
+        Err(HostProblem::Malformed)
+    }
+}
+
 fn condition_handlers(request: &CicsRequest) -> Result<Vec<(String, String)>, HostProblem> {
     if let Some(value) = request.arguments.get("CONDITIONS") {
         let allowed = ["CONDITIONS", "OPTION.NOHANDLE", "RESP", "RESP2"];
@@ -811,6 +897,7 @@ fn push_handle(
     }
     run.handle_stack.push(HandleFrame {
         handlers: std::mem::take(&mut run.handlers),
+        aid_handlers: std::mem::take(&mut run.aid_handlers),
         ignored_conditions: std::mem::take(&mut run.ignored_conditions),
         abend_handler: run.abend_handler.take(),
         cancelled_abend_handler: run.cancelled_abend_handler.take(),
@@ -837,6 +924,7 @@ fn pop_handle(
         return pop_handle_invreq(service, run, request);
     };
     run.handlers = frame.handlers;
+    run.aid_handlers = frame.aid_handlers;
     run.ignored_conditions = frame.ignored_conditions;
     run.abend_handler = frame.abend_handler;
     run.cancelled_abend_handler = frame.cancelled_abend_handler;

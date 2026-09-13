@@ -6,6 +6,10 @@ use mainframe_env_host_api::CicsOperation;
 pub(crate) const CICS_CONDITION_NAMES: &[&str] =
     &["ACTIVITYBUSY", "ACTIVITYERR", "ALLOCERR", "APPNOTFOUND", "BUSY", "CBIDERR", "CCSIDERR", "CHANGED", "CHANNELERR", "CODEPAGEERR", "CONTAINERERR", "CSDERR", "DISABLED", "DSNNOTFOUND", "DSSTAT", "DUPKEY", "DUPREC", "DUPRES", "END", "ENDDATA", "ENDFILE", "ENDINPT", "ENQBUSY", "ENVDEFERR", "EOC", "EODS", "EOF", "ERROR", "EVENTERR", "EXPIRED", "FILENOTFOUND", "FUNCERR", "IGREQCD", "IGREQID", "ILLOGIC", "INBFMH", "INCOMPLETE", "INVERRTERM", "INVEXITREQ", "INVLDC", "INVMPSZ", "INVPARTN", "INVPARTNSET", "INVREQ", "INVTSREQ", "IOERR", "ISCINVREQ", "ITEMERR", "JIDERR", "LENGERR", "LINKABEND", "LOADING", "LOCKED", "MAPFAIL", "MODELIDERR", "NETNAMEIDERR", "NODEIDERR", "NOJBUFSP", "NONVAL", "NOPASSBKRD", "NOPASSBKWR", "NORMAL", "NOSPACE", "NOSPOOL", "NOSTART", "NOSTG", "NOTALLOC", "NOTAUTH", "NOTFINISHED", "NOTFND", "NOTOPEN", "NOTSUPERUSER", "OPENERR", "OUTDESCRERR", "OVERFLOW", "PARTNERIDERR", "PARTNFAIL", "PGMIDERR", "POOLERR", "PROCESSBUSY", "PROCESSERR", "PROFILEIDERR", "QBUSY", "QIDERR", "QZERO", "RDATT", "RECORDBUSY", "RESIDERR", "RESUNAVAIL", "RETPAGE", "ROLLEDBACK", "RTEFAIL", "RTESOME", "SEGIDERR", "SELNERR", "SESSBUSY", "SESSIONERR", "SIGNAL", "SPOLBUSY", "SPOLERR", "STRELERR", "SUPPRESSED", "SYMBOLERR", "SYSBUSY", "SYSIDERR", "TASKIDERR", "TCIDERR", "TEMPLATERR", "TERMERR", "TERMIDERR", "TIMEDOUT", "TIMERERR", "TOKENERR", "TRANSIDERR", "TSIOERR", "UNEXPIN", "UOWLNOTFOUND", "UOWNOTFOUND", "USERIDERR", "VOLIDERR", "WRBRK"];
 
+#[rustfmt::skip]
+pub(crate) const CICS_AID_NAMES: &[&str] =
+    &["ANYKEY", "CLEAR", "CLRPARTN", "ENTER", "LIGHTPEN", "OPERID", "PA1", "PA2", "PA3", "PF1", "PF10", "PF11", "PF12", "PF13", "PF14", "PF15", "PF16", "PF17", "PF18", "PF19", "PF2", "PF20", "PF21", "PF22", "PF23", "PF24", "PF3", "PF4", "PF5", "PF6", "PF7", "PF8", "PF9", "TRIGGER"];
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum CicsCommandFamily {
     TaskControl,
@@ -101,6 +105,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         operation: CicsOperation::HandleAbend,
         syntax: "HANDLE ABEND",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0097",
+        family: CicsCommandFamily::TaskControl,
+        mutating: false,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::HandleAid,
+        syntax: "HANDLE AID",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0098",
         family: CicsCommandFamily::TaskControl,
         mutating: false,
     },
@@ -280,28 +291,29 @@ pub(crate) const fn command_descriptor(operation: CicsOperation) -> &'static Cic
         CicsOperation::Enq => &CICS_COMMAND_DESCRIPTORS[8],
         CicsOperation::FormatTime => &CICS_COMMAND_DESCRIPTORS[9],
         CicsOperation::HandleAbend => &CICS_COMMAND_DESCRIPTORS[10],
-        CicsOperation::HandleCondition => &CICS_COMMAND_DESCRIPTORS[11],
-        CicsOperation::IgnoreCondition => &CICS_COMMAND_DESCRIPTORS[12],
-        CicsOperation::Inquire => &CICS_COMMAND_DESCRIPTORS[13],
-        CicsOperation::Link => &CICS_COMMAND_DESCRIPTORS[14],
-        CicsOperation::PopHandle => &CICS_COMMAND_DESCRIPTORS[15],
-        CicsOperation::PushHandle => &CICS_COMMAND_DESCRIPTORS[16],
-        CicsOperation::Read => &CICS_COMMAND_DESCRIPTORS[17],
-        CicsOperation::ReadNext => &CICS_COMMAND_DESCRIPTORS[18],
-        CicsOperation::ReadPrev => &CICS_COMMAND_DESCRIPTORS[19],
-        CicsOperation::ReceiveMap => &CICS_COMMAND_DESCRIPTORS[20],
-        CicsOperation::Retrieve => &CICS_COMMAND_DESCRIPTORS[21],
-        CicsOperation::Return => &CICS_COMMAND_DESCRIPTORS[22],
-        CicsOperation::Rewrite => &CICS_COMMAND_DESCRIPTORS[23],
-        CicsOperation::SendMap => &CICS_COMMAND_DESCRIPTORS[24],
-        CicsOperation::SendText => &CICS_COMMAND_DESCRIPTORS[25],
-        CicsOperation::SetAssociationUserCorrData => &CICS_COMMAND_DESCRIPTORS[26],
-        CicsOperation::SetFileStatus => &CICS_COMMAND_DESCRIPTORS[27],
-        CicsOperation::StartBrowse => &CICS_COMMAND_DESCRIPTORS[28],
-        CicsOperation::Suspend => &CICS_COMMAND_DESCRIPTORS[29],
-        CicsOperation::Syncpoint => &CICS_COMMAND_DESCRIPTORS[30],
-        CicsOperation::Write => &CICS_COMMAND_DESCRIPTORS[31],
-        CicsOperation::WriteTransientData => &CICS_COMMAND_DESCRIPTORS[32],
-        CicsOperation::Xctl => &CICS_COMMAND_DESCRIPTORS[33],
+        CicsOperation::HandleAid => &CICS_COMMAND_DESCRIPTORS[11],
+        CicsOperation::HandleCondition => &CICS_COMMAND_DESCRIPTORS[12],
+        CicsOperation::IgnoreCondition => &CICS_COMMAND_DESCRIPTORS[13],
+        CicsOperation::Inquire => &CICS_COMMAND_DESCRIPTORS[14],
+        CicsOperation::Link => &CICS_COMMAND_DESCRIPTORS[15],
+        CicsOperation::PopHandle => &CICS_COMMAND_DESCRIPTORS[16],
+        CicsOperation::PushHandle => &CICS_COMMAND_DESCRIPTORS[17],
+        CicsOperation::Read => &CICS_COMMAND_DESCRIPTORS[18],
+        CicsOperation::ReadNext => &CICS_COMMAND_DESCRIPTORS[19],
+        CicsOperation::ReadPrev => &CICS_COMMAND_DESCRIPTORS[20],
+        CicsOperation::ReceiveMap => &CICS_COMMAND_DESCRIPTORS[21],
+        CicsOperation::Retrieve => &CICS_COMMAND_DESCRIPTORS[22],
+        CicsOperation::Return => &CICS_COMMAND_DESCRIPTORS[23],
+        CicsOperation::Rewrite => &CICS_COMMAND_DESCRIPTORS[24],
+        CicsOperation::SendMap => &CICS_COMMAND_DESCRIPTORS[25],
+        CicsOperation::SendText => &CICS_COMMAND_DESCRIPTORS[26],
+        CicsOperation::SetAssociationUserCorrData => &CICS_COMMAND_DESCRIPTORS[27],
+        CicsOperation::SetFileStatus => &CICS_COMMAND_DESCRIPTORS[28],
+        CicsOperation::StartBrowse => &CICS_COMMAND_DESCRIPTORS[29],
+        CicsOperation::Suspend => &CICS_COMMAND_DESCRIPTORS[30],
+        CicsOperation::Syncpoint => &CICS_COMMAND_DESCRIPTORS[31],
+        CicsOperation::Write => &CICS_COMMAND_DESCRIPTORS[32],
+        CicsOperation::WriteTransientData => &CICS_COMMAND_DESCRIPTORS[33],
+        CicsOperation::Xctl => &CICS_COMMAND_DESCRIPTORS[34],
     }
 }

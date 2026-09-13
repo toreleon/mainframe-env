@@ -150,6 +150,7 @@ pub enum HirCicsOperation {
     ChangeTask,
     Deq,
     Enq,
+    HandleAid,
     HandleCondition,
     IgnoreCondition,
     PopHandle,
@@ -178,6 +179,8 @@ pub enum HirCicsOperandName {
     UsingPointer,
     /// Canonical condition specifications for HANDLE or IGNORE.
     Conditions,
+    /// Canonical terminal AID handler specifications.
+    Aids,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2536,6 +2539,65 @@ mod tests {
             diagnostic
                 .public_message()
                 .contains("requires 1..=16 EIBRESP condition clauses, found 17")
+        }));
+    }
+
+    #[test]
+    fn cics_handle_aid_clauses_resolve_optional_labels_and_bounds() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSAID. PROCEDURE DIVISION. EXEC CICS HANDLE AID ANYKEY(ANY-HANDLER) ENTER PF10(PF-HANDLER) END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("HANDLE AID: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed HANDLE AID");
+        assert_eq!(command.operation, HirCicsOperation::HandleAid);
+        assert_eq!(
+            command.operands,
+            vec![HirCicsNamedOperand {
+                name: HirCicsOperandName::Aids,
+                value: HirCicsValue::Literal(
+                    "ANYKEY\tANY-HANDLER\nENTER\t\nPF10\tPF-HANDLER".into(),
+                ),
+            }]
+        );
+
+        let bare = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. AIDBARE. PROCEDURE DIVISION. EXEC CICS HANDLE AID END-EXEC. STOP RUN.",
+        );
+        assert!(bare.hir.is_some(), "{:?}", bare.diagnostics);
+        for (command, expected) in [
+            ("HANDLE AID PF25(HANDLER)", "unknown or unreviewed"),
+            ("HANDLE AID PF1(BAD_LABEL)", "requires one label operand"),
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. AIDBAD. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| { diagnostic.public_message().contains(expected) })
+            );
+        }
+        let seventeen = mainframe_env_ir::CICS_APPLICATION_AID_NAMES[..17].join(" ");
+        let analysis = analyze(&format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. AID17. PROCEDURE DIVISION. EXEC CICS HANDLE AID {seventeen} END-EXEC. STOP RUN."
+        ));
+        assert!(analysis.hir.is_none());
+        assert!(analysis.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("permits at most 16 AID clauses, found 17")
         }));
     }
 

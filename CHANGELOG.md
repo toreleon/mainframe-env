@@ -89,6 +89,9 @@ All notable changes to mainframe-env are documented here.
   command page and its linked BMS/DFHAID constant authority, reproduced through
   the existing Chrome session. This source receipt grants no execution or
   licensed differential credit.
+- Added typed CICS `HANDLE AID` for the 34 source-named terminal AIDs, including
+  optional-label deactivation, exact-over-`ANYKEY` precedence, the complete
+  reached DFHAID byte set, PUSH/POP participation, and DPL `INVREQ` 16/200.
 - Added the frozen-with-bounded-ambiguities CIC-901 command contract and generated
   263-row compiler registry. The registry explicitly separates three typed runtime
   handlers, 20 legacy compatibility handlers, and 240 unready handlers; automatic

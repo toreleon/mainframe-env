@@ -51,6 +51,8 @@ pub enum CicsPlanOperation {
     Deq,
     /// Acquire one task-owned enqueue.
     Enq,
+    /// Install or deactivate one bounded set of terminal AID handlers.
+    HandleAid,
     /// Install or deactivate one bounded set of reviewed condition handlers.
     HandleCondition,
     /// Ignore one bounded set of reviewed EIBRESP conditions.
@@ -111,6 +113,8 @@ pub enum CicsOperandName {
     UsingPointer,
     /// Canonical EIBRESP condition specifications for HANDLE or IGNORE.
     Conditions,
+    /// Canonical terminal AID handler specifications.
+    Aids,
 }
 
 /// Literal bytes or a runtime read from resolved storage.
@@ -470,6 +474,16 @@ fn validate_operation_shape(
                 || scheduling_options
                 || outputs.contains(&CicsOutputName::Into)
         }
+        CicsPlanOperation::HandleAid => {
+            inputs.len() != 1
+                || !inputs.contains(&CicsOperandName::Aids)
+                || plan.operands.iter().any(|operand| {
+                    operand.name != CicsOperandName::Aids
+                        || !matches!(&operand.value, CicsOperandValue::Literal(bytes) if valid_aid_handlers(bytes))
+                })
+                || scheduling_options
+                || outputs.contains(&CicsOutputName::Into)
+        }
         CicsPlanOperation::IgnoreCondition => {
             inputs.len() != 1
                 || !inputs.contains(&CicsOperandName::Conditions)
@@ -593,6 +607,40 @@ fn valid_condition_handlers(bytes: &[u8]) -> bool {
         && entries.windows(2).all(|pair| pair[0].0 < pair[1].0)
         && entries.iter().all(|(name, label)| {
             crate::CICS_APPLICATION_CONDITION_NAMES
+                .binary_search(name)
+                .is_ok()
+                && (label.is_empty()
+                    || label.bytes().all(|byte| {
+                        byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'-'
+                    }))
+        })
+}
+
+fn valid_aid_handlers(bytes: &[u8]) -> bool {
+    let Ok(text) = std::str::from_utf8(bytes) else {
+        return false;
+    };
+    let entries = if text.is_empty() {
+        Vec::new()
+    } else {
+        let entries = text
+            .split('\n')
+            .map(|entry| entry.split_once('\t'))
+            .collect::<Option<Vec<_>>>();
+        let Some(entries) = entries else {
+            return false;
+        };
+        entries
+    };
+    let unique = entries
+        .iter()
+        .map(|(name, _)| *name)
+        .collect::<BTreeSet<_>>();
+    entries.len() <= 16
+        && unique.len() == entries.len()
+        && entries.windows(2).all(|pair| pair[0].0 < pair[1].0)
+        && entries.iter().all(|(name, label)| {
+            crate::CICS_APPLICATION_AID_NAMES
                 .binary_search(name)
                 .is_ok()
                 && (label.is_empty()
@@ -728,6 +776,7 @@ const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::PushHandle => 10,
         CicsPlanOperation::IgnoreCondition => 11,
         CicsPlanOperation::HandleCondition => 12,
+        CicsPlanOperation::HandleAid => 13,
     }
 }
 
@@ -746,6 +795,7 @@ fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPlanCodecProbl
         10 => Ok(CicsPlanOperation::PushHandle),
         11 => Ok(CicsPlanOperation::IgnoreCondition),
         12 => Ok(CicsPlanOperation::HandleCondition),
+        13 => Ok(CicsPlanOperation::HandleAid),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -766,6 +816,7 @@ const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::UsingAddress => 11,
         CicsOperandName::UsingPointer => 12,
         CicsOperandName::Conditions => 13,
+        CicsOperandName::Aids => 14,
     }
 }
 
@@ -785,6 +836,7 @@ fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCodecProblem> 
         11 => Ok(CicsOperandName::UsingAddress),
         12 => Ok(CicsOperandName::UsingPointer),
         13 => Ok(CicsOperandName::Conditions),
+        14 => Ok(CicsOperandName::Aids),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -1176,6 +1228,49 @@ mod tests {
             );
             let mut malformed = plan;
             malformed.options.insert(CicsPlanOption::Rollback);
+            assert_eq!(
+                encode_cics_effect_plan(&malformed, CicsPlanLimits::default()),
+                Err(CicsPlanCodecProblem::Malformed)
+            );
+        }
+    }
+
+    #[test]
+    fn handle_aid_plan_requires_canonical_bounded_unique_specifications() {
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::HandleAid,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::Aids,
+                value: CicsOperandValue::Literal(
+                    b"ANYKEY\tANY-HANDLER\nENTER\t\nPF10\tPF-HANDLER".to_vec(),
+                ),
+            }],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
+            plan
+        );
+        let mut bare = plan.clone();
+        bare.operands[0].value = CicsOperandValue::Literal(Vec::new());
+        assert!(encode_cics_effect_plan(&bare, CicsPlanLimits::default()).is_ok());
+        for specifications in [
+            b"PF2\tTWO\nPF1\tONE".to_vec(),
+            b"PF1\tONE\nPF1\tTWO".to_vec(),
+            b"PF25\tHANDLER".to_vec(),
+            b"ENTER\tlower-case".to_vec(),
+            crate::CICS_APPLICATION_AID_NAMES[..17]
+                .iter()
+                .map(|name| format!("{name}\t"))
+                .collect::<Vec<_>>()
+                .join("\n")
+                .into_bytes(),
+        ] {
+            let mut malformed = plan.clone();
+            malformed.operands[0].value = CicsOperandValue::Literal(specifications);
             assert_eq!(
                 encode_cics_effect_plan(&malformed, CicsPlanLimits::default()),
                 Err(CicsPlanCodecProblem::Malformed)

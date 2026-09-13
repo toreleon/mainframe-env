@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:0e58054af30e48b1e8fedd182f4a183ea8818303846615a34ac151bb06d378b7",
+      "sha256": "sha256:f165f4774f5dd93d2141fbc320f0d74939d37418f378c0d73c4f557db59838ca",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -357,7 +357,7 @@
       "path": "docs/architecture/COBOL-RUNTIME-SEMANTICS.md",
       "relative_links": 0,
       "scope": "COBOL runtime semantic contracts",
-      "sha256": "sha256:63a9e9e0aea77a515963c6a3f63d98d05426d7d910749acd2966b782f7718b50",
+      "sha256": "sha256:52fdd70d043dc44146c024955c0eb89fb18ef17facbd3f4780345cc93cbcac05",
       "status": "Frozen for mainframe-env 0.4.0 implementation",
       "title": "COBOL runtime semantic contracts",
       "xtask_commands": 0
@@ -522,7 +522,7 @@
       "normative": false,
       "path": "docs/compatibility/CARDDEMO-COPYBOOKS.md",
       "relative_links": 0,
-      "sha256": "sha256:b4898990f86ea395a34e74b133c3980817a1f2cb619d074a4e17cdfe0201e43f",
+      "sha256": "sha256:01075a1461bb211e26a1841e4cdb66bac5c588a4805da24925b17364137d8807",
       "title": "CardDemo reached compatibility copybooks",
       "xtask_commands": 2
     },
@@ -545,7 +545,7 @@
       "path": "docs/contracts/EFFECT-CANONICAL-V1.md",
       "relative_links": 0,
       "scope": "canonical persisted host request/result digest representation",
-      "sha256": "sha256:7925a99c5200fcd7cd016552663076f219a8c30df399d2eb36573d18b02f0b34",
+      "sha256": "sha256:af4ddec70539b7ffd2d1e858fc3da5b9917bfa65bd60d207c979a39362bb280b",
       "status": "Frozen contract; implementation deviations tracked before 0.9.0",
       "title": "Canonical host effect representation, version 1",
       "xtask_commands": 0
@@ -1062,7 +1062,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:af8ce55dd55104578b6ce134ab94b4c88f255db8ff6cb75270909d190bc74b36",
+      "sha256": "sha256:a8a7390d8d774baab2b69c5524db19d94860bec7c49f9c714d676d6d6e58e111",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },

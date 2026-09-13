@@ -8,10 +8,11 @@ use super::{
 };
 use crate::{CobolUsage, SemanticModel};
 use mainframe_env_ir::{
-    CICS_APPLICATION_CONDITION_NAMES, CicsApplicationCobolApplicability,
-    CicsApplicationConditionLabelOperand, CicsApplicationConstraintStatus,
-    CicsApplicationHandlerReadiness, CicsApplicationOptionValueShape,
-    CicsApplicationRegistryDescriptor, cics_application_registry_candidates_for_tokens,
+    CICS_APPLICATION_AID_NAMES, CICS_APPLICATION_CONDITION_NAMES,
+    CicsApplicationCobolApplicability, CicsApplicationConditionLabelOperand,
+    CicsApplicationConstraintStatus, CicsApplicationHandlerReadiness,
+    CicsApplicationOptionValueShape, CicsApplicationRegistryDescriptor,
+    cics_application_registry_candidates_for_tokens,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -311,6 +312,7 @@ fn validate_candidate(
     }
 
     let mut condition_clause_count = 0usize;
+    let mut aid_clause_count = 0usize;
     for name in present {
         let Some(shape) = option_value_shape(descriptor, name) else {
             if let Some(condition_clauses) = descriptor.condition_clauses
@@ -335,6 +337,18 @@ fn validate_candidate(
                         ));
                     }
                     (CicsApplicationConditionLabelOperand::Forbidden, None) => {}
+                }
+                continue;
+            }
+            if descriptor.label_tokens == ["HANDLE", "AID"] && is_aid_name(name) {
+                aid_clause_count += 1;
+                if clauses
+                    .get(*name)
+                    .is_some_and(|tokens| !is_single_condition_label(tokens))
+                {
+                    return Err(format!(
+                        "CICS HANDLE AID option {name} requires one label operand"
+                    ));
                 }
                 continue;
             }
@@ -375,6 +389,11 @@ fn validate_candidate(
             command_label(descriptor),
             condition_clauses.minimum_occurrences,
             condition_clauses.maximum_occurrences,
+        ));
+    }
+    if descriptor.label_tokens == ["HANDLE", "AID"] && aid_clause_count > 16 {
+        return Err(format!(
+            "CICS HANDLE AID permits at most 16 AID clauses, found {aid_clause_count}"
         ));
     }
 
@@ -510,12 +529,17 @@ fn validate_candidate(
 fn option_is_known(descriptor: &CicsApplicationRegistryDescriptor, name: &str) -> bool {
     option_value_shape(descriptor, name).is_some()
         || (descriptor.condition_clauses.is_some() && is_condition_name(name))
+        || (descriptor.label_tokens == ["HANDLE", "AID"] && is_aid_name(name))
 }
 
 fn is_condition_name(name: &str) -> bool {
     CICS_APPLICATION_CONDITION_NAMES
         .binary_search(&name)
         .is_ok()
+}
+
+fn is_aid_name(name: &str) -> bool {
+    CICS_APPLICATION_AID_NAMES.binary_search(&name).is_ok()
 }
 
 fn is_single_condition_label(tokens: &[String]) -> bool {
@@ -732,6 +756,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         ["CHANGE", "TASK"] => HirCicsOperation::ChangeTask,
         ["DEQ"] => HirCicsOperation::Deq,
         ["ENQ"] => HirCicsOperation::Enq,
+        ["HANDLE", "AID"] => HirCicsOperation::HandleAid,
         ["HANDLE", "CONDITION"] => HirCicsOperation::HandleCondition,
         ["IGNORE", "CONDITION"] => HirCicsOperation::IgnoreCondition,
         ["POP", "HANDLE"] => HirCicsOperation::PopHandle,
@@ -749,7 +774,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Deq | HirCicsOperation::Enq => {
             &["RESOURCE", "LENGTH", "MAXLIFETIME", "RESP", "RESP2"]
         }
-        HirCicsOperation::HandleCondition
+        HirCicsOperation::HandleAid
+        | HirCicsOperation::HandleCondition
         | HirCicsOperation::IgnoreCondition
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle => &["RESP", "RESP2"],
@@ -762,6 +788,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     let allowed_options: &[&str] = match operation {
         HirCicsOperation::AddressSet
         | HirCicsOperation::ChangeTask
+        | HirCicsOperation::HandleAid
         | HirCicsOperation::HandleCondition
         | HirCicsOperation::IgnoreCondition
         | HirCicsOperation::PopHandle
@@ -779,6 +806,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         .filter(|name| {
             !allowed_clauses.contains(&name.as_str())
                 && !(operation == HirCicsOperation::HandleCondition && is_condition_name(name))
+                && !(operation == HirCicsOperation::HandleAid && is_aid_name(name))
         })
         .cloned()
         .collect::<Vec<_>>();
@@ -790,6 +818,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
                     operation,
                     HirCicsOperation::HandleCondition | HirCicsOperation::IgnoreCondition
                 ) && is_condition_name(name))
+                && !(operation == HirCicsOperation::HandleAid && is_aid_name(name))
         })
         .cloned()
         .collect::<Vec<_>>();
@@ -818,6 +847,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     for required in match operation {
         HirCicsOperation::AddressSet => &["SET", "USING"][..],
         HirCicsOperation::ChangeTask
+        | HirCicsOperation::HandleAid
         | HirCicsOperation::HandleCondition
         | HirCicsOperation::IgnoreCondition
         | HirCicsOperation::PopHandle
@@ -871,7 +901,29 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             },
         ]);
     }
-    if operation == HirCicsOperation::HandleCondition {
+    if operation == HirCicsOperation::HandleAid {
+        let mut handlers = clauses
+            .iter()
+            .filter(|(name, _)| is_aid_name(name))
+            .map(|(name, value)| (name.clone(), value[0].clone()))
+            .collect::<BTreeMap<_, _>>();
+        handlers.extend(
+            raw_options
+                .iter()
+                .filter(|name| is_aid_name(name))
+                .map(|name| (name.clone(), String::new())),
+        );
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::Aids,
+            value: HirCicsValue::Literal(
+                handlers
+                    .iter()
+                    .map(|(name, label)| format!("{name}\t{label}"))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ),
+        });
+    } else if operation == HirCicsOperation::HandleCondition {
         let mut handlers = clauses
             .iter()
             .filter(|(name, _)| is_condition_name(name))
@@ -970,7 +1022,13 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     }
     let mut options = raw_options
         .iter()
-        .filter(|option| !is_condition_name(option))
+        .filter(|option| {
+            !(matches!(
+                operation,
+                HirCicsOperation::HandleCondition | HirCicsOperation::IgnoreCondition
+            ) && is_condition_name(option))
+                && !(operation == HirCicsOperation::HandleAid && is_aid_name(option))
+        })
         .map(|option| match option.as_str() {
             "UPDATE" => HirCicsOption::Update,
             "ROLLBACK" => HirCicsOption::Rollback,

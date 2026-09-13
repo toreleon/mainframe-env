@@ -32,6 +32,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0064"
     },
     {
+      "operation": "HandleAid",
+      "interface": "api",
+      "family": "task-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0098"
+    },
+    {
       "operation": "IgnoreCondition",
       "interface": "api",
       "family": "task-control",

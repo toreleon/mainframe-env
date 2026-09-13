@@ -10757,6 +10757,138 @@ mod tests {
     }
 
     #[test]
+    fn online_handle_aid_uses_the_typed_selected_route_and_handle_stack() {
+        let limits = SourceLimits::default();
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. HAID.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 FIRST-FN PIC X(2).\n01 SECOND-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS HANDLE AID ANYKEY(OUTER-AID) ENTER PF10 END-EXEC.\nMOVE EIBFN TO FIRST-FN.\nEXEC CICS PUSH HANDLE END-EXEC.\nEXEC CICS HANDLE AID PF1(INNER-AID) END-EXEC.\nEXEC CICS POP HANDLE END-EXEC.\nMOVE EIBFN TO SECOND-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\nOUTER-AID.\nSTOP RUN.\nINNER-AID.\nSTOP RUN.\n";
+        let path = LogicalPath::new("HAID.cbl", limits.max_path_bytes).unwrap();
+        let bundle = SourceBundle::new(
+            &path,
+            vec![
+                SourceFile::input(
+                    "HAID.cbl",
+                    source.to_vec(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("HANDLE AID fixture did not publish");
+        };
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "HAID".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("HA00".into(), "HAID".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "HAID".into(),
+                    map: "HAID".into(),
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("handle-aid", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "HA00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "HA00",
+                24,
+                80,
+                "handle-aid-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "HAID", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "HAID", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(
+            restored.variable("FIRST-FN").unwrap().bytes(),
+            &[0x02, 0x06]
+        );
+        assert_eq!(
+            restored.variable("SECOND-FN").unwrap().bytes(),
+            &[0x02, 0x0e]
+        );
+        assert_eq!(
+            server
+                .store
+                .audit_records(&invocation.execution_id, 1, 32)
+                .unwrap()
+                .into_iter()
+                .filter(|record| record.capability.as_str() == "host.cics.execute")
+                .map(|record| (record.effect_sequence, record.decision))
+                .collect::<Vec<_>>(),
+            (1..=5)
+                .map(|sequence| {
+                    (
+                        sequence,
+                        mainframe_env_execution_api::AuditDecision::Success,
+                    )
+                })
+                .collect::<Vec<_>>()
+        );
+        server
+            .run_online_exchange(&session, &principal, "HAID", 3)
+            .unwrap();
+        assert!(server.online_exchange(&session).unwrap().is_none());
+    }
+
+    #[test]
     fn online_enqueue_wait_remains_durably_resumable_until_dequeue() {
         let limits = SourceLimits::default();
         let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. WAITENQ.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 LOCK-NAME PIC X(4) VALUE 'LOCK'.\nPROCEDURE DIVISION.\nEXEC CICS ENQ RESOURCE(LOCK-NAME) LENGTH(4) UOW END-EXEC.\nDISPLAY 'ACQUIRED'.\nSTOP RUN.\n";

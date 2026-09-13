@@ -21,6 +21,8 @@ pub enum CicsOperation {
     EndBrowse,
     FormatTime,
     HandleAbend,
+    /// Install or deactivate one bounded set of terminal AID handlers.
+    HandleAid,
     /// Install or deactivate one bounded set of reviewed condition handlers.
     HandleCondition,
     /// Ignore one bounded set of reviewed EIBRESP conditions for this program level.
@@ -68,6 +70,7 @@ impl CicsOperation {
             Self::EndBrowse => "EndBrowse",
             Self::FormatTime => "FormatTime",
             Self::HandleAbend => "HandleAbend",
+            Self::HandleAid => "HandleAid",
             Self::HandleCondition => "HandleCondition",
             Self::IgnoreCondition => "IgnoreCondition",
             Self::Inquire => "Inquire",
@@ -137,7 +140,8 @@ impl CicsOperation {
             ("ENDBR", _) => Self::EndBrowse,
             ("FORMATTIME", _) => Self::FormatTime,
             ("HANDLE", Some("ABEND")) => Self::HandleAbend,
-            ("HANDLE", _) => Self::HandleCondition,
+            ("HANDLE", Some("AID")) => Self::HandleAid,
+            ("HANDLE", Some("CONDITION")) => Self::HandleCondition,
             ("IGNORE", Some("CONDITION")) => Self::IgnoreCondition,
             ("INQUIRE", _) => Self::Inquire,
             ("LINK", _) => Self::Link,

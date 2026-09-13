@@ -102,6 +102,16 @@ condition has a terminating default action, the generalized `ERROR` ignore or
 handler applies after the specific condition action and before abnormal
 termination.
 
+CICS HANDLE AID carries one canonical `mainframe-env.cics.aid-handlers@1`
+payload containing zero to 16 strictly name-ordered records from the generated
+34-name AID authority. Each record contains the AID name, a tab, and an optional
+COBOL label. An empty label is retained as an explicit deactivation tombstone,
+so a specific key such as PF10 can continue after input even when ANYKEY has a
+label. Exact AID specifications precede ANYKEY; ANYKEY applies only to PA1–PA3,
+PF1–PF24, and CLEAR, never ENTER or the other special AIDs. The AID state joins
+the same bounded PUSH/POP stack. A DPL server attempt fails with INVREQ, RESP
+16, and RESP2 200 before changing the state.
+
 `CALL`, `INVOKE`, and LE callable services resolve through versioned typed ABI
 catalog entries. Names choose a registered program only after the ABI identity
 is known; no copybook, application, or program-name special case selects host

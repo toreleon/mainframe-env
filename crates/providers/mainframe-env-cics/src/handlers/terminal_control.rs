@@ -8,6 +8,18 @@ use mainframe_env_host_api::{
 };
 use std::collections::BTreeMap;
 
+pub(in crate::service) const fn valid_aid(aid: u8) -> bool {
+    matches!(
+        aid,
+        0x4a..=0x4c
+            | 0x6a..=0x6e
+            | 0x7a..=0x7f
+            | 0xc1..=0xc9
+            | 0xe6..=0xe7
+            | 0xf1..=0xf9
+    )
+}
+
 pub(in crate::service) fn invoke(
     service: &CicsService,
     run: &Run,
@@ -103,16 +115,31 @@ fn receive(service: &CicsService, run: &Run) -> Result<CicsResponse, HostProblem
         .ok_or(HostProblem::NotFound)?;
     let mut next = current.clone();
     next.version += 1;
-    let (disposition, payload, fields) = if let Some(input) = next.input.take() {
+    let (disposition, target, payload, fields) = if let Some(input) = next.input.take() {
         let fields = decode_map_payload(&input, service.limits)?;
-        (CicsDisposition::Complete, input, fields)
+        let target = aid_handler_target(&run.aid_handlers, current.aid);
+        (
+            if target.is_some() {
+                CicsDisposition::Handler
+            } else {
+                CicsDisposition::Complete
+            },
+            target,
+            input,
+            fields,
+        )
     } else {
         next.suspended = true;
-        (CicsDisposition::Suspended, Vec::new(), BTreeMap::new())
+        (
+            CicsDisposition::Suspended,
+            None,
+            Vec::new(),
+            BTreeMap::new(),
+        )
     };
     service.persist_session(&run.session, &next, Some(current.version))?;
     state.sessions.insert(run.session.clone(), next);
-    let mut response = service.response(run, disposition, "NORMAL", 0, 0, None, None, payload)?;
+    let mut response = service.response(run, disposition, "NORMAL", 0, 0, target, None, payload)?;
     response.aid = current.aid;
     for (name, value) in fields {
         let input_length = value.len();
@@ -138,4 +165,84 @@ fn receive(service: &CicsService, run: &Run) -> Result<CicsResponse, HostProblem
         );
     }
     Ok(response)
+}
+
+fn aid_handler_target(handlers: &BTreeMap<String, String>, aid: u8) -> Option<String> {
+    let name = aid_name(aid)?;
+    if let Some(label) = handlers.get(name) {
+        return (!label.is_empty()).then(|| label.clone());
+    }
+    if matches!(name, "CLEAR" | "PA1" | "PA2" | "PA3") || name.starts_with("PF") {
+        return handlers
+            .get("ANYKEY")
+            .filter(|label| !label.is_empty())
+            .cloned();
+    }
+    None
+}
+
+fn aid_name(aid: u8) -> Option<&'static str> {
+    Some(match aid {
+        0x6d => "CLEAR",
+        0x6a => "CLRPARTN",
+        0x7d => "ENTER",
+        0x7e => "LIGHTPEN",
+        0xe6 | 0xe7 => "OPERID",
+        0x6c => "PA1",
+        0x6e => "PA2",
+        0x6b => "PA3",
+        0xf1..=0xf9 => return pf_name(aid - 0xf0),
+        0x7a..=0x7c => return pf_name(aid - 0x70),
+        0xc1..=0xc9 => return pf_name(aid - 0xb4),
+        0x4a..=0x4c => return pf_name(aid - 0x34),
+        0x7f => "TRIGGER",
+        _ => return None,
+    })
+}
+
+fn pf_name(number: u8) -> Option<&'static str> {
+    const NAMES: [&str; 24] = [
+        "PF1", "PF2", "PF3", "PF4", "PF5", "PF6", "PF7", "PF8", "PF9", "PF10", "PF11", "PF12",
+        "PF13", "PF14", "PF15", "PF16", "PF17", "PF18", "PF19", "PF20", "PF21", "PF22", "PF23",
+        "PF24",
+    ];
+    number
+        .checked_sub(1)
+        .and_then(|index| NAMES.get(usize::from(index)))
+        .copied()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exact_aid_tombstones_precede_anykey_and_every_supported_byte_is_named() {
+        let handlers = BTreeMap::from([
+            ("ANYKEY".into(), "ANY-HANDLER".into()),
+            ("ENTER".into(), "ENTER-HANDLER".into()),
+            ("PF10".into(), String::new()),
+        ]);
+        assert_eq!(
+            aid_handler_target(&handlers, 0xf1).as_deref(),
+            Some("ANY-HANDLER")
+        );
+        assert_eq!(
+            aid_handler_target(&handlers, 0x6d).as_deref(),
+            Some("ANY-HANDLER")
+        );
+        assert_eq!(aid_handler_target(&handlers, 0x7a), None);
+        assert_eq!(
+            aid_handler_target(&handlers, 0x7d).as_deref(),
+            Some("ENTER-HANDLER")
+        );
+        for aid in [
+            0x4a, 0x4b, 0x4c, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x7a, 0x7b, 0x7c, 0x7d, 0x7e, 0x7f,
+            0xc1, 0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0xc8, 0xc9, 0xe6, 0xe7, 0xf1, 0xf2, 0xf3,
+            0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9,
+        ] {
+            assert!(aid_name(aid).is_some(), "{aid:02x}");
+        }
+        assert!(aid_name(0x00).is_none());
+    }
 }

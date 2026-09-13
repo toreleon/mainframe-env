@@ -22,5 +22,7 @@ pub(super) use task_enqueue::{
     load_enqueue_models, release_task as release_task_enqueues,
     release_uow as release_uow_enqueues, validate_store as validate_enqueue_store,
 };
-pub(super) use terminal_control::invoke as invoke_terminal_control;
+pub(super) use terminal_control::{
+    invoke as invoke_terminal_control, valid_aid as valid_terminal_aid,
+};
 pub(super) use time::invoke as invoke_time;

@@ -2425,6 +2425,7 @@ mod tests {
             CicsOperation::EndBrowse,
             CicsOperation::FormatTime,
             CicsOperation::HandleAbend,
+            CicsOperation::HandleAid,
             CicsOperation::HandleCondition,
             CicsOperation::IgnoreCondition,
             CicsOperation::Inquire,
@@ -2449,7 +2450,7 @@ mod tests {
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-        assert_eq!(forms.len(), 34);
+        assert_eq!(forms.len(), 35);
         let names = forms
             .iter()
             .map(|operation| operation.runtime_name())

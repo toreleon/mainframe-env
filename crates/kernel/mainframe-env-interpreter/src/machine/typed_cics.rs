@@ -250,6 +250,9 @@ pub(super) fn execute(
                 },
                 bytes.clone(),
             ),
+            CicsOperandValue::Literal(bytes) if operand.name == CicsOperandName::Aids => {
+                ("mainframe-env.cics.aid-handlers@1", bytes.clone())
+            }
             CicsOperandValue::Literal(bytes) => ("mainframe-env.cics.literal@1", bytes.clone()),
             CicsOperandValue::Storage(slot)
                 if matches!(
@@ -966,6 +969,7 @@ const fn host_operation(operation: CicsPlanOperation) -> CicsOperation {
         CicsPlanOperation::ChangeTask => CicsOperation::ChangeTask,
         CicsPlanOperation::Deq => CicsOperation::Deq,
         CicsPlanOperation::Enq => CicsOperation::Enq,
+        CicsPlanOperation::HandleAid => CicsOperation::HandleAid,
         CicsPlanOperation::HandleCondition => CicsOperation::HandleCondition,
         CicsPlanOperation::IgnoreCondition => CicsOperation::IgnoreCondition,
         CicsPlanOperation::PopHandle => CicsOperation::PopHandle,
@@ -994,6 +998,7 @@ const fn operand_name(name: CicsOperandName) -> &'static str {
         CicsOperandName::UsingAddress => "USING.ADDRESS",
         CicsOperandName::UsingPointer => "USING.POINTER",
         CicsOperandName::Conditions => "CONDITIONS",
+        CicsOperandName::Aids => "AIDS",
     }
 }
 

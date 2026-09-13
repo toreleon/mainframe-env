@@ -48,6 +48,13 @@ HANDLER_DIGEST_DOMAIN = b"mainframe-env.cics-application-command-handler@1\0"
 SOURCE_REVIEW_DIGEST_DOMAIN = b"mainframe-env.cics-source-review@2\0"
 CONDITION_NAME_DOMAIN = b"mainframe-env.cics-condition-name-authority@1\0"
 CONDITION_NAME_PROFILE = "cics-eibresp-condition-name@1"
+AID_NAMES = tuple(
+    sorted(
+        ["ANYKEY", "CLEAR", "CLRPARTN", "ENTER", "LIGHTPEN", "OPERID", "TRIGGER"]
+        + [f"PA{number}" for number in range(1, 4)]
+        + [f"PF{number}" for number in range(1, 25)]
+    )
+)
 CONDITION_NAME_OPTION = "CONDITION-NAME"
 IDENTIFIER = re.compile(r"^[A-Z][A-Za-z0-9]*$")
 OPTION_IDENTIFIER = re.compile(r"^[A-Z][A-Z0-9-]*$")
@@ -91,6 +98,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("Enq", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0064"),
     ("FormatTime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0080"),
     ("HandleAbend", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0097"),
+    ("HandleAid", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0098"),
     ("HandleCondition", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0099"),
     ("IgnoreCondition", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0100"),
     (
@@ -346,6 +354,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "AddressSet",
         "Deq",
         "Enq",
+        "HandleAid",
         "HandleCondition",
         "IgnoreCondition",
         "PopHandle",
@@ -382,6 +391,7 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "Enq": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
     ),
+    "HandleAid": frozenset({"memory-read", "memory-write", "condition"}),
     "HandleCondition": frozenset({"memory-read", "memory-write", "condition"}),
     "IgnoreCondition": frozenset({"memory-read", "memory-write", "condition"}),
     "PopHandle": frozenset({"memory-write", "condition"}),
@@ -589,6 +599,7 @@ def _load_typed_execution_registrations(
         "ChangeTask",
         "Deq",
         "Enq",
+        "HandleAid",
         "IgnoreCondition",
         "PopHandle",
         "PushHandle",
@@ -887,6 +898,7 @@ def load_catalog(
                 "AddressSet",
                 "Deq",
                 "Enq",
+                "HandleAid",
                 "IgnoreCondition",
                 "PopHandle",
                 "PushHandle",
@@ -3001,6 +3013,8 @@ def _recognition_contract(
     else:
         heads.add(tuple(catalog_head))
         discriminators.update(catalog_discriminators)
+    if command["label"] == "HANDLE AID":
+        heads = {("HANDLE", "AID")}
     if grammar["status"] == "pending":
         status = "pending"
     elif grammar["status"] == "not-applicable":
@@ -3165,8 +3179,8 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
         for row in catalog["_runtime_operations"]
         if row["interface"] == "api"
     }
-    if len(existing_runtime) != 32:
-        raise DescriptorError("CICS application runtime baseline must remain exactly 32 rows")
+    if len(existing_runtime) != 33:
+        raise DescriptorError("CICS application runtime set must remain exactly 33 rows")
 
     loaded_batches = []
     for batch_id, start, end, projection_path, review_path in CONTRACT_BATCHES:
@@ -3420,12 +3434,12 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
     if (
         len(registry_rows) != 263
         or len(set(handler_ids)) != 263
-        or len(typed_rows) != 13
+        or len(typed_rows) != 14
         or len(legacy_rows) != 19
         or {row["runtime_operation"] for row in typed_rows}
         != TYPED_RUNTIME_OPERATIONS
-        or len(advertised_rows) != 32
-        or len(unready_rows) != 231
+        or len(advertised_rows) != 33
+        or len(unready_rows) != 230
         or any(row["unready_result"] != "explicit-unsupported" for row in unready_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in typed_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in legacy_rows)
@@ -3548,6 +3562,10 @@ def render_provider(
         "#[rustfmt::skip]",
         "pub(crate) const CICS_CONDITION_NAMES: &[&str] =",
         f"    {_rust_string_slice(condition_names)};",
+        "",
+        "#[rustfmt::skip]",
+        "pub(crate) const CICS_AID_NAMES: &[&str] =",
+        f"    {_rust_string_slice(list(AID_NAMES))};",
         "",
         "#[derive(Clone, Copy, Debug, Eq, PartialEq)]",
         "pub(crate) enum CicsCommandFamily {",
@@ -3737,6 +3755,11 @@ def render_ir_registry(root: Path = ROOT, contracts: dict[str, Any] | None = Non
         "/// Condition names accepted by dynamic HANDLE/IGNORE CONDITION clauses.",
         "pub const CICS_APPLICATION_CONDITION_NAMES: &[&str] =",
         f"    {_rust_string_slice(condition_name_authority['allowed_names'])};",
+        "",
+        "#[rustfmt::skip]",
+        "/// AID names accepted by dynamic HANDLE AID clauses.",
+        "pub const CICS_APPLICATION_AID_NAMES: &[&str] =",
+        f"    {_rust_string_slice(list(AID_NAMES))};",
         "",
         "#[rustfmt::skip]",
         "/// Complete application-command registry shape in official-row order.",

@@ -188,6 +188,7 @@ struct Run {
     host_sequence: u64,
     outer_effect_key: Option<String>,
     handlers: BTreeMap<String, String>,
+    aid_handlers: BTreeMap<String, String>,
     ignored_conditions: BTreeSet<String>,
     abend_handler: Option<String>,
     cancelled_abend_handler: Option<String>,
@@ -813,7 +814,7 @@ impl CicsService {
         fields: &BTreeMap<String, Vec<u8>>,
         now_tick: u64,
     ) -> Result<CicsTerminalSnapshot, HostProblem> {
-        if !valid_aid(aid) || fields.len() > self.limits.max_fields {
+        if !handlers::valid_terminal_aid(aid) || fields.len() > self.limits.max_fields {
             return Err(HostProblem::Malformed);
         }
         let current = self.public_session(session, principal, Some(csrf_token), now_tick)?;
@@ -1762,7 +1763,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 34);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 35);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -2373,13 +2374,6 @@ fn normalize_terminal_name(value: &str, max: usize) -> Result<String, HostProble
     }
 }
 
-const fn valid_aid(aid: u8) -> bool {
-    matches!(
-        aid,
-        0x6b..=0x6e | 0x7d | 0xc1..=0xc9 | 0x4a..=0x4c | 0xf1..=0xfc
-    )
-}
-
 fn normalize_bms_input(field: &BmsFieldDefinition, value: &[u8]) -> Vec<u8> {
     if !field.justify_right || value.len() >= usize::from(field.length) {
         return value.to_vec();
@@ -2517,7 +2511,7 @@ fn decode_tn3270_input(
     map: &BmsMapDefinition,
     limits: CicsLimits,
 ) -> Result<BTreeMap<String, Vec<u8>>, HostProblem> {
-    if record.len() < 3 || !valid_aid(record[0]) || record.contains(&0xff) {
+    if record.len() < 3 || !handlers::valid_terminal_aid(record[0]) || record.contains(&0xff) {
         return Err(HostProblem::Malformed);
     }
     decode_terminal_address(record[1], record[2])?;
@@ -4480,6 +4474,20 @@ mod tests {
         .unwrap()
     }
 
+    fn aid_handlers(entries: &[(&str, &str)]) -> BoundedPayload {
+        BoundedPayload::new(
+            "mainframe-env.cics.aid-handlers@1",
+            entries
+                .iter()
+                .map(|(name, label)| format!("{name}\t{label}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+                .into_bytes(),
+            InvocationLimits::default(),
+        )
+        .unwrap()
+    }
+
     fn task_value(value: &[u8]) -> BoundedPayload {
         BoundedPayload::new(
             "mainframe-env.cics.storage-value@1",
@@ -4593,6 +4601,7 @@ mod tests {
             ("ENQ", CicsOperation::Enq),
             ("FORMATTIME", CicsOperation::FormatTime),
             ("HANDLE ABEND", CicsOperation::HandleAbend),
+            ("HANDLE AID", CicsOperation::HandleAid),
             ("HANDLE CONDITION", CicsOperation::HandleCondition),
             ("IGNORE CONDITION ERROR", CicsOperation::IgnoreCondition),
             ("INQUIRE PROGRAM(PGM)", CicsOperation::Inquire),
@@ -4630,7 +4639,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 34);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 35);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -5758,6 +5767,165 @@ mod tests {
             ),
             Err(HostProblem::Malformed)
         );
+    }
+
+    #[test]
+    fn handle_aid_is_bounded_stack_scoped_and_rejects_dpl_before_state_change() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, session) = registered(&service);
+        let invoke = |operation, arguments, sequence| {
+            let request = request(operation, arguments, sequence);
+            service.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), sequence),
+                request,
+            )
+        };
+        invoke(
+            CicsOperation::HandleAid,
+            BTreeMap::from([(
+                "AIDS".into(),
+                aid_handlers(&[
+                    ("ANYKEY", "ANY-HANDLER"),
+                    ("ENTER", "ENTER-HANDLER"),
+                    ("PF10", ""),
+                ]),
+            )]),
+            1,
+        )
+        .unwrap();
+        {
+            let state = service.lock().unwrap();
+            let run = state.runs.get(&invocation.run_unit_id).unwrap();
+            assert_eq!(run.aid_handlers["ANYKEY"], "ANY-HANDLER");
+            assert_eq!(run.aid_handlers["ENTER"], "ENTER-HANDLER");
+            assert_eq!(run.aid_handlers["PF10"], "");
+        }
+        invoke(CicsOperation::PushHandle, BTreeMap::new(), 2).unwrap();
+        invoke(
+            CicsOperation::HandleAid,
+            BTreeMap::from([("AIDS".into(), aid_handlers(&[("PF1", "INNER")]))]),
+            3,
+        )
+        .unwrap();
+        invoke(CicsOperation::PopHandle, BTreeMap::new(), 4).unwrap();
+        {
+            let state = service.lock().unwrap();
+            let run = state.runs.get(&invocation.run_unit_id).unwrap();
+            assert_eq!(run.aid_handlers.len(), 3);
+            assert!(!run.aid_handlers.contains_key("PF1"));
+        }
+        for (sequence, aid, disposition, target) in [
+            (20, 0xf1, CicsDisposition::Handler, Some("ANY-HANDLER")),
+            (21, 0x7a, CicsDisposition::Complete, None),
+        ] {
+            {
+                let mut state = service.lock().unwrap();
+                let terminal = state.sessions.get_mut(session.as_str()).unwrap();
+                terminal.aid = aid;
+                terminal.input = Some(Vec::new());
+            }
+            let response = invoke(CicsOperation::ReceiveMap, BTreeMap::new(), sequence).unwrap();
+            assert_eq!(
+                (
+                    response.disposition,
+                    response.aid,
+                    response.target.as_deref()
+                ),
+                (disposition, aid, target)
+            );
+        }
+
+        for (sequence, schema, value) in [
+            (5, "mainframe-env.cics.aid-handlers@1", "PF25\tBAD"),
+            (6, "mainframe-env.cics.aid-handlers@1", "PF2\tTWO\nPF1\tONE"),
+            (7, "mainframe-env.cics.aid-handlers@1", "PF1\tlower"),
+            (8, "mainframe-env.cics.literal@1", "PF1\tHANDLER"),
+        ] {
+            let malformed = request(
+                CicsOperation::HandleAid,
+                BTreeMap::from([(
+                    "AIDS".into(),
+                    BoundedPayload::new(
+                        schema,
+                        value.as_bytes().to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                )]),
+                sequence,
+            );
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, malformed.clone(), sequence),
+                    malformed,
+                ),
+                Err(HostProblem::Malformed)
+            );
+        }
+        let seventeen = crate::generated::CICS_AID_NAMES[..17]
+            .iter()
+            .map(|name| format!("{name}\t"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let oversized = request(
+            CicsOperation::HandleAid,
+            BTreeMap::from([(
+                "AIDS".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.aid-handlers@1",
+                    seventeen.into_bytes(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            )]),
+            10,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, oversized.clone(), 10),
+                oversized,
+            ),
+            Err(HostProblem::Malformed)
+        );
+
+        let context = BoundedPayload::new(
+            "mainframe-env.cics.execution-context@1",
+            b"dpl-synconreturn".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let dpl = invocation_for(
+            "handle-aid-dpl",
+            BTreeMap::from([("cics.execution-context".into(), context)]),
+        );
+        let dpl_session = SessionId::new("handle-aid-dpl", 64).unwrap();
+        service.create_session(&dpl_session, 24, 80).unwrap();
+        service
+            .register_run(dpl.clone(), &dpl_session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let mut denied = request(
+            CicsOperation::HandleAid,
+            BTreeMap::from([("AIDS".into(), aid_handlers(&[("ENTER", "BAD")]))]),
+            9,
+        );
+        denied.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let response = service
+            .invoke(&effect(&dpl.run_unit_id, denied.clone(), 9), denied)
+            .unwrap();
+        assert_eq!(
+            (
+                response.disposition,
+                response.condition.as_str(),
+                response.response,
+                response.response2,
+            ),
+            (CicsDisposition::Complete, "INVREQ", 16, 200)
+        );
+        let state = service.lock().unwrap();
+        assert!(state.runs[&dpl.run_unit_id].aid_handlers.is_empty());
     }
 
     #[test]

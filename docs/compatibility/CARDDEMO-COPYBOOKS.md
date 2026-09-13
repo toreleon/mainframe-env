@@ -12,8 +12,9 @@ corpus and are not a general CICS, Db2, or MQ SDK.
 
 ## Behavioral authorities
 
-- `DFHAID` represents the reached 3270 AID bytes for Enter, Clear, PA1/PA2, and
-  PF1–PF24. IBM documents DFHAID as the standard attention-identifier list and
+- `DFHAID` represents the reached 3270 AID bytes for Enter, Clear, Clear
+  Partition, PA1–PA3, PF1–PF24, selector pen, trigger, OPERID/MSR, and extended
+  MSR. IBM documents DFHAID as the standard attention-identifier list and
   recommends hexadecimal definitions where character-valued copies are not
   portable: <https://www.ibm.com/support/pages/node/377047>.
 - `DFHBMSCA` represents the reached standard field attributes and extended
