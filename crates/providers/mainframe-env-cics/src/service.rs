@@ -4782,6 +4782,8 @@ mod tests {
             CicsOperation::Assign,
             BTreeMap::from([
                 ("APPLID".into(), argument(b"APP-OUT")),
+                ("ALTSCRNHT".into(), argument(b"ALTERNATE-HEIGHT-OUT")),
+                ("ALTSCRNWD".into(), argument(b"ALTERNATE-WIDTH-OUT")),
                 ("DEFSCRNHT".into(), argument(b"DEFAULT-HEIGHT-OUT")),
                 ("DEFSCRNWD".into(), argument(b"DEFAULT-WIDTH-OUT")),
                 ("DS3270".into(), argument(b"DS3270-OUT")),
@@ -4814,6 +4816,8 @@ mod tests {
         assert_eq!(no_terminal.outputs["APPLID"].bytes(), b"MEAPPL");
         assert_eq!(no_terminal.outputs["FCI"].bytes(), &[0]);
         for name in [
+            "ALTSCRNHT",
+            "ALTSCRNWD",
             "DEFSCRNHT",
             "DEFSCRNWD",
             "DS3270",
@@ -5261,6 +5265,8 @@ mod tests {
             CicsOperation::Assign,
             BTreeMap::from([
                 ("APPLID".into(), argument(b"APP-OUT")),
+                ("ALTSCRNHT".into(), argument(b"ALTERNATE-HEIGHT-OUT")),
+                ("ALTSCRNWD".into(), argument(b"ALTERNATE-WIDTH-OUT")),
                 ("DEFSCRNHT".into(), argument(b"DEFAULT-HEIGHT-OUT")),
                 ("DEFSCRNWD".into(), argument(b"DEFAULT-WIDTH-OUT")),
                 ("DS3270".into(), argument(b"DS3270-OUT")),
@@ -5296,6 +5302,8 @@ mod tests {
         );
         assert_eq!(partial.outputs["APPLID"].bytes(), b"ME01");
         for name in [
+            "ALTSCRNHT",
+            "ALTSCRNWD",
             "DEFSCRNHT",
             "DEFSCRNWD",
             "DS3270",

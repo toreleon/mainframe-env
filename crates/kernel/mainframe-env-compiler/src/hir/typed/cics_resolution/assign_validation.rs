@@ -15,6 +15,8 @@ pub(super) fn validate(
     }
     for name in [
         "ABOFFSET",
+        "ALTSCRNHT",
+        "ALTSCRNWD",
         "APLKYBD",
         "APLTEXT",
         "APPLICATION",
@@ -91,7 +93,9 @@ pub(super) fn validate(
         }
         if matches!(
             name,
-            "CWALENG"
+            "ALTSCRNHT"
+                | "ALTSCRNWD"
+                | "CWALENG"
                 | "DEFSCRNHT"
                 | "DEFSCRNWD"
                 | "INITPARMLEN"

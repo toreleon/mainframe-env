@@ -791,7 +791,7 @@
       "web-control": 14,
       "web-service-control": 8
     },
-    "registry_sha256": "sha256:be0012cdf12e4f4b9c6ec9e11ec307bf1dfc0b39da5dc53a6e63c66c78aef375"
+    "registry_sha256": "sha256:685568c64f6f4173573cbd3019638ab4be9d51e5e703733ddaeb686dea2a8792"
   },
   "counts": {
     "batches": 3,
@@ -24998,6 +24998,8 @@
               "runtime_operation": "Assign",
               "legacy_execution_options": [
                 "ABOFFSET",
+                "ALTSCRNHT",
+                "ALTSCRNWD",
                 "APLKYBD",
                 "APLTEXT",
                 "APPLICATION",
@@ -25055,10 +25057,10 @@
                 "VALIDATION"
               ],
               "unready_result": null,
-              "handler_sha256": "sha256:a2815dd7a7366fa94bd36fee93285c3136043b4289fe8ec673984c17b6a3c128"
+              "handler_sha256": "sha256:2bc4dc691c17bad37c6dc2b41c036f75f30b527b5f2787d3b8fb0af489ddb4d1"
             }
           },
-          "row_contract_sha256": "sha256:ed9f32cedceeb04dda634e088a36f11527a9c5366dad01b3d8c1bfce2369a501"
+          "row_contract_sha256": "sha256:50854547ffab01adf6fca8a68c087e99f330a44581a056f8d74fa36026c359a7"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0012",
@@ -446859,5 +446861,5 @@
       ]
     }
   ],
-  "contract_sha256": "sha256:268e646fdb8a2ea9c57b8b8f0978dc28ecae553967e8ce1441b73dceb67b87e1"
+  "contract_sha256": "sha256:cf7430b8b5632c002dae841943636876e0efbd4af48575f7487716b555f945b7"
 }

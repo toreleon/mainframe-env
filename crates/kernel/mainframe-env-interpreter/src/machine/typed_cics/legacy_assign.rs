@@ -1,5 +1,7 @@
 pub(super) const OUTPUT_NAMES: &[&str] = &[
     "ABOFFSET",
+    "ALTSCRNHT",
+    "ALTSCRNWD",
     "APLKYBD",
     "APLTEXT",
     "APPLICATION",

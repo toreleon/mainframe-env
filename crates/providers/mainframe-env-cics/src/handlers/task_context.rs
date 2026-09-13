@@ -57,7 +57,14 @@ pub(in crate::service) fn assign(
 ) -> Result<CicsResponse, HostProblem> {
     validate_assign_request(request)?;
     let dpl = assign_dpl_context(run)?;
-    let screen_options = ["DEFSCRNHT", "DEFSCRNWD", "SCRNHT", "SCRNWD"];
+    let screen_options = [
+        "ALTSCRNHT",
+        "ALTSCRNWD",
+        "DEFSCRNHT",
+        "DEFSCRNWD",
+        "SCRNHT",
+        "SCRNWD",
+    ];
     let screen_requested = screen_options
         .iter()
         .any(|name| request.arguments.contains_key(*name));
@@ -81,6 +88,8 @@ pub(in crate::service) fn assign(
     let dpl_prohibited = dpl
         && (terminal_indicator_requested
             || [
+                "ALTSCRNHT",
+                "ALTSCRNWD",
                 "DEFSCRNHT",
                 "DEFSCRNWD",
                 "FCI",
@@ -145,6 +154,8 @@ pub(in crate::service) fn assign(
     }
     if let Some((rows, columns)) = dimensions {
         for (name, value) in [
+            ("ALTSCRNHT", rows),
+            ("ALTSCRNWD", columns),
             ("DEFSCRNHT", rows),
             ("DEFSCRNWD", columns),
             ("SCRNHT", rows),
@@ -288,6 +299,8 @@ fn assign_dpl_context(run: &Run) -> Result<bool, HostProblem> {
 fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
     let allowed = [
         "ABOFFSET",
+        "ALTSCRNHT",
+        "ALTSCRNWD",
         "APLKYBD",
         "APLTEXT",
         "APPLICATION",
