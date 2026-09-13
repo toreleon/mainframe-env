@@ -1,0 +1,108 @@
+{
+  "schema_version": "mainframe-env.cics-legacy-execution-options@1",
+  "target_version": "0.9.0",
+  "source_baseline": "ibm-cics-ts-6x-2026-08-31",
+  "application_identity_set_sha256": "sha256:a18057164564781563252d53586a8afbc401f2783950db456b3b98177fc60b94",
+  "routes": [
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0001",
+      "runtime_operation": "Abend",
+      "execution_options": ["ABCODE", "NOHANDLE", "RESP", "RESP2"]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0010",
+      "runtime_operation": "Asktime",
+      "execution_options": ["ABSTIME", "NOHANDLE", "RESP", "RESP2"]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0011",
+      "runtime_operation": "Assign",
+      "execution_options": ["APPLID", "NOHANDLE", "RESP", "RESP2", "SYSID"]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0040",
+      "runtime_operation": "Delete",
+      "execution_options": ["FILE", "NOHANDLE", "RESP", "RESP2", "RIDFLD"]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0058",
+      "runtime_operation": "EndBrowse",
+      "execution_options": ["FILE", "NOHANDLE", "RESP", "RESP2"]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0080",
+      "runtime_operation": "FormatTime",
+      "execution_options": ["ABSTIME", "DATESEP", "MILLISECONDS", "MMDDYY", "MMDDYYYY", "NOHANDLE", "RESP", "RESP2", "TIME", "TIMESEP", "YYDDD", "YYMMDD", "YYYYMMDD"]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0097",
+      "runtime_operation": "HandleAbend",
+      "execution_options": ["CANCEL", "LABEL", "NOHANDLE", "RESP", "RESP2"]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0099",
+      "runtime_operation": "HandleCondition",
+      "execution_options": ["NOHANDLE", "RESP", "RESP2"]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0138",
+      "runtime_operation": "Link",
+      "execution_options": ["COMMAREA", "NOHANDLE", "PROGRAM", "RESP", "RESP2"]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0157",
+      "runtime_operation": "ReadNext",
+      "execution_options": ["FILE", "INTO", "NOHANDLE", "RESP", "RESP2", "RIDFLD", "UPDATE"]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0158",
+      "runtime_operation": "ReadPrev",
+      "execution_options": ["FILE", "INTO", "NOHANDLE", "RESP", "RESP2", "RIDFLD", "UPDATE"]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0163",
+      "runtime_operation": "ReceiveMap",
+      "execution_options": ["INTO", "MAP", "MAPSET", "NOHANDLE", "RESP", "RESP2"]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0175",
+      "runtime_operation": "Retrieve",
+      "execution_options": ["INTO", "NOHANDLE", "RESP", "RESP2"]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0178",
+      "runtime_operation": "Return",
+      "execution_options": ["COMMAREA", "NOHANDLE", "RESP", "RESP2", "TRANSID"]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0189",
+      "runtime_operation": "SendMap",
+      "execution_options": ["FROM", "MAP", "MAPSET", "NOHANDLE", "RESP", "RESP2"]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0192",
+      "runtime_operation": "SendText",
+      "execution_options": ["FROM", "NOHANDLE", "RESP", "RESP2"]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0208",
+      "runtime_operation": "StartBrowse",
+      "execution_options": ["FILE", "NOHANDLE", "RESP", "RESP2", "RIDFLD"]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0253",
+      "runtime_operation": "Write",
+      "execution_options": ["FILE", "FROM", "NOHANDLE", "RESP", "RESP2", "RIDFLD"]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0257",
+      "runtime_operation": "WriteTransientData",
+      "execution_options": ["FROM", "LENGTH", "NOHANDLE", "QUEUE", "RESP", "RESP2"]
+    },
+    {
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0263",
+      "runtime_operation": "Xctl",
+      "execution_options": ["COMMAREA", "NOHANDLE", "PROGRAM", "RESP", "RESP2"]
+    }
+  ]
+}

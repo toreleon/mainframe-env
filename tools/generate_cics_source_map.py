@@ -567,7 +567,9 @@ def build_mapping(
 ) -> dict[str, Any]:
     validate_projection(projection)
     config = batch_config(batch_id)
-    catalog = descriptors.load_catalog(root)
+    # Source identity intentionally excludes the separate runtime-admission
+    # catalog so option-readiness work cannot invalidate frozen IBM receipts.
+    catalog = descriptors.load_catalog(root, include_legacy_execution_options=False)
     descriptor_path = root / descriptors.CATALOG_PATH
     descriptor_sha256 = f"sha256:{hashlib.sha256(descriptor_path.read_bytes()).hexdigest()}"
     commands = catalog["_application_commands"][

@@ -87,6 +87,11 @@ All notable changes to mainframe-env are documented here.
 - Updated the 0.9 CICS implementation plan to require the integrated 28-finding
   hardening baseline, bounded family slices, per-slice security/recovery,
   explicit backend validation, and early licensed-campaign planning.
+- Moved the 20 raw CICS compatibility routes' executable option subsets into a
+  versioned runtime-admission catalog and the generated application registry,
+  removing a handwritten compiler allowlist and rejecting catalog/runtime
+  drift during generation. The move also removed the unreachable `ASSIGN
+  TRANSID` entry, which is absent from the pinned application-command syntax.
 - Added a blocking `missing_docs` ratchet for every contract crate, reduced the
   initial execution/store debt, and added runnable lifecycle/store examples.
 - Split Db2, IMS, and MQ durable state into independently versioned object,

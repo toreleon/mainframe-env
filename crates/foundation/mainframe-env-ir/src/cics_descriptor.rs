@@ -236,6 +236,11 @@ pub struct CicsApplicationRegistryDescriptor {
     pub advertised: bool,
     /// Existing host API operation name when the handler is ready.
     pub runtime_operation: Option<&'static str>,
+    /// Source-reviewed options fully implemented by the raw compatibility route.
+    ///
+    /// Typed and unready rows keep this empty; their option admission is owned by
+    /// typed lowering or the explicit unsupported path respectively.
+    pub legacy_execution_options: &'static [&'static str],
 }
 
 include!("generated/cics_application_registry.rs");
@@ -447,11 +452,9 @@ mod tests {
             })
             .collect::<Vec<_>>();
         assert_eq!(typed.len(), 3);
-        assert!(
-            typed
-                .iter()
-                .all(|descriptor| descriptor.advertised && descriptor.runtime_operation.is_some())
-        );
+        assert!(typed.iter().all(|descriptor| descriptor.advertised
+            && descriptor.runtime_operation.is_some()
+            && descriptor.legacy_execution_options.is_empty()));
         let legacy = CICS_APPLICATION_REGISTRY
             .iter()
             .filter(|descriptor| {
@@ -459,21 +462,17 @@ mod tests {
             })
             .collect::<Vec<_>>();
         assert_eq!(legacy.len(), 20);
-        assert!(
-            legacy
-                .iter()
-                .all(|descriptor| descriptor.advertised && descriptor.runtime_operation.is_some())
-        );
+        assert!(legacy.iter().all(|descriptor| descriptor.advertised
+            && descriptor.runtime_operation.is_some()
+            && !descriptor.legacy_execution_options.is_empty()));
         let unready = CICS_APPLICATION_REGISTRY
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
         assert_eq!(unready.len(), 240);
-        assert!(
-            unready
-                .iter()
-                .all(|descriptor| !descriptor.advertised && descriptor.runtime_operation.is_none())
-        );
+        assert!(unready.iter().all(|descriptor| !descriptor.advertised
+            && descriptor.runtime_operation.is_none()
+            && descriptor.legacy_execution_options.is_empty()));
     }
 
     #[test]

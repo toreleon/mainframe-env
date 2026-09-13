@@ -13,6 +13,9 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG_PATH = Path("conformance/0.9/cics/command-descriptors.json")
+LEGACY_EXECUTION_CATALOG_PATH = Path(
+    "conformance/0.9/cics/legacy-execution-options.json"
+)
 OUTPUT_PATH = Path("crates/providers/mainframe-env-cics/src/generated/command_descriptors.rs")
 HOST_OUTPUT_PATH = Path(
     "crates/contracts/mainframe-env-host-api/src/generated/cics_application_commands.rs"
@@ -44,6 +47,7 @@ CONDITION_NAME_DOMAIN = b"mainframe-env.cics-condition-name-authority@1\0"
 CONDITION_NAME_PROFILE = "cics-eibresp-condition-name@1"
 CONDITION_NAME_OPTION = "CONDITION-NAME"
 IDENTIFIER = re.compile(r"^[A-Z][A-Za-z0-9]*$")
+OPTION_IDENTIFIER = re.compile(r"^[A-Z][A-Z0-9-]*$")
 FAMILY_ID = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
 EIBFN = re.compile(r"^[0-9A-F]{4}$")
 EXPECTED_UNITS = {
@@ -375,6 +379,71 @@ def _read_json(path: Path) -> dict[str, Any]:
         raise DescriptorError(f"{path}: {error}") from error
 
 
+def _load_legacy_execution_options(
+    root: Path,
+    commands: list[dict[str, Any]],
+    operations: list[dict[str, Any]],
+) -> dict[str, list[str]]:
+    path = root / LEGACY_EXECUTION_CATALOG_PATH
+    catalog = _read_json(path)
+    expected_fields = {
+        "schema_version",
+        "target_version",
+        "source_baseline",
+        "application_identity_set_sha256",
+        "routes",
+    }
+    if set(catalog) != expected_fields:
+        raise DescriptorError(f"{path} fields differ")
+    if (
+        catalog["schema_version"] != "mainframe-env.cics-legacy-execution-options@1"
+        or catalog["target_version"] != "0.9.0"
+        or catalog["source_baseline"] != OFFICIAL_BASELINE
+        or catalog["application_identity_set_sha256"]
+        != application_identity_digest(commands)
+    ):
+        raise DescriptorError(f"{path} identity binding differs")
+
+    expected_routes = [
+        (operation["official_row"], operation["operation"])
+        for operation in operations
+        if operation["interface"] == "api"
+        and operation["operation"] not in TYPED_RUNTIME_OPERATIONS
+    ]
+    routes = _array(catalog["routes"], "legacy execution routes")
+    normalized = []
+    for index, raw_route in enumerate(routes):
+        route = _object(raw_route, f"legacy execution routes[{index}]")
+        if set(route) != {"official_row", "runtime_operation", "execution_options"}:
+            raise DescriptorError(f"legacy execution routes[{index}] fields differ")
+        official_row = _text(
+            route["official_row"], f"legacy execution routes[{index}].official_row"
+        )
+        operation = _text(
+            route["runtime_operation"],
+            f"legacy execution routes[{index}].runtime_operation",
+        )
+        execution_options = [
+            _text(value, f"legacy execution routes[{index}].execution_options")
+            for value in _array(
+                route["execution_options"],
+                f"legacy execution routes[{index}].execution_options",
+            )
+        ]
+        if (
+            not execution_options
+            or execution_options != sorted(set(execution_options))
+            or any(
+                OPTION_IDENTIFIER.fullmatch(value) is None for value in execution_options
+            )
+        ):
+            raise DescriptorError(f"legacy execution route {official_row} options differ")
+        normalized.append((official_row, operation, execution_options))
+    if [(row, operation) for row, operation, _ in normalized] != expected_routes:
+        raise DescriptorError(f"{path} route identities or order differ")
+    return {row: options for row, _, options in normalized}
+
+
 def _official_units(
     root: Path, relative: Path, expected_digest: str
 ) -> tuple[dict[str, list[dict[str, Any]]], dict[str, dict[str, Any]]]:
@@ -463,7 +532,9 @@ def _official_units(
     return units, rows_by_id
 
 
-def load_catalog(root: Path = ROOT) -> dict[str, Any]:
+def load_catalog(
+    root: Path = ROOT, *, include_legacy_execution_options: bool = True
+) -> dict[str, Any]:
     path = root / CATALOG_PATH
     catalog = _read_json(path)
     expected = {
@@ -634,6 +705,15 @@ def load_catalog(root: Path = ROOT) -> dict[str, Any]:
     ]
     if observed_runtime != EXPECTED_RUNTIME_OPERATIONS:
         raise DescriptorError("CICS runtime operation compatibility set drifted")
+    legacy_execution_options = (
+        _load_legacy_execution_options(root, normalized_commands, normalized_operations)
+        if include_legacy_execution_options
+        else {}
+    )
+    for operation in normalized_operations:
+        operation["legacy_execution_options"] = legacy_execution_options.get(
+            operation["official_row"], []
+        )
 
     result = dict(catalog)
     result["_families"] = families
@@ -1041,6 +1121,7 @@ def _handler_digest(handler: dict[str, Any]) -> str:
             "readiness",
             "advertised",
             "runtime_operation",
+            "legacy_execution_options",
             "unready_result",
         )
     }
@@ -2114,6 +2195,11 @@ def _semantic_contract(
         "runtime_operation": (
             runtime_operation["operation"] if runtime_operation is not None else None
         ),
+        "legacy_execution_options": (
+            runtime_operation["legacy_execution_options"]
+            if runtime_operation is not None
+            else []
+        ),
         "unready_result": None if runtime_operation is not None else "explicit-unsupported",
     }
     registry["handler_sha256"] = _handler_digest(registry)
@@ -2894,6 +2980,7 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
         batch_commands = []
         for command in commands[start - 1 : end]:
             source_row = source_rows.get(command["official_row"])
+            source_accepted = False
             dimensions = []
             row_issue_ids: set[str] = set()
             scoped_ambiguity = review["ambiguity_scope"].get(
@@ -2992,6 +3079,17 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
                 condition_codes,
                 condition_name_authority,
             )
+            if source_accepted:
+                unknown_execution_options = set(
+                    semantic["registry"]["legacy_execution_options"]
+                ) - {
+                    option["name"] for option in semantic["options"]["entries"]
+                }
+                if unknown_execution_options:
+                    raise DescriptorError(
+                        f"{command['official_row']} legacy execution options are not "
+                        f"source-reviewed: {sorted(unknown_execution_options)}"
+                    )
             _validate_semantic_contract(command, semantic)
             dispositions = _dimension_dispositions(dimensions, semantic)
             if frozen:
@@ -3095,6 +3193,9 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
         or any(row["unready_result"] != "explicit-unsupported" for row in unready_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in typed_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in legacy_rows)
+        or any(not row["legacy_execution_options"] for row in legacy_rows)
+        or any(row["legacy_execution_options"] for row in typed_rows)
+        or any(row["legacy_execution_options"] for row in unready_rows)
         or any(row["advertised"] or row["runtime_operation"] is not None for row in unready_rows)
         or any(
             row["handler_sha256"]
@@ -3506,6 +3607,9 @@ def render_ir_registry(root: Path = ROOT, contracts: dict[str, Any] | None = Non
             if registry["runtime_operation"] is not None
             else "None"
         )
+        legacy_execution_options = _rust_string_slice(
+            registry["legacy_execution_options"]
+        )
         lines.append(
             "    CicsApplicationRegistryDescriptor { "
             f"official_row: {_rust_string(command['official_row'])}, "
@@ -3534,7 +3638,8 @@ def render_ir_registry(root: Path = ROOT, contracts: dict[str, Any] | None = Non
             f"handler_sha256: {_rust_string(registry['handler_sha256'])}, "
             f"readiness: {readiness}, "
             f"advertised: {str(registry['advertised']).lower()}, "
-            f"runtime_operation: {runtime_operation} "
+            f"runtime_operation: {runtime_operation}, "
+            f"legacy_execution_options: {legacy_execution_options} "
             "},"
         )
     lines.extend(["];"])

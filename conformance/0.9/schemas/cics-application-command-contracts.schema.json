@@ -260,13 +260,14 @@
     },
     "registry-row": {
       "type": "object", "additionalProperties": false,
-      "required": ["family", "handler_id", "handler_sha256", "readiness", "advertised", "runtime_operation", "unready_result"],
+      "required": ["family", "handler_id", "handler_sha256", "readiness", "advertised", "runtime_operation", "legacy_execution_options", "unready_result"],
       "properties": {
         "family": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"},
         "handler_id": {"type": "string", "pattern": "^mainframe-env-cics\\.handlers\\.[a-z0-9-]+\\.[a-z0-9-]+@1$"},
         "handler_sha256": {"$ref": "#/$defs/sha256"},
         "readiness": {"enum": ["typed-runtime", "legacy-compatibility", "unready"]}, "advertised": {"type": "boolean"},
         "runtime_operation": {"oneOf": [{"type": "null"}, {"type": "string", "pattern": "^[A-Z][A-Za-z0-9]*$"}]},
+        "legacy_execution_options": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9-]*$"}},
         "unready_result": {"oneOf": [{"type": "null"}, {"const": "explicit-unsupported"}]}
       }
     },

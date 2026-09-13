@@ -19,6 +19,7 @@ class CicsDescriptorTests(unittest.TestCase):
     def fixture(self, root: Path) -> None:
         for relative in [
             cics_descriptors.CATALOG_PATH,
+            cics_descriptors.LEGACY_EXECUTION_CATALOG_PATH,
             Path("conformance/0.2/catalogs/cics.json"),
         ]:
             target = root / relative
@@ -31,6 +32,10 @@ class CicsDescriptorTests(unittest.TestCase):
 
     def write_catalog(self, path: Path, catalog: dict) -> None:
         path.write_text(json.dumps(catalog, indent=2) + "\n")
+
+    def legacy_execution_catalog(self, root: Path) -> tuple[Path, dict]:
+        path = root / cics_descriptors.LEGACY_EXECUTION_CATALOG_PATH
+        return path, json.loads(path.read_text())
 
     def source_fixture(self, root: Path) -> tuple[Path, Path]:
         _, _, _, projection_relative, review_relative = cics_descriptors.CONTRACT_BATCHES[0]
@@ -482,6 +487,57 @@ class CicsDescriptorTests(unittest.TestCase):
             self.write_catalog(path, changed)
             with self.assertRaises(cics_descriptors.DescriptorError):
                 cics_descriptors.load_catalog(root)
+
+    def test_legacy_execution_options_are_catalog_owned_and_source_reviewed(self):
+        catalog = cics_descriptors.load_catalog(ROOT)
+        legacy = [
+            operation
+            for operation in catalog["_runtime_operations"]
+            if operation["legacy_execution_options"]
+        ]
+        self.assertEqual(len(legacy), 20)
+        self.assertTrue(
+            all(
+                operation["interface"] == "api"
+                and operation["operation"]
+                not in cics_descriptors.TYPED_RUNTIME_OPERATIONS
+                and operation["legacy_execution_options"]
+                == sorted(set(operation["legacy_execution_options"]))
+                for operation in legacy
+            )
+        )
+
+        contracts = cics_descriptors.build_contracts(ROOT)
+        registry = {
+            command["official_row"]: command["contract"]["registry"]
+            for batch in contracts["batches"]
+            for command in batch["commands"]
+        }
+        for operation in legacy:
+            self.assertEqual(
+                registry[operation["official_row"]]["legacy_execution_options"],
+                operation["legacy_execution_options"],
+            )
+
+    def test_legacy_execution_options_reject_missing_nonlegacy_and_invalid_entries(self):
+        mutations = {
+            "missing": lambda routes: routes.pop(),
+            "nonlegacy": lambda routes: routes[0].__setitem__(
+                "runtime_operation", "Read"
+            ),
+            "invalid": lambda routes: routes[0].__setitem__(
+                "execution_options", ["not-an-option"]
+            ),
+        }
+        for name, mutate in mutations.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                self.fixture(root)
+                path, catalog = self.legacy_execution_catalog(root)
+                mutate(catalog["routes"])
+                self.write_catalog(path, catalog)
+                with self.assertRaises(cics_descriptors.DescriptorError):
+                    cics_descriptors.build_contracts(root)
 
     def test_runtime_rejects_fepi_leakage_and_unknown_family(self):
         cases = [("official_row", "ibm-cics-ts-6x-2026-08-31:fepi-commands:0001")]

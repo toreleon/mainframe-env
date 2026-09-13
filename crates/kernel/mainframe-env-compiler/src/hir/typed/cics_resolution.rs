@@ -39,118 +39,6 @@ struct CandidateFailure {
     detail: String,
 }
 
-/// Options whose semantics are implemented by one raw compatibility route.
-///
-/// This is deliberately narrower than the source-reviewed IBM option catalog:
-/// catalog membership proves that a form is valid CICS syntax, while this
-/// table proves that the existing interpreter/provider path implements every
-/// option admitted for execution.
-struct CicsLegacyExecutionSubset {
-    official_row: &'static str,
-    options: &'static [&'static str],
-}
-
-const CICS_LEGACY_EXECUTION_SUBSETS: &[CicsLegacyExecutionSubset] = &[
-    CicsLegacyExecutionSubset {
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0001",
-        options: &["ABCODE", "NOHANDLE", "RESP", "RESP2"],
-    },
-    CicsLegacyExecutionSubset {
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0010",
-        options: &["ABSTIME", "NOHANDLE", "RESP", "RESP2"],
-    },
-    CicsLegacyExecutionSubset {
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0011",
-        options: &["APPLID", "NOHANDLE", "RESP", "RESP2", "SYSID", "TRANSID"],
-    },
-    CicsLegacyExecutionSubset {
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0040",
-        options: &["FILE", "NOHANDLE", "RESP", "RESP2", "RIDFLD"],
-    },
-    CicsLegacyExecutionSubset {
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0058",
-        options: &["FILE", "NOHANDLE", "RESP", "RESP2"],
-    },
-    CicsLegacyExecutionSubset {
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0080",
-        options: &[
-            "ABSTIME",
-            "DATESEP",
-            "MILLISECONDS",
-            "MMDDYY",
-            "MMDDYYYY",
-            "NOHANDLE",
-            "RESP",
-            "RESP2",
-            "TIME",
-            "TIMESEP",
-            "YYDDD",
-            "YYMMDD",
-            "YYYYMMDD",
-        ],
-    },
-    CicsLegacyExecutionSubset {
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0097",
-        options: &["CANCEL", "LABEL", "NOHANDLE", "RESP", "RESP2"],
-    },
-    CicsLegacyExecutionSubset {
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0099",
-        options: &["NOHANDLE", "RESP", "RESP2"],
-    },
-    CicsLegacyExecutionSubset {
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0138",
-        options: &["COMMAREA", "NOHANDLE", "PROGRAM", "RESP", "RESP2"],
-    },
-    CicsLegacyExecutionSubset {
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0157",
-        options: &[
-            "FILE", "INTO", "NOHANDLE", "RESP", "RESP2", "RIDFLD", "UPDATE",
-        ],
-    },
-    CicsLegacyExecutionSubset {
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0158",
-        options: &[
-            "FILE", "INTO", "NOHANDLE", "RESP", "RESP2", "RIDFLD", "UPDATE",
-        ],
-    },
-    CicsLegacyExecutionSubset {
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0163",
-        options: &["INTO", "MAP", "MAPSET", "NOHANDLE", "RESP", "RESP2"],
-    },
-    CicsLegacyExecutionSubset {
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0175",
-        options: &["INTO", "NOHANDLE", "RESP", "RESP2"],
-    },
-    CicsLegacyExecutionSubset {
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0178",
-        options: &["COMMAREA", "NOHANDLE", "RESP", "RESP2", "TRANSID"],
-    },
-    CicsLegacyExecutionSubset {
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0189",
-        options: &["FROM", "MAP", "MAPSET", "NOHANDLE", "RESP", "RESP2"],
-    },
-    CicsLegacyExecutionSubset {
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0192",
-        options: &["FROM", "NOHANDLE", "RESP", "RESP2"],
-    },
-    CicsLegacyExecutionSubset {
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0208",
-        options: &["FILE", "NOHANDLE", "RESP", "RESP2", "RIDFLD"],
-    },
-    CicsLegacyExecutionSubset {
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0253",
-        options: &["FILE", "FROM", "NOHANDLE", "RESP", "RESP2", "RIDFLD"],
-    },
-    CicsLegacyExecutionSubset {
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0257",
-        options: &["FROM", "LENGTH", "NOHANDLE", "QUEUE", "RESP", "RESP2"],
-    },
-    CicsLegacyExecutionSubset {
-        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0263",
-        options: &["COMMAREA", "NOHANDLE", "PROGRAM", "RESP", "RESP2"],
-    },
-];
-
 pub(super) fn validated_legacy_spi_compatibility(
     body: &[String],
 ) -> Resolution<Option<&'static CicsLegacySpiCompatibilityDescriptor>> {
@@ -690,20 +578,17 @@ fn validate_legacy_execution_subset(
     descriptor: &CicsApplicationRegistryDescriptor,
     present: &BTreeSet<&str>,
 ) -> Result<(), String> {
-    let subset = CICS_LEGACY_EXECUTION_SUBSETS
-        .iter()
-        .find(|subset| subset.official_row == descriptor.official_row)
-        .ok_or_else(|| {
-            format!(
-                "CICS {} has no frozen legacy execution option subset",
-                command_label(descriptor)
-            )
-        })?;
+    if descriptor.legacy_execution_options.is_empty() {
+        return Err(format!(
+            "CICS {} has no frozen legacy execution option subset",
+            command_label(descriptor)
+        ));
+    }
     let unready = present
         .iter()
         .filter(|name| {
             let canonical = compatibility_alias_target(descriptor, name).unwrap_or(name);
-            !subset.options.contains(&canonical)
+            !descriptor.legacy_execution_options.contains(&canonical)
                 && !(descriptor.condition_clauses.is_some() && is_condition_name(name))
         })
         .copied()
