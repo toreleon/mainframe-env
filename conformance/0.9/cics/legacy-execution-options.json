@@ -7,7 +7,7 @@
     {
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0001",
       "runtime_operation": "Abend",
-      "execution_options": ["ABCODE", "NOHANDLE", "RESP", "RESP2"]
+      "execution_options": ["ABCODE", "CANCEL", "NOHANDLE", "RESP", "RESP2"]
     },
     {
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0010",

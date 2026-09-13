@@ -5146,6 +5146,42 @@ mod tests {
                 .disposition,
             CicsDisposition::Abended
         );
+
+        let handle_abend = request(
+            CicsOperation::HandleAbend,
+            BTreeMap::from([("LABEL".into(), argument(b"SECOND-ABEND-ROUTINE"))]),
+            8,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, handle_abend.clone(), 8),
+                handle_abend,
+            )
+            .unwrap();
+        let abend_cancel = request(
+            CicsOperation::Abend,
+            BTreeMap::from([
+                ("ABCODE".into(), argument(b"9999")),
+                ("OPTION.CANCEL".into(), argument(b"")),
+            ]),
+            9,
+        );
+        let cancelled = service
+            .invoke(
+                &effect(&invocation.run_unit_id, abend_cancel.clone(), 9),
+                abend_cancel,
+            )
+            .unwrap();
+        assert_eq!(cancelled.disposition, CicsDisposition::Abended);
+        assert_eq!(cancelled.target, None);
+        let abend = request(CicsOperation::Abend, BTreeMap::new(), 10);
+        assert_eq!(
+            service
+                .invoke(&effect(&invocation.run_unit_id, abend.clone(), 10), abend)
+                .unwrap()
+                .disposition,
+            CicsDisposition::Abended
+        );
     }
 
     #[test]

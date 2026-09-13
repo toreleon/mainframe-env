@@ -57,6 +57,10 @@ All notable changes to mainframe-env are documented here.
   with replay-safe behavior. A zero-credit selected-route regression drives the
   condition through typed COBOL, Conformance IR, the coordinator, and product
   providers.
+- Implemented the source-defined `ABEND CANCEL` behavior on the existing task
+  path: it cancels the active HANDLE ABEND exit before abnormal termination,
+  persists no stale target, and is now admitted by the generated legacy option
+  catalog. Dump disposition and typed task-control migration remain pending.
 - Added a reviewed COBOL numeric `MOVE` pilot and corrected floating-insertion,
   capacity, sign, and overflow behavior found by that review.
 - Added cost-aware local Jenkins assurance, exact-candidate command receipts,

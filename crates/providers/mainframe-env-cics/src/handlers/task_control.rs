@@ -26,22 +26,33 @@ pub(in crate::service) fn invoke(
             run.retrieve.clone(),
         ),
         CicsOperation::Return => return_transaction(service, run, request),
-        CicsOperation::Abend => service.response(
-            run,
-            if run.abend_handler.is_some() {
-                CicsDisposition::Handler
-            } else {
-                CicsDisposition::Abended
-            },
-            "ERROR",
-            27,
-            0,
-            run.abend_handler.clone(),
-            None,
-            argument_bytes(request, "ABCODE").unwrap_or_default(),
-        ),
+        CicsOperation::Abend => abend(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
+}
+
+fn abend(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    if request.arguments.contains_key("OPTION.CANCEL") {
+        run.abend_handler = None;
+    }
+    service.response(
+        run,
+        if run.abend_handler.is_some() {
+            CicsDisposition::Handler
+        } else {
+            CicsDisposition::Abended
+        },
+        "ERROR",
+        27,
+        0,
+        run.abend_handler.clone(),
+        None,
+        argument_bytes(request, "ABCODE").unwrap_or_default(),
+    )
 }
 
 fn handle_condition(

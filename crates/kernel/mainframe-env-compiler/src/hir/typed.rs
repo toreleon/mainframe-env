@@ -2362,6 +2362,7 @@ mod tests {
     fn legacy_cics_routes_keep_only_implemented_forms_and_the_file_alias() {
         for command in [
             "ABEND ABCODE('A001')",
+            "ABEND ABCODE('B001') CANCEL",
             "ASSIGN APPLID(APPL-X)",
             "HANDLE ABEND LABEL(ABEND-HANDLER)",
             "READNEXT DATASET('ACCTDAT') RIDFLD(KEY-X) INTO(REC-X) UPDATE",
