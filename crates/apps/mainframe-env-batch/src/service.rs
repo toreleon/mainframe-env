@@ -9593,18 +9593,26 @@ mod tests {
             }),
             Err(HostProblem::NotFound)
         );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::ListLocks {
+                dataset: DatasetName::new("IBMUSER.EXISTING", 128).unwrap(),
+                now_tick: 1,
+                max_items: 8,
+            }),
+            Ok(DatasetResult::Locks { locks }) if locks.is_empty()
+        ));
     }
 
     #[test]
     fn idcams_delete_define_and_repro_mutate_exact_dataset_state() {
-        let records = Arc::new(Mutex::new(BTreeMap::from([
-            (
-                "IBMUSER.INPUT".into(),
-                vec![b"FIRST".to_vec(), b"SECOND".to_vec()],
-            ),
-            ("IBMUSER.TARGET".into(), vec![b"STALE".to_vec()]),
-        ])));
-        let service = service_with_datasets(records.clone());
+        let (service, dataset) = service_with_real_datasets();
+        seed_real_dataset(
+            &dataset,
+            "IBMUSER.INPUT",
+            vec![b"FIRST".to_vec(), b"SECOND".to_vec()],
+            804,
+        );
+        seed_real_dataset(&dataset, "IBMUSER.TARGET", vec![b"STALE".to_vec()], 806);
         let invocation = invocation();
         service
             .submit(
@@ -9617,14 +9625,31 @@ mod tests {
                 false,
             )
             .unwrap();
-        assert_eq!(
-            service.run_next(&invocation, false).unwrap().unwrap().state,
-            JobState::Completed
-        );
-        assert_eq!(
-            records.lock().unwrap()["IBMUSER.TARGET"],
-            vec![b"SECOND".to_vec()]
-        );
+        let completed = service.run_next(&invocation, false).unwrap().unwrap();
+        assert_eq!(completed.state, JobState::Completed);
+        assert_eq!(completed.return_code, Some(0));
+        let target = DatasetName::new("IBMUSER.TARGET", 128).unwrap();
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Read {
+                dataset: target.clone(),
+                member: None,
+                key: None,
+                max_records: 8,
+                control: Default::default(),
+            }),
+            Ok(DatasetResult::Records { records, .. }) if records == [b"SECOND".to_vec()]
+        ));
+        for name in [DatasetName::new("IBMUSER.INPUT", 128).unwrap(), target] {
+            let result = dataset.invoke(DatasetRequest::ListLocks {
+                dataset: name,
+                now_tick: 1,
+                max_items: 8,
+            });
+            assert!(
+                matches!(result, Ok(DatasetResult::Locks { ref locks }) if locks.is_empty()),
+                "orphan dataset lock: {result:?}"
+            );
+        }
     }
 
     fn hardening_catalog_page(names: &[DatasetName], start: Option<DatasetName>) -> DatasetResult {

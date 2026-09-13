@@ -2323,8 +2323,11 @@ impl DatasetService {
             DatasetRequest::Create {
                 dataset,
                 attributes,
-                ..
+                mutation,
             } => {
+                if dataset_name_lock_conflicts(state, dataset, mutation) {
+                    return Err(condition("LOCKED", 16));
+                }
                 let definition = validated_compatibility_definition(attributes, self.limits)?;
                 if state
                     .entries
@@ -2355,15 +2358,7 @@ impl DatasetService {
                 mutation,
             } => {
                 validate_dataset_definition(definition, self.limits)?;
-                if state.locks.values().any(|lock| {
-                    lock.dataset == *dataset
-                        && matches!(
-                            lock.target,
-                            mainframe_env_host_api::DatasetLockTarget::Dataset
-                        )
-                        && lock.expires_at > mutation.sequence
-                        && lock.transaction.as_deref() != mutation.transaction.as_deref()
-                }) {
+                if dataset_name_lock_conflicts(state, dataset, mutation) {
                     return Err(condition("LOCKED", 16));
                 }
                 if definition.lifecycle.migration_level != 0
@@ -4404,6 +4399,16 @@ impl DatasetService {
                         .insert(mutation.idempotency_key.as_str().into(), replay);
                     return Ok(result);
                 }
+                if member.is_none()
+                    && state.locks.values().any(|lock| {
+                        lock.dataset == *dataset
+                            && lock.transaction.is_some()
+                            && delete_mutation.transaction.as_deref() != lock.transaction.as_deref()
+                            && delete_mutation.transaction.as_deref() != Some(lock.lock_id.as_str())
+                    })
+                {
+                    return Err(condition("LOCKED", 16));
+                }
                 let current = entry(state, dataset)?.clone();
                 if expected_version.is_some_and(|expected| expected != current.version) {
                     return Err(HostProblem::IdempotencyConflict);
@@ -4467,13 +4472,18 @@ impl DatasetService {
                         .filter(|lock| lock.dataset == *dataset)
                         .cloned()
                         .collect::<Vec<_>>();
-                    if locks.iter().any(|lock| {
-                        lock.transaction.is_some()
-                            && delete_mutation.transaction.as_deref() != lock.transaction.as_deref()
-                            && delete_mutation.transaction.as_deref() != Some(lock.lock_id.as_str())
-                    }) {
-                        return Err(condition("LOCKED", 16));
-                    }
+                    let removed_locks = locks
+                        .iter()
+                        .filter(|lock| {
+                            !matches!(
+                                lock.target,
+                                mainframe_env_host_api::DatasetLockTarget::Dataset
+                            ) || delete_mutation.transaction.is_none()
+                                || delete_mutation.transaction.as_deref()
+                                    != lock.transaction.as_deref()
+                        })
+                        .cloned()
+                        .collect::<Vec<_>>();
                     let invalidation = state
                         .dependencies
                         .invalidation_order(dataset.as_str(), dependency_limits(self.limits))?;
@@ -4513,10 +4523,12 @@ impl DatasetService {
                         key: dataset.as_str().into(),
                         expected_version: current.version,
                     });
-                    mutations.extend(locks.iter().map(|lock| ProviderStateMutation::Delete {
-                        namespace: "dataset-lock".into(),
-                        key: lock.lock_id.clone(),
-                        expected_version: lock.version,
+                    mutations.extend(removed_locks.iter().map(|lock| {
+                        ProviderStateMutation::Delete {
+                            namespace: "dataset-lock".into(),
+                            key: lock.lock_id.clone(),
+                            expected_version: lock.version,
+                        }
                     }));
                     mutations.push(replay_mutation(mutation, &replay)?);
                     self.commit_catalog_mutations(mutations, mutation, &replay)?;
@@ -4525,7 +4537,7 @@ impl DatasetService {
                         state.dependencies.remove_node(&name);
                     }
                     state.entries.remove(dataset.as_str());
-                    for lock in locks {
+                    for lock in removed_locks {
                         state.locks.remove(&lock.lock_id);
                     }
                     state
@@ -5466,6 +5478,22 @@ fn lock_conflicts(
             mainframe_env_host_api::DatasetLockMode::Shared
         )
     )
+}
+
+fn dataset_name_lock_conflicts(
+    state: &State,
+    dataset: &DatasetName,
+    mutation: &mainframe_env_host_api::Mutation,
+) -> bool {
+    state.locks.values().any(|lock| {
+        lock.dataset == *dataset
+            && matches!(
+                lock.target,
+                mainframe_env_host_api::DatasetLockTarget::Dataset
+            )
+            && lock.expires_at > mutation.sequence
+            && lock.transaction.as_deref() != mutation.transaction.as_deref()
+    })
 }
 
 fn same_lock_isolation_owner(
@@ -11790,76 +11818,200 @@ mod tests {
 
     #[test]
     fn delete_accepts_transaction_or_lock_id_owner_and_rejects_other_transactions() {
-        let dataset = service(Arc::new(MemoryStore::new(Default::default())));
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let dataset = service(store.clone());
         let owner = principal("OWNER1");
-        let acquire = |name: DatasetName, sequence, transaction: &str| {
-            dataset
-                .invoke(DatasetRequest::AcquireLock {
-                    dataset: name,
-                    target: mainframe_env_host_api::DatasetLockTarget::Dataset,
-                    owner: owner.clone(),
-                    mode: mainframe_env_host_api::DatasetLockMode::Exclusive,
-                    now_tick: sequence,
-                    lease_ticks: 100,
-                    transaction: Some(transaction.into()),
-                    mutation: transaction_mutation(sequence, transaction),
-                })
-                .unwrap()
-        };
-        let delete = |name: DatasetName, sequence, transaction: Option<&str>| {
-            let mutation = transaction.map_or_else(
-                || mutation(sequence),
-                |transaction| transaction_mutation(sequence, transaction),
-            );
-            dataset.invoke(DatasetRequest::Delete {
-                dataset: name,
-                member: None,
-                expected_version: Some(1),
-                purge: false,
-                current_date: None,
-                mutation,
-            })
-        };
-
         let transaction_owned = DatasetName::new("USER.DELETE.JOB", 44).unwrap();
+        let mut definition = mainframe_env_host_api::DatasetDefinition::compatibility(attrs(
+            DatasetOrganization::KeySequenced,
+        ));
+        definition.vsam.access_mode = mainframe_env_host_api::VsamAccessMode::Rls;
         dataset
-            .invoke(DatasetRequest::Create {
+            .invoke(DatasetRequest::Define {
                 dataset: transaction_owned.clone(),
-                attributes: attrs(DatasetOrganization::Sequential),
+                definition: Box::new(definition.clone()),
                 mutation: mutation(420),
             })
             .unwrap();
-        acquire(transaction_owned.clone(), 421, "JOBX");
-        for (sequence, transaction) in [(422, Some("JOBY")), (423, None)] {
-            assert!(matches!(
-                delete(transaction_owned.clone(), sequence, transaction),
-                Err(HostProblem::Condition {
-                    ref name,
-                    response: 16,
-                    ..
-                }) if name == "LOCKED"
-            ));
-        }
+        let DatasetResult::Locks { locks } = dataset
+            .invoke(DatasetRequest::AcquireLock {
+                dataset: transaction_owned.clone(),
+                target: mainframe_env_host_api::DatasetLockTarget::Dataset,
+                owner: owner.clone(),
+                mode: mainframe_env_host_api::DatasetLockMode::Exclusive,
+                now_tick: 421,
+                lease_ticks: 100,
+                transaction: Some("JOBX".into()),
+                mutation: transaction_mutation(421, "JOBX"),
+            })
+            .unwrap()
+        else {
+            panic!("expected dataset lock receipt");
+        };
+        let dataset_lock_id = locks[0].lock_id.clone();
+        dataset
+            .invoke(DatasetRequest::Write {
+                dataset: transaction_owned.clone(),
+                member: None,
+                records: vec![b"ABCD".to_vec()],
+                expected_version: Some(1),
+                mutation: transaction_mutation(422, &dataset_lock_id),
+            })
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::AcquireLock {
+                dataset: transaction_owned.clone(),
+                target: mainframe_env_host_api::DatasetLockTarget::Record(b"AB".to_vec()),
+                owner: owner.clone(),
+                mode: mainframe_env_host_api::DatasetLockMode::Exclusive,
+                now_tick: 423,
+                lease_ticks: 100,
+                transaction: Some("JOBX".into()),
+                mutation: transaction_mutation(423, "JOBX"),
+            })
+            .unwrap();
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Delete {
+                dataset: transaction_owned.clone(),
+                member: None,
+                expected_version: Some(2),
+                purge: false,
+                current_date: None,
+                mutation: transaction_mutation(424, "JOBY"),
+            }),
+            Err(HostProblem::Condition {
+                ref name,
+                response: 16,
+                ..
+            }) if name == "LOCKED"
+        ));
+        let owner_delete = DatasetRequest::Delete {
+            dataset: transaction_owned.clone(),
+            member: None,
+            expected_version: Some(2),
+            purge: false,
+            current_date: None,
+            mutation: transaction_mutation(425, "JOBX"),
+        };
         assert_eq!(
-            delete(transaction_owned, 424, Some("JOBX")),
-            Ok(DatasetResult::Mutated { version: 2 })
+            dataset.invoke(owner_delete.clone()),
+            Ok(DatasetResult::Mutated { version: 3 })
         );
+        drop(dataset);
+
+        let dataset = service(store.clone());
+        assert_eq!(
+            dataset.invoke(owner_delete),
+            Ok(DatasetResult::Mutated { version: 3 })
+        );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::ListLocks {
+                dataset: transaction_owned.clone(),
+                now_tick: 426,
+                max_items: 8,
+            }),
+            Ok(DatasetResult::Locks { locks })
+                if locks.len() == 1 && locks[0].lock_id == dataset_lock_id
+        ));
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Create {
+                dataset: transaction_owned.clone(),
+                attributes: attrs(DatasetOrganization::Sequential),
+                mutation: transaction_mutation(426, "JOBY"),
+            }),
+            Err(HostProblem::Condition { ref name, .. }) if name == "LOCKED"
+        ));
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Define {
+                dataset: transaction_owned.clone(),
+                definition: Box::new(definition.clone()),
+                mutation: transaction_mutation(427, "JOBY"),
+            }),
+            Err(HostProblem::Condition { ref name, .. }) if name == "LOCKED"
+        ));
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Delete {
+                dataset: transaction_owned.clone(),
+                member: None,
+                expected_version: None,
+                purge: false,
+                current_date: None,
+                mutation: transaction_mutation(428, "JOBY"),
+            }),
+            Err(HostProblem::Condition { ref name, .. }) if name == "LOCKED"
+        ));
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::AcquireLock {
+                dataset: transaction_owned.clone(),
+                target: mainframe_env_host_api::DatasetLockTarget::Dataset,
+                owner: principal("OWNER2"),
+                mode: mainframe_env_host_api::DatasetLockMode::Exclusive,
+                now_tick: 429,
+                lease_ticks: 100,
+                transaction: Some("JOBY".into()),
+                mutation: transaction_mutation(429, "JOBY"),
+            }),
+            Err(HostProblem::Condition { ref name, .. }) if name == "LOCKED"
+        ));
+        assert_eq!(
+            dataset.invoke(DatasetRequest::Define {
+                dataset: transaction_owned.clone(),
+                definition: Box::new(definition),
+                mutation: transaction_mutation(430, "JOBX"),
+            }),
+            Ok(DatasetResult::Created { version: 1 })
+        );
+        dataset
+            .invoke(DatasetRequest::ReleaseLock {
+                dataset: transaction_owned,
+                lock_id: dataset_lock_id,
+                owner: owner.clone(),
+                mutation: transaction_mutation(431, "JOBX"),
+            })
+            .unwrap();
 
         let lock_owned = DatasetName::new("USER.DELETE.LOCK", 44).unwrap();
         dataset
             .invoke(DatasetRequest::Create {
                 dataset: lock_owned.clone(),
                 attributes: attrs(DatasetOrganization::Sequential),
-                mutation: mutation(425),
+                mutation: mutation(432),
             })
             .unwrap();
-        let DatasetResult::Locks { locks } = acquire(lock_owned.clone(), 426, "JOBX") else {
+        let DatasetResult::Locks { locks } = dataset
+            .invoke(DatasetRequest::AcquireLock {
+                dataset: lock_owned.clone(),
+                target: mainframe_env_host_api::DatasetLockTarget::Dataset,
+                owner,
+                mode: mainframe_env_host_api::DatasetLockMode::Exclusive,
+                now_tick: 433,
+                lease_ticks: 100,
+                transaction: Some("JOBX".into()),
+                mutation: transaction_mutation(433, "JOBX"),
+            })
+            .unwrap()
+        else {
             panic!("expected lock receipt");
         };
         assert_eq!(
-            delete(lock_owned, 427, Some(&locks[0].lock_id)),
+            dataset.invoke(DatasetRequest::Delete {
+                dataset: lock_owned.clone(),
+                member: None,
+                expected_version: Some(1),
+                purge: false,
+                current_date: None,
+                mutation: transaction_mutation(434, &locks[0].lock_id),
+            }),
             Ok(DatasetResult::Mutated { version: 2 })
         );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::ListLocks {
+                dataset: lock_owned,
+                now_tick: 435,
+                max_items: 8,
+            }),
+            Ok(DatasetResult::Locks { locks }) if locks.is_empty()
+        ));
     }
 
     #[test]

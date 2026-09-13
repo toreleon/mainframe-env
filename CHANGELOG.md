@@ -111,6 +111,9 @@ All notable changes to mainframe-env are documented here.
 
 - Allowed dataset deletion by the transaction that owns an active allocation lock while
   preserving lock rejection for unrelated transactions.
+- Kept a job's exclusive dataset-name lock through its own IDCAMS `DELETE` until step end, so
+  the step-end release finds it, while `DISP` terminal deletes still drop the lock with the
+  dataset and other transactions still receive `LOCKED` on the reserved name.
 - Repaired CardDemo conformance harnesses to run submitted jobs on JES background workers,
   observe terminal state through authenticated z/OSMF routes, and stop workers at gate shutdown.
 - Moved the authentication wall-clock fixture wholly behind the server test
