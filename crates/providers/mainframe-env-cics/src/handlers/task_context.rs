@@ -3,6 +3,28 @@ use mainframe_env_execution_api::{Invocation, RunUnitId};
 use mainframe_env_host_api::{CicsDisposition, CicsRequest, CicsResponse, HostProblem};
 use std::collections::BTreeMap;
 
+const TERMINAL_CAPABILITY_INDICATORS: [(&str, u8); 19] = [
+    ("APLKYBD", 0x00),
+    ("APLTEXT", 0x00),
+    ("BTRANS", 0x00),
+    ("COLOR", 0x00),
+    ("DS3270", 0xff),
+    ("DSSCS", 0x00),
+    ("EWASUPP", 0x00),
+    ("EXTDS", 0x00),
+    ("GMMI", 0x00),
+    ("HILIGHT", 0x00),
+    ("KATAKANA", 0x00),
+    ("MSRCONTROL", 0x00),
+    ("OUTLINE", 0x00),
+    ("PARTNS", 0x00),
+    ("PS", 0x00),
+    ("SOSI", 0x00),
+    ("TEXTKYBD", 0x00),
+    ("TEXTPRINT", 0x00),
+    ("VALIDATION", 0x00),
+];
+
 pub(in crate::service) fn current_program(invocation: &Invocation) -> Option<String> {
     invocation
         .selector
@@ -39,10 +61,12 @@ pub(in crate::service) fn assign(
     let screen_requested = screen_options
         .iter()
         .any(|name| request.arguments.contains_key(*name));
+    let terminal_indicator_requested = TERMINAL_CAPABILITY_INDICATORS
+        .iter()
+        .any(|(name, _)| request.arguments.contains_key(*name));
     let terminal_required = screen_requested
-        || ["DS3270", "DSSCS", "PARTNSET"]
-            .iter()
-            .any(|name| request.arguments.contains_key(*name));
+        || terminal_indicator_requested
+        || request.arguments.contains_key("PARTNSET");
     let dimensions = if !dpl && (terminal_required || request.arguments.contains_key("FCI")) {
         terminal_dimensions(service, run)?
     } else {
@@ -55,21 +79,20 @@ pub(in crate::service) fn assign(
         .then(|| assign_link_level(run, dpl))
         .transpose()?;
     let dpl_prohibited = dpl
-        && [
-            "DEFSCRNHT",
-            "DEFSCRNWD",
-            "DS3270",
-            "DSSCS",
-            "FCI",
-            "NEXTTRANSID",
-            "OPSECURITY",
-            "PARTNSET",
-            "SCRNHT",
-            "SCRNWD",
-            "TCTUALENG",
-        ]
-        .iter()
-        .any(|name| request.arguments.contains_key(*name));
+        && (terminal_indicator_requested
+            || [
+                "DEFSCRNHT",
+                "DEFSCRNWD",
+                "FCI",
+                "NEXTTRANSID",
+                "OPSECURITY",
+                "PARTNSET",
+                "SCRNHT",
+                "SCRNWD",
+                "TCTUALENG",
+            ]
+            .iter()
+            .any(|name| request.arguments.contains_key(*name)));
     let mut response = if dpl_prohibited || terminal_missing {
         super::condition::respond(
             service,
@@ -138,7 +161,7 @@ pub(in crate::service) fn assign(
                 .outputs
                 .insert("PARTNSET".into(), bounded(vec![b' '; 6])?);
         }
-        for (name, value) in [("DS3270", 0xff), ("DSSCS", 0x00)] {
+        for (name, value) in TERMINAL_CAPABILITY_INDICATORS {
             if request.arguments.contains_key(name) {
                 response.outputs.insert(name.into(), bounded(vec![value])?);
             }
@@ -265,6 +288,8 @@ fn assign_dpl_context(run: &Run) -> Result<bool, HostProblem> {
 fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
     let allowed = [
         "ABOFFSET",
+        "APLKYBD",
+        "APLTEXT",
         "APPLICATION",
         "APPLID",
         "ASRAPSW",
@@ -272,37 +297,52 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "ASRAREGS",
         "ASRAREGS64",
         "BRIDGE",
+        "BTRANS",
         "CHANNEL",
+        "COLOR",
         "CWALENG",
         "DEFSCRNHT",
         "DEFSCRNWD",
         "DS3270",
         "DSSCS",
+        "EWASUPP",
+        "EXTDS",
         "FCI",
+        "GMMI",
+        "HILIGHT",
         "INITPARM",
         "INITPARMLEN",
+        "KATAKANA",
         "LINKLEVEL",
         "MAJORVERSION",
         "MICROVERSION",
         "MINORVERSION",
+        "MSRCONTROL",
         "NEXTTRANSID",
         "OPTION.NOHANDLE",
         "OPERATION",
         "OPERKEYS",
         "OPSECURITY",
+        "OUTLINE",
+        "PARTNS",
         "PARTNSET",
         "PLATFORM",
         "PROGRAM",
+        "PS",
         "RESP",
         "RESP2",
         "RESTART",
         "SCRNHT",
         "SCRNWD",
+        "SOSI",
         "SYSID",
         "TASKPRIORITY",
         "TCTUALENG",
+        "TEXTKYBD",
+        "TEXTPRINT",
         "TWALENG",
         "USERID",
+        "VALIDATION",
     ];
     if request.arguments.len() > 16
         || request.arguments.iter().any(|(name, value)| {

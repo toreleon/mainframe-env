@@ -15,6 +15,8 @@ pub(super) fn validate(
     }
     for name in [
         "ABOFFSET",
+        "APLKYBD",
+        "APLTEXT",
         "APPLICATION",
         "APPLID",
         "ASRAPSW",
@@ -22,34 +24,49 @@ pub(super) fn validate(
         "ASRAREGS",
         "ASRAREGS64",
         "BRIDGE",
+        "BTRANS",
         "CHANNEL",
+        "COLOR",
         "CWALENG",
         "DEFSCRNHT",
         "DEFSCRNWD",
         "DS3270",
         "DSSCS",
+        "EWASUPP",
+        "EXTDS",
         "FCI",
+        "GMMI",
+        "HILIGHT",
         "INITPARM",
         "INITPARMLEN",
+        "KATAKANA",
         "LINKLEVEL",
         "MAJORVERSION",
         "MICROVERSION",
         "MINORVERSION",
+        "MSRCONTROL",
         "NEXTTRANSID",
         "OPERATION",
         "OPERKEYS",
         "OPSECURITY",
+        "OUTLINE",
+        "PARTNS",
         "PARTNSET",
         "PLATFORM",
         "PROGRAM",
+        "PS",
         "RESTART",
         "SCRNHT",
         "SCRNWD",
+        "SOSI",
         "SYSID",
         "TASKPRIORITY",
         "TCTUALENG",
+        "TEXTKYBD",
+        "TEXTPRINT",
         "TWALENG",
         "USERID",
+        "VALIDATION",
     ] {
         let Some(value) = clauses.get(name) else {
             continue;
@@ -102,7 +119,28 @@ pub(super) fn validate(
             || (name == "PARTNSET" && target.length != 6)
             || (name == "PROGRAM" && target.length != 8)
             || (name == "RESTART" && target.length != 1)
-            || (["DS3270", "DSSCS"].contains(&name) && target.length != 1)
+            || (matches!(
+                name,
+                "APLKYBD"
+                    | "APLTEXT"
+                    | "BTRANS"
+                    | "COLOR"
+                    | "DS3270"
+                    | "DSSCS"
+                    | "EWASUPP"
+                    | "EXTDS"
+                    | "GMMI"
+                    | "HILIGHT"
+                    | "KATAKANA"
+                    | "MSRCONTROL"
+                    | "OUTLINE"
+                    | "PARTNS"
+                    | "PS"
+                    | "SOSI"
+                    | "TEXTKYBD"
+                    | "TEXTPRINT"
+                    | "VALIDATION"
+            ) && target.length != 1)
         {
             return Err(format!(
                 "CICS ASSIGN {name} requires an exact-width data area"

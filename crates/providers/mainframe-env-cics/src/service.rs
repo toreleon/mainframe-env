@@ -4824,6 +4824,124 @@ mod tests {
         ] {
             assert!(!no_terminal.outputs.contains_key(name));
         }
+        for (offset, name) in [
+            "APLKYBD",
+            "APLTEXT",
+            "BTRANS",
+            "COLOR",
+            "EWASUPP",
+            "EXTDS",
+            "GMMI",
+            "HILIGHT",
+            "KATAKANA",
+            "MSRCONTROL",
+            "OUTLINE",
+            "PARTNS",
+            "PS",
+            "SOSI",
+            "TEXTKYBD",
+            "TEXTPRINT",
+            "VALIDATION",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let sequence = 100 + u64::try_from(offset).unwrap();
+            let mut capability = request(
+                CicsOperation::Assign,
+                BTreeMap::from([
+                    ("APPLID".into(), argument(b"APP-OUT")),
+                    (name.into(), argument(b"CAPABILITY-OUT")),
+                ]),
+                sequence,
+            );
+            capability.condition_policy = CicsConditionPolicy::Respond {
+                response_field: "RESP-X".into(),
+                response2_field: Some("RESP2-X".into()),
+            };
+            let capability = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, capability.clone(), sequence),
+                    capability,
+                )
+                .unwrap();
+            assert_eq!(
+                (
+                    capability.condition.as_str(),
+                    capability.response,
+                    capability.response2
+                ),
+                ("INVREQ", 16, 5),
+                "{name}"
+            );
+            assert_eq!(capability.outputs["APPLID"].bytes(), b"MEAPPL");
+            assert!(!capability.outputs.contains_key(name), "{name}");
+        }
+
+        let terminal_service = CicsService::open(
+            authorities(),
+            Arc::new(MemoryStore::new(Default::default())),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        let terminal_invocation = invocation_for("assign-capabilities", BTreeMap::new());
+        let terminal_session = SessionId::new("assign-capabilities", 64).unwrap();
+        terminal_service
+            .launch_terminal(
+                terminal_invocation.clone(),
+                &terminal_session,
+                "MENU",
+                24,
+                80,
+                "assign-capabilities-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let capability_names = [
+            "APLKYBD",
+            "APLTEXT",
+            "BTRANS",
+            "COLOR",
+            "EWASUPP",
+            "EXTDS",
+            "GMMI",
+            "HILIGHT",
+            "KATAKANA",
+            "MSRCONTROL",
+            "OUTLINE",
+            "PARTNS",
+            "PS",
+            "SOSI",
+            "TEXTKYBD",
+            "TEXTPRINT",
+            "VALIDATION",
+        ];
+        for (offset, names) in capability_names.chunks(15).enumerate() {
+            let sequence = 200 + u64::try_from(offset).unwrap();
+            let capability = request(
+                CicsOperation::Assign,
+                names
+                    .iter()
+                    .map(|name| ((*name).into(), argument(b"CAPABILITY-OUT")))
+                    .collect(),
+                sequence,
+            );
+            let capability = terminal_service
+                .invoke(
+                    &effect(
+                        &terminal_invocation.run_unit_id,
+                        capability.clone(),
+                        sequence,
+                    ),
+                    capability,
+                )
+                .unwrap();
+            assert_eq!(capability.condition, "NORMAL");
+            for name in names {
+                assert_eq!(capability.outputs[*name].bytes(), &[0], "{name}");
+            }
+        }
 
         let missing_program = request(
             CicsOperation::Assign,
@@ -5191,6 +5309,59 @@ mod tests {
             "TCTUALENG",
         ] {
             assert!(!partial.outputs.contains_key(name));
+        }
+        for (offset, name) in [
+            "APLKYBD",
+            "APLTEXT",
+            "BTRANS",
+            "COLOR",
+            "EWASUPP",
+            "EXTDS",
+            "GMMI",
+            "HILIGHT",
+            "KATAKANA",
+            "MSRCONTROL",
+            "OUTLINE",
+            "PARTNS",
+            "PS",
+            "SOSI",
+            "TEXTKYBD",
+            "TEXTPRINT",
+            "VALIDATION",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let sequence = 100 + u64::try_from(offset).unwrap();
+            let mut capability = request(
+                CicsOperation::Assign,
+                BTreeMap::from([
+                    ("APPLID".into(), argument(b"APP-OUT")),
+                    (name.into(), argument(b"CAPABILITY-OUT")),
+                ]),
+                sequence,
+            );
+            capability.condition_policy = CicsConditionPolicy::Respond {
+                response_field: "RESP-X".into(),
+                response2_field: Some("RESP2-X".into()),
+            };
+            let capability = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, capability.clone(), sequence),
+                    capability,
+                )
+                .unwrap();
+            assert_eq!(
+                (
+                    capability.condition.as_str(),
+                    capability.response,
+                    capability.response2
+                ),
+                ("INVREQ", 16, 200),
+                "{name}"
+            );
+            assert_eq!(capability.outputs["APPLID"].bytes(), b"ME01");
+            assert!(!capability.outputs.contains_key(name), "{name}");
         }
 
         let prohibited = request(

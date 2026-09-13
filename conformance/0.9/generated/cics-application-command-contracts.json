@@ -791,7 +791,7 @@
       "web-control": 14,
       "web-service-control": 8
     },
-    "registry_sha256": "sha256:aaaf19d1115ba52543a74afd8bcd684062070ceb792e5a08a2322ae270ce624e"
+    "registry_sha256": "sha256:be0012cdf12e4f4b9c6ec9e11ec307bf1dfc0b39da5dc53a6e63c66c78aef375"
   },
   "counts": {
     "batches": 3,
@@ -24998,6 +24998,8 @@
               "runtime_operation": "Assign",
               "legacy_execution_options": [
                 "ABOFFSET",
+                "APLKYBD",
+                "APLTEXT",
                 "APPLICATION",
                 "APPLID",
                 "ASRAPSW",
@@ -25005,43 +25007,58 @@
                 "ASRAREGS",
                 "ASRAREGS64",
                 "BRIDGE",
+                "BTRANS",
                 "CHANNEL",
+                "COLOR",
                 "CWALENG",
                 "DEFSCRNHT",
                 "DEFSCRNWD",
                 "DS3270",
                 "DSSCS",
+                "EWASUPP",
+                "EXTDS",
                 "FCI",
+                "GMMI",
+                "HILIGHT",
                 "INITPARM",
                 "INITPARMLEN",
+                "KATAKANA",
                 "LINKLEVEL",
                 "MAJORVERSION",
                 "MICROVERSION",
                 "MINORVERSION",
+                "MSRCONTROL",
                 "NEXTTRANSID",
                 "NOHANDLE",
                 "OPERATION",
                 "OPERKEYS",
                 "OPSECURITY",
+                "OUTLINE",
+                "PARTNS",
                 "PARTNSET",
                 "PLATFORM",
                 "PROGRAM",
+                "PS",
                 "RESP",
                 "RESP2",
                 "RESTART",
                 "SCRNHT",
                 "SCRNWD",
+                "SOSI",
                 "SYSID",
                 "TASKPRIORITY",
                 "TCTUALENG",
+                "TEXTKYBD",
+                "TEXTPRINT",
                 "TWALENG",
-                "USERID"
+                "USERID",
+                "VALIDATION"
               ],
               "unready_result": null,
-              "handler_sha256": "sha256:239d6381b3c6ba898390e0d7cc78b1b53f22d15d5799c5c9882695832e4a03a4"
+              "handler_sha256": "sha256:a2815dd7a7366fa94bd36fee93285c3136043b4289fe8ec673984c17b6a3c128"
             }
           },
-          "row_contract_sha256": "sha256:978733bfcd03345ca437b367bb7d27013e63a9399d24b53c601e72f37fc6154c"
+          "row_contract_sha256": "sha256:ed9f32cedceeb04dda634e088a36f11527a9c5366dad01b3d8c1bfce2369a501"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0012",
@@ -446842,5 +446859,5 @@
       ]
     }
   ],
-  "contract_sha256": "sha256:8dc190f306a1acdaaacf0ea6d0e852f2636730d6b4978130dfb8eebb499e15f2"
+  "contract_sha256": "sha256:268e646fdb8a2ea9c57b8b8f0978dc28ecae553967e8ce1441b73dceb67b87e1"
 }

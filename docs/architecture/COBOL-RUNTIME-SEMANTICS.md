@@ -95,6 +95,9 @@ contract explicitly permits it.
   rules.
   The virtual terminal's data-stream contract is 3270, not basic SCS, so
   DS3270 and DSSCS return `X'FF'` and `X'00'` respectively when it is attached.
+  Optional keyboard, display, print, partition, symbol, DBCS, reader, and
+  validation capabilities that the minimal terminal does not implement return
+  `X'00'`; they are not inferred from received byte values.
   Other source-valid ASSIGN options remain rejected until their terminal,
   program-level, or failure context has an owned runtime representation.
 - Terminal execution outcomes carry an explicit transaction-dump disposition.

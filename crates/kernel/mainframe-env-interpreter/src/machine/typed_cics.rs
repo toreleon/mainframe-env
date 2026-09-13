@@ -9,6 +9,8 @@ use mainframe_env_ir::{
     decode_cics_effect_plan, verify_semantic_contracts,
 };
 
+mod legacy_assign;
+
 const PLAN_ATTRIBUTE: &str = "cics_plan";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -410,44 +412,7 @@ pub(super) fn execute_legacy(
     let into = legacy_destination(&arguments, "INTO").map(CicsTarget::Legacy);
     let output_names: &[&str] = match operation {
         CicsOperation::Asktime => &["ABSTIME"],
-        CicsOperation::Assign => &[
-            "ABOFFSET",
-            "APPLICATION",
-            "APPLID",
-            "ASRAPSW",
-            "ASRAPSW16",
-            "ASRAREGS",
-            "ASRAREGS64",
-            "BRIDGE",
-            "CHANNEL",
-            "CWALENG",
-            "DEFSCRNHT",
-            "DEFSCRNWD",
-            "DS3270",
-            "DSSCS",
-            "FCI",
-            "INITPARM",
-            "INITPARMLEN",
-            "LINKLEVEL",
-            "MAJORVERSION",
-            "MICROVERSION",
-            "MINORVERSION",
-            "NEXTTRANSID",
-            "OPERATION",
-            "OPERKEYS",
-            "OPSECURITY",
-            "PARTNSET",
-            "PLATFORM",
-            "PROGRAM",
-            "RESTART",
-            "SCRNHT",
-            "SCRNWD",
-            "SYSID",
-            "TASKPRIORITY",
-            "TCTUALENG",
-            "TWALENG",
-            "USERID",
-        ],
+        CicsOperation::Assign => legacy_assign::OUTPUT_NAMES,
         CicsOperation::FormatTime => &[
             "YYYYMMDD",
             "YYMMDD",
