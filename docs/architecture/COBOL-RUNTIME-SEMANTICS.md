@@ -67,6 +67,9 @@ contract explicitly permits it.
   Product installation names are not reinterpreted as IBM application context.
   Output references resolve before dispatch, numeric and fixed binary fields
   require their exact shapes, and no command can exceed IBM's 16-option limit.
+  OPSECURITY is three null bytes and absent TCTUALENG is halfword zero locally;
+  in a DPL server either option raises `INVREQ` 16/200 while other requested
+  outputs are still applied when the condition policy permits return.
   Other source-valid ASSIGN options remain rejected until their terminal,
   program-level, or failure context has an owned runtime representation.
 - Terminal execution outcomes carry an explicit transaction-dump disposition.

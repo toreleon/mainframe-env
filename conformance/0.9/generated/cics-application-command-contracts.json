@@ -791,7 +791,7 @@
       "web-control": 14,
       "web-service-control": 8
     },
-    "registry_sha256": "sha256:f6ffa5e8f5a83e8aad532b63eff169078c68ac450cb470e4671e5b1c5b2acada"
+    "registry_sha256": "sha256:412a957e6427b948be2daff32a0597d50e2568ece7fb98e973859ac82d7362d3"
   },
   "counts": {
     "batches": 3,
@@ -25007,20 +25007,22 @@
                 "NOHANDLE",
                 "OPERATION",
                 "OPERKEYS",
+                "OPSECURITY",
                 "PLATFORM",
                 "RESP",
                 "RESP2",
                 "RESTART",
                 "SYSID",
                 "TASKPRIORITY",
+                "TCTUALENG",
                 "TWALENG",
                 "USERID"
               ],
               "unready_result": null,
-              "handler_sha256": "sha256:3063bdd52c10dc1390446f2dd2e08a481ae0360a69a3bdba8ae5e69428433f82"
+              "handler_sha256": "sha256:f98b0ca49a6c9cbe6c06f54e63eb622f24cc887ac6a8512fa453dac299809b4d"
             }
           },
-          "row_contract_sha256": "sha256:2880fc918f7110a7cb4d50b2fc6f3ead0f8c69ef023338148cf58fcc6287417b"
+          "row_contract_sha256": "sha256:b1cc72f667df7464173dd9e76340e8757fb1433260c32920e3b007a63a5dfe0d"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0012",
@@ -446821,5 +446823,5 @@
       ]
     }
   ],
-  "contract_sha256": "sha256:74f6f48994f28a107ef96f1ba0d4ff15d64d132d0d9a63fe562511fe920a7945"
+  "contract_sha256": "sha256:e7359ef76a9f8b190ab5539091753307deac3276e957b9e7f13e95110ef7d46b"
 }

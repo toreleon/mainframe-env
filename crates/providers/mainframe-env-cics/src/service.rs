@@ -4711,6 +4711,23 @@ mod tests {
         assert_eq!(assigned.outputs["TWALENG"].bytes(), b"0");
         assert_eq!(assigned.outputs["USERID"].bytes(), b"IBMUSER");
 
+        let local_only = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("OPSECURITY".into(), argument(b"OPSECURITY-OUT")),
+                ("TCTUALENG".into(), argument(b"TCTUA-LENGTH-OUT")),
+            ]),
+            29,
+        );
+        let local_only = service
+            .invoke(
+                &effect(&invocation.run_unit_id, local_only.clone(), 29),
+                local_only,
+            )
+            .unwrap();
+        assert_eq!(local_only.outputs["OPSECURITY"].bytes(), &[0; 3]);
+        assert_eq!(local_only.outputs["TCTUALENG"].bytes(), b"0");
+
         for (sequence, name, value) in [
             (30, "PROGRAM", argument(b"PROGRAM-OUT")),
             (31, "USERID", cics_decimal(1)),
@@ -4880,6 +4897,55 @@ mod tests {
         assert_eq!(response.outputs["TASKPRIORITY"].bytes(), b"0");
         assert_eq!(response.outputs["TWALENG"].bytes(), b"0");
         assert_eq!(response.outputs["USERID"].bytes(), b"IBMUSER");
+
+        let mut prohibited = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("APPLID".into(), argument(b"APP-OUT")),
+                ("OPSECURITY".into(), argument(b"OPSECURITY-OUT")),
+                ("TCTUALENG".into(), argument(b"TCTUA-LENGTH-OUT")),
+            ]),
+            2,
+        );
+        prohibited.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let partial = service
+            .invoke(
+                &effect(&invocation.run_unit_id, prohibited.clone(), 2),
+                prohibited,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                partial.disposition,
+                partial.condition.as_str(),
+                partial.response,
+                partial.response2,
+            ),
+            (CicsDisposition::Complete, "INVREQ", 16, 200)
+        );
+        assert_eq!(partial.outputs["APPLID"].bytes(), b"ME01");
+        assert!(!partial.outputs.contains_key("OPSECURITY"));
+        assert!(!partial.outputs.contains_key("TCTUALENG"));
+
+        let prohibited = request(
+            CicsOperation::Assign,
+            BTreeMap::from([("OPSECURITY".into(), argument(b"OPSECURITY-OUT"))]),
+            3,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, prohibited.clone(), 3),
+                prohibited,
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 200,
+            })
+        );
     }
 
     #[test]

@@ -59,8 +59,10 @@ All notable changes to mainframe-env are documented here.
   defaults. It also reports absent CWA/TWA lengths, null OPERKEYS, and a normal
   task start without inventing state. The compiler enforces the 16-option limit
   and halfword/fullword/exact-width receivers, the provider rejects unknown or
-  wrongly typed arguments, and a compiled online task observes priority changes
-  through the durable selected route.
+  wrongly typed arguments, and local OPSECURITY/TCTUALENG defaults become exact
+  DPL `INVREQ` 16/200 failures while unrelated requested outputs still populate.
+  A compiled online task observes the local values and priority changes through
+  the durable selected route.
 - Added online continuation format `MEOM4`, which retains the current task
   priority and an optional staged program-transfer handoff. Readers preserve
   `MEOM3` priority rows and historical `MEOM2` rows without that field.

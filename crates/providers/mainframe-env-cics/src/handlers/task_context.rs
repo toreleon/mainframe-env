@@ -7,16 +7,34 @@ pub(in crate::service) fn assign(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     validate_assign_request(request)?;
-    let mut response = service.response(
-        run,
-        CicsDisposition::Complete,
-        "NORMAL",
-        0,
-        0,
-        None,
-        None,
-        Vec::new(),
-    )?;
+    let dpl = assign_dpl_context(run)?;
+    let prohibited = dpl
+        && ["OPSECURITY", "TCTUALENG"]
+            .iter()
+            .any(|name| request.arguments.contains_key(*name));
+    let mut response = if prohibited {
+        super::condition::respond(
+            service,
+            run,
+            &request.condition_policy,
+            HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 200,
+            },
+        )?
+    } else {
+        service.response(
+            run,
+            CicsDisposition::Complete,
+            "NORMAL",
+            0,
+            0,
+            None,
+            None,
+            Vec::new(),
+        )?
+    };
     for (name, value) in [
         ("APPLID", run.applid.as_bytes()),
         ("SYSID", run.sysid.as_bytes()),
@@ -61,7 +79,31 @@ pub(in crate::service) fn assign(
             response.outputs.insert(name.into(), bounded(value)?);
         }
     }
+    if !prohibited && request.arguments.contains_key("TCTUALENG") {
+        response
+            .outputs
+            .insert("TCTUALENG".into(), decimal_payload(0)?);
+    }
+    if !prohibited && request.arguments.contains_key("OPSECURITY") {
+        response
+            .outputs
+            .insert("OPSECURITY".into(), bounded(vec![0; 3])?);
+    }
     Ok(response)
+}
+
+fn assign_dpl_context(run: &Run) -> Result<bool, HostProblem> {
+    let Some(context) = run.invocation.bindings.get("cics.execution-context") else {
+        return Ok(false);
+    };
+    if context.schema() != "mainframe-env.cics.execution-context@1" {
+        return Err(HostProblem::Malformed);
+    }
+    match context.bytes() {
+        b"local" => Ok(false),
+        b"dpl-synconreturn" | b"dpl-without-synconreturn" | b"dpl-executionset-subset" => Ok(true),
+        _ => Err(HostProblem::Malformed),
+    }
 }
 
 fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
@@ -76,12 +118,14 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "OPTION.NOHANDLE",
         "OPERATION",
         "OPERKEYS",
+        "OPSECURITY",
         "PLATFORM",
         "RESP",
         "RESP2",
         "RESTART",
         "SYSID",
         "TASKPRIORITY",
+        "TCTUALENG",
         "TWALENG",
         "USERID",
     ];
