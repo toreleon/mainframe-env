@@ -51,6 +51,12 @@ All notable changes to mainframe-env are documented here.
 - Added the first CIC-902 recovery guard: an owned execution-context binding
   rejects DPL `SYNCPOINT` without `SYNCONRETURN` or under `DPLSUBSET` with exact
   `INVREQ` RESP/RESP2 before unit-of-work mutation.
+- Added a bounded remote-syncpoint outcome binding: a `SYNCONRETURN` DPL commit
+  that the remote system cannot commit now rolls back local recoverable work,
+  durably finalizes the rolled-back UOW, and returns exact `ROLLEDBACK` RESP 82
+  with replay-safe behavior. A zero-credit selected-route regression drives the
+  condition through typed COBOL, Conformance IR, the coordinator, and product
+  providers.
 - Added a reviewed COBOL numeric `MOVE` pilot and corrected floating-insertion,
   capacity, sign, and overflow behavior found by that review.
 - Added cost-aware local Jenkins assurance, exact-candidate command receipts,

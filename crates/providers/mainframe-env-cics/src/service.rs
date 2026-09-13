@@ -2734,6 +2734,7 @@ fn condition_name(name: &str) -> &'static str {
         "IOERR" => "IOERR",
         "LOCKED" => "LOCKED",
         "RECORDBUSY" => "RECORDBUSY",
+        "ROLLEDBACK" => "ROLLEDBACK",
         _ => "ERROR",
     }
 }
@@ -3918,7 +3919,6 @@ fn store_error(error: StoreError) -> HostProblem {
         _ => HostProblem::InfrastructureFailure,
     }
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3931,7 +3931,7 @@ mod tests {
         SecretRef,
     };
     use mainframe_env_racf::{MemorySecretResolver, RacfService, racf_providers};
-    use mainframe_env_store::{MemoryStore, SqliteStateStore};
+    use mainframe_env_store::{MemoryStore, PostgresStateStore, SqliteStateStore};
     use mainframe_env_store_api::{
         EffectDigestFormat, EffectIntentMetadata, EffectRecord, EffectState,
     };
@@ -5254,6 +5254,270 @@ mod tests {
                 .get_provider_state("cics-uow", "outer-64")
                 .unwrap()
                 .is_none()
+        );
+    }
+
+    #[test]
+    fn remote_commit_refusal_rolls_back_and_returns_rolledback_condition() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let limits = InvocationLimits::default();
+        let context = BoundedPayload::new(
+            "mainframe-env.cics.execution-context@1",
+            b"dpl-synconreturn".to_vec(),
+            limits,
+        )
+        .unwrap();
+        let remote_outcome = BoundedPayload::new(
+            "mainframe-env.cics.syncpoint.remote-outcome@1",
+            b"unable-to-commit".to_vec(),
+            limits,
+        )
+        .unwrap();
+        let invocation = invocation_for(
+            "dpl-remote-rollback",
+            BTreeMap::from([
+                ("cics.execution-context".into(), context),
+                ("cics.syncpoint.remote-outcome".into(), remote_outcome),
+            ]),
+        );
+        let session = SessionId::new("dpl-remote-rollback", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let mut syncpoint = request(CicsOperation::Syncpoint, BTreeMap::new(), 65);
+        syncpoint.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, syncpoint.clone(), 65),
+                syncpoint.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                response.condition.as_str(),
+                response.response,
+                response.response2,
+                response.unit_of_work
+            ),
+            ("ROLLEDBACK", 82, 0, None)
+        );
+        let record = store
+            .get_provider_state("cics-uow", "outer-65")
+            .unwrap()
+            .unwrap();
+        assert_eq!(record.version, 2);
+        let uow = decode_uow(&record.payload).unwrap();
+        assert!(uow.finalized);
+        assert_eq!(uow.outcome, CicsUnitOfWorkOutcome::RolledBack);
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, syncpoint.clone(), 65),
+                    syncpoint
+                )
+                .unwrap(),
+            response
+        );
+
+        let remote_outcome = BoundedPayload::new(
+            "mainframe-env.cics.syncpoint.remote-outcome@1",
+            b"unable-to-commit".to_vec(),
+            limits,
+        )
+        .unwrap();
+        let local = invocation_for(
+            "local-remote-outcome",
+            BTreeMap::from([("cics.syncpoint.remote-outcome".into(), remote_outcome)]),
+        );
+        let local_session = SessionId::new("local-remote-outcome", 64).unwrap();
+        service.create_session(&local_session, 24, 80).unwrap();
+        service
+            .register_run(local.clone(), &local_session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let local_request = request(CicsOperation::Syncpoint, BTreeMap::new(), 66);
+        assert_eq!(
+            service.invoke(
+                &effect(&local.run_unit_id, local_request.clone(), 66),
+                local_request,
+            ),
+            Err(HostProblem::Malformed)
+        );
+        assert!(
+            store
+                .get_provider_state("cics-uow", "outer-66")
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn remote_commit_refusal_replays_after_sqlite_restart() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-remote-rollback-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("cics.db");
+        let url = format!("sqlite://{}?mode=rwc", path.display());
+        let limits = InvocationLimits::default();
+        let invocation = invocation_for(
+            "sqlite-remote-rollback",
+            BTreeMap::from([
+                (
+                    "cics.execution-context".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.execution-context@1",
+                        b"dpl-synconreturn".to_vec(),
+                        limits,
+                    )
+                    .unwrap(),
+                ),
+                (
+                    "cics.syncpoint.remote-outcome".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.syncpoint.remote-outcome@1",
+                        b"unable-to-commit".to_vec(),
+                        limits,
+                    )
+                    .unwrap(),
+                ),
+            ]),
+        );
+        let session = SessionId::new("sqlite-remote-rollback", 64).unwrap();
+        let mut syncpoint = request(CicsOperation::Syncpoint, BTreeMap::new(), 67);
+        syncpoint.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let expected = {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, syncpoint.clone(), 67),
+                    syncpoint.clone(),
+                )
+                .unwrap()
+        };
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            assert_eq!(
+                service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, syncpoint.clone(), 67),
+                        syncpoint,
+                    )
+                    .unwrap(),
+                expected
+            );
+            let record = store
+                .get_provider_state("cics-uow", "outer-67")
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                decode_uow(&record.payload).unwrap().outcome,
+                CicsUnitOfWorkOutcome::RolledBack
+            );
+        }
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_dir(directory);
+    }
+
+    #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+    fn remote_commit_refusal_replays_after_postgres_reopen() {
+        let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")
+            .expect("explicit PostgreSQL test URL required");
+        let suffix = std::process::id();
+        let limits = InvocationLimits::default();
+        let invocation = invocation_for(
+            &format!("postgres-remote-rollback-{suffix}"),
+            BTreeMap::from([
+                (
+                    "cics.execution-context".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.execution-context@1",
+                        b"dpl-synconreturn".to_vec(),
+                        limits,
+                    )
+                    .unwrap(),
+                ),
+                (
+                    "cics.syncpoint.remote-outcome".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.syncpoint.remote-outcome@1",
+                        b"unable-to-commit".to_vec(),
+                        limits,
+                    )
+                    .unwrap(),
+                ),
+            ]),
+        );
+        let session = SessionId::new(format!("postgres-remote-rollback-{suffix}"), 64).unwrap();
+        let mut syncpoint = request(CicsOperation::Syncpoint, BTreeMap::new(), 68);
+        syncpoint.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let effect_key = IdempotencyKey::new(
+            format!("postgres-remote-rollback-{suffix}"),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        syncpoint.mutation.as_mut().unwrap().idempotency_key = effect_key.clone();
+        let expected = {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, syncpoint.clone(), 68),
+                    syncpoint.clone(),
+                )
+                .unwrap()
+        };
+        let store: Arc<dyn ProviderStateStore> =
+            Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let service = service(store.clone());
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, syncpoint.clone(), 68),
+                    syncpoint,
+                )
+                .unwrap(),
+            expected
+        );
+        let record = store
+            .get_provider_state("cics-uow", effect_key.as_str())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            decode_uow(&record.payload).unwrap().outcome,
+            CicsUnitOfWorkOutcome::RolledBack
         );
     }
 

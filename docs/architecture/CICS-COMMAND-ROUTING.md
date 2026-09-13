@@ -72,6 +72,17 @@ split:
   compatibility path; and
 - 240 `unready` rows that are recognized but fail explicitly as unsupported.
 
+The 20 raw compatibility routes' implemented option subsets are owned by the
+separate versioned
+[`legacy-execution-options.json`](../../conformance/0.9/cics/legacy-execution-options.json)
+catalog and its
+[`schema`](../../conformance/0.9/schemas/cics-legacy-execution-options.schema.json).
+It binds the logical 263-row application identity digest, not the physical
+descriptor file, so runtime-readiness edits cannot invalidate frozen IBM
+source receipts. The generator requires its route identities to match the
+legacy API runtime set exactly and verifies every admitted option against a
+current accepted source projection before emitting the registry.
+
 The 23 existing API routes are the only advertised application commands.
 `ASKTIME ABSTIME` is the advertised time form because the existing handler
 returns its packed-decimal destination; bare `ASKTIME` remains unready until
@@ -148,6 +159,14 @@ syncpoint ownership, and `EXECUTIONSET=DPLSUBSET`. The recovery handler uses
 that context before changing UOW state; CIC-905 owns populating it from a
 future public DPL route. It is not embedded in source tokens or inferred from a
 successful transport call.
+
+For a DPL invocation that owns the syncpoint, the bounded
+`mainframe-env.cics.syncpoint.remote-outcome@1` binding records whether the
+remote system is commit-capable or unable to commit. The latter drives the UOW
+into rollback, persists the rolled-back terminal state, backs out local
+recoverable work, and raises `ROLLEDBACK` with RESP 82. The binding is rejected
+outside a `dpl-synconreturn` context; CIC-905 owns populating both bindings from
+the eventual public DPL transport.
 
 ## Change contract
 
