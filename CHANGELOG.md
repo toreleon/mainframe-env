@@ -85,6 +85,10 @@ All notable changes to mainframe-env are documented here.
   EIBRESP names. One command atomically installs or deactivates every selected
   handler, specific actions precede generalized `ERROR`, and canonical or
   legacy duplicates and malformed labels fail before task state changes.
+- Pinned a zero-credit CICS `HANDLE AID` source scope containing the exact
+  command page and its linked BMS/DFHAID constant authority, reproduced through
+  the existing Chrome session. This source receipt grants no execution or
+  licensed differential credit.
 - Added the frozen-with-bounded-ambiguities CIC-901 command contract and generated
   263-row compiler registry. The registry explicitly separates three typed runtime
   handlers, 20 legacy compatibility handlers, and 240 unready handlers; automatic

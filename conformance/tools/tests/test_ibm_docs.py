@@ -518,6 +518,7 @@ class CacheTests(unittest.TestCase):
         pins, tocs = ibm_docs.load_pins()
         scopes = {scope.scope_id for pin in [*pins, *tocs] for scope in pin.scopes}
         self.assertIn("cics-file-uow-pilot", scopes)
+        self.assertIn("cics-handle-aid", scopes)
         self.assertIn("cics-task-enqueue", scopes)
         self.assertIn("cobol-numeric-move-pilot", scopes)
         self.assertTrue(pins)

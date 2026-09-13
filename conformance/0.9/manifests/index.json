@@ -49,6 +49,17 @@
       "coverage_credit": 0
     },
     {
+      "scope_id": "cics-handle-aid",
+      "subsystem": "cics",
+      "baseline_id": "ibm-cics-ts-6x-handle-aid-2026-09-14",
+      "manifest": "conformance/0.9/manifests/cics-handle-aid-topics.json",
+      "manifest_sha256": "sha256:bcddaebb777c63db563be7ab3d22be67ba041da030d4001ad15053fef348e06b",
+      "topic_count": 2,
+      "topic_manifest_sha256": "sha256:8628fa60497ba97504966f9429927bf23acad1b101182ca2064c4db6c0a96d28",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
       "scope_id": "cics-task-association",
       "subsystem": "cics",
       "baseline_id": "ibm-cics-ts-6x-task-association-2026-09-13",
