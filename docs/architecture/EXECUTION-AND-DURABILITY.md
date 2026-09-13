@@ -152,14 +152,26 @@ cancellation, timeout, discard, and disconnect remove both owned locks and
 waiter entries. Promotion reserves the lock for the oldest waiter, which must
 resume under the same execution and run-unit identity before continuing.
 
+Installed ENQMODEL definitions are immutable rows in
+`cics-enqueue-model-v1`, bound as one complete set by the
+`cics-enqueue-model-catalog-v1` count/digest row. The first installation is
+allowed only while the enqueue authority is empty; this makes the transition
+from the single-region compatibility profile to explicit scoped identities
+atomic and rollback-safe. Once installed, unmatched resources and blank-scope
+matches include APPLID/SYSID in their local lock identity. A nonblank
+four-character ENQSCOPE replaces that region identity and therefore coordinates
+all CICS services sharing the durable store. Address-based requests never use
+an ENQMODEL. Disabled matches abend ENQ, and corrupt or partially installed
+model/catalog state prevents provider open. The pinned source set does not
+establish precedence among overlapping generic models, so installation rejects
+overlap rather than choosing an undocumented winner.
+
 An ENQ wait is not a terminal-input handoff. Its execution remains
 `Suspended`, and both the coordinator checkpoint and product continuation stay
 attached to the same online exchange. Resume reissues the ENQ as a new bounded
 effect attempt; a promoted waiter completes without incrementing the nesting
 count. A crossed deadline or cancellation terminalizes the execution and runs
-the task cleanup path. The current executable profile is the source-defined
-local/default scope; installed sysplex-wide ENQMODEL routing remains a separate
-family extension and receives no local-slice credit.
+the task cleanup path.
 
 When a terminal RECEIVE suspends a machine, the product first commits its own
 session continuation and then atomically moves the interpreter execution from

@@ -53,6 +53,15 @@ which removes the waiter or releases its owned locks and promotes the oldest
 surviving waiter. Manual deletion can orphan a grant or break the catalog count
 and will make the next provider open fail closed.
 
+Treat `cics-enqueue-model-v1` and `cics-enqueue-model-catalog-v1` as one
+configuration unit. Install the complete bounded model set before the first
+lock exists; later calls must be exact idempotent replays. Back up and restore
+the definition rows and singleton digest row together. Missing, extra,
+overlapping, noncanonical, or digest-mismatched definitions make CICS open fail
+closed. Do not delete the model catalog to force local routing: model-aware lock
+keys contain either APPLID/SYSID or ENQSCOPE and are not compatible with the
+single-region key profile.
+
 If an exchange points at a terminal execution, first finish the abandoned
 COBOL/CICS run, remove its interpreter checkpoint, and delete the exchange.
 Preserve `online-machine-continuation` only when the final lifecycle event is

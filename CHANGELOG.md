@@ -36,15 +36,20 @@ All notable changes to mainframe-env are documented here.
   application commands in deterministic 88/88/87 batches. The accepted receipts
   contain 18,070 candidates: 16,307 objectively verified and 1,763 retained as
   bounded product ambiguity, with raw IBM publication bodies kept outside Git.
-- Added a zero-credit, three-topic IBM source scope for the CICS task-enqueue
+- Added a zero-credit, five-topic IBM source scope for the CICS task-enqueue
   slice. Alongside ENQ and DEQ it pins the command-level parameter page that
-  establishes `DFHVALUE(TASK)=233` and `DFHVALUE(UOW)=246`; publication bodies
-  remain in the external content-addressed cache.
+  establishes `DFHVALUE(TASK)=233` and `DFHVALUE(UOW)=246`, plus the ENQMODEL
+  definition and global-enqueue tuning pages; publication bodies remain in the
+  external content-addressed cache.
 - Added typed local `EXEC CICS ENQ` and `DEQ` execution over a bounded durable
   lock catalog. The runtime preserves address-versus-content resource identity,
   nested UOW/TASK ownership, FIFO wait promotion, `NOSUSPEND`/active-handler
   `ENQBUSY`, syncpoint/task cleanup, atomic replay, and durable resume across
   memory, SQLite, and PostgreSQL store profiles.
+- Added durable installed ENQMODEL definitions with bounded generic matching,
+  local APPLID/SYSID isolation, nonblank-scope global serialization, disabled
+  model abends, address-enqueue locality, atomic catalog installation, and
+  restart validation.
 - Added the frozen-with-bounded-ambiguities CIC-901 command contract and generated
   263-row compiler registry. The registry explicitly separates three typed runtime
   handlers, 20 legacy compatibility handlers, and 240 unready handlers; automatic

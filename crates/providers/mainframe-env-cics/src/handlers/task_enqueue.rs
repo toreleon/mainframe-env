@@ -12,10 +12,16 @@ use mainframe_env_store_api::{
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
+mod model;
+pub use model::CicsEnqueueModelDefinition;
+pub(crate) use model::load_enqueue_models;
+use model::{enqueue_model_matches, model_character, validate_active_catalog};
+
 const LOCK_NAMESPACE: &str = "cics-enqueue-v1";
 const CATALOG_NAMESPACE: &str = "cics-enqueue-catalog-v1";
 const CATALOG_KEY: &str = "locks";
 const LOCK_MAGIC: &[u8; 8] = b"MECENQ02";
+const SCOPED_LOCK_MAGIC: &[u8; 8] = b"MECENQ03";
 const CATALOG_MAGIC: &[u8; 8] = b"MECENQC1";
 const MAX_CAS_ATTEMPTS: usize = 16;
 const TASK_CVDA: i64 = 233;
@@ -29,6 +35,7 @@ enum Lifetime {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct LockRecord {
+    scope: LockScope,
     owner_execution: String,
     owner_run_unit: String,
     uow_count: u32,
@@ -38,10 +45,24 @@ struct LockRecord {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+enum LockScope {
+    LegacyLocal,
+    Region { applid: String, sysid: String },
+    Global(String),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct Waiter {
     owner_execution: String,
     owner_run_unit: String,
     lifetime: Lifetime,
+}
+
+struct EnqueueIdentity {
+    resource_key: String,
+    lifetime: Lifetime,
+    scope: LockScope,
+    disabled: bool,
 }
 
 enum ApplyError {
@@ -75,11 +96,27 @@ pub(super) fn invoke(
         .as_ref()
         .ok_or(HostProblem::MissingIdempotency)?;
     validate_request_shape(request)?;
-    let (resource_key, lifetime) = request_identity(request)?;
+    let models = service.lock()?.enqueue_models.clone();
+    validate_active_catalog(service.store.as_ref(), &models)?;
+    let models = models.values().cloned().collect::<Vec<_>>();
+    let identity = request_identity(request, run, &models)?;
+    if identity.disabled && request.operation == CicsOperation::Enq {
+        release_task(service, run)?;
+        return service.response(
+            run,
+            CicsDisposition::Abended,
+            "ERROR",
+            1,
+            0,
+            None,
+            None,
+            Vec::new(),
+        );
+    }
     for _ in 0..MAX_CAS_ATTEMPTS {
         let current = service
             .store
-            .get_provider_state(LOCK_NAMESPACE, &resource_key)
+            .get_provider_state(LOCK_NAMESPACE, &identity.resource_key)
             .map_err(store_error)?;
         let applied = match request.operation {
             CicsOperation::Enq => acquire(
@@ -87,8 +124,9 @@ pub(super) fn invoke(
                 run,
                 request,
                 retention_tick,
-                &resource_key,
-                lifetime,
+                &identity.resource_key,
+                identity.lifetime,
+                &identity.scope,
                 current,
             ),
             CicsOperation::Deq => release(
@@ -96,8 +134,9 @@ pub(super) fn invoke(
                 run,
                 request,
                 retention_tick,
-                &resource_key,
-                lifetime,
+                &identity.resource_key,
+                identity.lifetime,
+                &identity.scope,
                 current,
             ),
             _ => unreachable!(),
@@ -308,6 +347,7 @@ fn acquire(
     retention_tick: u64,
     resource_key: &str,
     lifetime: Lifetime,
+    scope: &LockScope,
     current: Option<ProviderStateRecord>,
 ) -> Result<CicsResponse, ApplyError> {
     let owner_execution = run.invocation.execution_id.as_str();
@@ -319,6 +359,7 @@ fn acquire(
         ),
         None => (
             LockRecord {
+                scope: scope.clone(),
                 owner_execution: owner_execution.into(),
                 owner_run_unit: owner_run_unit.into(),
                 uow_count: 0,
@@ -329,6 +370,9 @@ fn acquire(
             None,
         ),
     };
+    if &lock.scope != scope {
+        return Err(HostProblem::InfrastructureFailure.into());
+    }
     if lock.owner_execution != owner_execution || lock.owner_run_unit != owner_run_unit {
         let active_handle = matches!(request.condition_policy, CicsConditionPolicy::Default)
             && run.handlers.contains_key("ENQBUSY");
@@ -451,6 +495,7 @@ fn release(
     retention_tick: u64,
     resource_key: &str,
     lifetime: Lifetime,
+    scope: &LockScope,
     current: Option<ProviderStateRecord>,
 ) -> Result<CicsResponse, ApplyError> {
     let response = normal_response(service, run)?;
@@ -462,6 +507,9 @@ fn release(
         return Ok(response);
     };
     let mut lock = decode_lock(&record.payload, service.limits)?;
+    if &lock.scope != scope {
+        return Err(HostProblem::InfrastructureFailure.into());
+    }
     if lock.owner_execution != run.invocation.execution_id.as_str()
         || lock.owner_run_unit != run.invocation.run_unit_id.as_str()
     {
@@ -621,7 +669,11 @@ fn decode_catalog(payload: &[u8]) -> Result<u64, HostProblem> {
     ))
 }
 
-fn request_identity(request: &CicsRequest) -> Result<(String, Lifetime), HostProblem> {
+fn request_identity(
+    request: &CicsRequest,
+    run: &Run,
+    models: &[CicsEnqueueModelDefinition],
+) -> Result<EnqueueIdentity, HostProblem> {
     let resource = request
         .arguments
         .get("RESOURCE")
@@ -673,12 +725,49 @@ fn request_identity(request: &CicsRequest) -> Result<(String, Lifetime), HostPro
     } else {
         Lifetime::Uow
     };
+    let model = (mode == b'C')
+        .then(|| {
+            models
+                .iter()
+                .find(|model| enqueue_model_matches(&model.enqueue_name, identity))
+        })
+        .flatten();
+    let scope = if models.is_empty() {
+        LockScope::LegacyLocal
+    } else if let Some(scope) = model.and_then(|model| model.enqueue_scope.clone()) {
+        LockScope::Global(scope)
+    } else {
+        LockScope::Region {
+            applid: run.applid.clone(),
+            sysid: run.sysid.clone(),
+        }
+    };
     let mut hash = Sha256::new();
-    hash.update(b"mainframe-env.cics.enqueue-resource@1\0");
+    match &scope {
+        LockScope::LegacyLocal => hash.update(b"mainframe-env.cics.enqueue-resource@1\0"),
+        LockScope::Region { applid, sysid } => {
+            hash.update(b"mainframe-env.cics.enqueue-resource@2\0L");
+            hash_framed(&mut hash, applid.as_bytes());
+            hash_framed(&mut hash, sysid.as_bytes());
+        }
+        LockScope::Global(scope) => {
+            hash.update(b"mainframe-env.cics.enqueue-resource@2\0G");
+            hash_framed(&mut hash, scope.as_bytes());
+        }
+    }
     hash.update([mode]);
-    hash.update((identity.len() as u64).to_be_bytes());
-    hash.update(identity);
-    Ok((hex(&hash.finalize()), lifetime))
+    hash_framed(&mut hash, identity);
+    Ok(EnqueueIdentity {
+        resource_key: hex(&hash.finalize()),
+        lifetime,
+        scope,
+        disabled: model.is_some_and(|model| !model.enabled),
+    })
+}
+
+fn hash_framed(hash: &mut Sha256, value: &[u8]) {
+    hash.update((value.len() as u64).to_be_bytes());
+    hash.update(value);
 }
 
 fn parse_integer(value: &[u8]) -> Result<i64, HostProblem> {
@@ -716,7 +805,22 @@ fn encode_lock(
     if lock.waiters.len() > limits.max_runs {
         return Err(HostProblem::ResourceExhausted);
     }
-    let mut out = LOCK_MAGIC.to_vec();
+    let mut out = match &lock.scope {
+        LockScope::LegacyLocal => LOCK_MAGIC.to_vec(),
+        LockScope::Region { applid, sysid } => {
+            let mut out = SCOPED_LOCK_MAGIC.to_vec();
+            out.push(0);
+            field(&mut out, applid.as_bytes())?;
+            field(&mut out, sysid.as_bytes())?;
+            out
+        }
+        LockScope::Global(scope) => {
+            let mut out = SCOPED_LOCK_MAGIC.to_vec();
+            out.push(1);
+            field(&mut out, scope.as_bytes())?;
+            out
+        }
+    };
     field(&mut out, lock.owner_execution.as_bytes())?;
     field(&mut out, lock.owner_run_unit.as_bytes())?;
     out.extend_from_slice(&lock.uow_count.to_be_bytes());
@@ -745,7 +849,20 @@ fn decode_lock(bytes: &[u8], limits: super::super::CicsLimits) -> Result<LockRec
     if bytes.len() > limits.max_queue_bytes {
         return Err(HostProblem::ResourceExhausted);
     }
-    let mut reader = CodecReader::new(bytes, LOCK_MAGIC)?;
+    let (mut reader, scope) = if bytes.starts_with(LOCK_MAGIC) {
+        (CodecReader::new(bytes, LOCK_MAGIC)?, LockScope::LegacyLocal)
+    } else {
+        let mut reader = CodecReader::new(bytes, SCOPED_LOCK_MAGIC)?;
+        let scope = match reader.byte()? {
+            0 => LockScope::Region {
+                applid: reader.text(128)?,
+                sysid: reader.text(128)?,
+            },
+            1 => LockScope::Global(reader.text(16)?),
+            _ => return Err(HostProblem::InfrastructureFailure),
+        };
+        (reader, scope)
+    };
     let owner_execution = reader.text(256)?;
     let owner_run_unit = reader.text(256)?;
     let uow_count = reader.u32()?;
@@ -782,6 +899,16 @@ fn decode_lock(bytes: &[u8], limits: super::super::CicsLimits) -> Result<LockRec
         .collect::<BTreeSet<_>>();
     if owner_execution.is_empty()
         || owner_run_unit.is_empty()
+        || match &scope {
+            LockScope::LegacyLocal => false,
+            LockScope::Region { applid, sysid } => applid.is_empty() || sysid.is_empty(),
+            LockScope::Global(scope) => {
+                scope.chars().count() != 4
+                    || !scope
+                        .chars()
+                        .all(|character| model_character(character, false))
+            }
+        }
         || uow_count
             .checked_add(task_count)
             .is_none_or(|count| count == 0)
@@ -797,6 +924,7 @@ fn decode_lock(bytes: &[u8], limits: super::super::CicsLimits) -> Result<LockRec
         return Err(HostProblem::InfrastructureFailure);
     }
     Ok(LockRecord {
+        scope,
         owner_execution,
         owner_run_unit,
         uow_count,

@@ -7,6 +7,7 @@ use crate::retention::{
     CICS_OUTER_EFFECT_ORIGIN_BINDING, CICS_OUTER_EFFECT_ORIGIN_SCHEMA, DecodedUow,
     UowRetentionMetadata,
 };
+pub use handlers::CicsEnqueueModelDefinition;
 use mainframe_env_encoding::CodePage;
 use mainframe_env_execution_api::{
     BoundedPayload, CapabilityId, ExecutionId, IdempotencyKey, Invocation, InvocationLimits,
@@ -37,6 +38,7 @@ pub struct CicsLimits {
     pub max_maps: usize,
     pub max_programs: usize,
     pub max_file_aliases: usize,
+    pub max_enqueue_models: usize,
     pub max_fields: usize,
     pub max_screen_bytes: usize,
     pub max_queue_records: usize,
@@ -51,6 +53,7 @@ impl Default for CicsLimits {
             max_maps: 1024,
             max_programs: 4096,
             max_file_aliases: 1024,
+            max_enqueue_models: 1024,
             max_fields: 512,
             max_screen_bytes: 4 * 1024 * 1024,
             max_queue_records: 65536,
@@ -241,6 +244,7 @@ struct State {
     programs: BTreeSet<String>,
     file_aliases: BTreeMap<String, CicsFileDefinition>,
     file_statuses: BTreeMap<String, DurableFileStatus>,
+    enqueue_models: BTreeMap<String, CicsEnqueueModelDefinition>,
     continuations: BTreeMap<String, DurableContinuation>,
     transient: BTreeMap<String, TransientQueue>,
     transient_bytes: usize,
@@ -381,6 +385,7 @@ impl CicsService {
                 },
             );
         }
+        let enqueue_models = handlers::load_enqueue_models(store.as_ref(), limits)?;
         let mut transient = BTreeMap::new();
         let mut transient_bytes = 0usize;
         for row in store
@@ -415,6 +420,7 @@ impl CicsService {
                 programs,
                 file_aliases,
                 file_statuses,
+                enqueue_models,
                 continuations,
                 transient,
                 transient_bytes,
@@ -1404,18 +1410,6 @@ impl CicsService {
                 .insert(name.trim().to_ascii_uppercase(), definition.clone());
         }
         Ok(())
-    }
-
-    pub fn file_status(&self, name: &str) -> Result<CicsFileStatus, HostProblem> {
-        let name = normalize_terminal_name(name, 16)?;
-        let state = self.lock()?;
-        if !state.file_aliases.contains_key(&name) {
-            return Err(HostProblem::NotFound);
-        }
-        Ok(state
-            .file_statuses
-            .get(&name)
-            .map_or(CicsFileStatus::Open, |record| record.status))
     }
 
     pub fn submit_input(
@@ -4455,6 +4449,20 @@ mod tests {
         .unwrap()
     }
 
+    fn enqueue_model(
+        name: &str,
+        enqueue_name: &str,
+        enqueue_scope: Option<&str>,
+        enabled: bool,
+    ) -> CicsEnqueueModelDefinition {
+        CicsEnqueueModelDefinition {
+            name: name.into(),
+            enqueue_name: enqueue_name.into(),
+            enqueue_scope: enqueue_scope.map(str::to_string),
+            enabled,
+        }
+    }
+
     fn request(
         operation: CicsOperation,
         arguments: BTreeMap<String, BoundedPayload>,
@@ -5375,6 +5383,297 @@ mod tests {
     }
 
     #[test]
+    fn enqueue_models_distinguish_region_local_global_address_and_disabled_resources() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        service
+            .register_enqueue_models(&[
+                enqueue_model("GLOBAL", "GLOBAL*", Some("G001"), true),
+                enqueue_model("LOCAL", "LOCAL*", None, true),
+            ])
+            .unwrap();
+        let first = invocation_for("enqueue-model-first", BTreeMap::new());
+        let second = invocation_for("enqueue-model-second", BTreeMap::new());
+        let first_session = SessionId::new("enqueue-model-first", 64).unwrap();
+        let second_session = SessionId::new("enqueue-model-second", 64).unwrap();
+        for (invocation, session, applid, sysid) in [
+            (&first, &first_session, "AP01", "S001"),
+            (&second, &second_session, "AP02", "S002"),
+        ] {
+            service.create_session(session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), session, "MENU", applid, sysid)
+                .unwrap();
+        }
+
+        let content_request = |operation, resource: &[u8], sequence, nosuspend| {
+            let mut arguments = BTreeMap::from([
+                ("RESOURCE".into(), enqueue_value(resource)),
+                (
+                    "LENGTH".into(),
+                    cics_decimal(i64::try_from(resource.len()).unwrap()),
+                ),
+            ]);
+            if nosuspend {
+                arguments.insert("OPTION.NOSUSPEND".into(), argument(b""));
+            }
+            request(operation, arguments, sequence)
+        };
+        let invoke = |invocation: &Invocation, request: CicsRequest, sequence| {
+            service.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), sequence),
+                request,
+            )
+        };
+
+        let global = b"GLOBAL-LOCK";
+        assert_eq!(
+            invoke(
+                &first,
+                content_request(CicsOperation::Enq, global, 300, false),
+                300,
+            )
+            .unwrap()
+            .disposition,
+            CicsDisposition::Complete
+        );
+        let busy = invoke(
+            &second,
+            content_request(CicsOperation::Enq, global, 301, true),
+            301,
+        )
+        .unwrap();
+        assert_eq!(
+            (busy.disposition, busy.condition.as_str(), busy.response),
+            (CicsDisposition::Ignored, "ENQBUSY", 55)
+        );
+        invoke(
+            &first,
+            content_request(CicsOperation::Deq, global, 302, false),
+            302,
+        )
+        .unwrap();
+
+        for (ordinal, resource) in [b"LOCAL-LOCK".as_slice(), b"OTHER-LOCK".as_slice()]
+            .into_iter()
+            .enumerate()
+        {
+            let sequence = 303 + u64::try_from(ordinal).unwrap() * 2;
+            for (invocation, sequence) in [(&first, sequence), (&second, sequence + 1)] {
+                assert_eq!(
+                    invoke(
+                        invocation,
+                        content_request(CicsOperation::Enq, resource, sequence, false),
+                        sequence,
+                    )
+                    .unwrap()
+                    .disposition,
+                    CicsDisposition::Complete
+                );
+            }
+        }
+
+        let address = b"same-storage-address";
+        for (invocation, sequence) in [(&first, 307), (&second, 308)] {
+            let enqueue = request(
+                CicsOperation::Enq,
+                BTreeMap::from([("RESOURCE".into(), enqueue_identity(address))]),
+                sequence,
+            );
+            assert_eq!(
+                invoke(invocation, enqueue, sequence).unwrap().disposition,
+                CicsDisposition::Complete
+            );
+        }
+        for (invocation, sequence) in [(&first, 309), (&second, 310)] {
+            let syncpoint = request(CicsOperation::Syncpoint, BTreeMap::new(), sequence);
+            invoke(invocation, syncpoint, sequence).unwrap();
+        }
+        assert!(
+            store
+                .list_provider_state("cics-enqueue-v1", 2)
+                .unwrap()
+                .is_empty()
+        );
+
+        let disabled_store = Arc::new(MemoryStore::new(Default::default()));
+        let disabled = self::service(disabled_store.clone());
+        disabled
+            .register_enqueue_models(&[enqueue_model("DISABLED", "STOP*", Some("G002"), false)])
+            .unwrap();
+        let (invocation, _) = registered(&disabled);
+        let enqueue = content_request(CicsOperation::Enq, b"STOP-NOW", 311, false);
+        assert_eq!(
+            disabled
+                .invoke(
+                    &effect(&invocation.run_unit_id, enqueue.clone(), 311),
+                    enqueue
+                )
+                .unwrap()
+                .disposition,
+            CicsDisposition::Abended
+        );
+        assert!(
+            disabled_store
+                .list_provider_state("cics-enqueue-v1", 1)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn enqueue_model_installation_is_bounded_atomic_and_restart_validated() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        assert_eq!(
+            service.register_enqueue_models(&[
+                enqueue_model("ONE", "LOCK*", Some("G001"), true),
+                enqueue_model("TWO", "LOCK-EXACT", Some("G002"), true),
+            ]),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            service.register_enqueue_models(&[enqueue_model(
+                "BAD",
+                "LOCK",
+                Some("TOO-LONG"),
+                true,
+            )]),
+            Err(HostProblem::Malformed)
+        );
+        let models = [
+            enqueue_model("one", "LOCK*", Some("g001"), true),
+            enqueue_model("LOCAL", "REGION*", None, true),
+        ];
+        service.register_enqueue_models(&models).unwrap();
+        service.register_enqueue_models(&models).unwrap();
+        assert_eq!(
+            service.register_enqueue_models(&[enqueue_model(
+                "THREE",
+                "OTHER*",
+                Some("G003"),
+                true,
+            )]),
+            Err(HostProblem::IdempotencyConflict)
+        );
+        drop(service);
+        let reopened = self::service(store.clone());
+        reopened.register_enqueue_models(&models).unwrap();
+        drop(reopened);
+        let catalog = store
+            .get_provider_state("cics-enqueue-model-catalog-v1", "models")
+            .unwrap()
+            .unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    version: 2,
+                    payload: b"corrupt".to_vec(),
+                    ..catalog
+                },
+                Some(1),
+            )
+            .unwrap();
+        assert!(matches!(
+            CicsService::open(authorities(), store, CicsLimits::default()),
+            Err(HostProblem::InfrastructureFailure)
+        ));
+
+        let race_store: Arc<dyn ProviderStateStore> =
+            Arc::new(MemoryStore::new(Default::default()));
+        let first = self::service(race_store.clone());
+        let second = self::service(race_store.clone());
+        let barrier = Arc::new(Barrier::new(2));
+        let install = |service: Arc<CicsService>, model: CicsEnqueueModelDefinition| {
+            let barrier = barrier.clone();
+            std::thread::spawn(move || {
+                barrier.wait();
+                service.register_enqueue_models(&[model])
+            })
+        };
+        let first = install(first, enqueue_model("FIRST", "FIRST*", Some("G001"), true));
+        let second = install(
+            second,
+            enqueue_model("SECOND", "SECOND*", Some("G002"), true),
+        );
+        let outcomes = [first.join().unwrap(), second.join().unwrap()];
+        assert_eq!(outcomes.iter().filter(|outcome| outcome.is_ok()).count(), 1);
+        assert_eq!(
+            outcomes
+                .iter()
+                .filter(|outcome| **outcome == Err(HostProblem::IdempotencyConflict))
+                .count(),
+            1
+        );
+        self::service(race_store);
+
+        let stale_store: Arc<dyn ProviderStateStore> =
+            Arc::new(MemoryStore::new(Default::default()));
+        let stale = self::service(stale_store.clone());
+        let stale_invocation = invocation_for("stale-model-reader", BTreeMap::new());
+        let stale_session = SessionId::new("stale-model-reader", 64).unwrap();
+        stale.create_session(&stale_session, 24, 80).unwrap();
+        let installer = self::service(stale_store);
+        installer
+            .register_enqueue_models(&[enqueue_model("FRESH", "FRESH*", Some("G005"), true)])
+            .unwrap();
+        stale
+            .register_run(
+                stale_invocation.clone(),
+                &stale_session,
+                "MENU",
+                "AP01",
+                "S001",
+            )
+            .unwrap();
+        let enqueue = request(
+            CicsOperation::Enq,
+            BTreeMap::from([("RESOURCE".into(), enqueue_identity(b"stale"))]),
+            313,
+        );
+        assert_eq!(
+            stale.invoke(
+                &effect(&stale_invocation.run_unit_id, enqueue.clone(), 313),
+                enqueue,
+            ),
+            Err(HostProblem::InfrastructureFailure)
+        );
+
+        let limited = CicsService::open(
+            authorities(),
+            Arc::new(MemoryStore::new(Default::default())),
+            CicsLimits {
+                max_enqueue_models: 1,
+                ..CicsLimits::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            limited.register_enqueue_models(&models),
+            Err(HostProblem::ResourceExhausted)
+        );
+
+        let active_store = Arc::new(MemoryStore::new(Default::default()));
+        let active = self::service(active_store);
+        let (invocation, _) = registered(&active);
+        let enqueue = request(
+            CicsOperation::Enq,
+            BTreeMap::from([("RESOURCE".into(), enqueue_identity(b"active-lock"))]),
+            312,
+        );
+        active
+            .invoke(
+                &effect(&invocation.run_unit_id, enqueue.clone(), 312),
+                enqueue,
+            )
+            .unwrap();
+        assert_eq!(
+            active.register_enqueue_models(&[enqueue_model("LATE", "LOCK*", Some("G004"), true,)]),
+            Err(HostProblem::IdempotencyConflict)
+        );
+    }
+
+    #[test]
     fn enqueue_waiters_are_fifo_replay_bound_and_handler_policy_is_exact() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = service(store.clone());
@@ -5716,15 +6015,27 @@ mod tests {
             let store: Arc<dyn ProviderStateStore> =
                 Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
             let service = service(store);
-            for (invocation, session) in [(&first, &first_session), (&second, &second_session)] {
+            service
+                .register_enqueue_models(&[enqueue_model("SQLITE", "sqlite*", Some("Q001"), true)])
+                .unwrap();
+            for (invocation, session, applid, sysid) in [
+                (&first, &first_session, "AP01", "S001"),
+                (&second, &second_session, "AP02", "S002"),
+            ] {
                 service.create_session(session, 24, 80).unwrap();
                 service
-                    .register_run(invocation.clone(), session, "MENU", "MEAPPL", "MESYS")
+                    .register_run(invocation.clone(), session, "MENU", applid, sysid)
                     .unwrap();
             }
             let acquire = request(
                 CicsOperation::Enq,
-                BTreeMap::from([("RESOURCE".into(), enqueue_identity(address))]),
+                BTreeMap::from([
+                    ("RESOURCE".into(), enqueue_value(address)),
+                    (
+                        "LENGTH".into(),
+                        cics_decimal(i64::try_from(address.len()).unwrap()),
+                    ),
+                ]),
                 120,
             );
             service
@@ -5732,7 +6043,13 @@ mod tests {
                 .unwrap();
             let wait = request(
                 CicsOperation::Enq,
-                BTreeMap::from([("RESOURCE".into(), enqueue_identity(address))]),
+                BTreeMap::from([
+                    ("RESOURCE".into(), enqueue_value(address)),
+                    (
+                        "LENGTH".into(),
+                        cics_decimal(i64::try_from(address.len()).unwrap()),
+                    ),
+                ]),
                 121,
             );
             assert_eq!(
@@ -5747,14 +6064,23 @@ mod tests {
             let store: Arc<dyn ProviderStateStore> =
                 Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
             let service = service(store.clone());
-            for (invocation, session) in [(&first, &first_session), (&second, &second_session)] {
+            for (invocation, session, applid, sysid) in [
+                (&first, &first_session, "AP01", "S001"),
+                (&second, &second_session, "AP02", "S002"),
+            ] {
                 service
-                    .register_run(invocation.clone(), session, "MENU", "MEAPPL", "MESYS")
+                    .register_run(invocation.clone(), session, "MENU", applid, sysid)
                     .unwrap();
             }
             let release = request(
                 CicsOperation::Deq,
-                BTreeMap::from([("RESOURCE".into(), enqueue_identity(address))]),
+                BTreeMap::from([
+                    ("RESOURCE".into(), enqueue_value(address)),
+                    (
+                        "LENGTH".into(),
+                        cics_decimal(i64::try_from(address.len()).unwrap()),
+                    ),
+                ]),
                 122,
             );
             service
@@ -5762,7 +6088,13 @@ mod tests {
                 .unwrap();
             let resume = request(
                 CicsOperation::Enq,
-                BTreeMap::from([("RESOURCE".into(), enqueue_identity(address))]),
+                BTreeMap::from([
+                    ("RESOURCE".into(), enqueue_value(address)),
+                    (
+                        "LENGTH".into(),
+                        cics_decimal(i64::try_from(address.len()).unwrap()),
+                    ),
+                ]),
                 123,
             );
             assert_eq!(
@@ -5792,7 +6124,7 @@ mod tests {
 
     #[test]
     #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
-    fn concurrent_enqueue_uses_one_postgres_owner_and_fifo_promotion() {
+    fn concurrent_global_enqueue_uses_one_postgres_owner_and_fifo_promotion() {
         let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")
             .expect("explicit PostgreSQL test URL required");
         let suffix = std::process::id().to_string();
@@ -5808,6 +6140,9 @@ mod tests {
         let initial_store: Arc<dyn ProviderStateStore> =
             Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
         let initial = service(initial_store);
+        initial
+            .register_enqueue_models(&[enqueue_model("POSTGRES", "postgres*", Some("P001"), true)])
+            .unwrap();
         initial.create_session(&first_session, 24, 80).unwrap();
         initial.create_session(&second_session, 24, 80).unwrap();
         drop(initial);
@@ -5819,10 +6154,10 @@ mod tests {
         let first_service = service(first_store);
         let second_service = service(second_store);
         first_service
-            .register_run(first.clone(), &first_session, "MENU", "MEAPPL", "MESYS")
+            .register_run(first.clone(), &first_session, "MENU", "AP01", "S001")
             .unwrap();
         second_service
-            .register_run(second.clone(), &second_session, "MENU", "MEAPPL", "MESYS")
+            .register_run(second.clone(), &second_session, "MENU", "AP02", "S002")
             .unwrap();
 
         let address = format!("postgres-enqueue-resource-{suffix}").into_bytes();

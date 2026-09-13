@@ -31,6 +31,20 @@ pub(in crate::service) fn invoke(
     }
 }
 
+impl CicsService {
+    pub fn file_status(&self, name: &str) -> Result<CicsFileStatus, HostProblem> {
+        let name = normalize_terminal_name(name, 16)?;
+        let state = self.lock()?;
+        if !state.file_aliases.contains_key(&name) {
+            return Err(HostProblem::NotFound);
+        }
+        Ok(state
+            .file_statuses
+            .get(&name)
+            .map_or(CicsFileStatus::Open, |record| record.status))
+    }
+}
+
 fn set_file_statuses(
     service: &CicsService,
     run: &mut Run,

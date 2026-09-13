@@ -53,9 +53,9 @@
       "subsystem": "cics",
       "baseline_id": "ibm-cics-ts-6x-task-enqueue-2026-09-13",
       "manifest": "conformance/0.9/manifests/cics-task-enqueue-topics.json",
-      "manifest_sha256": "sha256:3628c1aaa032fc23cff8ea657c29d33831cc175a38e6f3483cabc66124a0ecc7",
-      "topic_count": 3,
-      "topic_manifest_sha256": "sha256:519aaa89ff3bfdac95a9fe2b70188142579604c3d99fe75d8b7e5baa60002581",
+      "manifest_sha256": "sha256:46cd6cc70698d636d1b0f7d21918d1d49f3f71002a66f037e9a2c35db5cab18f",
+      "topic_count": 5,
+      "topic_manifest_sha256": "sha256:227d3f8ca1df29d60f1ee3fc33ee3ff89e6c172fd0e40311989bc573adbd0287",
       "semantic_authority": false,
       "coverage_credit": 0
     },

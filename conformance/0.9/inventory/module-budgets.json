@@ -114,7 +114,7 @@
     },
     {
       "path": "crates/providers/mainframe-env-cics/src/service.rs",
-      "max_production_lines": 3878,
+      "max_production_lines": 3872,
       "responsibility": "The CICS pilot service owns session, BMS, file, queue, program, and unit-of-work semantics and persistence.",
       "split_boundary": "Freeze this pilot and route future catalog descriptors through generated modules and semantics through handler-family modules."
     },
@@ -289,6 +289,7 @@
       "crates/providers/mainframe-env-cics/src/handlers/recovery.rs",
       "crates/providers/mainframe-env-cics/src/handlers/task_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/task_enqueue.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/task_enqueue/model.rs",
       "crates/providers/mainframe-env-cics/src/handlers/terminal_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/time.rs"
     ]

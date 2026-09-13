@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:d4d515ee0660eea9012260e235aff8341db61ed3f651560fccf7935d1b2eca8d",
+      "sha256": "sha256:ce4cdc74baf0b474d43a88eaa5f3a8a896308d57efae21acb9e5fa05f26734bb",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -429,7 +429,7 @@
       "path": "docs/architecture/EXECUTION-AND-DURABILITY.md",
       "relative_links": 1,
       "scope": "execution lifecycle, effects, work, checkpoints, and durability",
-      "sha256": "sha256:802e88444458afd125ecc632adde2a017e4aa84870b1e8c781d5b795c3458494",
+      "sha256": "sha256:f475be8b49066353f79046f633816f4c4459de66308f3da702f81da9008c132d",
       "status": "Accepted by repository owner",
       "title": "Execution and Durability Architecture",
       "xtask_commands": 0
@@ -1062,7 +1062,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:6091af7fff90dd77ad6bfe693e4461a728040710ff919eefb81665258b3a5397",
+      "sha256": "sha256:ab3d5036b9ee8d06158406b73219e3d164ebae31e399f627724c8a43a5794f8f",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },
@@ -1430,7 +1430,7 @@
       "normative": false,
       "path": "docs/runbooks/CAPACITY-AND-RECOVERY.md",
       "relative_links": 2,
-      "sha256": "sha256:7aff8bde6348cd2bcc5416f4474a60add76d5db34176ff8f9b3cc0e5a68288bc",
+      "sha256": "sha256:0f08a412dc7563c193cf54504a37097243b2909779a3ec0b2f1a989a3214084a",
       "title": "Capacity and recovery",
       "xtask_commands": 0
     },
