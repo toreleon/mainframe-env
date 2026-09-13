@@ -62,6 +62,13 @@ const SUSPEND_EFFECTS: &[Effect] = &[
     Effect::Suspension,
     Effect::Condition,
 ];
+const SET_ASSOCIATION_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+];
 
 /// Static executable facts owned by the typed CICS dialect.
 ///
@@ -412,7 +419,7 @@ pub fn cics_application_registry_for_runtime_operation(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 7] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 8] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -469,6 +476,14 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 7] = [
         effects: SUSPEND_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::SetAssociationUserCorrData,
+        namespace: "cics.task",
+        name: "set-association-usercorrdata",
+        major: 1,
+        effects: SET_ASSOCIATION_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
 ];
 
 /// Resolves the executable descriptor for a decoded CICS plan operation.
@@ -484,6 +499,7 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::Syncpoint => &CICS_EXECUTABLE_DESCRIPTORS[4],
         CicsPlanOperation::ChangeTask => &CICS_EXECUTABLE_DESCRIPTORS[5],
         CicsPlanOperation::Suspend => &CICS_EXECUTABLE_DESCRIPTORS[6],
+        CicsPlanOperation::SetAssociationUserCorrData => &CICS_EXECUTABLE_DESCRIPTORS[7],
     }
 }
 
@@ -544,7 +560,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 7);
+        assert_eq!(typed.len(), 8);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -562,7 +578,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 236);
+        assert_eq!(unready.len(), 235);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -729,6 +745,7 @@ mod tests {
                 CicsPlanOperation::Read,
                 CicsPlanOperation::Rewrite,
                 CicsPlanOperation::Syncpoint,
+                CicsPlanOperation::SetAssociationUserCorrData,
                 CicsPlanOperation::Suspend,
             ])
         );

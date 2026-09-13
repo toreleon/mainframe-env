@@ -725,6 +725,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         ["ENQ"] => HirCicsOperation::Enq,
         ["READ"] => HirCicsOperation::Read,
         ["REWRITE"] => HirCicsOperation::Rewrite,
+        ["SET", "ASSOCIATION", "USERCORRDATA"] => HirCicsOperation::SetAssociationUserCorrData,
         ["SYNCPOINT"] => HirCicsOperation::Syncpoint,
         ["SUSPEND"] => HirCicsOperation::Suspend,
         _ => return Err(ResolutionFailure::Unsupported),
@@ -736,11 +737,14 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         }
         HirCicsOperation::Read => &["FILE", "DATASET", "RIDFLD", "INTO", "RESP", "RESP2"],
         HirCicsOperation::Rewrite => &["FILE", "DATASET", "FROM", "RESP", "RESP2"],
+        HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA", "RESP", "RESP2"],
         HirCicsOperation::Syncpoint => &["RESP", "RESP2"],
         HirCicsOperation::Suspend => &["RESP", "RESP2"],
     };
     let allowed_options: &[&str] = match operation {
-        HirCicsOperation::ChangeTask | HirCicsOperation::Suspend => &["NOHANDLE"],
+        HirCicsOperation::ChangeTask
+        | HirCicsOperation::SetAssociationUserCorrData
+        | HirCicsOperation::Suspend => &["NOHANDLE"],
         HirCicsOperation::Deq => &["UOW", "TASK", "NOHANDLE"],
         HirCicsOperation::Enq => &["UOW", "TASK", "NOSUSPEND", "NOHANDLE"],
         HirCicsOperation::Read => &["UPDATE", "NOHANDLE"],
@@ -784,6 +788,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Deq | HirCicsOperation::Enq => &["RESOURCE"][..],
         HirCicsOperation::Read => &["RIDFLD", "INTO"][..],
         HirCicsOperation::Rewrite => &["FROM"][..],
+        HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA"][..],
         HirCicsOperation::Syncpoint => &[][..],
     } {
         if !clauses.contains_key(*required) {
@@ -831,6 +836,12 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         operands.push(HirCicsNamedOperand {
             name: HirCicsOperandName::Priority,
             value: cics_integer_value(value, semantic)?,
+        });
+    }
+    if operation == HirCicsOperation::SetAssociationUserCorrData {
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::UserCorrData,
+            value: cics_value(&clauses["USERCORRDATA"], semantic)?,
         });
     }
     let mut outputs = Vec::new();

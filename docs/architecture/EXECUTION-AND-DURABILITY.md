@@ -184,6 +184,15 @@ using the enclosing exchange priority when the historical row has no explicit
 field. Scheduler suspension keeps the execution and online exchange live until
 the next bounded redispatch, unlike terminal-input handoff.
 
+Typed `SET ASSOCIATION USERCORRDATA` mutates the durable session that owns the
+originating task. The provider verifies the issuing and originating run-unit
+identities, overwrites rather than appends, and silently truncates the supplied
+bytes to 64. Current `MECS5` session rows bind the result to both the mutation
+key and canonical request digest, so a replay-ledger crash gap can complete only
+the identical request. Readers retain `MECS1`–`MECS4`; those historical rows
+begin with no user correlator data. Session CAS is the single state authority
+across memory, SQLite, and PostgreSQL adapters.
+
 When a terminal RECEIVE suspends a machine, the product first commits its own
 session continuation and then atomically moves the interpreter execution from
 `Suspended` to terminal `Completed` with `HandoffCompleted`. Only after that

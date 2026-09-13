@@ -62,6 +62,14 @@ closed. Do not delete the model catalog to force local routing: model-aware lock
 keys contain either APPLID/SYSID or ENQSCOPE and are not compatible with the
 single-region key profile.
 
+Back up `cics-session` rows containing task association state before enabling
+typed `SET ASSOCIATION USERCORRDATA`. Current `MECS5` rows carry at most 64
+correlator bytes plus the last mutation key and canonical request digest;
+historical `MECS1`–`MECS4` rows decode with an empty correlator. If the session
+write succeeds but the outer replay row does not, retain the session row and
+retry only the identical key and request. A different digest is an idempotency
+conflict, and manual deletion of the session row loses the authoritative value.
+
 A `cics-scheduler` suspension from `CHANGE TASK` or `SUSPEND` is a one-shot
 yield, not a terminal handoff and not a command retry. Preserve the execution
 checkpoint, online exchange, and `online-machine-continuation` row, then resume

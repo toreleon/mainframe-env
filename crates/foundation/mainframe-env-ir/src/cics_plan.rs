@@ -55,6 +55,8 @@ pub enum CicsPlanOperation {
     Rewrite,
     /// Commit or roll back the current unit of work.
     Syncpoint,
+    /// Overwrite the originating task's bounded user correlator data.
+    SetAssociationUserCorrData,
     /// Yield the issuing task once for redispatch.
     Suspend,
 }
@@ -87,6 +89,8 @@ pub enum CicsOperandName {
     MaxLifetime,
     /// `PRIORITY(...)` task dispatch value.
     Priority,
+    /// `USERCORRDATA(...)` task association value.
+    UserCorrData,
 }
 
 /// Literal bytes or a runtime read from resolved storage.
@@ -447,6 +451,11 @@ fn validate_operation_shape(
                 || plan.options.contains(&CicsPlanOption::NoSuspend)
                 || outputs.contains(&CicsOutputName::Into)
         }
+        CicsPlanOperation::SetAssociationUserCorrData => {
+            (inputs.len() != 1 || !inputs.contains(&CicsOperandName::UserCorrData))
+                || scheduling_options
+                || outputs.contains(&CicsOutputName::Into)
+        }
         CicsPlanOperation::Suspend => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
@@ -611,6 +620,7 @@ const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::Enq => 4,
         CicsPlanOperation::ChangeTask => 5,
         CicsPlanOperation::Suspend => 6,
+        CicsPlanOperation::SetAssociationUserCorrData => 7,
     }
 }
 
@@ -623,6 +633,7 @@ fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPlanCodecProbl
         4 => Ok(CicsPlanOperation::Enq),
         5 => Ok(CicsPlanOperation::ChangeTask),
         6 => Ok(CicsPlanOperation::Suspend),
+        7 => Ok(CicsPlanOperation::SetAssociationUserCorrData),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -637,6 +648,7 @@ const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::Length => 5,
         CicsOperandName::MaxLifetime => 6,
         CicsOperandName::Priority => 7,
+        CicsOperandName::UserCorrData => 8,
     }
 }
 
@@ -650,6 +662,7 @@ fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCodecProblem> 
         5 => Ok(CicsOperandName::Length),
         6 => Ok(CicsOperandName::MaxLifetime),
         7 => Ok(CicsOperandName::Priority),
+        8 => Ok(CicsOperandName::UserCorrData),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -1021,6 +1034,31 @@ mod tests {
             )
             .unwrap(),
             suspend
+        );
+    }
+
+    #[test]
+    fn task_association_requires_one_bounded_value_operand() {
+        let association = CicsEffectPlan {
+            operation: CicsPlanOperation::SetAssociationUserCorrData,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::UserCorrData,
+                value: CicsOperandValue::Literal(vec![b'A'; 80]),
+            }],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&association, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
+            association
+        );
+        let mut missing = association;
+        missing.operands.clear();
+        assert_eq!(
+            encode_cics_effect_plan(&missing, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
         );
     }
 

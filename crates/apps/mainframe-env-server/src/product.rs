@@ -160,6 +160,7 @@ impl From<SaturationLevel> for ProductCapacityStatus {
 
 mod artifact;
 pub use artifact::{BatchProgramDefinition, OnlineProgramDefinition};
+mod bootstrap;
 mod continuation;
 #[cfg(test)]
 use continuation::{decode_online_machine_continuation, encode_online_machine_continuation};
@@ -2650,47 +2651,6 @@ impl ProductServer {
         } else {
             Err(HostProblem::Unauthorized)
         }
-    }
-
-    fn grant_bootstrap_profiles(&self, user: &str) -> Result<(), HostProblem> {
-        for (class, pattern, access) in [
-            (
-                "DATASET",
-                format!("{}.**", user.to_ascii_uppercase()),
-                AccessIntent::Alter,
-            ),
-            ("JESJOBS", "JOB.**".into(), AccessIntent::Alter),
-            ("FACILITY", "CONSOLE.**".into(), AccessIntent::Alter),
-            ("TCICSTRN", "CICS.**".into(), AccessIntent::Execute),
-            ("DB2TABLE", "**".into(), AccessIntent::Alter),
-            ("DB2PLAN", "**".into(), AccessIntent::Control),
-            ("DB2UOW", "**".into(), AccessIntent::Control),
-            ("IMSPSB", "**".into(), AccessIntent::Execute),
-            ("IMSDB", "**".into(), AccessIntent::Alter),
-            ("IMSUOW", "**".into(), AccessIntent::Control),
-            ("MQQUEUE", "**".into(), AccessIntent::Alter),
-            ("MQUOW", "**".into(), AccessIntent::Control),
-        ] {
-            let mut granted = false;
-            for _ in 0..BOOTSTRAP_CAS_ATTEMPTS {
-                match self.racf.define_profile(class, &pattern, user, None) {
-                    Ok(()) | Err(HostProblem::IdempotencyConflict) => {}
-                    Err(problem) => return Err(problem),
-                }
-                match self.racf.permit(class, &pattern, user, access) {
-                    Ok(()) => {
-                        granted = true;
-                        break;
-                    }
-                    Err(HostProblem::IdempotencyConflict | HostProblem::NotFound) => continue,
-                    Err(problem) => return Err(problem),
-                }
-            }
-            if !granted {
-                return Err(HostProblem::IdempotencyConflict);
-            }
-        }
-        Ok(())
     }
 
     pub fn bootstrap_identity(&self, user: &str, secret: &[u8]) -> Result<(), HostProblem> {
@@ -9985,6 +9945,141 @@ mod tests {
                 (2, mainframe_env_execution_api::AuditDecision::Success),
             ]
         );
+    }
+
+    #[test]
+    fn online_task_association_uses_selected_security_and_durable_session_route() {
+        let limits = SourceLimits::default();
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. ASSOC.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 CORR-X PIC X(80) VALUE ALL 'A'.\n01 SET-FN PIC X(2).\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS SET ASSOCIATION USERCORRDATA(CORR-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO SET-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let path = LogicalPath::new("ASSOC.cbl", limits.max_path_bytes).unwrap();
+        let bundle = SourceBundle::new(
+            &path,
+            vec![
+                SourceFile::input(
+                    "ASSOC.cbl",
+                    source.to_vec(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("task association fixture did not publish");
+        };
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "ASSOC".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("AS00".into(), "ASSOC".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "ASSOC".into(),
+                    map: "ASSOC".into(),
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("task-association", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "AS00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "AS00",
+                24,
+                80,
+                "task-association-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "ASSOC", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "ASSOC", 2)
+            .unwrap();
+
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("SET-FN").unwrap().bytes(), &[0xc4, 0x04]);
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0; 4]);
+        assert_eq!(restored.variable("RESP2-X").unwrap().bytes(), &[0; 4]);
+        let session_row = server
+            .store
+            .get_provider_state("cics-session", session.as_str())
+            .unwrap()
+            .unwrap();
+        assert!(
+            session_row
+                .payload
+                .windows(64)
+                .any(|window| window == [b'A'; 64])
+        );
+        assert_eq!(
+            server
+                .store
+                .audit_records(&invocation.execution_id, 1, 32)
+                .unwrap()
+                .into_iter()
+                .filter(|record| record.capability.as_str() == "host.cics.execute")
+                .map(|record| (record.effect_sequence, record.decision))
+                .collect::<Vec<_>>(),
+            vec![
+                (1, mainframe_env_execution_api::AuditDecision::Success),
+                (2, mainframe_env_execution_api::AuditDecision::Success),
+            ]
+        );
+        server
+            .run_online_exchange(&session, &principal, "ASSOC", 3)
+            .unwrap();
+        assert!(server.online_exchange(&session).unwrap().is_none());
     }
 
     #[test]

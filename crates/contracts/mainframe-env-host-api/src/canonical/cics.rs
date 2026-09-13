@@ -27,6 +27,9 @@ impl Canonical for CicsOperation {
             Self::Rewrite => out.variant("CicsOperation", "Rewrite", 0),
             Self::SendText => out.variant("CicsOperation", "SendText", 0),
             Self::SendMap => out.variant("CicsOperation", "SendMap", 0),
+            Self::SetAssociationUserCorrData => {
+                out.variant("CicsOperation", "SetAssociationUserCorrData", 0)
+            }
             Self::SetFileStatus => out.variant("CicsOperation", "SetFileStatus", 0),
             Self::StartBrowse => out.variant("CicsOperation", "StartBrowse", 0),
             Self::Suspend => out.variant("CicsOperation", "Suspend", 0),

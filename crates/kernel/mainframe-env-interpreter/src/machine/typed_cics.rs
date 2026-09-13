@@ -732,6 +732,7 @@ const fn host_operation(operation: CicsPlanOperation) -> CicsOperation {
         CicsPlanOperation::Enq => CicsOperation::Enq,
         CicsPlanOperation::Read => CicsOperation::Read,
         CicsPlanOperation::Rewrite => CicsOperation::Rewrite,
+        CicsPlanOperation::SetAssociationUserCorrData => CicsOperation::SetAssociationUserCorrData,
         CicsPlanOperation::Syncpoint => CicsOperation::Syncpoint,
         CicsPlanOperation::Suspend => CicsOperation::Suspend,
     }
@@ -747,6 +748,7 @@ const fn operand_name(name: CicsOperandName) -> &'static str {
         CicsOperandName::Length => "LENGTH",
         CicsOperandName::MaxLifetime => "MAXLIFETIME",
         CicsOperandName::Priority => "PRIORITY",
+        CicsOperandName::UserCorrData => "USERCORRDATA",
     }
 }
 

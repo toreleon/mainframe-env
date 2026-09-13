@@ -57,6 +57,10 @@ All notable changes to mainframe-env are documented here.
 - Added online continuation format `MEOM3`, which retains the current task
   priority across a scheduling suspension while continuing to read historical
   `MEOM2` rows.
+- Added a zero-credit IBM source scope and typed CICS `SET ASSOCIATION
+  USERCORRDATA`. The task-owned value overwrites with IBM's silent 64-byte
+  truncation, enforces originating-task and command-security checks, and uses
+  replay-bound `MECS5` session rows with `MECS1`–`MECS4` read compatibility.
 - Added the frozen-with-bounded-ambiguities CIC-901 command contract and generated
   263-row compiler registry. The registry explicitly separates three typed runtime
   handlers, 20 legacy compatibility handlers, and 240 unready handlers; automatic

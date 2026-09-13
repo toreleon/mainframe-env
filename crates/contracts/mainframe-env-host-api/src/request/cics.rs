@@ -31,6 +31,8 @@ pub enum CicsOperation {
     Rewrite,
     SendText,
     SendMap,
+    /// Overwrite the originating task's bounded user correlator data.
+    SetAssociationUserCorrData,
     SetFileStatus,
     StartBrowse,
     /// Relinquish control until the task is redispatched.
@@ -68,6 +70,7 @@ impl CicsOperation {
             Self::Rewrite => "Rewrite",
             Self::SendText => "SendText",
             Self::SendMap => "SendMap",
+            Self::SetAssociationUserCorrData => "SetAssociationUserCorrData",
             Self::SetFileStatus => "SetFileStatus",
             Self::StartBrowse => "StartBrowse",
             Self::Suspend => "Suspend",
@@ -92,6 +95,7 @@ impl CicsOperation {
                 | Self::ReceiveMap
                 | Self::SendMap
                 | Self::SendText
+                | Self::SetAssociationUserCorrData
                 | Self::Xctl
                 | Self::Return
                 | Self::Abend
@@ -131,6 +135,7 @@ impl CicsOperation {
             ("REWRITE", _) => Self::Rewrite,
             ("SEND", Some("MAP")) => Self::SendMap,
             ("SEND", _) => Self::SendText,
+            ("SET", Some("ASSOCIATION")) => Self::SetAssociationUserCorrData,
             ("STARTBR", _) => Self::StartBrowse,
             ("SUSPEND", _) => Self::Suspend,
             ("SYNCPOINT", _) => Self::Syncpoint,

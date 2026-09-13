@@ -109,6 +109,13 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("SendMap", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0189"),
     ("SendText", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0192"),
     (
+        "SetAssociationUserCorrData",
+        "api",
+        "task-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0193",
+    ),
+    (
         "SetFileStatus",
         "spi-compatibility",
         "file-control",
@@ -330,7 +337,16 @@ POLICY_BINDINGS = {
 }
 
 TYPED_RUNTIME_OPERATIONS = frozenset(
-    {"ChangeTask", "Deq", "Enq", "Read", "Rewrite", "Suspend", "Syncpoint"}
+    {
+        "ChangeTask",
+        "Deq",
+        "Enq",
+        "Read",
+        "Rewrite",
+        "SetAssociationUserCorrData",
+        "Suspend",
+        "Syncpoint",
+    }
 )
 ENQUEUE_COMMAND_ROWS = frozenset(
     {
@@ -363,6 +379,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
         {"dataset-write", "memory-read", "memory-write", "condition", "transaction"}
     ),
     "Syncpoint": frozenset({"memory-write", "condition", "transaction"}),
+    "SetAssociationUserCorrData": frozenset(
+        {"memory-read", "memory-write", "condition"}
+    ),
     "Suspend": frozenset({"memory-write", "suspension", "condition"}),
 }
 
@@ -555,6 +574,7 @@ def _load_typed_execution_registrations(
         "ChangeTask",
         "Deq",
         "Enq",
+        "SetAssociationUserCorrData",
         "Suspend",
     ]:
         raise DescriptorError(f"{path} registration identities or order differ")
@@ -843,7 +863,14 @@ def load_catalog(
         else [
             row
             for row in EXPECTED_RUNTIME_OPERATIONS
-            if row[0] not in {"ChangeTask", "Deq", "Enq", "Suspend"}
+            if row[0]
+            not in {
+                "ChangeTask",
+                "Deq",
+                "Enq",
+                "SetAssociationUserCorrData",
+                "Suspend",
+            }
         ]
     )
     if observed_runtime != expected_runtime:
@@ -3116,8 +3143,8 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
         for row in catalog["_runtime_operations"]
         if row["interface"] == "api"
     }
-    if len(existing_runtime) != 27:
-        raise DescriptorError("CICS application runtime baseline must remain exactly 27 rows")
+    if len(existing_runtime) != 28:
+        raise DescriptorError("CICS application runtime baseline must remain exactly 28 rows")
 
     loaded_batches = []
     for batch_id, start, end, projection_path, review_path in CONTRACT_BATCHES:
@@ -3371,12 +3398,12 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
     if (
         len(registry_rows) != 263
         or len(set(handler_ids)) != 263
-        or len(typed_rows) != 7
+        or len(typed_rows) != 8
         or len(legacy_rows) != 20
         or {row["runtime_operation"] for row in typed_rows}
         != TYPED_RUNTIME_OPERATIONS
-        or len(advertised_rows) != 27
-        or len(unready_rows) != 236
+        or len(advertised_rows) != 28
+        or len(unready_rows) != 235
         or any(row["unready_result"] != "explicit-unsupported" for row in unready_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in typed_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in legacy_rows)

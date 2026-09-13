@@ -37,6 +37,14 @@ or queue while holding its state fence, calls the mandatory production
 authorizer, and only then clones or mutates state. A broad host capability is a
 routing grant and never substitutes for this resource decision.
 
+The CICS `SET ASSOCIATION USERCORRDATA` system command adds an owned command
+decision before changing its task session. The provider authorizes `FACILITY`
+resource `CICS.COMMAND.SET.ASSOCIATION.USERCORRDATA` with `Alter`; denial maps to
+CICS `NOTAUTH` RESP 70, RESP2 100 and leaves the session unchanged. This
+platform audit remains mandatory even though the pinned IBM page says CICS does
+not itself audit this command. The bootstrap administrator receives only the
+bounded `CICS.COMMAND.**` profile needed for selected-route operation.
+
 ## Capability grants
 
 An invocation receives only grants needed by its selected workload, for

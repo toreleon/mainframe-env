@@ -151,6 +151,7 @@ pub enum HirCicsOperation {
     Enq,
     Read,
     Rewrite,
+    SetAssociationUserCorrData,
     Syncpoint,
     Suspend,
 }
@@ -165,6 +166,7 @@ pub enum HirCicsOperandName {
     Length,
     MaxLifetime,
     Priority,
+    UserCorrData,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1742,6 +1744,35 @@ mod tests {
             commands[2].condition_policy,
             HirCicsConditionPolicy::NoHandle
         );
+    }
+
+    #[test]
+    fn cics_task_association_resolves_one_typed_correlator_input() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSASSOC. DATA DIVISION. WORKING-STORAGE SECTION. 01 CORR-X PIC X(80) VALUE ALL 'A'. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS SET ASSOCIATION USERCORRDATA(CORR-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.";
+        let hir = analyze(source).hir.expect("typed task association HIR");
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("task association command");
+        assert_eq!(
+            command.operation,
+            HirCicsOperation::SetAssociationUserCorrData
+        );
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::UserCorrData
+                && matches!(operand.value, HirCicsValue::Data(_))
+        }));
+        assert!(matches!(
+            command.condition_policy,
+            HirCicsConditionPolicy::Respond {
+                response2: Some(_),
+                ..
+            }
+        ));
     }
 
     #[test]

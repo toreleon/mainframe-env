@@ -18,15 +18,15 @@
     },
     "registrations": {
       "type": "array",
-      "minItems": 4,
-      "maxItems": 4,
+      "minItems": 5,
+      "maxItems": 5,
       "uniqueItems": true,
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["operation", "interface", "family", "mutating", "official_row"],
         "properties": {
-          "operation": {"enum": ["ChangeTask", "Deq", "Enq", "Suspend"]},
+          "operation": {"enum": ["ChangeTask", "Deq", "Enq", "SetAssociationUserCorrData", "Suspend"]},
           "interface": {"const": "api"},
           "family": {"const": "task-control"},
           "mutating": {"type": "boolean"},
@@ -35,6 +35,7 @@
               "ibm-cics-ts-6x-2026-08-31:api-commands:0022",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0050",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0064",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0193",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0214"
             ]
           }

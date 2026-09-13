@@ -13,7 +13,9 @@ pub(super) use file_control::invoke as invoke_file_control;
 pub(super) use program_control::invoke as invoke_program_control;
 pub(super) use queue_control::invoke as invoke_queue_control;
 pub(super) use recovery::invoke as invoke_recovery;
-pub(super) use task_control::invoke as invoke_task_control;
+pub(super) use task_control::{
+    decode_session_flags, encode_session, invoke as invoke_task_control,
+};
 pub use task_enqueue::CicsEnqueueModelDefinition;
 pub(super) use task_enqueue::{
     load_enqueue_models, release_task as release_task_enqueues,
