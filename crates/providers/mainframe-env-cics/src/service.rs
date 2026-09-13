@@ -4733,6 +4733,7 @@ mod tests {
         let initparm = request(
             CicsOperation::Assign,
             BTreeMap::from([
+                ("BRIDGE".into(), argument(b"BRIDGE-OUT")),
                 ("INITPARM".into(), argument(b"INITPARM-OUT")),
                 ("INITPARMLEN".into(), argument(b"INITPARM-LENGTH-OUT")),
             ]),
@@ -4746,6 +4747,7 @@ mod tests {
             .unwrap();
         assert!(!initparm.outputs.contains_key("INITPARM"));
         assert_eq!(initparm.outputs["INITPARMLEN"].bytes(), b"0");
+        assert_eq!(initparm.outputs["BRIDGE"].bytes(), &[b' '; 4]);
 
         let missing_program = request(
             CicsOperation::Assign,
@@ -4987,6 +4989,7 @@ mod tests {
         let initparm = request(
             CicsOperation::Assign,
             BTreeMap::from([
+                ("BRIDGE".into(), argument(b"BRIDGE-OUT")),
                 ("INITPARM".into(), argument(b"INITPARM-OUT")),
                 ("INITPARMLEN".into(), argument(b"INITPARM-LENGTH-OUT")),
             ]),
@@ -5001,6 +5004,7 @@ mod tests {
         assert_eq!(initparm.condition, "NORMAL");
         assert!(!initparm.outputs.contains_key("INITPARM"));
         assert_eq!(initparm.outputs["INITPARMLEN"].bytes(), b"0");
+        assert_eq!(initparm.outputs["BRIDGE"].bytes(), &[b' '; 4]);
 
         let mut prohibited = request(
             CicsOperation::Assign,

@@ -90,6 +90,7 @@ pub(in crate::service) fn assign(
     }
     for (name, length) in [
         ("APPLICATION", 64),
+        ("BRIDGE", 4),
         ("CHANNEL", 16),
         ("OPERATION", 64),
         ("PLATFORM", 64),
@@ -158,6 +159,7 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
     let allowed = [
         "APPLICATION",
         "APPLID",
+        "BRIDGE",
         "CHANNEL",
         "CWALENG",
         "INITPARM",

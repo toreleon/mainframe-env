@@ -77,6 +77,8 @@ contract explicitly permits it.
   never accepted as caller-supplied CICS command context.
   NEXTTRANSID returns four blanks while no supported in-task command has set a
   successor; it is prohibited with `INVREQ` 16/200 in a DPL server program.
+  BRIDGE returns four blanks because the runtime has no bridge-monitor start
+  path; IBM defines the same blank result in local non-bridge and DPL contexts.
   Other source-valid ASSIGN options remain rejected until their terminal,
   program-level, or failure context has an owned runtime representation.
 - Terminal execution outcomes carry an explicit transaction-dump disposition.

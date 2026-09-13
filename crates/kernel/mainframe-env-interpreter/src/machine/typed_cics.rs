@@ -413,6 +413,7 @@ pub(super) fn execute_legacy(
         CicsOperation::Assign => &[
             "APPLICATION",
             "APPLID",
+            "BRIDGE",
             "CHANNEL",
             "CWALENG",
             "INITPARM",

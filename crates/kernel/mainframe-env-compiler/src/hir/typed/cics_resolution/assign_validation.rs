@@ -16,6 +16,7 @@ pub(super) fn validate(
     for name in [
         "APPLICATION",
         "APPLID",
+        "BRIDGE",
         "CHANNEL",
         "CWALENG",
         "INITPARM",
@@ -62,7 +63,8 @@ pub(super) fn validate(
                 "CICS ASSIGN {name} requires a halfword binary data area"
             ));
         }
-        if (name == "INITPARM" && target.length != 60)
+        if (name == "BRIDGE" && target.length != 4)
+            || (name == "INITPARM" && target.length != 60)
             || (name == "OPERKEYS" && target.length != 8)
             || (name == "OPSECURITY" && target.length != 3)
             || (name == "NEXTTRANSID" && target.length != 4)
