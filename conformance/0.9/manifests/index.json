@@ -49,6 +49,17 @@
       "coverage_credit": 0
     },
     {
+      "scope_id": "cics-task-enqueue",
+      "subsystem": "cics",
+      "baseline_id": "ibm-cics-ts-6x-task-enqueue-2026-09-13",
+      "manifest": "conformance/0.9/manifests/cics-task-enqueue-topics.json",
+      "manifest_sha256": "sha256:3628c1aaa032fc23cff8ea657c29d33831cc175a38e6f3483cabc66124a0ecc7",
+      "topic_count": 3,
+      "topic_manifest_sha256": "sha256:519aaa89ff3bfdac95a9fe2b70188142579604c3d99fe75d8b7e5baa60002581",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
       "scope_id": "cobol-numeric-move-pilot",
       "subsystem": "cobol",
       "baseline_id": "ibm-enterprise-cobol-6.5-numeric-move-pilot-2026-09-08",

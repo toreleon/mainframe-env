@@ -71,7 +71,7 @@ class CacheTests(unittest.TestCase):
 
     def test_environment_default_and_legacy_fallback(self):
         with patch.dict(os.environ, {"MAINFRAME_ENV_IBM_DOCS_CACHE": str(self.cache)}):
-            self.assertEqual(docs_api.default_cache(), self.cache)
+            self.assertEqual(docs_api.default_cache(), self.cache.resolve())
         with patch.dict(os.environ, {"MAINFRAME_ENV_IBM_DOCS_CACHE": ""}):
             self.assertEqual(
                 docs_api.default_cache(),
@@ -518,6 +518,7 @@ class CacheTests(unittest.TestCase):
         pins, tocs = ibm_docs.load_pins()
         scopes = {scope.scope_id for pin in [*pins, *tocs] for scope in pin.scopes}
         self.assertIn("cics-file-uow-pilot", scopes)
+        self.assertIn("cics-task-enqueue", scopes)
         self.assertIn("cobol-numeric-move-pilot", scopes)
         self.assertTrue(pins)
         self.assertTrue(tocs)
