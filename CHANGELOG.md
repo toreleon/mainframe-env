@@ -71,13 +71,14 @@ All notable changes to mainframe-env are documented here.
   no recoverable ASRA-class machine-check handoff exists. They observe these
   values, the durable terminal's current/default/alternate screen geometry,
   and priority changes through the selected route. Screen options fail with
-  `INVREQ` 16/5 for nonterminal tasks and `INVREQ` 16/200 in DPL; FCI distinguishes the
-  supported terminal facility (`X'01'`) from no facility (`X'00'`) and is also
-  DPL-prohibited. LINKLEVEL returns one for a top-level local program and two
-  for a DPL target behind its level-one mirror; unmodeled deeper local stacks
-  fail closed. With no application partition set, PARTNSET returns six blanks
-  on a terminal task and follows the local/DPL `INVREQ` matrix. The same owned
-  virtual terminal reports a 3270 data stream and no basic SCS data stream;
+  `INVREQ` 16/5 for nonterminal tasks and `INVREQ` 16/200 in DPL; FCI
+  distinguishes the supported terminal facility (`X'01'`) from no facility
+  (`X'00'`) and is also DPL-prohibited. LINKLEVEL returns one for a top-level
+  local program and two for a DPL target behind its level-one mirror; unmodeled
+  deeper local stacks fail closed. With no application partition set, PARTNSET
+  returns six blanks on a terminal task and follows the local/DPL `INVREQ`
+  matrix. The same owned virtual terminal reports a 3270 data stream and no
+  basic SCS data stream;
   its unsupported optional device capabilities return false indicators.
 - Added online continuation format `MEOM4`, which retains the current task
   priority and an optional staged program-transfer handoff. Readers preserve
@@ -122,6 +123,10 @@ All notable changes to mainframe-env are documented here.
   CAS, roll back on failed persistence, survive a terminal-input handoff and
   SQLite reopen, and clear when the task completes or recovery discards a
   non-handoff terminal task. `MECS6` label-only state remains readable.
+- Extended the session state to `MECS8` with the latest explicit EXEC CICS
+  ABEND code, dump request, and failing program. ASSIGN ABCODE, ABDUMP, and
+  ABPROGRAM now survive handler and program-transfer handoffs and SQLite reopen;
+  `MECS7` remains readable with no abend history.
 - Added current-level CICS `HANDLE ABEND PROGRAM(name)` with exact local-program
   SAF and PGMIDERR checks, issuing-program COMMAREA transfer, CANCEL/RESET and
   PUSH/POP participation, a compiled two-program selected route, and recoverable

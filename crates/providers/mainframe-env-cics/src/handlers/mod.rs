@@ -14,7 +14,8 @@ mod time;
 pub(super) use condition::respond as condition;
 pub(super) use file_control::invoke as invoke_file_control;
 pub(super) use handle_state::{
-    AbendExit, HandleFrame, HandleState, decode_handle_state, session_schema_version,
+    AbendExit, AbendRecord, HandleFrame, HandleState, decode_session_handle_state,
+    session_schema_version,
 };
 pub(super) use program_control::invoke as invoke_program_control;
 pub(super) use queue_control::invoke as invoke_queue_control;

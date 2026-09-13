@@ -3,7 +3,7 @@ use super::super::{
     argument_bytes, argument_optional, argument_text, field, mutation_problem,
 };
 use super::handle_state::{
-    AbendExit, HandleFrame, HandleState, MAX_HANDLE_STACK_DEPTH, encode_handle_state,
+    AbendExit, AbendRecord, HandleFrame, HandleState, MAX_HANDLE_STACK_DEPTH, encode_handle_state,
     persist_handle_state,
 };
 use crate::generated::{CICS_AID_NAMES, CICS_CONDITION_NAMES};
@@ -67,6 +67,7 @@ pub(in crate::service) fn new_run_with_state(
         abend_handler,
         cancelled_abend_handler,
         stack,
+        latest_abend,
     } = seed.handle_state;
     Run {
         invocation,
@@ -84,6 +85,7 @@ pub(in crate::service) fn new_run_with_state(
         abend_handler,
         cancelled_abend_handler,
         handle_stack: stack,
+        latest_abend,
         retrieve: seed.retrieve,
         current_records: BTreeMap::new(),
         current_record_values: BTreeMap::new(),
@@ -105,7 +107,7 @@ pub(in crate::service) fn encode_session(session: &Session) -> Result<Vec<u8>, H
         IdempotencyKey::new(key, InvocationLimits::default())
             .map_err(|_| HostProblem::InfrastructureFailure)?;
     }
-    let mut out = b"MECS7".to_vec();
+    let mut out = b"MECS8".to_vec();
     out.extend_from_slice(&session.rows.to_be_bytes());
     out.extend_from_slice(&session.columns.to_be_bytes());
     field(&mut out, session.principal.as_bytes())?;
@@ -515,6 +517,9 @@ fn abend(
 ) -> Result<CicsResponse, HostProblem> {
     validate_abend_request(request)?;
     super::release_task_enqueues(service, run)?;
+    let code = argument_bytes(request, "ABCODE").unwrap_or_default();
+    let dump_requested =
+        !request.arguments.contains_key("OPTION.NODUMP") && valid_abend_code(&code);
     let previous = HandleState::from_run(run);
     let exit = if request.arguments.contains_key("OPTION.CANCEL") {
         run.abend_handler = None;
@@ -526,6 +531,11 @@ fn abend(
     } else {
         None
     };
+    run.latest_abend = valid_abend_code(&code).then(|| AbendRecord {
+        code: code.clone(),
+        dump_requested,
+        program: run.current_program.clone(),
+    });
     if HandleState::from_run(run) != previous {
         persist_handle_state(service, run, previous)?;
     }
@@ -534,8 +544,7 @@ fn abend(
         Some(AbendExit::Program(target)) => (CicsDisposition::Transfer, Some(target)),
         None => (CicsDisposition::Abended, None),
     };
-    let code = argument_bytes(request, "ABCODE").unwrap_or_default();
-    let dump = if !request.arguments.contains_key("OPTION.NODUMP") && valid_abend_code(&code) {
+    let dump = if dump_requested {
         b"requested".as_slice()
     } else {
         b"suppressed".as_slice()

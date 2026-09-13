@@ -79,12 +79,15 @@ contract explicitly permits it.
   successor; it is prohibited with `INVREQ` 16/200 in a DPL server program.
   BRIDGE returns four blanks because the runtime has no bridge-monitor start
   path; IBM defines the same blank result in local non-bridge and DPL contexts.
+  ABCODE, ABDUMP, and ABPROGRAM return the latest explicit EXEC CICS ABEND
+  record from durable task state, or their documented blank/null absence values.
   Without a recoverable ASRA-class machine-check handoff, ABOFFSET is fullword
   zero and ASRAPSW/ASRAPSW16/ASRAREGS/ASRAREGS64 are their exact zero-filled
   widths; an explicit EXEC CICS ABEND is not treated as a processor fault.
   ALTSCRNHT/ALTSCRNWD, DEFSCRNHT/DEFSCRNWD, and SCRNHT/SCRNWD come from the
   owned durable terminal geometry. Nonterminal tasks receive `INVREQ` 16/5,
-  while DPL returns the qualified `INVREQ` 16/200 and leaves those receivers unchanged.
+  while DPL returns the qualified `INVREQ` 16/200 and leaves those receivers
+  unchanged.
   FCI is `X'01'` for that terminal attachment and `X'00'` when none exists;
   DPL prohibits the option with the same 16/200 condition.
   LINKLEVEL is halfword one for a top-level local program and two for a DPL
@@ -161,12 +164,13 @@ the same bounded PUSH/POP stack. A DPL server attempt fails with INVREQ, RESP
 Condition, AID, ignored-condition, active/canceled ABEND, and nested PUSH/POP
 state is task-local while a run is live and session-durable across a terminal
 input handoff. Every state-changing command first validates the complete
-request, then commits the next `MECS7` session version by CAS; a failed write
+request, then commits the next `MECS8` session version by CAS; a failed write
 restores the prior in-memory state. The next terminal task restores the exact
 state before replaying the machine checkpoint. Normal task completion and
 non-handoff terminal recovery clear it, preventing specifications from leaking
-into an unrelated task. Historical `MECS6` rows retain label-only HANDLE state;
-`MECS1`–`MECS5` decode with empty HANDLE state.
+  into an unrelated task. Historical `MECS7` rows retain typed HANDLE state
+  with no abend history, `MECS6` rows retain label-only HANDLE state, and
+  `MECS1`–`MECS5` decode with empty HANDLE state.
 
 `CALL`, `INVOKE`, and LE callable services resolve through versioned typed ABI
 catalog entries. Names choose a registered program only after the ABI identity

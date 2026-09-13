@@ -195,6 +195,10 @@ struct Run {
     abend_handler: Option<handlers::AbendExit>,
     cancelled_abend_handler: Option<handlers::AbendExit>,
     handle_stack: Vec<handlers::HandleFrame>,
+    /// Latest explicit application ABEND for source-faithful ASSIGN outputs.
+    /// It is restored only from the versioned session handle-state authority;
+    /// machine-check diagnostics remain a separate unsupported context.
+    latest_abend: Option<handlers::AbendRecord>,
     retrieve: Vec<u8>,
     current_records: BTreeMap<String, Vec<u8>>,
     current_record_values: BTreeMap<String, Vec<u8>>,
@@ -3296,11 +3300,7 @@ fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Sess
     } else {
         (Vec::new(), None, None)
     };
-    let handle_state = match schema {
-        6 => handlers::decode_handle_state(&mut reader, true)?,
-        7 => handlers::decode_handle_state(&mut reader, false)?,
-        _ => handlers::HandleState::default(),
-    };
+    let handle_state = handlers::decode_session_handle_state(&mut reader, schema)?;
     if reader.at != bytes.len() || rows == 0 || columns == 0 {
         return Err(HostProblem::InfrastructureFailure);
     }
@@ -4752,7 +4752,10 @@ mod tests {
         let diagnostics = request(
             CicsOperation::Assign,
             BTreeMap::from([
+                ("ABCODE".into(), argument(b"ABCODE-OUT")),
+                ("ABDUMP".into(), argument(b"ABDUMP-OUT")),
                 ("ABOFFSET".into(), argument(b"ABOFFSET-OUT")),
+                ("ABPROGRAM".into(), argument(b"ABPROGRAM-OUT")),
                 ("ASRAPSW".into(), argument(b"ASRA-PSW-OUT")),
                 ("ASRAPSW16".into(), argument(b"ASRA-PSW16-OUT")),
                 ("ASRAREGS".into(), argument(b"ASRA-REGS-OUT")),
@@ -4767,7 +4770,10 @@ mod tests {
                 diagnostics,
             )
             .unwrap();
+        assert_eq!(diagnostics.outputs["ABCODE"].bytes(), b"    ");
+        assert_eq!(diagnostics.outputs["ABDUMP"].bytes(), &[0]);
         assert_eq!(diagnostics.outputs["ABOFFSET"].bytes(), b"0");
+        assert_eq!(diagnostics.outputs["ABPROGRAM"].bytes(), &[0; 8]);
         assert_eq!(diagnostics.outputs["LINKLEVEL"].bytes(), b"1");
         for (name, length) in [
             ("ASRAPSW", 8),
@@ -4988,7 +4994,7 @@ mod tests {
         );
 
         for (sequence, name, value) in [
-            (31, "ABCODE", argument(b"ABCODE-OUT")),
+            (31, "ACTIVITY", argument(b"ACTIVITY-OUT")),
             (32, "USERID", cics_decimal(1)),
             (33, "OPTION.NOHANDLE", argument(b"")),
         ] {
@@ -5234,7 +5240,10 @@ mod tests {
         let diagnostics = request(
             CicsOperation::Assign,
             BTreeMap::from([
+                ("ABCODE".into(), argument(b"ABCODE-OUT")),
+                ("ABDUMP".into(), argument(b"ABDUMP-OUT")),
                 ("ABOFFSET".into(), argument(b"ABOFFSET-OUT")),
+                ("ABPROGRAM".into(), argument(b"ABPROGRAM-OUT")),
                 ("ASRAPSW".into(), argument(b"ASRA-PSW-OUT")),
                 ("ASRAPSW16".into(), argument(b"ASRA-PSW16-OUT")),
                 ("ASRAREGS".into(), argument(b"ASRA-REGS-OUT")),
@@ -5250,7 +5259,10 @@ mod tests {
             )
             .unwrap();
         assert_eq!(diagnostics.condition, "NORMAL");
+        assert_eq!(diagnostics.outputs["ABCODE"].bytes(), b"    ");
+        assert_eq!(diagnostics.outputs["ABDUMP"].bytes(), &[0]);
         assert_eq!(diagnostics.outputs["ABOFFSET"].bytes(), b"0");
+        assert_eq!(diagnostics.outputs["ABPROGRAM"].bytes(), &[0; 8]);
         assert_eq!(diagnostics.outputs["LINKLEVEL"].bytes(), b"2");
         for (name, length) in [
             ("ASRAPSW", 8),
@@ -6913,6 +6925,22 @@ mod tests {
                 9,
             )
             .unwrap();
+            let handled = invoke(
+                CicsOperation::Abend,
+                BTreeMap::from([
+                    ("ABCODE".into(), argument(b"B777")),
+                    ("OPTION.NODUMP".into(), argument(b"")),
+                ]),
+                10,
+            )
+            .unwrap();
+            assert_eq!(handled.disposition, CicsDisposition::Transfer);
+            invoke(
+                CicsOperation::HandleAbend,
+                BTreeMap::from([("OPTION.RESET".into(), argument(b""))]),
+                11,
+            )
+            .unwrap();
             let state = service.lock().unwrap();
             expected =
                 handlers::HandleState::from_run(state.runs.get(&invocation.run_unit_id).unwrap());
@@ -6932,6 +6960,10 @@ mod tests {
                 expected.abend_handler,
                 Some(handlers::AbendExit::Program(_))
             ));
+            let latest = expected.latest_abend.as_ref().unwrap();
+            assert_eq!(latest.code, b"B777");
+            assert!(!latest.dump_requested);
+            assert_eq!(latest.program, None);
             assert_eq!(expected.stack[0].handlers["INVREQ"], "OUTER-COND");
             assert_eq!(expected.stack[0].aid_handlers["PF1"], "OUTER-AID");
             assert!(expected.stack[0].ignored_conditions.contains("LENGERR"));
@@ -7600,15 +7632,26 @@ mod tests {
                 .unwrap();
             let current = service.lock().unwrap().sessions[session.as_str()].clone();
             let encoded = handlers::encode_session(&current).unwrap();
-            assert_eq!(&encoded[..5], b"MECS7");
+            assert_eq!(&encoded[..5], b"MECS8");
             let mut corrupted = encoded.clone();
-            let depth = corrupted.len() - 4;
-            corrupted[depth..].copy_from_slice(&65_u32.to_be_bytes());
+            let depth = corrupted.len() - 5;
+            corrupted[depth..depth + 4].copy_from_slice(&65_u32.to_be_bytes());
             assert!(matches!(
                 decode_session(&corrupted, current.version, CicsLimits::default()),
                 Err(HostProblem::ResourceExhausted)
             ));
-            let mut legacy6 = encoded;
+            let mut legacy7 = encoded;
+            legacy7.pop();
+            legacy7[..5].copy_from_slice(b"MECS7");
+            let decoded = decode_session(&legacy7, current.version, CicsLimits::default()).unwrap();
+            assert_eq!(decoded.user_corr_data, current.user_corr_data);
+            assert_eq!(decoded.user_corr_effect_key, current.user_corr_effect_key);
+            assert_eq!(
+                decoded.user_corr_request_digest,
+                current.user_corr_request_digest
+            );
+            assert_eq!(decoded.handle_state, handlers::HandleState::default());
+            let mut legacy6 = legacy7;
             legacy6.truncate(legacy6.len() - 18);
             legacy6.extend_from_slice(&[0; 24]);
             legacy6[..5].copy_from_slice(b"MECS6");

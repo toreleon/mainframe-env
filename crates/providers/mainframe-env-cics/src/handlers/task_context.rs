@@ -147,6 +147,31 @@ pub(in crate::service) fn assign(
             .outputs
             .insert("ABOFFSET".into(), decimal_payload(0)?);
     }
+    if request.arguments.contains_key("ABCODE") {
+        let mut value = vec![b' '; 4];
+        if let Some(record) = &run.latest_abend {
+            value[..record.code.len()].copy_from_slice(&record.code);
+        }
+        response.outputs.insert("ABCODE".into(), bounded(value)?);
+    }
+    if request.arguments.contains_key("ABDUMP") {
+        let value = run
+            .latest_abend
+            .as_ref()
+            .is_some_and(|record| record.dump_requested);
+        response.outputs.insert(
+            "ABDUMP".into(),
+            bounded(vec![if value { 0xff } else { 0 }])?,
+        );
+    }
+    if request.arguments.contains_key("ABPROGRAM") {
+        let value = run
+            .latest_abend
+            .as_ref()
+            .and_then(|record| record.program.as_ref())
+            .map_or_else(|| vec![0; 8], |program| program.as_bytes().to_vec());
+        response.outputs.insert("ABPROGRAM".into(), bounded(value)?);
+    }
     if let Some(link_level) = link_level {
         response
             .outputs
@@ -298,7 +323,10 @@ fn assign_dpl_context(run: &Run) -> Result<bool, HostProblem> {
 
 fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
     let allowed = [
+        "ABCODE",
+        "ABDUMP",
         "ABOFFSET",
+        "ABPROGRAM",
         "ALTSCRNHT",
         "ALTSCRNWD",
         "APLKYBD",

@@ -14,7 +14,10 @@ pub(super) fn validate(
         ));
     }
     for name in [
+        "ABCODE",
+        "ABDUMP",
         "ABOFFSET",
+        "ABPROGRAM",
         "ALTSCRNHT",
         "ALTSCRNWD",
         "APLKYBD",
@@ -110,7 +113,10 @@ pub(super) fn validate(
                 "CICS ASSIGN {name} requires a halfword binary data area"
             ));
         }
-        if (name == "ASRAPSW" && target.length != 8)
+        if (name == "ABCODE" && target.length != 4)
+            || (name == "ABDUMP" && target.length != 1)
+            || (name == "ABPROGRAM" && target.length != 8)
+            || (name == "ASRAPSW" && target.length != 8)
             || (name == "ASRAPSW16" && target.length != 16)
             || (name == "ASRAREGS" && target.length != 64)
             || (name == "ASRAREGS64" && target.length != 128)
