@@ -100,6 +100,8 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Repaired CardDemo conformance harnesses to run submitted jobs on JES background workers,
+  observe terminal state through authenticated z/OSMF routes, and stop workers at gate shutdown.
 - Moved the authentication wall-clock fixture wholly behind the server test
   boundary and tightened the reviewed product-module production-line ceiling.
 - Anchored authentication-session expiry and rotation to the shared durable

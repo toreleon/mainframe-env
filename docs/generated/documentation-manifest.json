@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:7f8cba2db1a8548171ea50189b394139c05ee7a7d8830ca5ffba76f4ffe39b27",
+      "sha256": "sha256:775d3a64ced4feb08739704ac134478217bb9fb122bad3e5b7fd53b6066b5319",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -1653,7 +1653,6 @@
   ],
   "navigation": [
     {
-      "heading": "Architecture and contracts",
       "entries": [
         {
           "label": "Project charter",
@@ -1747,10 +1746,10 @@
           "label": "Release builder security model",
           "path": "docs/architecture/RELEASE-BUILDER.md"
         }
-      ]
+      ],
+      "heading": "Architecture and contracts"
     },
     {
-      "heading": "Architecture decisions",
       "entries": [
         {
           "label": "ADR-0001: Technology stack",
@@ -1801,10 +1800,10 @@
           "path": "docs/decisions/README.md"
         }
       ],
+      "heading": "Architecture decisions",
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."
     },
     {
-      "heading": "Delivery and development",
       "entries": [
         {
           "label": "Implementation roadmap",
@@ -1843,10 +1842,10 @@
           "path": "docs/prompts/coverage-versions/README.md"
         }
       ],
+      "heading": "Delivery and development",
       "note": "Version-specific status files and review reports describe candidates at a point in time. They are not automatically current product documentation."
     },
     {
-      "heading": "Operations",
       "entries": [
         {
           "label": "Core-server operations",
@@ -1876,10 +1875,10 @@
           "label": "Conformance family rollout",
           "path": "docs/runbooks/conformance-family-rollout.md"
         }
-      ]
+      ],
+      "heading": "Operations"
     },
     {
-      "heading": "Releases, reviews, and research",
       "entries": [
         {
           "label": "0.8 release notes",
@@ -1905,7 +1904,8 @@
           "label": "CICS behavioral pilot",
           "path": "docs/research/cics-behavioral-conformance-pilot.md"
         }
-      ]
+      ],
+      "heading": "Releases, reviews, and research"
     }
   ],
   "package_topology": {

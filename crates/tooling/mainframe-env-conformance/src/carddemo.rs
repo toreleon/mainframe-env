@@ -78,9 +78,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
+use std::time::Duration;
 use tower::ServiceExt;
 
 const CORPUS_ENV: &str = "CARDDEMO_CORPUS_DIR";
+const JOB_COMPLETION_TIMEOUT: Duration = Duration::from_secs(120);
+const JOB_POLL_INTERVAL: Duration = Duration::from_millis(10);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CorpusProblem {
@@ -6594,6 +6597,9 @@ async fn exercise_full_certification() -> Result<FullCertificationExercise, Corp
         .racf_service()
         .permit("JESJOBS", "JOB.**", "APPUSER", AccessIntent::Alter)
         .map_err(terminal_problem)?;
+    memory
+        .start_background_workers()
+        .map_err(terminal_problem)?;
     let app = memory.router();
     let basic = format!(
         "Basic {}",
@@ -9312,16 +9318,25 @@ async fn exercise_base_batch_routes(
     }
 
     let rollback_jcl = "//CD23ROLL JOB CLASS=A\n//FAIL EXEC PGM=NOTREAL\n//WORK DD DSN=AWS.M2.CARDDEMO.CD23.ROLLBACK,DISP=(NEW,KEEP,DELETE),\n// UNIT=SYSDA,DCB=(LRECL=80,RECFM=FB)\n";
+    server
+        .start_background_workers()
+        .map_err(terminal_problem)?;
+    let rollback_headers = base_batch_job_headers();
     let (rollback_status, rollback_body) = terminal_http(
         &app,
         Method::PUT,
         "/zosmf/restjobs/jobs",
-        base_batch_job_headers(),
+        rollback_headers.clone(),
         rollback_jcl.as_bytes().to_vec(),
     )
     .await?;
     let rollback_job: serde_json::Value = serde_json::from_slice(&rollback_body)
         .map_err(|error| CorpusProblem::new("carddemo.base_batch.rollback", error.to_string()))?;
+    let rollback_job = if rollback_status == StatusCode::CREATED {
+        wait_for_submitted_job(&server, &app, &rollback_headers, rollback_job).await?
+    } else {
+        rollback_job
+    };
     if rollback_status != StatusCode::CREATED
         || rollback_job["status"] != "OUTPUT"
         || !rollback_job["retcode"].is_null()
@@ -10322,6 +10337,7 @@ async fn exercise_batch_program_routes(
         ));
     }
     submit_expected_abend(
+        &server,
         &server.router(),
         "//ABENDJOB JOB CLASS=A\n//FAIL EXEC PGM=ABENDCHK\n",
         "ABEND U0999",
@@ -10616,6 +10632,14 @@ async fn exercise_utility_routes() -> Result<UtilityExercise, CorpusProblem> {
             "internal reader child job did not complete",
         ));
     }
+    drop(app);
+    if !server.graceful_shutdown().await {
+        return Err(CorpusProblem::new(
+            "carddemo.utility.shutdown_failed",
+            "utility server did not shut down",
+        ));
+    }
+    drop(server);
     let _ = fs::remove_dir_all(&artifact_root);
     Ok(UtilityExercise {
         selected_job_routes: 7,
@@ -10793,7 +10817,7 @@ fn utility_records(
 }
 
 async fn submit_utility_job(
-    server: &ProductServer,
+    server: &Arc<ProductServer>,
     app: &axum::Router,
     jcl: &str,
 ) -> Result<(), CorpusProblem> {
@@ -10803,11 +10827,14 @@ async fn submit_utility_job(
 }
 
 async fn submit_job_with_retcode(
-    server: &ProductServer,
+    server: &Arc<ProductServer>,
     app: &axum::Router,
     jcl: &str,
     expected_retcode: &str,
 ) -> Result<String, CorpusProblem> {
+    server
+        .start_background_workers()
+        .map_err(terminal_problem)?;
     let headers = BTreeMap::from([
         (
             "authorization".into(),
@@ -10822,7 +10849,7 @@ async fn submit_job_with_retcode(
         app,
         Method::PUT,
         "/zosmf/restjobs/jobs",
-        headers,
+        headers.clone(),
         jcl.as_bytes().to_vec(),
     )
     .await?;
@@ -10837,34 +10864,9 @@ async fn submit_job_with_retcode(
     }
     let job: serde_json::Value = serde_json::from_slice(&body)
         .map_err(|error| CorpusProblem::new("carddemo.utility.job_failed", error.to_string()))?;
-    let spool_invocation = base_batch_control_invocation()?;
+    let job = wait_for_submitted_job(server, app, &headers, job).await?;
     if job["status"] != "OUTPUT" || job["retcode"] != expected_retcode {
-        let detail = job["jobid"].as_str().map_or_else(BTreeMap::new, |id| {
-            [
-                "JESMSGLG", "JOBLOG", "SYSPRINT", "SYSOUT", "CMDOUT", "ISFOUT",
-            ]
-            .into_iter()
-            .filter_map(|name| {
-                server
-                    .batch_service()
-                    .spool(&spool_invocation, id, name, 0, 4096)
-                    .ok()
-                    .map(|(records, _)| {
-                        (
-                            name.to_string(),
-                            records
-                                .into_iter()
-                                .map(|record| String::from_utf8_lossy(&record).into_owned())
-                                .collect::<Vec<_>>(),
-                        )
-                    })
-            })
-            .collect()
-        });
-        return Err(CorpusProblem::new(
-            "carddemo.utility.job_failed",
-            format!("utility job did not complete: {job}; spool={detail:?}"),
-        ));
+        return Err(utility_job_failure(server, &job)?);
     }
     job["jobid"]
         .as_str()
@@ -10872,11 +10874,94 @@ async fn submit_job_with_retcode(
         .ok_or_else(|| CorpusProblem::new("carddemo.utility.job_failed", "job ID is missing"))
 }
 
+async fn wait_for_submitted_job(
+    server: &ProductServer,
+    app: &axum::Router,
+    headers: &BTreeMap<String, String>,
+    mut job: serde_json::Value,
+) -> Result<serde_json::Value, CorpusProblem> {
+    let jobname = job["jobname"]
+        .as_str()
+        .ok_or_else(|| CorpusProblem::new("carddemo.utility.job_failed", "job name is missing"))?
+        .to_string();
+    let jobid = job["jobid"]
+        .as_str()
+        .ok_or_else(|| CorpusProblem::new("carddemo.utility.job_failed", "job ID is missing"))?
+        .to_string();
+    let deadline = tokio::time::Instant::now() + JOB_COMPLETION_TIMEOUT;
+    loop {
+        let (status, body) = terminal_http(
+            app,
+            Method::GET,
+            &format!("/zosmf/restjobs/jobs/{jobname}/{jobid}"),
+            headers.clone(),
+            Vec::new(),
+        )
+        .await?;
+        if status != StatusCode::OK {
+            return Err(CorpusProblem::new(
+                "carddemo.utility.job_failed",
+                format!(
+                    "utility job status returned {status}: {}",
+                    String::from_utf8_lossy(&body)
+                ),
+            ));
+        }
+        job = serde_json::from_slice(&body).map_err(|error| {
+            CorpusProblem::new("carddemo.utility.job_failed", error.to_string())
+        })?;
+        if !matches!(job["status"].as_str(), Some("INPUT" | "ACTIVE")) {
+            return Ok(job);
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return Err(utility_job_failure(server, &job)?);
+        }
+        tokio::time::sleep(JOB_POLL_INTERVAL).await;
+    }
+}
+
+fn utility_job_failure(
+    server: &ProductServer,
+    job: &serde_json::Value,
+) -> Result<CorpusProblem, CorpusProblem> {
+    let spool_invocation = base_batch_control_invocation()?;
+    let detail = job["jobid"].as_str().map_or_else(BTreeMap::new, |id| {
+        [
+            "JESMSGLG", "JOBLOG", "SYSPRINT", "SYSOUT", "CMDOUT", "ISFOUT",
+        ]
+        .into_iter()
+        .filter_map(|name| {
+            server
+                .batch_service()
+                .spool(&spool_invocation, id, name, 0, 4096)
+                .ok()
+                .map(|(records, _)| {
+                    (
+                        name.to_string(),
+                        records
+                            .into_iter()
+                            .map(|record| String::from_utf8_lossy(&record).into_owned())
+                            .collect::<Vec<_>>(),
+                    )
+                })
+        })
+        .collect()
+    });
+    Ok(CorpusProblem::new(
+        "carddemo.utility.job_failed",
+        format!("utility job did not complete: {job}; spool={detail:?}"),
+    ))
+}
+
 async fn submit_expected_abend(
+    server: &Arc<ProductServer>,
     app: &axum::Router,
     jcl: &str,
     expected: &str,
 ) -> Result<(), CorpusProblem> {
+    server
+        .start_background_workers()
+        .map_err(terminal_problem)?;
     let headers = BTreeMap::from([
         (
             "authorization".into(),
@@ -10891,12 +10976,17 @@ async fn submit_expected_abend(
         app,
         Method::PUT,
         "/zosmf/restjobs/jobs",
-        headers,
+        headers.clone(),
         jcl.as_bytes().to_vec(),
     )
     .await?;
     let job: serde_json::Value = serde_json::from_slice(&body)
         .map_err(|error| CorpusProblem::new("carddemo.batch_program.abend", error.to_string()))?;
+    let job = if status == StatusCode::CREATED {
+        wait_for_submitted_job(server, app, &headers, job).await?
+    } else {
+        job
+    };
     if status != StatusCode::CREATED || job["status"] != "OUTPUT" || job["retcode"] != expected {
         return Err(CorpusProblem::new(
             "carddemo.batch_program.abend",
@@ -14387,6 +14477,58 @@ mod tests {
     }
 
     #[test]
+    fn submitted_job_reaches_terminal_state_through_public_route() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let artifact_root = env::temp_dir().join(format!(
+            "mainframe-env-carddemo-job-poll-{}-{nonce}",
+            std::process::id()
+        ));
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let server = ProductServer::open(
+                ServerConfig {
+                    store_profile: StoreProfile::Memory,
+                    artifact_root: artifact_root.clone(),
+                    tls: TlsConfig {
+                        enabled: false,
+                        certificate_path: None,
+                        private_key_reference: None,
+                    },
+                    ..ServerConfig::default()
+                },
+                Arc::new(MemoryStore::new(Default::default())),
+                Arc::new(MemorySecretResolver::default()),
+                default_program_router(),
+            )
+            .unwrap();
+            server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+            let app = server.router();
+            let id = submit_job_with_retcode(
+                &server,
+                &app,
+                "//POLLJOB JOB CLASS=A\n//STEP EXEC PGM=IEFBR14\n",
+                "CC 0000",
+            )
+            .await
+            .unwrap();
+            assert_eq!(
+                server.batch_service().get(&id).unwrap().state,
+                JobState::Completed
+            );
+            drop(app);
+            assert!(server.graceful_shutdown().await);
+            drop(server);
+        });
+        let _ = fs::remove_dir_all(artifact_root);
+    }
+
+    #[test]
     fn accepted_cdv1_correction_compiles_and_runs_public_route() {
         let inventory = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../../conformance/0.1.1/inventory/carddemo-corpus.json");
@@ -14427,6 +14569,7 @@ mod tests {
             })
             .unwrap();
             server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+            server.start_background_workers().unwrap();
             server
                 .racf_service()
                 .define_profile("DATASET", "AWS.M2.CARDDEMO.**", "IBMUSER", None)
@@ -14448,6 +14591,7 @@ mod tests {
                 })
                 .await
                 .unwrap();
+            assert!(server.graceful_shutdown().await);
         });
     }
 
