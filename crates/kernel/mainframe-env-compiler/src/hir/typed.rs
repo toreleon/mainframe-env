@@ -2298,7 +2298,7 @@ mod tests {
     #[test]
     fn cics_optional_and_alternate_forms_do_not_become_false_discriminators() {
         let handle = analyze(
-            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSHAND. PROCEDURE DIVISION. EXEC CICS HANDLE ABEND PROGRAM('P') END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSHAND. PROCEDURE DIVISION. EXEC CICS HANDLE ABEND LABEL(ABEND-HANDLER) END-EXEC. STOP RUN. ABEND-HANDLER. STOP RUN.",
         );
         let hir = handle
             .hir
@@ -2329,6 +2329,67 @@ mod tests {
                 analysis.diagnostics
             );
         }
+    }
+
+    #[test]
+    fn legacy_cics_routes_reject_catalog_options_without_runtime_semantics() {
+        for (command, option) in [
+            ("ABEND NODUMP", "NODUMP"),
+            ("ASSIGN USERID(USER-X)", "USERID"),
+            ("HANDLE ABEND PROGRAM('PGM1')", "PROGRAM"),
+            ("LINK PROGRAM('PGM1') CHANNEL('CHAN1')", "CHANNEL"),
+            ("RETURN IMMEDIATE", "IMMEDIATE"),
+            ("WRITEQ TD QUEUE('Q1') FROM('A') SYSID('R1')", "SYSID"),
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLEG. DATA DIVISION. WORKING-STORAGE SECTION. 01 USER-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis.diagnostics.iter().any(|diagnostic| {
+                    let message = diagnostic.public_message();
+                    message.contains("catalog-known but legacy execution is unready")
+                        && message.contains(option)
+                }),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
+    #[test]
+    fn legacy_cics_routes_keep_only_implemented_forms_and_the_file_alias() {
+        for command in [
+            "ABEND ABCODE('A001')",
+            "ASSIGN APPLID(APPL-X)",
+            "HANDLE ABEND LABEL(ABEND-HANDLER)",
+            "READNEXT DATASET('ACCTDAT') RIDFLD(KEY-X) INTO(REC-X) UPDATE",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLEG. DATA DIVISION. WORKING-STORAGE SECTION. 01 APPL-X PIC X(8). 01 KEY-X PIC X(2). 01 REC-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN. ABEND-HANDLER. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{command}: {:?}", analysis.diagnostics));
+            let statement = hir
+                .statements
+                .iter()
+                .find(|statement| statement.kind == StatementKind::ExecCics)
+                .expect("EXEC CICS statement");
+            assert!(statement.resolved.is_none(), "{command}");
+        }
+
+        let duplicate_resource = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSALIAS. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2). 01 REC-X PIC X(8). PROCEDURE DIVISION. EXEC CICS READNEXT FILE('A') DATASET('B') RIDFLD(KEY-X) INTO(REC-X) END-EXEC. STOP RUN.",
+        );
+        assert!(duplicate_resource.hir.is_none());
+        assert!(duplicate_resource.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("options DATASET and FILE are aliases and mutually exclusive")
+        }));
     }
 
     #[test]

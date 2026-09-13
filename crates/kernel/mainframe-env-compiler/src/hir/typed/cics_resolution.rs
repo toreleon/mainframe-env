@@ -5,8 +5,8 @@ use crate::SemanticModel;
 use mainframe_env_ir::{
     CICS_APPLICATION_CONDITION_NAMES, CicsApplicationCobolApplicability,
     CicsApplicationConditionLabelOperand, CicsApplicationConstraintStatus,
-    CicsApplicationOptionValueShape, CicsApplicationRegistryDescriptor,
-    cics_application_registry_candidates_for_tokens,
+    CicsApplicationHandlerReadiness, CicsApplicationOptionValueShape,
+    CicsApplicationRegistryDescriptor, cics_application_registry_candidates_for_tokens,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -38,6 +38,118 @@ struct CandidateFailure {
     score: (usize, usize, usize),
     detail: String,
 }
+
+/// Options whose semantics are implemented by one raw compatibility route.
+///
+/// This is deliberately narrower than the source-reviewed IBM option catalog:
+/// catalog membership proves that a form is valid CICS syntax, while this
+/// table proves that the existing interpreter/provider path implements every
+/// option admitted for execution.
+struct CicsLegacyExecutionSubset {
+    official_row: &'static str,
+    options: &'static [&'static str],
+}
+
+const CICS_LEGACY_EXECUTION_SUBSETS: &[CicsLegacyExecutionSubset] = &[
+    CicsLegacyExecutionSubset {
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0001",
+        options: &["ABCODE", "NOHANDLE", "RESP", "RESP2"],
+    },
+    CicsLegacyExecutionSubset {
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0010",
+        options: &["ABSTIME", "NOHANDLE", "RESP", "RESP2"],
+    },
+    CicsLegacyExecutionSubset {
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0011",
+        options: &["APPLID", "NOHANDLE", "RESP", "RESP2", "SYSID", "TRANSID"],
+    },
+    CicsLegacyExecutionSubset {
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0040",
+        options: &["FILE", "NOHANDLE", "RESP", "RESP2", "RIDFLD"],
+    },
+    CicsLegacyExecutionSubset {
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0058",
+        options: &["FILE", "NOHANDLE", "RESP", "RESP2"],
+    },
+    CicsLegacyExecutionSubset {
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0080",
+        options: &[
+            "ABSTIME",
+            "DATESEP",
+            "MILLISECONDS",
+            "MMDDYY",
+            "MMDDYYYY",
+            "NOHANDLE",
+            "RESP",
+            "RESP2",
+            "TIME",
+            "TIMESEP",
+            "YYDDD",
+            "YYMMDD",
+            "YYYYMMDD",
+        ],
+    },
+    CicsLegacyExecutionSubset {
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0097",
+        options: &["CANCEL", "LABEL", "NOHANDLE", "RESP", "RESP2"],
+    },
+    CicsLegacyExecutionSubset {
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0099",
+        options: &["NOHANDLE", "RESP", "RESP2"],
+    },
+    CicsLegacyExecutionSubset {
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0138",
+        options: &["COMMAREA", "NOHANDLE", "PROGRAM", "RESP", "RESP2"],
+    },
+    CicsLegacyExecutionSubset {
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0157",
+        options: &[
+            "FILE", "INTO", "NOHANDLE", "RESP", "RESP2", "RIDFLD", "UPDATE",
+        ],
+    },
+    CicsLegacyExecutionSubset {
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0158",
+        options: &[
+            "FILE", "INTO", "NOHANDLE", "RESP", "RESP2", "RIDFLD", "UPDATE",
+        ],
+    },
+    CicsLegacyExecutionSubset {
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0163",
+        options: &["INTO", "MAP", "MAPSET", "NOHANDLE", "RESP", "RESP2"],
+    },
+    CicsLegacyExecutionSubset {
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0175",
+        options: &["INTO", "NOHANDLE", "RESP", "RESP2"],
+    },
+    CicsLegacyExecutionSubset {
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0178",
+        options: &["COMMAREA", "NOHANDLE", "RESP", "RESP2", "TRANSID"],
+    },
+    CicsLegacyExecutionSubset {
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0189",
+        options: &["FROM", "MAP", "MAPSET", "NOHANDLE", "RESP", "RESP2"],
+    },
+    CicsLegacyExecutionSubset {
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0192",
+        options: &["FROM", "NOHANDLE", "RESP", "RESP2"],
+    },
+    CicsLegacyExecutionSubset {
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0208",
+        options: &["FILE", "NOHANDLE", "RESP", "RESP2", "RIDFLD"],
+    },
+    CicsLegacyExecutionSubset {
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0253",
+        options: &["FILE", "FROM", "NOHANDLE", "RESP", "RESP2", "RIDFLD"],
+    },
+    CicsLegacyExecutionSubset {
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0257",
+        options: &["FROM", "LENGTH", "NOHANDLE", "QUEUE", "RESP", "RESP2"],
+    },
+    CicsLegacyExecutionSubset {
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0263",
+        options: &["COMMAREA", "NOHANDLE", "PROGRAM", "RESP", "RESP2"],
+    },
+];
 
 pub(super) fn validated_legacy_spi_compatibility(
     body: &[String],
@@ -201,6 +313,22 @@ pub(super) fn validated_command(
             );
             continue;
         }
+        if candidate.descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
+            && let Err(detail) = validate_legacy_execution_subset(candidate.descriptor, &present)
+        {
+            keep_best_failure(
+                &mut best_failure,
+                CandidateFailure {
+                    score: (
+                        candidate.head_tokens.len(),
+                        discriminator_matches,
+                        recognized_options,
+                    ),
+                    detail,
+                },
+            );
+            continue;
+        }
 
         let validated = ValidatedCandidate {
             descriptor: candidate.descriptor,
@@ -278,6 +406,17 @@ fn validate_candidate(
         ));
     }
 
+    let mut canonical_spellings = BTreeMap::<&str, &str>::new();
+    for name in present {
+        let canonical = compatibility_alias_target(descriptor, name).unwrap_or(name);
+        if let Some(existing) = canonical_spellings.insert(canonical, name) {
+            return Err(format!(
+                "CICS {} options {existing} and {name} are aliases and mutually exclusive",
+                command_label(descriptor)
+            ));
+        }
+    }
+
     let mut condition_clause_count = 0usize;
     for name in present {
         let Some(shape) = option_value_shape(descriptor, name) else {
@@ -349,7 +488,7 @@ fn validate_candidate(
     if !descriptor
         .required_discriminator_options
         .iter()
-        .all(|name| present.contains(name))
+        .all(|name| option_is_present(descriptor, present, name))
     {
         return Err(format!(
             "CICS {} is missing a required command discriminator",
@@ -359,7 +498,7 @@ fn validate_candidate(
     if let Some(name) = descriptor
         .forbidden_discriminator_options
         .iter()
-        .find(|name| present.contains(**name))
+        .find(|name| option_is_present(descriptor, present, name))
     {
         return Err(format!(
             "CICS {} forbids discriminator {name}",
@@ -372,7 +511,7 @@ fn validate_candidate(
         && !descriptor
             .discriminator_options
             .iter()
-            .any(|name| present.contains(name))
+            .any(|name| option_is_present(descriptor, present, name))
     {
         return Err(format!(
             "CICS {} is missing a source-reviewed command discriminator",
@@ -400,7 +539,7 @@ fn validate_candidate(
     if let Some(name) = descriptor
         .required_options
         .iter()
-        .find(|name| !present.contains(**name))
+        .find(|name| !option_is_present(descriptor, present, name))
     {
         return Err(format!(
             "CICS {} requires option {name}",
@@ -411,7 +550,7 @@ fn validate_candidate(
         let count = alternative
             .members
             .iter()
-            .filter(|name| present.contains(**name))
+            .filter(|name| option_is_present(descriptor, present, name))
             .count();
         if alternative.required && count == 0 {
             return Err(format!(
@@ -422,11 +561,11 @@ fn validate_candidate(
         }
     }
     for dependency in descriptor.dependencies {
-        if present.contains(dependency.option)
+        if option_is_present(descriptor, present, dependency.option)
             && let Some(required) = dependency
                 .requires
                 .iter()
-                .find(|required| !present.contains(**required))
+                .find(|required| !option_is_present(descriptor, present, required))
         {
             return Err(format!(
                 "CICS {} option {} requires {required}",
@@ -438,7 +577,7 @@ fn validate_candidate(
     for group in descriptor.mutual_exclusion_groups {
         let selected = group
             .iter()
-            .filter(|name| present.contains(**name))
+            .filter(|name| option_is_present(descriptor, present, name))
             .copied()
             .collect::<Vec<_>>();
         if selected.len() > 1 {
@@ -502,18 +641,82 @@ fn option_value_shape(
         .find(|option| option.name == name)
         .map(|option| option.value_shape)
         .or_else(|| {
-            is_typed_compatibility_option(descriptor, name)
-                .then_some(CicsApplicationOptionValueShape::Value)
+            compatibility_alias_target(descriptor, name).and_then(|canonical| {
+                descriptor
+                    .options
+                    .iter()
+                    .find(|option| option.name == canonical)
+                    .map(|option| option.value_shape)
+            })
         })
 }
 
-fn is_typed_compatibility_option(
+fn compatibility_alias_target(
     descriptor: &CicsApplicationRegistryDescriptor,
     name: &str,
+) -> Option<&'static str> {
+    // The pre-registry file provider accepts DATASET as FILE's spelling for
+    // every keyed and browse operation. Preserve that compiler ABI alias
+    // without widening the source-reviewed IBM option catalog.
+    (name == "DATASET"
+        && matches!(
+            descriptor.runtime_operation,
+            Some(
+                "Delete"
+                    | "EndBrowse"
+                    | "Read"
+                    | "ReadNext"
+                    | "ReadPrev"
+                    | "Rewrite"
+                    | "StartBrowse"
+                    | "Write"
+            )
+        ))
+    .then_some("FILE")
+}
+
+fn option_is_present(
+    descriptor: &CicsApplicationRegistryDescriptor,
+    present: &BTreeSet<&str>,
+    name: &str,
 ) -> bool {
-    // The shipped typed file plan already accepts DATASET as FILE's spelling.
-    // Keep that one compiler ABI alias without widening any catalog row.
-    name == "DATASET" && matches!(descriptor.label_tokens, ["READ"] | ["REWRITE"])
+    present.contains(name)
+        || present
+            .iter()
+            .any(|candidate| compatibility_alias_target(descriptor, candidate) == Some(name))
+}
+
+fn validate_legacy_execution_subset(
+    descriptor: &CicsApplicationRegistryDescriptor,
+    present: &BTreeSet<&str>,
+) -> Result<(), String> {
+    let subset = CICS_LEGACY_EXECUTION_SUBSETS
+        .iter()
+        .find(|subset| subset.official_row == descriptor.official_row)
+        .ok_or_else(|| {
+            format!(
+                "CICS {} has no frozen legacy execution option subset",
+                command_label(descriptor)
+            )
+        })?;
+    let unready = present
+        .iter()
+        .filter(|name| {
+            let canonical = compatibility_alias_target(descriptor, name).unwrap_or(name);
+            !subset.options.contains(&canonical)
+                && !(descriptor.condition_clauses.is_some() && is_condition_name(name))
+        })
+        .copied()
+        .collect::<Vec<_>>();
+    if unready.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "CICS {} is catalog-known but legacy execution is unready for {}",
+            command_label(descriptor),
+            unready.join(", ")
+        ))
+    }
 }
 
 fn command_label(descriptor: &CicsApplicationRegistryDescriptor) -> String {
