@@ -958,6 +958,8 @@ const fn host_operation(operation: CicsPlanOperation) -> CicsOperation {
         CicsPlanOperation::ChangeTask => CicsOperation::ChangeTask,
         CicsPlanOperation::Deq => CicsOperation::Deq,
         CicsPlanOperation::Enq => CicsOperation::Enq,
+        CicsPlanOperation::PopHandle => CicsOperation::PopHandle,
+        CicsPlanOperation::PushHandle => CicsOperation::PushHandle,
         CicsPlanOperation::Read => CicsOperation::Read,
         CicsPlanOperation::Rewrite => CicsOperation::Rewrite,
         CicsPlanOperation::SetAssociationUserCorrData => CicsOperation::SetAssociationUserCorrData,

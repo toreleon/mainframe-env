@@ -732,6 +732,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         ["CHANGE", "TASK"] => HirCicsOperation::ChangeTask,
         ["DEQ"] => HirCicsOperation::Deq,
         ["ENQ"] => HirCicsOperation::Enq,
+        ["POP", "HANDLE"] => HirCicsOperation::PopHandle,
+        ["PUSH", "HANDLE"] => HirCicsOperation::PushHandle,
         ["READ"] => HirCicsOperation::Read,
         ["REWRITE"] => HirCicsOperation::Rewrite,
         ["SET", "ASSOCIATION", "USERCORRDATA"] => HirCicsOperation::SetAssociationUserCorrData,
@@ -745,6 +747,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Deq | HirCicsOperation::Enq => {
             &["RESOURCE", "LENGTH", "MAXLIFETIME", "RESP", "RESP2"]
         }
+        HirCicsOperation::PopHandle | HirCicsOperation::PushHandle => &["RESP", "RESP2"],
         HirCicsOperation::Read => &["FILE", "DATASET", "RIDFLD", "INTO", "RESP", "RESP2"],
         HirCicsOperation::Rewrite => &["FILE", "DATASET", "FROM", "RESP", "RESP2"],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA", "RESP", "RESP2"],
@@ -754,6 +757,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     let allowed_options: &[&str] = match operation {
         HirCicsOperation::AddressSet
         | HirCicsOperation::ChangeTask
+        | HirCicsOperation::PopHandle
+        | HirCicsOperation::PushHandle
         | HirCicsOperation::SetAssociationUserCorrData
         | HirCicsOperation::Suspend => &["NOHANDLE"],
         HirCicsOperation::Deq => &["UOW", "TASK", "NOHANDLE"],
@@ -796,7 +801,10 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     }
     for required in match operation {
         HirCicsOperation::AddressSet => &["SET", "USING"][..],
-        HirCicsOperation::ChangeTask | HirCicsOperation::Suspend => &[][..],
+        HirCicsOperation::ChangeTask
+        | HirCicsOperation::PopHandle
+        | HirCicsOperation::PushHandle
+        | HirCicsOperation::Suspend => &[][..],
         HirCicsOperation::Deq | HirCicsOperation::Enq => &["RESOURCE"][..],
         HirCicsOperation::Read => &["RIDFLD", "INTO"][..],
         HirCicsOperation::Rewrite => &["FROM"][..],

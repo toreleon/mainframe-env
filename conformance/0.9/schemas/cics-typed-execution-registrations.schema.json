@@ -18,15 +18,15 @@
     },
     "registrations": {
       "type": "array",
-      "minItems": 6,
-      "maxItems": 6,
+      "minItems": 8,
+      "maxItems": 8,
       "uniqueItems": true,
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["operation", "interface", "family", "mutating", "official_row"],
         "properties": {
-          "operation": {"enum": ["AddressSet", "ChangeTask", "Deq", "Enq", "SetAssociationUserCorrData", "Suspend"]},
+          "operation": {"enum": ["AddressSet", "ChangeTask", "Deq", "Enq", "PopHandle", "PushHandle", "SetAssociationUserCorrData", "Suspend"]},
           "interface": {"const": "api"},
           "family": {"const": "task-control"},
           "mutating": {"type": "boolean"},
@@ -36,6 +36,8 @@
               "ibm-cics-ts-6x-2026-08-31:api-commands:0022",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0050",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0064",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0146",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0149",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0193",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0214"
             ]

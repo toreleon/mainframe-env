@@ -150,6 +150,8 @@ pub enum HirCicsOperation {
     ChangeTask,
     Deq,
     Enq,
+    PopHandle,
+    PushHandle,
     Read,
     Rewrite,
     SetAssociationUserCorrData,
@@ -1840,6 +1842,44 @@ mod tests {
             diagnostic
                 .public_message()
                 .contains("pointer operand must use POINTER or POINTER-32")
+        }));
+    }
+
+    #[test]
+    fn cics_handle_stack_commands_resolve_without_unowned_operands() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSHSTK. DATA DIVISION. WORKING-STORAGE SECTION. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS PUSH HANDLE NOHANDLE END-EXEC. EXEC CICS POP HANDLE RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.";
+        let hir = analyze(source).hir.expect("typed HANDLE stack HIR");
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 2);
+        assert_eq!(commands[0].operation, HirCicsOperation::PushHandle);
+        assert_eq!(commands[1].operation, HirCicsOperation::PopHandle);
+        assert!(commands.iter().all(|command| command.operands.is_empty()));
+        assert_eq!(
+            commands[0].condition_policy,
+            HirCicsConditionPolicy::NoHandle
+        );
+        assert!(matches!(
+            commands[1].condition_policy,
+            HirCicsConditionPolicy::Respond {
+                response2: Some(_),
+                ..
+            }
+        ));
+
+        let invalid = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADHSTK. PROCEDURE DIVISION. EXEC CICS PUSH HANDLE RESET END-EXEC. STOP RUN.",
+        );
+        assert!(invalid.hir.is_none());
+        assert!(invalid.diagnostics.iter().any(|diagnostic| {
+            let message = diagnostic.public_message();
+            message.contains("PUSH HANDLE") && message.contains("RESET")
         }));
     }
 

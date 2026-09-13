@@ -73,6 +73,10 @@ All notable changes to mainframe-env are documented here.
   an active label automatically deactivates it, RESET reactivates the canceled
   label, bare HANDLE ABEND defaults to CANCEL, and conflicting action forms
   fail before execution.
+- Added typed CICS `PUSH HANDLE` and `POP HANDLE` over a bounded 64-frame task
+  stack. Nested frames suspend and restore condition/ABEND specifications,
+  unmatched POP returns exact INVREQ behavior, and a compiled online route
+  proves inner-to-outer exit restoration.
 - Added the frozen-with-bounded-ambiguities CIC-901 command contract and generated
   263-row compiler registry. The registry explicitly separates three typed runtime
   handlers, 20 legacy compatibility handlers, and 240 unready handlers; automatic

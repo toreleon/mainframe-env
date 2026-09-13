@@ -79,6 +79,13 @@ single-level exit back to active, and an explicit or default CANCEL deactivates
 it. Program exits and nested logical-level search remain separate continuation
 work and are not represented as labels.
 
+CICS PUSH HANDLE moves the current condition mappings, ignored-condition set,
+and active/canceled ABEND labels into one bounded task-local frame, leaving a
+clear specification set for the nested routine. POP HANDLE discards the nested
+set and restores exactly one prior frame. The stack permits 64 frames, rejects
+growth before mutation, and treats an unmatched POP as INVREQ rather than as an
+empty success.
+
 `CALL`, `INVOKE`, and LE callable services resolve through versioned typed ABI
 catalog entries. Names choose a registered program only after the ABI identity
 is known; no copybook, application, or program-name special case selects host

@@ -51,6 +51,10 @@ pub enum CicsPlanOperation {
     Deq,
     /// Acquire one task-owned enqueue.
     Enq,
+    /// Restore one suspended HANDLE/IGNORE specification snapshot.
+    PopHandle,
+    /// Suspend the current HANDLE/IGNORE specifications in one nested snapshot.
+    PushHandle,
     /// Read one file record.
     Read,
     /// Rewrite the record held by the current update context.
@@ -447,6 +451,9 @@ fn validate_operation_shape(
                     && plan.options.contains(&CicsPlanOption::NoSuspend))
                 || outputs.contains(&CicsOutputName::Into)
         }
+        CicsPlanOperation::PopHandle | CicsPlanOperation::PushHandle => {
+            !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
+        }
         CicsPlanOperation::Read => {
             resources != 1
                 || !inputs.contains(&CicsOperandName::Ridfld)
@@ -647,6 +654,8 @@ const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::Suspend => 6,
         CicsPlanOperation::SetAssociationUserCorrData => 7,
         CicsPlanOperation::AddressSet => 8,
+        CicsPlanOperation::PopHandle => 9,
+        CicsPlanOperation::PushHandle => 10,
     }
 }
 
@@ -661,6 +670,8 @@ fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPlanCodecProbl
         6 => Ok(CicsPlanOperation::Suspend),
         7 => Ok(CicsPlanOperation::SetAssociationUserCorrData),
         8 => Ok(CicsPlanOperation::AddressSet),
+        9 => Ok(CicsPlanOperation::PopHandle),
+        10 => Ok(CicsPlanOperation::PushHandle),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -1070,6 +1081,30 @@ mod tests {
             .unwrap(),
             suspend
         );
+    }
+
+    #[test]
+    fn handle_stack_plans_round_trip_and_reject_unowned_options() {
+        for operation in [CicsPlanOperation::PushHandle, CicsPlanOperation::PopHandle] {
+            let plan = CicsEffectPlan {
+                operation,
+                operands: Vec::new(),
+                options: BTreeSet::new(),
+                outputs: Vec::new(),
+                condition: CicsCondition::Default,
+            };
+            let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+            assert_eq!(
+                decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
+                plan
+            );
+            let mut malformed = plan;
+            malformed.options.insert(CicsPlanOption::Rollback);
+            assert_eq!(
+                encode_cics_effect_plan(&malformed, CicsPlanLimits::default()),
+                Err(CicsPlanCodecProblem::Malformed)
+            );
+        }
     }
 
     #[test]

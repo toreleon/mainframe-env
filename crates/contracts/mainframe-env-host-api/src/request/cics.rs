@@ -24,6 +24,10 @@ pub enum CicsOperation {
     HandleCondition,
     Inquire,
     Link,
+    /// Restore one suspended HANDLE/IGNORE specification snapshot.
+    PopHandle,
+    /// Suspend the current HANDLE/IGNORE specifications in one nested snapshot.
+    PushHandle,
     Read,
     ReadNext,
     ReadPrev,
@@ -64,6 +68,8 @@ impl CicsOperation {
             Self::HandleCondition => "HandleCondition",
             Self::Inquire => "Inquire",
             Self::Link => "Link",
+            Self::PopHandle => "PopHandle",
+            Self::PushHandle => "PushHandle",
             Self::Read => "Read",
             Self::ReadNext => "ReadNext",
             Self::ReadPrev => "ReadPrev",
@@ -130,6 +136,8 @@ impl CicsOperation {
             ("HANDLE", _) => Self::HandleCondition,
             ("INQUIRE", _) => Self::Inquire,
             ("LINK", _) => Self::Link,
+            ("POP", Some("HANDLE")) => Self::PopHandle,
+            ("PUSH", Some("HANDLE")) => Self::PushHandle,
             ("READ", _) => Self::Read,
             ("READNEXT", _) => Self::ReadNext,
             ("READPREV", _) => Self::ReadPrev,

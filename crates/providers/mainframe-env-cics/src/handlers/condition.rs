@@ -30,7 +30,18 @@ pub(crate) fn respond(
             Vec::new(),
         ),
         CicsConditionPolicy::Default => {
-            if let Some(target) = run.handlers.get(name) {
+            if run.ignored_conditions.contains(name) {
+                service.response(
+                    run,
+                    CicsDisposition::Ignored,
+                    name,
+                    response,
+                    response2,
+                    None,
+                    None,
+                    Vec::new(),
+                )
+            } else if let Some(target) = run.handlers.get(name) {
                 service.response(
                     run,
                     CicsDisposition::Handler,

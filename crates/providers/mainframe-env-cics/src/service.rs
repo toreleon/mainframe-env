@@ -188,8 +188,10 @@ struct Run {
     host_sequence: u64,
     outer_effect_key: Option<String>,
     handlers: BTreeMap<String, String>,
+    ignored_conditions: BTreeSet<String>,
     abend_handler: Option<String>,
     cancelled_abend_handler: Option<String>,
+    handle_stack: Vec<handlers::HandleFrame>,
     retrieve: Vec<u8>,
     current_records: BTreeMap<String, Vec<u8>>,
     current_record_values: BTreeMap<String, Vec<u8>>,
@@ -1088,26 +1090,19 @@ impl CicsService {
         );
         state.runs.insert(
             invocation.run_unit_id.clone(),
-            Run {
+            handlers::new_run_with_state(
                 invocation,
-                session: session.as_str().into(),
-                transaction: transaction.to_ascii_uppercase(),
-                applid: applid.to_ascii_uppercase(),
-                sysid: sysid.to_ascii_uppercase(),
-                originating_task,
-                host_sequence: 0,
-                outer_effect_key: None,
-                handlers: BTreeMap::new(),
-                abend_handler: None,
-                cancelled_abend_handler: None,
-                retrieve,
-                current_records: BTreeMap::new(),
-                current_record_values: BTreeMap::new(),
-                undo,
-                undo_version,
-                browses: BTreeMap::new(),
-                trace: Vec::new(),
-            },
+                session.as_str(),
+                transaction,
+                applid,
+                sysid,
+                handlers::RunSeed {
+                    originating_task,
+                    retrieve,
+                    undo,
+                    undo_version,
+                },
+            ),
         );
         Ok(())
     }
@@ -1145,26 +1140,19 @@ impl CicsService {
         }
         state.runs.insert(
             invocation.run_unit_id.clone(),
-            Run {
+            handlers::new_run_with_state(
                 invocation,
-                session: session.as_str().into(),
-                transaction: transaction.to_ascii_uppercase(),
-                applid: "ME01".into(),
-                sysid: "S001".into(),
-                originating_task: current.run_unit,
-                host_sequence: 0,
-                outer_effect_key: None,
-                handlers: BTreeMap::new(),
-                abend_handler: None,
-                cancelled_abend_handler: None,
-                retrieve,
-                current_records: BTreeMap::new(),
-                current_record_values: BTreeMap::new(),
-                undo,
-                undo_version,
-                browses: BTreeMap::new(),
-                trace: Vec::new(),
-            },
+                session.as_str(),
+                transaction,
+                "ME01",
+                "S001",
+                handlers::RunSeed {
+                    originating_task: current.run_unit,
+                    retrieve,
+                    undo,
+                    undo_version,
+                },
+            ),
         );
         Ok(())
     }
@@ -1234,26 +1222,19 @@ impl CicsService {
         );
         state.runs.insert(
             invocation.run_unit_id.clone(),
-            Run {
+            handlers::new_run_with_state(
                 invocation,
-                session: session.as_str().into(),
-                transaction: next.transaction,
-                applid: applid.to_ascii_uppercase(),
-                sysid: sysid.to_ascii_uppercase(),
-                originating_task,
-                host_sequence: 0,
-                outer_effect_key: None,
-                handlers: BTreeMap::new(),
-                abend_handler: None,
-                cancelled_abend_handler: None,
-                retrieve: Vec::new(),
-                current_records: BTreeMap::new(),
-                current_record_values: BTreeMap::new(),
-                undo,
-                undo_version,
-                browses: BTreeMap::new(),
-                trace: Vec::new(),
-            },
+                session.as_str(),
+                &next.transaction,
+                applid,
+                sysid,
+                handlers::RunSeed {
+                    originating_task,
+                    retrieve: Vec::new(),
+                    undo,
+                    undo_version,
+                },
+            ),
         );
         Ok(continuation)
     }
@@ -1781,7 +1762,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 31);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 33);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -4592,6 +4573,8 @@ mod tests {
             ("HANDLE CONDITION", CicsOperation::HandleCondition),
             ("INQUIRE PROGRAM(PGM)", CicsOperation::Inquire),
             ("LINK", CicsOperation::Link),
+            ("POP HANDLE", CicsOperation::PopHandle),
+            ("PUSH HANDLE", CicsOperation::PushHandle),
             ("READ", CicsOperation::Read),
             ("READNEXT", CicsOperation::ReadNext),
             ("READPREV", CicsOperation::ReadPrev),
@@ -4623,7 +4606,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 31);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 33);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -5311,6 +5294,193 @@ mod tests {
                 conflicting_handler,
             ),
             Err(HostProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn handle_stack_nests_restores_and_reports_unmatched_pop_exactly() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+        let invoke = |operation, arguments, sequence| {
+            let request = request(operation, arguments, sequence);
+            service.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), sequence),
+                request,
+            )
+        };
+        invoke(
+            CicsOperation::HandleCondition,
+            BTreeMap::from([("PGMIDERR".into(), argument(b"OUTER-COND"))]),
+            1,
+        )
+        .unwrap();
+        invoke(
+            CicsOperation::HandleAbend,
+            BTreeMap::from([("LABEL".into(), argument(b"OUTER-ABEND"))]),
+            2,
+        )
+        .unwrap();
+        invoke(CicsOperation::PushHandle, BTreeMap::new(), 3).unwrap();
+        invoke(
+            CicsOperation::HandleCondition,
+            BTreeMap::from([("PGMIDERR".into(), argument(b"INNER-COND"))]),
+            4,
+        )
+        .unwrap();
+        invoke(
+            CicsOperation::HandleAbend,
+            BTreeMap::from([("LABEL".into(), argument(b"INNER-ABEND"))]),
+            5,
+        )
+        .unwrap();
+        invoke(CicsOperation::PushHandle, BTreeMap::new(), 6).unwrap();
+        invoke(CicsOperation::PopHandle, BTreeMap::new(), 7).unwrap();
+        let inner = invoke(
+            CicsOperation::Inquire,
+            BTreeMap::from([("PROGRAM".into(), argument(b"MISSING"))]),
+            8,
+        )
+        .unwrap();
+        assert_eq!(inner.disposition, CicsDisposition::Handler);
+        assert_eq!(inner.target.as_deref(), Some("INNER-COND"));
+        invoke(CicsOperation::PopHandle, BTreeMap::new(), 9).unwrap();
+        let outer = invoke(
+            CicsOperation::Inquire,
+            BTreeMap::from([("PROGRAM".into(), argument(b"MISSING"))]),
+            10,
+        )
+        .unwrap();
+        assert_eq!(outer.disposition, CicsDisposition::Handler);
+        assert_eq!(outer.target.as_deref(), Some("OUTER-COND"));
+        let outer_abend = invoke(
+            CicsOperation::Abend,
+            BTreeMap::from([("ABCODE".into(), argument(b"B001"))]),
+            11,
+        )
+        .unwrap();
+        assert_eq!(outer_abend.disposition, CicsDisposition::Handler);
+        assert_eq!(outer_abend.target.as_deref(), Some("OUTER-ABEND"));
+
+        let unmatched = self::service(Arc::new(MemoryStore::new(Default::default())));
+        let (unmatched_invocation, _) = registered(&unmatched);
+        let pop = request(CicsOperation::PopHandle, BTreeMap::new(), 1);
+        let terminal = unmatched
+            .invoke(
+                &effect(&unmatched_invocation.run_unit_id, pop.clone(), 1),
+                pop,
+            )
+            .unwrap();
+        assert_eq!(terminal.disposition, CicsDisposition::Abended);
+        assert_eq!(
+            (
+                terminal.condition.as_str(),
+                terminal.response,
+                terminal.response2
+            ),
+            ("INVREQ", 16, 0)
+        );
+        let mut nohandle = request(CicsOperation::PopHandle, BTreeMap::new(), 2);
+        nohandle.condition_policy = CicsConditionPolicy::NoHandle;
+        let returned = unmatched
+            .invoke(
+                &effect(&unmatched_invocation.run_unit_id, nohandle.clone(), 2),
+                nohandle,
+            )
+            .unwrap();
+        assert_eq!(returned.disposition, CicsDisposition::Complete);
+        assert_eq!((returned.response, returned.response2), (16, 0));
+
+        let mut responded = request(CicsOperation::PopHandle, BTreeMap::new(), 3);
+        responded.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let returned = unmatched
+            .invoke(
+                &effect(&unmatched_invocation.run_unit_id, responded.clone(), 3),
+                responded,
+            )
+            .unwrap();
+        assert_eq!(returned.disposition, CicsDisposition::Complete);
+        assert_eq!((returned.response, returned.response2), (16, 0));
+
+        let abend_handler = request(
+            CicsOperation::HandleAbend,
+            BTreeMap::from([("LABEL".into(), argument(b"POP-ABEND"))]),
+            4,
+        );
+        unmatched
+            .invoke(
+                &effect(&unmatched_invocation.run_unit_id, abend_handler.clone(), 4),
+                abend_handler,
+            )
+            .unwrap();
+        let pop = request(CicsOperation::PopHandle, BTreeMap::new(), 5);
+        let handled = unmatched
+            .invoke(
+                &effect(&unmatched_invocation.run_unit_id, pop.clone(), 5),
+                pop,
+            )
+            .unwrap();
+        assert_eq!(handled.disposition, CicsDisposition::Handler);
+        assert_eq!(handled.target.as_deref(), Some("POP-ABEND"));
+
+        let condition_handler = request(
+            CicsOperation::HandleCondition,
+            BTreeMap::from([("INVREQ".into(), argument(b"POP-INVREQ"))]),
+            6,
+        );
+        unmatched
+            .invoke(
+                &effect(
+                    &unmatched_invocation.run_unit_id,
+                    condition_handler.clone(),
+                    6,
+                ),
+                condition_handler,
+            )
+            .unwrap();
+        let pop = request(CicsOperation::PopHandle, BTreeMap::new(), 7);
+        let handled = unmatched
+            .invoke(
+                &effect(&unmatched_invocation.run_unit_id, pop.clone(), 7),
+                pop,
+            )
+            .unwrap();
+        assert_eq!(handled.disposition, CicsDisposition::Handler);
+        assert_eq!(handled.target.as_deref(), Some("POP-INVREQ"));
+
+        let malformed = request(
+            CicsOperation::PushHandle,
+            BTreeMap::from([("OPTION.UNKNOWN".into(), argument(b""))]),
+            8,
+        );
+        assert_eq!(
+            unmatched.invoke(
+                &effect(&unmatched_invocation.run_unit_id, malformed.clone(), 8),
+                malformed,
+            ),
+            Err(HostProblem::Malformed)
+        );
+
+        let bounded = self::service(Arc::new(MemoryStore::new(Default::default())));
+        let (bounded_invocation, _) = registered(&bounded);
+        for sequence in 1..=64 {
+            let push = request(CicsOperation::PushHandle, BTreeMap::new(), sequence);
+            bounded
+                .invoke(
+                    &effect(&bounded_invocation.run_unit_id, push.clone(), sequence),
+                    push,
+                )
+                .unwrap();
+        }
+        let overflow = request(CicsOperation::PushHandle, BTreeMap::new(), 65);
+        assert_eq!(
+            bounded.invoke(
+                &effect(&bounded_invocation.run_unit_id, overflow.clone(), 65),
+                overflow,
+            ),
+            Err(HostProblem::ResourceExhausted)
         );
     }
 
