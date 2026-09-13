@@ -72,6 +72,13 @@ not Rust errors. Condition phrases select exact CFG edges after the operation
 records a typed condition status. Unhandled conditions become `Condition`,
 `Abend`, or `Failed` according to the accepted execution taxonomy.
 
+CICS HANDLE ABEND label state distinguishes active from canceled. Selecting an
+active exit moves it to canceled before the interpreter branches, preventing a
+recursive abend from immediately selecting the same exit. RESET moves that
+single-level exit back to active, and an explicit or default CANCEL deactivates
+it. Program exits and nested logical-level search remain separate continuation
+work and are not represented as labels.
+
 `CALL`, `INVOKE`, and LE callable services resolve through versioned typed ABI
 catalog entries. Names choose a registered program only after the ABI identity
 is known; no copybook, application, or program-name special case selects host

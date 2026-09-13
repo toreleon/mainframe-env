@@ -2,12 +2,47 @@ use super::super::{
     CicsLimits, CicsService, DurableContinuation, Reader, Run, Session, argument_bytes,
     argument_optional, argument_text, bounded, field, mutation_problem,
 };
-use mainframe_env_execution_api::{BoundedPayload, IdempotencyKey, InvocationLimits};
+use mainframe_env_execution_api::{BoundedPayload, IdempotencyKey, Invocation, InvocationLimits};
 use mainframe_env_host_api::{
     AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
     HostRequest, canonical_request_digest,
 };
 use std::collections::BTreeMap;
+
+pub(in crate::service) fn new_run(
+    invocation: Invocation,
+    session: &str,
+    transaction: &str,
+    applid: &str,
+    sysid: &str,
+) -> Run {
+    let originating_task = invocation.run_unit_id.as_str().to_string();
+    let retrieve = invocation
+        .bindings
+        .get("cics.retrieve")
+        .map(|value| value.bytes().to_vec())
+        .unwrap_or_default();
+    Run {
+        invocation,
+        session: session.into(),
+        transaction: transaction.to_ascii_uppercase(),
+        applid: applid.to_ascii_uppercase(),
+        sysid: sysid.to_ascii_uppercase(),
+        originating_task,
+        host_sequence: 0,
+        outer_effect_key: None,
+        handlers: BTreeMap::new(),
+        abend_handler: None,
+        cancelled_abend_handler: None,
+        retrieve,
+        current_records: BTreeMap::new(),
+        current_record_values: BTreeMap::new(),
+        undo: Vec::new(),
+        undo_version: None,
+        browses: BTreeMap::new(),
+        trace: Vec::new(),
+    }
+}
 
 pub(in crate::service) fn encode_session(session: &Session) -> Result<Vec<u8>, HostProblem> {
     if session.user_corr_data.len() > 64
@@ -425,10 +460,17 @@ fn abend(
 ) -> Result<CicsResponse, HostProblem> {
     validate_abend_request(request)?;
     super::release_task_enqueues(service, run)?;
-    if request.arguments.contains_key("OPTION.CANCEL") {
+    let target = if request.arguments.contains_key("OPTION.CANCEL") {
         run.abend_handler = None;
-    }
-    let disposition = if run.abend_handler.is_some() {
+        run.cancelled_abend_handler = None;
+        None
+    } else if let Some(handler) = run.abend_handler.take() {
+        run.cancelled_abend_handler = Some(handler.clone());
+        Some(handler)
+    } else {
+        None
+    };
+    let disposition = if target.is_some() {
         CicsDisposition::Handler
     } else {
         CicsDisposition::Abended
@@ -439,16 +481,7 @@ fn abend(
     } else {
         b"suppressed".as_slice()
     };
-    let mut response = service.response(
-        run,
-        disposition,
-        "ERROR",
-        27,
-        0,
-        run.abend_handler.clone(),
-        None,
-        code,
-    )?;
+    let mut response = service.response(run, disposition, "ERROR", 27, 0, target, None, code)?;
     if disposition == CicsDisposition::Abended {
         response.outputs.insert(
             "ABEND.DUMP".into(),
@@ -522,10 +555,21 @@ fn handle_abend(
     run: &mut Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
-    if request.arguments.contains_key("OPTION.CANCEL") {
-        run.abend_handler = None;
-    } else {
-        run.abend_handler = Some(argument_text(request, "LABEL")?);
+    match handle_abend_action(request)? {
+        AbendHandlerAction::Cancel => {
+            if let Some(handler) = run.abend_handler.take() {
+                run.cancelled_abend_handler = Some(handler);
+            }
+        }
+        AbendHandlerAction::Label(handler) => {
+            run.abend_handler = Some(handler);
+            run.cancelled_abend_handler = None;
+        }
+        AbendHandlerAction::Reset => {
+            if let Some(handler) = run.cancelled_abend_handler.take() {
+                run.abend_handler = Some(handler);
+            }
+        }
     }
     service.response(
         run,
@@ -537,6 +581,54 @@ fn handle_abend(
         None,
         Vec::new(),
     )
+}
+
+enum AbendHandlerAction {
+    Cancel,
+    Label(String),
+    Reset,
+}
+
+fn handle_abend_action(request: &CicsRequest) -> Result<AbendHandlerAction, HostProblem> {
+    let allowed = [
+        "LABEL",
+        "OPTION.CANCEL",
+        "OPTION.NOHANDLE",
+        "OPTION.RESET",
+        "PROGRAM",
+        "RESP",
+        "RESP2",
+    ];
+    if request.arguments.iter().any(|(name, value)| {
+        !allowed.contains(&name.as_str())
+            || name.starts_with("OPTION.") && !value.bytes().is_empty()
+    }) {
+        return Err(HostProblem::Malformed);
+    }
+    let cancel = request.arguments.contains_key("OPTION.CANCEL");
+    let label = request.arguments.contains_key("LABEL");
+    let program = request.arguments.contains_key("PROGRAM");
+    let reset = request.arguments.contains_key("OPTION.RESET");
+    if usize::from(cancel) + usize::from(label) + usize::from(program) + usize::from(reset) > 1 {
+        return Err(HostProblem::Malformed);
+    }
+    if program {
+        // PROGRAM requires a program-invocation continuation, authority checks,
+        // and autoinstall behavior that this legacy handler does not own yet.
+        return Err(HostProblem::Malformed);
+    }
+    if label {
+        let label = argument_text(request, "LABEL")?;
+        if label.is_empty() {
+            return Err(HostProblem::Malformed);
+        }
+        Ok(AbendHandlerAction::Label(label))
+    } else if reset {
+        Ok(AbendHandlerAction::Reset)
+    } else {
+        // IBM defines CANCEL as the default when no action option is present.
+        Ok(AbendHandlerAction::Cancel)
+    }
 }
 
 fn assign(

@@ -598,15 +598,23 @@ fn validate_legacy_execution_subset(
         })
         .copied()
         .collect::<Vec<_>>();
-    if unready.is_empty() {
-        Ok(())
-    } else {
-        Err(format!(
+    if !unready.is_empty() {
+        return Err(format!(
             "CICS {} is catalog-known but legacy execution is unready for {}",
             command_label(descriptor),
             unready.join(", ")
-        ))
+        ));
     }
+    if descriptor.runtime_operation == Some("HandleAbend")
+        && ["CANCEL", "LABEL", "PROGRAM", "RESET"]
+            .into_iter()
+            .filter(|name| option_is_present(descriptor, present, name))
+            .count()
+            > 1
+    {
+        return Err("CICS HANDLE ABEND action options are mutually exclusive".into());
+    }
+    Ok(())
 }
 
 fn command_label(descriptor: &CicsApplicationRegistryDescriptor) -> String {

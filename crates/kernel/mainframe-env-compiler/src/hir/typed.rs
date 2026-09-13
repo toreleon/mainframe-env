@@ -2349,6 +2349,16 @@ mod tests {
                 analysis.diagnostics
             );
         }
+
+        let conflict = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSCONF. PROCEDURE DIVISION. EXEC CICS HANDLE ABEND CANCEL RESET END-EXEC. STOP RUN.",
+        );
+        assert!(conflict.hir.is_none());
+        assert!(conflict.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("HANDLE ABEND action options are mutually exclusive")
+        }));
     }
 
     #[test]
@@ -2359,7 +2369,9 @@ mod tests {
             "ABEND ABCODE('B002') NODUMP",
             "ABEND NODUMP",
             "ASSIGN APPLID(APPL-X)",
+            "HANDLE ABEND",
             "HANDLE ABEND LABEL(ABEND-HANDLER)",
+            "HANDLE ABEND RESET",
             "READNEXT DATASET('ACCTDAT') RIDFLD(KEY-X) INTO(REC-X) UPDATE",
         ] {
             let source = format!(

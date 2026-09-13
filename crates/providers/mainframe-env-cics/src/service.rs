@@ -189,6 +189,7 @@ struct Run {
     outer_effect_key: Option<String>,
     handlers: BTreeMap<String, String>,
     abend_handler: Option<String>,
+    cancelled_abend_handler: Option<String>,
     retrieve: Vec<u8>,
     current_records: BTreeMap<String, Vec<u8>>,
     current_record_values: BTreeMap<String, Vec<u8>>,
@@ -611,7 +612,7 @@ impl CicsService {
             field_values: BTreeMap::new(),
             version: 1,
         };
-        let run = run_for(
+        let run = handlers::new_run(
             invocation.clone(),
             session.as_str(),
             transaction,
@@ -1098,6 +1099,7 @@ impl CicsService {
                 outer_effect_key: None,
                 handlers: BTreeMap::new(),
                 abend_handler: None,
+                cancelled_abend_handler: None,
                 retrieve,
                 current_records: BTreeMap::new(),
                 current_record_values: BTreeMap::new(),
@@ -1154,6 +1156,7 @@ impl CicsService {
                 outer_effect_key: None,
                 handlers: BTreeMap::new(),
                 abend_handler: None,
+                cancelled_abend_handler: None,
                 retrieve,
                 current_records: BTreeMap::new(),
                 current_record_values: BTreeMap::new(),
@@ -1242,6 +1245,7 @@ impl CicsService {
                 outer_effect_key: None,
                 handlers: BTreeMap::new(),
                 abend_handler: None,
+                cancelled_abend_handler: None,
                 retrieve: Vec::new(),
                 current_records: BTreeMap::new(),
                 current_record_values: BTreeMap::new(),
@@ -2330,40 +2334,6 @@ pub fn cics_provider(service: Arc<CicsService>, limits: InvocationLimits) -> Arc
             ready: true,
         },
     })
-}
-
-fn run_for(
-    invocation: Invocation,
-    session: &str,
-    transaction: &str,
-    applid: &str,
-    sysid: &str,
-) -> Run {
-    let originating_task = invocation.run_unit_id.as_str().to_string();
-    let retrieve = invocation
-        .bindings
-        .get("cics.retrieve")
-        .map(|value| value.bytes().to_vec())
-        .unwrap_or_default();
-    Run {
-        invocation,
-        session: session.into(),
-        transaction: transaction.to_ascii_uppercase(),
-        applid: applid.to_ascii_uppercase(),
-        sysid: sysid.to_ascii_uppercase(),
-        originating_task,
-        host_sequence: 0,
-        outer_effect_key: None,
-        handlers: BTreeMap::new(),
-        abend_handler: None,
-        retrieve,
-        current_records: BTreeMap::new(),
-        current_record_values: BTreeMap::new(),
-        undo: Vec::new(),
-        undo_version: None,
-        browses: BTreeMap::new(),
-        trace: Vec::new(),
-    }
 }
 
 fn originating_task_for(session: &Session, invocation: &Invocation) -> String {
@@ -5196,28 +5166,53 @@ mod tests {
             BTreeMap::from([("ABCODE".into(), argument(b"9999"))]),
             5,
         );
-        assert_eq!(
-            service
-                .invoke(&effect(&invocation.run_unit_id, abend.clone(), 5), abend)
-                .unwrap()
-                .disposition,
-            CicsDisposition::Handler
-        );
-        let cancel = request(
+        let handled = service
+            .invoke(&effect(&invocation.run_unit_id, abend.clone(), 5), abend)
+            .unwrap();
+        assert_eq!(handled.disposition, CicsDisposition::Handler);
+        assert_eq!(handled.target.as_deref(), Some("ABEND-ROUTINE"));
+
+        let reset = request(
             CicsOperation::HandleAbend,
-            BTreeMap::from([("OPTION.CANCEL".into(), argument(b""))]),
+            BTreeMap::from([("OPTION.RESET".into(), argument(b""))]),
             6,
         );
         service
-            .invoke(&effect(&invocation.run_unit_id, cancel.clone(), 6), cancel)
+            .invoke(&effect(&invocation.run_unit_id, reset.clone(), 6), reset)
             .unwrap();
         let abend = request(
             CicsOperation::Abend,
             BTreeMap::from([("ABCODE".into(), argument(b"9999"))]),
             7,
         );
-        let dumped = service
+        let handled_again = service
             .invoke(&effect(&invocation.run_unit_id, abend.clone(), 7), abend)
+            .unwrap();
+        assert_eq!(handled_again.disposition, CicsDisposition::Handler);
+        assert_eq!(handled_again.target.as_deref(), Some("ABEND-ROUTINE"));
+
+        let reset = request(
+            CicsOperation::HandleAbend,
+            BTreeMap::from([("OPTION.RESET".into(), argument(b""))]),
+            8,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, reset.clone(), 8), reset)
+            .unwrap();
+        let default_cancel = request(CicsOperation::HandleAbend, BTreeMap::new(), 9);
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, default_cancel.clone(), 9),
+                default_cancel,
+            )
+            .unwrap();
+        let abend = request(
+            CicsOperation::Abend,
+            BTreeMap::from([("ABCODE".into(), argument(b"9999"))]),
+            10,
+        );
+        let dumped = service
+            .invoke(&effect(&invocation.run_unit_id, abend.clone(), 10), abend)
             .unwrap();
         assert_eq!(dumped.disposition, CicsDisposition::Abended);
         assert_eq!(
@@ -5229,11 +5224,11 @@ mod tests {
         let handle_abend = request(
             CicsOperation::HandleAbend,
             BTreeMap::from([("LABEL".into(), argument(b"SECOND-ABEND-ROUTINE"))]),
-            8,
+            11,
         );
         service
             .invoke(
-                &effect(&invocation.run_unit_id, handle_abend.clone(), 8),
+                &effect(&invocation.run_unit_id, handle_abend.clone(), 11),
                 handle_abend,
             )
             .unwrap();
@@ -5243,19 +5238,19 @@ mod tests {
                 ("ABCODE".into(), argument(b"9999")),
                 ("OPTION.CANCEL".into(), argument(b"")),
             ]),
-            9,
+            12,
         );
         let cancelled = service
             .invoke(
-                &effect(&invocation.run_unit_id, abend_cancel.clone(), 9),
+                &effect(&invocation.run_unit_id, abend_cancel.clone(), 12),
                 abend_cancel,
             )
             .unwrap();
         assert_eq!(cancelled.disposition, CicsDisposition::Abended);
         assert_eq!(cancelled.target, None);
-        let abend = request(CicsOperation::Abend, BTreeMap::new(), 10);
+        let abend = request(CicsOperation::Abend, BTreeMap::new(), 13);
         let default_no_dump = service
-            .invoke(&effect(&invocation.run_unit_id, abend.clone(), 10), abend)
+            .invoke(&effect(&invocation.run_unit_id, abend.clone(), 13), abend)
             .unwrap();
         assert_eq!(default_no_dump.disposition, CicsDisposition::Abended);
         assert_eq!(default_no_dump.outputs["ABEND.DUMP"].bytes(), b"suppressed");
@@ -5266,11 +5261,11 @@ mod tests {
                 ("ABCODE".into(), argument(b"9999")),
                 ("OPTION.NODUMP".into(), argument(b"")),
             ]),
-            11,
+            14,
         );
         let no_dump = service
             .invoke(
-                &effect(&invocation.run_unit_id, no_dump.clone(), 11),
+                &effect(&invocation.run_unit_id, no_dump.clone(), 14),
                 no_dump,
             )
             .unwrap();
@@ -5279,11 +5274,11 @@ mod tests {
         let reserved_code = request(
             CicsOperation::Abend,
             BTreeMap::from([("ABCODE".into(), argument(b"A001"))]),
-            12,
+            15,
         );
         let reserved_code = service
             .invoke(
-                &effect(&invocation.run_unit_id, reserved_code.clone(), 12),
+                &effect(&invocation.run_unit_id, reserved_code.clone(), 15),
                 reserved_code,
             )
             .unwrap();
@@ -5292,12 +5287,28 @@ mod tests {
         let malformed = request(
             CicsOperation::Abend,
             BTreeMap::from([("OPTION.NODUMP".into(), argument(b"unexpected"))]),
-            13,
+            16,
         );
         assert_eq!(
             service.invoke(
-                &effect(&invocation.run_unit_id, malformed.clone(), 13),
+                &effect(&invocation.run_unit_id, malformed.clone(), 16),
                 malformed,
+            ),
+            Err(HostProblem::Malformed)
+        );
+
+        let conflicting_handler = request(
+            CicsOperation::HandleAbend,
+            BTreeMap::from([
+                ("OPTION.CANCEL".into(), argument(b"")),
+                ("OPTION.RESET".into(), argument(b"")),
+            ]),
+            17,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, conflicting_handler.clone(), 17,),
+                conflicting_handler,
             ),
             Err(HostProblem::Malformed)
         );

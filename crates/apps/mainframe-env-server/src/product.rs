@@ -10209,6 +10209,139 @@ mod tests {
     }
 
     #[test]
+    fn online_handle_abend_reset_reactivates_the_selected_exit_once() {
+        let limits = SourceLimits::default();
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. HABRESET.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 COUNT-X PIC 9 VALUE 0.\n01 FIRST-FN PIC X(2).\n01 SECOND-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS HANDLE ABEND LABEL(ABEND-HANDLER) END-EXEC.\nEXEC CICS ABEND ABCODE('B001') END-EXEC.\nSTOP RUN.\nABEND-HANDLER.\nADD 1 TO COUNT-X.\nMOVE EIBFN TO FIRST-FN.\nIF COUNT-X = 1\n  EXEC CICS HANDLE ABEND RESET END-EXEC\n  EXEC CICS ABEND ABCODE('B002') END-EXEC\nEND-IF.\nMOVE EIBFN TO SECOND-FN.\nEXEC CICS HANDLE ABEND END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let path = LogicalPath::new("HABRESET.cbl", limits.max_path_bytes).unwrap();
+        let bundle = SourceBundle::new(
+            &path,
+            vec![
+                SourceFile::input(
+                    "HABRESET.cbl",
+                    source.to_vec(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("HANDLE ABEND RESET fixture did not publish");
+        };
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "HABRESET".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("HR00".into(), "HABRESET".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "HABRESET".into(),
+                    map: "HABRESET".into(),
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("handle-abend-reset", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "HR00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "HR00",
+                24,
+                80,
+                "handle-abend-reset-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "HABRESET", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "HABRESET", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("COUNT-X").unwrap().bytes(), b"2");
+        assert_eq!(
+            restored.variable("FIRST-FN").unwrap().bytes(),
+            &[0x0e, 0x0c]
+        );
+        assert_eq!(
+            restored.variable("SECOND-FN").unwrap().bytes(),
+            &[0x0e, 0x0c]
+        );
+        assert_eq!(
+            server
+                .store
+                .audit_records(&invocation.execution_id, 1, 32)
+                .unwrap()
+                .into_iter()
+                .filter(|record| record.capability.as_str() == "host.cics.execute")
+                .map(|record| (record.effect_sequence, record.decision))
+                .collect::<Vec<_>>(),
+            (1..=6)
+                .map(|sequence| {
+                    (
+                        sequence,
+                        mainframe_env_execution_api::AuditDecision::Success,
+                    )
+                })
+                .collect::<Vec<_>>()
+        );
+        server
+            .run_online_exchange(&session, &principal, "HABRESET", 3)
+            .unwrap();
+        assert!(server.online_exchange(&session).unwrap().is_none());
+    }
+
+    #[test]
     fn online_enqueue_wait_remains_durably_resumable_until_dequeue() {
         let limits = SourceLimits::default();
         let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. WAITENQ.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 LOCK-NAME PIC X(4) VALUE 'LOCK'.\nPROCEDURE DIVISION.\nEXEC CICS ENQ RESOURCE(LOCK-NAME) LENGTH(4) UOW END-EXEC.\nDISPLAY 'ACQUIRED'.\nSTOP RUN.\n";

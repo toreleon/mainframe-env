@@ -37,7 +37,7 @@
     {
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0097",
       "runtime_operation": "HandleAbend",
-      "execution_options": ["CANCEL", "LABEL", "NOHANDLE", "RESP", "RESP2"]
+      "execution_options": ["CANCEL", "LABEL", "NOHANDLE", "RESET", "RESP", "RESP2"]
     },
     {
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0099",
