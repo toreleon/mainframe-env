@@ -76,7 +76,8 @@ All notable changes to mainframe-env are documented here.
   DPL-prohibited. LINKLEVEL returns one for a top-level local program and two
   for a DPL target behind its level-one mirror; unmodeled deeper local stacks
   fail closed. With no application partition set, PARTNSET returns six blanks
-  on a terminal task and follows the local/DPL `INVREQ` matrix.
+  on a terminal task and follows the local/DPL `INVREQ` matrix. The same owned
+  virtual terminal reports a 3270 data stream and no basic SCS data stream.
 - Added online continuation format `MEOM4`, which retains the current task
   priority and an optional staged program-transfer handoff. Readers preserve
   `MEOM3` priority rows and historical `MEOM2` rows without that field.

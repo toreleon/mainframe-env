@@ -39,7 +39,10 @@ pub(in crate::service) fn assign(
     let screen_requested = screen_options
         .iter()
         .any(|name| request.arguments.contains_key(*name));
-    let terminal_required = screen_requested || request.arguments.contains_key("PARTNSET");
+    let terminal_required = screen_requested
+        || ["DS3270", "DSSCS", "PARTNSET"]
+            .iter()
+            .any(|name| request.arguments.contains_key(*name));
     let dimensions = if !dpl && (terminal_required || request.arguments.contains_key("FCI")) {
         terminal_dimensions(service, run)?
     } else {
@@ -55,6 +58,8 @@ pub(in crate::service) fn assign(
         && [
             "DEFSCRNHT",
             "DEFSCRNWD",
+            "DS3270",
+            "DSSCS",
             "FCI",
             "NEXTTRANSID",
             "OPSECURITY",
@@ -132,6 +137,11 @@ pub(in crate::service) fn assign(
             response
                 .outputs
                 .insert("PARTNSET".into(), bounded(vec![b' '; 6])?);
+        }
+        for (name, value) in [("DS3270", 0xff), ("DSSCS", 0x00)] {
+            if request.arguments.contains_key(name) {
+                response.outputs.insert(name.into(), bounded(vec![value])?);
+            }
         }
     }
     if !dpl_prohibited && request.arguments.contains_key("FCI") {
@@ -266,6 +276,8 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "CWALENG",
         "DEFSCRNHT",
         "DEFSCRNWD",
+        "DS3270",
+        "DSSCS",
         "FCI",
         "INITPARM",
         "INITPARMLEN",

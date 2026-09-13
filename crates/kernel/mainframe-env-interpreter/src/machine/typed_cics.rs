@@ -423,6 +423,8 @@ pub(super) fn execute_legacy(
             "CWALENG",
             "DEFSCRNHT",
             "DEFSCRNWD",
+            "DS3270",
+            "DSSCS",
             "FCI",
             "INITPARM",
             "INITPARMLEN",

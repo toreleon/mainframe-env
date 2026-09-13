@@ -93,6 +93,8 @@ contract explicitly permits it.
   PARTNSET returns six blanks for an owned terminal with no application
   partition set; nonterminal and DPL contexts follow the screen-option INVREQ
   rules.
+  The virtual terminal's data-stream contract is 3270, not basic SCS, so
+  DS3270 and DSSCS return `X'FF'` and `X'00'` respectively when it is attached.
   Other source-valid ASSIGN options remain rejected until their terminal,
   program-level, or failure context has an owned runtime representation.
 - Terminal execution outcomes carry an explicit transaction-dump disposition.

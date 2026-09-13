@@ -26,6 +26,8 @@ pub(super) fn validate(
         "CWALENG",
         "DEFSCRNHT",
         "DEFSCRNWD",
+        "DS3270",
+        "DSSCS",
         "FCI",
         "INITPARM",
         "INITPARMLEN",
@@ -100,6 +102,7 @@ pub(super) fn validate(
             || (name == "PARTNSET" && target.length != 6)
             || (name == "PROGRAM" && target.length != 8)
             || (name == "RESTART" && target.length != 1)
+            || (["DS3270", "DSSCS"].contains(&name) && target.length != 1)
         {
             return Err(format!(
                 "CICS ASSIGN {name} requires an exact-width data area"

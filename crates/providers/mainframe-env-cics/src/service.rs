@@ -4784,6 +4784,8 @@ mod tests {
                 ("APPLID".into(), argument(b"APP-OUT")),
                 ("DEFSCRNHT".into(), argument(b"DEFAULT-HEIGHT-OUT")),
                 ("DEFSCRNWD".into(), argument(b"DEFAULT-WIDTH-OUT")),
+                ("DS3270".into(), argument(b"DS3270-OUT")),
+                ("DSSCS".into(), argument(b"DSSCS-OUT")),
                 ("FCI".into(), argument(b"FCI-OUT")),
                 ("PARTNSET".into(), argument(b"PARTITION-SET-OUT")),
                 ("SCRNHT".into(), argument(b"SCREEN-HEIGHT-OUT")),
@@ -4811,7 +4813,15 @@ mod tests {
         );
         assert_eq!(no_terminal.outputs["APPLID"].bytes(), b"MEAPPL");
         assert_eq!(no_terminal.outputs["FCI"].bytes(), &[0]);
-        for name in ["DEFSCRNHT", "DEFSCRNWD", "PARTNSET", "SCRNHT", "SCRNWD"] {
+        for name in [
+            "DEFSCRNHT",
+            "DEFSCRNWD",
+            "DS3270",
+            "DSSCS",
+            "PARTNSET",
+            "SCRNHT",
+            "SCRNWD",
+        ] {
             assert!(!no_terminal.outputs.contains_key(name));
         }
 
@@ -5135,6 +5145,8 @@ mod tests {
                 ("APPLID".into(), argument(b"APP-OUT")),
                 ("DEFSCRNHT".into(), argument(b"DEFAULT-HEIGHT-OUT")),
                 ("DEFSCRNWD".into(), argument(b"DEFAULT-WIDTH-OUT")),
+                ("DS3270".into(), argument(b"DS3270-OUT")),
+                ("DSSCS".into(), argument(b"DSSCS-OUT")),
                 ("FCI".into(), argument(b"FCI-OUT")),
                 ("NEXTTRANSID".into(), argument(b"NEXT-TRANS-OUT")),
                 ("OPSECURITY".into(), argument(b"OPSECURITY-OUT")),
@@ -5168,6 +5180,8 @@ mod tests {
         for name in [
             "DEFSCRNHT",
             "DEFSCRNWD",
+            "DS3270",
+            "DSSCS",
             "FCI",
             "NEXTTRANSID",
             "OPSECURITY",
