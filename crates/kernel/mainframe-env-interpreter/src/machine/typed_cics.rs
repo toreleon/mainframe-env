@@ -424,6 +424,7 @@ pub(super) fn execute_legacy(
             "OPERKEYS",
             "OPSECURITY",
             "PLATFORM",
+            "PROGRAM",
             "RESTART",
             "SYSID",
             "TASKPRIORITY",

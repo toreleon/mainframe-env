@@ -72,6 +72,9 @@ contract explicitly permits it.
   outputs are still applied when the condition policy permits return.
   Without an INITPARM system definition, INITPARM deliberately emits no output
   so its receiver stays unchanged and INITPARMLEN returns halfword zero.
+  PROGRAM is the eight-character current program name derived from the selected
+  execution frame; it changes with durable HANDLE ABEND program transfer and is
+  never accepted as caller-supplied CICS command context.
   Other source-valid ASSIGN options remain rejected until their terminal,
   program-level, or failure context has an owned runtime representation.
 - Terminal execution outcomes carry an explicit transaction-dump disposition.

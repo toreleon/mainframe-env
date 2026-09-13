@@ -19,6 +19,7 @@ pub(super) use handle_state::{
 pub(super) use program_control::invoke as invoke_program_control;
 pub(super) use queue_control::invoke as invoke_queue_control;
 pub(super) use recovery::invoke as invoke_recovery;
+pub(super) use task_context::synchronize_current_program;
 pub(super) use task_control::{
     RunSeed, decode_session_flags, encode_session, invoke as invoke_task_control, new_run,
     new_run_with_state,

@@ -1,5 +1,32 @@
 use super::super::{CicsService, Run, bounded, decimal_payload};
+use mainframe_env_execution_api::{Invocation, RunUnitId};
 use mainframe_env_host_api::{CicsDisposition, CicsRequest, CicsResponse, HostProblem};
+use std::collections::BTreeMap;
+
+pub(in crate::service) fn current_program(invocation: &Invocation) -> Option<String> {
+    invocation
+        .selector
+        .as_str()
+        .strip_prefix("program:")
+        .filter(|program| !program.is_empty())
+        .map(str::to_ascii_uppercase)
+}
+
+pub(in crate::service) fn synchronize_current_program(
+    runs: &mut BTreeMap<RunUnitId, Run>,
+    invocation: &Invocation,
+) -> Result<bool, HostProblem> {
+    let Some(run) = runs.get_mut(&invocation.run_unit_id) else {
+        return Ok(false);
+    };
+    if run.invocation.principal.id() != invocation.principal.id() {
+        return Err(HostProblem::Unauthorized);
+    }
+    if let Some(program) = current_program(invocation) {
+        run.current_program = Some(program);
+    }
+    Ok(true)
+}
 
 pub(in crate::service) fn assign(
     service: &CicsService,
@@ -51,6 +78,15 @@ pub(in crate::service) fn assign(
             "TASKPRIORITY".into(),
             decimal_payload(i64::from(run.invocation.priority))?,
         );
+    }
+    if request.arguments.contains_key("PROGRAM") {
+        let program = run
+            .current_program
+            .as_ref()
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        response
+            .outputs
+            .insert("PROGRAM".into(), bounded(program.as_bytes().to_vec())?);
     }
     for (name, length) in [
         ("APPLICATION", 64),
@@ -129,6 +165,7 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "OPERKEYS",
         "OPSECURITY",
         "PLATFORM",
+        "PROGRAM",
         "RESP",
         "RESP2",
         "RESTART",

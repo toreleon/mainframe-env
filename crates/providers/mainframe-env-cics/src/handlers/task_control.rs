@@ -59,6 +59,7 @@ pub(in crate::service) fn new_run_with_state(
     sysid: &str,
     seed: RunSeed,
 ) -> Run {
+    let current_program = super::task_context::current_program(&invocation);
     let HandleState {
         handlers,
         aid_handlers,
@@ -69,6 +70,7 @@ pub(in crate::service) fn new_run_with_state(
     } = seed.handle_state;
     Run {
         invocation,
+        current_program,
         session: session.into(),
         transaction: transaction.to_ascii_uppercase(),
         applid: applid.to_ascii_uppercase(),

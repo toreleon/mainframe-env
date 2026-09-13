@@ -27,6 +27,7 @@ pub(super) fn validate(
         "OPERKEYS",
         "OPSECURITY",
         "PLATFORM",
+        "PROGRAM",
         "RESTART",
         "SYSID",
         "TASKPRIORITY",
@@ -63,6 +64,7 @@ pub(super) fn validate(
         if (name == "INITPARM" && target.length != 60)
             || (name == "OPERKEYS" && target.length != 8)
             || (name == "OPSECURITY" && target.length != 3)
+            || (name == "PROGRAM" && target.length != 8)
             || (name == "RESTART" && target.length != 1)
         {
             return Err(format!(

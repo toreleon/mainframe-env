@@ -10412,7 +10412,7 @@ mod tests {
         );
         let exit = compile(
             "ABEXIT",
-            b"IDENTIFICATION DIVISION.\nPROGRAM-ID. ABEXIT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 EXIT-HIT PIC X VALUE '0'.\nPROCEDURE DIVISION.\nMOVE '1' TO EXIT-HIT.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+            b"IDENTIFICATION DIVISION.\nPROGRAM-ID. ABEXIT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 CURRENT-PROGRAM PIC X(8).\n01 EXIT-HIT PIC X VALUE '0'.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS ASSIGN PROGRAM(CURRENT-PROGRAM) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE '1' TO EXIT-HIT.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
         );
         let server = ProductServer::memory(config()).unwrap();
         server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
@@ -10510,7 +10510,13 @@ mod tests {
         restored
             .restore_checkpoint(&continuation.checkpoint)
             .unwrap();
+        assert_eq!(
+            restored.variable("CURRENT-PROGRAM").unwrap().bytes(),
+            b"ABEXIT  "
+        );
         assert_eq!(restored.variable("EXIT-HIT").unwrap().bytes(), b"1");
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0; 4]);
+        assert_eq!(restored.variable("RESP2-X").unwrap().bytes(), &[0; 4]);
         let transferred_exchange = server.online_exchange(&session).unwrap().unwrap();
         assert_eq!(transferred_exchange.program, "ABEXIT");
         let transferred_execution = ExecutionId::new(
@@ -10545,7 +10551,10 @@ mod tests {
                 .filter(|record| record.capability.as_str() == "host.cics.execute")
                 .map(|record| (record.effect_sequence, record.decision))
                 .collect::<Vec<_>>(),
-            vec![(1, mainframe_env_execution_api::AuditDecision::Success,)]
+            vec![
+                (1, mainframe_env_execution_api::AuditDecision::Success),
+                (2, mainframe_env_execution_api::AuditDecision::Success),
+            ]
         );
 
         let continuation_record = server

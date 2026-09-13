@@ -181,6 +181,7 @@ pub struct CicsTerminalExecution {
 #[derive(Clone)]
 struct Run {
     invocation: Invocation,
+    current_program: Option<String>,
     session: String,
     transaction: String,
     applid: String,
@@ -1173,12 +1174,11 @@ impl CicsService {
 
     fn ensure_run(&self, invocation: &Invocation) -> Result<(), HostProblem> {
         reject_reserved_nested_origin(invocation)?;
-        {
-            let state = self.lock()?;
-            if state.runs.contains_key(&invocation.run_unit_id) {
-                return Ok(());
-            }
+        let mut state = self.lock()?;
+        if handlers::synchronize_current_program(&mut state.runs, invocation)? {
+            return Ok(());
         }
+        drop(state);
         let session_name = invocation
             .bindings
             .get("cics.session")
@@ -4745,10 +4745,23 @@ mod tests {
         assert!(!initparm.outputs.contains_key("INITPARM"));
         assert_eq!(initparm.outputs["INITPARMLEN"].bytes(), b"0");
 
+        let missing_program = request(
+            CicsOperation::Assign,
+            BTreeMap::from([("PROGRAM".into(), argument(b"PROGRAM-OUT"))]),
+            30,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, missing_program.clone(), 30),
+                missing_program,
+            ),
+            Err(HostProblem::InfrastructureFailure)
+        );
+
         for (sequence, name, value) in [
-            (30, "PROGRAM", argument(b"PROGRAM-OUT")),
-            (31, "USERID", cics_decimal(1)),
-            (32, "OPTION.NOHANDLE", argument(b"")),
+            (31, "ABCODE", argument(b"ABCODE-OUT")),
+            (32, "USERID", cics_decimal(1)),
+            (33, "OPTION.NOHANDLE", argument(b"")),
         ] {
             let malformed = request(
                 CicsOperation::Assign,
@@ -4857,6 +4870,57 @@ mod tests {
     }
 
     #[test]
+    fn existing_run_tracks_only_authenticated_program_frames() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+        assert_eq!(
+            service
+                .lock()
+                .unwrap()
+                .runs
+                .get(&invocation.run_unit_id)
+                .unwrap()
+                .current_program,
+            None
+        );
+
+        let mut frame = invocation.clone();
+        frame.selector = Selector::new("program:current", InvocationLimits::default()).unwrap();
+        service.ensure_run(&frame).unwrap();
+        assert_eq!(
+            service
+                .lock()
+                .unwrap()
+                .runs
+                .get(&invocation.run_unit_id)
+                .unwrap()
+                .current_program
+                .as_deref(),
+            Some("CURRENT")
+        );
+
+        let mut foreign = frame;
+        foreign.principal = Principal::new(
+            PrincipalId::new("OTHER", InvocationLimits::default()).unwrap(),
+            BTreeSet::new(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(service.ensure_run(&foreign), Err(HostProblem::Unauthorized));
+        assert_eq!(
+            service
+                .lock()
+                .unwrap()
+                .runs
+                .get(&invocation.run_unit_id)
+                .unwrap()
+                .current_program
+                .as_deref(),
+            Some("CURRENT")
+        );
+    }
+
+    #[test]
     fn assign_context_subset_is_available_in_dpl_context() {
         let service = service(Arc::new(MemoryStore::new(Default::default())));
         let context = BoundedPayload::new(
@@ -4865,10 +4929,11 @@ mod tests {
             InvocationLimits::default(),
         )
         .unwrap();
-        let invocation = invocation_for(
+        let mut invocation = invocation_for(
             "assign-dpl",
             BTreeMap::from([("cics.execution-context".into(), context)]),
         );
+        invocation.selector = Selector::new("program:DPLPGM", InvocationLimits::default()).unwrap();
         let session = SessionId::new("assign-dpl", 64).unwrap();
         service.create_session(&session, 24, 80).unwrap();
         service
@@ -4887,6 +4952,7 @@ mod tests {
                 ("OPERATION".into(), argument(b"OPERATION-OUT")),
                 ("OPERKEYS".into(), argument(b"OPERKEYS-OUT")),
                 ("PLATFORM".into(), argument(b"PLATFORM-OUT")),
+                ("PROGRAM".into(), argument(b"PROGRAM-OUT")),
                 ("RESTART".into(), argument(b"RESTART-OUT")),
                 ("SYSID".into(), argument(b"SYS-OUT")),
                 ("TASKPRIORITY".into(), argument(b"PRIORITY-OUT")),
@@ -4909,6 +4975,7 @@ mod tests {
         assert_eq!(response.outputs["OPERATION"].bytes(), &[b' '; 64]);
         assert_eq!(response.outputs["OPERKEYS"].bytes(), &[0; 8]);
         assert_eq!(response.outputs["PLATFORM"].bytes(), &[b' '; 64]);
+        assert_eq!(response.outputs["PROGRAM"].bytes(), b"DPLPGM");
         assert_eq!(response.outputs["RESTART"].bytes(), &[0]);
         assert_eq!(response.outputs["SYSID"].bytes(), b"S001");
         assert_eq!(response.outputs["TASKPRIORITY"].bytes(), b"0");
