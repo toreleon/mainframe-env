@@ -5,8 +5,9 @@ use mainframe_env_diagnostics::{
 };
 use mainframe_env_encoding::CodePage;
 use mainframe_env_execution_api::{
-    Abend, BoundedPayload, Completion, Condition, IdempotencyKey, Invocation, InvocationLimits,
-    Machine, MachineDrive, MachineResume, Quantum, Selector, Suspension, Transfer,
+    Abend, AbendDumpDisposition, BoundedPayload, Completion, Condition, IdempotencyKey, Invocation,
+    InvocationLimits, Machine, MachineDrive, MachineResume, Quantum, Selector, Suspension,
+    Transfer,
 };
 use mainframe_env_host_api::{
     CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest, ClassName, ClockRequest,
@@ -1810,6 +1811,7 @@ impl ReferenceMachine {
                     self.deferred_drive = Some(MachineDrive::Abend(Abend {
                         code,
                         reason: Some("compatible CEE3ABD service".into()),
+                        dump: AbendDumpDisposition::Unspecified,
                     }));
                     return Ok(());
                 }
@@ -2068,13 +2070,9 @@ impl ReferenceMachine {
                         None
                     }
                     CicsDisposition::Returned => Some(MachineDrive::Completed(self.complete()?)),
-                    CicsDisposition::Abended => Some(MachineDrive::Abend(Abend {
-                        code: response.condition,
-                        reason: Some(format!(
-                            "EIBRESP={} EIBRESP2={}",
-                            response.response, response.response2
-                        )),
-                    })),
+                    CicsDisposition::Abended => Some(MachineDrive::Abend(
+                        typed_cics::abend_outcome(operation, &response)?,
+                    )),
                 };
             }
             (

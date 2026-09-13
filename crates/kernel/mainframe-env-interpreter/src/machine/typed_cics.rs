@@ -117,6 +117,48 @@ pub(super) fn write_runtime_output(
     Ok(true)
 }
 
+pub(super) fn abend_dump_disposition(
+    operation: CicsOperation,
+    response: &CicsResponse,
+) -> Result<AbendDumpDisposition, MachineProblem> {
+    if operation != CicsOperation::Abend {
+        return Ok(AbendDumpDisposition::Unspecified);
+    }
+    let Some(value) = response.outputs.get("ABEND.DUMP") else {
+        // Retained responses written before this metadata was introduced do
+        // not claim a dump decision.
+        return Ok(AbendDumpDisposition::Unspecified);
+    };
+    if value.schema() != "mainframe-env.cics.abend-dump@1" {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
+    match value.bytes() {
+        b"requested" => Ok(AbendDumpDisposition::Requested),
+        b"suppressed" => Ok(AbendDumpDisposition::Suppressed),
+        _ => Err(MachineProblem::UnexpectedHostResult),
+    }
+}
+
+pub(super) fn abend_outcome(
+    operation: CicsOperation,
+    response: &CicsResponse,
+) -> Result<Abend, MachineProblem> {
+    let code = if operation == CicsOperation::Abend && !response.payload.bytes().is_empty() {
+        String::from_utf8(response.payload.bytes().to_vec())
+            .map_err(|_| MachineProblem::UnexpectedHostResult)?
+    } else {
+        response.condition.clone()
+    };
+    Ok(Abend {
+        code,
+        reason: Some(format!(
+            "EIBRESP={} EIBRESP2={}",
+            response.response, response.response2
+        )),
+        dump: abend_dump_disposition(operation, response)?,
+    })
+}
+
 pub(super) fn suspension(
     machine: &mut ReferenceMachine,
     operation: CicsOperation,
@@ -1148,6 +1190,66 @@ mod tests {
         assert_eq!(
             legacy_condition_policy(&tokens, &arguments),
             Err(MachineProblem::UnsupportedForm)
+        );
+    }
+
+    #[test]
+    fn cics_abend_dump_metadata_is_typed_and_backward_compatible() {
+        let response = |schema: &str, value: &[u8]| CicsResponse {
+            disposition: CicsDisposition::Abended,
+            condition: "ERROR".into(),
+            response: 27,
+            response2: 0,
+            applid: "MEAPPL".into(),
+            sysid: "MESYS".into(),
+            transaction: "MENU".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: payload("mainframe-env.cics.payload@1", b"B001".to_vec()).unwrap(),
+            outputs: BTreeMap::from([(
+                "ABEND.DUMP".into(),
+                payload(schema, value.to_vec()).unwrap(),
+            )]),
+            unit_of_work: None,
+        };
+        assert_eq!(
+            abend_dump_disposition(
+                CicsOperation::Abend,
+                &response("mainframe-env.cics.abend-dump@1", b"requested"),
+            ),
+            Ok(AbendDumpDisposition::Requested)
+        );
+        assert_eq!(
+            abend_outcome(
+                CicsOperation::Abend,
+                &response("mainframe-env.cics.abend-dump@1", b"requested"),
+            ),
+            Ok(Abend {
+                code: "B001".into(),
+                reason: Some("EIBRESP=27 EIBRESP2=0".into()),
+                dump: AbendDumpDisposition::Requested,
+            })
+        );
+        assert_eq!(
+            abend_dump_disposition(
+                CicsOperation::Abend,
+                &response("mainframe-env.cics.abend-dump@1", b"suppressed"),
+            ),
+            Ok(AbendDumpDisposition::Suppressed)
+        );
+        assert_eq!(
+            abend_dump_disposition(
+                CicsOperation::Abend,
+                &response("mainframe-env.cics.payload@1", b"requested"),
+            ),
+            Err(MachineProblem::UnexpectedHostResult)
+        );
+        let mut legacy = response("mainframe-env.cics.abend-dump@1", b"requested");
+        legacy.outputs.clear();
+        assert_eq!(
+            abend_dump_disposition(CicsOperation::Abend, &legacy),
+            Ok(AbendDumpDisposition::Unspecified)
         );
     }
 

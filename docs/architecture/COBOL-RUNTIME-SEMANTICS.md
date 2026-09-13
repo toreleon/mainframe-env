@@ -58,6 +58,11 @@ contract explicitly permits it.
   before dispatch and applies the alias only after a successful audited CICS
   response, so denial, cancellation, malformed input, and audit failure cannot
   change storage.
+- Terminal execution outcomes carry an explicit transaction-dump disposition.
+  CICS ABEND results translate the provider's typed `ABEND.DUMP` metadata to
+  requested or suppressed while retained responses from before that metadata
+  remain unspecified. The interpreter preserves the supplied ABCODE as the
+  terminal code instead of replacing it with the generic CICS condition name.
 
 ## Control, conditions, calls, and effects
 

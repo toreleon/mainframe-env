@@ -5216,13 +5216,15 @@ mod tests {
             BTreeMap::from([("ABCODE".into(), argument(b"9999"))]),
             7,
         );
+        let dumped = service
+            .invoke(&effect(&invocation.run_unit_id, abend.clone(), 7), abend)
+            .unwrap();
+        assert_eq!(dumped.disposition, CicsDisposition::Abended);
         assert_eq!(
-            service
-                .invoke(&effect(&invocation.run_unit_id, abend.clone(), 7), abend)
-                .unwrap()
-                .disposition,
-            CicsDisposition::Abended
+            dumped.outputs["ABEND.DUMP"].schema(),
+            "mainframe-env.cics.abend-dump@1"
         );
+        assert_eq!(dumped.outputs["ABEND.DUMP"].bytes(), b"requested");
 
         let handle_abend = request(
             CicsOperation::HandleAbend,
@@ -5252,12 +5254,52 @@ mod tests {
         assert_eq!(cancelled.disposition, CicsDisposition::Abended);
         assert_eq!(cancelled.target, None);
         let abend = request(CicsOperation::Abend, BTreeMap::new(), 10);
+        let default_no_dump = service
+            .invoke(&effect(&invocation.run_unit_id, abend.clone(), 10), abend)
+            .unwrap();
+        assert_eq!(default_no_dump.disposition, CicsDisposition::Abended);
+        assert_eq!(default_no_dump.outputs["ABEND.DUMP"].bytes(), b"suppressed");
+
+        let no_dump = request(
+            CicsOperation::Abend,
+            BTreeMap::from([
+                ("ABCODE".into(), argument(b"9999")),
+                ("OPTION.NODUMP".into(), argument(b"")),
+            ]),
+            11,
+        );
+        let no_dump = service
+            .invoke(
+                &effect(&invocation.run_unit_id, no_dump.clone(), 11),
+                no_dump,
+            )
+            .unwrap();
+        assert_eq!(no_dump.outputs["ABEND.DUMP"].bytes(), b"suppressed");
+
+        let reserved_code = request(
+            CicsOperation::Abend,
+            BTreeMap::from([("ABCODE".into(), argument(b"A001"))]),
+            12,
+        );
+        let reserved_code = service
+            .invoke(
+                &effect(&invocation.run_unit_id, reserved_code.clone(), 12),
+                reserved_code,
+            )
+            .unwrap();
+        assert_eq!(reserved_code.outputs["ABEND.DUMP"].bytes(), b"suppressed");
+
+        let malformed = request(
+            CicsOperation::Abend,
+            BTreeMap::from([("OPTION.NODUMP".into(), argument(b"unexpected"))]),
+            13,
+        );
         assert_eq!(
-            service
-                .invoke(&effect(&invocation.run_unit_id, abend.clone(), 10), abend)
-                .unwrap()
-                .disposition,
-            CicsDisposition::Abended
+            service.invoke(
+                &effect(&invocation.run_unit_id, malformed.clone(), 13),
+                malformed,
+            ),
+            Err(HostProblem::Malformed)
         );
     }
 

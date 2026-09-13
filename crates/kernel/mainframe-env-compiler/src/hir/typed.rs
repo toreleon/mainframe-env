@@ -2328,7 +2328,6 @@ mod tests {
     #[test]
     fn legacy_cics_routes_reject_catalog_options_without_runtime_semantics() {
         for (command, option) in [
-            ("ABEND NODUMP", "NODUMP"),
             ("ASSIGN USERID(USER-X)", "USERID"),
             ("HANDLE ABEND PROGRAM('PGM1')", "PROGRAM"),
             ("LINK PROGRAM('PGM1') CHANNEL('CHAN1')", "CHANNEL"),
@@ -2355,8 +2354,10 @@ mod tests {
     #[test]
     fn legacy_cics_routes_keep_only_implemented_forms_and_the_file_alias() {
         for command in [
-            "ABEND ABCODE('A001')",
+            "ABEND ABCODE('C001')",
             "ABEND ABCODE('B001') CANCEL",
+            "ABEND ABCODE('B002') NODUMP",
+            "ABEND NODUMP",
             "ASSIGN APPLID(APPL-X)",
             "HANDLE ABEND LABEL(ABEND-HANDLER)",
             "READNEXT DATASET('ACCTDAT') RIDFLD(KEY-X) INTO(REC-X) UPDATE",

@@ -54,6 +54,12 @@ The `AddressSet`, `ChangeTask`, `Deq`, `Enq`, `SetAssociationUserCorrData`, and
 named variants: they do not alter the canonical bytes of any existing value,
 and their exact variant-name bytes are frozen by golden tests.
 
+A terminal CICS ABEND records `ABEND.DUMP` in the response output map with
+schema `mainframe-env.cics.abend-dump@1` and exact value `requested` or
+`suppressed`. The entry therefore participates in the ordinary canonical result
+digest without changing the `CicsResponse` object shape. Historical retained
+responses that lack the entry remain readable and make no dump claim.
+
 ## Typed size budgets
 
 `CapabilityDescriptor.max_request_bytes` and `.max_result_bytes` now count the

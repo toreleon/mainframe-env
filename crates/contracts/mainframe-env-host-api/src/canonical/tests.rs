@@ -66,6 +66,51 @@ fn cics_additive_wire_identities_are_frozen_named_variants() {
 }
 
 #[test]
+fn cics_abend_dump_metadata_participates_in_the_result_digest() {
+    let response = |dump: Option<&[u8]>| -> Result<HostResult, HostProblem> {
+        let outputs = dump
+            .map(|value| {
+                BTreeMap::from([(
+                    "ABEND.DUMP".into(),
+                    mainframe_env_execution_api::BoundedPayload::new(
+                        "mainframe-env.cics.abend-dump@1",
+                        value.to_vec(),
+                        mainframe_env_execution_api::InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                )])
+            })
+            .unwrap_or_default();
+        Ok(HostResult::Cics(CicsResponse {
+            disposition: CicsDisposition::Abended,
+            condition: "ERROR".into(),
+            response: 27,
+            response2: 0,
+            applid: "MEAPPL".into(),
+            sysid: "MESYS".into(),
+            transaction: "MENU".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                b"B001".to_vec(),
+                mainframe_env_execution_api::InvocationLimits::default(),
+            )
+            .unwrap(),
+            outputs,
+            unit_of_work: None,
+        }))
+    };
+    let requested = canonical_result_digest(&response(Some(b"requested"))).unwrap();
+    let suppressed = canonical_result_digest(&response(Some(b"suppressed"))).unwrap();
+    let historical = canonical_result_digest(&response(None)).unwrap();
+    assert_ne!(requested, suppressed);
+    assert_ne!(requested, historical);
+    assert_ne!(suppressed, historical);
+}
+
+#[test]
 fn audit_resource_digest_is_versioned_deterministic_and_distinguishes_resources() {
     let one = HostRequest::State(StateRequest::Get { key: "one".into() });
     let two = HostRequest::State(StateRequest::Get { key: "two".into() });

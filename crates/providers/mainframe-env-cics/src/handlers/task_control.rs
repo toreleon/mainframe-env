@@ -423,24 +423,69 @@ fn abend(
     run: &mut Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
+    validate_abend_request(request)?;
     super::release_task_enqueues(service, run)?;
     if request.arguments.contains_key("OPTION.CANCEL") {
         run.abend_handler = None;
     }
-    service.response(
+    let disposition = if run.abend_handler.is_some() {
+        CicsDisposition::Handler
+    } else {
+        CicsDisposition::Abended
+    };
+    let code = argument_bytes(request, "ABCODE").unwrap_or_default();
+    let dump = if !request.arguments.contains_key("OPTION.NODUMP") && valid_abend_code(&code) {
+        b"requested".as_slice()
+    } else {
+        b"suppressed".as_slice()
+    };
+    let mut response = service.response(
         run,
-        if run.abend_handler.is_some() {
-            CicsDisposition::Handler
-        } else {
-            CicsDisposition::Abended
-        },
+        disposition,
         "ERROR",
         27,
         0,
         run.abend_handler.clone(),
         None,
-        argument_bytes(request, "ABCODE").unwrap_or_default(),
-    )
+        code,
+    )?;
+    if disposition == CicsDisposition::Abended {
+        response.outputs.insert(
+            "ABEND.DUMP".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.abend-dump@1",
+                dump.to_vec(),
+                InvocationLimits::default(),
+            )
+            .map_err(|_| HostProblem::ResourceExhausted)?,
+        );
+    }
+    Ok(response)
+}
+
+fn validate_abend_request(request: &CicsRequest) -> Result<(), HostProblem> {
+    let allowed = [
+        "ABCODE",
+        "OPTION.CANCEL",
+        "OPTION.NODUMP",
+        "OPTION.NOHANDLE",
+        "RESP",
+        "RESP2",
+    ];
+    if request.arguments.iter().any(|(name, value)| {
+        !allowed.contains(&name.as_str())
+            || name.starts_with("OPTION.") && !value.bytes().is_empty()
+    }) {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
+}
+
+fn valid_abend_code(code: &[u8]) -> bool {
+    matches!(code.len(), 1..=4)
+        && !code[0].eq_ignore_ascii_case(&b'A')
+        && code.iter().all(|byte| byte.is_ascii_graphic())
 }
 
 fn handle_condition(

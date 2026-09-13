@@ -65,6 +65,10 @@ All notable changes to mainframe-env are documented here.
   compiler distinguishes pointer references from `ADDRESS OF` data areas, the
   provider validates only opaque storage identities, and the interpreter
   applies checked virtual aliases after successful audited dispatch.
+- Added source-backed CICS `ABEND NODUMP` admission and explicit terminal dump
+  disposition. Valid nonreserved ABCODE values request a dump, omitted or
+  invalid codes and NODUMP suppress it, and retained older outcomes remain
+  distinguishable as having no recorded dump decision.
 - Added the frozen-with-bounded-ambiguities CIC-901 command contract and generated
   263-row compiler registry. The registry explicitly separates three typed runtime
   handlers, 20 legacy compatibility handlers, and 240 unready handlers; automatic
