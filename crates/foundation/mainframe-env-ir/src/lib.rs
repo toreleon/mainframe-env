@@ -31,7 +31,8 @@ pub use cics_descriptor::{
     CicsApplicationOptionDescriptor, CicsApplicationOptionDirection,
     CicsApplicationOptionValueShape, CicsApplicationRegistryDescriptor,
     CicsApplicationRegistryMatch, CicsExecutableDescriptor,
-    cics_application_registry_candidates_for_tokens, cics_application_registry_for_tokens,
+    cics_application_registry_candidates_for_tokens,
+    cics_application_registry_for_runtime_operation, cics_application_registry_for_tokens,
     cics_executable_descriptor, cics_executable_descriptor_for_identity,
 };
 pub use cics_plan::{

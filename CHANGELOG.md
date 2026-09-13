@@ -40,6 +40,11 @@ All notable changes to mainframe-env are documented here.
   slice. Alongside ENQ and DEQ it pins the command-level parameter page that
   establishes `DFHVALUE(TASK)=233` and `DFHVALUE(UOW)=246`; publication bodies
   remain in the external content-addressed cache.
+- Added typed local `EXEC CICS ENQ` and `DEQ` execution over a bounded durable
+  lock catalog. The runtime preserves address-versus-content resource identity,
+  nested UOW/TASK ownership, FIFO wait promotion, `NOSUSPEND`/active-handler
+  `ENQBUSY`, syncpoint/task cleanup, atomic replay, and durable resume across
+  memory, SQLite, and PostgreSQL store profiles.
 - Added the frozen-with-bounded-ambiguities CIC-901 command contract and generated
   263-row compiler registry. The registry explicitly separates three typed runtime
   handlers, 20 legacy compatibility handlers, and 240 unready handlers; automatic
@@ -111,6 +116,10 @@ All notable changes to mainframe-env are documented here.
   now requires `RESOURCE`, resolves RESOURCE/MAXLIFETIME as inputs, and enforces
   the three lifetime spellings as mutually exclusive without advertising the
   still-unimplemented commands.
+- CICS result handling now distinguishes a source-defined ignored condition
+  from normal completion, updates `EIBFN` from the generated application row,
+  and retains an ENQ suspension as the same durable online task until dequeue,
+  timeout, or cancellation cleanup.
 - Added a blocking `missing_docs` ratchet for every contract crate, reduced the
   initial execution/store debt, and added runnable lifecycle/store examples.
 - Split Db2, IMS, and MQ durable state into independently versioned object,

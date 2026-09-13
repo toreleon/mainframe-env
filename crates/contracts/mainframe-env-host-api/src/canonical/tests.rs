@@ -34,6 +34,22 @@ fn golden_request_and_unknown_result_are_versioned_and_domain_separated() {
 }
 
 #[test]
+fn cics_enqueue_wire_identities_are_frozen_named_variants() {
+    assert_eq!(
+        hex(&bytes(&CicsOperation::Deq, b"")),
+        "41010d00000000000000436963734f7065726174696f6e0103000000000000004465710000000000000000"
+    );
+    assert_eq!(
+        hex(&bytes(&CicsOperation::Enq, b"")),
+        "41010d00000000000000436963734f7065726174696f6e010300000000000000456e710000000000000000"
+    );
+    assert_eq!(
+        hex(&bytes(&CicsDisposition::Ignored, b"")),
+        "41010f0000000000000043696373446973706f736974696f6e01070000000000000049676e6f7265640000000000000000"
+    );
+}
+
+#[test]
 fn audit_resource_digest_is_versioned_deterministic_and_distinguishes_resources() {
     let one = HostRequest::State(StateRequest::Get { key: "one".into() });
     let two = HostRequest::State(StateRequest::Get { key: "two".into() });

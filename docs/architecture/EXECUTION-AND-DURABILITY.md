@@ -131,7 +131,7 @@ outer result, reconciliation changes the effect to `Completed` before machine
 execution resumes.
 
 CICS also retains the exact bounded outer response for every mutating file,
-transient-queue, program-link, and syncpoint request. The replay key is checked
+transient-queue, program-link, enqueue/dequeue, and syncpoint request. The replay key is checked
 against the canonical request digest. New replay envelopes also retain the
 owning execution and conservative effect deadline; legacy envelopes remain
 replayable but are not retention-eligible. A crash after the provider mutation
@@ -139,6 +139,27 @@ but before the caller observes the response therefore cannot apply that
 mutation twice. An unresolved result remains an explicit HTTP 409
 `unknown_outcome`; it is never translated to a normal CICS condition or the
 generic `conflict` code.
+
+Local CICS ENQ state is stored in `cics-enqueue-v1`, with one content-addressed
+resource row containing the exact owner, nested UOW/TASK counts, pending grant,
+and bounded FIFO waiter list. `cics-enqueue-catalog-v1` is the CAS-protected
+row-count authority. A first acquisition or final release changes the resource,
+catalog, and normal `cics-effect-replay-v1` receipt in one provider-state
+transaction; waiter registration is committed with its suspended response.
+Reopen validates every row and the catalog count before admission. Syncpoint
+releases UOW ownership, while task completion, abnormal termination,
+cancellation, timeout, discard, and disconnect remove both owned locks and
+waiter entries. Promotion reserves the lock for the oldest waiter, which must
+resume under the same execution and run-unit identity before continuing.
+
+An ENQ wait is not a terminal-input handoff. Its execution remains
+`Suspended`, and both the coordinator checkpoint and product continuation stay
+attached to the same online exchange. Resume reissues the ENQ as a new bounded
+effect attempt; a promoted waiter completes without incrementing the nesting
+count. A crossed deadline or cancellation terminalizes the execution and runs
+the task cleanup path. The current executable profile is the source-defined
+local/default scope; installed sysplex-wide ENQMODEL routing remains a separate
+family extension and receives no local-slice credit.
 
 When a terminal RECEIVE suspends a machine, the product first commits its own
 session continuation and then atomically moves the interpreter execution from

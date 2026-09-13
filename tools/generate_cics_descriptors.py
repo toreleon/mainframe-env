@@ -16,6 +16,9 @@ CATALOG_PATH = Path("conformance/0.9/cics/command-descriptors.json")
 LEGACY_EXECUTION_CATALOG_PATH = Path(
     "conformance/0.9/cics/legacy-execution-options.json"
 )
+TYPED_EXECUTION_REGISTRATIONS_PATH = Path(
+    "conformance/0.9/cics/typed-execution-registrations.json"
+)
 OUTPUT_PATH = Path("crates/providers/mainframe-env-cics/src/generated/command_descriptors.rs")
 HOST_OUTPUT_PATH = Path(
     "crates/contracts/mainframe-env-host-api/src/generated/cics_application_commands.rs"
@@ -81,7 +84,9 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("Asktime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0010"),
     ("Assign", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0011"),
     ("Delete", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0040"),
+    ("Deq", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0050"),
     ("EndBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0058"),
+    ("Enq", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0064"),
     ("FormatTime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0080"),
     ("HandleAbend", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0097"),
     ("HandleCondition", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0099"),
@@ -322,7 +327,7 @@ POLICY_BINDINGS = {
     },
 }
 
-TYPED_RUNTIME_OPERATIONS = frozenset({"Read", "Rewrite", "Syncpoint"})
+TYPED_RUNTIME_OPERATIONS = frozenset({"Deq", "Enq", "Read", "Rewrite", "Syncpoint"})
 ENQUEUE_COMMAND_ROWS = frozenset(
     {
         f"{OFFICIAL_BASELINE}:api-commands:0050",
@@ -340,6 +345,10 @@ COMPILER_SPI_COMPATIBILITY = {
     "resp2_requires_resp": True,
 }
 TYPED_RUNTIME_IR_EFFECTS = {
+    "Deq": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "Enq": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
     "Read": frozenset(
         {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
     ),
@@ -450,6 +459,84 @@ def _load_legacy_execution_options(
     return {row: options for row, _, options in normalized}
 
 
+def _load_typed_execution_registrations(
+    root: Path,
+    commands: list[dict[str, Any]],
+    families: dict[str, str],
+    existing_operations: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    path = root / TYPED_EXECUTION_REGISTRATIONS_PATH
+    catalog = _read_json(path)
+    if set(catalog) != {
+        "schema_version",
+        "target_version",
+        "application_identity_set_sha256",
+        "registrations",
+    } or (
+        catalog["schema_version"]
+        != "mainframe-env.cics-typed-execution-registrations@1"
+        or catalog["target_version"] != "0.9.0"
+        or catalog["application_identity_set_sha256"]
+        != application_identity_digest(commands)
+    ):
+        raise DescriptorError(f"{path} identity or fields differ")
+    command_by_row = {command["official_row"]: command for command in commands}
+    existing_names = {operation["operation"] for operation in existing_operations}
+    existing_rows = {operation["official_row"] for operation in existing_operations}
+    normalized = []
+    for index, raw_registration in enumerate(
+        _array(catalog["registrations"], "typed execution registrations")
+    ):
+        registration = _object(
+            raw_registration, f"typed execution registrations[{index}]"
+        )
+        if set(registration) != {
+            "operation",
+            "interface",
+            "family",
+            "mutating",
+            "official_row",
+        }:
+            raise DescriptorError(f"typed execution registrations[{index}] fields differ")
+        name = _text(
+            registration["operation"],
+            f"typed execution registrations[{index}].operation",
+        )
+        family = _text(
+            registration["family"], f"typed execution registrations[{index}].family"
+        )
+        official_row = _text(
+            registration["official_row"],
+            f"typed execution registrations[{index}].official_row",
+        )
+        command = command_by_row.get(official_row)
+        if (
+            registration["interface"] != "api"
+            or registration["mutating"] is not True
+            or IDENTIFIER.fullmatch(name) is None
+            or family not in families
+            or command is None
+            or name in existing_names
+            or official_row in existing_rows
+        ):
+            raise DescriptorError(f"invalid typed execution registration {name}")
+        existing_names.add(name)
+        existing_rows.add(official_row)
+        normalized.append(
+            {
+                "operation": name,
+                "interface": "api",
+                "family": family,
+                "mutating": True,
+                "official_row": official_row,
+                "label": command["label"],
+            }
+        )
+    if [row["operation"] for row in normalized] != ["Deq", "Enq"]:
+        raise DescriptorError(f"{path} registration identities or order differ")
+    return normalized
+
+
 def _official_units(
     root: Path, relative: Path, expected_digest: str
 ) -> tuple[dict[str, list[dict[str, Any]]], dict[str, dict[str, Any]]]:
@@ -539,7 +626,7 @@ def _official_units(
 
 
 def load_catalog(
-    root: Path = ROOT, *, include_legacy_execution_options: bool = True
+    root: Path = ROOT, *, include_runtime_admission: bool = True
 ) -> dict[str, Any]:
     path = root / CATALOG_PATH
     catalog = _read_json(path)
@@ -699,6 +786,23 @@ def load_catalog(
         )
     if interface_counts != {"api": 23, "spi-compatibility": 2}:
         raise DescriptorError(f"CICS runtime interface split drifted: {interface_counts}")
+    if include_runtime_admission:
+        normalized_operations.extend(
+            _load_typed_execution_registrations(
+                root, normalized_commands, families, normalized_operations
+            )
+        )
+    expected_order = {
+        (operation, official_row): index
+        for index, (operation, _, _, _, official_row) in enumerate(
+            EXPECTED_RUNTIME_OPERATIONS
+        )
+    }
+    normalized_operations.sort(
+        key=lambda row: expected_order.get(
+            (row["operation"], row["official_row"]), len(expected_order)
+        )
+    )
     observed_runtime = [
         (
             row["operation"],
@@ -709,11 +813,18 @@ def load_catalog(
         )
         for row in normalized_operations
     ]
-    if observed_runtime != EXPECTED_RUNTIME_OPERATIONS:
+    expected_runtime = (
+        EXPECTED_RUNTIME_OPERATIONS
+        if include_runtime_admission
+        else [
+            row for row in EXPECTED_RUNTIME_OPERATIONS if row[0] not in {"Deq", "Enq"}
+        ]
+    )
+    if observed_runtime != expected_runtime:
         raise DescriptorError("CICS runtime operation compatibility set drifted")
     legacy_execution_options = (
         _load_legacy_execution_options(root, normalized_commands, normalized_operations)
-        if include_legacy_execution_options
+        if include_runtime_admission
         else {}
     )
     for operation in normalized_operations:
@@ -2979,8 +3090,8 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
         for row in catalog["_runtime_operations"]
         if row["interface"] == "api"
     }
-    if len(existing_runtime) != 23:
-        raise DescriptorError("CICS application runtime baseline must remain exactly 23 rows")
+    if len(existing_runtime) != 25:
+        raise DescriptorError("CICS application runtime baseline must remain exactly 25 rows")
 
     loaded_batches = []
     for batch_id, start, end, projection_path, review_path in CONTRACT_BATCHES:
@@ -3234,12 +3345,12 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
     if (
         len(registry_rows) != 263
         or len(set(handler_ids)) != 263
-        or len(typed_rows) != 3
+        or len(typed_rows) != 5
         or len(legacy_rows) != 20
         or {row["runtime_operation"] for row in typed_rows}
         != TYPED_RUNTIME_OPERATIONS
-        or len(advertised_rows) != 23
-        or len(unready_rows) != 240
+        or len(advertised_rows) != 25
+        or len(unready_rows) != 238
         or any(row["unready_result"] != "explicit-unsupported" for row in unready_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in typed_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in legacy_rows)

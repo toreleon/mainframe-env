@@ -9,13 +9,12 @@ use mainframe_env_execution_api::{
     Machine, MachineDrive, MachineResume, Quantum, Selector, Suspension, Transfer,
 };
 use mainframe_env_host_api::{
-    CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, ClassName,
-    ClockRequest, DatasetCloseControl, DatasetName, DatasetReadControl, DatasetReadLockMode,
-    DatasetReelUnit, DatasetRequest, Db2HostVariable, Db2Operation, Db2Request, EffectRequest,
-    EffectResult, HostLimits, HostProblem, HostRequest, HostResult, ImsOperation, ImsQualifier,
-    ImsRequest, KeyRelation, MethodName, MqOperation, MqRequest, Mutation, ProgramName,
-    ProgramRequest, RuntimeServiceKind, RuntimeServiceName, RuntimeServiceSelector,
-    TerminalRequest,
+    CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest, ClassName, ClockRequest,
+    DatasetCloseControl, DatasetName, DatasetReadControl, DatasetReadLockMode, DatasetReelUnit,
+    DatasetRequest, Db2HostVariable, Db2Operation, Db2Request, EffectRequest, EffectResult,
+    HostLimits, HostProblem, HostRequest, HostResult, ImsOperation, ImsQualifier, ImsRequest,
+    KeyRelation, MethodName, MqOperation, MqRequest, Mutation, ProgramName, ProgramRequest,
+    RuntimeServiceKind, RuntimeServiceName, RuntimeServiceSelector, TerminalRequest,
 };
 use mainframe_env_ir::{
     Attribute, CodecLimits, Module, Operation, OperationIdentity, StorageId, decode_binary,
@@ -509,6 +508,7 @@ impl ReferenceMachine {
                     scale: 0,
                 }),
             ),
+            ("EIBFN".into(), CobolValue::Bytes(vec![0, 0])),
             (
                 "EIBCALEN".into(),
                 CobolValue::Decimal(Decimal {
@@ -2032,7 +2032,7 @@ impl ReferenceMachine {
                         )?;
                     }
                 }
-                self.write_cics_context(operation, &response)?;
+                typed_cics::write_context(self, operation, &response)?;
                 self.deferred_drive = match response.disposition {
                     CicsDisposition::Complete => (response.response != 0 && !responded).then_some(
                         MachineDrive::Condition(Condition {
@@ -2042,10 +2042,16 @@ impl ReferenceMachine {
                             handled: false,
                         }),
                     ),
+                    CicsDisposition::Ignored => None,
                     CicsDisposition::Suspended => {
                         self.pc = self.pc.saturating_sub(1);
                         Some(MachineDrive::Suspended(Suspension {
-                            kind: "cics-terminal".into(),
+                            kind: if operation == CicsOperation::Enq {
+                                "cics-enqueue"
+                            } else {
+                                "cics-terminal"
+                            }
+                            .into(),
                             resume_token: format!(
                                 "{}:{}",
                                 self.invocation.run_unit_id, self.effect_sequence
@@ -4319,30 +4325,6 @@ impl ReferenceMachine {
         };
         self.effect(HostRequest::Dataset(request), pending)
     }
-    fn write_cics_context(
-        &mut self,
-        operation: CicsOperation,
-        response: &CicsResponse,
-    ) -> Result<(), MachineProblem> {
-        for (name, value) in [
-            ("EIBRESP", i128::from(response.response)),
-            ("EIBRESP2", i128::from(response.response2)),
-        ] {
-            self.write_decimal(
-                name,
-                Decimal {
-                    coefficient: value,
-                    scale: 0,
-                },
-            )?;
-        }
-        if operation == CicsOperation::ReceiveMap {
-            self.write("EIBAID", &[response.aid])?;
-        }
-        self.write("EIBTRNID", response.transaction.as_bytes())?;
-        Ok(())
-    }
-
     fn ims_effect(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
         let opcode = args
             .iter()

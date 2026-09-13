@@ -2345,32 +2345,22 @@ impl ProductServer {
                     )?;
                     return Ok(());
                 }
-                ExecutionOutcome::Suspended(_) => {
-                    let checkpoint = machine.checkpoint().ok_or(HostProblem::ProviderFailure)?;
-                    let _ = self.persist_online_machine_continuation(
+                ExecutionOutcome::Suspended(suspension) => {
+                    return self.finish_online_suspension(
                         session,
+                        principal,
                         &current,
                         &artifact,
-                        &invocation.provider_generations,
-                        &checkpoint,
+                        &invocation,
+                        &machine,
                         saved_version,
-                    )?;
-                    let control = self
-                        .program
-                        .observe_execution_control(&invocation)
-                        .map_err(|_| HostProblem::InfrastructureFailure)?;
-                    coordinator
-                        .complete_suspended_handoff(&invocation, control.now_tick)
-                        .map_err(store_error)?;
-                    self.program.finish_run_unit(&invocation)?;
-                    self.finish_online_machine_run(session, principal, now_tick)?;
-                    self.clear_online_exchange(
-                        session,
+                        &suspension,
+                        &coordinator,
                         exchange
                             .as_ref()
                             .ok_or(HostProblem::InfrastructureFailure)?,
-                    )?;
-                    return Ok(());
+                        now_tick,
+                    );
                 }
                 ExecutionOutcome::Transfer(transfer) if transfer.replace_frame => {
                     let (next_program, _) =
@@ -6496,6 +6486,8 @@ mod tests {
         PublishedArtifact, VersionedArtifactManifest,
     };
     use mainframe_env_db2::Db2TableDefinition;
+    use mainframe_env_host_api::{CicsConditionPolicy, CicsRequest};
+    use mainframe_env_interpreter::{ExecutionControl, ExecutionControlError};
     use mainframe_env_ir::{
         Attribute, CicsPlanOperation, IrLimits, ModuleBuilder, OperationIdentity,
         cics_executable_descriptor,
@@ -9861,6 +9853,338 @@ mod tests {
                     mainframe_env_execution_api::LifecycleEventKind::EffectIntent { .. }
                 )),
             "online host effects bypassed the durable journal"
+        );
+    }
+
+    #[test]
+    fn online_enqueue_wait_remains_durably_resumable_until_dequeue() {
+        let limits = SourceLimits::default();
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. WAITENQ.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 LOCK-NAME PIC X(4) VALUE 'LOCK'.\nPROCEDURE DIVISION.\nEXEC CICS ENQ RESOURCE(LOCK-NAME) LENGTH(4) UOW END-EXEC.\nDISPLAY 'ACQUIRED'.\nSTOP RUN.\n";
+        let path = LogicalPath::new("WAITENQ.cbl", limits.max_path_bytes).unwrap();
+        let bundle = SourceBundle::new(
+            &path,
+            vec![
+                SourceFile::input(
+                    "WAITENQ.cbl",
+                    source.to_vec(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("enqueue wait fixture did not publish");
+        };
+        let clock = Arc::new(ManualJesClock::new(100));
+        let platform_store: Arc<dyn PlatformStore> = Arc::new(MemoryStore::new(Default::default()));
+        let server =
+            ProductServer::open_with_clock(config(), platform_store, clock.clone()).unwrap();
+        let execution_clock = clock.clone();
+        server
+            .program
+            .bind_execution_control(Arc::new(move |_: &Invocation| {
+                Ok(ExecutionControl {
+                    now_tick: execution_clock
+                        .now_tick()
+                        .map_err(|_| ExecutionControlError::Unavailable)?,
+                    cancellation_requested: false,
+                })
+            }))
+            .unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "WAITENQ".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("EQ00".into(), "WAITENQ".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "WAITENQ".into(),
+                    map: "WAITENQ".into(),
+                    rows: 24,
+                    columns: 80,
+                    fields: vec![mainframe_env_cics::BmsFieldDefinition {
+                        name: "STATUS".into(),
+                        row: 1,
+                        column: 1,
+                        length: 8,
+                        initial: Vec::new(),
+                        color: None,
+                        highlight: None,
+                        protected: true,
+                        secret: false,
+                        fset: false,
+                        justify_right: false,
+                        fill_zero: false,
+                        output_offset: None,
+                        attribute_offset: None,
+                    }],
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+
+        let owner_session = SessionId::new("enqueue-owner", 64).unwrap();
+        let owner = server
+            .cics_invocation("IBMUSER", "EQ00", Some(artifact_ref.clone()))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                owner.clone(),
+                &owner_session,
+                "EQ00",
+                24,
+                80,
+                "enqueue-owner-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let argument = |schema: &str, bytes: Vec<u8>| {
+            BoundedPayload::new(schema, bytes, InvocationLimits::default()).unwrap()
+        };
+        let cics_request = |operation, sequence, key: &str| CicsRequest {
+            operation,
+            arguments: BTreeMap::from([
+                (
+                    "RESOURCE".into(),
+                    argument("mainframe-env.cics.storage-value@1", b"LOCK".to_vec()),
+                ),
+                (
+                    "LENGTH".into(),
+                    argument("mainframe-env.cics.decimal@1", b"4".to_vec()),
+                ),
+            ]),
+            condition_policy: CicsConditionPolicy::Default,
+            mutation: Some(Mutation {
+                sequence,
+                idempotency_key: IdempotencyKey::new(key, InvocationLimits::default()).unwrap(),
+                transaction: Some("EQ00".into()),
+            }),
+        };
+        let acquire = cics_request(CicsOperation::Enq, 1, "enqueue-owner-acquire");
+        server
+            .cics
+            .invoke(
+                &EffectRequest {
+                    run_unit: owner.run_unit_id.clone(),
+                    sequence: 1,
+                    deadline_tick: owner.deadline_tick,
+                    idempotency_key: acquire
+                        .mutation
+                        .as_ref()
+                        .map(|mutation| mutation.idempotency_key.clone()),
+                    request: HostRequest::Cics(acquire.clone()),
+                },
+                acquire,
+            )
+            .unwrap();
+
+        let waiter_session = SessionId::new("enqueue-waiter", 64).unwrap();
+        let waiter = server
+            .cics_invocation("IBMUSER", "EQ00", Some(artifact_ref.clone()))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                waiter.clone(),
+                &waiter_session,
+                "EQ00",
+                24,
+                80,
+                "enqueue-waiter-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&waiter_session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&waiter_session, "WAITENQ", &context)
+            .unwrap();
+        assert_eq!(
+            server.run_online_exchange(&waiter_session, &principal, "WAITENQ", 2),
+            Ok(())
+        );
+        assert_eq!(
+            server
+                .store
+                .get_execution(&waiter.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Suspended
+        );
+        assert!(server.online_exchange(&waiter_session).unwrap().is_some());
+        assert!(
+            server
+                .online_machine_continuation(&waiter_session)
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            server
+                .store
+                .get_checkpoint(&waiter.execution_id)
+                .unwrap()
+                .is_some()
+        );
+
+        let release = cics_request(CicsOperation::Deq, 2, "enqueue-owner-release");
+        server
+            .cics
+            .invoke(
+                &EffectRequest {
+                    run_unit: owner.run_unit_id.clone(),
+                    sequence: 2,
+                    deadline_tick: owner.deadline_tick,
+                    idempotency_key: release
+                        .mutation
+                        .as_ref()
+                        .map(|mutation| mutation.idempotency_key.clone()),
+                    request: HostRequest::Cics(release.clone()),
+                },
+                release,
+            )
+            .unwrap();
+        assert_eq!(
+            server.run_online_exchange(&waiter_session, &principal, "WAITENQ", 3),
+            Ok(())
+        );
+        assert_eq!(
+            server
+                .store
+                .get_execution(&waiter.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Completed
+        );
+        assert!(server.online_exchange(&waiter_session).unwrap().is_none());
+        assert!(
+            server
+                .online_machine_continuation(&waiter_session)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            server
+                .store
+                .list_provider_state("cics-enqueue-v1", 2)
+                .unwrap()
+                .is_empty()
+        );
+
+        let reacquire = cics_request(CicsOperation::Enq, 3, "enqueue-owner-reacquire");
+        server
+            .cics
+            .invoke(
+                &EffectRequest {
+                    run_unit: owner.run_unit_id.clone(),
+                    sequence: 3,
+                    deadline_tick: owner.deadline_tick,
+                    idempotency_key: reacquire
+                        .mutation
+                        .as_ref()
+                        .map(|mutation| mutation.idempotency_key.clone()),
+                    request: HostRequest::Cics(reacquire.clone()),
+                },
+                reacquire,
+            )
+            .unwrap();
+        let timed_session = SessionId::new("enqueue-timed-waiter", 64).unwrap();
+        let timed = server
+            .cics_invocation("IBMUSER", "EQ00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                timed.clone(),
+                &timed_session,
+                "EQ00",
+                24,
+                80,
+                "enqueue-timed-csrf",
+                4,
+                10_000,
+            )
+            .unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&timed_session, &principal, 4)
+            .unwrap();
+        server
+            .begin_online_exchange(&timed_session, "WAITENQ", &context)
+            .unwrap();
+        assert_eq!(
+            server.run_online_exchange(&timed_session, &principal, "WAITENQ", 4),
+            Ok(())
+        );
+        clock.advance(server.config.timeout_millis + 1);
+        assert_eq!(
+            server.run_online_exchange(&timed_session, &principal, "WAITENQ", 5),
+            Err(HostProblem::TimedOut)
+        );
+        assert_eq!(
+            server
+                .store
+                .get_execution(&timed.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::TimedOut
+        );
+        assert!(server.online_exchange(&timed_session).unwrap().is_none());
+
+        let release = cics_request(CicsOperation::Deq, 4, "enqueue-owner-final-release");
+        server
+            .cics
+            .invoke(
+                &EffectRequest {
+                    run_unit: owner.run_unit_id.clone(),
+                    sequence: 4,
+                    deadline_tick: owner.deadline_tick,
+                    idempotency_key: release
+                        .mutation
+                        .as_ref()
+                        .map(|mutation| mutation.idempotency_key.clone()),
+                    request: HostRequest::Cics(release.clone()),
+                },
+                release,
+            )
+            .unwrap();
+        assert!(
+            server
+                .store
+                .list_provider_state("cics-enqueue-v1", 2)
+                .unwrap()
+                .is_empty()
         );
     }
 

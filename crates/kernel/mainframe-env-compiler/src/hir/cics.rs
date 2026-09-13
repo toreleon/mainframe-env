@@ -171,12 +171,16 @@ impl PlanContext<'_> {
                 HirCicsOperandName::Dataset => CicsOperandName::Dataset,
                 HirCicsOperandName::From => CicsOperandName::From,
                 HirCicsOperandName::Ridfld => CicsOperandName::Ridfld,
+                HirCicsOperandName::Resource => CicsOperandName::Resource,
+                HirCicsOperandName::Length => CicsOperandName::Length,
+                HirCicsOperandName::MaxLifetime => CicsOperandName::MaxLifetime,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
                     CicsOperandValue::Literal(value.as_bytes().to_vec())
                 }
                 HirCicsValue::Data(reference) => CicsOperandValue::Storage(self.slot(reference)?),
+                HirCicsValue::Integer(value) => CicsOperandValue::Integer(*value),
             },
         })
     }
@@ -236,6 +240,8 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::Read => CicsPlanOperation::Read,
         HirCicsOperation::Rewrite => CicsPlanOperation::Rewrite,
         HirCicsOperation::Syncpoint => CicsPlanOperation::Syncpoint,
+        HirCicsOperation::Deq => CicsPlanOperation::Deq,
+        HirCicsOperation::Enq => CicsPlanOperation::Enq,
     }
 }
 
@@ -244,5 +250,8 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::Update => CicsPlanOption::Update,
         HirCicsOption::Rollback => CicsPlanOption::Rollback,
         HirCicsOption::NoHandle => CicsPlanOption::NoHandle,
+        HirCicsOption::Task => CicsPlanOption::Task,
+        HirCicsOption::Uow => CicsPlanOption::Uow,
+        HirCicsOption::NoSuspend => CicsPlanOption::NoSuspend,
     }
 }

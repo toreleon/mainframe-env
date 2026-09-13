@@ -1,0 +1,21 @@
+{
+  "schema_version": "mainframe-env.cics-typed-execution-registrations@1",
+  "target_version": "0.9.0",
+  "application_identity_set_sha256": "sha256:a18057164564781563252d53586a8afbc401f2783950db456b3b98177fc60b94",
+  "registrations": [
+    {
+      "operation": "Deq",
+      "interface": "api",
+      "family": "task-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0050"
+    },
+    {
+      "operation": "Enq",
+      "interface": "api",
+      "family": "task-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0064"
+    }
+  ]
+}

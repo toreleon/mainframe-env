@@ -44,6 +44,15 @@ Replay envelope `MECER002` records expose the owner execution and effect
 deadline needed by retention; `MECER001` rows lack that proof and must remain
 retention-ineligible.
 
+For a suspended `cics-enqueue` exchange, also leave `cics-enqueue-v1` and
+`cics-enqueue-catalog-v1` untouched. The resource row is the durable FIFO and
+ownership authority; its catalog count is checked when CICS opens. Resume the
+same online exchange after the resource owner dequeues. Timeout, cancellation,
+session disconnect, or abandoned-task recovery invokes bounded task cleanup,
+which removes the waiter or releases its owned locks and promotes the oldest
+surviving waiter. Manual deletion can orphan a grant or break the catalog count
+and will make the next provider open fail closed.
+
 If an exchange points at a terminal execution, first finish the abandoned
 COBOL/CICS run, remove its interpreter checkpoint, and delete the exchange.
 Preserve `online-machine-continuation` only when the final lifecycle event is

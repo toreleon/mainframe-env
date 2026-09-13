@@ -950,149 +950,8 @@ pub struct MqResult {
     pub trigger_program: Option<String>,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum CicsOperation {
-    Abend,
-    Asktime,
-    Assign,
-    Delete,
-    EndBrowse,
-    FormatTime,
-    HandleAbend,
-    HandleCondition,
-    Inquire,
-    Link,
-    Read,
-    ReadNext,
-    ReadPrev,
-    ReceiveMap,
-    Retrieve,
-    Return,
-    Rewrite,
-    SendText,
-    SendMap,
-    SetFileStatus,
-    StartBrowse,
-    Syncpoint,
-    Write,
-    WriteTransientData,
-    Xctl,
-}
-
-impl CicsOperation {
-    #[must_use]
-    pub const fn is_mutating(self) -> bool {
-        matches!(
-            self,
-            Self::Delete
-                | Self::Rewrite
-                | Self::Write
-                | Self::WriteTransientData
-                | Self::Link
-                | Self::ReceiveMap
-                | Self::SendMap
-                | Self::SendText
-                | Self::Xctl
-                | Self::Return
-                | Self::Abend
-                | Self::Syncpoint
-                | Self::SetFileStatus
-        )
-    }
-
-    #[must_use]
-    pub fn from_tokens(tokens: &[String]) -> Option<Self> {
-        let words: Vec<String> = tokens
-            .iter()
-            .map(|token| token.to_ascii_uppercase())
-            .filter(|token| !matches!(token.as_str(), "EXEC" | "CICS" | "END-EXEC"))
-            .collect();
-        let first = words.first()?.as_str();
-        Some(match (first, words.get(1).map(String::as_str)) {
-            ("ABEND", _) => Self::Abend,
-            ("ASKTIME", _) => Self::Asktime,
-            ("ASSIGN", _) => Self::Assign,
-            ("DELETE", _) => Self::Delete,
-            ("ENDBR", _) => Self::EndBrowse,
-            ("FORMATTIME", _) => Self::FormatTime,
-            ("HANDLE", Some("ABEND")) => Self::HandleAbend,
-            ("HANDLE", _) => Self::HandleCondition,
-            ("INQUIRE", _) => Self::Inquire,
-            ("LINK", _) => Self::Link,
-            ("READ", _) => Self::Read,
-            ("READNEXT", _) => Self::ReadNext,
-            ("READPREV", _) => Self::ReadPrev,
-            ("RECEIVE", Some("MAP")) => Self::ReceiveMap,
-            ("RETRIEVE", _) => Self::Retrieve,
-            ("RETURN", _) => Self::Return,
-            ("REWRITE", _) => Self::Rewrite,
-            ("SEND", Some("MAP")) => Self::SendMap,
-            ("SEND", _) => Self::SendText,
-            ("STARTBR", _) => Self::StartBrowse,
-            ("SYNCPOINT", _) => Self::Syncpoint,
-            ("WRITE", _) => Self::Write,
-            ("WRITEQ", Some("TD")) => Self::WriteTransientData,
-            ("XCTL", _) => Self::Xctl,
-            _ => return None,
-        })
-    }
-
-    #[must_use]
-    pub const fn supported(self) -> bool {
-        true
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum CicsConditionPolicy {
-    Default,
-    NoHandle,
-    Respond {
-        response_field: String,
-        response2_field: Option<String>,
-    },
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CicsRequest {
-    pub operation: CicsOperation,
-    pub arguments: BTreeMap<String, BoundedPayload>,
-    pub condition_policy: CicsConditionPolicy,
-    pub mutation: Option<Mutation>,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum CicsDisposition {
-    Complete,
-    Suspended,
-    Transfer,
-    Handler,
-    Returned,
-    Abended,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum CicsUnitOfWorkOutcome {
-    Committed,
-    RolledBack,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CicsResponse {
-    pub disposition: CicsDisposition,
-    pub condition: String,
-    pub response: i32,
-    pub response2: i32,
-    pub applid: String,
-    pub sysid: String,
-    pub transaction: String,
-    pub aid: u8,
-    pub target: Option<String>,
-    pub next_transaction: Option<String>,
-    pub payload: BoundedPayload,
-    pub outputs: BTreeMap<String, BoundedPayload>,
-    pub unit_of_work: Option<CicsUnitOfWorkOutcome>,
-}
+mod cics;
+pub use cics::*;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum HostRequest {
@@ -2553,12 +2412,14 @@ mod tests {
     }
 
     #[test]
-    fn all_frozen_cics_forms_are_typed() {
+    fn all_cics_runtime_operation_names_are_unique() {
         let forms = [
             CicsOperation::Abend,
             CicsOperation::Asktime,
             CicsOperation::Assign,
+            CicsOperation::Deq,
             CicsOperation::Delete,
+            CicsOperation::Enq,
             CicsOperation::EndBrowse,
             CicsOperation::FormatTime,
             CicsOperation::HandleAbend,
@@ -2574,12 +2435,18 @@ mod tests {
             CicsOperation::Rewrite,
             CicsOperation::SendText,
             CicsOperation::SendMap,
+            CicsOperation::SetFileStatus,
             CicsOperation::StartBrowse,
             CicsOperation::Syncpoint,
             CicsOperation::Write,
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-        assert_eq!(forms.len(), 24);
+        assert_eq!(forms.len(), 27);
+        let names = forms
+            .iter()
+            .map(|operation| operation.runtime_name())
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(names.len(), forms.len());
     }
 }

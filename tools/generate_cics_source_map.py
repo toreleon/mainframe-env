@@ -569,7 +569,7 @@ def build_mapping(
     config = batch_config(batch_id)
     # Source identity intentionally excludes the separate runtime-admission
     # catalog so option-readiness work cannot invalidate frozen IBM receipts.
-    catalog = descriptors.load_catalog(root, include_legacy_execution_options=False)
+    catalog = descriptors.load_catalog(root, include_runtime_admission=False)
     descriptor_path = root / descriptors.CATALOG_PATH
     descriptor_sha256 = f"sha256:{hashlib.sha256(descriptor_path.read_bytes()).hexdigest()}"
     commands = catalog["_application_commands"][

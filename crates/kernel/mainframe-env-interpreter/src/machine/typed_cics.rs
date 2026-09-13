@@ -1,4 +1,5 @@
 use super::*;
+use mainframe_env_host_api::CicsResponse;
 use mainframe_env_ir::{
     CICS_EXECUTABLE_DESCRIPTORS, CicsCondition, CicsEffectPlan, CicsExecutableDescriptor,
     CicsOperandName, CicsOperandValue, CicsOperationContract, CicsOutputName, CicsPlanLimits,
@@ -25,6 +26,35 @@ pub(super) fn operation_identities() -> Vec<OperationIdentity> {
 
 pub(super) fn is_typed(operation: &Operation) -> bool {
     expected_operation(&operation.identity).is_some()
+}
+
+pub(super) fn write_context(
+    machine: &mut ReferenceMachine,
+    operation: CicsOperation,
+    response: &CicsResponse,
+) -> Result<(), MachineProblem> {
+    for (name, value) in [
+        ("EIBRESP", i128::from(response.response)),
+        ("EIBRESP2", i128::from(response.response2)),
+    ] {
+        machine.write_decimal(
+            name,
+            Decimal {
+                coefficient: value,
+                scale: 0,
+            },
+        )?;
+    }
+    if let Some(descriptor) =
+        mainframe_env_ir::cics_application_registry_for_runtime_operation(operation.runtime_name())
+    {
+        machine.write("EIBFN", &descriptor.eibfn)?;
+    }
+    if operation == CicsOperation::ReceiveMap {
+        machine.write("EIBAID", &[response.aid])?;
+    }
+    machine.write("EIBTRNID", response.transaction.as_bytes())?;
+    Ok(())
 }
 
 pub(super) fn validate_module_operations(module: &Module) -> Result<(), MachineProblem> {
@@ -86,9 +116,42 @@ pub(super) fn execute(
     for operand in &plan.operands {
         let (schema, bytes) = match &operand.value {
             CicsOperandValue::Literal(bytes) => ("mainframe-env.cics.literal@1", bytes.clone()),
+            CicsOperandValue::Storage(slot)
+                if matches!(
+                    operand.name,
+                    CicsOperandName::Length | CicsOperandName::MaxLifetime
+                ) =>
+            {
+                (
+                    "mainframe-env.cics.decimal@1",
+                    read_integer_slot(machine, slot)?.to_string().into_bytes(),
+                )
+            }
+            CicsOperandValue::Storage(slot)
+                if operand.name == CicsOperandName::Resource
+                    && !plan
+                        .operands
+                        .iter()
+                        .any(|value| value.name == CicsOperandName::Length) =>
+            {
+                (
+                    "mainframe-env.cics.storage-identity@1",
+                    format!(
+                        "{}:{}:{}",
+                        machine.invocation.artifact.as_str(),
+                        slot.storage.get(),
+                        slot.qualified_layout_name
+                    )
+                    .into_bytes(),
+                )
+            }
             CicsOperandValue::Storage(slot) => (
                 "mainframe-env.cics.storage-value@1",
                 read_slot(machine, slot)?,
+            ),
+            CicsOperandValue::Integer(value) => (
+                "mainframe-env.cics.decimal@1",
+                value.to_string().into_bytes(),
             ),
         };
         arguments.insert(operand_name(operand.name).into(), payload(schema, bytes)?);
@@ -594,6 +657,24 @@ fn read_slot(
     machine.read(&slot.qualified_layout_name)
 }
 
+fn read_integer_slot(
+    machine: &ReferenceMachine,
+    slot: &CicsStorageSlot,
+) -> Result<i128, MachineProblem> {
+    let layout = machine
+        .layouts
+        .get(&slot.qualified_layout_name)
+        .ok_or(MachineProblem::UnknownStorage)?;
+    if !is_numeric(layout.category) {
+        return Err(MachineProblem::DataException);
+    }
+    let value = decode_decimal(layout, &read_slot(machine, slot)?)?;
+    if value.scale != 0 {
+        return Err(MachineProblem::DataException);
+    }
+    Ok(value.coefficient)
+}
+
 fn expected_operation(identity: &OperationIdentity) -> Option<CicsPlanOperation> {
     cics_executable_descriptor_for_identity(identity).map(|descriptor| descriptor.operation)
 }
@@ -604,6 +685,8 @@ fn expected_effects(operation: CicsPlanOperation) -> &'static [Effect] {
 
 const fn host_operation(operation: CicsPlanOperation) -> CicsOperation {
     match operation {
+        CicsPlanOperation::Deq => CicsOperation::Deq,
+        CicsPlanOperation::Enq => CicsOperation::Enq,
         CicsPlanOperation::Read => CicsOperation::Read,
         CicsPlanOperation::Rewrite => CicsOperation::Rewrite,
         CicsPlanOperation::Syncpoint => CicsOperation::Syncpoint,
@@ -616,6 +699,9 @@ const fn operand_name(name: CicsOperandName) -> &'static str {
         CicsOperandName::Dataset => "DATASET",
         CicsOperandName::From => "FROM",
         CicsOperandName::Ridfld => "RIDFLD",
+        CicsOperandName::Resource => "RESOURCE",
+        CicsOperandName::Length => "LENGTH",
+        CicsOperandName::MaxLifetime => "MAXLIFETIME",
     }
 }
 
@@ -632,6 +718,9 @@ const fn option_name(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::Update => "UPDATE",
         CicsPlanOption::Rollback => "ROLLBACK",
         CicsPlanOption::NoHandle => "NOHANDLE",
+        CicsPlanOption::Task => "TASK",
+        CicsPlanOption::Uow => "UOW",
+        CicsPlanOption::NoSuspend => "NOSUSPEND",
     }
 }
 
@@ -880,7 +969,7 @@ mod tests {
     #[test]
     fn typed_cics_plan_identity_signature_and_storage_are_fail_closed() {
         let syncpoint = syncpoint_plan();
-        let identity = operation_identities()[2].clone();
+        let identity = operation_identities()[4].clone();
         assert!(
             super::super::validate_module(&module(
                 identity.clone(),
@@ -937,7 +1026,7 @@ mod tests {
     fn malformed_plan_and_unregistered_major_are_rejected() {
         let syncpoint = syncpoint_plan();
         let malformed = module(
-            operation_identities()[2].clone(),
+            operation_identities()[4].clone(),
             &syncpoint,
             expected_effects(CicsPlanOperation::Syncpoint).to_vec(),
             false,
@@ -1071,7 +1160,7 @@ mod tests {
         builder
             .add_operation(
                 block,
-                operation_identities()[0].clone(),
+                operation_identities()[2].clone(),
                 Vec::new(),
                 0,
                 BTreeMap::from([(

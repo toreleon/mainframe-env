@@ -1490,7 +1490,7 @@ mod tests {
 
     #[test]
     fn typed_cics_is_proof_bound_in_hir_and_the_published_executable() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSP. DATA DIVISION. WORKING-STORAGE SECTION. 01 RECORD-X PIC X(4). 01 KEY-X PIC X(3) VALUE '003'. 01 CODE-A PIC S9(9) COMP. 01 CODE-B PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') UPDATE INTO(RECORD-X) RIDFLD(KEY-X) RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS REWRITE DATASET('ACCTDAT') FROM(RECORD-X) END-EXEC. EXEC CICS SYNCPOINT ROLLBACK NOHANDLE END-EXEC. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSP. DATA DIVISION. WORKING-STORAGE SECTION. 01 RECORD-X PIC X(4). 01 KEY-X PIC X(3) VALUE '003'. 01 LOCK-X PIC X(4) VALUE 'LOCK'. 01 CODE-A PIC S9(9) COMP. 01 CODE-B PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') UPDATE INTO(RECORD-X) RIDFLD(KEY-X) RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS REWRITE DATASET('ACCTDAT') FROM(RECORD-X) END-EXEC. EXEC CICS ENQ RESOURCE(LOCK-X) LENGTH(4) UOW NOSUSPEND END-EXEC. EXEC CICS DEQ RESOURCE(LOCK-X) LENGTH(4) UOW END-EXEC. EXEC CICS SYNCPOINT ROLLBACK NOHANDLE END-EXEC. STOP RUN.";
         let compiler = CobolCompiler::default();
         let analysis = compiler.analyze(&bundle(source));
         let hir = analysis.hir.as_ref().expect("typed CICS HIR");
@@ -1522,7 +1522,7 @@ mod tests {
                     && operation.identity.major() == 2
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed_hir.len(), 3);
+        assert_eq!(typed_hir.len(), 5);
         let mut hir_plans = Vec::new();
         for operation in typed_hir {
             assert!(!operation.attributes.contains_key("arguments"));
@@ -1567,6 +1567,8 @@ mod tests {
                 );
             }
             let source_operation = match plan.operation {
+                CicsPlanOperation::Deq => crate::HirCicsOperation::Deq,
+                CicsPlanOperation::Enq => crate::HirCicsOperation::Enq,
                 CicsPlanOperation::Read => crate::HirCicsOperation::Read,
                 CicsPlanOperation::Rewrite => crate::HirCicsOperation::Rewrite,
                 CicsPlanOperation::Syncpoint => crate::HirCicsOperation::Syncpoint,
@@ -1590,6 +1592,8 @@ mod tests {
                 .map(|plan| plan.operation)
                 .collect::<BTreeSet<_>>(),
             BTreeSet::from([
+                CicsPlanOperation::Deq,
+                CicsPlanOperation::Enq,
                 CicsPlanOperation::Read,
                 CicsPlanOperation::Rewrite,
                 CicsPlanOperation::Syncpoint,
@@ -1676,6 +1680,7 @@ mod tests {
             BTreeSet::from([
                 "cics.file@1".into(),
                 "cics.recovery@1".into(),
+                "cics.task@1".into(),
                 "mainframe.core.cobol@1".into(),
             ])
         );
@@ -1688,11 +1693,11 @@ mod tests {
             .filter(|operation| {
                 matches!(
                     operation.identity.namespace(),
-                    "cics.file" | "cics.recovery"
+                    "cics.file" | "cics.recovery" | "cics.task"
                 )
             })
             .collect::<Vec<_>>();
-        assert_eq!(operations.len(), 3);
+        assert_eq!(operations.len(), 5);
         assert_eq!(
             operations
                 .iter()
@@ -1773,8 +1778,10 @@ mod tests {
         }
     }
 
-    fn cics_grammar_tokens() -> [&'static [u8]; 13] {
+    fn cics_grammar_tokens() -> [&'static [u8]; 21] {
         [
+            b"DEQ",
+            b"ENQ",
             b"READ",
             b"REWRITE",
             b"SYNCPOINT",
@@ -1787,6 +1794,12 @@ mod tests {
             b"UPDATE",
             b"ROLLBACK",
             b"NOHANDLE",
+            b"RESOURCE",
+            b"LENGTH",
+            b"MAXLIFETIME",
+            b"TASK",
+            b"UOW",
+            b"NOSUSPEND",
             b"END-EXEC",
         ]
     }
@@ -1798,6 +1811,7 @@ mod tests {
             .filter_map(|operand| match &operand.value {
                 CicsOperandValue::Literal(_) => None,
                 CicsOperandValue::Storage(slot) => Some(slot.storage),
+                CicsOperandValue::Integer(_) => None,
             })
             .chain(plan.outputs.iter().map(|output| output.target.storage))
             .collect::<BTreeSet<_>>();

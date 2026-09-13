@@ -1,6 +1,10 @@
-use super::normalize_online_name;
-use mainframe_env_execution_api::{ArtifactRef, BoundedPayload, CapabilityId, InvocationLimits};
-use mainframe_env_host_api::{HostProblem, ScopedHostService};
+use super::{OnlineExchangeState, ProductServer, normalize_online_name, store_error};
+use mainframe_env_execution_api::{
+    ArtifactRef, BoundedPayload, CapabilityId, Invocation, InvocationLimits, Machine, PrincipalId,
+    Suspension,
+};
+use mainframe_env_host_api::{HostProblem, ScopedHostService, SessionId};
+use mainframe_env_interpreter::{ExecutionCoordinator, ReferenceMachine};
 use mainframe_env_store_api::ProviderStateRecord;
 use std::collections::BTreeMap;
 
@@ -25,6 +29,49 @@ pub(super) struct OnlineMachineContinuation {
     pub(super) provider_generations: BTreeMap<CapabilityId, String>,
     pub(super) checkpoint: BoundedPayload,
     pub(super) version: u64,
+}
+
+impl ProductServer {
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn finish_online_suspension(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        program: &str,
+        artifact: &ArtifactRef,
+        invocation: &Invocation,
+        machine: &ReferenceMachine,
+        current_version: Option<u64>,
+        suspension: &Suspension,
+        coordinator: &ExecutionCoordinator,
+        exchange: &OnlineExchangeState,
+        now_tick: u64,
+    ) -> Result<(), HostProblem> {
+        let checkpoint = machine.checkpoint().ok_or(HostProblem::ProviderFailure)?;
+        self.persist_online_machine_continuation(
+            session,
+            program,
+            artifact,
+            &invocation.provider_generations,
+            &checkpoint,
+            current_version,
+        )?;
+        match suspension.kind.as_str() {
+            "cics-enqueue" => return Ok(()),
+            "cics-terminal" => {}
+            _ => return Err(HostProblem::InfrastructureFailure),
+        }
+        let control = self
+            .program
+            .observe_execution_control(invocation)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        coordinator
+            .complete_suspended_handoff(invocation, control.now_tick)
+            .map_err(store_error)?;
+        self.program.finish_run_unit(invocation)?;
+        self.finish_online_machine_run(session, principal, now_tick)?;
+        self.clear_online_exchange(session, exchange)
+    }
 }
 
 pub(super) fn encode_online_machine_continuation(

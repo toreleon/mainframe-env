@@ -9,6 +9,8 @@ const READ_EFFECTS: &[Effect] = &[
     Effect::DatasetRead,
     Effect::MemoryRead,
     Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
     Effect::Condition,
     Effect::Transaction,
 ];
@@ -16,10 +18,35 @@ const REWRITE_EFFECTS: &[Effect] = &[
     Effect::DatasetWrite,
     Effect::MemoryRead,
     Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
     Effect::Condition,
     Effect::Transaction,
 ];
-const SYNCPOINT_EFFECTS: &[Effect] = &[Effect::MemoryWrite, Effect::Condition, Effect::Transaction];
+const SYNCPOINT_EFFECTS: &[Effect] = &[
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+    Effect::Transaction,
+];
+const DEQ_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+    Effect::Transaction,
+];
+const ENQ_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Suspension,
+    Effect::Condition,
+    Effect::Transaction,
+];
 
 /// Static executable facts owned by the typed CICS dialect.
 ///
@@ -354,8 +381,39 @@ pub fn cics_application_registry_for_tokens(
     best.and_then(|(descriptor, _)| (!ambiguous).then_some(descriptor))
 }
 
+/// Resolves the unique advertised application row for a host runtime operation.
+///
+/// Internal-only operations and the separate SPI compatibility route have no
+/// application row and therefore return `None`.
+#[must_use]
+pub fn cics_application_registry_for_runtime_operation(
+    runtime_operation: &str,
+) -> Option<&'static CicsApplicationRegistryDescriptor> {
+    let mut matches = CICS_APPLICATION_REGISTRY.iter().filter(|descriptor| {
+        descriptor.advertised && descriptor.runtime_operation == Some(runtime_operation)
+    });
+    let descriptor = matches.next()?;
+    matches.next().is_none().then_some(descriptor)
+}
+
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 3] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 5] = [
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Deq,
+        namespace: "cics.task",
+        name: "deq",
+        major: 1,
+        effects: DEQ_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Enq,
+        namespace: "cics.task",
+        name: "enq",
+        major: 1,
+        effects: ENQ_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Read,
         namespace: "cics.file",
@@ -388,9 +446,11 @@ pub const fn cics_executable_descriptor(
     operation: CicsPlanOperation,
 ) -> &'static CicsExecutableDescriptor {
     match operation {
-        CicsPlanOperation::Read => &CICS_EXECUTABLE_DESCRIPTORS[0],
-        CicsPlanOperation::Rewrite => &CICS_EXECUTABLE_DESCRIPTORS[1],
-        CicsPlanOperation::Syncpoint => &CICS_EXECUTABLE_DESCRIPTORS[2],
+        CicsPlanOperation::Deq => &CICS_EXECUTABLE_DESCRIPTORS[0],
+        CicsPlanOperation::Enq => &CICS_EXECUTABLE_DESCRIPTORS[1],
+        CicsPlanOperation::Read => &CICS_EXECUTABLE_DESCRIPTORS[2],
+        CicsPlanOperation::Rewrite => &CICS_EXECUTABLE_DESCRIPTORS[3],
+        CicsPlanOperation::Syncpoint => &CICS_EXECUTABLE_DESCRIPTORS[4],
     }
 }
 
@@ -451,7 +511,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 3);
+        assert_eq!(typed.len(), 5);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -469,10 +529,24 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 240);
+        assert_eq!(unready.len(), 238);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
+        for descriptor in typed.into_iter().chain(legacy) {
+            assert_eq!(
+                cics_application_registry_for_runtime_operation(
+                    descriptor
+                        .runtime_operation
+                        .expect("ready runtime operation")
+                ),
+                Some(descriptor)
+            );
+        }
+        assert_eq!(
+            cics_application_registry_for_runtime_operation("Inquire"),
+            None
+        );
     }
 
     #[test]
@@ -616,6 +690,8 @@ mod tests {
                 .map(|descriptor| descriptor.operation)
                 .collect::<BTreeSet<_>>(),
             BTreeSet::from([
+                CicsPlanOperation::Deq,
+                CicsPlanOperation::Enq,
                 CicsPlanOperation::Read,
                 CicsPlanOperation::Rewrite,
                 CicsPlanOperation::Syncpoint,

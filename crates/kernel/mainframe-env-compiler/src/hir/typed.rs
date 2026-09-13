@@ -1,7 +1,6 @@
 use super::{HirProblem, HirStatement, StatementKind, StatementOption, StatementOptionKind};
 use crate::{CobolLayout, CobolUsage, DataCategory, LosslessSyntax, SemanticModel, SourceSpan};
 use mainframe_env_diagnostics::SourceSpan as IrSourceSpan;
-use mainframe_env_ir::CicsApplicationHandlerReadiness;
 use mainframe_env_source::SourceBundle;
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
@@ -147,6 +146,8 @@ pub struct HirComputeStatement {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HirCicsOperation {
+    Deq,
+    Enq,
     Read,
     Rewrite,
     Syncpoint,
@@ -158,12 +159,16 @@ pub enum HirCicsOperandName {
     Dataset,
     From,
     Ridfld,
+    Resource,
+    Length,
+    MaxLifetime,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum HirCicsValue {
     Literal(String),
     Data(HirDataReference),
+    Integer(i64),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -177,6 +182,9 @@ pub enum HirCicsOption {
     Update,
     Rollback,
     NoHandle,
+    Task,
+    Uow,
+    NoSuspend,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -915,160 +923,7 @@ const fn is_add_corresponding_group(category: DataCategory) -> bool {
 }
 
 fn resolve_cics(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsStatement> {
-    let mut body = tokens;
-    if body
-        .first()
-        .is_some_and(|token| token.eq_ignore_ascii_case("CICS"))
-    {
-        body = &body[1..];
-    }
-    if body
-        .last()
-        .is_some_and(|token| token.eq_ignore_ascii_case("END-EXEC"))
-    {
-        body = &body[..body.len() - 1];
-    }
-    if cics_resolution::validated_legacy_spi_compatibility(body)?.is_some() {
-        return Err(ResolutionFailure::Unsupported);
-    }
-    let (descriptor, clauses, raw_options) = cics_resolution::validated_command(body, semantic)?;
-    match descriptor.readiness {
-        CicsApplicationHandlerReadiness::TypedRuntime => {}
-        CicsApplicationHandlerReadiness::LegacyCompatibility => {
-            return Err(ResolutionFailure::Unsupported);
-        }
-        CicsApplicationHandlerReadiness::Unready => {
-            return Err(ResolutionFailure::Invalid(format!(
-                "CICS application command {} is catalog-known but its handler is unready",
-                descriptor.label_tokens.join(" ")
-            )));
-        }
-    }
-    let operation = match descriptor.label_tokens {
-        ["READ"] => HirCicsOperation::Read,
-        ["REWRITE"] => HirCicsOperation::Rewrite,
-        ["SYNCPOINT"] => HirCicsOperation::Syncpoint,
-        _ => return Err(ResolutionFailure::Unsupported),
-    };
-    let allowed_clauses: &[&str] = match operation {
-        HirCicsOperation::Read => &["FILE", "DATASET", "RIDFLD", "INTO", "RESP", "RESP2"],
-        HirCicsOperation::Rewrite => &["FILE", "DATASET", "FROM", "RESP", "RESP2"],
-        HirCicsOperation::Syncpoint => &["RESP", "RESP2"],
-    };
-    let allowed_options: &[&str] = match operation {
-        HirCicsOperation::Read => &["UPDATE", "NOHANDLE"],
-        HirCicsOperation::Rewrite => &["NOHANDLE"],
-        HirCicsOperation::Syncpoint => &["ROLLBACK", "NOHANDLE"],
-    };
-    let unready_clauses = clauses
-        .keys()
-        .filter(|name| !allowed_clauses.contains(&name.as_str()))
-        .cloned()
-        .collect::<Vec<_>>();
-    let unready_options = raw_options
-        .iter()
-        .filter(|name| !allowed_options.contains(&name.as_str()))
-        .cloned()
-        .collect::<Vec<_>>();
-    if !unready_clauses.is_empty() || !unready_options.is_empty() {
-        let names = unready_clauses
-            .into_iter()
-            .chain(unready_options)
-            .collect::<Vec<_>>()
-            .join(", ");
-        return Err(ResolutionFailure::Invalid(format!(
-            "CICS {} is catalog-known but typed lowering is unready for {names}",
-            descriptor.label_tokens.join(" ")
-        )));
-    }
-    let resources =
-        usize::from(clauses.contains_key("FILE")) + usize::from(clauses.contains_key("DATASET"));
-    if !matches!(operation, HirCicsOperation::Syncpoint) && resources != 1 {
-        return Err(ResolutionFailure::Invalid(
-            "CICS file command requires exactly one FILE or DATASET".into(),
-        ));
-    }
-    for required in match operation {
-        HirCicsOperation::Read => &["RIDFLD", "INTO"][..],
-        HirCicsOperation::Rewrite => &["FROM"][..],
-        HirCicsOperation::Syncpoint => &[][..],
-    } {
-        if !clauses.contains_key(*required) {
-            return Err(ResolutionFailure::Invalid(format!(
-                "CICS {operation:?} requires {required}"
-            )));
-        }
-    }
-    let mut operands = Vec::new();
-    for (name, identity) in [
-        ("FILE", HirCicsOperandName::File),
-        ("DATASET", HirCicsOperandName::Dataset),
-        ("FROM", HirCicsOperandName::From),
-        ("RIDFLD", HirCicsOperandName::Ridfld),
-    ] {
-        if let Some(value) = clauses.get(name) {
-            operands.push(HirCicsNamedOperand {
-                name: identity,
-                value: cics_value(value, semantic)?,
-            });
-        }
-    }
-    let mut outputs = Vec::new();
-    for (name, identity) in [
-        ("INTO", HirCicsOutputName::Into),
-        ("RESP", HirCicsOutputName::Resp),
-        ("RESP2", HirCicsOutputName::Resp2),
-    ] {
-        if let Some(value) = clauses.get(name) {
-            let target = complete_data_reference(value, semantic)?;
-            require_writable(&target)?;
-            if matches!(identity, HirCicsOutputName::Resp | HirCicsOutputName::Resp2) {
-                require_numeric(&target)?;
-            }
-            outputs.push(HirCicsOutputBinding {
-                name: identity,
-                target,
-            });
-        }
-    }
-    let mut options = raw_options
-        .iter()
-        .map(|option| match option.as_str() {
-            "UPDATE" => HirCicsOption::Update,
-            "ROLLBACK" => HirCicsOption::Rollback,
-            "NOHANDLE" => HirCicsOption::NoHandle,
-            _ => unreachable!("allowed CICS option"),
-        })
-        .collect::<BTreeSet<_>>();
-    let response = output(&outputs, HirCicsOutputName::Resp).cloned();
-    let response2 = output(&outputs, HirCicsOutputName::Resp2).cloned();
-    if response.is_none() && response2.is_some() {
-        return Err(ResolutionFailure::Invalid(
-            "CICS RESP2 requires RESP".into(),
-        ));
-    }
-    let no_handle = options.contains(&HirCicsOption::NoHandle);
-    let condition_policy = if let Some(response) = response {
-        // RESP implies NOHANDLE while retaining the response-area update. The
-        // typed plan carries that canonical policy as Respond, so an explicit
-        // redundant NOHANDLE flag must not overwrite it.
-        options.remove(&HirCicsOption::NoHandle);
-        HirCicsConditionPolicy::Respond {
-            response,
-            response2,
-        }
-    } else if no_handle {
-        HirCicsConditionPolicy::NoHandle
-    } else {
-        HirCicsConditionPolicy::Default
-    };
-    Ok(HirCicsStatement {
-        operation,
-        operands,
-        options,
-        outputs,
-        condition_policy,
-    })
+    cics_resolution::resolve(tokens, semantic)
 }
 
 fn matching_close(tokens: &[String], open: usize) -> Resolution<usize> {
@@ -1086,39 +941,6 @@ fn matching_close(tokens: &[String], open: usize) -> Resolution<usize> {
         }
     }
     Err(ResolutionFailure::Unsupported)
-}
-
-fn cics_value(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsValue> {
-    if let [value] = tokens
-        && value.len() >= 2
-        && value.starts_with(['\'', '"'])
-        && value.as_bytes().first() == value.as_bytes().last()
-    {
-        return Ok(HirCicsValue::Literal(value[1..value.len() - 1].into()));
-    }
-    if matches!(tokens, [value] if numeric_literal(value).is_some()) {
-        return Err(ResolutionFailure::Unsupported);
-    }
-    complete_data_reference(tokens, semantic).map(HirCicsValue::Data)
-}
-
-fn complete_data_reference(
-    tokens: &[String],
-    semantic: &SemanticModel,
-) -> Resolution<HirDataReference> {
-    let (reference, end) = data_reference_at(tokens, 0, semantic)?;
-    if end == tokens.len() {
-        Ok(reference)
-    } else {
-        Err(ResolutionFailure::Unsupported)
-    }
-}
-
-fn output(outputs: &[HirCicsOutputBinding], name: HirCicsOutputName) -> Option<&HirDataReference> {
-    outputs
-        .iter()
-        .find(|output| output.name == name)
-        .map(|output| &output.target)
 }
 
 pub(super) fn has_multiple_arithmetic_receivers(statement: &HirStatement) -> bool {
@@ -1193,6 +1015,7 @@ fn arithmetic_receiver_count(tokens: &[String]) -> usize {
 mod tests {
     use super::*;
     use crate::CobolCompiler;
+    use mainframe_env_ir::CicsApplicationHandlerReadiness;
     use mainframe_env_source::{
         LogicalPath, SourceBundle, SourceEncoding, SourceFile, SourceFormat, SourceLimits,
     };
@@ -1857,6 +1680,32 @@ mod tests {
     }
 
     #[test]
+    fn cics_enqueue_commands_resolve_resource_length_cvda_and_flags() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSENQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 LOCK-NAME PIC X(9) VALUE 'EMPLOYEE1'. 01 LOCK-LENGTH PIC S9(4) COMP VALUE 9. 01 LIFE PIC S9(9) COMP VALUE 246. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS ENQ RESOURCE(LOCK-NAME) LENGTH(LOCK-LENGTH) MAXLIFETIME(LIFE) NOSUSPEND RESP(RESP-X) RESP2(RESP2-X) END-EXEC. EXEC CICS DEQ RESOURCE(LOCK-NAME) LENGTH(9) UOW END-EXEC. STOP RUN.";
+        let hir = analyze(source).hir.expect("typed enqueue HIR");
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 2);
+        assert_eq!(commands[0].operation, HirCicsOperation::Enq);
+        assert!(commands[0].options.contains(&HirCicsOption::NoSuspend));
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::MaxLifetime
+                && matches!(operand.value, HirCicsValue::Data(_))
+        }));
+        assert_eq!(commands[1].operation, HirCicsOperation::Deq);
+        assert!(commands[1].options.contains(&HirCicsOption::Uow));
+        assert!(commands[1].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length && operand.value == HirCicsValue::Integer(9)
+        }));
+    }
+
+    #[test]
     fn cics_resp_binding_wins_over_an_explicit_nohandle_flag() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSRESP. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(4). 01 KEY-X PIC X(3) VALUE '003'. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) NOHANDLE RESP(RESP-X) END-EXEC. STOP RUN.";
         let hir = analyze(source).hir.expect("typed CICS RESP policy HIR");
@@ -2161,20 +2010,15 @@ mod tests {
 
     #[test]
     fn catalog_known_unready_cics_command_fails_before_legacy_lowering() {
-        for (command, label) in [
-            ("ADDRESS SET(PTR-X)", "ADDRESS SET"),
-            ("ENQ RESOURCE('LOCK') MAXLIFETIME('UOW') NOSUSPEND", "ENQ"),
-        ] {
-            let source = format!(
-                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSWAIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
-            );
-            let analysis = analyze(&source);
-            assert!(analysis.hir.is_none());
-            assert!(analysis.diagnostics.iter().any(|diagnostic| {
-                let message = diagnostic.public_message();
-                message.contains(label) && message.contains("handler is unready")
-            }));
-        }
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSWAIT. DATA DIVISION. \
+            WORKING-STORAGE SECTION. 01 PTR-X PIC X(8). PROCEDURE DIVISION. \
+            EXEC CICS ADDRESS SET(PTR-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        assert!(analysis.hir.is_none());
+        assert!(analysis.diagnostics.iter().any(|diagnostic| {
+            let message = diagnostic.public_message();
+            message.contains("ADDRESS SET") && message.contains("handler is unready")
+        }));
     }
 
     #[test]
@@ -2194,7 +2038,7 @@ mod tests {
         assert!(legacy.iter().all(|descriptor| {
             !matches!(
                 descriptor.label_tokens,
-                ["READ"] | ["REWRITE"] | ["SYNCPOINT"]
+                ["DEQ"] | ["ENQ"] | ["READ"] | ["REWRITE"] | ["SYNCPOINT"]
             )
         }));
     }

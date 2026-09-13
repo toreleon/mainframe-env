@@ -43,6 +43,10 @@ impl Default for CicsPlanLimits {
 /// CICS operation selected by the frontend.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsPlanOperation {
+    /// Release one task-owned enqueue.
+    Deq,
+    /// Acquire one task-owned enqueue.
+    Enq,
     /// Read one file record.
     Read,
     /// Rewrite the record held by the current update context.
@@ -71,6 +75,12 @@ pub enum CicsOperandName {
     From,
     /// `RIDFLD(...)` record identifier.
     Ridfld,
+    /// `RESOURCE(...)` enqueue identity.
+    Resource,
+    /// `LENGTH(...)` content-identity length.
+    Length,
+    /// `MAXLIFETIME(...)` dynamic CVDA value.
+    MaxLifetime,
 }
 
 /// Literal bytes or a runtime read from resolved storage.
@@ -80,6 +90,8 @@ pub enum CicsOperandValue {
     Literal(Vec<u8>),
     /// Runtime bytes from a resolved storage slot.
     Storage(CicsStorageSlot),
+    /// Exact signed integer value resolved by the frontend.
+    Integer(i64),
 }
 
 /// One typed named input operand.
@@ -100,6 +112,12 @@ pub enum CicsPlanOption {
     Rollback,
     /// Suppress default condition handling.
     NoHandle,
+    /// Keep an enqueue until task termination.
+    Task,
+    /// Keep an enqueue until the current unit of work ends.
+    Uow,
+    /// Return `ENQBUSY` rather than suspending for a contended resource.
+    NoSuspend,
 }
 
 /// Named result binding written after the host result arrives.
@@ -178,6 +196,10 @@ pub fn encode_cics_effect_plan(
                 writer.byte(1)?;
                 encode_slot(&mut writer, slot, limits)?;
             }
+            CicsOperandValue::Integer(value) => {
+                writer.byte(2)?;
+                writer.i64(*value)?;
+            }
         }
     }
 
@@ -234,6 +256,7 @@ pub fn decode_cics_effect_plan(
                 CicsOperandValue::Literal(bytes)
             }
             1 => CicsOperandValue::Storage(decode_slot(&mut reader, limits)?),
+            2 => CicsOperandValue::Integer(reader.i64()?),
             _ => return Err(CicsPlanCodecProblem::Malformed),
         };
         operands.push(CicsNamedOperand { name, value });
@@ -306,6 +329,31 @@ fn validate_plan(
                 }
             }
             CicsOperandValue::Storage(slot) => validate_slot(slot, limits)?,
+            CicsOperandValue::Integer(_) => {}
+        }
+    }
+    if matches!(
+        plan.operation,
+        CicsPlanOperation::Deq | CicsPlanOperation::Enq
+    ) {
+        let resource = plan
+            .operands
+            .iter()
+            .find(|operand| operand.name == CicsOperandName::Resource)
+            .ok_or(CicsPlanCodecProblem::Malformed)?;
+        let content_mode = plan
+            .operands
+            .iter()
+            .any(|operand| operand.name == CicsOperandName::Length);
+        if (!content_mode && !matches!(resource.value, CicsOperandValue::Storage(_)))
+            || plan.operands.iter().any(|operand| {
+                matches!(
+                    operand.name,
+                    CicsOperandName::Length | CicsOperandName::MaxLifetime
+                ) && matches!(operand.value, CicsOperandValue::Literal(_))
+            })
+        {
+            return Err(CicsPlanCodecProblem::Malformed);
         }
     }
     let mut output_names = BTreeSet::new();
@@ -326,13 +374,36 @@ fn validate_operation_shape(
 ) -> Result<(), CicsPlanCodecProblem> {
     let resources = usize::from(inputs.contains(&CicsOperandName::File))
         + usize::from(inputs.contains(&CicsOperandName::Dataset));
+    let enqueue_lifetimes = usize::from(inputs.contains(&CicsOperandName::MaxLifetime))
+        + usize::from(plan.options.contains(&CicsPlanOption::Task))
+        + usize::from(plan.options.contains(&CicsPlanOption::Uow));
+    let enqueue_inputs = [
+        CicsOperandName::Resource,
+        CicsOperandName::Length,
+        CicsOperandName::MaxLifetime,
+    ]
+    .into_iter()
+    .collect::<BTreeSet<_>>();
     let malformed = match plan.operation {
+        CicsPlanOperation::Deq | CicsPlanOperation::Enq => {
+            !inputs.contains(&CicsOperandName::Resource)
+                || !inputs.is_subset(&enqueue_inputs)
+                || enqueue_lifetimes > 1
+                || plan.options.contains(&CicsPlanOption::Update)
+                || plan.options.contains(&CicsPlanOption::Rollback)
+                || (plan.operation == CicsPlanOperation::Deq
+                    && plan.options.contains(&CicsPlanOption::NoSuspend))
+                || outputs.contains(&CicsOutputName::Into)
+        }
         CicsPlanOperation::Read => {
             resources != 1
                 || !inputs.contains(&CicsOperandName::Ridfld)
                 || inputs.contains(&CicsOperandName::From)
                 || !outputs.contains(&CicsOutputName::Into)
                 || plan.options.contains(&CicsPlanOption::Rollback)
+                || plan.options.contains(&CicsPlanOption::Task)
+                || plan.options.contains(&CicsPlanOption::Uow)
+                || plan.options.contains(&CicsPlanOption::NoSuspend)
         }
         CicsPlanOperation::Rewrite => {
             resources != 1
@@ -340,11 +411,17 @@ fn validate_operation_shape(
                 || inputs.contains(&CicsOperandName::Ridfld)
                 || plan.options.contains(&CicsPlanOption::Update)
                 || plan.options.contains(&CicsPlanOption::Rollback)
+                || plan.options.contains(&CicsPlanOption::Task)
+                || plan.options.contains(&CicsPlanOption::Uow)
+                || plan.options.contains(&CicsPlanOption::NoSuspend)
                 || outputs.contains(&CicsOutputName::Into)
         }
         CicsPlanOperation::Syncpoint => {
             !inputs.is_empty()
                 || plan.options.contains(&CicsPlanOption::Update)
+                || plan.options.contains(&CicsPlanOption::Task)
+                || plan.options.contains(&CicsPlanOption::Uow)
+                || plan.options.contains(&CicsPlanOption::NoSuspend)
                 || outputs.contains(&CicsOutputName::Into)
         }
     };
@@ -504,6 +581,8 @@ const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::Read => 0,
         CicsPlanOperation::Rewrite => 1,
         CicsPlanOperation::Syncpoint => 2,
+        CicsPlanOperation::Deq => 3,
+        CicsPlanOperation::Enq => 4,
     }
 }
 
@@ -512,6 +591,8 @@ fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPlanCodecProbl
         0 => Ok(CicsPlanOperation::Read),
         1 => Ok(CicsPlanOperation::Rewrite),
         2 => Ok(CicsPlanOperation::Syncpoint),
+        3 => Ok(CicsPlanOperation::Deq),
+        4 => Ok(CicsPlanOperation::Enq),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -522,6 +603,9 @@ const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::Dataset => 1,
         CicsOperandName::From => 2,
         CicsOperandName::Ridfld => 3,
+        CicsOperandName::Resource => 4,
+        CicsOperandName::Length => 5,
+        CicsOperandName::MaxLifetime => 6,
     }
 }
 
@@ -531,6 +615,9 @@ fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCodecProblem> 
         1 => Ok(CicsOperandName::Dataset),
         2 => Ok(CicsOperandName::From),
         3 => Ok(CicsOperandName::Ridfld),
+        4 => Ok(CicsOperandName::Resource),
+        5 => Ok(CicsOperandName::Length),
+        6 => Ok(CicsOperandName::MaxLifetime),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -540,6 +627,9 @@ const fn option_tag(value: CicsPlanOption) -> u8 {
         CicsPlanOption::Update => 0,
         CicsPlanOption::Rollback => 1,
         CicsPlanOption::NoHandle => 2,
+        CicsPlanOption::Task => 3,
+        CicsPlanOption::Uow => 4,
+        CicsPlanOption::NoSuspend => 5,
     }
 }
 
@@ -548,6 +638,9 @@ fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodecProblem> {
         0 => Ok(CicsPlanOption::Update),
         1 => Ok(CicsPlanOption::Rollback),
         2 => Ok(CicsPlanOption::NoHandle),
+        3 => Ok(CicsPlanOption::Task),
+        4 => Ok(CicsPlanOption::Uow),
+        5 => Ok(CicsPlanOption::NoSuspend),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -591,6 +684,9 @@ impl Writer {
         self.extend(&value.to_be_bytes())
     }
     fn u32(&mut self, value: u32) -> Result<(), CicsPlanCodecProblem> {
+        self.extend(&value.to_be_bytes())
+    }
+    fn i64(&mut self, value: i64) -> Result<(), CicsPlanCodecProblem> {
         self.extend(&value.to_be_bytes())
     }
     fn count(&mut self, value: usize) -> Result<(), CicsPlanCodecProblem> {
@@ -661,6 +757,13 @@ impl<'a> Reader<'a> {
     fn u32(&mut self) -> Result<u32, CicsPlanCodecProblem> {
         Ok(u32::from_be_bytes(
             self.take(4)?
+                .try_into()
+                .map_err(|_| CicsPlanCodecProblem::Truncated)?,
+        ))
+    }
+    fn i64(&mut self) -> Result<i64, CicsPlanCodecProblem> {
+        Ok(i64::from_be_bytes(
+            self.take(8)?
                 .try_into()
                 .map_err(|_| CicsPlanCodecProblem::Truncated)?,
         ))
@@ -815,6 +918,44 @@ mod tests {
             decoded.operands[1].value,
             CicsOperandValue::Literal(ref bytes) if bytes == b"003"
         ));
+    }
+
+    #[test]
+    fn enqueue_plans_round_trip_integer_lengths_and_lifetime_exclusion() {
+        let enq = CicsEffectPlan {
+            operation: CicsPlanOperation::Enq,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::Resource,
+                    value: CicsOperandValue::Storage(slot(1, "REQUEST.LOCK-NAME")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Length,
+                    value: CicsOperandValue::Integer(9),
+                },
+            ],
+            options: BTreeSet::from([CicsPlanOption::Uow, CicsPlanOption::NoSuspend]),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let bytes = encode_cics_effect_plan(&enq, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&bytes, CicsPlanLimits::default()).unwrap(),
+            enq
+        );
+
+        let mut conflicting = enq.clone();
+        conflicting.options.insert(CicsPlanOption::Task);
+        assert_eq!(
+            encode_cics_effect_plan(&conflicting, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut invalid_deq = enq;
+        invalid_deq.operation = CicsPlanOperation::Deq;
+        assert_eq!(
+            encode_cics_effect_plan(&invalid_deq, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
     }
 
     #[test]

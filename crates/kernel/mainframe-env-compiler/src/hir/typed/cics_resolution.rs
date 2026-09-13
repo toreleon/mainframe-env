@@ -1,6 +1,11 @@
 //! Catalog-bound recognition of top-level EXEC CICS command clauses.
 
-use super::{Resolution, ResolutionFailure};
+use super::{
+    HirCicsConditionPolicy, HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation,
+    HirCicsOption, HirCicsOutputBinding, HirCicsOutputName, HirCicsStatement, HirCicsValue,
+    HirDataReference, Resolution, ResolutionFailure, data_reference_at, numeric_literal,
+    require_numeric, require_writable,
+};
 use crate::SemanticModel;
 use mainframe_env_ir::{
     CICS_APPLICATION_CONDITION_NAMES, CicsApplicationCobolApplicability,
@@ -682,4 +687,253 @@ fn matching_close(tokens: &[String], open: usize) -> Resolution<usize> {
     Err(ResolutionFailure::Invalid(
         "CICS clause parentheses are malformed".into(),
     ))
+}
+
+pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsStatement> {
+    let mut body = tokens;
+    if body
+        .first()
+        .is_some_and(|token| token.eq_ignore_ascii_case("CICS"))
+    {
+        body = &body[1..];
+    }
+    if body
+        .last()
+        .is_some_and(|token| token.eq_ignore_ascii_case("END-EXEC"))
+    {
+        body = &body[..body.len() - 1];
+    }
+    if validated_legacy_spi_compatibility(body)?.is_some() {
+        return Err(ResolutionFailure::Unsupported);
+    }
+    let (descriptor, clauses, raw_options) = validated_command(body, semantic)?;
+    match descriptor.readiness {
+        CicsApplicationHandlerReadiness::TypedRuntime => {}
+        CicsApplicationHandlerReadiness::LegacyCompatibility => {
+            return Err(ResolutionFailure::Unsupported);
+        }
+        CicsApplicationHandlerReadiness::Unready => {
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS application command {} is catalog-known but its handler is unready",
+                descriptor.label_tokens.join(" ")
+            )));
+        }
+    }
+    let operation = match descriptor.label_tokens {
+        ["DEQ"] => HirCicsOperation::Deq,
+        ["ENQ"] => HirCicsOperation::Enq,
+        ["READ"] => HirCicsOperation::Read,
+        ["REWRITE"] => HirCicsOperation::Rewrite,
+        ["SYNCPOINT"] => HirCicsOperation::Syncpoint,
+        _ => return Err(ResolutionFailure::Unsupported),
+    };
+    let allowed_clauses: &[&str] = match operation {
+        HirCicsOperation::Deq | HirCicsOperation::Enq => {
+            &["RESOURCE", "LENGTH", "MAXLIFETIME", "RESP", "RESP2"]
+        }
+        HirCicsOperation::Read => &["FILE", "DATASET", "RIDFLD", "INTO", "RESP", "RESP2"],
+        HirCicsOperation::Rewrite => &["FILE", "DATASET", "FROM", "RESP", "RESP2"],
+        HirCicsOperation::Syncpoint => &["RESP", "RESP2"],
+    };
+    let allowed_options: &[&str] = match operation {
+        HirCicsOperation::Deq => &["UOW", "TASK", "NOHANDLE"],
+        HirCicsOperation::Enq => &["UOW", "TASK", "NOSUSPEND", "NOHANDLE"],
+        HirCicsOperation::Read => &["UPDATE", "NOHANDLE"],
+        HirCicsOperation::Rewrite => &["NOHANDLE"],
+        HirCicsOperation::Syncpoint => &["ROLLBACK", "NOHANDLE"],
+    };
+    let unready_clauses = clauses
+        .keys()
+        .filter(|name| !allowed_clauses.contains(&name.as_str()))
+        .cloned()
+        .collect::<Vec<_>>();
+    let unready_options = raw_options
+        .iter()
+        .filter(|name| !allowed_options.contains(&name.as_str()))
+        .cloned()
+        .collect::<Vec<_>>();
+    if !unready_clauses.is_empty() || !unready_options.is_empty() {
+        let names = unready_clauses
+            .into_iter()
+            .chain(unready_options)
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(ResolutionFailure::Invalid(format!(
+            "CICS {} is catalog-known but typed lowering is unready for {names}",
+            descriptor.label_tokens.join(" ")
+        )));
+    }
+    let resources =
+        usize::from(clauses.contains_key("FILE")) + usize::from(clauses.contains_key("DATASET"));
+    if matches!(
+        operation,
+        HirCicsOperation::Read | HirCicsOperation::Rewrite
+    ) && resources != 1
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS file command requires exactly one FILE or DATASET".into(),
+        ));
+    }
+    for required in match operation {
+        HirCicsOperation::Deq | HirCicsOperation::Enq => &["RESOURCE"][..],
+        HirCicsOperation::Read => &["RIDFLD", "INTO"][..],
+        HirCicsOperation::Rewrite => &["FROM"][..],
+        HirCicsOperation::Syncpoint => &[][..],
+    } {
+        if !clauses.contains_key(*required) {
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS {operation:?} requires {required}"
+            )));
+        }
+    }
+    let mut operands = Vec::new();
+    for (name, identity) in [
+        ("FILE", HirCicsOperandName::File),
+        ("DATASET", HirCicsOperandName::Dataset),
+        ("FROM", HirCicsOperandName::From),
+        ("RIDFLD", HirCicsOperandName::Ridfld),
+    ] {
+        if let Some(value) = clauses.get(name) {
+            operands.push(HirCicsNamedOperand {
+                name: identity,
+                value: cics_value(value, semantic)?,
+            });
+        }
+    }
+    if matches!(operation, HirCicsOperation::Deq | HirCicsOperation::Enq) {
+        let resource = complete_data_reference(&clauses["RESOURCE"], semantic)?;
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::Resource,
+            value: HirCicsValue::Data(resource),
+        });
+        if let Some(value) = clauses.get("LENGTH") {
+            operands.push(HirCicsNamedOperand {
+                name: HirCicsOperandName::Length,
+                value: cics_integer_value(value, semantic)?,
+            });
+        }
+        if let Some(value) = clauses.get("MAXLIFETIME") {
+            operands.push(HirCicsNamedOperand {
+                name: HirCicsOperandName::MaxLifetime,
+                value: cics_cvda_value(value, semantic)?,
+            });
+        }
+    }
+    let mut outputs = Vec::new();
+    for (name, identity) in [
+        ("INTO", HirCicsOutputName::Into),
+        ("RESP", HirCicsOutputName::Resp),
+        ("RESP2", HirCicsOutputName::Resp2),
+    ] {
+        if let Some(value) = clauses.get(name) {
+            let target = complete_data_reference(value, semantic)?;
+            require_writable(&target)?;
+            if matches!(identity, HirCicsOutputName::Resp | HirCicsOutputName::Resp2) {
+                require_numeric(&target)?;
+            }
+            outputs.push(HirCicsOutputBinding {
+                name: identity,
+                target,
+            });
+        }
+    }
+    let mut options = raw_options
+        .iter()
+        .map(|option| match option.as_str() {
+            "UPDATE" => HirCicsOption::Update,
+            "ROLLBACK" => HirCicsOption::Rollback,
+            "NOHANDLE" => HirCicsOption::NoHandle,
+            "TASK" => HirCicsOption::Task,
+            "UOW" => HirCicsOption::Uow,
+            "NOSUSPEND" => HirCicsOption::NoSuspend,
+            _ => unreachable!("allowed CICS option"),
+        })
+        .collect::<BTreeSet<_>>();
+    let response = output(&outputs, HirCicsOutputName::Resp).cloned();
+    let response2 = output(&outputs, HirCicsOutputName::Resp2).cloned();
+    if response.is_none() && response2.is_some() {
+        return Err(ResolutionFailure::Invalid(
+            "CICS RESP2 requires RESP".into(),
+        ));
+    }
+    let no_handle = options.contains(&HirCicsOption::NoHandle);
+    let condition_policy = if let Some(response) = response {
+        // RESP implies NOHANDLE while retaining the response-area update.
+        options.remove(&HirCicsOption::NoHandle);
+        HirCicsConditionPolicy::Respond {
+            response,
+            response2,
+        }
+    } else if no_handle {
+        HirCicsConditionPolicy::NoHandle
+    } else {
+        HirCicsConditionPolicy::Default
+    };
+    Ok(HirCicsStatement {
+        operation,
+        operands,
+        options,
+        outputs,
+        condition_policy,
+    })
+}
+
+fn cics_value(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsValue> {
+    if let [value] = tokens
+        && value.len() >= 2
+        && value.starts_with(['\'', '"'])
+        && value.as_bytes().first() == value.as_bytes().last()
+    {
+        return Ok(HirCicsValue::Literal(value[1..value.len() - 1].into()));
+    }
+    if matches!(tokens, [value] if numeric_literal(value).is_some()) {
+        return Err(ResolutionFailure::Unsupported);
+    }
+    complete_data_reference(tokens, semantic).map(HirCicsValue::Data)
+}
+
+fn cics_integer_value(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsValue> {
+    if let [value] = tokens
+        && let Ok(value) = value.parse::<i64>()
+    {
+        return Ok(HirCicsValue::Integer(value));
+    }
+    let reference = complete_data_reference(tokens, semantic)?;
+    require_numeric(&reference)?;
+    Ok(HirCicsValue::Data(reference))
+}
+
+fn cics_cvda_value(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsValue> {
+    if let [function, open, value, close] = tokens
+        && function.eq_ignore_ascii_case("DFHVALUE")
+        && open == "("
+        && close == ")"
+        && matches!(value.as_str(), "TASK" | "UOW" | "LUW")
+    {
+        return Ok(HirCicsValue::Integer(match value.as_str() {
+            "TASK" => 233,
+            "UOW" | "LUW" => 246,
+            _ => unreachable!(),
+        }));
+    }
+    cics_integer_value(tokens, semantic)
+}
+
+fn complete_data_reference(
+    tokens: &[String],
+    semantic: &SemanticModel,
+) -> Resolution<HirDataReference> {
+    let (reference, end) = data_reference_at(tokens, 0, semantic)?;
+    if end == tokens.len() {
+        Ok(reference)
+    } else {
+        Err(ResolutionFailure::Unsupported)
+    }
+}
+
+fn output(outputs: &[HirCicsOutputBinding], name: HirCicsOutputName) -> Option<&HirDataReference> {
+    outputs
+        .iter()
+        .find(|output| output.name == name)
+        .map(|output| &output.target)
 }

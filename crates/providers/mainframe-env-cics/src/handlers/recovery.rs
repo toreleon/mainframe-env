@@ -127,6 +127,7 @@ fn syncpoint(
     syncpoint_db2(service, run, outcome)?;
     syncpoint_ims(service, run, outcome)?;
     syncpoint_mq(service, run, outcome)?;
+    super::release_uow_enqueues(service, run)?;
     if outcome == CicsUnitOfWorkOutcome::RolledBack {
         rollback_run(service, run)?;
     } else {

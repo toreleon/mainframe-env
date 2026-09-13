@@ -10,8 +10,12 @@ pub(in crate::service) fn invoke(
     service: &CicsService,
     run: &mut Run,
     request: &CicsRequest,
+    retention_tick: u64,
 ) -> Result<CicsResponse, HostProblem> {
     match request.operation {
+        CicsOperation::Deq | CicsOperation::Enq => {
+            super::task_enqueue::invoke(service, run, request, retention_tick)
+        }
         CicsOperation::HandleCondition => handle_condition(service, run, request),
         CicsOperation::HandleAbend => handle_abend(service, run, request),
         CicsOperation::Assign => assign(service, run, request),
@@ -36,6 +40,7 @@ fn abend(
     run: &mut Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
+    super::release_task_enqueues(service, run)?;
     if request.arguments.contains_key("OPTION.CANCEL") {
         run.abend_handler = None;
     }
@@ -207,6 +212,7 @@ fn return_transaction(
             .map_err(mutation_problem)?;
         state.continuations.remove(&run.session);
     }
+    super::release_task_enqueues(service, run)?;
     service.response(
         run,
         CicsDisposition::Returned,

@@ -13,14 +13,15 @@ use mainframe_env_execution_api::{
     PrincipalId, RunUnitId,
 };
 use mainframe_env_host_api::{
-    AccessIntent, CapabilityDescriptor, CicsConditionPolicy, CicsDisposition, CicsOperation,
-    CicsRequest, CicsResponse, CicsUnitOfWorkOutcome, DatasetName, EffectRequest, EffectResult,
-    HostProblem, HostProvider, HostRequest, HostResult, Mutation, ResourceName, ScopedHostService,
-    SecurityDecision, SecurityRequest, SessionId, canonical_request_digest,
-    canonical_result_digest,
+    AccessIntent, CapabilityDescriptor, CicsDisposition, CicsOperation, CicsRequest, CicsResponse,
+    CicsUnitOfWorkOutcome, DatasetName, EffectRequest, EffectResult, HostProblem, HostProvider,
+    HostRequest, HostResult, Mutation, ResourceName, ScopedHostService, SecurityDecision,
+    SecurityRequest, SessionId, canonical_request_digest, canonical_result_digest,
 };
 #[cfg(test)]
-use mainframe_env_host_api::{ClockRequest, DatasetRequest, DatasetResult, ProgramRequest};
+use mainframe_env_host_api::{
+    CicsConditionPolicy, ClockRequest, DatasetRequest, DatasetResult, ProgramRequest,
+};
 use mainframe_env_store_api::{
     ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
 };
@@ -400,6 +401,7 @@ impl CicsService {
                 return Err(HostProblem::InfrastructureFailure);
             }
         }
+        handlers::validate_enqueue_store(store.as_ref(), limits)?;
         Ok(Arc::new(Self {
             host,
             store,
@@ -683,7 +685,11 @@ impl CicsService {
         let run_id = RunUnitId::new(&current.run_unit, InvocationLimits::default())
             .map_err(|_| HostProblem::InfrastructureFailure)?;
         let state = self.lock()?;
-        let run = state.runs.get(&run_id).ok_or(HostProblem::NotFound)?;
+        let run = state
+            .runs
+            .get(&run_id)
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
         if run.session != session.as_str()
             || run.invocation.principal.id() != principal
             || run.transaction != current.transaction
@@ -708,7 +714,11 @@ impl CicsService {
         let run_id = RunUnitId::new(&current.run_unit, InvocationLimits::default())
             .map_err(|_| HostProblem::InfrastructureFailure)?;
         let mut state = self.lock()?;
-        let run = state.runs.get(&run_id).ok_or(HostProblem::NotFound)?;
+        let run = state
+            .runs
+            .get(&run_id)
+            .cloned()
+            .ok_or(HostProblem::NotFound)?;
         if run.session != session.as_str() || run.invocation.principal.id() != principal {
             return Err(HostProblem::Unauthorized);
         }
@@ -726,6 +736,7 @@ impl CicsService {
                 .continuations
                 .insert(session.as_str().into(), released);
         }
+        handlers::release_task_enqueues(self, &run)?;
         state.runs.remove(&run_id);
         Ok(())
     }
@@ -766,6 +777,9 @@ impl CicsService {
             state
                 .continuations
                 .insert(session.as_str().into(), released);
+        }
+        if let Some(run) = state.runs.get(&run_id).cloned() {
+            handlers::release_task_enqueues(self, &run)?;
         }
         state.runs.remove(&run_id);
         Ok(trace)
@@ -942,6 +956,15 @@ impl CicsService {
             .is_none_or(|value| value.version != current.version)
         {
             return Err(HostProblem::IdempotencyConflict);
+        }
+        for run in state
+            .runs
+            .values()
+            .filter(|run| run.session == session.as_str())
+            .cloned()
+            .collect::<Vec<_>>()
+        {
+            handlers::release_task_enqueues(self, &run)?;
         }
         self.store
             .delete_provider_state("cics-session", session.as_str(), current.version)
@@ -1733,12 +1756,14 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 25);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 27);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
         match descriptor.family {
-            CicsCommandFamily::TaskControl => handlers::invoke_task_control(self, run, &request),
+            CicsCommandFamily::TaskControl => {
+                handlers::invoke_task_control(self, run, &request, retention_tick)
+            }
             CicsCommandFamily::Time => handlers::invoke_time(self, run, &request),
             CicsCommandFamily::ProgramControl => {
                 handlers::invoke_program_control(self, run, &request)
@@ -1752,7 +1777,7 @@ impl CicsService {
                 handlers::invoke_recovery(self, run, &request, retention_tick)
             }
         }
-        .or_else(|problem| self.condition(run, &request.condition_policy, problem))
+        .or_else(|problem| handlers::condition(self, run, &request.condition_policy, problem))
     }
 
     pub fn reconcile_unit_of_work(
@@ -1912,53 +1937,6 @@ impl CicsService {
         result.outcome
     }
 
-    fn condition(
-        &self,
-        run: &Run,
-        policy: &CicsConditionPolicy,
-        problem: HostProblem,
-    ) -> Result<CicsResponse, HostProblem> {
-        if matches!(
-            problem,
-            HostProblem::UnknownOutcome
-                | HostProblem::InfrastructureFailure
-                | HostProblem::ProviderFailure
-                | HostProblem::TimedOut
-                | HostProblem::Cancelled
-        ) {
-            return Err(problem);
-        }
-        let (name, response, response2) = condition_for(&problem);
-        match policy {
-            CicsConditionPolicy::NoHandle | CicsConditionPolicy::Respond { .. } => self.response(
-                run,
-                CicsDisposition::Complete,
-                name,
-                response,
-                response2,
-                None,
-                None,
-                Vec::new(),
-            ),
-            CicsConditionPolicy::Default => {
-                if let Some(target) = run.handlers.get(name) {
-                    self.response(
-                        run,
-                        CicsDisposition::Handler,
-                        name,
-                        response,
-                        response2,
-                        Some(target.clone()),
-                        None,
-                        Vec::new(),
-                    )
-                } else {
-                    Err(problem)
-                }
-            }
-        }
-    }
-
     #[allow(clippy::too_many_arguments)]
     fn response(
         &self,
@@ -2046,6 +2024,15 @@ impl CicsService {
             return Err(HostProblem::NotFound);
         }
         if now_tick >= current.expires_at_tick {
+            for run in state
+                .runs
+                .values()
+                .filter(|run| run.session == session.as_str())
+                .cloned()
+                .collect::<Vec<_>>()
+            {
+                handlers::release_task_enqueues(self, &run)?;
+            }
             self.store
                 .delete_provider_state("cics-session", session.as_str(), current.version)
                 .map_err(store_error)?;
@@ -2705,38 +2692,6 @@ fn nested_mutation(run: &Run, sequence: u64) -> Result<Mutation, HostProblem> {
         idempotency_key: nested_key(run, sequence)?,
         transaction: Some(run.transaction.clone()),
     })
-}
-
-fn condition_for(problem: &HostProblem) -> (&'static str, i32, i32) {
-    match problem {
-        HostProblem::NotFound => ("NOTFND", 13, 0),
-        HostProblem::Unauthorized => ("NOTAUTH", 70, 0),
-        HostProblem::ResourceExhausted => ("ERROR", 1, 101),
-        HostProblem::Condition {
-            name,
-            response,
-            response2,
-        } => (condition_name(name), *response, *response2),
-        _ => ("ERROR", 1, 0),
-    }
-}
-
-fn condition_name(name: &str) -> &'static str {
-    match name {
-        "DUPREC" => "DUPREC",
-        "INVREQ" => "INVREQ",
-        "LENGERR" => "LENGERR",
-        "ENDFILE" => "ENDFILE",
-        "PGMIDERR" => "PGMIDERR",
-        "NOTAUTH" => "NOTAUTH",
-        "NOTFND" => "NOTFND",
-        "NOTOPEN" => "NOTOPEN",
-        "IOERR" => "IOERR",
-        "LOCKED" => "LOCKED",
-        "RECORDBUSY" => "RECORDBUSY",
-        "ROLLEDBACK" => "ROLLEDBACK",
-        _ => "ERROR",
-    }
 }
 
 fn encode_undo(operations: &[DatasetUndo]) -> Result<Vec<u8>, HostProblem> {
@@ -3572,6 +3527,7 @@ fn encode_cics_effect_replay(replay: &CicsEffectReplay) -> Result<Vec<u8>, HostP
         CicsDisposition::Handler => 4,
         CicsDisposition::Returned => 5,
         CicsDisposition::Abended => 6,
+        CicsDisposition::Ignored => 7,
     });
     field(&mut out, response.condition.as_bytes())?;
     out.extend_from_slice(&response.response.to_be_bytes());
@@ -3729,6 +3685,7 @@ pub(crate) fn decode_cics_effect_replay(
         4 => CicsDisposition::Handler,
         5 => CicsDisposition::Returned,
         6 => CicsDisposition::Abended,
+        7 => CicsDisposition::Ignored,
         _ => return Err(HostProblem::InfrastructureFailure),
     };
     let condition =
@@ -3937,6 +3894,7 @@ mod tests {
     };
     use mainframe_env_store_api::{ProviderStateMutation, ProviderStateWrite};
     use std::collections::BTreeSet;
+    use std::sync::Barrier;
     use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
     struct TestCicsClock {
@@ -4470,6 +4428,33 @@ mod tests {
         .unwrap()
     }
 
+    fn enqueue_identity(value: &[u8]) -> BoundedPayload {
+        BoundedPayload::new(
+            "mainframe-env.cics.storage-identity@1",
+            value.to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap()
+    }
+
+    fn enqueue_value(value: &[u8]) -> BoundedPayload {
+        BoundedPayload::new(
+            "mainframe-env.cics.storage-value@1",
+            value.to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap()
+    }
+
+    fn cics_decimal(value: i64) -> BoundedPayload {
+        BoundedPayload::new(
+            "mainframe-env.cics.decimal@1",
+            value.to_string().into_bytes(),
+            InvocationLimits::default(),
+        )
+        .unwrap()
+    }
+
     fn request(
         operation: CicsOperation,
         arguments: BTreeMap<String, BoundedPayload>,
@@ -4576,7 +4561,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 25);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 27);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -5182,6 +5167,777 @@ mod tests {
                 .disposition,
             CicsDisposition::Abended
         );
+    }
+
+    #[test]
+    fn enqueue_nesting_contention_conditions_and_syncpoint_release_are_durable() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let (first, _) = registered(&service);
+        let second = invocation_for("enqueue-second", BTreeMap::new());
+        let second_session = SessionId::new("enqueue-second", 64).unwrap();
+        service.create_session(&second_session, 24, 80).unwrap();
+        service
+            .register_run(second.clone(), &second_session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let third = invocation_for("enqueue-third", BTreeMap::new());
+        let third_session = SessionId::new("enqueue-third", 64).unwrap();
+        service.create_session(&third_session, 24, 80).unwrap();
+        service
+            .register_run(third.clone(), &third_session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+
+        let address = b"artifact:1:LOCK-NAME";
+        for sequence in [70, 71] {
+            let enq = request(
+                CicsOperation::Enq,
+                BTreeMap::from([("RESOURCE".into(), enqueue_identity(address))]),
+                sequence,
+            );
+            assert_eq!(
+                service
+                    .invoke(&effect(&first.run_unit_id, enq.clone(), sequence), enq)
+                    .unwrap()
+                    .condition,
+                "NORMAL"
+            );
+        }
+
+        let waiting = request(
+            CicsOperation::Enq,
+            BTreeMap::from([("RESOURCE".into(), enqueue_identity(address))]),
+            72,
+        );
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&second.run_unit_id, waiting.clone(), 72),
+                    waiting.clone(),
+                )
+                .unwrap()
+                .disposition,
+            CicsDisposition::Suspended
+        );
+
+        let deq = request(
+            CicsOperation::Deq,
+            BTreeMap::from([("RESOURCE".into(), enqueue_identity(address))]),
+            73,
+        );
+        service
+            .invoke(&effect(&first.run_unit_id, deq.clone(), 73), deq)
+            .unwrap();
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&second.run_unit_id, waiting.clone(), 72),
+                    waiting.clone(),
+                )
+                .unwrap()
+                .disposition,
+            CicsDisposition::Suspended
+        );
+        let deq = request(
+            CicsOperation::Deq,
+            BTreeMap::from([("RESOURCE".into(), enqueue_identity(address))]),
+            74,
+        );
+        service
+            .invoke(&effect(&first.run_unit_id, deq.clone(), 74), deq)
+            .unwrap();
+        let resumed = request(
+            CicsOperation::Enq,
+            BTreeMap::from([("RESOURCE".into(), enqueue_identity(address))]),
+            75,
+        );
+        assert_eq!(
+            service
+                .invoke(&effect(&second.run_unit_id, resumed.clone(), 75), resumed)
+                .unwrap()
+                .disposition,
+            CicsDisposition::Complete
+        );
+
+        let busy = request(
+            CicsOperation::Enq,
+            BTreeMap::from([
+                ("RESOURCE".into(), enqueue_identity(address)),
+                ("OPTION.NOSUSPEND".into(), argument(b"")),
+            ]),
+            76,
+        );
+        let ignored = service
+            .invoke(&effect(&third.run_unit_id, busy.clone(), 76), busy)
+            .unwrap();
+        assert_eq!(
+            (
+                ignored.disposition,
+                ignored.condition.as_str(),
+                ignored.response
+            ),
+            (CicsDisposition::Ignored, "ENQBUSY", 55)
+        );
+
+        let syncpoint = request(CicsOperation::Syncpoint, BTreeMap::new(), 77);
+        service
+            .invoke(
+                &effect(&second.run_unit_id, syncpoint.clone(), 77),
+                syncpoint,
+            )
+            .unwrap();
+        let enq = request(
+            CicsOperation::Enq,
+            BTreeMap::from([("RESOURCE".into(), enqueue_identity(address))]),
+            78,
+        );
+        assert_eq!(
+            service
+                .invoke(&effect(&third.run_unit_id, enq.clone(), 78), enq)
+                .unwrap()
+                .disposition,
+            CicsDisposition::Complete
+        );
+
+        for (sequence, arguments, expected) in [
+            (
+                79,
+                BTreeMap::from([
+                    ("RESOURCE".into(), enqueue_value(b"LOCK")),
+                    ("LENGTH".into(), cics_decimal(0)),
+                ]),
+                ("LENGERR", 22, 1),
+            ),
+            (
+                80,
+                BTreeMap::from([
+                    ("RESOURCE".into(), enqueue_identity(b"OTHER")),
+                    ("MAXLIFETIME".into(), cics_decimal(7)),
+                ]),
+                ("INVREQ", 16, 2),
+            ),
+        ] {
+            let mut invalid = request(CicsOperation::Enq, arguments, sequence);
+            invalid.condition_policy = CicsConditionPolicy::Respond {
+                response_field: "RESP-X".into(),
+                response2_field: Some("RESP2-X".into()),
+            };
+            let response = service
+                .invoke(
+                    &effect(&third.run_unit_id, invalid.clone(), sequence),
+                    invalid,
+                )
+                .unwrap();
+            assert_eq!(
+                (
+                    response.condition.as_str(),
+                    response.response,
+                    response.response2
+                ),
+                expected
+            );
+        }
+
+        for (sequence, operation, arguments) in [
+            (
+                81,
+                CicsOperation::Deq,
+                BTreeMap::from([
+                    ("RESOURCE".into(), enqueue_identity(address)),
+                    ("OPTION.NOSUSPEND".into(), argument(b"")),
+                ]),
+            ),
+            (
+                82,
+                CicsOperation::Enq,
+                BTreeMap::from([
+                    ("RESOURCE".into(), enqueue_identity(address)),
+                    ("OPTION.TASK".into(), argument(b"valued")),
+                ]),
+            ),
+            (
+                83,
+                CicsOperation::Enq,
+                BTreeMap::from([
+                    ("RESOURCE".into(), enqueue_identity(address)),
+                    ("LENGTH".into(), argument(b"4")),
+                ]),
+            ),
+        ] {
+            let invalid = request(operation, arguments, sequence);
+            assert_eq!(
+                service.invoke(
+                    &effect(&third.run_unit_id, invalid.clone(), sequence),
+                    invalid,
+                ),
+                Err(HostProblem::Malformed)
+            );
+        }
+    }
+
+    #[test]
+    fn enqueue_waiters_are_fifo_replay_bound_and_handler_policy_is_exact() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let (first, _) = registered(&service);
+        let second = invocation_for("enqueue-fifo-second", BTreeMap::new());
+        let second_session = SessionId::new("enqueue-fifo-second", 64).unwrap();
+        service.create_session(&second_session, 24, 80).unwrap();
+        service
+            .register_run(second.clone(), &second_session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let third = invocation_for("enqueue-fifo-third", BTreeMap::new());
+        let third_session = SessionId::new("enqueue-fifo-third", 64).unwrap();
+        service.create_session(&third_session, 24, 80).unwrap();
+        service
+            .register_run(third.clone(), &third_session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let address = b"fifo-resource";
+        let enqueue = |sequence| {
+            request(
+                CicsOperation::Enq,
+                BTreeMap::from([("RESOURCE".into(), enqueue_identity(address))]),
+                sequence,
+            )
+        };
+        let dequeue = |sequence| {
+            request(
+                CicsOperation::Deq,
+                BTreeMap::from([("RESOURCE".into(), enqueue_identity(address))]),
+                sequence,
+            )
+        };
+
+        let acquire = enqueue(100);
+        assert_eq!(
+            service
+                .invoke(&effect(&first.run_unit_id, acquire.clone(), 100), acquire)
+                .unwrap()
+                .disposition,
+            CicsDisposition::Complete
+        );
+        for (invocation, sequence) in [(&second, 101), (&third, 102)] {
+            let waiting = enqueue(sequence);
+            assert_eq!(
+                service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, waiting.clone(), sequence),
+                        waiting,
+                    )
+                    .unwrap()
+                    .disposition,
+                CicsDisposition::Suspended
+            );
+        }
+        let release = dequeue(103);
+        service
+            .invoke(&effect(&first.run_unit_id, release.clone(), 103), release)
+            .unwrap();
+
+        let third_early = enqueue(104);
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&third.run_unit_id, third_early.clone(), 104),
+                    third_early,
+                )
+                .unwrap()
+                .disposition,
+            CicsDisposition::Suspended
+        );
+        let second_resume = enqueue(105);
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&second.run_unit_id, second_resume.clone(), 105),
+                    second_resume,
+                )
+                .unwrap()
+                .disposition,
+            CicsDisposition::Complete
+        );
+        let release = dequeue(106);
+        service
+            .invoke(&effect(&second.run_unit_id, release.clone(), 106), release)
+            .unwrap();
+        let third_resume = enqueue(107);
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&third.run_unit_id, third_resume.clone(), 107),
+                    third_resume,
+                )
+                .unwrap()
+                .disposition,
+            CicsDisposition::Complete
+        );
+        let syncpoint = request(CicsOperation::Syncpoint, BTreeMap::new(), 108);
+        service
+            .invoke(
+                &effect(&third.run_unit_id, syncpoint.clone(), 108),
+                syncpoint,
+            )
+            .unwrap();
+        assert!(
+            store
+                .list_provider_state("cics-enqueue-v1", 16)
+                .unwrap()
+                .is_empty()
+        );
+        let catalog = store
+            .get_provider_state("cics-enqueue-catalog-v1", "locks")
+            .unwrap()
+            .expect("enqueue catalog");
+        assert_eq!(&catalog.payload[8..], &0_u64.to_be_bytes());
+        let replay_rows = store
+            .list_provider_state("cics-effect-replay-v1", 32)
+            .unwrap();
+        assert_eq!(replay_rows.len(), 9);
+        assert!(replay_rows.iter().all(|row| {
+            crate::retention::describe_cics_replay_row(row, None, CicsLimits::default()).is_ok_and(
+                |descriptor| {
+                    descriptor.retention
+                        == crate::retention::CicsReplayRetentionState::PendingProtected
+                },
+            )
+        }));
+
+        let fourth = invocation_for("enqueue-handler-fourth", BTreeMap::new());
+        let fourth_session = SessionId::new("enqueue-handler-fourth", 64).unwrap();
+        service.create_session(&fourth_session, 24, 80).unwrap();
+        service
+            .register_run(fourth.clone(), &fourth_session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let reacquire = enqueue(109);
+        service
+            .invoke(
+                &effect(&first.run_unit_id, reacquire.clone(), 109),
+                reacquire,
+            )
+            .unwrap();
+        let handle = request(
+            CicsOperation::HandleCondition,
+            BTreeMap::from([("ENQBUSY".into(), argument(b"BUSY-LABEL"))]),
+            110,
+        );
+        service
+            .invoke(&effect(&fourth.run_unit_id, handle.clone(), 110), handle)
+            .unwrap();
+        let handled = enqueue(111);
+        let handled = service
+            .invoke(&effect(&fourth.run_unit_id, handled.clone(), 111), handled)
+            .unwrap();
+        assert_eq!(handled.disposition, CicsDisposition::Handler);
+        assert_eq!(handled.target.as_deref(), Some("BUSY-LABEL"));
+
+        let mut nohandle = enqueue(112);
+        nohandle.condition_policy = CicsConditionPolicy::NoHandle;
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&fourth.run_unit_id, nohandle.clone(), 112),
+                    nohandle,
+                )
+                .unwrap()
+                .disposition,
+            CicsDisposition::Suspended
+        );
+    }
+
+    #[test]
+    fn cancelling_one_side_of_an_enqueue_cycle_promotes_the_surviving_task() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let first = invocation_for("enqueue-cycle-first", BTreeMap::new());
+        let second = invocation_for("enqueue-cycle-second", BTreeMap::new());
+        let first_session = SessionId::new("enqueue-cycle-first", 64).unwrap();
+        let second_session = SessionId::new("enqueue-cycle-second", 64).unwrap();
+        service
+            .launch_terminal(
+                first.clone(),
+                &first_session,
+                "MENU",
+                24,
+                80,
+                "enqueue-cycle-first-csrf",
+                1,
+                100,
+            )
+            .unwrap();
+        service
+            .launch_terminal(
+                second.clone(),
+                &second_session,
+                "MENU",
+                24,
+                80,
+                "enqueue-cycle-second-csrf",
+                1,
+                100,
+            )
+            .unwrap();
+        let enqueue = |resource: &'static [u8], sequence| {
+            request(
+                CicsOperation::Enq,
+                BTreeMap::from([
+                    ("RESOURCE".into(), enqueue_value(resource)),
+                    (
+                        "LENGTH".into(),
+                        cics_decimal(i64::try_from(resource.len()).unwrap()),
+                    ),
+                    ("OPTION.TASK".into(), argument(b"")),
+                ]),
+                sequence,
+            )
+        };
+        let first_a = enqueue(b"RESOURCE-A", 200);
+        service
+            .invoke(&effect(&first.run_unit_id, first_a.clone(), 200), first_a)
+            .unwrap();
+        let second_b = enqueue(b"RESOURCE-B", 201);
+        service
+            .invoke(
+                &effect(&second.run_unit_id, second_b.clone(), 201),
+                second_b,
+            )
+            .unwrap();
+        let first_wait = enqueue(b"RESOURCE-B", 202);
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&first.run_unit_id, first_wait.clone(), 202),
+                    first_wait,
+                )
+                .unwrap()
+                .disposition,
+            CicsDisposition::Suspended
+        );
+        let second_wait = enqueue(b"RESOURCE-A", 203);
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&second.run_unit_id, second_wait.clone(), 203),
+                    second_wait,
+                )
+                .unwrap()
+                .disposition,
+            CicsDisposition::Suspended
+        );
+
+        service
+            .discard_terminal_run_if_present(&second_session, second.principal.id(), 2)
+            .unwrap();
+        let first_resume = enqueue(b"RESOURCE-B", 204);
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&first.run_unit_id, first_resume.clone(), 204),
+                    first_resume,
+                )
+                .unwrap()
+                .disposition,
+            CicsDisposition::Complete
+        );
+        service
+            .complete_terminal_run(&first_session, first.principal.id(), 2)
+            .unwrap();
+        assert!(
+            store
+                .list_provider_state("cics-enqueue-v1", 4)
+                .unwrap()
+                .is_empty()
+        );
+        let catalog = store
+            .get_provider_state("cics-enqueue-catalog-v1", "locks")
+            .unwrap()
+            .unwrap();
+        assert_eq!(&catalog.payload[8..], &0_u64.to_be_bytes());
+    }
+
+    #[test]
+    fn enqueue_lock_catalog_enforces_the_configured_resource_bound() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open(
+            authorities(),
+            store.clone(),
+            CicsLimits {
+                max_queue_records: 1,
+                ..CicsLimits::default()
+            },
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        for (sequence, resource, expected) in [
+            (210, b"A".as_slice(), Ok(())),
+            (211, b"B".as_slice(), Err(HostProblem::ResourceExhausted)),
+        ] {
+            let enqueue = request(
+                CicsOperation::Enq,
+                BTreeMap::from([
+                    ("RESOURCE".into(), enqueue_value(resource)),
+                    ("LENGTH".into(), cics_decimal(1)),
+                ]),
+                sequence,
+            );
+            assert_eq!(
+                service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, enqueue.clone(), sequence),
+                        enqueue,
+                    )
+                    .map(|_| ()),
+                expected
+            );
+        }
+        assert_eq!(
+            store
+                .list_provider_state("cics-enqueue-v1", 2)
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn enqueue_wait_and_promotion_survive_sqlite_reopen() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-enqueue-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("cics.db");
+        let url = format!("sqlite://{}?mode=rwc", path.display());
+        let first = invocation_for("sqlite-enqueue-first", BTreeMap::new());
+        let second = invocation_for("sqlite-enqueue-second", BTreeMap::new());
+        let first_session = SessionId::new("sqlite-enqueue-first", 64).unwrap();
+        let second_session = SessionId::new("sqlite-enqueue-second", 64).unwrap();
+        let address = b"sqlite-enqueue-resource";
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            for (invocation, session) in [(&first, &first_session), (&second, &second_session)] {
+                service.create_session(session, 24, 80).unwrap();
+                service
+                    .register_run(invocation.clone(), session, "MENU", "MEAPPL", "MESYS")
+                    .unwrap();
+            }
+            let acquire = request(
+                CicsOperation::Enq,
+                BTreeMap::from([("RESOURCE".into(), enqueue_identity(address))]),
+                120,
+            );
+            service
+                .invoke(&effect(&first.run_unit_id, acquire.clone(), 120), acquire)
+                .unwrap();
+            let wait = request(
+                CicsOperation::Enq,
+                BTreeMap::from([("RESOURCE".into(), enqueue_identity(address))]),
+                121,
+            );
+            assert_eq!(
+                service
+                    .invoke(&effect(&second.run_unit_id, wait.clone(), 121), wait)
+                    .unwrap()
+                    .disposition,
+                CicsDisposition::Suspended
+            );
+        }
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store.clone());
+            for (invocation, session) in [(&first, &first_session), (&second, &second_session)] {
+                service
+                    .register_run(invocation.clone(), session, "MENU", "MEAPPL", "MESYS")
+                    .unwrap();
+            }
+            let release = request(
+                CicsOperation::Deq,
+                BTreeMap::from([("RESOURCE".into(), enqueue_identity(address))]),
+                122,
+            );
+            service
+                .invoke(&effect(&first.run_unit_id, release.clone(), 122), release)
+                .unwrap();
+            let resume = request(
+                CicsOperation::Enq,
+                BTreeMap::from([("RESOURCE".into(), enqueue_identity(address))]),
+                123,
+            );
+            assert_eq!(
+                service
+                    .invoke(&effect(&second.run_unit_id, resume.clone(), 123), resume)
+                    .unwrap()
+                    .disposition,
+                CicsDisposition::Complete
+            );
+            let syncpoint = request(CicsOperation::Syncpoint, BTreeMap::new(), 124);
+            service
+                .invoke(
+                    &effect(&second.run_unit_id, syncpoint.clone(), 124),
+                    syncpoint,
+                )
+                .unwrap();
+            assert!(
+                store
+                    .list_provider_state("cics-enqueue-v1", 2)
+                    .unwrap()
+                    .is_empty()
+            );
+        }
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_dir(directory);
+    }
+
+    #[test]
+    #[ignore = "requires isolated MAINFRAME_ENV_POSTGRES_TEST_URL pointing at PostgreSQL 18"]
+    fn concurrent_enqueue_uses_one_postgres_owner_and_fifo_promotion() {
+        let url = std::env::var("MAINFRAME_ENV_POSTGRES_TEST_URL")
+            .expect("explicit PostgreSQL test URL required");
+        let suffix = std::process::id().to_string();
+        let first = invocation_for(&format!("postgres-enqueue-first-{suffix}"), BTreeMap::new());
+        let second = invocation_for(
+            &format!("postgres-enqueue-second-{suffix}"),
+            BTreeMap::new(),
+        );
+        let first_session =
+            SessionId::new(format!("postgres-enqueue-first-{suffix}"), 128).unwrap();
+        let second_session =
+            SessionId::new(format!("postgres-enqueue-second-{suffix}"), 128).unwrap();
+        let initial_store: Arc<dyn ProviderStateStore> =
+            Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let initial = service(initial_store);
+        initial.create_session(&first_session, 24, 80).unwrap();
+        initial.create_session(&second_session, 24, 80).unwrap();
+        drop(initial);
+
+        let first_store: Arc<dyn ProviderStateStore> =
+            Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let second_store: Arc<dyn ProviderStateStore> =
+            Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let first_service = service(first_store);
+        let second_service = service(second_store);
+        first_service
+            .register_run(first.clone(), &first_session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        second_service
+            .register_run(second.clone(), &second_session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+
+        let address = format!("postgres-enqueue-resource-{suffix}").into_bytes();
+        let barrier = Arc::new(Barrier::new(2));
+        let invoke = |service: Arc<CicsService>, invocation: Invocation, ordinal: u64| {
+            let address = address.clone();
+            let barrier = barrier.clone();
+            let suffix = suffix.clone();
+            std::thread::spawn(move || {
+                let mut enqueue = request(
+                    CicsOperation::Enq,
+                    BTreeMap::from([("RESOURCE".into(), enqueue_value(&address))]),
+                    ordinal,
+                );
+                enqueue.arguments.insert(
+                    "LENGTH".into(),
+                    cics_decimal(i64::try_from(address.len()).unwrap()),
+                );
+                enqueue.mutation.as_mut().unwrap().idempotency_key = IdempotencyKey::new(
+                    format!("postgres-enqueue-{suffix}-{ordinal}"),
+                    InvocationLimits::default(),
+                )
+                .unwrap();
+                barrier.wait();
+                service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, enqueue.clone(), ordinal),
+                        enqueue,
+                    )
+                    .unwrap()
+                    .disposition
+            })
+        };
+        let first_join = invoke(first_service.clone(), first.clone(), 130);
+        let second_join = invoke(second_service.clone(), second.clone(), 131);
+        let first_disposition = first_join.join().unwrap();
+        let second_disposition = second_join.join().unwrap();
+        assert_eq!(
+            [first_disposition, second_disposition]
+                .into_iter()
+                .filter(|disposition| *disposition == CicsDisposition::Complete)
+                .count(),
+            1
+        );
+        assert_eq!(
+            [first_disposition, second_disposition]
+                .into_iter()
+                .filter(|disposition| *disposition == CicsDisposition::Suspended)
+                .count(),
+            1
+        );
+
+        let (owner_service, owner, waiter_service, waiter) =
+            if first_disposition == CicsDisposition::Complete {
+                (&first_service, &first, &second_service, &second)
+            } else {
+                (&second_service, &second, &first_service, &first)
+            };
+        let mut release = request(
+            CicsOperation::Deq,
+            BTreeMap::from([
+                ("RESOURCE".into(), enqueue_value(&address)),
+                (
+                    "LENGTH".into(),
+                    cics_decimal(i64::try_from(address.len()).unwrap()),
+                ),
+            ]),
+            132,
+        );
+        release.mutation.as_mut().unwrap().idempotency_key = IdempotencyKey::new(
+            format!("postgres-enqueue-{suffix}-132"),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        owner_service
+            .invoke(&effect(&owner.run_unit_id, release.clone(), 132), release)
+            .unwrap();
+        let mut resume = request(
+            CicsOperation::Enq,
+            BTreeMap::from([
+                ("RESOURCE".into(), enqueue_value(&address)),
+                (
+                    "LENGTH".into(),
+                    cics_decimal(i64::try_from(address.len()).unwrap()),
+                ),
+            ]),
+            133,
+        );
+        resume.mutation.as_mut().unwrap().idempotency_key = IdempotencyKey::new(
+            format!("postgres-enqueue-{suffix}-133"),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            waiter_service
+                .invoke(&effect(&waiter.run_unit_id, resume.clone(), 133), resume)
+                .unwrap()
+                .disposition,
+            CicsDisposition::Complete
+        );
+        let mut syncpoint = request(CicsOperation::Syncpoint, BTreeMap::new(), 134);
+        syncpoint.mutation.as_mut().unwrap().idempotency_key = IdempotencyKey::new(
+            format!("postgres-enqueue-{suffix}-134"),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        waiter_service
+            .invoke(
+                &effect(&waiter.run_unit_id, syncpoint.clone(), 134),
+                syncpoint,
+            )
+            .unwrap();
+        let reopened: Arc<dyn ProviderStateStore> =
+            Arc::new(PostgresStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        service(reopened);
     }
 
     #[test]
