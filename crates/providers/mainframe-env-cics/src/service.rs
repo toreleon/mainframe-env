@@ -1777,7 +1777,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 30);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 31);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -4515,6 +4515,15 @@ mod tests {
         .unwrap()
     }
 
+    fn storage_target(value: &[u8]) -> BoundedPayload {
+        BoundedPayload::new(
+            "mainframe-env.cics.storage-target@1",
+            value.to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap()
+    }
+
     fn enqueue_model(
         name: &str,
         enqueue_name: &str,
@@ -4600,6 +4609,7 @@ mod tests {
     fn shared_catalog_recognizes_all_frozen_forms() {
         let cases = [
             ("ABEND", CicsOperation::Abend),
+            ("ADDRESS SET", CicsOperation::AddressSet),
             ("ASKTIME ABSTIME(ABS-TIME)", CicsOperation::Asktime),
             ("ASSIGN", CicsOperation::Assign),
             ("CHANGE TASK", CicsOperation::ChangeTask),
@@ -4643,7 +4653,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 30);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 31);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -5559,6 +5569,78 @@ mod tests {
                 service.invoke(
                     &effect(&invocation.run_unit_id, malformed.clone(), sequence),
                     malformed,
+                ),
+                Err(HostProblem::Malformed)
+            );
+        }
+    }
+
+    #[test]
+    fn address_set_accepts_only_two_checked_virtual_pointer_directions() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+        for (sequence, arguments) in [
+            (
+                327,
+                BTreeMap::from([
+                    ("SET.POINTER".into(), storage_target(b"artifact:1:PTR-X")),
+                    (
+                        "USING.ADDRESS".into(),
+                        enqueue_identity(b"artifact:2:DATA-X"),
+                    ),
+                ]),
+            ),
+            (
+                328,
+                BTreeMap::from([
+                    ("SET.ADDRESS".into(), storage_target(b"artifact:2:LINK-X")),
+                    ("USING.POINTER".into(), task_value(&[0, 0x10, 0, 0])),
+                ]),
+            ),
+        ] {
+            let request = request(CicsOperation::AddressSet, arguments, sequence);
+            assert_eq!(
+                service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, request.clone(), sequence),
+                        request,
+                    )
+                    .unwrap()
+                    .disposition,
+                CicsDisposition::Complete
+            );
+        }
+        for (sequence, arguments) in [
+            (
+                329,
+                BTreeMap::from([
+                    ("SET.POINTER".into(), storage_target(b"artifact:1:PTR-X")),
+                    ("USING.POINTER".into(), task_value(&[0, 0x10, 0, 0])),
+                ]),
+            ),
+            (
+                330,
+                BTreeMap::from([
+                    ("SET.POINTER".into(), argument(b"WRONG-SCHEMA")),
+                    (
+                        "USING.ADDRESS".into(),
+                        enqueue_identity(b"artifact:2:DATA-X"),
+                    ),
+                ]),
+            ),
+            (
+                331,
+                BTreeMap::from([
+                    ("SET.ADDRESS".into(), storage_target(b"artifact:2:LINK-X")),
+                    ("USING.POINTER".into(), task_value(&[0, 1, 2])),
+                ]),
+            ),
+        ] {
+            let request = request(CicsOperation::AddressSet, arguments, sequence);
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), sequence),
+                    request,
                 ),
                 Err(HostProblem::Malformed)
             );

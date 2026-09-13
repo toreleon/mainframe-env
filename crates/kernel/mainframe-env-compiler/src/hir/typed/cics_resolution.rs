@@ -6,7 +6,7 @@ use super::{
     HirDataReference, Resolution, ResolutionFailure, data_reference_at, numeric_literal,
     require_numeric, require_writable,
 };
-use crate::SemanticModel;
+use crate::{CobolUsage, SemanticModel};
 use mainframe_env_ir::{
     CICS_APPLICATION_CONDITION_NAMES, CicsApplicationCobolApplicability,
     CicsApplicationConditionLabelOperand, CicsApplicationConstraintStatus,
@@ -720,6 +720,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         }
     }
     let operation = match descriptor.label_tokens {
+        ["ADDRESS", "SET"] => HirCicsOperation::AddressSet,
         ["CHANGE", "TASK"] => HirCicsOperation::ChangeTask,
         ["DEQ"] => HirCicsOperation::Deq,
         ["ENQ"] => HirCicsOperation::Enq,
@@ -731,6 +732,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         _ => return Err(ResolutionFailure::Unsupported),
     };
     let allowed_clauses: &[&str] = match operation {
+        HirCicsOperation::AddressSet => &["SET", "USING", "RESP", "RESP2"],
         HirCicsOperation::ChangeTask => &["PRIORITY", "RESP", "RESP2"],
         HirCicsOperation::Deq | HirCicsOperation::Enq => {
             &["RESOURCE", "LENGTH", "MAXLIFETIME", "RESP", "RESP2"]
@@ -742,7 +744,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Suspend => &["RESP", "RESP2"],
     };
     let allowed_options: &[&str] = match operation {
-        HirCicsOperation::ChangeTask
+        HirCicsOperation::AddressSet
+        | HirCicsOperation::ChangeTask
         | HirCicsOperation::SetAssociationUserCorrData
         | HirCicsOperation::Suspend => &["NOHANDLE"],
         HirCicsOperation::Deq => &["UOW", "TASK", "NOHANDLE"],
@@ -784,6 +787,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         ));
     }
     for required in match operation {
+        HirCicsOperation::AddressSet => &["SET", "USING"][..],
         HirCicsOperation::ChangeTask | HirCicsOperation::Suspend => &[][..],
         HirCicsOperation::Deq | HirCicsOperation::Enq => &["RESOURCE"][..],
         HirCicsOperation::Read => &["RIDFLD", "INTO"][..],
@@ -798,6 +802,41 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         }
     }
     let mut operands = Vec::new();
+    if operation == HirCicsOperation::AddressSet {
+        let (set_is_address, set) = cics_address_value(&clauses["SET"], semantic)?;
+        let (using_is_address, using) = cics_address_value(&clauses["USING"], semantic)?;
+        if set_is_address == using_is_address {
+            return Err(ResolutionFailure::Invalid(
+                "CICS ADDRESS SET requires one pointer reference and one ADDRESS OF data area"
+                    .into(),
+            ));
+        }
+        require_writable(&set)?;
+        let pointer = if set_is_address { &using } else { &set };
+        if !matches!(pointer.usage, CobolUsage::Pointer | CobolUsage::Pointer32) {
+            return Err(ResolutionFailure::Invalid(
+                "CICS ADDRESS SET pointer operand must use POINTER or POINTER-32".into(),
+            ));
+        }
+        operands.extend([
+            HirCicsNamedOperand {
+                name: if set_is_address {
+                    HirCicsOperandName::SetAddress
+                } else {
+                    HirCicsOperandName::SetPointer
+                },
+                value: HirCicsValue::Data(set),
+            },
+            HirCicsNamedOperand {
+                name: if using_is_address {
+                    HirCicsOperandName::UsingAddress
+                } else {
+                    HirCicsOperandName::UsingPointer
+                },
+                value: HirCicsValue::Data(using),
+            },
+        ]);
+    }
     for (name, identity) in [
         ("FILE", HirCicsOperandName::File),
         ("DATASET", HirCicsOperandName::Dataset),
@@ -915,6 +954,20 @@ fn cics_value(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCics
         return Err(ResolutionFailure::Unsupported);
     }
     complete_data_reference(tokens, semantic).map(HirCicsValue::Data)
+}
+
+fn cics_address_value(
+    tokens: &[String],
+    semantic: &SemanticModel,
+) -> Resolution<(bool, HirDataReference)> {
+    if tokens.len() > 2
+        && tokens[0].eq_ignore_ascii_case("ADDRESS")
+        && tokens[1].eq_ignore_ascii_case("OF")
+    {
+        complete_data_reference(&tokens[2..], semantic).map(|reference| (true, reference))
+    } else {
+        complete_data_reference(tokens, semantic).map(|reference| (false, reference))
+    }
 }
 
 fn cics_integer_value(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsValue> {

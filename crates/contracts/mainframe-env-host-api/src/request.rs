@@ -2415,6 +2415,7 @@ mod tests {
     fn all_cics_runtime_operation_names_are_unique() {
         let forms = [
             CicsOperation::Abend,
+            CicsOperation::AddressSet,
             CicsOperation::Asktime,
             CicsOperation::Assign,
             CicsOperation::ChangeTask,
@@ -2445,7 +2446,7 @@ mod tests {
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-        assert_eq!(forms.len(), 30);
+        assert_eq!(forms.len(), 31);
         let names = forms
             .iter()
             .map(|operation| operation.runtime_name())

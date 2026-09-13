@@ -43,6 +43,8 @@ impl Default for CicsPlanLimits {
 /// CICS operation selected by the frontend.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsPlanOperation {
+    /// Copy one checked virtual pointer/address relationship.
+    AddressSet,
     /// Change the issuing task's dispatch priority and optionally yield.
     ChangeTask,
     /// Release one task-owned enqueue.
@@ -91,6 +93,14 @@ pub enum CicsOperandName {
     Priority,
     /// `USERCORRDATA(...)` task association value.
     UserCorrData,
+    /// `SET(ADDRESS OF data-area)` target.
+    SetAddress,
+    /// `SET(pointer-reference)` target.
+    SetPointer,
+    /// `USING(ADDRESS OF data-area)` source.
+    UsingAddress,
+    /// `USING(pointer-reference)` source.
+    UsingPointer,
 }
 
 /// Literal bytes or a runtime read from resolved storage.
@@ -407,6 +417,21 @@ fn validate_operation_shape(
         .iter()
         .any(|option| !matches!(option, CicsPlanOption::NoHandle));
     let malformed = match plan.operation {
+        CicsPlanOperation::AddressSet => {
+            let pointer_from_data = inputs.len() == 2
+                && inputs.contains(&CicsOperandName::SetPointer)
+                && inputs.contains(&CicsOperandName::UsingAddress);
+            let data_from_pointer = inputs.len() == 2
+                && inputs.contains(&CicsOperandName::SetAddress)
+                && inputs.contains(&CicsOperandName::UsingPointer);
+            (!pointer_from_data && !data_from_pointer)
+                || plan
+                    .operands
+                    .iter()
+                    .any(|operand| !matches!(operand.value, CicsOperandValue::Storage(_)))
+                || scheduling_options
+                || outputs.contains(&CicsOutputName::Into)
+        }
         CicsPlanOperation::ChangeTask => {
             !inputs.is_subset(&BTreeSet::from([CicsOperandName::Priority]))
                 || scheduling_options
@@ -621,6 +646,7 @@ const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::ChangeTask => 5,
         CicsPlanOperation::Suspend => 6,
         CicsPlanOperation::SetAssociationUserCorrData => 7,
+        CicsPlanOperation::AddressSet => 8,
     }
 }
 
@@ -634,6 +660,7 @@ fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPlanCodecProbl
         5 => Ok(CicsPlanOperation::ChangeTask),
         6 => Ok(CicsPlanOperation::Suspend),
         7 => Ok(CicsPlanOperation::SetAssociationUserCorrData),
+        8 => Ok(CicsPlanOperation::AddressSet),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -649,6 +676,10 @@ const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::MaxLifetime => 6,
         CicsOperandName::Priority => 7,
         CicsOperandName::UserCorrData => 8,
+        CicsOperandName::SetAddress => 9,
+        CicsOperandName::SetPointer => 10,
+        CicsOperandName::UsingAddress => 11,
+        CicsOperandName::UsingPointer => 12,
     }
 }
 
@@ -663,6 +694,10 @@ fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCodecProblem> 
         6 => Ok(CicsOperandName::MaxLifetime),
         7 => Ok(CicsOperandName::Priority),
         8 => Ok(CicsOperandName::UserCorrData),
+        9 => Ok(CicsOperandName::SetAddress),
+        10 => Ok(CicsOperandName::SetPointer),
+        11 => Ok(CicsOperandName::UsingAddress),
+        12 => Ok(CicsOperandName::UsingPointer),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -1058,6 +1093,41 @@ mod tests {
         missing.operands.clear();
         assert_eq!(
             encode_cics_effect_plan(&missing, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn address_set_plans_require_one_pointer_and_one_address_role() {
+        let pointer_from_data = CicsEffectPlan {
+            operation: CicsPlanOperation::AddressSet,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::SetPointer,
+                    value: CicsOperandValue::Storage(slot(1, "PTR-X")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::UsingAddress,
+                    value: CicsOperandValue::Storage(slot(2, "DATA-X")),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let encoded =
+            encode_cics_effect_plan(&pointer_from_data, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
+            pointer_from_data
+        );
+        let mut data_from_pointer = pointer_from_data.clone();
+        data_from_pointer.operands[0].name = CicsOperandName::SetAddress;
+        data_from_pointer.operands[1].name = CicsOperandName::UsingPointer;
+        assert!(encode_cics_effect_plan(&data_from_pointer, CicsPlanLimits::default()).is_ok());
+        data_from_pointer.operands[0].value = CicsOperandValue::Literal(b"PTR-X".to_vec());
+        assert_eq!(
+            encode_cics_effect_plan(&data_from_pointer, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }

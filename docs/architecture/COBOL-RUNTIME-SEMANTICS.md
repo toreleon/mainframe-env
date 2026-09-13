@@ -51,6 +51,13 @@ contract explicitly permits it.
   identities; `SET ADDRESS OF` retargets linkage views, and `FREE` invalidates
   the allocation and its aliases atomically. Heap, alias, and freed state is
   checkpointed rather than reconstructed from ambient addresses.
+- CICS `ADDRESS SET` reuses that virtual-pointer authority. Typed plans carry
+  exactly one pointer role and one `ADDRESS OF` data-area role; provider requests
+  contain opaque storage identities or virtual-pointer bytes, never native
+  addresses. The interpreter validates pointer category and linkage targets
+  before dispatch and applies the alias only after a successful audited CICS
+  response, so denial, cancellation, malformed input, and audit failure cannot
+  change storage.
 
 ## Control, conditions, calls, and effects
 

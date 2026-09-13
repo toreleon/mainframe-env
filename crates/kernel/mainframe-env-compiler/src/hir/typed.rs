@@ -146,6 +146,7 @@ pub struct HirComputeStatement {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HirCicsOperation {
+    AddressSet,
     ChangeTask,
     Deq,
     Enq,
@@ -167,6 +168,10 @@ pub enum HirCicsOperandName {
     MaxLifetime,
     Priority,
     UserCorrData,
+    SetAddress,
+    SetPointer,
+    UsingAddress,
+    UsingPointer,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1776,6 +1781,69 @@ mod tests {
     }
 
     #[test]
+    fn cics_address_set_resolves_both_virtual_pointer_directions() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSADDR. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). 01 PTR-X POINTER. LINKAGE SECTION. 01 LINK-X PIC X(8). PROCEDURE DIVISION USING LINK-X. EXEC CICS ADDRESS SET(PTR-X) USING(ADDRESS OF DATA-X) END-EXEC. EXEC CICS ADDRESS SET(ADDRESS OF LINK-X) USING(PTR-X) NOHANDLE END-EXEC. STOP RUN.";
+        let hir = analyze(source).hir.expect("typed ADDRESS SET HIR");
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 2);
+        assert!(commands.iter().all(|command| {
+            command.operation == HirCicsOperation::AddressSet && command.operands.len() == 2
+        }));
+        assert_eq!(
+            commands[0]
+                .operands
+                .iter()
+                .map(|operand| operand.name)
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                HirCicsOperandName::SetPointer,
+                HirCicsOperandName::UsingAddress,
+            ])
+        );
+        assert_eq!(
+            commands[1]
+                .operands
+                .iter()
+                .map(|operand| operand.name)
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                HirCicsOperandName::SetAddress,
+                HirCicsOperandName::UsingPointer,
+            ])
+        );
+        assert_eq!(
+            commands[1].condition_policy,
+            HirCicsConditionPolicy::NoHandle
+        );
+
+        let invalid = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADADDR. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-A POINTER. 01 PTR-B POINTER. PROCEDURE DIVISION. EXEC CICS ADDRESS SET(PTR-A) USING(PTR-B) END-EXEC. STOP RUN.",
+        );
+        assert!(invalid.hir.is_none());
+        assert!(invalid.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("requires one pointer reference and one ADDRESS OF data area")
+        }));
+        let wrong_category = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADCAT. DATA DIVISION. WORKING-STORAGE SECTION. 01 TEXT-X PIC X(4). 01 DATA-X PIC X(4). PROCEDURE DIVISION. EXEC CICS ADDRESS SET(TEXT-X) USING(ADDRESS OF DATA-X) END-EXEC. STOP RUN.",
+        );
+        assert!(wrong_category.hir.is_none());
+        assert!(wrong_category.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("pointer operand must use POINTER or POINTER-32")
+        }));
+    }
+
+    #[test]
     fn cics_resp_binding_wins_over_an_explicit_nohandle_flag() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSRESP. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(4). 01 KEY-X PIC X(3) VALUE '003'. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) NOHANDLE RESP(RESP-X) END-EXEC. STOP RUN.";
         let hir = analyze(source).hir.expect("typed CICS RESP policy HIR");
@@ -2082,12 +2150,12 @@ mod tests {
     fn catalog_known_unready_cics_command_fails_before_legacy_lowering() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSWAIT. DATA DIVISION. \
             WORKING-STORAGE SECTION. 01 PTR-X PIC X(8). PROCEDURE DIVISION. \
-            EXEC CICS ADDRESS SET(PTR-X) END-EXEC. STOP RUN.";
+            EXEC CICS ADDRESS ACEE(PTR-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);
         assert!(analysis.hir.is_none());
         assert!(analysis.diagnostics.iter().any(|diagnostic| {
             let message = diagnostic.public_message();
-            message.contains("ADDRESS SET") && message.contains("handler is unready")
+            message.contains("ADDRESS") && message.contains("handler is unready")
         }));
     }
 

@@ -61,6 +61,10 @@ All notable changes to mainframe-env are documented here.
   USERCORRDATA`. The task-owned value overwrites with IBM's silent 64-byte
   truncation, enforces originating-task and command-security checks, and uses
   replay-bound `MECS5` session rows with `MECS1`–`MECS4` read compatibility.
+- Added typed CICS `ADDRESS SET` for both documented COBOL directions. The
+  compiler distinguishes pointer references from `ADDRESS OF` data areas, the
+  provider validates only opaque storage identities, and the interpreter
+  applies checked virtual aliases after successful audited dispatch.
 - Added the frozen-with-bounded-ambiguities CIC-901 command contract and generated
   263-row compiler registry. The registry explicitly separates three typed runtime
   handlers, 20 legacy compatibility handlers, and 240 unready handlers; automatic

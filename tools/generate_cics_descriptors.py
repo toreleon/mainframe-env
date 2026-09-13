@@ -81,6 +81,7 @@ EXPECTED_FAMILIES = {
 }
 EXPECTED_RUNTIME_OPERATIONS = [
     ("Abend", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0001"),
+    ("AddressSet", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0006"),
     ("Asktime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0010"),
     ("Assign", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0011"),
     ("ChangeTask", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0022"),
@@ -339,6 +340,7 @@ POLICY_BINDINGS = {
 TYPED_RUNTIME_OPERATIONS = frozenset(
     {
         "ChangeTask",
+        "AddressSet",
         "Deq",
         "Enq",
         "Read",
@@ -365,6 +367,7 @@ COMPILER_SPI_COMPATIBILITY = {
     "resp2_requires_resp": True,
 }
 TYPED_RUNTIME_IR_EFFECTS = {
+    "AddressSet": frozenset({"memory-read", "memory-write", "condition"}),
     "ChangeTask": frozenset(
         {"memory-read", "memory-write", "suspension", "condition"}
     ),
@@ -571,6 +574,7 @@ def _load_typed_execution_registrations(
             }
         )
     if [row["operation"] for row in normalized] != [
+        "AddressSet",
         "ChangeTask",
         "Deq",
         "Enq",
@@ -866,6 +870,7 @@ def load_catalog(
             if row[0]
             not in {
                 "ChangeTask",
+                "AddressSet",
                 "Deq",
                 "Enq",
                 "SetAssociationUserCorrData",
@@ -3143,8 +3148,8 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
         for row in catalog["_runtime_operations"]
         if row["interface"] == "api"
     }
-    if len(existing_runtime) != 28:
-        raise DescriptorError("CICS application runtime baseline must remain exactly 28 rows")
+    if len(existing_runtime) != 29:
+        raise DescriptorError("CICS application runtime baseline must remain exactly 29 rows")
 
     loaded_batches = []
     for batch_id, start, end, projection_path, review_path in CONTRACT_BATCHES:
@@ -3398,12 +3403,12 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
     if (
         len(registry_rows) != 263
         or len(set(handler_ids)) != 263
-        or len(typed_rows) != 8
+        or len(typed_rows) != 9
         or len(legacy_rows) != 20
         or {row["runtime_operation"] for row in typed_rows}
         != TYPED_RUNTIME_OPERATIONS
-        or len(advertised_rows) != 28
-        or len(unready_rows) != 235
+        or len(advertised_rows) != 29
+        or len(unready_rows) != 234
         or any(row["unready_result"] != "explicit-unsupported" for row in unready_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in typed_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in legacy_rows)

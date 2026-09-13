@@ -342,6 +342,7 @@ enum PendingKind {
         outputs: BTreeMap<String, typed_cics::CicsTarget>,
         response: Option<typed_cics::CicsTarget>,
         response2: Option<typed_cics::CicsTarget>,
+        address_set: Option<typed_cics::CicsAddressSet>,
         no_handle: bool,
     },
     Ignore,
@@ -1953,31 +1954,19 @@ impl ReferenceMachine {
                     outputs,
                     response: response_target,
                     response2: response2_target,
+                    address_set,
                     no_handle,
                 },
                 HostResult::Cics(response),
             ) => {
                 let responded = response_target.is_some() || no_handle;
-                if let Some(target) = response_target {
-                    typed_cics::write_target(
-                        self,
-                        &target,
-                        &CobolValue::Decimal(Decimal {
-                            coefficient: i128::from(response.response),
-                            scale: 0,
-                        }),
-                    )?;
-                }
-                if let Some(target) = response2_target {
-                    typed_cics::write_target(
-                        self,
-                        &target,
-                        &CobolValue::Decimal(Decimal {
-                            coefficient: i128::from(response.response2),
-                            scale: 0,
-                        }),
-                    )?;
-                }
+                typed_cics::write_response_state(
+                    self,
+                    response_target.as_ref(),
+                    response2_target.as_ref(),
+                    address_set.as_ref(),
+                    &response,
+                )?;
                 if let Some(target) = into
                     && matches!(
                         response.payload.schema(),

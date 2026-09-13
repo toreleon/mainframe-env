@@ -125,6 +125,7 @@ pub(in crate::service) fn invoke(
     retention_tick: u64,
 ) -> Result<CicsResponse, HostProblem> {
     match request.operation {
+        CicsOperation::AddressSet => address_set(service, run, request),
         CicsOperation::ChangeTask => change_task(service, run, request),
         CicsOperation::Deq | CicsOperation::Enq => {
             super::task_enqueue::invoke(service, run, request, retention_tick)
@@ -150,6 +151,73 @@ pub(in crate::service) fn invoke(
         CicsOperation::Abend => abend(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
+}
+
+fn address_set(
+    service: &CicsService,
+    run: &Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    validate_address_set_request(request)?;
+    service.response(
+        run,
+        CicsDisposition::Complete,
+        "NORMAL",
+        0,
+        0,
+        None,
+        None,
+        Vec::new(),
+    )
+}
+
+fn validate_address_set_request(request: &CicsRequest) -> Result<(), HostProblem> {
+    let allowed = [
+        "OPTION.NOHANDLE",
+        "RESP",
+        "RESP2",
+        "SET.ADDRESS",
+        "SET.POINTER",
+        "USING.ADDRESS",
+        "USING.POINTER",
+    ];
+    if request.arguments.iter().any(|(name, value)| {
+        !allowed.contains(&name.as_str())
+            || name.starts_with("OPTION.") && !value.bytes().is_empty()
+    }) {
+        return Err(HostProblem::Malformed);
+    }
+    let has = |name| request.arguments.contains_key(name);
+    let pointer_from_data =
+        has("SET.POINTER") && has("USING.ADDRESS") && !has("SET.ADDRESS") && !has("USING.POINTER");
+    let data_from_pointer =
+        has("SET.ADDRESS") && has("USING.POINTER") && !has("SET.POINTER") && !has("USING.ADDRESS");
+    if !pointer_from_data && !data_from_pointer {
+        return Err(HostProblem::Malformed);
+    }
+    for name in ["SET.ADDRESS", "SET.POINTER"] {
+        if request
+            .arguments
+            .get(name)
+            .is_some_and(|value| value.schema() != "mainframe-env.cics.storage-target@1")
+        {
+            return Err(HostProblem::Malformed);
+        }
+    }
+    if request
+        .arguments
+        .get("USING.ADDRESS")
+        .is_some_and(|value| value.schema() != "mainframe-env.cics.storage-identity@1")
+    {
+        return Err(HostProblem::Malformed);
+    }
+    if request.arguments.get("USING.POINTER").is_some_and(|value| {
+        value.schema() != "mainframe-env.cics.storage-value@1"
+            || !matches!(value.bytes().len(), 4 | 8)
+    }) {
+        return Err(HostProblem::Malformed);
+    }
+    Ok(())
 }
 
 fn change_task(

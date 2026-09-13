@@ -17,6 +17,18 @@ pub(super) enum CicsTarget {
     Resolved(CicsStorageSlot),
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) enum CicsAddressSet {
+    PointerFromData {
+        target: CicsStorageSlot,
+        source: CicsStorageSlot,
+    },
+    DataFromPointer {
+        target: CicsStorageSlot,
+        source: CicsStorageSlot,
+    },
+}
+
 pub(super) fn operation_identities() -> Vec<OperationIdentity> {
     CICS_EXECUTABLE_DESCRIPTORS
         .iter()
@@ -54,6 +66,37 @@ pub(super) fn write_context(
         machine.write("EIBAID", &[response.aid])?;
     }
     machine.write("EIBTRNID", response.transaction.as_bytes())?;
+    Ok(())
+}
+
+pub(super) fn write_response_state(
+    machine: &mut ReferenceMachine,
+    response_target: Option<&CicsTarget>,
+    response2_target: Option<&CicsTarget>,
+    address_set: Option<&CicsAddressSet>,
+    response: &CicsResponse,
+) -> Result<(), MachineProblem> {
+    for (target, value) in [
+        (response_target, response.response),
+        (response2_target, response.response2),
+    ] {
+        if let Some(target) = target {
+            write_target(
+                machine,
+                target,
+                &CobolValue::Decimal(Decimal {
+                    coefficient: i128::from(value),
+                    scale: 0,
+                }),
+            )?;
+        }
+    }
+    if response.disposition == CicsDisposition::Complete
+        && response.response == 0
+        && let Some(action) = address_set
+    {
+        apply_address_set(machine, action)?;
+    }
     Ok(())
 }
 
@@ -132,6 +175,7 @@ pub(super) fn validate_machine(machine: &ReferenceMachine) -> Result<(), Machine
         for slot in plan_slots(&plan)? {
             validate_machine_slot(machine, operation, &slot, SlotUse::Input)?;
         }
+        validate_address_set_slots(machine, operation, &plan)?;
         for output in &plan.outputs {
             let slot_use = match output.name {
                 CicsOutputName::Into => SlotUse::Output,
@@ -152,10 +196,38 @@ pub(super) fn execute(
     validate_runtime_plan(machine, operation, &plan)?;
 
     let host_operation = host_operation(plan.operation);
+    let address_set = address_set_action(&plan)?;
     let mut arguments = BTreeMap::new();
     for operand in &plan.operands {
         let (schema, bytes) = match &operand.value {
             CicsOperandValue::Literal(bytes) => ("mainframe-env.cics.literal@1", bytes.clone()),
+            CicsOperandValue::Storage(slot)
+                if matches!(
+                    operand.name,
+                    CicsOperandName::SetAddress | CicsOperandName::SetPointer
+                ) =>
+            {
+                (
+                    "mainframe-env.cics.storage-target@1",
+                    format!(
+                        "{}:{}:{}",
+                        machine.invocation.artifact.as_str(),
+                        slot.storage.get(),
+                        slot.qualified_layout_name
+                    )
+                    .into_bytes(),
+                )
+            }
+            CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::UsingAddress => (
+                "mainframe-env.cics.storage-identity@1",
+                format!(
+                    "{}:{}:{}",
+                    machine.invocation.artifact.as_str(),
+                    slot.storage.get(),
+                    slot.qualified_layout_name
+                )
+                .into_bytes(),
+            ),
             CicsOperandValue::Storage(slot)
                 if matches!(
                     operand.name,
@@ -270,6 +342,7 @@ pub(super) fn execute(
             outputs,
             response,
             response2,
+            address_set,
             no_handle,
         },
     )
@@ -388,6 +461,7 @@ pub(super) fn execute_legacy(
             outputs,
             response: response_target,
             response2: response2_target,
+            address_set: None,
             no_handle: args.iter().any(|argument| argument == "NOHANDLE"),
         },
     )
@@ -435,26 +509,87 @@ pub(super) fn write_target(
     }
 }
 
+fn address_set_action(plan: &CicsEffectPlan) -> Result<Option<CicsAddressSet>, MachineProblem> {
+    if plan.operation != CicsPlanOperation::AddressSet {
+        return Ok(None);
+    }
+    let slot = |name| {
+        plan.operands
+            .iter()
+            .find(|operand| operand.name == name)
+            .and_then(|operand| match &operand.value {
+                CicsOperandValue::Storage(slot) => Some(slot.clone()),
+                _ => None,
+            })
+            .ok_or_else(|| invalid_plan("ADDRESS SET storage role is missing"))
+    };
+    if plan
+        .operands
+        .iter()
+        .any(|operand| operand.name == CicsOperandName::SetPointer)
+    {
+        Ok(Some(CicsAddressSet::PointerFromData {
+            target: slot(CicsOperandName::SetPointer)?,
+            source: slot(CicsOperandName::UsingAddress)?,
+        }))
+    } else {
+        Ok(Some(CicsAddressSet::DataFromPointer {
+            target: slot(CicsOperandName::SetAddress)?,
+            source: slot(CicsOperandName::UsingPointer)?,
+        }))
+    }
+}
+
+pub(super) fn apply_address_set(
+    machine: &mut ReferenceMachine,
+    action: &CicsAddressSet,
+) -> Result<(), MachineProblem> {
+    match action {
+        CicsAddressSet::PointerFromData { target, source } => {
+            let target = resolved_slot(machine, target)?;
+            let source = resolved_slot(machine, source)?;
+            let address = machine.address_bytes(&source, target.length)?;
+            machine.write_reference(&target, &address)
+        }
+        CicsAddressSet::DataFromPointer { target, source } => {
+            let target = resolved_slot(machine, target)?;
+            let source = resolved_slot(machine, source)?;
+            let pointer = machine.read_reference(&source)?;
+            let address = if pointer.as_slice() == [0xff, 0, 0, 0] {
+                None
+            } else {
+                machine.decode_address(&pointer)?
+            };
+            machine.assign_linkage_address(&target.layout.name, address)
+        }
+    }
+}
+
+fn resolved_slot(
+    machine: &ReferenceMachine,
+    slot: &CicsStorageSlot,
+) -> Result<ResolvedReference, MachineProblem> {
+    Ok(ResolvedReference {
+        layout: machine
+            .layouts
+            .get(&slot.qualified_layout_name)
+            .cloned()
+            .ok_or(MachineProblem::UnknownStorage)?,
+        offset: 0,
+        length: machine
+            .views_by_id
+            .get(&slot.storage)
+            .ok_or(MachineProblem::UnknownStorage)?
+            .length,
+    })
+}
+
 fn write_resolved(
     machine: &mut ReferenceMachine,
     slot: &CicsStorageSlot,
     value: &CobolValue,
 ) -> Result<(), MachineProblem> {
-    let layout = machine
-        .layouts
-        .get(&slot.qualified_layout_name)
-        .cloned()
-        .ok_or(MachineProblem::UnknownStorage)?;
-    let length = machine
-        .views_by_id
-        .get(&slot.storage)
-        .ok_or(MachineProblem::UnknownStorage)?
-        .length;
-    let reference = ResolvedReference {
-        layout,
-        offset: 0,
-        length,
-    };
+    let reference = resolved_slot(machine, slot)?;
     if reference.layout.dynamic {
         let bytes = match value {
             CobolValue::Bytes(bytes) => bytes.clone(),
@@ -569,6 +704,7 @@ fn validate_runtime_plan(
             validate_machine_slot(machine, operation, slot, SlotUse::Input)?;
         }
     }
+    validate_address_set_slots(machine, operation, plan)?;
     for output in &plan.outputs {
         validate_machine_slot(
             machine,
@@ -588,6 +724,31 @@ enum SlotUse {
     Input,
     Output,
     NumericOutput,
+    PointerInput,
+    PointerOutput,
+    AddressInput,
+    AddressOutput,
+}
+
+fn validate_address_set_slots(
+    machine: &ReferenceMachine,
+    operation: &Operation,
+    plan: &CicsEffectPlan,
+) -> Result<(), MachineProblem> {
+    for operand in &plan.operands {
+        let CicsOperandValue::Storage(slot) = &operand.value else {
+            continue;
+        };
+        let slot_use = match operand.name {
+            CicsOperandName::SetAddress => SlotUse::AddressOutput,
+            CicsOperandName::SetPointer => SlotUse::PointerOutput,
+            CicsOperandName::UsingAddress => SlotUse::AddressInput,
+            CicsOperandName::UsingPointer => SlotUse::PointerInput,
+            _ => continue,
+        };
+        validate_machine_slot(machine, operation, slot, slot_use)?;
+    }
+    Ok(())
 }
 
 fn validate_machine_slot(
@@ -616,16 +777,40 @@ fn validate_machine_slot(
             "plan storage slot does not match its qualified layout name",
         ));
     }
-    if matches!(slot_use, SlotUse::Output | SlotUse::NumericOutput)
+    if matches!(
+        slot_use,
+        SlotUse::Output | SlotUse::NumericOutput | SlotUse::PointerOutput | SlotUse::AddressOutput
+    ) && matches!(
+        layout.category,
+        LayoutCategory::Condition | LayoutCategory::Rename
+    ) {
+        return Err(invalid_plan("plan output is not writable storage"));
+    }
+    if matches!(slot_use, SlotUse::NumericOutput) && !is_numeric(layout.category) {
+        return Err(invalid_plan("RESP and RESP2 outputs must be numeric"));
+    }
+    if matches!(slot_use, SlotUse::PointerInput | SlotUse::PointerOutput)
+        && !matches!(
+            layout.category,
+            LayoutCategory::Pointer | LayoutCategory::Pointer32
+        )
+    {
+        return Err(invalid_plan(
+            "ADDRESS SET pointer operands must use POINTER or POINTER-32",
+        ));
+    }
+    if matches!(slot_use, SlotUse::AddressInput | SlotUse::AddressOutput)
         && matches!(
             layout.category,
             LayoutCategory::Condition | LayoutCategory::Rename
         )
     {
-        return Err(invalid_plan("plan output is not writable storage"));
+        return Err(invalid_plan("ADDRESS SET data area is not addressable"));
     }
-    if matches!(slot_use, SlotUse::NumericOutput) && !is_numeric(layout.category) {
-        return Err(invalid_plan("RESP and RESP2 outputs must be numeric"));
+    if matches!(slot_use, SlotUse::AddressOutput) && !layout.linkage {
+        return Err(invalid_plan(
+            "ADDRESS SET ADDRESS OF target must be linkage storage",
+        ));
     }
     let exact_length = u64::try_from(id_view.length)
         .map_err(|_| invalid_plan("plan storage view length is invalid"))?;
@@ -727,6 +912,7 @@ fn expected_effects(operation: CicsPlanOperation) -> &'static [Effect] {
 
 const fn host_operation(operation: CicsPlanOperation) -> CicsOperation {
     match operation {
+        CicsPlanOperation::AddressSet => CicsOperation::AddressSet,
         CicsPlanOperation::ChangeTask => CicsOperation::ChangeTask,
         CicsPlanOperation::Deq => CicsOperation::Deq,
         CicsPlanOperation::Enq => CicsOperation::Enq,
@@ -749,6 +935,10 @@ const fn operand_name(name: CicsOperandName) -> &'static str {
         CicsOperandName::MaxLifetime => "MAXLIFETIME",
         CicsOperandName::Priority => "PRIORITY",
         CicsOperandName::UserCorrData => "USERCORRDATA",
+        CicsOperandName::SetAddress => "SET.ADDRESS",
+        CicsOperandName::SetPointer => "SET.POINTER",
+        CicsOperandName::UsingAddress => "USING.ADDRESS",
+        CicsOperandName::UsingPointer => "USING.POINTER",
     }
 }
 

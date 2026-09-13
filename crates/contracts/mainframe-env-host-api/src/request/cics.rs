@@ -7,6 +7,8 @@ use std::collections::BTreeMap;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CicsOperation {
     Abend,
+    /// Copy one checked virtual pointer/address relationship.
+    AddressSet,
     Asktime,
     Assign,
     /// Change the issuing CICS task's dispatch priority.
@@ -49,6 +51,7 @@ impl CicsOperation {
     pub const fn runtime_name(self) -> &'static str {
         match self {
             Self::Abend => "Abend",
+            Self::AddressSet => "AddressSet",
             Self::Asktime => "Asktime",
             Self::Assign => "Assign",
             Self::ChangeTask => "ChangeTask",
@@ -114,6 +117,7 @@ impl CicsOperation {
         let first = words.first()?.as_str();
         Some(match (first, words.get(1).map(String::as_str)) {
             ("ABEND", _) => Self::Abend,
+            ("ADDRESS", Some("SET")) => Self::AddressSet,
             ("ASKTIME", _) => Self::Asktime,
             ("ASSIGN", _) => Self::Assign,
             ("CHANGE", Some("TASK")) => Self::ChangeTask,
