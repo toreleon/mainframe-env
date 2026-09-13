@@ -449,7 +449,19 @@ fn validate_candidate(
     }
 
     if descriptor.runtime_operation == Some("Assign") {
-        for name in ["APPLID", "SYSID", "TASKPRIORITY", "USERID"] {
+        for name in [
+            "APPLICATION",
+            "APPLID",
+            "CHANNEL",
+            "MAJORVERSION",
+            "MICROVERSION",
+            "MINORVERSION",
+            "OPERATION",
+            "PLATFORM",
+            "SYSID",
+            "TASKPRIORITY",
+            "USERID",
+        ] {
             let Some(value) = clauses.get(name) else {
                 continue;
             };
@@ -463,6 +475,13 @@ fn validate_candidate(
                 && (target.usage != CobolUsage::Binary || target.length != 2 || target.scale != 0)
             {
                 return Err("CICS ASSIGN TASKPRIORITY requires a halfword binary data area".into());
+            }
+            if matches!(name, "MAJORVERSION" | "MICROVERSION" | "MINORVERSION")
+                && (target.usage != CobolUsage::Binary || target.length != 4 || target.scale != 0)
+            {
+                return Err(format!(
+                    "CICS ASSIGN {name} requires a fullword binary data area"
+                ));
             }
         }
     }

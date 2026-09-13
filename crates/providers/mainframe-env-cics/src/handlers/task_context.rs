@@ -34,13 +34,37 @@ pub(in crate::service) fn assign(
             decimal_payload(i64::from(run.invocation.priority))?,
         );
     }
+    for (name, length) in [
+        ("APPLICATION", 64),
+        ("CHANNEL", 16),
+        ("OPERATION", 64),
+        ("PLATFORM", 64),
+    ] {
+        if request.arguments.contains_key(name) {
+            response
+                .outputs
+                .insert(name.into(), bounded(vec![b' '; length])?);
+        }
+    }
+    for name in ["MAJORVERSION", "MICROVERSION", "MINORVERSION"] {
+        if request.arguments.contains_key(name) {
+            response.outputs.insert(name.into(), decimal_payload(-1)?);
+        }
+    }
     Ok(response)
 }
 
 fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
     let allowed = [
+        "APPLICATION",
         "APPLID",
+        "CHANNEL",
+        "MAJORVERSION",
+        "MICROVERSION",
+        "MINORVERSION",
         "OPTION.NOHANDLE",
+        "OPERATION",
+        "PLATFORM",
         "RESP",
         "RESP2",
         "SYSID",

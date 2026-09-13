@@ -410,7 +410,19 @@ pub(super) fn execute_legacy(
     let into = legacy_destination(&arguments, "INTO").map(CicsTarget::Legacy);
     let output_names: &[&str] = match operation {
         CicsOperation::Asktime => &["ABSTIME"],
-        CicsOperation::Assign => &["APPLID", "SYSID", "TASKPRIORITY", "USERID"],
+        CicsOperation::Assign => &[
+            "APPLICATION",
+            "APPLID",
+            "CHANNEL",
+            "MAJORVERSION",
+            "MICROVERSION",
+            "MINORVERSION",
+            "OPERATION",
+            "PLATFORM",
+            "SYSID",
+            "TASKPRIORITY",
+            "USERID",
+        ],
         CicsOperation::FormatTime => &[
             "YYYYMMDD",
             "YYMMDD",

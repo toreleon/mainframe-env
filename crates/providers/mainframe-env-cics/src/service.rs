@@ -4666,7 +4666,14 @@ mod tests {
         let assign = request(
             CicsOperation::Assign,
             BTreeMap::from([
+                ("APPLICATION".into(), argument(b"APPLICATION-OUT")),
                 ("APPLID".into(), argument(b"APP-OUT")),
+                ("CHANNEL".into(), argument(b"CHANNEL-OUT")),
+                ("MAJORVERSION".into(), argument(b"MAJOR-OUT")),
+                ("MICROVERSION".into(), argument(b"MICRO-OUT")),
+                ("MINORVERSION".into(), argument(b"MINOR-OUT")),
+                ("OPERATION".into(), argument(b"OPERATION-OUT")),
+                ("PLATFORM".into(), argument(b"PLATFORM-OUT")),
                 ("SYSID".into(), argument(b"SYS-OUT")),
                 ("TASKPRIORITY".into(), argument(b"PRIORITY-OUT")),
                 ("USERID".into(), argument(b"USER-OUT")),
@@ -4676,7 +4683,18 @@ mod tests {
         let assigned = service
             .invoke(&effect(&invocation.run_unit_id, assign.clone(), 3), assign)
             .unwrap();
+        assert_eq!(assigned.outputs["APPLICATION"].bytes(), &[b' '; 64]);
         assert_eq!(assigned.outputs["APPLID"].bytes(), b"MEAPPL");
+        assert_eq!(assigned.outputs["CHANNEL"].bytes(), &[b' '; 16]);
+        for name in ["MAJORVERSION", "MICROVERSION", "MINORVERSION"] {
+            assert_eq!(
+                assigned.outputs[name].schema(),
+                "mainframe-env.cics.decimal@1"
+            );
+            assert_eq!(assigned.outputs[name].bytes(), b"-1");
+        }
+        assert_eq!(assigned.outputs["OPERATION"].bytes(), &[b' '; 64]);
+        assert_eq!(assigned.outputs["PLATFORM"].bytes(), &[b' '; 64]);
         assert_eq!(assigned.outputs["SYSID"].bytes(), b"MESYS");
         assert_eq!(
             assigned.outputs["TASKPRIORITY"].schema(),
@@ -4763,7 +4781,7 @@ mod tests {
     }
 
     #[test]
-    fn assign_task_identity_subset_is_available_in_dpl_context() {
+    fn assign_context_subset_is_available_in_dpl_context() {
         let service = service(Arc::new(MemoryStore::new(Default::default())));
         let context = BoundedPayload::new(
             "mainframe-env.cics.execution-context@1",
@@ -4783,7 +4801,14 @@ mod tests {
         let assign = request(
             CicsOperation::Assign,
             BTreeMap::from([
+                ("APPLICATION".into(), argument(b"APPLICATION-OUT")),
                 ("APPLID".into(), argument(b"APP-OUT")),
+                ("CHANNEL".into(), argument(b"CHANNEL-OUT")),
+                ("MAJORVERSION".into(), argument(b"MAJOR-OUT")),
+                ("MICROVERSION".into(), argument(b"MICRO-OUT")),
+                ("MINORVERSION".into(), argument(b"MINOR-OUT")),
+                ("OPERATION".into(), argument(b"OPERATION-OUT")),
+                ("PLATFORM".into(), argument(b"PLATFORM-OUT")),
                 ("SYSID".into(), argument(b"SYS-OUT")),
                 ("TASKPRIORITY".into(), argument(b"PRIORITY-OUT")),
                 ("USERID".into(), argument(b"USER-OUT")),
@@ -4794,7 +4819,14 @@ mod tests {
             .invoke(&effect(&invocation.run_unit_id, assign.clone(), 1), assign)
             .unwrap();
         assert_eq!(response.condition, "NORMAL");
+        assert_eq!(response.outputs["APPLICATION"].bytes(), &[b' '; 64]);
         assert_eq!(response.outputs["APPLID"].bytes(), b"ME01");
+        assert_eq!(response.outputs["CHANNEL"].bytes(), &[b' '; 16]);
+        for name in ["MAJORVERSION", "MICROVERSION", "MINORVERSION"] {
+            assert_eq!(response.outputs[name].bytes(), b"-1");
+        }
+        assert_eq!(response.outputs["OPERATION"].bytes(), &[b' '; 64]);
+        assert_eq!(response.outputs["PLATFORM"].bytes(), &[b' '; 64]);
         assert_eq!(response.outputs["SYSID"].bytes(), b"S001");
         assert_eq!(response.outputs["TASKPRIORITY"].bytes(), b"0");
         assert_eq!(response.outputs["USERID"].bytes(), b"IBMUSER");

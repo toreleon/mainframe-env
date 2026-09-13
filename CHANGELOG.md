@@ -55,10 +55,10 @@ All notable changes to mainframe-env are documented here.
   priorities `0..255` update the task and yield once, invalid values return
   `INVREQ` 16/1, and SUSPEND produces a one-shot durable scheduler handoff.
 - Expanded the source-bounded CICS `ASSIGN` compatibility route with APPLID,
-  SYSID, USERID, and TASKPRIORITY task-context outputs. The compiler requires a
-  writable halfword-binary TASKPRIORITY receiver, the provider rejects unknown
-  or wrongly typed arguments, and a compiled online task observes priority
-  changes through the durable selected route.
+  SYSID, USERID, TASKPRIORITY, and the exact absent application/channel context
+  defaults. The compiler enforces halfword/fullword binary receivers, the
+  provider rejects unknown or wrongly typed arguments, and a compiled online
+  task observes priority changes through the durable selected route.
 - Added online continuation format `MEOM4`, which retains the current task
   priority and an optional staged program-transfer handoff. Readers preserve
   `MEOM3` priority rows and historical `MEOM2` rows without that field.

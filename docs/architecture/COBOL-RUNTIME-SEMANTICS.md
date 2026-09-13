@@ -59,10 +59,13 @@ contract explicitly permits it.
   response, so denial, cancellation, malformed input, and audit failure cannot
   change storage.
 - The bounded legacy CICS `ASSIGN` route returns APPLID, SYSID, USERID, and the
-  current TASKPRIORITY from owned invocation context. Output references are
-  resolved before dispatch; TASKPRIORITY requires a writable halfword-binary
-  data area and travels as typed decimal output. Other source-valid ASSIGN
-  options remain rejected until their terminal, program-level, application, or
+  current TASKPRIORITY from owned invocation context. Because no CICS
+  application, platform, operation, version, or channel context is currently
+  bound, their source-defined absence values are returned as fixed blanks or
+  fullword `-1`; product installation names are not reinterpreted as IBM
+  application context. Output references resolve before dispatch, and numeric
+  fields require their exact halfword/fullword binary shapes. Other source-valid
+  ASSIGN options remain rejected until their terminal, program-level, or
   failure context has an owned runtime representation.
 - Terminal execution outcomes carry an explicit transaction-dump disposition.
   CICS ABEND results translate the provider's typed `ABEND.DUMP` metadata to
