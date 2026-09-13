@@ -79,6 +79,9 @@ contract explicitly permits it.
   successor; it is prohibited with `INVREQ` 16/200 in a DPL server program.
   BRIDGE returns four blanks because the runtime has no bridge-monitor start
   path; IBM defines the same blank result in local non-bridge and DPL contexts.
+  Without a recoverable ASRA-class machine-check handoff, ABOFFSET is fullword
+  zero and ASRAPSW/ASRAPSW16/ASRAREGS/ASRAREGS64 are their exact zero-filled
+  widths; an explicit EXEC CICS ABEND is not treated as a processor fault.
   Other source-valid ASSIGN options remain rejected until their terminal,
   program-level, or failure context has an owned runtime representation.
 - Terminal execution outcomes carry an explicit transaction-dump disposition.

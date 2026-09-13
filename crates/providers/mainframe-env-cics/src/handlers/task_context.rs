@@ -79,6 +79,11 @@ pub(in crate::service) fn assign(
             decimal_payload(i64::from(run.invocation.priority))?,
         );
     }
+    if request.arguments.contains_key("ABOFFSET") {
+        response
+            .outputs
+            .insert("ABOFFSET".into(), decimal_payload(0)?);
+    }
     if request.arguments.contains_key("PROGRAM") {
         let program = run
             .current_program
@@ -128,6 +133,18 @@ pub(in crate::service) fn assign(
             response.outputs.insert(name.into(), bounded(value)?);
         }
     }
+    for (name, length) in [
+        ("ASRAPSW", 8),
+        ("ASRAPSW16", 16),
+        ("ASRAREGS", 64),
+        ("ASRAREGS64", 128),
+    ] {
+        if request.arguments.contains_key(name) {
+            response
+                .outputs
+                .insert(name.into(), bounded(vec![0; length])?);
+        }
+    }
     if !prohibited && request.arguments.contains_key("TCTUALENG") {
         response
             .outputs
@@ -157,8 +174,13 @@ fn assign_dpl_context(run: &Run) -> Result<bool, HostProblem> {
 
 fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
     let allowed = [
+        "ABOFFSET",
         "APPLICATION",
         "APPLID",
+        "ASRAPSW",
+        "ASRAPSW16",
+        "ASRAREGS",
+        "ASRAREGS64",
         "BRIDGE",
         "CHANNEL",
         "CWALENG",

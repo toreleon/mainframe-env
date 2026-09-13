@@ -4749,6 +4749,33 @@ mod tests {
         assert_eq!(initparm.outputs["INITPARMLEN"].bytes(), b"0");
         assert_eq!(initparm.outputs["BRIDGE"].bytes(), &[b' '; 4]);
 
+        let diagnostics = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("ABOFFSET".into(), argument(b"ABOFFSET-OUT")),
+                ("ASRAPSW".into(), argument(b"ASRA-PSW-OUT")),
+                ("ASRAPSW16".into(), argument(b"ASRA-PSW16-OUT")),
+                ("ASRAREGS".into(), argument(b"ASRA-REGS-OUT")),
+                ("ASRAREGS64".into(), argument(b"ASRA-REGS64-OUT")),
+            ]),
+            27,
+        );
+        let diagnostics = service
+            .invoke(
+                &effect(&invocation.run_unit_id, diagnostics.clone(), 27),
+                diagnostics,
+            )
+            .unwrap();
+        assert_eq!(diagnostics.outputs["ABOFFSET"].bytes(), b"0");
+        for (name, length) in [
+            ("ASRAPSW", 8),
+            ("ASRAPSW16", 16),
+            ("ASRAREGS", 64),
+            ("ASRAREGS64", 128),
+        ] {
+            assert_eq!(diagnostics.outputs[name].bytes(), vec![0; length]);
+        }
+
         let missing_program = request(
             CicsOperation::Assign,
             BTreeMap::from([("PROGRAM".into(), argument(b"PROGRAM-OUT"))]),
@@ -5005,6 +5032,34 @@ mod tests {
         assert!(!initparm.outputs.contains_key("INITPARM"));
         assert_eq!(initparm.outputs["INITPARMLEN"].bytes(), b"0");
         assert_eq!(initparm.outputs["BRIDGE"].bytes(), &[b' '; 4]);
+
+        let diagnostics = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("ABOFFSET".into(), argument(b"ABOFFSET-OUT")),
+                ("ASRAPSW".into(), argument(b"ASRA-PSW-OUT")),
+                ("ASRAPSW16".into(), argument(b"ASRA-PSW16-OUT")),
+                ("ASRAREGS".into(), argument(b"ASRA-REGS-OUT")),
+                ("ASRAREGS64".into(), argument(b"ASRA-REGS64-OUT")),
+            ]),
+            5,
+        );
+        let diagnostics = service
+            .invoke(
+                &effect(&invocation.run_unit_id, diagnostics.clone(), 5),
+                diagnostics,
+            )
+            .unwrap();
+        assert_eq!(diagnostics.condition, "NORMAL");
+        assert_eq!(diagnostics.outputs["ABOFFSET"].bytes(), b"0");
+        for (name, length) in [
+            ("ASRAPSW", 8),
+            ("ASRAPSW16", 16),
+            ("ASRAREGS", 64),
+            ("ASRAREGS64", 128),
+        ] {
+            assert_eq!(diagnostics.outputs[name].bytes(), vec![0; length]);
+        }
 
         let mut prohibited = request(
             CicsOperation::Assign,

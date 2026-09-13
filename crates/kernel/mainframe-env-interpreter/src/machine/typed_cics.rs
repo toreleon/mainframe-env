@@ -411,8 +411,13 @@ pub(super) fn execute_legacy(
     let output_names: &[&str] = match operation {
         CicsOperation::Asktime => &["ABSTIME"],
         CicsOperation::Assign => &[
+            "ABOFFSET",
             "APPLICATION",
             "APPLID",
+            "ASRAPSW",
+            "ASRAPSW16",
+            "ASRAREGS",
+            "ASRAREGS64",
             "BRIDGE",
             "CHANNEL",
             "CWALENG",

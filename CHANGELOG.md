@@ -67,8 +67,9 @@ All notable changes to mainframe-env are documented here.
   local tasks with no pending next transaction receive four blanks from
   NEXTTRANSID, while DPL use returns `INVREQ` 16/200. BRIDGE returns four
   blanks because bridge-started tasks are outside the runtime. Compiled online
-  tasks observe these values and priority changes through the durable selected
-  route.
+  tasks also receive exact zero ABOFFSET, PSW, and register diagnostics because
+  no recoverable ASRA-class machine-check handoff exists. They observe these
+  values and priority changes through the durable selected route.
 - Added online continuation format `MEOM4`, which retains the current task
   priority and an optional staged program-transfer handoff. Readers preserve
   `MEOM3` priority rows and historical `MEOM2` rows without that field.
