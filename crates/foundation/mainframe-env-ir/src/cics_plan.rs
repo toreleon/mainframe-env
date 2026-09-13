@@ -71,6 +71,10 @@ pub enum CicsOperandName {
     From,
     /// `RIDFLD(...)` record identifier.
     Ridfld,
+    /// `LENGTH(...)` record length.
+    Length,
+    /// `KEYLENGTH(...)` key length.
+    KeyLength,
 }
 
 /// Literal bytes or a runtime read from resolved storage.
@@ -80,6 +84,8 @@ pub enum CicsOperandValue {
     Literal(Vec<u8>),
     /// Runtime bytes from a resolved storage slot.
     Storage(CicsStorageSlot),
+    /// Runtime byte length of a resolved storage slot.
+    LengthOf(CicsStorageSlot),
 }
 
 /// One typed named input operand.
@@ -111,6 +117,8 @@ pub enum CicsOutputName {
     Resp,
     /// Secondary response code destination.
     Resp2,
+    /// Actual record length destination for `READ`.
+    Length,
 }
 
 /// One pre-resolved result binding.
@@ -178,6 +186,10 @@ pub fn encode_cics_effect_plan(
                 writer.byte(1)?;
                 encode_slot(&mut writer, slot, limits)?;
             }
+            CicsOperandValue::LengthOf(slot) => {
+                writer.byte(2)?;
+                encode_slot(&mut writer, slot, limits)?;
+            }
         }
     }
 
@@ -234,6 +246,7 @@ pub fn decode_cics_effect_plan(
                 CicsOperandValue::Literal(bytes)
             }
             1 => CicsOperandValue::Storage(decode_slot(&mut reader, limits)?),
+            2 => CicsOperandValue::LengthOf(decode_slot(&mut reader, limits)?),
             _ => return Err(CicsPlanCodecProblem::Malformed),
         };
         operands.push(CicsNamedOperand { name, value });
@@ -294,6 +307,15 @@ fn validate_plan(
         if !operand_names.insert(operand.name) {
             return Err(CicsPlanCodecProblem::Malformed);
         }
+        let numeric_length = matches!(
+            operand.name,
+            CicsOperandName::Length | CicsOperandName::KeyLength
+        );
+        if (numeric_length && matches!(&operand.value, CicsOperandValue::Literal(_)))
+            || (!numeric_length && matches!(&operand.value, CicsOperandValue::LengthOf(_)))
+        {
+            return Err(CicsPlanCodecProblem::Malformed);
+        }
         match &operand.value {
             CicsOperandValue::Literal(bytes) => {
                 total_literal_bytes = total_literal_bytes
@@ -305,7 +327,9 @@ fn validate_plan(
                     return Err(CicsPlanCodecProblem::LimitExceeded);
                 }
             }
-            CicsOperandValue::Storage(slot) => validate_slot(slot, limits)?,
+            CicsOperandValue::Storage(slot) | CicsOperandValue::LengthOf(slot) => {
+                validate_slot(slot, limits)?
+            }
         }
     }
     let mut output_names = BTreeSet::new();
@@ -333,19 +357,33 @@ fn validate_operation_shape(
                 || inputs.contains(&CicsOperandName::From)
                 || !outputs.contains(&CicsOutputName::Into)
                 || plan.options.contains(&CicsPlanOption::Rollback)
+                || outputs.contains(&CicsOutputName::Length)
+                    != matches!(
+                        operand_value(plan, CicsOperandName::Length),
+                        Some(CicsOperandValue::Storage(_))
+                    )
+                || match operand_value(plan, CicsOperandName::Length) {
+                    Some(CicsOperandValue::Storage(slot)) => {
+                        output_target(&plan.outputs, CicsOutputName::Length) != Some(slot)
+                    }
+                    _ => false,
+                }
         }
         CicsPlanOperation::Rewrite => {
             resources != 1
                 || !inputs.contains(&CicsOperandName::From)
                 || inputs.contains(&CicsOperandName::Ridfld)
+                || inputs.contains(&CicsOperandName::KeyLength)
                 || plan.options.contains(&CicsPlanOption::Update)
                 || plan.options.contains(&CicsPlanOption::Rollback)
                 || outputs.contains(&CicsOutputName::Into)
+                || outputs.contains(&CicsOutputName::Length)
         }
         CicsPlanOperation::Syncpoint => {
             !inputs.is_empty()
                 || plan.options.contains(&CicsPlanOption::Update)
                 || outputs.contains(&CicsOutputName::Into)
+                || outputs.contains(&CicsOutputName::Length)
         }
     };
     if malformed
@@ -355,6 +393,13 @@ fn validate_operation_shape(
     } else {
         Ok(())
     }
+}
+
+fn operand_value(plan: &CicsEffectPlan, name: CicsOperandName) -> Option<&CicsOperandValue> {
+    plan.operands
+        .iter()
+        .find(|operand| operand.name == name)
+        .map(|operand| &operand.value)
 }
 
 fn validate_condition(
@@ -522,6 +567,8 @@ const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::Dataset => 1,
         CicsOperandName::From => 2,
         CicsOperandName::Ridfld => 3,
+        CicsOperandName::Length => 4,
+        CicsOperandName::KeyLength => 5,
     }
 }
 
@@ -531,6 +578,8 @@ fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCodecProblem> 
         1 => Ok(CicsOperandName::Dataset),
         2 => Ok(CicsOperandName::From),
         3 => Ok(CicsOperandName::Ridfld),
+        4 => Ok(CicsOperandName::Length),
+        5 => Ok(CicsOperandName::KeyLength),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -557,6 +606,7 @@ const fn output_tag(value: CicsOutputName) -> u8 {
         CicsOutputName::Into => 0,
         CicsOutputName::Resp => 1,
         CicsOutputName::Resp2 => 2,
+        CicsOutputName::Length => 3,
     }
 }
 
@@ -565,6 +615,7 @@ fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodecProblem> {
         0 => Ok(CicsOutputName::Into),
         1 => Ok(CicsOutputName::Resp),
         2 => Ok(CicsOutputName::Resp2),
+        3 => Ok(CicsOutputName::Length),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -746,6 +797,14 @@ mod tests {
                     name: CicsOperandName::File,
                     value: CicsOperandValue::Literal(b"ACCTDAT".to_vec()),
                 },
+                CicsNamedOperand {
+                    name: CicsOperandName::Length,
+                    value: CicsOperandValue::Storage(slot(4, "RESULT.LENGTH")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::KeyLength,
+                    value: CicsOperandValue::LengthOf(slot(5, "REQUEST.KEY")),
+                },
             ],
             options: BTreeSet::from([CicsPlanOption::Update]),
             outputs: vec![
@@ -760,6 +819,10 @@ mod tests {
                 CicsOutputBinding {
                     name: CicsOutputName::Resp,
                     target: response.clone(),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::Length,
+                    target: slot(4, "RESULT.LENGTH"),
                 },
             ],
             condition: CicsCondition::Respond {
@@ -782,6 +845,10 @@ mod tests {
                 CicsNamedOperand {
                     name: CicsOperandName::From,
                     value: CicsOperandValue::Storage(slot(1, "REQUEST.RECORD")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Length,
+                    value: CicsOperandValue::LengthOf(slot(1, "REQUEST.RECORD")),
                 },
             ],
             options: BTreeSet::new(),

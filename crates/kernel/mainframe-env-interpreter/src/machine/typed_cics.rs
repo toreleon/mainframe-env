@@ -62,10 +62,21 @@ pub(super) fn validate_machine(machine: &ReferenceMachine) -> Result<(), Machine
         for slot in plan_slots(&plan)? {
             validate_machine_slot(machine, operation, &slot, SlotUse::Input)?;
         }
+        for operand in &plan.operands {
+            if matches!(
+                operand.name,
+                CicsOperandName::Length | CicsOperandName::KeyLength
+            ) && let CicsOperandValue::Storage(slot) = &operand.value
+            {
+                validate_machine_slot(machine, operation, slot, SlotUse::HalfwordInput)?;
+            }
+        }
         for output in &plan.outputs {
             let slot_use = match output.name {
                 CicsOutputName::Into => SlotUse::Output,
-                CicsOutputName::Resp | CicsOutputName::Resp2 => SlotUse::NumericOutput,
+                CicsOutputName::Resp | CicsOutputName::Resp2 | CicsOutputName::Length => {
+                    SlotUse::NumericOutput
+                }
             };
             validate_machine_slot(machine, operation, &output.target, slot_use)?;
         }
@@ -86,32 +97,52 @@ pub(super) fn execute(
     for operand in &plan.operands {
         let (schema, bytes) = match &operand.value {
             CicsOperandValue::Literal(bytes) => ("mainframe-env.cics.literal@1", bytes.clone()),
+            CicsOperandValue::Storage(slot)
+                if matches!(
+                    operand.name,
+                    CicsOperandName::Length | CicsOperandName::KeyLength
+                ) =>
+            {
+                (
+                    "mainframe-env.cics.decimal@1",
+                    read_numeric_slot(machine, slot)?,
+                )
+            }
             CicsOperandValue::Storage(slot) => (
                 "mainframe-env.cics.storage-value@1",
                 read_slot(machine, slot)?,
+            ),
+            CicsOperandValue::LengthOf(slot) => (
+                "mainframe-env.cics.decimal@1",
+                read_slot(machine, slot)?.len().to_string().into_bytes(),
             ),
         };
         arguments.insert(operand_name(operand.name).into(), payload(schema, bytes)?);
     }
 
     let mut into = None;
-    let outputs = BTreeMap::new();
+    let mut outputs = BTreeMap::new();
     let mut response = None;
     let mut response2 = None;
     for output in &plan.outputs {
         let key = output_name(output.name);
-        arguments.insert(
-            key.into(),
-            payload(
-                "mainframe-env.cics.argument@1",
-                output.target.qualified_layout_name.as_bytes().to_vec(),
-            )?,
-        );
+        if output.name != CicsOutputName::Length {
+            arguments.insert(
+                key.into(),
+                payload(
+                    "mainframe-env.cics.argument@1",
+                    output.target.qualified_layout_name.as_bytes().to_vec(),
+                )?,
+            );
+        }
         let target = CicsTarget::Resolved(output.target.clone());
         match output.name {
             CicsOutputName::Into => into = Some(target),
             CicsOutputName::Resp => response = Some(target),
             CicsOutputName::Resp2 => response2 = Some(target),
+            CicsOutputName::Length => {
+                outputs.insert("LENGTH".into(), target);
+            }
         }
     }
     for option in &plan.options {
@@ -460,8 +491,17 @@ fn validate_runtime_plan(
     plan: &CicsEffectPlan,
 ) -> Result<(), MachineProblem> {
     for operand in &plan.operands {
-        if let CicsOperandValue::Storage(slot) = &operand.value {
-            validate_machine_slot(machine, operation, slot, SlotUse::Input)?;
+        if let CicsOperandValue::Storage(slot) | CicsOperandValue::LengthOf(slot) = &operand.value {
+            let slot_use = if matches!(operand.value, CicsOperandValue::Storage(_))
+                && matches!(
+                    operand.name,
+                    CicsOperandName::Length | CicsOperandName::KeyLength
+                ) {
+                SlotUse::HalfwordInput
+            } else {
+                SlotUse::Input
+            };
+            validate_machine_slot(machine, operation, slot, slot_use)?;
         }
     }
     for output in &plan.outputs {
@@ -471,7 +511,9 @@ fn validate_runtime_plan(
             &output.target,
             match output.name {
                 CicsOutputName::Into => SlotUse::Output,
-                CicsOutputName::Resp | CicsOutputName::Resp2 => SlotUse::NumericOutput,
+                CicsOutputName::Resp | CicsOutputName::Resp2 | CicsOutputName::Length => {
+                    SlotUse::NumericOutput
+                }
             },
         )?;
     }
@@ -481,6 +523,7 @@ fn validate_runtime_plan(
 #[derive(Clone, Copy)]
 enum SlotUse {
     Input,
+    HalfwordInput,
     Output,
     NumericOutput,
 }
@@ -522,6 +565,13 @@ fn validate_machine_slot(
     if matches!(slot_use, SlotUse::NumericOutput) && !is_numeric(layout.category) {
         return Err(invalid_plan("RESP and RESP2 outputs must be numeric"));
     }
+    if matches!(slot_use, SlotUse::HalfwordInput)
+        && (layout.category != LayoutCategory::Binary || layout.length != 2)
+    {
+        return Err(invalid_plan(
+            "LENGTH and KEYLENGTH inputs must be halfword binary",
+        ));
+    }
     let exact_length = u64::try_from(id_view.length)
         .map_err(|_| invalid_plan("plan storage view length is invalid"))?;
     if !operation.storage.iter().any(|reference| {
@@ -539,7 +589,7 @@ fn validate_machine_slot(
 fn plan_slots(plan: &CicsEffectPlan) -> Result<Vec<CicsStorageSlot>, MachineProblem> {
     let mut slots = BTreeMap::<StorageId, CicsStorageSlot>::new();
     for operand in &plan.operands {
-        if let CicsOperandValue::Storage(slot) = &operand.value {
+        if let CicsOperandValue::Storage(slot) | CicsOperandValue::LengthOf(slot) = &operand.value {
             insert_slot(&mut slots, slot)?;
         }
     }
@@ -594,6 +644,21 @@ fn read_slot(
     machine.read(&slot.qualified_layout_name)
 }
 
+fn read_numeric_slot(
+    machine: &ReferenceMachine,
+    slot: &CicsStorageSlot,
+) -> Result<Vec<u8>, MachineProblem> {
+    let layout = machine
+        .layouts
+        .get(&slot.qualified_layout_name)
+        .ok_or(MachineProblem::UnknownStorage)?;
+    let value = decode_decimal(layout, &read_slot(machine, slot)?)?;
+    if value.scale != 0 {
+        return Err(MachineProblem::DataException);
+    }
+    Ok(value.coefficient.to_string().into_bytes())
+}
+
 fn expected_operation(identity: &OperationIdentity) -> Option<CicsPlanOperation> {
     cics_executable_descriptor_for_identity(identity).map(|descriptor| descriptor.operation)
 }
@@ -616,6 +681,8 @@ const fn operand_name(name: CicsOperandName) -> &'static str {
         CicsOperandName::Dataset => "DATASET",
         CicsOperandName::From => "FROM",
         CicsOperandName::Ridfld => "RIDFLD",
+        CicsOperandName::Length => "LENGTH",
+        CicsOperandName::KeyLength => "KEYLENGTH",
     }
 }
 
@@ -624,6 +691,7 @@ const fn output_name(name: CicsOutputName) -> &'static str {
         CicsOutputName::Into => "INTO",
         CicsOutputName::Resp => "RESP",
         CicsOutputName::Resp2 => "RESP2",
+        CicsOutputName::Length => "LENGTH",
     }
 }
 

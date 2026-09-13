@@ -55,6 +55,15 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Extended typed CICS file control with lossless `READ LENGTH`/`KEYLENGTH` and
+  `REWRITE LENGTH` operands, including `LENGTH OF`, actual-length reporting,
+  full-key validation, truncation, and sourced `LENGERR`/`INVREQ` responses.
+  The behavior is bound to baseline
+  `ibm-cics-ts-6x-file-uow-pilot-2026-09-08`, catalog rows
+  `ibm-cics-ts-6x-2026-08-31:api-commands:0156` and `:0181`, and the Options
+  and Conditions sections of
+  `SSJL4D_6.x/reference-applications/commands-api/dfhp4_read.html` and
+  `SSJL4D_6.x/reference-applications/commands-api/dfhp4_rewrite.html`.
 - Scoped local CI to the last successful ancestor, preserving policy/docs
   checks while skipping runtime rebuild/deployment for prose-only changes. Added
   per-command timings, bounded stage timeouts, and focused agent verification rules.

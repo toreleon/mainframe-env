@@ -158,12 +158,15 @@ pub enum HirCicsOperandName {
     Dataset,
     From,
     Ridfld,
+    Length,
+    KeyLength,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum HirCicsValue {
     Literal(String),
     Data(HirDataReference),
+    LengthOf(HirDataReference),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -184,6 +187,7 @@ pub enum HirCicsOutputName {
     Into,
     Resp,
     Resp2,
+    Length,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -951,8 +955,17 @@ fn resolve_cics(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCi
         _ => return Err(ResolutionFailure::Unsupported),
     };
     let allowed_clauses: &[&str] = match operation {
-        HirCicsOperation::Read => &["FILE", "DATASET", "RIDFLD", "INTO", "RESP", "RESP2"],
-        HirCicsOperation::Rewrite => &["FILE", "DATASET", "FROM", "RESP", "RESP2"],
+        HirCicsOperation::Read => &[
+            "FILE",
+            "DATASET",
+            "RIDFLD",
+            "INTO",
+            "LENGTH",
+            "KEYLENGTH",
+            "RESP",
+            "RESP2",
+        ],
+        HirCicsOperation::Rewrite => &["FILE", "DATASET", "FROM", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::Syncpoint => &["RESP", "RESP2"],
     };
     let allowed_options: &[&str] = match operation {
@@ -1013,6 +1026,26 @@ fn resolve_cics(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCi
             });
         }
     }
+    let mut length_output = None;
+    for (name, identity) in [
+        ("LENGTH", HirCicsOperandName::Length),
+        ("KEYLENGTH", HirCicsOperandName::KeyLength),
+    ] {
+        if let Some(value) = clauses.get(name) {
+            let value = cics_numeric_value(value, semantic)?;
+            if operation == HirCicsOperation::Read
+                && identity == HirCicsOperandName::Length
+                && let HirCicsValue::Data(target) = &value
+            {
+                require_writable(target)?;
+                length_output = Some(target.clone());
+            }
+            operands.push(HirCicsNamedOperand {
+                name: identity,
+                value,
+            });
+        }
+    }
     let mut outputs = Vec::new();
     for (name, identity) in [
         ("INTO", HirCicsOutputName::Into),
@@ -1030,6 +1063,12 @@ fn resolve_cics(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCi
                 target,
             });
         }
+    }
+    if let Some(target) = length_output {
+        outputs.push(HirCicsOutputBinding {
+            name: HirCicsOutputName::Length,
+            target,
+        });
     }
     let mut options = raw_options
         .iter()
@@ -1100,6 +1139,26 @@ fn cics_value(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCics
         return Err(ResolutionFailure::Unsupported);
     }
     complete_data_reference(tokens, semantic).map(HirCicsValue::Data)
+}
+
+fn cics_numeric_value(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsValue> {
+    if tokens
+        .first()
+        .is_some_and(|token| token.eq_ignore_ascii_case("LENGTH"))
+        && tokens
+            .get(1)
+            .is_some_and(|token| token.eq_ignore_ascii_case("OF"))
+    {
+        return complete_data_reference(&tokens[2..], semantic).map(HirCicsValue::LengthOf);
+    }
+    let reference = complete_data_reference(tokens, semantic)?;
+    if reference.category != DataCategory::Binary || reference.length != 2 {
+        return Err(ResolutionFailure::Invalid(format!(
+            "{} is not a halfword binary data item",
+            reference.qualified_name
+        )));
+    }
+    Ok(HirCicsValue::Data(reference))
 }
 
 fn complete_data_reference(
@@ -1857,6 +1916,65 @@ mod tests {
     }
 
     #[test]
+    fn cics_file_lengths_lower_as_typed_values_and_read_output() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(3). 01 LEN-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) LENGTH(LEN-X) KEYLENGTH(LENGTH OF KEY-X) END-EXEC. EXEC CICS REWRITE FILE('ACCTDAT') FROM(REC-X) LENGTH(LENGTH OF REC-X) END-EXEC. STOP RUN.";
+        let hir = analyze(source).hir.expect("typed CICS length HIR");
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 2);
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(operand.value, HirCicsValue::Data(_))
+        }));
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::KeyLength
+                && matches!(operand.value, HirCicsValue::LengthOf(_))
+        }));
+        assert!(
+            commands[0]
+                .outputs
+                .iter()
+                .any(|output| output.name == HirCicsOutputName::Length)
+        );
+        assert!(commands[1].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(operand.value, HirCicsValue::LengthOf(_))
+        }));
+        assert!(
+            !commands[1]
+                .outputs
+                .iter()
+                .any(|output| output.name == HirCicsOutputName::Length)
+        );
+    }
+
+    #[test]
+    fn cics_file_length_data_items_require_halfword_binary_storage() {
+        for command in [
+            "READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) LENGTH(TEXT-X)",
+            "READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) KEYLENGTH(FULL-X)",
+            "REWRITE FILE('ACCTDAT') FROM(REC-X) LENGTH(FULL-X)",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLBAD. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(3). 01 TEXT-X PIC X(2). 01 FULL-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(analysis.diagnostics.iter().any(|diagnostic| {
+                diagnostic
+                    .public_message()
+                    .contains("is not a halfword binary data item")
+            }));
+        }
+    }
+
+    #[test]
     fn cics_resp_binding_wins_over_an_explicit_nohandle_flag() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSRESP. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(4). 01 KEY-X PIC X(3) VALUE '003'. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) NOHANDLE RESP(RESP-X) END-EXEC. STOP RUN.";
         let hir = analyze(source).hir.expect("typed CICS RESP policy HIR");
@@ -2406,6 +2524,22 @@ mod tests {
                 "NOSUSPEND",
             ),
             ("REWRITE FILE('ACCTDAT') FROM(REC-X) NOSUSPEND", "NOSUSPEND"),
+            (
+                "READ FILE('ACCTDAT') RIDFLD(KEY-X) INTO(REC-X) KEYLENGTH(LENGTH OF KEY-X) GENERIC",
+                "GENERIC",
+            ),
+            (
+                "READ FILE('ACCTDAT') RIDFLD(KEY-X) INTO(REC-X) GTEQ",
+                "GTEQ",
+            ),
+            (
+                "READ FILE('ACCTDAT') RIDFLD(KEY-X) INTO(REC-X) EQUAL",
+                "EQUAL",
+            ),
+            (
+                "READ FILE('ACCTDAT') RIDFLD(KEY-X) INTO(REC-X) SYSID('REM1')",
+                "SYSID",
+            ),
         ] {
             let source = format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFORM. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2). 01 REC-X PIC X(8). 01 PTR-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."

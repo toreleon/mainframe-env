@@ -171,12 +171,17 @@ impl PlanContext<'_> {
                 HirCicsOperandName::Dataset => CicsOperandName::Dataset,
                 HirCicsOperandName::From => CicsOperandName::From,
                 HirCicsOperandName::Ridfld => CicsOperandName::Ridfld,
+                HirCicsOperandName::Length => CicsOperandName::Length,
+                HirCicsOperandName::KeyLength => CicsOperandName::KeyLength,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
                     CicsOperandValue::Literal(value.as_bytes().to_vec())
                 }
                 HirCicsValue::Data(reference) => CicsOperandValue::Storage(self.slot(reference)?),
+                HirCicsValue::LengthOf(reference) => {
+                    CicsOperandValue::LengthOf(self.slot(reference)?)
+                }
             },
         })
     }
@@ -190,6 +195,7 @@ impl PlanContext<'_> {
                 HirCicsOutputName::Into => CicsOutputName::Into,
                 HirCicsOutputName::Resp => CicsOutputName::Resp,
                 HirCicsOutputName::Resp2 => CicsOutputName::Resp2,
+                HirCicsOutputName::Length => CicsOutputName::Length,
             },
             target: self.slot(&output.target)?,
         })
