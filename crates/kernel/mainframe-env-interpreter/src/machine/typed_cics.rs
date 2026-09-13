@@ -434,6 +434,7 @@ pub(super) fn execute_legacy(
             "OPERATION",
             "OPERKEYS",
             "OPSECURITY",
+            "PARTNSET",
             "PLATFORM",
             "PROGRAM",
             "RESTART",

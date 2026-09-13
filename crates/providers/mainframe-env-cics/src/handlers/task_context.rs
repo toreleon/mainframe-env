@@ -39,12 +39,13 @@ pub(in crate::service) fn assign(
     let screen_requested = screen_options
         .iter()
         .any(|name| request.arguments.contains_key(*name));
-    let dimensions = if !dpl && (screen_requested || request.arguments.contains_key("FCI")) {
+    let terminal_required = screen_requested || request.arguments.contains_key("PARTNSET");
+    let dimensions = if !dpl && (terminal_required || request.arguments.contains_key("FCI")) {
         terminal_dimensions(service, run)?
     } else {
         None
     };
-    let terminal_missing = !dpl && screen_requested && dimensions.is_none();
+    let terminal_missing = !dpl && terminal_required && dimensions.is_none();
     let link_level = request
         .arguments
         .contains_key("LINKLEVEL")
@@ -57,6 +58,7 @@ pub(in crate::service) fn assign(
             "FCI",
             "NEXTTRANSID",
             "OPSECURITY",
+            "PARTNSET",
             "SCRNHT",
             "SCRNWD",
             "TCTUALENG",
@@ -125,6 +127,11 @@ pub(in crate::service) fn assign(
                     .outputs
                     .insert(name.into(), decimal_payload(i64::from(value))?);
             }
+        }
+        if request.arguments.contains_key("PARTNSET") {
+            response
+                .outputs
+                .insert("PARTNSET".into(), bounded(vec![b' '; 6])?);
         }
     }
     if !dpl_prohibited && request.arguments.contains_key("FCI") {
@@ -271,6 +278,7 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "OPERATION",
         "OPERKEYS",
         "OPSECURITY",
+        "PARTNSET",
         "PLATFORM",
         "PROGRAM",
         "RESP",

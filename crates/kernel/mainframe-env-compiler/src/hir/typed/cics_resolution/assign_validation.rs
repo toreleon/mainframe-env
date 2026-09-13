@@ -37,6 +37,7 @@ pub(super) fn validate(
         "OPERATION",
         "OPERKEYS",
         "OPSECURITY",
+        "PARTNSET",
         "PLATFORM",
         "PROGRAM",
         "RESTART",
@@ -96,6 +97,7 @@ pub(super) fn validate(
             || (name == "OPERKEYS" && target.length != 8)
             || (name == "OPSECURITY" && target.length != 3)
             || (name == "NEXTTRANSID" && target.length != 4)
+            || (name == "PARTNSET" && target.length != 6)
             || (name == "PROGRAM" && target.length != 8)
             || (name == "RESTART" && target.length != 1)
         {

@@ -75,7 +75,8 @@ All notable changes to mainframe-env are documented here.
   supported terminal facility (`X'01'`) from no facility (`X'00'`) and is also
   DPL-prohibited. LINKLEVEL returns one for a top-level local program and two
   for a DPL target behind its level-one mirror; unmodeled deeper local stacks
-  fail closed.
+  fail closed. With no application partition set, PARTNSET returns six blanks
+  on a terminal task and follows the local/DPL `INVREQ` matrix.
 - Added online continuation format `MEOM4`, which retains the current task
   priority and an optional staged program-transfer handoff. Readers preserve
   `MEOM3` priority rows and historical `MEOM2` rows without that field.

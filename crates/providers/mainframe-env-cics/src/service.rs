@@ -4785,6 +4785,7 @@ mod tests {
                 ("DEFSCRNHT".into(), argument(b"DEFAULT-HEIGHT-OUT")),
                 ("DEFSCRNWD".into(), argument(b"DEFAULT-WIDTH-OUT")),
                 ("FCI".into(), argument(b"FCI-OUT")),
+                ("PARTNSET".into(), argument(b"PARTITION-SET-OUT")),
                 ("SCRNHT".into(), argument(b"SCREEN-HEIGHT-OUT")),
                 ("SCRNWD".into(), argument(b"SCREEN-WIDTH-OUT")),
             ]),
@@ -4810,7 +4811,7 @@ mod tests {
         );
         assert_eq!(no_terminal.outputs["APPLID"].bytes(), b"MEAPPL");
         assert_eq!(no_terminal.outputs["FCI"].bytes(), &[0]);
-        for name in ["DEFSCRNHT", "DEFSCRNWD", "SCRNHT", "SCRNWD"] {
+        for name in ["DEFSCRNHT", "DEFSCRNWD", "PARTNSET", "SCRNHT", "SCRNWD"] {
             assert!(!no_terminal.outputs.contains_key(name));
         }
 
@@ -5137,6 +5138,7 @@ mod tests {
                 ("FCI".into(), argument(b"FCI-OUT")),
                 ("NEXTTRANSID".into(), argument(b"NEXT-TRANS-OUT")),
                 ("OPSECURITY".into(), argument(b"OPSECURITY-OUT")),
+                ("PARTNSET".into(), argument(b"PARTITION-SET-OUT")),
                 ("SCRNHT".into(), argument(b"SCREEN-HEIGHT-OUT")),
                 ("SCRNWD".into(), argument(b"SCREEN-WIDTH-OUT")),
                 ("TCTUALENG".into(), argument(b"TCTUA-LENGTH-OUT")),
@@ -5169,6 +5171,7 @@ mod tests {
             "FCI",
             "NEXTTRANSID",
             "OPSECURITY",
+            "PARTNSET",
             "SCRNHT",
             "SCRNWD",
             "TCTUALENG",

@@ -90,6 +90,9 @@ contract explicitly permits it.
   LINKLEVEL is halfword one for a top-level local program and two for a DPL
   target behind its level-one mirror. Deeper local program stacks require an
   owned CICS link-depth context and otherwise fail closed.
+  PARTNSET returns six blanks for an owned terminal with no application
+  partition set; nonterminal and DPL contexts follow the screen-option INVREQ
+  rules.
   Other source-valid ASSIGN options remain rejected until their terminal,
   program-level, or failure context has an owned runtime representation.
 - Terminal execution outcomes carry an explicit transaction-dump disposition.
