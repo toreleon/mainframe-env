@@ -178,22 +178,34 @@ Typed `CHANGE TASK PRIORITY` and `SUSPEND` use a distinct
 yielding, so resume cannot execute the same scheduling request twice. A valid
 priority change is returned as typed control metadata and updates both the CICS
 run and interpreter invocation; omission and `-1` do not yield. Product
-continuation format `MEOM3` stores the resulting priority beside the machine
-checkpoint and provider generations. The reader retains `MEOM2` compatibility,
-using the enclosing exchange priority when the historical row has no explicit
-field. Scheduler suspension keeps the execution and online exchange live until
-the next bounded redispatch, unlike terminal-input handoff.
+continuation format `MEOM4` stores the resulting priority beside the machine
+checkpoint and provider generations. It can also stage a program-transfer
+exchange before terminalizing the artifact-bound source execution. The reader
+retains `MEOM3` priority rows and `MEOM2` compatibility, using the enclosing
+exchange priority when the oldest row has no explicit field. Scheduler
+suspension keeps the execution and online exchange live until the next bounded
+redispatch, unlike terminal-input handoff.
 
 Typed `SET ASSOCIATION USERCORRDATA` mutates the durable session that owns the
 originating task. The provider verifies the issuing and originating run-unit
 identities, overwrites rather than appends, and silently truncates the supplied
-bytes to 64. Current `MECS6` session rows bind the result to both the mutation
-key and canonical request digest and also carry the complete CICS HANDLE state.
+bytes to 64. Current `MECS7` session rows bind the result to both the mutation
+key and canonical request digest and also carry typed CICS HANDLE state.
 A replay-ledger crash gap can complete only the identical association request;
 a failed HANDLE-state CAS restores the prior volatile run. Readers retain
-`MECS1`–`MECS5`: versions 1–4 begin with no user correlator, and every historical
-version begins with empty HANDLE state. Session CAS is the single state
-authority across memory, SQLite, and PostgreSQL adapters.
+`MECS1`–`MECS6`: versions 1–4 begin with no user correlator, versions 1–5 begin
+with empty HANDLE state, and version 6 preserves label-only ABEND exits. Session
+CAS is the single state authority across memory, SQLite, and PostgreSQL
+adapters.
+
+An online program transfer never changes an admitted execution's artifact
+identity. The product first stores an `MEOM4` start checkpoint and next-exchange
+identity, terminalizes the source execution with `HandoffCompleted`, CASes the
+exchange to a new execution over the same CICS run unit, and then clears the
+staging marker. Recovery accepts only the exact prior or next exchange version,
+finishes an observed suspended predecessor once, and verifies the terminal
+handoff event before advancing. Thus a crash between any two writes cannot run
+the source artifact under the target identity or strand its checkpoint.
 
 When a terminal RECEIVE suspends a machine, the product first commits its own
 session continuation and then atomically moves the interpreter execution from

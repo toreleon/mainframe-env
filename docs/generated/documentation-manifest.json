@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:c999c0ef74cff119be8ee0e829cc702a40226a7ad8b50b7e5f707064df688f26",
+      "sha256": "sha256:e4346e7d04459caac245d8fca48a19a396be9e903739174a035b982c91f1ac4b",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -357,7 +357,7 @@
       "path": "docs/architecture/COBOL-RUNTIME-SEMANTICS.md",
       "relative_links": 0,
       "scope": "COBOL runtime semantic contracts",
-      "sha256": "sha256:3ecd27a5d3fa2b8bfbd021b7dcce27799f2c275bfbd09fa557dd159863efb472",
+      "sha256": "sha256:e9d73cc2ee7094f7af6d01829f294d48e248fa95795c2c1363a9af395657ae72",
       "status": "Frozen for mainframe-env 0.4.0 implementation",
       "title": "COBOL runtime semantic contracts",
       "xtask_commands": 0
@@ -429,7 +429,7 @@
       "path": "docs/architecture/EXECUTION-AND-DURABILITY.md",
       "relative_links": 1,
       "scope": "execution lifecycle, effects, work, checkpoints, and durability",
-      "sha256": "sha256:1885594fcd45bc624166c96df2c95426d73d02e77a69c03d09bff08cb34c3979",
+      "sha256": "sha256:dd2460e8eb88fc6fbfa9c7245a0af83158c95bd4617c5db3a0b01f729cbd4d8e",
       "status": "Accepted by repository owner",
       "title": "Execution and Durability Architecture",
       "xtask_commands": 0
@@ -1062,7 +1062,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:28fa0c66ca757907e8ca9659b145ac0df25427e96edc7c6ee4105241786e5c1a",
+      "sha256": "sha256:6d6a3a0f103edb1fa388907d5ecf0691b83998f659f66ef4dfee6a34ddd68651",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },
@@ -1430,7 +1430,7 @@
       "normative": false,
       "path": "docs/runbooks/CAPACITY-AND-RECOVERY.md",
       "relative_links": 2,
-      "sha256": "sha256:50c588dc9db8e40985e1a1bbc98d67b638089f86edef3901fb2243af43abc1c8",
+      "sha256": "sha256:454a8d8c65faf3f1626a3f9c3861507b96124fd92acb56605b368734191c7993",
       "title": "Capacity and recovery",
       "xtask_commands": 0
     },

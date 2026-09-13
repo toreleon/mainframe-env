@@ -54,9 +54,9 @@ All notable changes to mainframe-env are documented here.
   `CHANGE TASK` and `SUSPEND`. Priority omission and `-1` remain no-ops,
   priorities `0..255` update the task and yield once, invalid values return
   `INVREQ` 16/1, and SUSPEND produces a one-shot durable scheduler handoff.
-- Added online continuation format `MEOM3`, which retains the current task
-  priority across a scheduling suspension while continuing to read historical
-  `MEOM2` rows.
+- Added online continuation format `MEOM4`, which retains the current task
+  priority and an optional staged program-transfer handoff. Readers preserve
+  `MEOM3` priority rows and historical `MEOM2` rows without that field.
 - Added a zero-credit IBM source scope and typed CICS `SET ASSOCIATION
   USERCORRDATA`. The task-owned value overwrites with IBM's silent 64-byte
   truncation, enforces originating-task and command-security checks, and uses
@@ -92,10 +92,15 @@ All notable changes to mainframe-env are documented here.
 - Added typed CICS `HANDLE AID` for the 34 source-named terminal AIDs, including
   optional-label deactivation, exact-over-`ANYKEY` precedence, the complete
   reached DFHAID byte set, PUSH/POP participation, and DPL `INVREQ` 16/200.
-- Added durable `MECS6` CICS HANDLE state. Condition, AID, IGNORE, ABEND, and
-  nested PUSH/POP specifications now use session CAS, roll back on failed
-  persistence, survive a terminal-input handoff and SQLite reopen, and clear
-  when the task completes or recovery discards a non-handoff terminal task.
+- Added durable `MECS7` CICS HANDLE state. Condition, AID, IGNORE, typed
+  LABEL/PROGRAM ABEND exits, and nested PUSH/POP specifications now use session
+  CAS, roll back on failed persistence, survive a terminal-input handoff and
+  SQLite reopen, and clear when the task completes or recovery discards a
+  non-handoff terminal task. `MECS6` label-only state remains readable.
+- Added current-level CICS `HANDLE ABEND PROGRAM(name)` with exact local-program
+  SAF and PGMIDERR checks, issuing-program COMMAREA transfer, CANCEL/RESET and
+  PUSH/POP participation, a compiled two-program selected route, and recoverable
+  artifact-bound execution handoff. Outward LINK-level search remains pending.
 - Added the frozen-with-bounded-ambiguities CIC-901 command contract and generated
   263-row compiler registry. The registry explicitly separates three typed runtime
   handlers, 20 legacy compatibility handlers, and 240 unready handlers; automatic

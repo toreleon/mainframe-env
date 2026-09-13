@@ -1737,17 +1737,6 @@ impl ProductServer {
         Ok(selected)
     }
 
-    fn online_exchange(
-        &self,
-        session: &SessionId,
-    ) -> Result<Option<OnlineExchangeState>, HostProblem> {
-        self.store
-            .get_provider_state(ONLINE_EXCHANGE_NAMESPACE, session.as_str())
-            .map_err(store_error)?
-            .map(|record| decode_online_exchange(&record))
-            .transpose()
-    }
-
     fn begin_online_exchange(
         &self,
         session: &SessionId,
@@ -1803,30 +1792,6 @@ impl ProductServer {
             )
             .map_err(store_error)?;
         Ok(state)
-    }
-
-    fn persist_online_exchange(
-        &self,
-        session: &SessionId,
-        state: &mut OnlineExchangeState,
-    ) -> Result<(), HostProblem> {
-        let previous = state.version;
-        state.version = previous
-            .checked_add(1)
-            .ok_or(HostProblem::ResourceExhausted)?;
-        if let Err(error) = self.store.put_provider_state(
-            ProviderStateRecord {
-                namespace: ONLINE_EXCHANGE_NAMESPACE.into(),
-                key: session.as_str().into(),
-                version: state.version,
-                payload: encode_online_exchange(state)?,
-            },
-            Some(previous),
-        ) {
-            state.version = previous;
-            return Err(store_error(error));
-        }
-        Ok(())
     }
 
     fn clear_online_exchange(
@@ -2104,15 +2069,24 @@ impl ProductServer {
         program: &str,
         now_tick: u64,
     ) -> Result<(), HostProblem> {
-        let saved = self.preflight_online_continuation(session, Some(program))?;
+        let mut saved = self.preflight_online_continuation(session, None)?;
         if saved.is_none() {
             self.preflight_online_program(program)?;
         }
         let mut exchange = self.online_exchange(session)?;
+        self.recover_pending_online_transfer_if_present(
+            session,
+            &mut saved,
+            &mut exchange,
+            now_tick,
+        )?;
         if let Some(state) = exchange.as_ref() {
             self.preflight_online_exchange_state(state)?;
+            let expected_program = saved
+                .as_ref()
+                .map_or(program, |continuation| continuation.program.as_str());
             if state.principal != principal.as_str()
-                || state.program != normalize_online_name(program, 128)?
+                || state.program != normalize_online_name(expected_program, 128)?
             {
                 return Err(HostProblem::Unauthorized);
             }
@@ -2163,7 +2137,10 @@ impl ProductServer {
             }
             None => {
                 let context = self.cics.terminal_execution(session, principal, now_tick)?;
-                exchange = Some(self.begin_online_exchange(session, program, &context)?);
+                let exchange_program = saved
+                    .as_ref()
+                    .map_or(program, |continuation| continuation.program.as_str());
+                exchange = Some(self.begin_online_exchange(session, exchange_program, &context)?);
                 context
             }
         };
@@ -2210,7 +2187,7 @@ impl ProductServer {
                 .map_or(program, |saved| saved.program.as_str()),
             128,
         )?;
-        let root_idempotency = invocation.idempotency_key.as_str().to_string();
+        let mut root_idempotency = invocation.idempotency_key.as_str().to_string();
         for frame in 0..invocation.limits.max_frames {
             let artifact = self
                 .online_programs
@@ -2237,7 +2214,7 @@ impl ProductServer {
                     .map_err(|_| HostProblem::InfrastructureFailure)?;
             invocation.artifact = artifact.clone();
             invocation.idempotency_key = IdempotencyKey::new(
-                format!("{root_idempotency}:{frame}:{current}"),
+                format!("{root_idempotency}:{current}"),
                 InvocationLimits::default(),
             )
             .map_err(|_| HostProblem::ResourceExhausted)?;
@@ -2293,10 +2270,21 @@ impl ProductServer {
                     );
                 }
                 ExecutionOutcome::Transfer(transfer) if transfer.replace_frame => {
-                    let (next_program, _) =
+                    let (next_program, next_artifact) =
                         self.preflight_online_program(transfer.selector.as_str())?;
-                    self.clear_online_machine_continuation(session, saved_version)?;
-                    saved_version = None;
+                    let (next, checkpoint, next_version) = self.stage_online_program_transfer(
+                        session,
+                        &next_program,
+                        &next_artifact,
+                        &invocation,
+                        &transfer.payload,
+                        saved_version,
+                        exchange
+                            .as_mut()
+                            .ok_or(HostProblem::InfrastructureFailure)?,
+                        &coordinator,
+                        now_tick,
+                    )?;
                     self.online_traces
                         .lock()
                         .map_err(|_| HostProblem::InfrastructureFailure)?
@@ -2310,15 +2298,10 @@ impl ProductServer {
                             payload_bytes: 0,
                         });
                     current = next_program;
-                    invocation.bindings.insert(
-                        "cics.commarea".into(),
-                        BoundedPayload::new(
-                            "mainframe-env.cics.commarea@1",
-                            transfer.payload.bytes().to_vec(),
-                            InvocationLimits::default(),
-                        )
-                        .map_err(|_| HostProblem::ResourceExhausted)?,
-                    );
+                    invocation = next;
+                    root_idempotency = invocation.idempotency_key.as_str().into();
+                    saved_checkpoint = Some(checkpoint);
+                    saved_version = Some(next_version);
                 }
                 ExecutionOutcome::Condition(condition) => {
                     self.finish_known_online_failure(
@@ -6368,7 +6351,10 @@ mod tests {
     use axum::body::{Body, to_bytes};
     use axum::http::{Method, Request};
     use base64::Engine;
-    use continuation::{decode_online_machine_continuation, encode_online_machine_continuation};
+    use continuation::{
+        PendingOnlineTransfer, decode_online_machine_continuation,
+        encode_online_machine_continuation, encode_online_machine_continuation_with_transfer,
+    };
     use mainframe_env_compiler::CobolCompiler;
     use mainframe_env_compiler_api::{
         ARTIFACT_CONTRACT, ArtifactManifestV2, CompilationMode, CompileOptions, CompileTarget,
@@ -9852,7 +9838,14 @@ mod tests {
             .get_provider_state("online-machine-continuation", session.as_str())
             .unwrap()
             .unwrap();
-        let mut legacy = current_record.clone();
+        assert_eq!(&current_record.payload[..5], b"MEOM4");
+        let mut legacy3 = current_record.clone();
+        legacy3.payload.truncate(legacy3.payload.len() - 4);
+        legacy3.payload[..5].copy_from_slice(b"MEOM3");
+        let decoded_legacy3 = decode_online_machine_continuation(&legacy3).unwrap();
+        assert_eq!(decoded_legacy3.priority, Some(200));
+        assert!(decoded_legacy3.transfer.is_none());
+        let mut legacy = legacy3;
         let mut at = 5usize;
         for _ in 0..3 {
             let length = usize::try_from(u32::from_be_bytes(
@@ -10324,6 +10317,251 @@ mod tests {
         server
             .run_online_exchange(&session, &principal, "HABRESET", 3)
             .unwrap();
+        assert!(server.online_exchange(&session).unwrap().is_none());
+    }
+
+    #[test]
+    fn online_handle_abend_program_transfers_to_the_selected_exit() {
+        let limits = SourceLimits::default();
+        let compile = |name: &str, source: &[u8]| {
+            let filename = format!("{name}.cbl");
+            let path = LogicalPath::new(&filename, limits.max_path_bytes).unwrap();
+            let bundle = SourceBundle::new(
+                &path,
+                vec![
+                    SourceFile::input(
+                        &filename,
+                        source.to_vec(),
+                        SourceFormat::Free,
+                        SourceEncoding::Utf8,
+                        limits,
+                    )
+                    .unwrap(),
+                ],
+                BTreeMap::new(),
+                Vec::new(),
+                limits,
+            )
+            .unwrap();
+            let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+                .compile(CompilerRequest {
+                    source: bundle,
+                    mode: CompilationMode::Executable,
+                    target: CompileTarget::new("reference").unwrap(),
+                    options: CompileOptions::new(BTreeMap::new()).unwrap(),
+                })
+                .unwrap()
+            else {
+                panic!("{name} HANDLE ABEND PROGRAM fixture did not publish");
+            };
+            artifact
+        };
+        let main = compile(
+            "HABPROG",
+            b"IDENTIFICATION DIVISION.\nPROGRAM-ID. HABPROG.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 UNEXPECTED-HIT PIC X VALUE '0'.\nPROCEDURE DIVISION.\nEXEC CICS HANDLE ABEND PROGRAM('ABEXIT') END-EXEC.\nEXEC CICS ABEND ABCODE('B777') END-EXEC.\nMOVE '1' TO UNEXPECTED-HIT.\nSTOP RUN.\n",
+        );
+        let exit = compile(
+            "ABEXIT",
+            b"IDENTIFICATION DIVISION.\nPROGRAM-ID. ABEXIT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 EXIT-HIT PIC X VALUE '0'.\nPROCEDURE DIVISION.\nMOVE '1' TO EXIT-HIT.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .racf
+            .define_profile("FACILITY", "CICS.PROGRAM.ABEXIT", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "FACILITY",
+                "CICS.PROGRAM.ABEXIT",
+                "IBMUSER",
+                AccessIntent::Execute,
+            )
+            .unwrap();
+        let main_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(main.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let exit_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(exit.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![
+                    OnlineProgramDefinition {
+                        name: "HABPROG".into(),
+                        artifact: main_ref.clone(),
+                        payload: main.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(main.manifest().clone()),
+                        semantic_identity: main.semantic_id().to_reference(),
+                    },
+                    OnlineProgramDefinition {
+                        name: "ABEXIT".into(),
+                        artifact: exit_ref.clone(),
+                        payload: exit.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(exit.manifest().clone()),
+                        semantic_identity: exit.semantic_id().to_reference(),
+                    },
+                ],
+                transactions: BTreeMap::from([("HP00".into(), "HABPROG".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "HABPROG".into(),
+                    map: "HABPROG".into(),
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("handle-abend-program", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "HP00", Some(main_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "HP00",
+                24,
+                80,
+                "handle-abend-program-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        let original_exchange = server
+            .begin_online_exchange(&session, "HABPROG", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "HABPROG", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        assert_eq!(continuation.program, "ABEXIT");
+        assert_eq!(continuation.artifact, exit_ref);
+        let mut restored = ReferenceMachine::from_binary(
+            exit.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("EXIT-HIT").unwrap().bytes(), b"1");
+        let transferred_exchange = server.online_exchange(&session).unwrap().unwrap();
+        assert_eq!(transferred_exchange.program, "ABEXIT");
+        let transferred_execution = ExecutionId::new(
+            &transferred_exchange.execution_id,
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            server
+                .store
+                .audit_records(&invocation.execution_id, 1, 32)
+                .unwrap()
+                .into_iter()
+                .filter(|record| record.capability.as_str() == "host.cics.execute")
+                .map(|record| (record.effect_sequence, record.decision))
+                .collect::<Vec<_>>(),
+            (1..=2)
+                .map(|sequence| {
+                    (
+                        sequence,
+                        mainframe_env_execution_api::AuditDecision::Success,
+                    )
+                })
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            server
+                .store
+                .audit_records(&transferred_execution, 1, 32)
+                .unwrap()
+                .into_iter()
+                .filter(|record| record.capability.as_str() == "host.cics.execute")
+                .map(|record| (record.effect_sequence, record.decision))
+                .collect::<Vec<_>>(),
+            vec![(1, mainframe_env_execution_api::AuditDecision::Success,)]
+        );
+
+        let continuation_record = server
+            .store
+            .get_provider_state("online-machine-continuation", session.as_str())
+            .unwrap()
+            .unwrap();
+        let pending = PendingOnlineTransfer {
+            prior_execution_id: invocation.execution_id.as_str().into(),
+            expected_exchange_version: original_exchange.version,
+            next_exchange: transferred_exchange.clone(),
+        };
+        let staged = ProviderStateRecord {
+            namespace: "online-machine-continuation".into(),
+            key: session.as_str().into(),
+            version: continuation_record.version + 1,
+            payload: encode_online_machine_continuation_with_transfer(
+                &continuation.program,
+                &continuation.artifact,
+                &continuation.provider_generations,
+                continuation.priority.unwrap(),
+                &continuation.checkpoint,
+                Some(&pending),
+            )
+            .unwrap(),
+        };
+        server
+            .store
+            .put_provider_state(staged, Some(continuation_record.version))
+            .unwrap();
+        server
+            .store
+            .delete_provider_state(
+                ONLINE_EXCHANGE_NAMESPACE,
+                session.as_str(),
+                transferred_exchange.version,
+            )
+            .unwrap();
+        server
+            .store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: ONLINE_EXCHANGE_NAMESPACE.into(),
+                    key: session.as_str().into(),
+                    version: original_exchange.version,
+                    payload: encode_online_exchange(&original_exchange).unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        let mut saved = server.online_machine_continuation(&session).unwrap();
+        let mut exchange = server.online_exchange(&session).unwrap();
+        server
+            .recover_pending_online_transfer_if_present(&session, &mut saved, &mut exchange, 3)
+            .unwrap();
+        assert_eq!(exchange.unwrap(), transferred_exchange);
+        assert!(saved.unwrap().transfer.is_none());
+        server
+            .run_online_exchange(&session, &principal, "HABPROG", 4)
+            .unwrap();
+        assert!(
+            server
+                .online_machine_continuation(&session)
+                .unwrap()
+                .is_none()
+        );
         assert!(server.online_exchange(&session).unwrap().is_none());
     }
 

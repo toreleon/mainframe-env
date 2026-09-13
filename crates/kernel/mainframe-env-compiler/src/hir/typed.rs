@@ -2381,7 +2381,6 @@ mod tests {
     fn legacy_cics_routes_reject_catalog_options_without_runtime_semantics() {
         for (command, option) in [
             ("ASSIGN USERID(USER-X)", "USERID"),
-            ("HANDLE ABEND PROGRAM('PGM1')", "PROGRAM"),
             ("LINK PROGRAM('PGM1') CHANNEL('CHAN1')", "CHANNEL"),
             ("RETURN IMMEDIATE", "IMMEDIATE"),
             ("WRITEQ TD QUEUE('Q1') FROM('A') SYSID('R1')", "SYSID"),
@@ -2423,6 +2422,7 @@ mod tests {
             "ASSIGN APPLID(APPL-X)",
             "HANDLE ABEND",
             "HANDLE ABEND LABEL(ABEND-HANDLER)",
+            "HANDLE ABEND PROGRAM('ABEXIT')",
             "HANDLE ABEND RESET",
             "READNEXT DATASET('ACCTDAT') RIDFLD(KEY-X) INTO(REC-X) UPDATE",
         ] {

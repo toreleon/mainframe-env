@@ -64,23 +64,26 @@ single-region key profile.
 
 Back up `cics-session` rows containing task association or HANDLE state before
 enabling typed `SET ASSOCIATION USERCORRDATA` or durable handlers. Current
-`MECS6` rows carry at most 64 correlator bytes, the last mutation key and
-canonical request digest, and the complete bounded condition/AID/IGNORE/ABEND
-PUSH/POP state. Historical `MECS1`–`MECS4` rows decode with an empty correlator,
-`MECS5` retains its correlator, and all five historical versions decode with
-empty HANDLE state. If the session write succeeds but the outer replay row does
-not, retain the session row and retry only the identical key and request. A
-different digest is an idempotency conflict, and manual deletion of the session
-row loses both authoritative values.
+`MECS7` rows carry at most 64 correlator bytes, the last mutation key and
+canonical request digest, and the complete bounded condition/AID/IGNORE/typed
+ABEND PUSH/POP state. Historical `MECS1`–`MECS4` rows decode with an empty
+correlator, `MECS5` and `MECS6` retain theirs, versions 1–5 have empty HANDLE
+state, and `MECS6` retains label-only exits. If the session write succeeds but
+the outer replay row does not, retain the session row and retry only the
+identical key and request. A different digest is an idempotency conflict, and
+manual deletion of the session row loses both authoritative values.
 
 A `cics-scheduler` suspension from `CHANGE TASK` or `SUSPEND` is a one-shot
 yield, not a terminal handoff and not a command retry. Preserve the execution
 checkpoint, online exchange, and `online-machine-continuation` row, then resume
-the same execution through normal bounded admission. Current `MEOM3` rows carry
-the changed priority; historical `MEOM2` rows remain readable and inherit the
-priority already stored by their online exchange. Deleting either continuation
-can lose the post-command program counter and must be treated as failed
-recovery, not permission to reissue the CICS command.
+the same execution through normal bounded admission. Current `MEOM4` rows carry
+the changed priority and optional staged program transfer; `MEOM3` priority
+rows and historical `MEOM2` rows remain readable. For a nonempty transfer
+marker, retain both rows: recovery must observe the predecessor's exact
+`HandoffCompleted` event and CAS the recorded next exchange before clearing the
+marker. Deleting either continuation can lose the post-command program counter
+and must be treated as failed recovery, not permission to reissue the CICS
+command.
 
 If an exchange points at a terminal execution, first finish the abandoned
 COBOL/CICS run, remove its interpreter checkpoint, and delete the exchange.

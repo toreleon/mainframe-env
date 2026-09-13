@@ -6,13 +6,41 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub(super) const MAX_HANDLE_STACK_DEPTH: usize = 64;
 
+pub(in crate::service) fn session_schema_version(schema: &[u8]) -> Option<u8> {
+    match schema {
+        b"MECS1" => Some(1),
+        b"MECS2" => Some(2),
+        b"MECS3" => Some(3),
+        b"MECS4" => Some(4),
+        b"MECS5" => Some(5),
+        b"MECS6" => Some(6),
+        b"MECS7" => Some(7),
+        _ => None,
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::service) enum AbendExit {
+    Label(String),
+    Program(String),
+}
+
+impl AbendExit {
+    #[cfg(test)]
+    pub(in crate::service) fn target(&self) -> &str {
+        match self {
+            Self::Label(target) | Self::Program(target) => target,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::service) struct HandleFrame {
     pub(in crate::service) handlers: BTreeMap<String, String>,
     pub(in crate::service) aid_handlers: BTreeMap<String, String>,
     pub(in crate::service) ignored_conditions: BTreeSet<String>,
-    pub(in crate::service) abend_handler: Option<String>,
-    pub(in crate::service) cancelled_abend_handler: Option<String>,
+    pub(in crate::service) abend_handler: Option<AbendExit>,
+    pub(in crate::service) cancelled_abend_handler: Option<AbendExit>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -20,8 +48,8 @@ pub(in crate::service) struct HandleState {
     pub(in crate::service) handlers: BTreeMap<String, String>,
     pub(in crate::service) aid_handlers: BTreeMap<String, String>,
     pub(in crate::service) ignored_conditions: BTreeSet<String>,
-    pub(in crate::service) abend_handler: Option<String>,
-    pub(in crate::service) cancelled_abend_handler: Option<String>,
+    pub(in crate::service) abend_handler: Option<AbendExit>,
+    pub(in crate::service) cancelled_abend_handler: Option<AbendExit>,
     pub(in crate::service) stack: Vec<HandleFrame>,
 }
 
@@ -85,8 +113,8 @@ pub(super) fn encode_handle_state(
         &state.handlers,
         &state.aid_handlers,
         &state.ignored_conditions,
-        state.abend_handler.as_deref(),
-        state.cancelled_abend_handler.as_deref(),
+        state.abend_handler.as_ref(),
+        state.cancelled_abend_handler.as_ref(),
     )?;
     if state.stack.len() > MAX_HANDLE_STACK_DEPTH {
         return Err(HostProblem::InfrastructureFailure);
@@ -102,8 +130,8 @@ pub(super) fn encode_handle_state(
             &frame.handlers,
             &frame.aid_handlers,
             &frame.ignored_conditions,
-            frame.abend_handler.as_deref(),
-            frame.cancelled_abend_handler.as_deref(),
+            frame.abend_handler.as_ref(),
+            frame.cancelled_abend_handler.as_ref(),
         )?;
     }
     Ok(())
@@ -114,8 +142,8 @@ fn encode_handle_specifications(
     handlers: &BTreeMap<String, String>,
     aid_handlers: &BTreeMap<String, String>,
     ignored: &BTreeSet<String>,
-    abend: Option<&str>,
-    cancelled_abend: Option<&str>,
+    abend: Option<&AbendExit>,
+    cancelled_abend: Option<&AbendExit>,
 ) -> Result<(), HostProblem> {
     encode_named_labels(out, handlers, CICS_CONDITION_NAMES, false)?;
     encode_named_labels(out, aid_handlers, CICS_AID_NAMES, true)?;
@@ -133,11 +161,8 @@ fn encode_handle_specifications(
         }
         field(out, name.as_bytes())?;
     }
-    for label in [abend, cancelled_abend] {
-        if label.is_some_and(|label| label.is_empty() || !valid_condition_label(label)) {
-            return Err(HostProblem::InfrastructureFailure);
-        }
-        field(out, label.unwrap_or("").as_bytes())?;
+    for exit in [abend, cancelled_abend] {
+        encode_abend_exit(out, exit)?;
     }
     Ok(())
 }
@@ -158,7 +183,7 @@ fn encode_named_labels(
     );
     for (name, label) in values {
         if allowed.binary_search(&name.as_str()).is_err()
-            || !valid_condition_label(label)
+            || !label.is_empty() && !valid_condition_label(label)
             || !allow_empty && label.is_empty()
         {
             return Err(HostProblem::InfrastructureFailure);
@@ -169,11 +194,28 @@ fn encode_named_labels(
     Ok(())
 }
 
+fn encode_abend_exit(out: &mut Vec<u8>, exit: Option<&AbendExit>) -> Result<(), HostProblem> {
+    match exit {
+        None => out.push(0),
+        Some(AbendExit::Label(label)) if valid_condition_label(label) => {
+            out.push(1);
+            field(out, label.as_bytes())?;
+        }
+        Some(AbendExit::Program(program)) if valid_program_name(program) => {
+            out.push(2);
+            field(out, program.as_bytes())?;
+        }
+        Some(_) => return Err(HostProblem::InfrastructureFailure),
+    }
+    Ok(())
+}
+
 pub(in crate::service) fn decode_handle_state(
     reader: &mut Reader<'_>,
+    legacy_abend_labels: bool,
 ) -> Result<HandleState, HostProblem> {
     let (handlers, aid_handlers, ignored_conditions, abend_handler, cancelled_abend_handler) =
-        decode_handle_specifications(reader)?;
+        decode_handle_specifications(reader, legacy_abend_labels)?;
     let depth = usize::try_from(u32::from_be_bytes(
         reader
             .take(4)?
@@ -187,7 +229,7 @@ pub(in crate::service) fn decode_handle_state(
     let mut stack = Vec::with_capacity(depth);
     for _ in 0..depth {
         let (handlers, aid_handlers, ignored_conditions, abend_handler, cancelled_abend_handler) =
-            decode_handle_specifications(reader)?;
+            decode_handle_specifications(reader, legacy_abend_labels)?;
         stack.push(HandleFrame {
             handlers,
             aid_handlers,
@@ -210,12 +252,13 @@ type DecodedHandleSpecifications = (
     BTreeMap<String, String>,
     BTreeMap<String, String>,
     BTreeSet<String>,
-    Option<String>,
-    Option<String>,
+    Option<AbendExit>,
+    Option<AbendExit>,
 );
 
 fn decode_handle_specifications(
     reader: &mut Reader<'_>,
+    legacy_abend_labels: bool,
 ) -> Result<DecodedHandleSpecifications, HostProblem> {
     let handlers = decode_named_labels(reader, CICS_CONDITION_NAMES, false)?;
     let aid_handlers = decode_named_labels(reader, CICS_AID_NAMES, true)?;
@@ -237,16 +280,38 @@ fn decode_handle_specifications(
             return Err(HostProblem::InfrastructureFailure);
         }
     }
-    let mut label = || -> Result<Option<String>, HostProblem> {
-        let value =
-            String::from_utf8(reader.field(InvocationLimits::default().max_identity_bytes)?)
-                .map_err(|_| HostProblem::InfrastructureFailure)?;
-        if !value.is_empty() && !valid_condition_label(&value) {
-            return Err(HostProblem::InfrastructureFailure);
-        }
-        Ok((!value.is_empty()).then_some(value))
+    let (abend, cancelled_abend) = if legacy_abend_labels {
+        (
+            decode_legacy_abend_label(reader)?,
+            decode_legacy_abend_label(reader)?,
+        )
+    } else {
+        (decode_abend_exit(reader)?, decode_abend_exit(reader)?)
     };
-    Ok((handlers, aid_handlers, ignored, label()?, label()?))
+    Ok((handlers, aid_handlers, ignored, abend, cancelled_abend))
+}
+
+fn decode_legacy_abend_label(reader: &mut Reader<'_>) -> Result<Option<AbendExit>, HostProblem> {
+    let value = String::from_utf8(reader.field(InvocationLimits::default().max_identity_bytes)?)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    if !value.is_empty() && !valid_condition_label(&value) {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok((!value.is_empty()).then_some(AbendExit::Label(value)))
+}
+
+fn decode_abend_exit(reader: &mut Reader<'_>) -> Result<Option<AbendExit>, HostProblem> {
+    let kind = reader.take(1)?[0];
+    if kind == 0 {
+        return Ok(None);
+    }
+    let target = String::from_utf8(reader.field(InvocationLimits::default().max_identity_bytes)?)
+        .map_err(|_| HostProblem::InfrastructureFailure)?;
+    match kind {
+        1 if valid_condition_label(&target) => Ok(Some(AbendExit::Label(target))),
+        2 if valid_program_name(&target) => Ok(Some(AbendExit::Program(target))),
+        _ => Err(HostProblem::InfrastructureFailure),
+    }
 }
 
 fn decode_named_labels(
@@ -272,7 +337,7 @@ fn decode_named_labels(
             String::from_utf8(reader.field(InvocationLimits::default().max_identity_bytes)?)
                 .map_err(|_| HostProblem::InfrastructureFailure)?;
         if allowed.binary_search(&name.as_str()).is_err()
-            || !valid_condition_label(&label)
+            || !label.is_empty() && !valid_condition_label(&label)
             || !allow_empty && label.is_empty()
             || values.insert(name, label).is_some()
         {
@@ -283,8 +348,13 @@ fn decode_named_labels(
 }
 
 fn valid_condition_label(value: &str) -> bool {
-    value.len() <= InvocationLimits::default().max_identity_bytes
+    !value.is_empty()
+        && value.len() <= InvocationLimits::default().max_identity_bytes
         && value
             .bytes()
             .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'-')
+}
+
+fn valid_program_name(value: &str) -> bool {
+    matches!(value.len(), 1..=8) && value.bytes().all(|byte| byte.is_ascii_alphanumeric())
 }

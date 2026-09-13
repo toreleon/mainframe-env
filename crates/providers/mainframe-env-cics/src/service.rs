@@ -191,8 +191,8 @@ struct Run {
     handlers: BTreeMap<String, String>,
     aid_handlers: BTreeMap<String, String>,
     ignored_conditions: BTreeSet<String>,
-    abend_handler: Option<String>,
-    cancelled_abend_handler: Option<String>,
+    abend_handler: Option<handlers::AbendExit>,
+    cancelled_abend_handler: Option<handlers::AbendExit>,
     handle_stack: Vec<handlers::HandleFrame>,
     retrieve: Vec<u8>,
     current_records: BTreeMap<String, Vec<u8>>,
@@ -3103,13 +3103,8 @@ fn decode_map(bytes: &[u8], limits: CicsLimits) -> Result<BmsMapDefinition, Host
 
 fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Session, HostProblem> {
     let mut reader = Reader { bytes, at: 0 };
-    let schema = reader.take(5)?;
-    if !matches!(
-        schema,
-        b"MECS1" | b"MECS2" | b"MECS3" | b"MECS4" | b"MECS5" | b"MECS6"
-    ) {
-        return Err(HostProblem::InfrastructureFailure);
-    }
+    let schema = handlers::session_schema_version(reader.take(5)?)
+        .ok_or(HostProblem::InfrastructureFailure)?;
     let rows = u16::from_be_bytes(
         reader
             .take(2)?
@@ -3130,7 +3125,7 @@ fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Sess
         idle_timeout_ticks,
         expires_at_tick,
         connected,
-    ) = if matches!(schema, b"MECS2" | b"MECS3" | b"MECS4" | b"MECS5" | b"MECS6") {
+    ) = if schema >= 2 {
         let principal = String::from_utf8(reader.field(128)?)
             .map_err(|_| HostProblem::InfrastructureFailure)?;
         let transaction =
@@ -3196,7 +3191,7 @@ fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Sess
         1 => true,
         _ => return Err(HostProblem::InfrastructureFailure),
     };
-    let (mapset, map) = if matches!(schema, b"MECS2" | b"MECS3" | b"MECS4" | b"MECS5" | b"MECS6") {
+    let (mapset, map) = if schema >= 2 {
         let mapset =
             String::from_utf8(reader.field(16)?).map_err(|_| HostProblem::InfrastructureFailure)?;
         let map =
@@ -3208,7 +3203,7 @@ fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Sess
     } else {
         (None, None)
     };
-    let field_protection = if matches!(schema, b"MECS3" | b"MECS4" | b"MECS5" | b"MECS6") {
+    let field_protection = if schema >= 3 {
         let count = usize::try_from(u32::from_be_bytes(
             reader
                 .take(4)?
@@ -3236,12 +3231,12 @@ fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Sess
     } else {
         BTreeMap::new()
     };
-    let field_modified = if matches!(schema, b"MECS4" | b"MECS5" | b"MECS6") {
+    let field_modified = if schema >= 4 {
         handlers::decode_session_flags(&mut reader, limits)?
     } else {
         BTreeMap::new()
     };
-    let field_values = if matches!(schema, b"MECS4" | b"MECS5" | b"MECS6") {
+    let field_values = if schema >= 4 {
         let count = usize::try_from(u32::from_be_bytes(
             reader
                 .take(4)?
@@ -3271,41 +3266,40 @@ fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Sess
         1 => Some(reader.field(limits.max_screen_bytes)?),
         _ => return Err(HostProblem::InfrastructureFailure),
     };
-    let (user_corr_data, user_corr_effect_key, user_corr_request_digest) =
-        if matches!(schema, b"MECS5" | b"MECS6") {
-            let data = reader.field(64)?;
-            let key = String::from_utf8(reader.field(256)?)
-                .map_err(|_| HostProblem::InfrastructureFailure)?;
-            let digest = match reader.take(1)?[0] {
-                0 => None,
-                1 => Some(
-                    reader
-                        .take(32)?
-                        .try_into()
-                        .map_err(|_| HostProblem::InfrastructureFailure)?,
-                ),
-                _ => return Err(HostProblem::InfrastructureFailure),
-            };
-            if key.is_empty() && (digest.is_some() || !data.is_empty())
-                || !key.is_empty() && digest.is_none()
-            {
-                return Err(HostProblem::InfrastructureFailure);
-            }
-            let key = if key.is_empty() {
-                None
-            } else {
-                IdempotencyKey::new(&key, InvocationLimits::default())
-                    .map_err(|_| HostProblem::InfrastructureFailure)?;
-                Some(key)
-            };
-            (data, key, digest)
-        } else {
-            (Vec::new(), None, None)
+    let (user_corr_data, user_corr_effect_key, user_corr_request_digest) = if schema >= 5 {
+        let data = reader.field(64)?;
+        let key = String::from_utf8(reader.field(256)?)
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let digest = match reader.take(1)?[0] {
+            0 => None,
+            1 => Some(
+                reader
+                    .take(32)?
+                    .try_into()
+                    .map_err(|_| HostProblem::InfrastructureFailure)?,
+            ),
+            _ => return Err(HostProblem::InfrastructureFailure),
         };
-    let handle_state = if schema == b"MECS6" {
-        handlers::decode_handle_state(&mut reader)?
+        if key.is_empty() && (digest.is_some() || !data.is_empty())
+            || !key.is_empty() && digest.is_none()
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let key = if key.is_empty() {
+            None
+        } else {
+            IdempotencyKey::new(&key, InvocationLimits::default())
+                .map_err(|_| HostProblem::InfrastructureFailure)?;
+            Some(key)
+        };
+        (data, key, digest)
     } else {
-        handlers::HandleState::default()
+        (Vec::new(), None, None)
+    };
+    let handle_state = match schema {
+        6 => handlers::decode_handle_state(&mut reader, true)?,
+        7 => handlers::decode_handle_state(&mut reader, false)?,
+        _ => handlers::HandleState::default(),
     };
     if reader.at != bytes.len() || rows == 0 || columns == 0 {
         return Err(HostProblem::InfrastructureFailure);
@@ -5281,6 +5275,181 @@ mod tests {
     }
 
     #[test]
+    fn handle_abend_program_checks_and_transfers_the_issuing_commarea() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        service
+            .register_programs(&BTreeSet::from(["ABEXIT".into()]))
+            .unwrap();
+        let invocation = invocation_for(
+            "handle-abend-program",
+            BTreeMap::from([("cics.retrieve".into(), argument(b"ISSUER-COMMAREA"))]),
+        );
+        let session = SessionId::new("handle-abend-program", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let invoke = |request: CicsRequest, sequence| {
+            service.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), sequence),
+                request,
+            )
+        };
+        invoke(
+            request(
+                CicsOperation::HandleAbend,
+                BTreeMap::from([("PROGRAM".into(), argument(b"abexit "))]),
+                1,
+            ),
+            1,
+        )
+        .unwrap();
+        let transferred = invoke(
+            request(
+                CicsOperation::Abend,
+                BTreeMap::from([("ABCODE".into(), argument(b"B001"))]),
+                2,
+            ),
+            2,
+        )
+        .unwrap();
+        assert_eq!(
+            (
+                transferred.disposition,
+                transferred.target.as_deref(),
+                transferred.payload.bytes(),
+            ),
+            (
+                CicsDisposition::Transfer,
+                Some("ABEXIT"),
+                b"ISSUER-COMMAREA".as_slice(),
+            )
+        );
+        invoke(
+            request(
+                CicsOperation::HandleAbend,
+                BTreeMap::from([("OPTION.RESET".into(), argument(b""))]),
+                3,
+            ),
+            3,
+        )
+        .unwrap();
+        let unmatched_pop =
+            invoke(request(CicsOperation::PopHandle, BTreeMap::new(), 4), 4).unwrap();
+        assert_eq!(
+            (
+                unmatched_pop.disposition,
+                unmatched_pop.condition.as_str(),
+                unmatched_pop.target.as_deref(),
+                unmatched_pop.payload.bytes(),
+            ),
+            (
+                CicsDisposition::Transfer,
+                "INVREQ",
+                Some("ABEXIT"),
+                b"ISSUER-COMMAREA".as_slice(),
+            )
+        );
+
+        let missing = self::service(Arc::new(MemoryStore::new(Default::default())));
+        let (missing_invocation, _) = registered(&missing);
+        let mut missing_request = request(
+            CicsOperation::HandleAbend,
+            BTreeMap::from([("PROGRAM".into(), argument(b"MISSING"))]),
+            1,
+        );
+        missing_request.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let response = missing
+            .invoke(
+                &effect(&missing_invocation.run_unit_id, missing_request.clone(), 1),
+                missing_request,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                response.disposition,
+                response.condition.as_str(),
+                response.response,
+                response.response2,
+            ),
+            (CicsDisposition::Complete, "PGMIDERR", 27, 1)
+        );
+        assert_eq!(
+            handlers::HandleState::from_run(
+                missing
+                    .lock()
+                    .unwrap()
+                    .runs
+                    .get(&missing_invocation.run_unit_id)
+                    .unwrap(),
+            ),
+            handlers::HandleState::default()
+        );
+
+        let (host, _) = command_authorities(true);
+        let denied = CicsService::open(
+            host,
+            Arc::new(MemoryStore::new(Default::default())),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        denied
+            .register_programs(&BTreeSet::from(["ABEXIT".into()]))
+            .unwrap();
+        let (denied_invocation, _) = registered(&denied);
+        let mut denied_request = request(
+            CicsOperation::HandleAbend,
+            BTreeMap::from([("PROGRAM".into(), argument(b"ABEXIT"))]),
+            1,
+        );
+        denied_request.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let response = denied
+            .invoke(
+                &effect(&denied_invocation.run_unit_id, denied_request.clone(), 1),
+                denied_request,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                response.condition.as_str(),
+                response.response,
+                response.response2,
+            ),
+            ("NOTAUTH", 70, 0)
+        );
+        assert_eq!(
+            handlers::HandleState::from_run(
+                denied
+                    .lock()
+                    .unwrap()
+                    .runs
+                    .get(&denied_invocation.run_unit_id)
+                    .unwrap(),
+            ),
+            handlers::HandleState::default()
+        );
+
+        let malformed = request(
+            CicsOperation::HandleAbend,
+            BTreeMap::from([("PROGRAM".into(), argument(b"TOO-LONG9"))]),
+            5,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, malformed.clone(), 5),
+                malformed,
+            ),
+            Err(HostProblem::Malformed)
+        );
+    }
+
+    #[test]
     fn handle_stack_nests_restores_and_reports_unmatched_pop_exactly() {
         let service = service(Arc::new(MemoryStore::new(Default::default())));
         let (invocation, _) = registered(&service);
@@ -6020,6 +6189,9 @@ mod tests {
             let store: Arc<dyn ProviderStateStore> =
                 Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
             let service = service(store);
+            service
+                .register_programs(&BTreeSet::from(["ABEXIT".into()]))
+                .unwrap();
             service.create_session(&session, 24, 80).unwrap();
             service
                 .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
@@ -6082,7 +6254,7 @@ mod tests {
             .unwrap();
             invoke(
                 CicsOperation::HandleAbend,
-                BTreeMap::from([("LABEL".into(), argument(b"INNER-ABEND"))]),
+                BTreeMap::from([("PROGRAM".into(), argument(b"ABEXIT"))]),
                 9,
             )
             .unwrap();
@@ -6094,12 +6266,25 @@ mod tests {
             assert_eq!(expected.handlers["ERROR"], "INNER-COND");
             assert_eq!(expected.aid_handlers["PF2"], "INNER-AID");
             assert!(expected.ignored_conditions.contains("PGMIDERR"));
-            assert_eq!(expected.abend_handler.as_deref(), Some("INNER-ABEND"));
+            assert_eq!(
+                expected
+                    .abend_handler
+                    .as_ref()
+                    .map(handlers::AbendExit::target),
+                Some("ABEXIT")
+            );
+            assert!(matches!(
+                expected.abend_handler,
+                Some(handlers::AbendExit::Program(_))
+            ));
             assert_eq!(expected.stack[0].handlers["INVREQ"], "OUTER-COND");
             assert_eq!(expected.stack[0].aid_handlers["PF1"], "OUTER-AID");
             assert!(expected.stack[0].ignored_conditions.contains("LENGERR"));
             assert_eq!(
-                expected.stack[0].abend_handler.as_deref(),
+                expected.stack[0]
+                    .abend_handler
+                    .as_ref()
+                    .map(handlers::AbendExit::target),
                 Some("OUTER-ABEND")
             );
         }
@@ -6760,7 +6945,7 @@ mod tests {
                 .unwrap();
             let current = service.lock().unwrap().sessions[session.as_str()].clone();
             let encoded = handlers::encode_session(&current).unwrap();
-            assert_eq!(&encoded[..5], b"MECS6");
+            assert_eq!(&encoded[..5], b"MECS7");
             let mut corrupted = encoded.clone();
             let depth = corrupted.len() - 4;
             corrupted[depth..].copy_from_slice(&65_u32.to_be_bytes());
@@ -6768,7 +6953,19 @@ mod tests {
                 decode_session(&corrupted, current.version, CicsLimits::default()),
                 Err(HostProblem::ResourceExhausted)
             ));
-            let mut legacy = encoded;
+            let mut legacy6 = encoded;
+            legacy6.truncate(legacy6.len() - 18);
+            legacy6.extend_from_slice(&[0; 24]);
+            legacy6[..5].copy_from_slice(b"MECS6");
+            let decoded = decode_session(&legacy6, current.version, CicsLimits::default()).unwrap();
+            assert_eq!(decoded.user_corr_data, current.user_corr_data);
+            assert_eq!(decoded.user_corr_effect_key, current.user_corr_effect_key);
+            assert_eq!(
+                decoded.user_corr_request_digest,
+                current.user_corr_request_digest
+            );
+            assert_eq!(decoded.handle_state, handlers::HandleState::default());
+            let mut legacy = legacy6;
             legacy.truncate(legacy.len() - 24);
             legacy[..5].copy_from_slice(b"MECS5");
             let decoded = decode_session(&legacy, current.version, CicsLimits::default()).unwrap();

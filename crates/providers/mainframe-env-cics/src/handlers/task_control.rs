@@ -3,7 +3,8 @@ use super::super::{
     argument_bytes, argument_optional, argument_text, bounded, field, mutation_problem,
 };
 use super::handle_state::{
-    HandleFrame, HandleState, MAX_HANDLE_STACK_DEPTH, encode_handle_state, persist_handle_state,
+    AbendExit, HandleFrame, HandleState, MAX_HANDLE_STACK_DEPTH, encode_handle_state,
+    persist_handle_state,
 };
 use crate::generated::{CICS_AID_NAMES, CICS_CONDITION_NAMES};
 use mainframe_env_execution_api::{BoundedPayload, IdempotencyKey, Invocation, InvocationLimits};
@@ -102,7 +103,7 @@ pub(in crate::service) fn encode_session(session: &Session) -> Result<Vec<u8>, H
         IdempotencyKey::new(key, InvocationLimits::default())
             .map_err(|_| HostProblem::InfrastructureFailure)?;
     }
-    let mut out = b"MECS6".to_vec();
+    let mut out = b"MECS7".to_vec();
     out.extend_from_slice(&session.rows.to_be_bytes());
     out.extend_from_slice(&session.columns.to_be_bytes());
     field(&mut out, session.principal.as_bytes())?;
@@ -513,23 +514,23 @@ fn abend(
     validate_abend_request(request)?;
     super::release_task_enqueues(service, run)?;
     let previous = HandleState::from_run(run);
-    let target = if request.arguments.contains_key("OPTION.CANCEL") {
+    let exit = if request.arguments.contains_key("OPTION.CANCEL") {
         run.abend_handler = None;
         run.cancelled_abend_handler = None;
         None
-    } else if let Some(handler) = run.abend_handler.take() {
-        run.cancelled_abend_handler = Some(handler.clone());
-        Some(handler)
+    } else if let Some(exit) = run.abend_handler.take() {
+        run.cancelled_abend_handler = Some(exit.clone());
+        Some(exit)
     } else {
         None
     };
     if HandleState::from_run(run) != previous {
         persist_handle_state(service, run, previous)?;
     }
-    let disposition = if target.is_some() {
-        CicsDisposition::Handler
-    } else {
-        CicsDisposition::Abended
+    let (disposition, target) = match exit {
+        Some(AbendExit::Label(target)) => (CicsDisposition::Handler, Some(target)),
+        Some(AbendExit::Program(target)) => (CicsDisposition::Transfer, Some(target)),
+        None => (CicsDisposition::Abended, None),
     };
     let code = argument_bytes(request, "ABCODE").unwrap_or_default();
     let dump = if !request.arguments.contains_key("OPTION.NODUMP") && valid_abend_code(&code) {
@@ -537,7 +538,12 @@ fn abend(
     } else {
         b"suppressed".as_slice()
     };
-    let mut response = service.response(run, disposition, "ERROR", 27, 0, target, None, code)?;
+    let payload = if disposition == CicsDisposition::Transfer {
+        run.retrieve.clone()
+    } else {
+        code
+    };
+    let mut response = service.response(run, disposition, "ERROR", 27, 0, target, None, payload)?;
     if disposition == CicsDisposition::Abended {
         response.outputs.insert(
             "ABEND.DUMP".into(),
@@ -825,6 +831,21 @@ fn handle_abend(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     let action = handle_abend_action(request)?;
+    if let AbendHandlerAction::Exit(AbendExit::Program(program)) = &action {
+        service.authorize(
+            run,
+            "FACILITY",
+            &format!("CICS.PROGRAM.{program}"),
+            AccessIntent::Execute,
+        )?;
+        if !service.lock()?.programs.contains(program) {
+            return Err(HostProblem::Condition {
+                name: "PGMIDERR".into(),
+                response: 27,
+                response2: 1,
+            });
+        }
+    }
     let previous = HandleState::from_run(run);
     match action {
         AbendHandlerAction::Cancel => {
@@ -832,8 +853,8 @@ fn handle_abend(
                 run.cancelled_abend_handler = Some(handler);
             }
         }
-        AbendHandlerAction::Label(handler) => {
-            run.abend_handler = Some(handler);
+        AbendHandlerAction::Exit(exit) => {
+            run.abend_handler = Some(exit);
             run.cancelled_abend_handler = None;
         }
         AbendHandlerAction::Reset => {
@@ -857,7 +878,7 @@ fn handle_abend(
 
 enum AbendHandlerAction {
     Cancel,
-    Label(String),
+    Exit(AbendExit),
     Reset,
 }
 
@@ -884,17 +905,22 @@ fn handle_abend_action(request: &CicsRequest) -> Result<AbendHandlerAction, Host
     if usize::from(cancel) + usize::from(label) + usize::from(program) + usize::from(reset) > 1 {
         return Err(HostProblem::Malformed);
     }
-    if program {
-        // PROGRAM requires a program-invocation continuation, authority checks,
-        // and autoinstall behavior that this legacy handler does not own yet.
-        return Err(HostProblem::Malformed);
-    }
     if label {
         let label = argument_text(request, "LABEL")?;
-        if label.is_empty() {
+        if !valid_condition_label(&label) {
             return Err(HostProblem::Malformed);
         }
-        Ok(AbendHandlerAction::Label(label))
+        Ok(AbendHandlerAction::Exit(AbendExit::Label(label)))
+    } else if program {
+        let program = argument_text(request, "PROGRAM")?
+            .trim()
+            .to_ascii_uppercase();
+        if !matches!(program.len(), 1..=8)
+            || !program.bytes().all(|byte| byte.is_ascii_alphanumeric())
+        {
+            return Err(HostProblem::Malformed);
+        }
+        Ok(AbendHandlerAction::Exit(AbendExit::Program(program)))
     } else if reset {
         Ok(AbendHandlerAction::Reset)
     } else {
@@ -979,34 +1005,47 @@ fn pop_handle_invreq(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     let previous = HandleState::from_run(run);
-    let (disposition, target) = match &request.condition_policy {
+    let (disposition, target, payload) = match &request.condition_policy {
         CicsConditionPolicy::NoHandle | CicsConditionPolicy::Respond { .. } => {
-            (CicsDisposition::Complete, None)
+            (CicsDisposition::Complete, None, Vec::new())
         }
         CicsConditionPolicy::Default if run.ignored_conditions.contains("INVREQ") => {
-            (CicsDisposition::Ignored, None)
+            (CicsDisposition::Ignored, None, Vec::new())
         }
         CicsConditionPolicy::Default if run.handlers.contains_key("INVREQ") => (
             CicsDisposition::Handler,
             run.handlers.get("INVREQ").cloned(),
+            Vec::new(),
         ),
         CicsConditionPolicy::Default if run.ignored_conditions.contains("ERROR") => {
-            (CicsDisposition::Ignored, None)
+            (CicsDisposition::Ignored, None, Vec::new())
         }
-        CicsConditionPolicy::Default if run.handlers.contains_key("ERROR") => {
-            (CicsDisposition::Handler, run.handlers.get("ERROR").cloned())
-        }
+        CicsConditionPolicy::Default if run.handlers.contains_key("ERROR") => (
+            CicsDisposition::Handler,
+            run.handlers.get("ERROR").cloned(),
+            Vec::new(),
+        ),
         CicsConditionPolicy::Default if run.abend_handler.is_some() => {
-            let handler = run.abend_handler.take();
-            run.cancelled_abend_handler.clone_from(&handler);
-            (CicsDisposition::Handler, handler)
+            let exit = run
+                .abend_handler
+                .take()
+                .ok_or(HostProblem::InfrastructureFailure)?;
+            run.cancelled_abend_handler = Some(exit.clone());
+            match exit {
+                AbendExit::Label(target) => (CicsDisposition::Handler, Some(target), Vec::new()),
+                AbendExit::Program(target) => (
+                    CicsDisposition::Transfer,
+                    Some(target),
+                    run.retrieve.clone(),
+                ),
+            }
         }
-        CicsConditionPolicy::Default => (CicsDisposition::Abended, None),
+        CicsConditionPolicy::Default => (CicsDisposition::Abended, None, Vec::new()),
     };
     if HandleState::from_run(run) != previous {
         persist_handle_state(service, run, previous)?;
     }
-    service.response(run, disposition, "INVREQ", 16, 0, target, None, Vec::new())
+    service.response(run, disposition, "INVREQ", 16, 0, target, None, payload)
 }
 
 fn assign(

@@ -72,15 +72,19 @@ not Rust errors. Condition phrases select exact CFG edges after the operation
 records a typed condition status. Unhandled conditions become `Condition`,
 `Abend`, or `Failed` according to the accepted execution taxonomy.
 
-CICS HANDLE ABEND label state distinguishes active from canceled. Selecting an
-active exit moves it to canceled before the interpreter branches, preventing a
-recursive abend from immediately selecting the same exit. RESET moves that
-single-level exit back to active, and an explicit or default CANCEL deactivates
-it. Program exits and nested logical-level search remain separate continuation
-work and are not represented as labels.
+CICS HANDLE ABEND state distinguishes active from canceled and LABEL from
+PROGRAM exits. Selecting either exit moves it to canceled before control
+transfers, preventing a recursive abend from immediately selecting it. A LABEL
+branches inside the current program. A PROGRAM names a registered local online
+program, requires its exact `FACILITY CICS.PROGRAM.<name>` execute decision,
+and receives the COMMAREA of the program that installed the exit. Missing local
+programs return PGMIDERR 27/1; denied programs return NOTAUTH 70. RESET moves
+the typed single-level exit back to active, and an explicit or default CANCEL
+deactivates it. Autoinstall, current-channel transfer, and outward search across
+LINK-created logical levels remain pending.
 
 CICS PUSH HANDLE moves the current condition mappings, ignored-condition set,
-and active/canceled ABEND labels into one bounded task-local frame, leaving a
+and active/canceled typed ABEND exits into one bounded task-local frame, leaving a
 clear specification set for the nested routine. POP HANDLE discards the nested
 set and restores exactly one prior frame. The stack permits 64 frames, rejects
 growth before mutation, and treats an unmatched POP as INVREQ rather than as an
@@ -115,12 +119,12 @@ the same bounded PUSH/POP stack. A DPL server attempt fails with INVREQ, RESP
 Condition, AID, ignored-condition, active/canceled ABEND, and nested PUSH/POP
 state is task-local while a run is live and session-durable across a terminal
 input handoff. Every state-changing command first validates the complete
-request, then commits the next `MECS6` session version by CAS; a failed write
+request, then commits the next `MECS7` session version by CAS; a failed write
 restores the prior in-memory state. The next terminal task restores the exact
 state before replaying the machine checkpoint. Normal task completion and
 non-handoff terminal recovery clear it, preventing specifications from leaking
-into an unrelated task. Historical `MECS1`–`MECS5` rows decode with empty
-HANDLE state.
+into an unrelated task. Historical `MECS6` rows retain label-only HANDLE state;
+`MECS1`–`MECS5` decode with empty HANDLE state.
 
 `CALL`, `INVOKE`, and LE callable services resolve through versioned typed ABI
 catalog entries. Names choose a registered program only after the ABI identity
