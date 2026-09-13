@@ -92,6 +92,10 @@ All notable changes to mainframe-env are documented here.
 - Added typed CICS `HANDLE AID` for the 34 source-named terminal AIDs, including
   optional-label deactivation, exact-over-`ANYKEY` precedence, the complete
   reached DFHAID byte set, PUSH/POP participation, and DPL `INVREQ` 16/200.
+- Added durable `MECS6` CICS HANDLE state. Condition, AID, IGNORE, ABEND, and
+  nested PUSH/POP specifications now use session CAS, roll back on failed
+  persistence, survive a terminal-input handoff and SQLite reopen, and clear
+  when the task completes or recovery discards a non-handoff terminal task.
 - Added the frozen-with-bounded-ambiguities CIC-901 command contract and generated
   263-row compiler registry. The registry explicitly separates three typed runtime
   handlers, 20 legacy compatibility handlers, and 240 unready handlers; automatic

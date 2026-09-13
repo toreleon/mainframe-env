@@ -122,10 +122,10 @@ differentials, or make 0.9.0 release-ready.
 
 | Family | Owns |
 |---|---|
-| `task-control` | task context, HANDLE state, ASSIGN, RETRIEVE, ABEND, and pseudo-conversation RETURN |
+| `task-control` / `handle-state` | task context, durable HANDLE state, ASSIGN, RETRIEVE, ABEND, and pseudo-conversation RETURN |
 | `time` | ASKTIME clock acquisition and FORMATTIME conversion |
 | `program-control` | program inquiry, LINK, and XCTL |
-| `terminal-control` | BMS and text send/receive behavior |
+| `terminal-control` / `terminal-run` | BMS and text send/receive behavior plus terminal-task lifecycle cleanup |
 | `file-control` | file status, keyed I/O, and browse behavior |
 | `queue-control` | transient-data queue writes |
 | `recovery` | SYNCPOINT coordination, rollback, and subsystem unit-of-work completion |

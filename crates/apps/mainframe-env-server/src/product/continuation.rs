@@ -33,6 +33,45 @@ pub(super) struct OnlineMachineContinuation {
 }
 
 impl ProductServer {
+    pub(super) fn discard_online_machine_run_if_present(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        now_tick: u64,
+        preserve_handle_state: bool,
+    ) -> Result<(), HostProblem> {
+        let trace = if preserve_handle_state {
+            self.cics
+                .discard_handed_off_terminal_run_if_present(session, principal, now_tick)
+        } else {
+            self.cics
+                .discard_terminal_run_if_present(session, principal, now_tick)
+        }?;
+        self.online_traces
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .entry(session.as_str().into())
+            .or_default()
+            .extend(trace);
+        Ok(())
+    }
+
+    fn suspend_online_machine_run(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        now_tick: u64,
+    ) -> Result<(), HostProblem> {
+        let trace = self.cics.terminal_run_trace(session, principal, now_tick)?;
+        self.online_traces
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .entry(session.as_str().into())
+            .or_default()
+            .extend(trace);
+        self.cics.suspend_terminal_run(session, principal, now_tick)
+    }
+
     pub(super) fn online_machine_continuation(
         &self,
         session: &SessionId,
@@ -130,7 +169,7 @@ impl ProductServer {
             .complete_suspended_handoff(invocation, control.now_tick)
             .map_err(store_error)?;
         self.program.finish_run_unit(invocation)?;
-        self.finish_online_machine_run(session, principal, now_tick)?;
+        self.suspend_online_machine_run(session, principal, now_tick)?;
         self.clear_online_exchange(session, exchange)
     }
 }

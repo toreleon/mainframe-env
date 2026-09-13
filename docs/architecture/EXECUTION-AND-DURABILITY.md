@@ -187,22 +187,27 @@ the next bounded redispatch, unlike terminal-input handoff.
 Typed `SET ASSOCIATION USERCORRDATA` mutates the durable session that owns the
 originating task. The provider verifies the issuing and originating run-unit
 identities, overwrites rather than appends, and silently truncates the supplied
-bytes to 64. Current `MECS5` session rows bind the result to both the mutation
-key and canonical request digest, so a replay-ledger crash gap can complete only
-the identical request. Readers retain `MECS1`–`MECS4`; those historical rows
-begin with no user correlator data. Session CAS is the single state authority
-across memory, SQLite, and PostgreSQL adapters.
+bytes to 64. Current `MECS6` session rows bind the result to both the mutation
+key and canonical request digest and also carry the complete CICS HANDLE state.
+A replay-ledger crash gap can complete only the identical association request;
+a failed HANDLE-state CAS restores the prior volatile run. Readers retain
+`MECS1`–`MECS5`: versions 1–4 begin with no user correlator, and every historical
+version begins with empty HANDLE state. Session CAS is the single state
+authority across memory, SQLite, and PostgreSQL adapters.
 
 When a terminal RECEIVE suspends a machine, the product first commits its own
 session continuation and then atomically moves the interpreter execution from
 `Suspended` to terminal `Completed` with `HandoffCompleted`. Only after that
 handoff does it delete the redundant interpreter checkpoint and finish the
-volatile COBOL/CICS run. A restart in the cleanup gap recognizes the handoff
-event, preserves the product continuation, completes the remaining cleanup,
-and admits the next terminal task under a new execution identity. Other stale
-terminal exchanges discard both continuations and retain their conservative
-`Cancelled`, `TimedOut`, or provider-failure outcome; terminal journal rows are
-never passed back to resumable execution.
+volatile COBOL/CICS run while retaining its durable HANDLE state. The next task
+restores both the machine checkpoint and those specifications before consuming
+terminal input. A restart in the cleanup gap recognizes the handoff event,
+preserves the product continuation and HANDLE state, completes the remaining
+cleanup, and admits the next terminal task under a new execution identity.
+Other stale terminal exchanges discard both continuations and clear HANDLE
+state before retaining their conservative `Cancelled`, `TimedOut`, or
+provider-failure outcome; terminal journal rows are never passed back to
+resumable execution.
 
 Keyed dataset insert, rewrite, and delete commit the base cluster, every
 upgradable alternate-index generation, and the idempotency result as one atomic

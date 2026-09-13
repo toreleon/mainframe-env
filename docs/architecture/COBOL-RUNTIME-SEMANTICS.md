@@ -112,6 +112,16 @@ PF1–PF24, and CLEAR, never ENTER or the other special AIDs. The AID state join
 the same bounded PUSH/POP stack. A DPL server attempt fails with INVREQ, RESP
 16, and RESP2 200 before changing the state.
 
+Condition, AID, ignored-condition, active/canceled ABEND, and nested PUSH/POP
+state is task-local while a run is live and session-durable across a terminal
+input handoff. Every state-changing command first validates the complete
+request, then commits the next `MECS6` session version by CAS; a failed write
+restores the prior in-memory state. The next terminal task restores the exact
+state before replaying the machine checkpoint. Normal task completion and
+non-handoff terminal recovery clear it, preventing specifications from leaking
+into an unrelated task. Historical `MECS1`–`MECS5` rows decode with empty
+HANDLE state.
+
 `CALL`, `INVOKE`, and LE callable services resolve through versioned typed ABI
 catalog entries. Names choose a registered program only after the ABI identity
 is known; no copybook, application, or program-name special case selects host

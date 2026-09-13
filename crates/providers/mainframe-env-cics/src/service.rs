@@ -148,6 +148,7 @@ struct Session {
     field_protection: BTreeMap<String, bool>,
     field_modified: BTreeMap<String, bool>,
     field_values: BTreeMap<String, Vec<u8>>,
+    handle_state: handlers::HandleState,
     version: u64,
 }
 
@@ -549,6 +550,7 @@ impl CicsService {
             field_protection: BTreeMap::new(),
             field_modified: BTreeMap::new(),
             field_values: BTreeMap::new(),
+            handle_state: handlers::HandleState::default(),
             version: 1,
         };
         let mut state = self.lock()?;
@@ -613,6 +615,7 @@ impl CicsService {
             field_protection: BTreeMap::new(),
             field_modified: BTreeMap::new(),
             field_values: BTreeMap::new(),
+            handle_state: handlers::HandleState::default(),
             version: 1,
         };
         let run = handlers::new_run(
@@ -722,87 +725,6 @@ impl CicsService {
             commarea: run.retrieve.clone(),
             aid: current.aid,
         })
-    }
-
-    pub fn complete_terminal_run(
-        &self,
-        session: &SessionId,
-        principal: &PrincipalId,
-        now_tick: u64,
-    ) -> Result<(), HostProblem> {
-        let current = self.public_session(session, principal, None, now_tick)?;
-        let run_id = RunUnitId::new(&current.run_unit, InvocationLimits::default())
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let mut state = self.lock()?;
-        let run = state
-            .runs
-            .get(&run_id)
-            .cloned()
-            .ok_or(HostProblem::NotFound)?;
-        if run.session != session.as_str() || run.invocation.principal.id() != principal {
-            return Err(HostProblem::Unauthorized);
-        }
-        if let Some(current) = state.continuations.get(session.as_str()).cloned()
-            && current.claimed_by.as_deref() == Some(run_id.as_str())
-        {
-            let mut released = current.clone();
-            released.version = released
-                .version
-                .checked_add(1)
-                .ok_or(HostProblem::ResourceExhausted)?;
-            released.claimed_by = None;
-            self.persist_continuation(session.as_str(), &released, Some(current.version))?;
-            state
-                .continuations
-                .insert(session.as_str().into(), released);
-        }
-        handlers::release_task_enqueues(self, &run)?;
-        state.runs.remove(&run_id);
-        Ok(())
-    }
-
-    /// Idempotently discard a terminal run while recovering a durable online
-    /// exchange. The persisted session remains usable for a fresh task, and a
-    /// continuation claim owned by the abandoned run is released.
-    pub fn discard_terminal_run_if_present(
-        &self,
-        session: &SessionId,
-        principal: &PrincipalId,
-        now_tick: u64,
-    ) -> Result<Vec<CicsTraceEntry>, HostProblem> {
-        let current = self.public_session(session, principal, None, now_tick)?;
-        let run_id = RunUnitId::new(&current.run_unit, InvocationLimits::default())
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let mut state = self.lock()?;
-        let trace = match state.runs.get(&run_id) {
-            Some(run)
-                if run.session == session.as_str()
-                    && run.invocation.principal.id() == principal =>
-            {
-                run.trace.clone()
-            }
-            Some(_) => return Err(HostProblem::Unauthorized),
-            None => Vec::new(),
-        };
-        if let Some(current) = state.continuations.get(session.as_str()).cloned()
-            && current.claimed_by.as_deref() == Some(run_id.as_str())
-        {
-            let mut released = current.clone();
-            released.version = released
-                .version
-                .checked_add(1)
-                .ok_or(HostProblem::ResourceExhausted)?;
-            released.claimed_by = None;
-            self.persist_continuation(session.as_str(), &released, Some(current.version))?;
-            state
-                .continuations
-                .insert(session.as_str().into(), released);
-        }
-        if let Some(run) = state.runs.get(&run_id).cloned() {
-            handlers::release_task_enqueues(self, &run)?;
-        }
-        state.runs.remove(&run_id);
-        Ok(trace)
     }
 
     pub fn submit_terminal_input(
@@ -1089,6 +1011,12 @@ impl CicsService {
                 .ok_or(HostProblem::NotFound)?,
             &invocation,
         );
+        let handle_state = state
+            .sessions
+            .get(session.as_str())
+            .ok_or(HostProblem::NotFound)?
+            .handle_state
+            .clone();
         state.runs.insert(
             invocation.run_unit_id.clone(),
             handlers::new_run_with_state(
@@ -1102,6 +1030,7 @@ impl CicsService {
                     retrieve,
                     undo,
                     undo_version,
+                    handle_state,
                 },
             ),
         );
@@ -1111,9 +1040,9 @@ impl CicsService {
     /// Rebuild volatile CICS run state for the exact durable terminal run.
     ///
     /// The machine is replayed through its durable coordinator after this
-    /// call, so all transient handlers and cursors are deliberately reset.
-    /// Durable undo data is reloaded and the session/run/principal identity is
-    /// checked before replacing any abandoned in-memory copy.
+    /// call. Durable HANDLE state and undo data are reloaded, while cursors
+    /// remain transient. Session, run, and principal identity are checked
+    /// before replacing any abandoned in-memory copy.
     pub fn restore_terminal_run(
         &self,
         invocation: Invocation,
@@ -1152,6 +1081,7 @@ impl CicsService {
                     retrieve,
                     undo,
                     undo_version,
+                    handle_state: current.handle_state,
                 },
             ),
         );
@@ -1234,6 +1164,7 @@ impl CicsService {
                     retrieve: Vec::new(),
                     undo,
                     undo_version,
+                    handle_state: handlers::HandleState::default(),
                 },
             ),
         );
@@ -3173,7 +3104,10 @@ fn decode_map(bytes: &[u8], limits: CicsLimits) -> Result<BmsMapDefinition, Host
 fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Session, HostProblem> {
     let mut reader = Reader { bytes, at: 0 };
     let schema = reader.take(5)?;
-    if !matches!(schema, b"MECS1" | b"MECS2" | b"MECS3" | b"MECS4" | b"MECS5") {
+    if !matches!(
+        schema,
+        b"MECS1" | b"MECS2" | b"MECS3" | b"MECS4" | b"MECS5" | b"MECS6"
+    ) {
         return Err(HostProblem::InfrastructureFailure);
     }
     let rows = u16::from_be_bytes(
@@ -3196,7 +3130,7 @@ fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Sess
         idle_timeout_ticks,
         expires_at_tick,
         connected,
-    ) = if matches!(schema, b"MECS2" | b"MECS3" | b"MECS4" | b"MECS5") {
+    ) = if matches!(schema, b"MECS2" | b"MECS3" | b"MECS4" | b"MECS5" | b"MECS6") {
         let principal = String::from_utf8(reader.field(128)?)
             .map_err(|_| HostProblem::InfrastructureFailure)?;
         let transaction =
@@ -3262,7 +3196,7 @@ fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Sess
         1 => true,
         _ => return Err(HostProblem::InfrastructureFailure),
     };
-    let (mapset, map) = if matches!(schema, b"MECS2" | b"MECS3" | b"MECS4" | b"MECS5") {
+    let (mapset, map) = if matches!(schema, b"MECS2" | b"MECS3" | b"MECS4" | b"MECS5" | b"MECS6") {
         let mapset =
             String::from_utf8(reader.field(16)?).map_err(|_| HostProblem::InfrastructureFailure)?;
         let map =
@@ -3274,7 +3208,7 @@ fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Sess
     } else {
         (None, None)
     };
-    let field_protection = if matches!(schema, b"MECS3" | b"MECS4" | b"MECS5") {
+    let field_protection = if matches!(schema, b"MECS3" | b"MECS4" | b"MECS5" | b"MECS6") {
         let count = usize::try_from(u32::from_be_bytes(
             reader
                 .take(4)?
@@ -3302,12 +3236,12 @@ fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Sess
     } else {
         BTreeMap::new()
     };
-    let field_modified = if matches!(schema, b"MECS4" | b"MECS5") {
+    let field_modified = if matches!(schema, b"MECS4" | b"MECS5" | b"MECS6") {
         handlers::decode_session_flags(&mut reader, limits)?
     } else {
         BTreeMap::new()
     };
-    let field_values = if matches!(schema, b"MECS4" | b"MECS5") {
+    let field_values = if matches!(schema, b"MECS4" | b"MECS5" | b"MECS6") {
         let count = usize::try_from(u32::from_be_bytes(
             reader
                 .take(4)?
@@ -3337,35 +3271,41 @@ fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Sess
         1 => Some(reader.field(limits.max_screen_bytes)?),
         _ => return Err(HostProblem::InfrastructureFailure),
     };
-    let (user_corr_data, user_corr_effect_key, user_corr_request_digest) = if schema == b"MECS5" {
-        let data = reader.field(64)?;
-        let key = String::from_utf8(reader.field(256)?)
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let digest = match reader.take(1)?[0] {
-            0 => None,
-            1 => Some(
-                reader
-                    .take(32)?
-                    .try_into()
-                    .map_err(|_| HostProblem::InfrastructureFailure)?,
-            ),
-            _ => return Err(HostProblem::InfrastructureFailure),
-        };
-        if key.is_empty() && (digest.is_some() || !data.is_empty())
-            || !key.is_empty() && digest.is_none()
-        {
-            return Err(HostProblem::InfrastructureFailure);
-        }
-        let key = if key.is_empty() {
-            None
-        } else {
-            IdempotencyKey::new(&key, InvocationLimits::default())
+    let (user_corr_data, user_corr_effect_key, user_corr_request_digest) =
+        if matches!(schema, b"MECS5" | b"MECS6") {
+            let data = reader.field(64)?;
+            let key = String::from_utf8(reader.field(256)?)
                 .map_err(|_| HostProblem::InfrastructureFailure)?;
-            Some(key)
+            let digest = match reader.take(1)?[0] {
+                0 => None,
+                1 => Some(
+                    reader
+                        .take(32)?
+                        .try_into()
+                        .map_err(|_| HostProblem::InfrastructureFailure)?,
+                ),
+                _ => return Err(HostProblem::InfrastructureFailure),
+            };
+            if key.is_empty() && (digest.is_some() || !data.is_empty())
+                || !key.is_empty() && digest.is_none()
+            {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+            let key = if key.is_empty() {
+                None
+            } else {
+                IdempotencyKey::new(&key, InvocationLimits::default())
+                    .map_err(|_| HostProblem::InfrastructureFailure)?;
+                Some(key)
+            };
+            (data, key, digest)
+        } else {
+            (Vec::new(), None, None)
         };
-        (data, key, digest)
+    let handle_state = if schema == b"MECS6" {
+        handlers::decode_handle_state(&mut reader)?
     } else {
-        (Vec::new(), None, None)
+        handlers::HandleState::default()
     };
     if reader.at != bytes.len() || rows == 0 || columns == 0 {
         return Err(HostProblem::InfrastructureFailure);
@@ -3392,6 +3332,7 @@ fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Sess
         field_protection,
         field_modified,
         field_values,
+        handle_state,
         version,
     })
 }
@@ -3832,6 +3773,7 @@ mod tests {
         inner: MemoryStore,
         fail_insert: AtomicBool,
         fail_next: AtomicBool,
+        fail_session: AtomicBool,
     }
 
     impl FailCicsReplayCasStore {
@@ -3840,6 +3782,7 @@ mod tests {
                 inner: MemoryStore::new(Default::default()),
                 fail_insert: AtomicBool::new(false),
                 fail_next: AtomicBool::new(false),
+                fail_session: AtomicBool::new(false),
             }
         }
     }
@@ -3885,7 +3828,14 @@ mod tests {
             record: ProviderStateRecord,
             expected_version: Option<u64>,
         ) -> Result<(), StoreError> {
-            if record.namespace == "cics-effect-replay-v1"
+            if record.namespace == "cics-session"
+                && expected_version.is_some()
+                && self.fail_session.swap(false, Ordering::SeqCst)
+            {
+                Err(StoreError::Infrastructure(
+                    "injected-cics-session-cas-failure".into(),
+                ))
+            } else if record.namespace == "cics-effect-replay-v1"
                 && expected_version.is_none()
                 && self.fail_insert.swap(false, Ordering::SeqCst)
             {
@@ -5929,6 +5879,258 @@ mod tests {
     }
 
     #[test]
+    fn handle_state_rolls_back_when_its_session_cas_fails() {
+        let store = Arc::new(FailCicsReplayCasStore::new());
+        let service = service(store.clone());
+        let (invocation, session) = registered(&service);
+        let before = {
+            let state = service.lock().unwrap();
+            handlers::HandleState::from_run(state.runs.get(&invocation.run_unit_id).unwrap())
+        };
+        let session_before = service.lock().unwrap().sessions[session.as_str()].clone();
+        store.fail_session.store(true, Ordering::SeqCst);
+        let handle = request(
+            CicsOperation::HandleCondition,
+            BTreeMap::from([("INVREQ".into(), argument(b"SHOULD-ROLL-BACK"))]),
+            1,
+        );
+        assert_eq!(
+            service.invoke(&effect(&invocation.run_unit_id, handle.clone(), 1), handle,),
+            Err(HostProblem::InfrastructureFailure)
+        );
+        let state = service.lock().unwrap();
+        assert_eq!(
+            handlers::HandleState::from_run(state.runs.get(&invocation.run_unit_id).unwrap()),
+            before
+        );
+        assert_eq!(state.sessions[session.as_str()].handle_state, before);
+        assert_eq!(
+            state.sessions[session.as_str()].version,
+            session_before.version
+        );
+        drop(state);
+        assert_eq!(
+            store
+                .get_provider_state("cics-session", session.as_str())
+                .unwrap()
+                .unwrap()
+                .version,
+            session_before.version
+        );
+    }
+
+    #[test]
+    fn terminal_handoff_preserves_handle_state_and_terminal_outcomes_clear_it() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let session = SessionId::new("terminal-handle-lifecycle", 64).unwrap();
+        let first = invocation_for("terminal-handle-first", BTreeMap::new());
+        service
+            .launch_terminal(
+                first.clone(),
+                &session,
+                "MENU",
+                24,
+                80,
+                "terminal-handle-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let handle = request(
+            CicsOperation::HandleAid,
+            BTreeMap::from([("AIDS".into(), aid_handlers(&[("PF1", "PRESERVED")]))]),
+            1,
+        );
+        service
+            .invoke(&effect(&first.run_unit_id, handle.clone(), 1), handle)
+            .unwrap();
+        let expected = service.lock().unwrap().sessions[session.as_str()]
+            .handle_state
+            .clone();
+        service
+            .suspend_terminal_run(&session, first.principal.id(), 2)
+            .unwrap();
+        assert_eq!(
+            service.lock().unwrap().sessions[session.as_str()].handle_state,
+            expected
+        );
+
+        let second = invocation_for("terminal-handle-second", BTreeMap::new());
+        service
+            .resume_terminal(second.clone(), &session, "terminal-handle-csrf", 3)
+            .unwrap();
+        assert_eq!(
+            handlers::HandleState::from_run(
+                service
+                    .lock()
+                    .unwrap()
+                    .runs
+                    .get(&second.run_unit_id)
+                    .unwrap(),
+            ),
+            expected
+        );
+        service
+            .complete_terminal_run(&session, second.principal.id(), 4)
+            .unwrap();
+        assert_eq!(
+            service.lock().unwrap().sessions[session.as_str()].handle_state,
+            handlers::HandleState::default()
+        );
+
+        let third = invocation_for("terminal-handle-third", BTreeMap::new());
+        service
+            .resume_terminal(third.clone(), &session, "terminal-handle-csrf", 5)
+            .unwrap();
+        let handle = request(
+            CicsOperation::HandleCondition,
+            BTreeMap::from([("INVREQ".into(), argument(b"DISCARDED"))]),
+            1,
+        );
+        service
+            .invoke(&effect(&third.run_unit_id, handle.clone(), 1), handle)
+            .unwrap();
+        assert_ne!(
+            service.lock().unwrap().sessions[session.as_str()].handle_state,
+            handlers::HandleState::default()
+        );
+        service
+            .discard_terminal_run_if_present(&session, third.principal.id(), 6)
+            .unwrap();
+        assert_eq!(
+            service.lock().unwrap().sessions[session.as_str()].handle_state,
+            handlers::HandleState::default()
+        );
+    }
+
+    #[test]
+    fn complete_handle_state_survives_sqlite_reopen_and_reseeds_a_run() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-handle-state-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("cics.db");
+        let url = format!("sqlite://{}?mode=rwc", path.display());
+        let invocation = invocation_for("sqlite-handle-state", BTreeMap::new());
+        let session = SessionId::new("sqlite-handle-state", 64).unwrap();
+        let expected;
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let invoke = |operation, arguments, sequence| {
+                let request = request(operation, arguments, sequence);
+                service.invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), sequence),
+                    request,
+                )
+            };
+            invoke(
+                CicsOperation::HandleCondition,
+                BTreeMap::from([(
+                    "CONDITIONS".into(),
+                    condition_handlers(&[("INVREQ", "OUTER-COND")]),
+                )]),
+                1,
+            )
+            .unwrap();
+            invoke(
+                CicsOperation::HandleAid,
+                BTreeMap::from([("AIDS".into(), aid_handlers(&[("PF1", "OUTER-AID")]))]),
+                2,
+            )
+            .unwrap();
+            invoke(
+                CicsOperation::IgnoreCondition,
+                BTreeMap::from([("CONDITIONS".into(), condition_list(&["LENGERR"]))]),
+                3,
+            )
+            .unwrap();
+            invoke(
+                CicsOperation::HandleAbend,
+                BTreeMap::from([("LABEL".into(), argument(b"OUTER-ABEND"))]),
+                4,
+            )
+            .unwrap();
+            invoke(CicsOperation::PushHandle, BTreeMap::new(), 5).unwrap();
+            invoke(
+                CicsOperation::HandleCondition,
+                BTreeMap::from([(
+                    "CONDITIONS".into(),
+                    condition_handlers(&[("ERROR", "INNER-COND")]),
+                )]),
+                6,
+            )
+            .unwrap();
+            invoke(
+                CicsOperation::HandleAid,
+                BTreeMap::from([("AIDS".into(), aid_handlers(&[("PF2", "INNER-AID")]))]),
+                7,
+            )
+            .unwrap();
+            invoke(
+                CicsOperation::IgnoreCondition,
+                BTreeMap::from([("CONDITIONS".into(), condition_list(&["PGMIDERR"]))]),
+                8,
+            )
+            .unwrap();
+            invoke(
+                CicsOperation::HandleAbend,
+                BTreeMap::from([("LABEL".into(), argument(b"INNER-ABEND"))]),
+                9,
+            )
+            .unwrap();
+            let state = service.lock().unwrap();
+            expected =
+                handlers::HandleState::from_run(state.runs.get(&invocation.run_unit_id).unwrap());
+            assert_eq!(state.sessions[session.as_str()].handle_state, expected);
+            assert_eq!(expected.stack.len(), 1);
+            assert_eq!(expected.handlers["ERROR"], "INNER-COND");
+            assert_eq!(expected.aid_handlers["PF2"], "INNER-AID");
+            assert!(expected.ignored_conditions.contains("PGMIDERR"));
+            assert_eq!(expected.abend_handler.as_deref(), Some("INNER-ABEND"));
+            assert_eq!(expected.stack[0].handlers["INVREQ"], "OUTER-COND");
+            assert_eq!(expected.stack[0].aid_handlers["PF1"], "OUTER-AID");
+            assert!(expected.stack[0].ignored_conditions.contains("LENGERR"));
+            assert_eq!(
+                expected.stack[0].abend_handler.as_deref(),
+                Some("OUTER-ABEND")
+            );
+        }
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            assert_eq!(
+                service.lock().unwrap().sessions[session.as_str()].handle_state,
+                expected
+            );
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            assert_eq!(
+                handlers::HandleState::from_run(
+                    service
+                        .lock()
+                        .unwrap()
+                        .runs
+                        .get(&invocation.run_unit_id)
+                        .unwrap(),
+                ),
+                expected
+            );
+        }
+        std::fs::remove_file(path).unwrap();
+        std::fs::remove_dir(directory).unwrap();
+    }
+
+    #[test]
     fn enqueue_nesting_contention_conditions_and_syncpoint_release_are_durable() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = service(store);
@@ -6557,7 +6759,26 @@ mod tests {
                 )
                 .unwrap();
             let current = service.lock().unwrap().sessions[session.as_str()].clone();
-            let mut legacy = handlers::encode_session(&current).unwrap();
+            let encoded = handlers::encode_session(&current).unwrap();
+            assert_eq!(&encoded[..5], b"MECS6");
+            let mut corrupted = encoded.clone();
+            let depth = corrupted.len() - 4;
+            corrupted[depth..].copy_from_slice(&65_u32.to_be_bytes());
+            assert!(matches!(
+                decode_session(&corrupted, current.version, CicsLimits::default()),
+                Err(HostProblem::ResourceExhausted)
+            ));
+            let mut legacy = encoded;
+            legacy.truncate(legacy.len() - 24);
+            legacy[..5].copy_from_slice(b"MECS5");
+            let decoded = decode_session(&legacy, current.version, CicsLimits::default()).unwrap();
+            assert_eq!(decoded.user_corr_data, current.user_corr_data);
+            assert_eq!(decoded.user_corr_effect_key, current.user_corr_effect_key);
+            assert_eq!(
+                decoded.user_corr_request_digest,
+                current.user_corr_request_digest
+            );
+            assert_eq!(decoded.handle_state, handlers::HandleState::default());
             let suffix = 8
                 + current.user_corr_data.len()
                 + current.user_corr_effect_key.as_deref().unwrap().len()

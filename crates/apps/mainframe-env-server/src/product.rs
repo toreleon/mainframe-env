@@ -162,8 +162,6 @@ mod artifact;
 pub use artifact::{BatchProgramDefinition, OnlineProgramDefinition};
 mod bootstrap;
 mod continuation;
-#[cfg(test)]
-use continuation::{decode_online_machine_continuation, encode_online_machine_continuation};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BatchInstallReceipt {
@@ -1987,24 +1985,6 @@ impl ProductServer {
             .complete_terminal_run(session, principal, now_tick)
     }
 
-    fn discard_online_machine_run_if_present(
-        &self,
-        session: &SessionId,
-        principal: &PrincipalId,
-        now_tick: u64,
-    ) -> Result<(), HostProblem> {
-        let trace = self
-            .cics
-            .discard_terminal_run_if_present(session, principal, now_tick)?;
-        self.online_traces
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?
-            .entry(session.as_str().into())
-            .or_default()
-            .extend(trace);
-        Ok(())
-    }
-
     fn clear_execution_checkpoint(&self, execution_id: &ExecutionId) -> Result<(), HostProblem> {
         match self.store.delete_checkpoint(execution_id) {
             Ok(()) | Err(StoreError::NotFound) => Ok(()),
@@ -2073,7 +2053,12 @@ impl ProductServer {
             )
         };
         let checkpoint_result = self.clear_execution_checkpoint(&invocation.execution_id);
-        let cics_result = self.discard_online_machine_run_if_present(session, principal, now_tick);
+        let cics_result = self.discard_online_machine_run_if_present(
+            session,
+            principal,
+            now_tick,
+            preserve_handoff,
+        );
         let exchange_result = self.clear_online_exchange(session, exchange);
         for result in [
             program_result,
@@ -6383,6 +6368,7 @@ mod tests {
     use axum::body::{Body, to_bytes};
     use axum::http::{Method, Request};
     use base64::Engine;
+    use continuation::{decode_online_machine_continuation, encode_online_machine_continuation};
     use mainframe_env_compiler::CobolCompiler;
     use mainframe_env_compiler_api::{
         ARTIFACT_CONTRACT, ArtifactManifestV2, CompilationMode, CompileOptions, CompileTarget,
@@ -10886,6 +10872,139 @@ mod tests {
             .run_online_exchange(&session, &principal, "HAID", 3)
             .unwrap();
         assert!(server.online_exchange(&session).unwrap().is_none());
+    }
+
+    #[test]
+    fn online_handle_aid_survives_a_durable_terminal_handoff() {
+        let limits = SourceLimits::default();
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. HARES.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 AID-HIT PIC X VALUE '0'.\n01 UNEXPECTED-HIT PIC X VALUE '0'.\nPROCEDURE DIVISION.\nEXEC CICS HANDLE AID ANYKEY(AID-HANDLER) END-EXEC.\nEXEC CICS SEND MAP('HARES') MAPSET('HARES') END-EXEC.\nEXEC CICS RECEIVE MAP('HARES') MAPSET('HARES') END-EXEC.\nMOVE '1' TO UNEXPECTED-HIT.\nSTOP RUN.\nAID-HANDLER.\nMOVE '1' TO AID-HIT.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let path = LogicalPath::new("HARES.cbl", limits.max_path_bytes).unwrap();
+        let bundle = SourceBundle::new(
+            &path,
+            vec![
+                SourceFile::input(
+                    "HARES.cbl",
+                    source.to_vec(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("durable HANDLE AID fixture did not publish");
+        };
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "HARES".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("HR00".into(), "HARES".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "HARES".into(),
+                    map: "HARES".into(),
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("handle-aid-handoff", 64).unwrap();
+        let first = server
+            .cics_invocation("IBMUSER", "HR00", Some(artifact_ref.clone()))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                first.clone(),
+                &session,
+                "HR00",
+                24,
+                80,
+                "handle-aid-handoff-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "HARES", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "HARES", 2)
+            .unwrap();
+        assert!(matches!(
+            server.cics.terminal_execution(&session, &principal, 2),
+            Err(HostProblem::NotFound)
+        ));
+        assert!(
+            server
+                .online_machine_continuation(&session)
+                .unwrap()
+                .is_some()
+        );
+
+        server
+            .cics
+            .submit_terminal_input(
+                &session,
+                &principal,
+                "handle-aid-handoff-csrf",
+                0xf1,
+                &BTreeMap::new(),
+                3,
+            )
+            .unwrap();
+        let resumed = server
+            .cics_invocation("IBMUSER", "HR00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .resume_terminal(resumed.clone(), &session, "handle-aid-handoff-csrf", 4)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "HARES", 4)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), resumed, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("AID-HIT").unwrap().bytes(), b"1");
+        assert_eq!(restored.variable("UNEXPECTED-HIT").unwrap().bytes(), b"0");
     }
 
     #[test]

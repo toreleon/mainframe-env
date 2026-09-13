@@ -2,6 +2,9 @@ use super::super::{
     CicsLimits, CicsService, DatasetUndo, DurableContinuation, Reader, Run, Session,
     argument_bytes, argument_optional, argument_text, bounded, field, mutation_problem,
 };
+use super::handle_state::{
+    HandleFrame, HandleState, MAX_HANDLE_STACK_DEPTH, encode_handle_state, persist_handle_state,
+};
 use crate::generated::{CICS_AID_NAMES, CICS_CONDITION_NAMES};
 use mainframe_env_execution_api::{BoundedPayload, IdempotencyKey, Invocation, InvocationLimits};
 use mainframe_env_host_api::{
@@ -10,22 +13,12 @@ use mainframe_env_host_api::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 
-const MAX_HANDLE_STACK_DEPTH: usize = 64;
-
-#[derive(Clone)]
-pub(in crate::service) struct HandleFrame {
-    handlers: BTreeMap<String, String>,
-    aid_handlers: BTreeMap<String, String>,
-    ignored_conditions: BTreeSet<String>,
-    abend_handler: Option<String>,
-    cancelled_abend_handler: Option<String>,
-}
-
 pub(in crate::service) struct RunSeed {
     pub(in crate::service) originating_task: String,
     pub(in crate::service) retrieve: Vec<u8>,
     pub(in crate::service) undo: Vec<DatasetUndo>,
     pub(in crate::service) undo_version: Option<u64>,
+    pub(in crate::service) handle_state: HandleState,
 }
 
 pub(in crate::service) fn new_run(
@@ -52,6 +45,7 @@ pub(in crate::service) fn new_run(
             retrieve,
             undo: Vec::new(),
             undo_version: None,
+            handle_state: HandleState::default(),
         },
     )
 }
@@ -64,6 +58,14 @@ pub(in crate::service) fn new_run_with_state(
     sysid: &str,
     seed: RunSeed,
 ) -> Run {
+    let HandleState {
+        handlers,
+        aid_handlers,
+        ignored_conditions,
+        abend_handler,
+        cancelled_abend_handler,
+        stack,
+    } = seed.handle_state;
     Run {
         invocation,
         session: session.into(),
@@ -73,12 +75,12 @@ pub(in crate::service) fn new_run_with_state(
         originating_task: seed.originating_task,
         host_sequence: 0,
         outer_effect_key: None,
-        handlers: BTreeMap::new(),
-        aid_handlers: BTreeMap::new(),
-        ignored_conditions: BTreeSet::new(),
-        abend_handler: None,
-        cancelled_abend_handler: None,
-        handle_stack: Vec::new(),
+        handlers,
+        aid_handlers,
+        ignored_conditions,
+        abend_handler,
+        cancelled_abend_handler,
+        handle_stack: stack,
         retrieve: seed.retrieve,
         current_records: BTreeMap::new(),
         current_record_values: BTreeMap::new(),
@@ -100,7 +102,7 @@ pub(in crate::service) fn encode_session(session: &Session) -> Result<Vec<u8>, H
         IdempotencyKey::new(key, InvocationLimits::default())
             .map_err(|_| HostProblem::InfrastructureFailure)?;
     }
-    let mut out = b"MECS5".to_vec();
+    let mut out = b"MECS6".to_vec();
     out.extend_from_slice(&session.rows.to_be_bytes());
     out.extend_from_slice(&session.columns.to_be_bytes());
     field(&mut out, session.principal.as_bytes())?;
@@ -165,6 +167,7 @@ pub(in crate::service) fn encode_session(session: &Session) -> Result<Vec<u8>, H
         }
         None => out.push(0),
     }
+    encode_handle_state(&mut out, &session.handle_state)?;
     Ok(out)
 }
 
@@ -509,6 +512,7 @@ fn abend(
 ) -> Result<CicsResponse, HostProblem> {
     validate_abend_request(request)?;
     super::release_task_enqueues(service, run)?;
+    let previous = HandleState::from_run(run);
     let target = if request.arguments.contains_key("OPTION.CANCEL") {
         run.abend_handler = None;
         run.cancelled_abend_handler = None;
@@ -519,6 +523,9 @@ fn abend(
     } else {
         None
     };
+    if HandleState::from_run(run) != previous {
+        persist_handle_state(service, run, previous)?;
+    }
     let disposition = if target.is_some() {
         CicsDisposition::Handler
     } else {
@@ -576,6 +583,7 @@ fn handle_condition(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     let handlers = condition_handlers(request)?;
+    let previous = HandleState::from_run(run);
     for (condition, label) in handlers {
         run.ignored_conditions.remove(&condition);
         if label.is_empty() {
@@ -584,6 +592,7 @@ fn handle_condition(
             run.handlers.insert(condition, label);
         }
     }
+    persist_handle_state(service, run, previous)?;
     service.response(
         run,
         CicsDisposition::Complete,
@@ -616,9 +625,12 @@ fn handle_aid(
     if value.schema() != "mainframe-env.cics.aid-handlers@1" {
         return Err(HostProblem::Malformed);
     }
-    for (name, label) in parse_aid_handlers(value.bytes())? {
+    let handlers = parse_aid_handlers(value.bytes())?;
+    let previous = HandleState::from_run(run);
+    for (name, label) in handlers {
         run.aid_handlers.insert(name, label);
     }
+    persist_handle_state(service, run, previous)?;
     service.response(
         run,
         CicsDisposition::Complete,
@@ -789,10 +801,12 @@ fn ignore_condition(
     {
         return Err(HostProblem::Malformed);
     }
+    let previous = HandleState::from_run(run);
     for name in names {
         run.handlers.remove(name);
         run.ignored_conditions.insert(name.into());
     }
+    persist_handle_state(service, run, previous)?;
     service.response(
         run,
         CicsDisposition::Complete,
@@ -810,7 +824,9 @@ fn handle_abend(
     run: &mut Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
-    match handle_abend_action(request)? {
+    let action = handle_abend_action(request)?;
+    let previous = HandleState::from_run(run);
+    match action {
         AbendHandlerAction::Cancel => {
             if let Some(handler) = run.abend_handler.take() {
                 run.cancelled_abend_handler = Some(handler);
@@ -826,6 +842,7 @@ fn handle_abend(
             }
         }
     }
+    persist_handle_state(service, run, previous)?;
     service.response(
         run,
         CicsDisposition::Complete,
@@ -895,6 +912,7 @@ fn push_handle(
     if run.handle_stack.len() >= MAX_HANDLE_STACK_DEPTH {
         return Err(HostProblem::ResourceExhausted);
     }
+    let previous = HandleState::from_run(run);
     run.handle_stack.push(HandleFrame {
         handlers: std::mem::take(&mut run.handlers),
         aid_handlers: std::mem::take(&mut run.aid_handlers),
@@ -902,6 +920,7 @@ fn push_handle(
         abend_handler: run.abend_handler.take(),
         cancelled_abend_handler: run.cancelled_abend_handler.take(),
     });
+    persist_handle_state(service, run, previous)?;
     service.response(
         run,
         CicsDisposition::Complete,
@@ -920,6 +939,7 @@ fn pop_handle(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     validate_handle_stack_request(request)?;
+    let previous = HandleState::from_run(run);
     let Some(frame) = run.handle_stack.pop() else {
         return pop_handle_invreq(service, run, request);
     };
@@ -928,6 +948,7 @@ fn pop_handle(
     run.ignored_conditions = frame.ignored_conditions;
     run.abend_handler = frame.abend_handler;
     run.cancelled_abend_handler = frame.cancelled_abend_handler;
+    persist_handle_state(service, run, previous)?;
     service.response(
         run,
         CicsDisposition::Complete,
@@ -957,6 +978,7 @@ fn pop_handle_invreq(
     run: &mut Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
+    let previous = HandleState::from_run(run);
     let (disposition, target) = match &request.condition_policy {
         CicsConditionPolicy::NoHandle | CicsConditionPolicy::Respond { .. } => {
             (CicsDisposition::Complete, None)
@@ -981,6 +1003,9 @@ fn pop_handle_invreq(
         }
         CicsConditionPolicy::Default => (CicsDisposition::Abended, None),
     };
+    if HandleState::from_run(run) != previous {
+        persist_handle_state(service, run, previous)?;
+    }
     service.response(run, disposition, "INVREQ", 16, 0, target, None, Vec::new())
 }
 

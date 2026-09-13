@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:f165f4774f5dd93d2141fbc320f0d74939d37418f378c0d73c4f557db59838ca",
+      "sha256": "sha256:c999c0ef74cff119be8ee0e829cc702a40226a7ad8b50b7e5f707064df688f26",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -345,7 +345,7 @@
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
       "relative_links": 22,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:b152e8dbd28d11d0b5bff98bb5dc65df40dc34f441a613b0f1ab17d4663792c1",
+      "sha256": "sha256:7b3077c98a595e10c65f57e880fdeec12b24b037daa3cf510df7f60586e84f2f",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -357,7 +357,7 @@
       "path": "docs/architecture/COBOL-RUNTIME-SEMANTICS.md",
       "relative_links": 0,
       "scope": "COBOL runtime semantic contracts",
-      "sha256": "sha256:52fdd70d043dc44146c024955c0eb89fb18ef17facbd3f4780345cc93cbcac05",
+      "sha256": "sha256:3ecd27a5d3fa2b8bfbd021b7dcce27799f2c275bfbd09fa557dd159863efb472",
       "status": "Frozen for mainframe-env 0.4.0 implementation",
       "title": "COBOL runtime semantic contracts",
       "xtask_commands": 0
@@ -429,7 +429,7 @@
       "path": "docs/architecture/EXECUTION-AND-DURABILITY.md",
       "relative_links": 1,
       "scope": "execution lifecycle, effects, work, checkpoints, and durability",
-      "sha256": "sha256:dae1540ab1a6bdad121431da090b3147bb84493d91661882ae5886a693b9dd0a",
+      "sha256": "sha256:1885594fcd45bc624166c96df2c95426d73d02e77a69c03d09bff08cb34c3979",
       "status": "Accepted by repository owner",
       "title": "Execution and Durability Architecture",
       "xtask_commands": 0
@@ -1062,7 +1062,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:a8a7390d8d774baab2b69c5524db19d94860bec7c49f9c714d676d6d6e58e111",
+      "sha256": "sha256:28fa0c66ca757907e8ca9659b145ac0df25427e96edc7c6ee4105241786e5c1a",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },
@@ -1430,7 +1430,7 @@
       "normative": false,
       "path": "docs/runbooks/CAPACITY-AND-RECOVERY.md",
       "relative_links": 2,
-      "sha256": "sha256:3f134f564e8d85a0a4b4c2d6e86737e18386975194b4b9ba6b00bc4346e75ccf",
+      "sha256": "sha256:50c588dc9db8e40985e1a1bbc98d67b638089f86edef3901fb2243af43abc1c8",
       "title": "Capacity and recovery",
       "xtask_commands": 0
     },
