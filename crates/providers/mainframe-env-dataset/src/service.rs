@@ -4469,6 +4469,7 @@ impl DatasetService {
                         .collect::<Vec<_>>();
                     if locks.iter().any(|lock| {
                         lock.transaction.is_some()
+                            && delete_mutation.transaction.as_deref() != lock.transaction.as_deref()
                             && delete_mutation.transaction.as_deref() != Some(lock.lock_id.as_str())
                     }) {
                         return Err(condition("LOCKED", 16));
@@ -11785,6 +11786,80 @@ mod tests {
                 mutation: mutation(5, "release-a", "JOB-A"),
             })
             .unwrap();
+    }
+
+    #[test]
+    fn delete_accepts_transaction_or_lock_id_owner_and_rejects_other_transactions() {
+        let dataset = service(Arc::new(MemoryStore::new(Default::default())));
+        let owner = principal("OWNER1");
+        let acquire = |name: DatasetName, sequence, transaction: &str| {
+            dataset
+                .invoke(DatasetRequest::AcquireLock {
+                    dataset: name,
+                    target: mainframe_env_host_api::DatasetLockTarget::Dataset,
+                    owner: owner.clone(),
+                    mode: mainframe_env_host_api::DatasetLockMode::Exclusive,
+                    now_tick: sequence,
+                    lease_ticks: 100,
+                    transaction: Some(transaction.into()),
+                    mutation: transaction_mutation(sequence, transaction),
+                })
+                .unwrap()
+        };
+        let delete = |name: DatasetName, sequence, transaction: Option<&str>| {
+            let mutation = transaction.map_or_else(
+                || mutation(sequence),
+                |transaction| transaction_mutation(sequence, transaction),
+            );
+            dataset.invoke(DatasetRequest::Delete {
+                dataset: name,
+                member: None,
+                expected_version: Some(1),
+                purge: false,
+                current_date: None,
+                mutation,
+            })
+        };
+
+        let transaction_owned = DatasetName::new("USER.DELETE.JOB", 44).unwrap();
+        dataset
+            .invoke(DatasetRequest::Create {
+                dataset: transaction_owned.clone(),
+                attributes: attrs(DatasetOrganization::Sequential),
+                mutation: mutation(420),
+            })
+            .unwrap();
+        acquire(transaction_owned.clone(), 421, "JOBX");
+        for (sequence, transaction) in [(422, Some("JOBY")), (423, None)] {
+            assert!(matches!(
+                delete(transaction_owned.clone(), sequence, transaction),
+                Err(HostProblem::Condition {
+                    ref name,
+                    response: 16,
+                    ..
+                }) if name == "LOCKED"
+            ));
+        }
+        assert_eq!(
+            delete(transaction_owned, 424, Some("JOBX")),
+            Ok(DatasetResult::Mutated { version: 2 })
+        );
+
+        let lock_owned = DatasetName::new("USER.DELETE.LOCK", 44).unwrap();
+        dataset
+            .invoke(DatasetRequest::Create {
+                dataset: lock_owned.clone(),
+                attributes: attrs(DatasetOrganization::Sequential),
+                mutation: mutation(425),
+            })
+            .unwrap();
+        let DatasetResult::Locks { locks } = acquire(lock_owned.clone(), 426, "JOBX") else {
+            panic!("expected lock receipt");
+        };
+        assert_eq!(
+            delete(lock_owned, 427, Some(&locks[0].lock_id)),
+            Ok(DatasetResult::Mutated { version: 2 })
+        );
     }
 
     #[test]
