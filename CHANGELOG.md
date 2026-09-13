@@ -61,8 +61,9 @@ All notable changes to mainframe-env are documented here.
   and halfword/fullword/exact-width receivers, the provider rejects unknown or
   wrongly typed arguments, and local OPSECURITY/TCTUALENG defaults become exact
   DPL `INVREQ` 16/200 failures while unrelated requested outputs still populate.
-  A compiled online task observes the local values and priority changes through
-  the durable selected route.
+  With no configured initialization parameter, INITPARM remains unchanged and
+  INITPARMLEN returns halfword zero. A compiled online task observes the local
+  values and priority changes through the durable selected route.
 - Added online continuation format `MEOM4`, which retains the current task
   priority and an optional staged program-transfer handoff. Readers preserve
   `MEOM3` priority rows and historical `MEOM2` rows without that field.

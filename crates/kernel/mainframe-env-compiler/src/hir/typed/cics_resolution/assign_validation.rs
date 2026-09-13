@@ -18,6 +18,8 @@ pub(super) fn validate(
         "APPLID",
         "CHANNEL",
         "CWALENG",
+        "INITPARM",
+        "INITPARMLEN",
         "MAJORVERSION",
         "MICROVERSION",
         "MINORVERSION",
@@ -51,14 +53,15 @@ pub(super) fn validate(
                 "CICS ASSIGN {name} requires a fullword binary data area"
             ));
         }
-        if matches!(name, "CWALENG" | "TCTUALENG" | "TWALENG")
+        if matches!(name, "CWALENG" | "INITPARMLEN" | "TCTUALENG" | "TWALENG")
             && (target.usage != CobolUsage::Binary || target.length != 2 || target.scale != 0)
         {
             return Err(format!(
                 "CICS ASSIGN {name} requires a halfword binary data area"
             ));
         }
-        if (name == "OPERKEYS" && target.length != 8)
+        if (name == "INITPARM" && target.length != 60)
+            || (name == "OPERKEYS" && target.length != 8)
             || (name == "OPSECURITY" && target.length != 3)
             || (name == "RESTART" && target.length != 1)
         {

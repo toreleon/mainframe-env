@@ -4728,6 +4728,23 @@ mod tests {
         assert_eq!(local_only.outputs["OPSECURITY"].bytes(), &[0; 3]);
         assert_eq!(local_only.outputs["TCTUALENG"].bytes(), b"0");
 
+        let initparm = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("INITPARM".into(), argument(b"INITPARM-OUT")),
+                ("INITPARMLEN".into(), argument(b"INITPARM-LENGTH-OUT")),
+            ]),
+            28,
+        );
+        let initparm = service
+            .invoke(
+                &effect(&invocation.run_unit_id, initparm.clone(), 28),
+                initparm,
+            )
+            .unwrap();
+        assert!(!initparm.outputs.contains_key("INITPARM"));
+        assert_eq!(initparm.outputs["INITPARMLEN"].bytes(), b"0");
+
         for (sequence, name, value) in [
             (30, "PROGRAM", argument(b"PROGRAM-OUT")),
             (31, "USERID", cics_decimal(1)),
@@ -4897,6 +4914,24 @@ mod tests {
         assert_eq!(response.outputs["TASKPRIORITY"].bytes(), b"0");
         assert_eq!(response.outputs["TWALENG"].bytes(), b"0");
         assert_eq!(response.outputs["USERID"].bytes(), b"IBMUSER");
+
+        let initparm = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("INITPARM".into(), argument(b"INITPARM-OUT")),
+                ("INITPARMLEN".into(), argument(b"INITPARM-LENGTH-OUT")),
+            ]),
+            4,
+        );
+        let initparm = service
+            .invoke(
+                &effect(&invocation.run_unit_id, initparm.clone(), 4),
+                initparm,
+            )
+            .unwrap();
+        assert_eq!(initparm.condition, "NORMAL");
+        assert!(!initparm.outputs.contains_key("INITPARM"));
+        assert_eq!(initparm.outputs["INITPARMLEN"].bytes(), b"0");
 
         let mut prohibited = request(
             CicsOperation::Assign,

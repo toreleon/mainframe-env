@@ -74,6 +74,13 @@ pub(in crate::service) fn assign(
             response.outputs.insert(name.into(), decimal_payload(0)?);
         }
     }
+    if request.arguments.contains_key("INITPARMLEN") {
+        response
+            .outputs
+            .insert("INITPARMLEN".into(), decimal_payload(0)?);
+    }
+    // With no configured INITPARM for the current program, IBM leaves the
+    // INITPARM receiver unchanged; omitting that output preserves its bytes.
     for (name, value) in [("OPERKEYS", vec![0; 8]), ("RESTART", vec![0])] {
         if request.arguments.contains_key(name) {
             response.outputs.insert(name.into(), bounded(value)?);
@@ -112,6 +119,8 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "APPLID",
         "CHANNEL",
         "CWALENG",
+        "INITPARM",
+        "INITPARMLEN",
         "MAJORVERSION",
         "MICROVERSION",
         "MINORVERSION",

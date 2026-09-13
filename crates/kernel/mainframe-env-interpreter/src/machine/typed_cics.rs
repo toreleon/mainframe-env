@@ -415,6 +415,8 @@ pub(super) fn execute_legacy(
             "APPLID",
             "CHANNEL",
             "CWALENG",
+            "INITPARM",
+            "INITPARMLEN",
             "MAJORVERSION",
             "MICROVERSION",
             "MINORVERSION",

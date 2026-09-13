@@ -70,6 +70,8 @@ contract explicitly permits it.
   OPSECURITY is three null bytes and absent TCTUALENG is halfword zero locally;
   in a DPL server either option raises `INVREQ` 16/200 while other requested
   outputs are still applied when the condition policy permits return.
+  Without an INITPARM system definition, INITPARM deliberately emits no output
+  so its receiver stays unchanged and INITPARMLEN returns halfword zero.
   Other source-valid ASSIGN options remain rejected until their terminal,
   program-level, or failure context has an owned runtime representation.
 - Terminal execution outcomes carry an explicit transaction-dump disposition.
