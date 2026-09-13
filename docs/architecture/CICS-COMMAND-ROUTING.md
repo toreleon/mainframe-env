@@ -76,6 +76,12 @@ The 23 existing API routes are the only advertised application commands.
 `ASKTIME ABSTIME` is the advertised time form because the existing handler
 returns its packed-decimal destination; bare `ASKTIME` remains unready until
 the runtime also implements its distinct EIBDATE/EIBTIME update contract.
+Each legacy route admits only the source-valid option subset whose behavior is
+implemented by that raw handler. A catalog-known option outside that subset
+fails explicitly before compatibility lowering instead of being silently
+dropped. The pre-registry `DATASET` spelling remains an exact alias for `FILE`
+on the existing file and browse operations; specifying both spellings fails as
+an ambiguous resource selection.
 `automatic_registration` remains false, the default handler is null, and an
 unready row cannot reach a generic-success fallback. The application registry
 does not accept or dispatch SPI or FEPI identities. A separate generated,
@@ -134,6 +140,14 @@ and output destinations before execution, then emits the existing owned typed
 request through the execution coordinator. The provider never parses COBOL HIR
 or source syntax, and the migration cannot introduce a parallel CICS provider,
 store, unit-of-work protocol, or condition authority.
+
+Execution-context facts that are not command operands travel in bounded,
+versioned invocation bindings. `mainframe-env.cics.execution-context@1`
+currently distinguishes local execution, DPL with `SYNCONRETURN`, DPL without
+syncpoint ownership, and `EXECUTIONSET=DPLSUBSET`. The recovery handler uses
+that context before changing UOW state; CIC-905 owns populating it from a
+future public DPL route. It is not embedded in source tokens or inferred from a
+successful transport call.
 
 ## Change contract
 

@@ -12,6 +12,9 @@ use mainframe_env_host_api::{
 use mainframe_env_store_api::ProviderStateRecord;
 use std::collections::BTreeMap;
 
+const EXECUTION_CONTEXT_BINDING: &str = "cics.execution-context";
+const EXECUTION_CONTEXT_SCHEMA: &str = "mainframe-env.cics.execution-context@1";
+
 pub(in crate::service) fn invoke(
     service: &CicsService,
     run: &mut Run,
@@ -30,6 +33,7 @@ fn syncpoint(
     request: &CicsRequest,
     retention_tick: u64,
 ) -> Result<CicsResponse, HostProblem> {
+    validate_syncpoint_owner(run)?;
     let mutation = request
         .mutation
         .as_ref()
@@ -152,6 +156,26 @@ fn syncpoint(
         return Err(HostProblem::UnknownOutcome);
     }
     uow_response(service, run, outcome)
+}
+
+fn validate_syncpoint_owner(run: &Run) -> Result<(), HostProblem> {
+    let Some(context) = run.invocation.bindings.get(EXECUTION_CONTEXT_BINDING) else {
+        return Ok(());
+    };
+    if context.schema() != EXECUTION_CONTEXT_SCHEMA {
+        return Err(HostProblem::Malformed);
+    }
+    match context.bytes() {
+        b"local" | b"dpl-synconreturn" => Ok(()),
+        // IBM topic dfhp4_syncpoint.html assigns INVREQ RESP2 200 when a DPL
+        // server does not own the syncpoint or is constrained to DPLSUBSET.
+        b"dpl-without-synconreturn" | b"dpl-executionset-subset" => Err(HostProblem::Condition {
+            name: "INVREQ".into(),
+            response: 16,
+            response2: 200,
+        }),
+        _ => Err(HostProblem::Malformed),
+    }
 }
 
 fn syncpoint_db2(

@@ -5149,6 +5149,115 @@ mod tests {
     }
 
     #[test]
+    fn syncpoint_rejects_unowned_dpl_context_before_uow_mutation() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        for (sequence, context) in [
+            (61, b"dpl-without-synconreturn".as_slice()),
+            (62, b"dpl-executionset-subset".as_slice()),
+        ] {
+            let binding = BoundedPayload::new(
+                "mainframe-env.cics.execution-context@1",
+                context.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap();
+            let invocation = invocation_for(
+                &format!("dpl-{sequence}"),
+                BTreeMap::from([("cics.execution-context".into(), binding)]),
+            );
+            let session = SessionId::new(format!("dpl-session-{sequence}"), 64).unwrap();
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let mut request = request(CicsOperation::Syncpoint, BTreeMap::new(), sequence);
+            request.condition_policy = CicsConditionPolicy::Respond {
+                response_field: "RESP-X".into(),
+                response2_field: Some("RESP2-X".into()),
+            };
+            let response = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), sequence),
+                    request,
+                )
+                .unwrap();
+            assert_eq!(
+                (
+                    response.condition.as_str(),
+                    response.response,
+                    response.response2
+                ),
+                ("INVREQ", 16, 200)
+            );
+            assert_eq!(response.unit_of_work, None);
+            assert!(
+                store
+                    .get_provider_state("cics-uow", &format!("outer-{sequence}"))
+                    .unwrap()
+                    .is_none()
+            );
+        }
+
+        let binding = BoundedPayload::new(
+            "mainframe-env.cics.execution-context@1",
+            b"dpl-synconreturn".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let invocation = invocation_for(
+            "dpl-synconreturn",
+            BTreeMap::from([("cics.execution-context".into(), binding)]),
+        );
+        let session = SessionId::new("dpl-synconreturn", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let allowed_request = request(CicsOperation::Syncpoint, BTreeMap::new(), 63);
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, allowed_request.clone(), 63),
+                    allowed_request,
+                )
+                .unwrap()
+                .unit_of_work,
+            Some(CicsUnitOfWorkOutcome::Committed)
+        );
+
+        let malformed = BoundedPayload::new(
+            "mainframe-env.cics.argument@1",
+            b"dpl-synconreturn".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let invocation = invocation_for(
+            "dpl-malformed",
+            BTreeMap::from([("cics.execution-context".into(), malformed)]),
+        );
+        let session = SessionId::new("dpl-malformed", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let malformed_request = request(CicsOperation::Syncpoint, BTreeMap::new(), 64);
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, malformed_request.clone(), 64),
+                malformed_request,
+            ),
+            Err(HostProblem::Malformed)
+        );
+        assert!(
+            store
+                .get_provider_state("cics-uow", "outer-64")
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
     fn terminal_suspends_without_worker_and_resumes_from_durable_input() {
         let service = service(Arc::new(MemoryStore::new(Default::default())));
         let (invocation, session) = registered(&service);

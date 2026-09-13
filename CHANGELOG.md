@@ -48,6 +48,9 @@ All notable changes to mainframe-env are documented here.
   discriminators, dependencies, alternatives, exclusions, and known source bounds.
   This seals only the non-release CIC-901 implementation boundary; it grants no new
   execution, coverage, or differential credit to unready commands.
+- Added the first CIC-902 recovery guard: an owned execution-context binding
+  rejects DPL `SYNCPOINT` without `SYNCONRETURN` or under `DPLSUBSET` with exact
+  `INVREQ` RESP/RESP2 before unit-of-work mutation.
 - Added a reviewed COBOL numeric `MOVE` pilot and corrected floating-insertion,
   capacity, sign, and overflow behavior found by that review.
 - Added cost-aware local Jenkins assurance, exact-candidate command receipts,
@@ -100,6 +103,9 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Made legacy EXEC CICS compatibility routes reject source-valid options that
+  their pre-typed runtime handlers do not implement, preventing silent operand
+  drops while retaining the documented `DATASET` file-name compatibility alias.
 - Moved the authentication wall-clock fixture wholly behind the server test
   boundary and tightened the reviewed product-module production-line ceiling.
 - Anchored authentication-session expiry and rotation to the shared durable
