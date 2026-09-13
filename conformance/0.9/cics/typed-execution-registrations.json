@@ -4,6 +4,13 @@
   "application_identity_set_sha256": "sha256:a18057164564781563252d53586a8afbc401f2783950db456b3b98177fc60b94",
   "registrations": [
     {
+      "operation": "ChangeTask",
+      "interface": "api",
+      "family": "task-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0022"
+    },
+    {
       "operation": "Deq",
       "interface": "api",
       "family": "task-control",
@@ -16,6 +23,13 @@
       "family": "task-control",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0064"
+    },
+    {
+      "operation": "Suspend",
+      "interface": "api",
+      "family": "task-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0214"
     }
   ]
 }

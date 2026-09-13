@@ -47,6 +47,21 @@ const ENQ_EFFECTS: &[Effect] = &[
     Effect::Condition,
     Effect::Transaction,
 ];
+const CHANGE_TASK_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Suspension,
+    Effect::Condition,
+];
+const SUSPEND_EFFECTS: &[Effect] = &[
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Suspension,
+    Effect::Condition,
+];
 
 /// Static executable facts owned by the typed CICS dialect.
 ///
@@ -397,7 +412,7 @@ pub fn cics_application_registry_for_runtime_operation(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 5] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 7] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -438,6 +453,22 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 5] = [
         effects: SYNCPOINT_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::ChangeTask,
+        namespace: "cics.task",
+        name: "change-task",
+        major: 1,
+        effects: CHANGE_TASK_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Suspend,
+        namespace: "cics.task",
+        name: "suspend",
+        major: 1,
+        effects: SUSPEND_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
 ];
 
 /// Resolves the executable descriptor for a decoded CICS plan operation.
@@ -451,6 +482,8 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::Read => &CICS_EXECUTABLE_DESCRIPTORS[2],
         CicsPlanOperation::Rewrite => &CICS_EXECUTABLE_DESCRIPTORS[3],
         CicsPlanOperation::Syncpoint => &CICS_EXECUTABLE_DESCRIPTORS[4],
+        CicsPlanOperation::ChangeTask => &CICS_EXECUTABLE_DESCRIPTORS[5],
+        CicsPlanOperation::Suspend => &CICS_EXECUTABLE_DESCRIPTORS[6],
     }
 }
 
@@ -511,7 +544,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 5);
+        assert_eq!(typed.len(), 7);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -529,7 +562,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 238);
+        assert_eq!(unready.len(), 236);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -690,11 +723,13 @@ mod tests {
                 .map(|descriptor| descriptor.operation)
                 .collect::<BTreeSet<_>>(),
             BTreeSet::from([
+                CicsPlanOperation::ChangeTask,
                 CicsPlanOperation::Deq,
                 CicsPlanOperation::Enq,
                 CicsPlanOperation::Read,
                 CicsPlanOperation::Rewrite,
                 CicsPlanOperation::Syncpoint,
+                CicsPlanOperation::Suspend,
             ])
         );
         assert_eq!(

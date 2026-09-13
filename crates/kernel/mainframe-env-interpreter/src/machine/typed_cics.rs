@@ -57,6 +57,46 @@ pub(super) fn write_context(
     Ok(())
 }
 
+pub(super) fn write_runtime_output(
+    machine: &mut ReferenceMachine,
+    name: &str,
+    value: &BoundedPayload,
+) -> Result<bool, MachineProblem> {
+    if name != "TASK.PRIORITY" {
+        return Ok(false);
+    }
+    if value.schema() != "mainframe-env.cics.decimal@1" {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
+    machine.invocation.priority = String::from_utf8_lossy(value.bytes())
+        .parse::<u8>()
+        .map_err(|_| MachineProblem::UnexpectedHostResult)?;
+    Ok(true)
+}
+
+pub(super) fn suspension(
+    machine: &mut ReferenceMachine,
+    operation: CicsOperation,
+    state_bytes: usize,
+) -> MachineDrive<EffectRequest> {
+    let (kind, reissue) = match operation {
+        CicsOperation::Enq => ("cics-enqueue", true),
+        CicsOperation::ChangeTask | CicsOperation::Suspend => ("cics-scheduler", false),
+        _ => ("cics-terminal", true),
+    };
+    if reissue {
+        machine.pc = machine.pc.saturating_sub(1);
+    }
+    MachineDrive::Suspended(Suspension {
+        kind: kind.into(),
+        resume_token: format!(
+            "{}:{}",
+            machine.invocation.run_unit_id, machine.effect_sequence
+        ),
+        state_bytes: state_bytes as u64,
+    })
+}
+
 pub(super) fn validate_module_operations(module: &Module) -> Result<(), MachineProblem> {
     let mut catalog = OperationCatalog::default();
     for descriptor in CICS_EXECUTABLE_DESCRIPTORS {
@@ -119,7 +159,9 @@ pub(super) fn execute(
             CicsOperandValue::Storage(slot)
                 if matches!(
                     operand.name,
-                    CicsOperandName::Length | CicsOperandName::MaxLifetime
+                    CicsOperandName::Length
+                        | CicsOperandName::MaxLifetime
+                        | CicsOperandName::Priority
                 ) =>
             {
                 (
@@ -685,11 +727,13 @@ fn expected_effects(operation: CicsPlanOperation) -> &'static [Effect] {
 
 const fn host_operation(operation: CicsPlanOperation) -> CicsOperation {
     match operation {
+        CicsPlanOperation::ChangeTask => CicsOperation::ChangeTask,
         CicsPlanOperation::Deq => CicsOperation::Deq,
         CicsPlanOperation::Enq => CicsOperation::Enq,
         CicsPlanOperation::Read => CicsOperation::Read,
         CicsPlanOperation::Rewrite => CicsOperation::Rewrite,
         CicsPlanOperation::Syncpoint => CicsOperation::Syncpoint,
+        CicsPlanOperation::Suspend => CicsOperation::Suspend,
     }
 }
 
@@ -702,6 +746,7 @@ const fn operand_name(name: CicsOperandName) -> &'static str {
         CicsOperandName::Resource => "RESOURCE",
         CicsOperandName::Length => "LENGTH",
         CicsOperandName::MaxLifetime => "MAXLIFETIME",
+        CicsOperandName::Priority => "PRIORITY",
     }
 }
 

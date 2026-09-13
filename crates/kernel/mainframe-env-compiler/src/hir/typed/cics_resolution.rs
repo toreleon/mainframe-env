@@ -720,22 +720,27 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         }
     }
     let operation = match descriptor.label_tokens {
+        ["CHANGE", "TASK"] => HirCicsOperation::ChangeTask,
         ["DEQ"] => HirCicsOperation::Deq,
         ["ENQ"] => HirCicsOperation::Enq,
         ["READ"] => HirCicsOperation::Read,
         ["REWRITE"] => HirCicsOperation::Rewrite,
         ["SYNCPOINT"] => HirCicsOperation::Syncpoint,
+        ["SUSPEND"] => HirCicsOperation::Suspend,
         _ => return Err(ResolutionFailure::Unsupported),
     };
     let allowed_clauses: &[&str] = match operation {
+        HirCicsOperation::ChangeTask => &["PRIORITY", "RESP", "RESP2"],
         HirCicsOperation::Deq | HirCicsOperation::Enq => {
             &["RESOURCE", "LENGTH", "MAXLIFETIME", "RESP", "RESP2"]
         }
         HirCicsOperation::Read => &["FILE", "DATASET", "RIDFLD", "INTO", "RESP", "RESP2"],
         HirCicsOperation::Rewrite => &["FILE", "DATASET", "FROM", "RESP", "RESP2"],
         HirCicsOperation::Syncpoint => &["RESP", "RESP2"],
+        HirCicsOperation::Suspend => &["RESP", "RESP2"],
     };
     let allowed_options: &[&str] = match operation {
+        HirCicsOperation::ChangeTask | HirCicsOperation::Suspend => &["NOHANDLE"],
         HirCicsOperation::Deq => &["UOW", "TASK", "NOHANDLE"],
         HirCicsOperation::Enq => &["UOW", "TASK", "NOSUSPEND", "NOHANDLE"],
         HirCicsOperation::Read => &["UPDATE", "NOHANDLE"],
@@ -775,6 +780,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         ));
     }
     for required in match operation {
+        HirCicsOperation::ChangeTask | HirCicsOperation::Suspend => &[][..],
         HirCicsOperation::Deq | HirCicsOperation::Enq => &["RESOURCE"][..],
         HirCicsOperation::Read => &["RIDFLD", "INTO"][..],
         HirCicsOperation::Rewrite => &["FROM"][..],
@@ -818,6 +824,14 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
                 value: cics_cvda_value(value, semantic)?,
             });
         }
+    }
+    if operation == HirCicsOperation::ChangeTask
+        && let Some(value) = clauses.get("PRIORITY")
+    {
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::Priority,
+            value: cics_integer_value(value, semantic)?,
+        });
     }
     let mut outputs = Vec::new();
     for (name, identity) in [

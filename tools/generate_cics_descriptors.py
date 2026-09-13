@@ -83,6 +83,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("Abend", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0001"),
     ("Asktime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0010"),
     ("Assign", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0011"),
+    ("ChangeTask", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0022"),
     ("Delete", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0040"),
     ("Deq", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0050"),
     ("EndBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0058"),
@@ -115,6 +116,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
         f"{OFFICIAL_BASELINE}:spi-commands-unique:0224",
     ),
     ("StartBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0208"),
+    ("Suspend", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0214"),
     ("Syncpoint", "api", "recovery", True, f"{OFFICIAL_BASELINE}:api-commands:0218"),
     ("Write", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0253"),
     (
@@ -327,7 +329,9 @@ POLICY_BINDINGS = {
     },
 }
 
-TYPED_RUNTIME_OPERATIONS = frozenset({"Deq", "Enq", "Read", "Rewrite", "Syncpoint"})
+TYPED_RUNTIME_OPERATIONS = frozenset(
+    {"ChangeTask", "Deq", "Enq", "Read", "Rewrite", "Suspend", "Syncpoint"}
+)
 ENQUEUE_COMMAND_ROWS = frozenset(
     {
         f"{OFFICIAL_BASELINE}:api-commands:0050",
@@ -345,6 +349,9 @@ COMPILER_SPI_COMPATIBILITY = {
     "resp2_requires_resp": True,
 }
 TYPED_RUNTIME_IR_EFFECTS = {
+    "ChangeTask": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition"}
+    ),
     "Deq": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "Enq": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
@@ -356,6 +363,7 @@ TYPED_RUNTIME_IR_EFFECTS = {
         {"dataset-write", "memory-read", "memory-write", "condition", "transaction"}
     ),
     "Syncpoint": frozenset({"memory-write", "condition", "transaction"}),
+    "Suspend": frozenset({"memory-write", "suspension", "condition"}),
 }
 
 
@@ -483,6 +491,10 @@ def _load_typed_execution_registrations(
     command_by_row = {command["official_row"]: command for command in commands}
     existing_names = {operation["operation"] for operation in existing_operations}
     existing_rows = {operation["official_row"] for operation in existing_operations}
+    expected_by_name = {
+        operation: (interface, family, mutating, official_row)
+        for operation, interface, family, mutating, official_row in EXPECTED_RUNTIME_OPERATIONS
+    }
     normalized = []
     for index, raw_registration in enumerate(
         _array(catalog["registrations"], "typed execution registrations")
@@ -510,9 +522,16 @@ def _load_typed_execution_registrations(
             f"typed execution registrations[{index}].official_row",
         )
         command = command_by_row.get(official_row)
+        expected = expected_by_name.get(name)
         if (
-            registration["interface"] != "api"
-            or registration["mutating"] is not True
+            expected is None
+            or (
+                registration["interface"],
+                family,
+                registration["mutating"],
+                official_row,
+            )
+            != expected
             or IDENTIFIER.fullmatch(name) is None
             or family not in families
             or command is None
@@ -525,14 +544,19 @@ def _load_typed_execution_registrations(
         normalized.append(
             {
                 "operation": name,
-                "interface": "api",
+                "interface": registration["interface"],
                 "family": family,
-                "mutating": True,
+                "mutating": registration["mutating"],
                 "official_row": official_row,
                 "label": command["label"],
             }
         )
-    if [row["operation"] for row in normalized] != ["Deq", "Enq"]:
+    if [row["operation"] for row in normalized] != [
+        "ChangeTask",
+        "Deq",
+        "Enq",
+        "Suspend",
+    ]:
         raise DescriptorError(f"{path} registration identities or order differ")
     return normalized
 
@@ -817,7 +841,9 @@ def load_catalog(
         EXPECTED_RUNTIME_OPERATIONS
         if include_runtime_admission
         else [
-            row for row in EXPECTED_RUNTIME_OPERATIONS if row[0] not in {"Deq", "Enq"}
+            row
+            for row in EXPECTED_RUNTIME_OPERATIONS
+            if row[0] not in {"ChangeTask", "Deq", "Enq", "Suspend"}
         ]
     )
     if observed_runtime != expected_runtime:
@@ -3090,8 +3116,8 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
         for row in catalog["_runtime_operations"]
         if row["interface"] == "api"
     }
-    if len(existing_runtime) != 25:
-        raise DescriptorError("CICS application runtime baseline must remain exactly 25 rows")
+    if len(existing_runtime) != 27:
+        raise DescriptorError("CICS application runtime baseline must remain exactly 27 rows")
 
     loaded_batches = []
     for batch_id, start, end, projection_path, review_path in CONTRACT_BATCHES:
@@ -3345,12 +3371,12 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
     if (
         len(registry_rows) != 263
         or len(set(handler_ids)) != 263
-        or len(typed_rows) != 5
+        or len(typed_rows) != 7
         or len(legacy_rows) != 20
         or {row["runtime_operation"] for row in typed_rows}
         != TYPED_RUNTIME_OPERATIONS
-        or len(advertised_rows) != 25
-        or len(unready_rows) != 238
+        or len(advertised_rows) != 27
+        or len(unready_rows) != 236
         or any(row["unready_result"] != "explicit-unsupported" for row in unready_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in typed_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in legacy_rows)

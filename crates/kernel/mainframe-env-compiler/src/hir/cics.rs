@@ -174,6 +174,7 @@ impl PlanContext<'_> {
                 HirCicsOperandName::Resource => CicsOperandName::Resource,
                 HirCicsOperandName::Length => CicsOperandName::Length,
                 HirCicsOperandName::MaxLifetime => CicsOperandName::MaxLifetime,
+                HirCicsOperandName::Priority => CicsOperandName::Priority,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -237,9 +238,11 @@ impl PlanContext<'_> {
 
 const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
     match operation {
+        HirCicsOperation::ChangeTask => CicsPlanOperation::ChangeTask,
         HirCicsOperation::Read => CicsPlanOperation::Read,
         HirCicsOperation::Rewrite => CicsPlanOperation::Rewrite,
         HirCicsOperation::Syncpoint => CicsPlanOperation::Syncpoint,
+        HirCicsOperation::Suspend => CicsPlanOperation::Suspend,
         HirCicsOperation::Deq => CicsPlanOperation::Deq,
         HirCicsOperation::Enq => CicsPlanOperation::Enq,
     }

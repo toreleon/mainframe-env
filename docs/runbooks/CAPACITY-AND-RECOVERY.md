@@ -62,6 +62,15 @@ closed. Do not delete the model catalog to force local routing: model-aware lock
 keys contain either APPLID/SYSID or ENQSCOPE and are not compatible with the
 single-region key profile.
 
+A `cics-scheduler` suspension from `CHANGE TASK` or `SUSPEND` is a one-shot
+yield, not a terminal handoff and not a command retry. Preserve the execution
+checkpoint, online exchange, and `online-machine-continuation` row, then resume
+the same execution through normal bounded admission. Current `MEOM3` rows carry
+the changed priority; historical `MEOM2` rows remain readable and inherit the
+priority already stored by their online exchange. Deleting either continuation
+can lose the post-command program counter and must be treated as failed
+recovery, not permission to reissue the CICS command.
+
 If an exchange points at a terminal execution, first finish the abandoned
 COBOL/CICS run, remove its interpreter checkpoint, and delete the exchange.
 Preserve `online-machine-continuation` only when the final lifecycle event is

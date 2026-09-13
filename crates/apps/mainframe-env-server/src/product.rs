@@ -161,10 +161,8 @@ impl From<SaturationLevel> for ProductCapacityStatus {
 mod artifact;
 pub use artifact::{BatchProgramDefinition, OnlineProgramDefinition};
 mod continuation;
-use continuation::{
-    OnlineMachineContinuation, decode_online_machine_continuation,
-    encode_online_machine_continuation,
-};
+#[cfg(test)]
+use continuation::{decode_online_machine_continuation, encode_online_machine_continuation};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BatchInstallReceipt {
@@ -1971,62 +1969,6 @@ impl ProductServer {
         Ok(true)
     }
 
-    fn online_machine_continuation(
-        &self,
-        session: &SessionId,
-    ) -> Result<Option<OnlineMachineContinuation>, HostProblem> {
-        self.store
-            .get_provider_state("online-machine-continuation", session.as_str())
-            .map_err(store_error)?
-            .map(|record| decode_online_machine_continuation(&record))
-            .transpose()
-    }
-
-    fn persist_online_machine_continuation(
-        &self,
-        session: &SessionId,
-        program: &str,
-        artifact: &ArtifactRef,
-        provider_generations: &BTreeMap<CapabilityId, String>,
-        checkpoint: &BoundedPayload,
-        current_version: Option<u64>,
-    ) -> Result<u64, HostProblem> {
-        let version = current_version
-            .unwrap_or_default()
-            .checked_add(1)
-            .ok_or(HostProblem::ResourceExhausted)?;
-        self.store
-            .put_provider_state(
-                ProviderStateRecord {
-                    namespace: "online-machine-continuation".into(),
-                    key: session.as_str().into(),
-                    version,
-                    payload: encode_online_machine_continuation(
-                        program,
-                        artifact,
-                        provider_generations,
-                        checkpoint,
-                    )?,
-                },
-                current_version,
-            )
-            .map_err(store_error)?;
-        Ok(version)
-    }
-
-    fn clear_online_machine_continuation(
-        &self,
-        session: &SessionId,
-        version: Option<u64>,
-    ) -> Result<(), HostProblem> {
-        if let Some(version) = version {
-            self.store
-                .delete_provider_state("online-machine-continuation", session.as_str(), version)
-                .map_err(store_error)?;
-        }
-        Ok(())
-    }
-
     fn finish_online_machine_run(
         &self,
         session: &SessionId,
@@ -2217,7 +2159,8 @@ impl ProductServer {
         }
         let context = match exchange.as_ref() {
             Some(state) => {
-                let invocation = self.online_exchange_invocation(state)?;
+                let mut invocation = self.online_exchange_invocation(state)?;
+                continuation::restore_online_machine_priority(&mut invocation, saved.as_ref());
                 self.cics.restore_terminal_run(
                     invocation.clone(),
                     session,
@@ -2244,6 +2187,7 @@ impl ProductServer {
                 .provider_generations
                 .clone_from(&continuation.provider_generations);
         }
+        continuation::restore_online_machine_priority(&mut invocation, saved.as_ref());
         invocation.bindings.insert(
             "cics.commarea".into(),
             BoundedPayload::new(
@@ -9857,6 +9801,193 @@ mod tests {
     }
 
     #[test]
+    fn online_task_scheduling_yields_once_and_retains_changed_priority() {
+        let limits = SourceLimits::default();
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. SCHEDULE.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PRIORITY-X PIC S9(4) COMP VALUE 200.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS CHANGE TASK PRIORITY(PRIORITY-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let path = LogicalPath::new("SCHEDULE.cbl", limits.max_path_bytes).unwrap();
+        let bundle = SourceBundle::new(
+            &path,
+            vec![
+                SourceFile::input(
+                    "SCHEDULE.cbl",
+                    source.to_vec(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("task scheduling fixture did not publish");
+        };
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "SCHEDULE".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("SC00".into(), "SCHEDULE".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "SCHEDULE".into(),
+                    map: "SCHEDULE".into(),
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("task-scheduling", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "SC00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "SC00",
+                24,
+                80,
+                "task-scheduling-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "SCHEDULE", &context)
+            .unwrap();
+
+        server
+            .run_online_exchange(&session, &principal, "SCHEDULE", 2)
+            .unwrap();
+        let first = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        assert_eq!(first.priority, Some(200));
+        let mut restored = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored.restore_checkpoint(&first.checkpoint).unwrap();
+        assert_eq!(restored.variable("EIBFN").unwrap().bytes(), &[0x5e, 0x06]);
+        let current_record = server
+            .store
+            .get_provider_state("online-machine-continuation", session.as_str())
+            .unwrap()
+            .unwrap();
+        let mut legacy = current_record.clone();
+        let mut at = 5usize;
+        for _ in 0..3 {
+            let length = usize::try_from(u32::from_be_bytes(
+                legacy.payload[at..at + 4].try_into().unwrap(),
+            ))
+            .unwrap();
+            at += 4 + length;
+        }
+        assert_eq!(&legacy.payload[at..at + 5], &[0, 0, 0, 1, 200]);
+        legacy.payload.drain(at..at + 5);
+        legacy.payload[..5].copy_from_slice(b"MEOM2");
+        let decoded_legacy = decode_online_machine_continuation(&legacy).unwrap();
+        assert_eq!(decoded_legacy.priority, None);
+        assert_eq!(decoded_legacy.checkpoint, first.checkpoint);
+        let platform_store = server.store.clone();
+        drop(server);
+        let server = ProductServer::open(
+            config(),
+            platform_store,
+            Arc::new(MemorySecretResolver::default()),
+            default_program_router(),
+        )
+        .unwrap();
+        assert_eq!(
+            server
+                .store
+                .get_execution(&invocation.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Suspended
+        );
+
+        server
+            .run_online_exchange(&session, &principal, "SCHEDULE", 3)
+            .unwrap();
+        let second = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        assert_eq!(second.priority, Some(200));
+        assert!(second.version > first.version);
+        restored.restore_checkpoint(&second.checkpoint).unwrap();
+        assert_eq!(restored.variable("EIBFN").unwrap().bytes(), &[0x12, 0x08]);
+        server
+            .run_online_exchange(&session, &principal, "SCHEDULE", 4)
+            .unwrap();
+        assert!(
+            server
+                .online_machine_continuation(&session)
+                .unwrap()
+                .is_none()
+        );
+        assert!(server.online_exchange(&session).unwrap().is_none());
+        assert_eq!(
+            server
+                .store
+                .get_execution(&invocation.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Completed
+        );
+        let cics_audits = server
+            .store
+            .audit_records(&invocation.execution_id, 1, 32)
+            .unwrap()
+            .into_iter()
+            .filter(|record| record.capability.as_str() == "host.cics.execute")
+            .map(|record| (record.effect_sequence, record.decision))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            cics_audits,
+            vec![
+                (1, mainframe_env_execution_api::AuditDecision::Success),
+                (2, mainframe_env_execution_api::AuditDecision::Success),
+            ]
+        );
+    }
+
+    #[test]
     fn online_enqueue_wait_remains_durably_resumable_until_dequeue() {
         let limits = SourceLimits::default();
         let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. WAITENQ.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 LOCK-NAME PIC X(4) VALUE 'LOCK'.\nPROCEDURE DIVISION.\nEXEC CICS ENQ RESOURCE(LOCK-NAME) LENGTH(4) UOW END-EXEC.\nDISPLAY 'ACQUIRED'.\nSTOP RUN.\n";
@@ -10367,6 +10498,7 @@ mod tests {
             &decoded.program,
             &ArtifactRef::new(format!("sha256:{:064x}", 0), InvocationLimits::default()).unwrap(),
             &decoded.provider_generations,
+            decoded.priority.unwrap_or(0),
             &decoded.checkpoint,
         )
         .unwrap();
@@ -10429,6 +10561,7 @@ mod tests {
             &decoded.program,
             &artifact_ref,
             &wrong_generations,
+            decoded.priority.unwrap_or(0),
             &decoded.checkpoint,
         )
         .unwrap();

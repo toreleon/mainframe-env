@@ -18,22 +18,24 @@
     },
     "registrations": {
       "type": "array",
-      "minItems": 2,
-      "maxItems": 2,
+      "minItems": 4,
+      "maxItems": 4,
       "uniqueItems": true,
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["operation", "interface", "family", "mutating", "official_row"],
         "properties": {
-          "operation": {"enum": ["Deq", "Enq"]},
+          "operation": {"enum": ["ChangeTask", "Deq", "Enq", "Suspend"]},
           "interface": {"const": "api"},
           "family": {"const": "task-control"},
-          "mutating": {"const": true},
+          "mutating": {"type": "boolean"},
           "official_row": {
             "enum": [
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0022",
               "ibm-cics-ts-6x-2026-08-31:api-commands:0050",
-              "ibm-cics-ts-6x-2026-08-31:api-commands:0064"
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0064",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0214"
             ]
           }
         }

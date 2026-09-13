@@ -1174,6 +1174,11 @@ impl ReferenceMachine {
     pub fn output(&self) -> &[u8] {
         &self.output
     }
+    /// Current task priority after any completed CICS scheduling command.
+    #[must_use]
+    pub fn invocation_priority(&self) -> u8 {
+        self.invocation.priority
+    }
     #[must_use]
     pub fn dataset_cursors(&self) -> &BTreeMap<String, String> {
         &self.dataset_cursors
@@ -1986,6 +1991,9 @@ impl ReferenceMachine {
                     )?;
                 }
                 for (name, value) in &response.outputs {
+                    if typed_cics::write_runtime_output(self, name, value)? {
+                        continue;
+                    }
                     if let Some(field) = name.strip_prefix("BMS.") {
                         if let Some(field) = field.strip_suffix(".LENGTH") {
                             let target = format!("{field}L");
@@ -2043,22 +2051,11 @@ impl ReferenceMachine {
                         }),
                     ),
                     CicsDisposition::Ignored => None,
-                    CicsDisposition::Suspended => {
-                        self.pc = self.pc.saturating_sub(1);
-                        Some(MachineDrive::Suspended(Suspension {
-                            kind: if operation == CicsOperation::Enq {
-                                "cics-enqueue"
-                            } else {
-                                "cics-terminal"
-                            }
-                            .into(),
-                            resume_token: format!(
-                                "{}:{}",
-                                self.invocation.run_unit_id, self.effect_sequence
-                            ),
-                            state_bytes: response.payload.bytes().len() as u64,
-                        }))
-                    }
+                    CicsDisposition::Suspended => Some(typed_cics::suspension(
+                        self,
+                        operation,
+                        response.payload.bytes().len(),
+                    )),
                     CicsDisposition::Transfer => {
                         let target = response
                             .target

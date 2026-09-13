@@ -146,11 +146,13 @@ pub struct HirComputeStatement {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HirCicsOperation {
+    ChangeTask,
     Deq,
     Enq,
     Read,
     Rewrite,
     Syncpoint,
+    Suspend,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -162,6 +164,7 @@ pub enum HirCicsOperandName {
     Resource,
     Length,
     MaxLifetime,
+    Priority,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1703,6 +1706,42 @@ mod tests {
         assert!(commands[1].operands.iter().any(|operand| {
             operand.name == HirCicsOperandName::Length && operand.value == HirCicsValue::Integer(9)
         }));
+    }
+
+    #[test]
+    fn cics_task_scheduling_resolves_priority_and_one_shot_suspend() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSSCHED. DATA DIVISION. WORKING-STORAGE SECTION. 01 PRIORITY-X PIC S9(4) COMP VALUE 200. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS CHANGE TASK PRIORITY(PRIORITY-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. EXEC CICS CHANGE TASK PRIORITY(-1) END-EXEC. EXEC CICS SUSPEND NOHANDLE END-EXEC. STOP RUN.";
+        let hir = analyze(source).hir.expect("typed task scheduling HIR");
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 3);
+        assert_eq!(commands[0].operation, HirCicsOperation::ChangeTask);
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Priority
+                && matches!(operand.value, HirCicsValue::Data(_))
+        }));
+        assert!(matches!(
+            commands[0].condition_policy,
+            HirCicsConditionPolicy::Respond {
+                response2: Some(_),
+                ..
+            }
+        ));
+        assert!(commands[1].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Priority
+                && operand.value == HirCicsValue::Integer(-1)
+        }));
+        assert_eq!(commands[2].operation, HirCicsOperation::Suspend);
+        assert_eq!(
+            commands[2].condition_policy,
+            HirCicsConditionPolicy::NoHandle
+        );
     }
 
     #[test]

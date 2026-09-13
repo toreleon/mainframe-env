@@ -49,9 +49,10 @@ explicit boundaries. There are no floating-point host values in this schema.
 Adding a field/variant requires updating an exhaustive implementation; it cannot
 silently disappear through a default serializer. A schema change requires
 review of the protocol version, golden vectors and persistence compatibility.
-The `Deq` and `Enq` CICS operation identities and `Ignored` CICS disposition are
-additive named variants: they do not alter the canonical bytes of any existing
-value, and their exact variant-name bytes are frozen by golden tests.
+The `ChangeTask`, `Deq`, `Enq`, and `Suspend` CICS operation identities and
+`Ignored` CICS disposition are additive named variants: they do not alter the
+canonical bytes of any existing value, and their exact variant-name bytes are
+frozen by golden tests.
 
 ## Typed size budgets
 

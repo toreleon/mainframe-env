@@ -173,6 +173,17 @@ effect attempt; a promoted waiter completes without incrementing the nesting
 count. A crossed deadline or cancellation terminalizes the execution and runs
 the task cleanup path.
 
+Typed `CHANGE TASK PRIORITY` and `SUSPEND` use a distinct
+`cics-scheduler` suspension. The machine advances past the command before
+yielding, so resume cannot execute the same scheduling request twice. A valid
+priority change is returned as typed control metadata and updates both the CICS
+run and interpreter invocation; omission and `-1` do not yield. Product
+continuation format `MEOM3` stores the resulting priority beside the machine
+checkpoint and provider generations. The reader retains `MEOM2` compatibility,
+using the enclosing exchange priority when the historical row has no explicit
+field. Scheduler suspension keeps the execution and online exchange live until
+the next bounded redispatch, unlike terminal-input handoff.
+
 When a terminal RECEIVE suspends a machine, the product first commits its own
 session continuation and then atomically moves the interpreter execution from
 `Suspended` to terminal `Completed` with `HandoffCompleted`. Only after that

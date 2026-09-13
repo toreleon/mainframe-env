@@ -2,6 +2,7 @@ use super::super::{
     CicsService, DurableContinuation, Run, argument_bytes, argument_optional, argument_text,
     bounded, mutation_problem,
 };
+use mainframe_env_execution_api::{BoundedPayload, InvocationLimits};
 use mainframe_env_host_api::{
     CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
 };
@@ -13,6 +14,7 @@ pub(in crate::service) fn invoke(
     retention_tick: u64,
 ) -> Result<CicsResponse, HostProblem> {
     match request.operation {
+        CicsOperation::ChangeTask => change_task(service, run, request),
         CicsOperation::Deq | CicsOperation::Enq => {
             super::task_enqueue::invoke(service, run, request, retention_tick)
         }
@@ -30,8 +32,112 @@ pub(in crate::service) fn invoke(
             run.retrieve.clone(),
         ),
         CicsOperation::Return => return_transaction(service, run, request),
+        CicsOperation::Suspend => suspend(service, run, request),
         CicsOperation::Abend => abend(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
+    }
+}
+
+fn change_task(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    validate_scheduling_request(request, true)?;
+    let Some(priority) = request.arguments.get("PRIORITY") else {
+        return service.response(
+            run,
+            CicsDisposition::Complete,
+            "NORMAL",
+            0,
+            0,
+            None,
+            None,
+            Vec::new(),
+        );
+    };
+    let priority = std::str::from_utf8(priority.bytes())
+        .map_err(|_| HostProblem::Malformed)?
+        .parse::<i64>()
+        .map_err(|_| HostProblem::Malformed)?;
+    if priority == -1 {
+        return service.response(
+            run,
+            CicsDisposition::Complete,
+            "NORMAL",
+            0,
+            0,
+            None,
+            None,
+            Vec::new(),
+        );
+    }
+    let priority = u8::try_from(priority).map_err(|_| HostProblem::Condition {
+        name: "INVREQ".into(),
+        response: 16,
+        response2: 1,
+    })?;
+    run.invocation.priority = priority;
+    let mut response = service.response(
+        run,
+        CicsDisposition::Suspended,
+        "NORMAL",
+        0,
+        0,
+        None,
+        None,
+        Vec::new(),
+    )?;
+    response.outputs.insert(
+        "TASK.PRIORITY".into(),
+        BoundedPayload::new(
+            "mainframe-env.cics.decimal@1",
+            priority.to_string().into_bytes(),
+            InvocationLimits::default(),
+        )
+        .map_err(|_| HostProblem::ResourceExhausted)?,
+    );
+    Ok(response)
+}
+
+fn suspend(
+    service: &CicsService,
+    run: &Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    validate_scheduling_request(request, false)?;
+    service.response(
+        run,
+        CicsDisposition::Suspended,
+        "NORMAL",
+        0,
+        0,
+        None,
+        None,
+        Vec::new(),
+    )
+}
+
+fn validate_scheduling_request(
+    request: &CicsRequest,
+    accepts_priority: bool,
+) -> Result<(), HostProblem> {
+    let allowed = if accepts_priority {
+        &["OPTION.NOHANDLE", "PRIORITY", "RESP", "RESP2"][..]
+    } else {
+        &["OPTION.NOHANDLE", "RESP", "RESP2"][..]
+    };
+    if request.arguments.iter().any(|(name, value)| {
+        !allowed.contains(&name.as_str())
+            || name.starts_with("OPTION.") && !value.bytes().is_empty()
+    }) || request
+        .arguments
+        .get("PRIORITY")
+        .is_some_and(|value| value.schema() != "mainframe-env.cics.decimal@1")
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
     }
 }
 

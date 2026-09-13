@@ -50,6 +50,13 @@ All notable changes to mainframe-env are documented here.
   local APPLID/SYSID isolation, nonblank-scope global serialization, disabled
   model abends, address-enqueue locality, atomic catalog installation, and
   restart validation.
+- Added a zero-credit two-topic IBM source scope and typed execution for CICS
+  `CHANGE TASK` and `SUSPEND`. Priority omission and `-1` remain no-ops,
+  priorities `0..255` update the task and yield once, invalid values return
+  `INVREQ` 16/1, and SUSPEND produces a one-shot durable scheduler handoff.
+- Added online continuation format `MEOM3`, which retains the current task
+  priority across a scheduling suspension while continuing to read historical
+  `MEOM2` rows.
 - Added the frozen-with-bounded-ambiguities CIC-901 command contract and generated
   263-row compiler registry. The registry explicitly separates three typed runtime
   handlers, 20 legacy compatibility handlers, and 240 unready handlers; automatic

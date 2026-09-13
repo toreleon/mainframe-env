@@ -43,6 +43,8 @@ impl Default for CicsPlanLimits {
 /// CICS operation selected by the frontend.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsPlanOperation {
+    /// Change the issuing task's dispatch priority and optionally yield.
+    ChangeTask,
     /// Release one task-owned enqueue.
     Deq,
     /// Acquire one task-owned enqueue.
@@ -53,6 +55,8 @@ pub enum CicsPlanOperation {
     Rewrite,
     /// Commit or roll back the current unit of work.
     Syncpoint,
+    /// Yield the issuing task once for redispatch.
+    Suspend,
 }
 
 /// A resolved storage slot in the containing IR module.
@@ -81,6 +85,8 @@ pub enum CicsOperandName {
     Length,
     /// `MAXLIFETIME(...)` dynamic CVDA value.
     MaxLifetime,
+    /// `PRIORITY(...)` task dispatch value.
+    Priority,
 }
 
 /// Literal bytes or a runtime read from resolved storage.
@@ -356,6 +362,14 @@ fn validate_plan(
             return Err(CicsPlanCodecProblem::Malformed);
         }
     }
+    if plan.operation == CicsPlanOperation::ChangeTask
+        && plan.operands.iter().any(|operand| {
+            operand.name == CicsOperandName::Priority
+                && matches!(operand.value, CicsOperandValue::Literal(_))
+        })
+    {
+        return Err(CicsPlanCodecProblem::Malformed);
+    }
     let mut output_names = BTreeSet::new();
     for output in &plan.outputs {
         if !output_names.insert(output.name) {
@@ -384,7 +398,16 @@ fn validate_operation_shape(
     ]
     .into_iter()
     .collect::<BTreeSet<_>>();
+    let scheduling_options = plan
+        .options
+        .iter()
+        .any(|option| !matches!(option, CicsPlanOption::NoHandle));
     let malformed = match plan.operation {
+        CicsPlanOperation::ChangeTask => {
+            !inputs.is_subset(&BTreeSet::from([CicsOperandName::Priority]))
+                || scheduling_options
+                || outputs.contains(&CicsOutputName::Into)
+        }
         CicsPlanOperation::Deq | CicsPlanOperation::Enq => {
             !inputs.contains(&CicsOperandName::Resource)
                 || !inputs.is_subset(&enqueue_inputs)
@@ -423,6 +446,9 @@ fn validate_operation_shape(
                 || plan.options.contains(&CicsPlanOption::Uow)
                 || plan.options.contains(&CicsPlanOption::NoSuspend)
                 || outputs.contains(&CicsOutputName::Into)
+        }
+        CicsPlanOperation::Suspend => {
+            !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
     };
     if malformed
@@ -583,6 +609,8 @@ const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::Syncpoint => 2,
         CicsPlanOperation::Deq => 3,
         CicsPlanOperation::Enq => 4,
+        CicsPlanOperation::ChangeTask => 5,
+        CicsPlanOperation::Suspend => 6,
     }
 }
 
@@ -593,6 +621,8 @@ fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPlanCodecProbl
         2 => Ok(CicsPlanOperation::Syncpoint),
         3 => Ok(CicsPlanOperation::Deq),
         4 => Ok(CicsPlanOperation::Enq),
+        5 => Ok(CicsPlanOperation::ChangeTask),
+        6 => Ok(CicsPlanOperation::Suspend),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -606,6 +636,7 @@ const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::Resource => 4,
         CicsOperandName::Length => 5,
         CicsOperandName::MaxLifetime => 6,
+        CicsOperandName::Priority => 7,
     }
 }
 
@@ -618,6 +649,7 @@ fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCodecProblem> 
         4 => Ok(CicsOperandName::Resource),
         5 => Ok(CicsOperandName::Length),
         6 => Ok(CicsOperandName::MaxLifetime),
+        7 => Ok(CicsOperandName::Priority),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -955,6 +987,40 @@ mod tests {
         assert_eq!(
             encode_cics_effect_plan(&invalid_deq, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn task_scheduling_plans_round_trip_and_reject_cross_command_operands() {
+        let change = CicsEffectPlan {
+            operation: CicsPlanOperation::ChangeTask,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::Priority,
+                value: CicsOperandValue::Integer(200),
+            }],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&change, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
+            change
+        );
+        let mut suspend = change;
+        suspend.operation = CicsPlanOperation::Suspend;
+        assert_eq!(
+            encode_cics_effect_plan(&suspend, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        suspend.operands.clear();
+        assert_eq!(
+            decode_cics_effect_plan(
+                &encode_cics_effect_plan(&suspend, CicsPlanLimits::default()).unwrap(),
+                CicsPlanLimits::default(),
+            )
+            .unwrap(),
+            suspend
         );
     }
 

@@ -1750,7 +1750,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 27);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 29);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -4536,8 +4536,11 @@ mod tests {
             ("ABEND", CicsOperation::Abend),
             ("ASKTIME ABSTIME(ABS-TIME)", CicsOperation::Asktime),
             ("ASSIGN", CicsOperation::Assign),
+            ("CHANGE TASK", CicsOperation::ChangeTask),
+            ("DEQ", CicsOperation::Deq),
             ("DELETE", CicsOperation::Delete),
             ("ENDBR", CicsOperation::EndBrowse),
+            ("ENQ", CicsOperation::Enq),
             ("FORMATTIME", CicsOperation::FormatTime),
             ("HANDLE ABEND", CicsOperation::HandleAbend),
             ("HANDLE CONDITION", CicsOperation::HandleCondition),
@@ -4553,6 +4556,7 @@ mod tests {
             ("SEND TEXT", CicsOperation::SendText),
             ("SEND MAP", CicsOperation::SendMap),
             ("STARTBR", CicsOperation::StartBrowse),
+            ("SUSPEND", CicsOperation::Suspend),
             ("SYNCPOINT", CicsOperation::Syncpoint),
             ("WRITE", CicsOperation::Write),
             ("WRITEQ TD", CicsOperation::WriteTransientData),
@@ -4569,7 +4573,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 27);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 29);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -5376,6 +5380,115 @@ mod tests {
                 service.invoke(
                     &effect(&third.run_unit_id, invalid.clone(), sequence),
                     invalid,
+                ),
+                Err(HostProblem::Malformed)
+            );
+        }
+    }
+
+    #[test]
+    fn task_priority_change_and_suspend_yield_once_with_exact_conditions() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+        for (sequence, priority) in [(320, None), (321, Some(-1))] {
+            let arguments = priority.map_or_else(BTreeMap::new, |priority| {
+                BTreeMap::from([("PRIORITY".into(), cics_decimal(priority))])
+            });
+            let change = request(CicsOperation::ChangeTask, arguments, sequence);
+            assert_eq!(
+                service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, change.clone(), sequence),
+                        change,
+                    )
+                    .unwrap()
+                    .disposition,
+                CicsDisposition::Complete
+            );
+        }
+
+        let change = request(
+            CicsOperation::ChangeTask,
+            BTreeMap::from([("PRIORITY".into(), cics_decimal(200))]),
+            322,
+        );
+        let changed = service
+            .invoke(
+                &effect(&invocation.run_unit_id, change.clone(), 322),
+                change,
+            )
+            .unwrap();
+        assert_eq!(changed.disposition, CicsDisposition::Suspended);
+        assert_eq!(
+            changed.outputs.get("TASK.PRIORITY").unwrap().bytes(),
+            b"200"
+        );
+        assert_eq!(
+            service
+                .lock()
+                .unwrap()
+                .runs
+                .get(&invocation.run_unit_id)
+                .unwrap()
+                .invocation
+                .priority,
+            200
+        );
+
+        let suspend = request(CicsOperation::Suspend, BTreeMap::new(), 323);
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, suspend.clone(), 323),
+                    suspend,
+                )
+                .unwrap()
+                .disposition,
+            CicsDisposition::Suspended
+        );
+
+        let mut invalid = request(
+            CicsOperation::ChangeTask,
+            BTreeMap::from([("PRIORITY".into(), cics_decimal(256))]),
+            324,
+        );
+        invalid.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 324),
+                invalid,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                response.disposition,
+                response.condition.as_str(),
+                response.response,
+                response.response2,
+            ),
+            (CicsDisposition::Complete, "INVREQ", 16, 1)
+        );
+
+        for (sequence, operation, arguments) in [
+            (
+                325,
+                CicsOperation::ChangeTask,
+                BTreeMap::from([("PRIORITY".into(), argument(b"100"))]),
+            ),
+            (
+                326,
+                CicsOperation::Suspend,
+                BTreeMap::from([("PRIORITY".into(), cics_decimal(100))]),
+            ),
+        ] {
+            let malformed = request(operation, arguments, sequence);
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, malformed.clone(), sequence),
+                    malformed,
                 ),
                 Err(HostProblem::Malformed)
             );

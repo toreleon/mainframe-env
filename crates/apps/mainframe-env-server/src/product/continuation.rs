@@ -27,11 +27,71 @@ pub(super) struct OnlineMachineContinuation {
     pub(super) program: String,
     pub(super) artifact: ArtifactRef,
     pub(super) provider_generations: BTreeMap<CapabilityId, String>,
+    pub(super) priority: Option<u8>,
     pub(super) checkpoint: BoundedPayload,
     pub(super) version: u64,
 }
 
 impl ProductServer {
+    pub(super) fn online_machine_continuation(
+        &self,
+        session: &SessionId,
+    ) -> Result<Option<OnlineMachineContinuation>, HostProblem> {
+        self.store
+            .get_provider_state("online-machine-continuation", session.as_str())
+            .map_err(store_error)?
+            .map(|record| decode_online_machine_continuation(&record))
+            .transpose()
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn persist_online_machine_continuation(
+        &self,
+        session: &SessionId,
+        program: &str,
+        artifact: &ArtifactRef,
+        provider_generations: &BTreeMap<CapabilityId, String>,
+        priority: u8,
+        checkpoint: &BoundedPayload,
+        current_version: Option<u64>,
+    ) -> Result<u64, HostProblem> {
+        let version = current_version
+            .unwrap_or_default()
+            .checked_add(1)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        self.store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "online-machine-continuation".into(),
+                    key: session.as_str().into(),
+                    version,
+                    payload: encode_online_machine_continuation(
+                        program,
+                        artifact,
+                        provider_generations,
+                        priority,
+                        checkpoint,
+                    )?,
+                },
+                current_version,
+            )
+            .map_err(store_error)?;
+        Ok(version)
+    }
+
+    pub(super) fn clear_online_machine_continuation(
+        &self,
+        session: &SessionId,
+        version: Option<u64>,
+    ) -> Result<(), HostProblem> {
+        if let Some(version) = version {
+            self.store
+                .delete_provider_state("online-machine-continuation", session.as_str(), version)
+                .map_err(store_error)?;
+        }
+        Ok(())
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub(super) fn finish_online_suspension(
         &self,
@@ -53,11 +113,12 @@ impl ProductServer {
             program,
             artifact,
             &invocation.provider_generations,
+            machine.invocation_priority(),
             &checkpoint,
             current_version,
         )?;
         match suspension.kind.as_str() {
-            "cics-enqueue" => return Ok(()),
+            "cics-enqueue" | "cics-scheduler" => return Ok(()),
             "cics-terminal" => {}
             _ => return Err(HostProblem::InfrastructureFailure),
         }
@@ -78,14 +139,17 @@ pub(super) fn encode_online_machine_continuation(
     program: &str,
     artifact: &ArtifactRef,
     provider_generations: &BTreeMap<CapabilityId, String>,
+    priority: u8,
     checkpoint: &BoundedPayload,
 ) -> Result<Vec<u8>, HostProblem> {
     let generations = encode_provider_generations(provider_generations)?;
-    let mut encoded = b"MEOM2".to_vec();
+    let priority = [priority];
+    let mut encoded = b"MEOM3".to_vec();
     for value in [
         program.as_bytes(),
         artifact.as_str().as_bytes(),
         &generations,
+        &priority,
         checkpoint.schema().as_bytes(),
         checkpoint.bytes(),
     ] {
@@ -102,7 +166,8 @@ pub(super) fn encode_online_machine_continuation(
 pub(super) fn decode_online_machine_continuation(
     record: &ProviderStateRecord,
 ) -> Result<OnlineMachineContinuation, HostProblem> {
-    if !record.payload.starts_with(b"MEOM2") {
+    let current = record.payload.starts_with(b"MEOM3");
+    if !current && !record.payload.starts_with(b"MEOM2") {
         return Err(HostProblem::InfrastructureFailure);
     }
     let mut at = 5usize;
@@ -135,6 +200,14 @@ pub(super) fn decode_online_machine_continuation(
     )
     .map_err(|_| HostProblem::InfrastructureFailure)?;
     let provider_generations = decode_provider_generations(&next()?)?;
+    let priority = if current {
+        match next()?.as_slice() {
+            [priority] => Some(*priority),
+            _ => return Err(HostProblem::InfrastructureFailure),
+        }
+    } else {
+        None
+    };
     let schema = String::from_utf8(next()?).map_err(|_| HostProblem::InfrastructureFailure)?;
     let bytes = next()?;
     if at != record.payload.len() {
@@ -144,6 +217,7 @@ pub(super) fn decode_online_machine_continuation(
         program: normalize_online_name(&program, 128)?,
         artifact,
         provider_generations,
+        priority,
         checkpoint: BoundedPayload::new(
             schema,
             bytes,
@@ -155,6 +229,15 @@ pub(super) fn decode_online_machine_continuation(
         .map_err(|_| HostProblem::InfrastructureFailure)?,
         version: record.version,
     })
+}
+
+pub(super) fn restore_online_machine_priority(
+    invocation: &mut Invocation,
+    continuation: Option<&OnlineMachineContinuation>,
+) {
+    if let Some(priority) = continuation.and_then(|continuation| continuation.priority) {
+        invocation.priority = priority;
+    }
 }
 
 fn encode_provider_generations(
