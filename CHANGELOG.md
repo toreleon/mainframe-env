@@ -64,8 +64,9 @@ All notable changes to mainframe-env are documented here.
   With no configured initialization parameter, INITPARM remains unchanged and
   INITPARMLEN returns halfword zero. PROGRAM is derived from the trusted current
   execution frame and follows durable HANDLE ABEND program transfers. Compiled
-  online tasks observe these values and priority changes through the durable
-  selected route.
+  local tasks with no pending next transaction receive four blanks from
+  NEXTTRANSID, while DPL use returns `INVREQ` 16/200. Compiled online tasks
+  observe these values and priority changes through the durable selected route.
 - Added online continuation format `MEOM4`, which retains the current task
   priority and an optional staged program-transfer handoff. Readers preserve
   `MEOM3` priority rows and historical `MEOM2` rows without that field.

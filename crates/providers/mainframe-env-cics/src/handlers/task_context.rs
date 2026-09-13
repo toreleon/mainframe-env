@@ -36,7 +36,7 @@ pub(in crate::service) fn assign(
     validate_assign_request(request)?;
     let dpl = assign_dpl_context(run)?;
     let prohibited = dpl
-        && ["OPSECURITY", "TCTUALENG"]
+        && ["NEXTTRANSID", "OPSECURITY", "TCTUALENG"]
             .iter()
             .any(|name| request.arguments.contains_key(*name));
     let mut response = if prohibited {
@@ -110,6 +110,11 @@ pub(in crate::service) fn assign(
             response.outputs.insert(name.into(), decimal_payload(0)?);
         }
     }
+    if !prohibited && request.arguments.contains_key("NEXTTRANSID") {
+        response
+            .outputs
+            .insert("NEXTTRANSID".into(), bounded(vec![b' '; 4])?);
+    }
     if request.arguments.contains_key("INITPARMLEN") {
         response
             .outputs
@@ -160,6 +165,7 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "MAJORVERSION",
         "MICROVERSION",
         "MINORVERSION",
+        "NEXTTRANSID",
         "OPTION.NOHANDLE",
         "OPERATION",
         "OPERKEYS",

@@ -75,6 +75,8 @@ contract explicitly permits it.
   PROGRAM is the eight-character current program name derived from the selected
   execution frame; it changes with durable HANDLE ABEND program transfer and is
   never accepted as caller-supplied CICS command context.
+  NEXTTRANSID returns four blanks while no supported in-task command has set a
+  successor; it is prohibited with `INVREQ` 16/200 in a DPL server program.
   Other source-valid ASSIGN options remain rejected until their terminal,
   program-level, or failure context has an owned runtime representation.
 - Terminal execution outcomes carry an explicit transaction-dump disposition.

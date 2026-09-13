@@ -4673,6 +4673,7 @@ mod tests {
                 ("MAJORVERSION".into(), argument(b"MAJOR-OUT")),
                 ("MICROVERSION".into(), argument(b"MICRO-OUT")),
                 ("MINORVERSION".into(), argument(b"MINOR-OUT")),
+                ("NEXTTRANSID".into(), argument(b"NEXT-TRANS-OUT")),
                 ("OPERATION".into(), argument(b"OPERATION-OUT")),
                 ("OPERKEYS".into(), argument(b"OPERKEYS-OUT")),
                 ("PLATFORM".into(), argument(b"PLATFORM-OUT")),
@@ -4698,6 +4699,7 @@ mod tests {
             );
             assert_eq!(assigned.outputs[name].bytes(), b"-1");
         }
+        assert_eq!(assigned.outputs["NEXTTRANSID"].bytes(), &[b' '; 4]);
         assert_eq!(assigned.outputs["OPERATION"].bytes(), &[b' '; 64]);
         assert_eq!(assigned.outputs["OPERKEYS"].bytes(), &[0; 8]);
         assert_eq!(assigned.outputs["PLATFORM"].bytes(), &[b' '; 64]);
@@ -5004,6 +5006,7 @@ mod tests {
             CicsOperation::Assign,
             BTreeMap::from([
                 ("APPLID".into(), argument(b"APP-OUT")),
+                ("NEXTTRANSID".into(), argument(b"NEXT-TRANS-OUT")),
                 ("OPSECURITY".into(), argument(b"OPSECURITY-OUT")),
                 ("TCTUALENG".into(), argument(b"TCTUA-LENGTH-OUT")),
             ]),
@@ -5029,6 +5032,7 @@ mod tests {
             (CicsDisposition::Complete, "INVREQ", 16, 200)
         );
         assert_eq!(partial.outputs["APPLID"].bytes(), b"ME01");
+        assert!(!partial.outputs.contains_key("NEXTTRANSID"));
         assert!(!partial.outputs.contains_key("OPSECURITY"));
         assert!(!partial.outputs.contains_key("TCTUALENG"));
 

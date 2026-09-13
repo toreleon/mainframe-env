@@ -23,6 +23,7 @@ pub(super) fn validate(
         "MAJORVERSION",
         "MICROVERSION",
         "MINORVERSION",
+        "NEXTTRANSID",
         "OPERATION",
         "OPERKEYS",
         "OPSECURITY",
@@ -64,6 +65,7 @@ pub(super) fn validate(
         if (name == "INITPARM" && target.length != 60)
             || (name == "OPERKEYS" && target.length != 8)
             || (name == "OPSECURITY" && target.length != 3)
+            || (name == "NEXTTRANSID" && target.length != 4)
             || (name == "PROGRAM" && target.length != 8)
             || (name == "RESTART" && target.length != 1)
         {

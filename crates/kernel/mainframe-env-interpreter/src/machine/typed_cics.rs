@@ -420,6 +420,7 @@ pub(super) fn execute_legacy(
             "MAJORVERSION",
             "MICROVERSION",
             "MINORVERSION",
+            "NEXTTRANSID",
             "OPERATION",
             "OPERKEYS",
             "OPSECURITY",
