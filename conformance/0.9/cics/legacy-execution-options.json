@@ -17,7 +17,7 @@
     {
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0011",
       "runtime_operation": "Assign",
-      "execution_options": ["APPLID", "NOHANDLE", "RESP", "RESP2", "SYSID"]
+      "execution_options": ["APPLID", "NOHANDLE", "RESP", "RESP2", "SYSID", "TASKPRIORITY", "USERID"]
     },
     {
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0040",

@@ -58,6 +58,12 @@ contract explicitly permits it.
   before dispatch and applies the alias only after a successful audited CICS
   response, so denial, cancellation, malformed input, and audit failure cannot
   change storage.
+- The bounded legacy CICS `ASSIGN` route returns APPLID, SYSID, USERID, and the
+  current TASKPRIORITY from owned invocation context. Output references are
+  resolved before dispatch; TASKPRIORITY requires a writable halfword-binary
+  data area and travels as typed decimal output. Other source-valid ASSIGN
+  options remain rejected until their terminal, program-level, application, or
+  failure context has an owned runtime representation.
 - Terminal execution outcomes carry an explicit transaction-dump disposition.
   CICS ABEND results translate the provider's typed `ABEND.DUMP` metadata to
   requested or suppressed while retained responses from before that metadata

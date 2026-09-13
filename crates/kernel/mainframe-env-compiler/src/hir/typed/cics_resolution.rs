@@ -448,6 +448,25 @@ fn validate_candidate(
         }
     }
 
+    if descriptor.runtime_operation == Some("Assign") {
+        for name in ["APPLID", "SYSID", "TASKPRIORITY", "USERID"] {
+            let Some(value) = clauses.get(name) else {
+                continue;
+            };
+            let target = complete_data_reference(value, semantic).map_err(|_| {
+                format!("CICS ASSIGN option {name} requires one writable data area")
+            })?;
+            require_writable(&target).map_err(|_| {
+                format!("CICS ASSIGN option {name} requires one writable data area")
+            })?;
+            if name == "TASKPRIORITY"
+                && (target.usage != CobolUsage::Binary || target.length != 2 || target.scale != 0)
+            {
+                return Err("CICS ASSIGN TASKPRIORITY requires a halfword binary data area".into());
+            }
+        }
+    }
+
     if let Some(name) = descriptor
         .required_options
         .iter()

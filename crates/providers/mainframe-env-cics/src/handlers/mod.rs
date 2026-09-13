@@ -4,6 +4,7 @@ mod handle_state;
 mod program_control;
 mod queue_control;
 mod recovery;
+mod task_context;
 mod task_control;
 mod task_enqueue;
 mod terminal_control;

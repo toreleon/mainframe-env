@@ -1,6 +1,6 @@
 use super::super::{
     CicsLimits, CicsService, DatasetUndo, DurableContinuation, Reader, Run, Session,
-    argument_bytes, argument_optional, argument_text, bounded, field, mutation_problem,
+    argument_bytes, argument_optional, argument_text, field, mutation_problem,
 };
 use super::handle_state::{
     AbendExit, HandleFrame, HandleState, MAX_HANDLE_STACK_DEPTH, encode_handle_state,
@@ -220,7 +220,7 @@ pub(in crate::service) fn invoke(
         CicsOperation::IgnoreCondition => ignore_condition(service, run, request),
         CicsOperation::PopHandle => pop_handle(service, run, request),
         CicsOperation::PushHandle => push_handle(service, run, request),
-        CicsOperation::Assign => assign(service, run, request),
+        CicsOperation::Assign => super::task_context::assign(service, run, request),
         CicsOperation::Retrieve => service.response(
             run,
             CicsDisposition::Complete,
@@ -1046,39 +1046,6 @@ fn pop_handle_invreq(
         persist_handle_state(service, run, previous)?;
     }
     service.response(run, disposition, "INVREQ", 16, 0, target, None, payload)
-}
-
-fn assign(
-    service: &CicsService,
-    run: &Run,
-    request: &CicsRequest,
-) -> Result<CicsResponse, HostProblem> {
-    let mut response = service.response(
-        run,
-        CicsDisposition::Complete,
-        "NORMAL",
-        0,
-        0,
-        None,
-        None,
-        Vec::new(),
-    )?;
-    for (name, value) in [
-        ("APPLID", run.applid.as_bytes()),
-        ("SYSID", run.sysid.as_bytes()),
-        ("TRANSID", run.transaction.as_bytes()),
-        (
-            "PRINCIPAL",
-            run.invocation.principal.id().as_str().as_bytes(),
-        ),
-    ] {
-        if request.arguments.contains_key(name) {
-            response
-                .outputs
-                .insert(name.into(), bounded(value.to_vec())?);
-        }
-    }
-    Ok(response)
 }
 
 fn return_transaction(

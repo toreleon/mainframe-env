@@ -410,7 +410,7 @@ pub(super) fn execute_legacy(
     let into = legacy_destination(&arguments, "INTO").map(CicsTarget::Legacy);
     let output_names: &[&str] = match operation {
         CicsOperation::Asktime => &["ABSTIME"],
-        CicsOperation::Assign => &["APPLID", "SYSID", "TRANSID", "PRINCIPAL"],
+        CicsOperation::Assign => &["APPLID", "SYSID", "TASKPRIORITY", "USERID"],
         CicsOperation::FormatTime => &[
             "YYYYMMDD",
             "YYMMDD",
@@ -431,6 +431,9 @@ pub(super) fn execute_legacy(
                 .map(|target| ((*name).into(), CicsTarget::Legacy(target)))
         })
         .collect::<BTreeMap<_, _>>();
+    if operation == CicsOperation::Assign {
+        validate_legacy_assign_outputs(machine, &outputs)?;
+    }
     let response_target = legacy_destination(&arguments, "RESP").map(CicsTarget::Legacy);
     let response2_target = legacy_destination(&arguments, "RESP2").map(CicsTarget::Legacy);
     let absolute_time = legacy_destination(&arguments, "ABSTIME");
@@ -1123,6 +1126,30 @@ fn legacy_destination(arguments: &BTreeMap<String, BoundedPayload>, key: &str) -
     arguments
         .get(key)
         .map(|value| String::from_utf8_lossy(value.bytes()).into_owned())
+}
+
+fn validate_legacy_assign_outputs(
+    machine: &ReferenceMachine,
+    outputs: &BTreeMap<String, CicsTarget>,
+) -> Result<(), MachineProblem> {
+    for (name, target) in outputs {
+        let CicsTarget::Legacy(target) = target else {
+            return Err(MachineProblem::InvalidOperation);
+        };
+        let tokens = target
+            .split_whitespace()
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        let reference = machine.reference(&tokens)?;
+        if name == "TASKPRIORITY"
+            && (reference.layout.category != LayoutCategory::Binary
+                || reference.length != 2
+                || reference.layout.scale != 0)
+        {
+            return Err(MachineProblem::DataException);
+        }
+    }
+    Ok(())
 }
 
 fn invalid_plan(detail: &str) -> MachineProblem {

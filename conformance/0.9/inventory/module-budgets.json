@@ -288,6 +288,7 @@
       "crates/providers/mainframe-env-cics/src/handlers/program_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/queue_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/recovery.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/task_context.rs",
       "crates/providers/mainframe-env-cics/src/handlers/task_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/task_enqueue.rs",
       "crates/providers/mainframe-env-cics/src/handlers/task_enqueue/model.rs",

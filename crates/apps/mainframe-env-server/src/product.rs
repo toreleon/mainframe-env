@@ -9735,7 +9735,7 @@ mod tests {
     #[test]
     fn online_task_scheduling_yields_once_and_retains_changed_priority() {
         let limits = SourceLimits::default();
-        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. SCHEDULE.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PRIORITY-X PIC S9(4) COMP VALUE 200.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS CHANGE TASK PRIORITY(PRIORITY-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. SCHEDULE.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PRIORITY-X PIC S9(4) COMP VALUE 200.\n01 OBSERVED-PRIORITY PIC S9(4) COMP.\n01 APPL-X PIC X(8).\n01 SYS-X PIC X(4).\n01 USER-X PIC X(8).\n01 ASSIGN-FN PIC X(2).\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS CHANGE TASK PRIORITY(PRIORITY-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS ASSIGN APPLID(APPL-X) SYSID(SYS-X) TASKPRIORITY(OBSERVED-PRIORITY) USERID(USER-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO ASSIGN-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
         let path = LogicalPath::new("SCHEDULE.cbl", limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
             &path,
@@ -9890,6 +9890,19 @@ mod tests {
         assert!(second.version > first.version);
         restored.restore_checkpoint(&second.checkpoint).unwrap();
         assert_eq!(restored.variable("EIBFN").unwrap().bytes(), &[0x12, 0x08]);
+        assert_eq!(
+            restored.variable("ASSIGN-FN").unwrap().bytes(),
+            &[0x02, 0x08]
+        );
+        assert_eq!(
+            restored.variable("OBSERVED-PRIORITY").unwrap().bytes(),
+            &[0, 200]
+        );
+        assert_eq!(restored.variable("APPL-X").unwrap().bytes(), b"ME01    ");
+        assert_eq!(restored.variable("SYS-X").unwrap().bytes(), b"S001");
+        assert_eq!(restored.variable("USER-X").unwrap().bytes(), b"IBMUSER ");
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0; 4]);
+        assert_eq!(restored.variable("RESP2-X").unwrap().bytes(), &[0; 4]);
         server
             .run_online_exchange(&session, &principal, "SCHEDULE", 4)
             .unwrap();
@@ -9922,6 +9935,7 @@ mod tests {
             vec![
                 (1, mainframe_env_execution_api::AuditDecision::Success),
                 (2, mainframe_env_execution_api::AuditDecision::Success),
+                (3, mainframe_env_execution_api::AuditDecision::Success),
             ]
         );
     }

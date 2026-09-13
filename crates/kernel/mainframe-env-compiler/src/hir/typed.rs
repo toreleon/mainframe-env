@@ -2380,7 +2380,7 @@ mod tests {
     #[test]
     fn legacy_cics_routes_reject_catalog_options_without_runtime_semantics() {
         for (command, option) in [
-            ("ASSIGN USERID(USER-X)", "USERID"),
+            ("ASSIGN PROGRAM(USER-X)", "PROGRAM"),
             ("LINK PROGRAM('PGM1') CHANNEL('CHAN1')", "CHANNEL"),
             ("RETURN IMMEDIATE", "IMMEDIATE"),
             ("WRITEQ TD QUEUE('Q1') FROM('A') SYSID('R1')", "SYSID"),
@@ -2420,6 +2420,7 @@ mod tests {
             "ABEND ABCODE('B002') NODUMP",
             "ABEND NODUMP",
             "ASSIGN APPLID(APPL-X)",
+            "ASSIGN TASKPRIORITY(PRIORITY-X) USERID(USER-X)",
             "HANDLE ABEND",
             "HANDLE ABEND LABEL(ABEND-HANDLER)",
             "HANDLE ABEND PROGRAM('ABEXIT')",
@@ -2427,7 +2428,7 @@ mod tests {
             "READNEXT DATASET('ACCTDAT') RIDFLD(KEY-X) INTO(REC-X) UPDATE",
         ] {
             let source = format!(
-                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLEG. DATA DIVISION. WORKING-STORAGE SECTION. 01 APPL-X PIC X(8). 01 KEY-X PIC X(2). 01 REC-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN. ABEND-HANDLER. STOP RUN."
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLEG. DATA DIVISION. WORKING-STORAGE SECTION. 01 APPL-X PIC X(8). 01 USER-X PIC X(8). 01 PRIORITY-X PIC S9(4) COMP. 01 KEY-X PIC X(2). 01 REC-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN. ABEND-HANDLER. STOP RUN."
             );
             let analysis = analyze(&source);
             let hir = analysis
@@ -2450,6 +2451,18 @@ mod tests {
                 .public_message()
                 .contains("options DATASET and FILE are aliases and mutually exclusive")
         }));
+
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 PRIORITY-X PIC X(2). PROCEDURE DIVISION. EXEC CICS ASSIGN TASKPRIORITY(PRIORITY-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. PROCEDURE DIVISION. EXEC CICS ASSIGN USERID(MISSING-X) END-EXEC. STOP RUN.",
+        ] {
+            let analysis = analyze(source);
+            assert!(analysis.hir.is_none());
+            assert!(analysis.diagnostics.iter().any(|diagnostic| {
+                let message = diagnostic.public_message();
+                message.contains("CICS ASSIGN") && message.contains("data area")
+            }));
+        }
     }
 
     #[test]

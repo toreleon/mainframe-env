@@ -2704,7 +2704,7 @@ fn decode_uow(payload: &[u8]) -> Result<UowRecord, HostProblem> {
     })
 }
 
-fn decimal_payload(value: i64) -> Result<BoundedPayload, HostProblem> {
+pub(in crate::service) fn decimal_payload(value: i64) -> Result<BoundedPayload, HostProblem> {
     BoundedPayload::new(
         "mainframe-env.cics.decimal@1",
         value.to_string().into_bytes(),
@@ -4668,6 +4668,8 @@ mod tests {
             BTreeMap::from([
                 ("APPLID".into(), argument(b"APP-OUT")),
                 ("SYSID".into(), argument(b"SYS-OUT")),
+                ("TASKPRIORITY".into(), argument(b"PRIORITY-OUT")),
+                ("USERID".into(), argument(b"USER-OUT")),
             ]),
             3,
         );
@@ -4676,6 +4678,31 @@ mod tests {
             .unwrap();
         assert_eq!(assigned.outputs["APPLID"].bytes(), b"MEAPPL");
         assert_eq!(assigned.outputs["SYSID"].bytes(), b"MESYS");
+        assert_eq!(
+            assigned.outputs["TASKPRIORITY"].schema(),
+            "mainframe-env.cics.decimal@1"
+        );
+        assert_eq!(assigned.outputs["TASKPRIORITY"].bytes(), b"0");
+        assert_eq!(assigned.outputs["USERID"].bytes(), b"IBMUSER");
+
+        for (sequence, name, value) in [
+            (30, "PROGRAM", argument(b"PROGRAM-OUT")),
+            (31, "USERID", cics_decimal(1)),
+            (32, "OPTION.NOHANDLE", argument(b"")),
+        ] {
+            let malformed = request(
+                CicsOperation::Assign,
+                BTreeMap::from([(name.into(), value)]),
+                sequence,
+            );
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, malformed.clone(), sequence),
+                    malformed,
+                ),
+                Err(HostProblem::Malformed)
+            );
+        }
 
         let inquire = request(
             CicsOperation::Inquire,
@@ -4733,6 +4760,44 @@ mod tests {
                 .bytes(),
             b"MQ-TRIGGER"
         );
+    }
+
+    #[test]
+    fn assign_task_identity_subset_is_available_in_dpl_context() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let context = BoundedPayload::new(
+            "mainframe-env.cics.execution-context@1",
+            b"dpl-without-synconreturn".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let invocation = invocation_for(
+            "assign-dpl",
+            BTreeMap::from([("cics.execution-context".into(), context)]),
+        );
+        let session = SessionId::new("assign-dpl", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "ME01", "S001")
+            .unwrap();
+        let assign = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("APPLID".into(), argument(b"APP-OUT")),
+                ("SYSID".into(), argument(b"SYS-OUT")),
+                ("TASKPRIORITY".into(), argument(b"PRIORITY-OUT")),
+                ("USERID".into(), argument(b"USER-OUT")),
+            ]),
+            1,
+        );
+        let response = service
+            .invoke(&effect(&invocation.run_unit_id, assign.clone(), 1), assign)
+            .unwrap();
+        assert_eq!(response.condition, "NORMAL");
+        assert_eq!(response.outputs["APPLID"].bytes(), b"ME01");
+        assert_eq!(response.outputs["SYSID"].bytes(), b"S001");
+        assert_eq!(response.outputs["TASKPRIORITY"].bytes(), b"0");
+        assert_eq!(response.outputs["USERID"].bytes(), b"IBMUSER");
     }
 
     #[test]
