@@ -150,6 +150,7 @@ pub enum HirCicsOperation {
     ChangeTask,
     Deq,
     Enq,
+    IgnoreCondition,
     PopHandle,
     PushHandle,
     Read,
@@ -174,6 +175,7 @@ pub enum HirCicsOperandName {
     SetPointer,
     UsingAddress,
     UsingPointer,
+    Conditions,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2456,13 +2458,27 @@ mod tests {
         assert!(statement.resolved.is_none());
 
         let ignore = analyze(
-            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSIGN. PROCEDURE DIVISION. EXEC CICS IGNORE CONDITION ERROR END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSIGN. PROCEDURE DIVISION. EXEC CICS IGNORE CONDITION ERROR LENGERR END-EXEC. STOP RUN.",
         );
-        assert!(ignore.hir.is_none());
-        assert!(ignore.diagnostics.iter().any(|diagnostic| {
-            let message = diagnostic.public_message();
-            message.contains("IGNORE CONDITION") && message.contains("handler is unready")
-        }));
+        let ignore = ignore
+            .hir
+            .unwrap_or_else(|| panic!("IGNORE CONDITION: {:?}", ignore.diagnostics));
+        let command = ignore
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed IGNORE CONDITION");
+        assert_eq!(command.operation, HirCicsOperation::IgnoreCondition);
+        assert_eq!(
+            command.operands,
+            vec![HirCicsNamedOperand {
+                name: HirCicsOperandName::Conditions,
+                value: HirCicsValue::Literal("ERROR\nLENGERR".into()),
+            }]
+        );
 
         for (command, expected) in [
             (

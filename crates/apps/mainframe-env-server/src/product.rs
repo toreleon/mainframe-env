@@ -10476,6 +10476,144 @@ mod tests {
     }
 
     #[test]
+    fn online_ignore_condition_continues_and_survives_push_pop() {
+        let limits = SourceLimits::default();
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. IGNCOND.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 IGNORE-FN PIC X(2).\n01 POP-FN PIC X(2).\n01 FIRST-RESP PIC S9(9) COMP.\n01 SECOND-RESP PIC S9(9) COMP.\n01 ERROR-HIT PIC 9 VALUE 0.\nPROCEDURE DIVISION.\nEXEC CICS IGNORE CONDITION INVREQ END-EXEC.\nMOVE EIBFN TO IGNORE-FN.\nEXEC CICS POP HANDLE END-EXEC.\nMOVE EIBRESP TO FIRST-RESP.\nEXEC CICS PUSH HANDLE END-EXEC.\nEXEC CICS HANDLE CONDITION INVREQ(ERROR-HANDLER) END-EXEC.\nEXEC CICS POP HANDLE END-EXEC.\nEXEC CICS POP HANDLE END-EXEC.\nMOVE EIBFN TO POP-FN.\nMOVE EIBRESP TO SECOND-RESP.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\nERROR-HANDLER.\nMOVE 1 TO ERROR-HIT.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let path = LogicalPath::new("IGNCOND.cbl", limits.max_path_bytes).unwrap();
+        let bundle = SourceBundle::new(
+            &path,
+            vec![
+                SourceFile::input(
+                    "IGNCOND.cbl",
+                    source.to_vec(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("IGNORE CONDITION fixture did not publish");
+        };
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "IGNCOND".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("IC00".into(), "IGNCOND".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "IGNCOND".into(),
+                    map: "IGNCOND".into(),
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("ignore-condition", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "IC00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "IC00",
+                24,
+                80,
+                "ignore-condition-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "IGNCOND", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "IGNCOND", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(
+            restored.variable("IGNORE-FN").unwrap().bytes(),
+            &[0x02, 0x0a]
+        );
+        assert_eq!(restored.variable("POP-FN").unwrap().bytes(), &[0x02, 0x0e]);
+        assert_eq!(
+            restored.variable("FIRST-RESP").unwrap().bytes(),
+            &[0, 0, 0, 16]
+        );
+        assert_eq!(
+            restored.variable("SECOND-RESP").unwrap().bytes(),
+            &[0, 0, 0, 16]
+        );
+        assert_eq!(restored.variable("ERROR-HIT").unwrap().bytes(), b"0");
+        assert_eq!(
+            server
+                .store
+                .audit_records(&invocation.execution_id, 1, 32)
+                .unwrap()
+                .into_iter()
+                .filter(|record| record.capability.as_str() == "host.cics.execute")
+                .map(|record| (record.effect_sequence, record.decision))
+                .collect::<Vec<_>>(),
+            (1..=7)
+                .map(|sequence| {
+                    (
+                        sequence,
+                        mainframe_env_execution_api::AuditDecision::Success,
+                    )
+                })
+                .collect::<Vec<_>>()
+        );
+        server
+            .run_online_exchange(&session, &principal, "IGNCOND", 3)
+            .unwrap();
+        assert!(server.online_exchange(&session).unwrap().is_none());
+    }
+
+    #[test]
     fn online_enqueue_wait_remains_durably_resumable_until_dequeue() {
         let limits = SourceLimits::default();
         let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. WAITENQ.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 LOCK-NAME PIC X(4) VALUE 'LOCK'.\nPROCEDURE DIVISION.\nEXEC CICS ENQ RESOURCE(LOCK-NAME) LENGTH(4) UOW END-EXEC.\nDISPLAY 'ACQUIRED'.\nSTOP RUN.\n";

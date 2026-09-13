@@ -86,6 +86,12 @@ set and restores exactly one prior frame. The stack permits 64 frames, rejects
 growth before mutation, and treats an unmatched POP as INVREQ rather than as an
 empty success.
 
+CICS IGNORE CONDITION carries one canonical newline-separated list of 1–16
+unique names from the generated 121-name EIBRESP authority. A matching provider
+condition returns the ignored disposition so execution continues after EIB
+state is updated. HANDLE CONDITION for the same name removes that ignore, and
+the ignored set participates in the same PUSH/POP snapshot as label handlers.
+
 `CALL`, `INVOKE`, and LE callable services resolve through versioned typed ABI
 catalog entries. Names choose a registered program only after the ABI identity
 is known; no copybook, application, or program-name special case selects host

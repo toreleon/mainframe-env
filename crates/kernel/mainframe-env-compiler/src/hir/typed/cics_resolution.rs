@@ -732,6 +732,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         ["CHANGE", "TASK"] => HirCicsOperation::ChangeTask,
         ["DEQ"] => HirCicsOperation::Deq,
         ["ENQ"] => HirCicsOperation::Enq,
+        ["IGNORE", "CONDITION"] => HirCicsOperation::IgnoreCondition,
         ["POP", "HANDLE"] => HirCicsOperation::PopHandle,
         ["PUSH", "HANDLE"] => HirCicsOperation::PushHandle,
         ["READ"] => HirCicsOperation::Read,
@@ -747,7 +748,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Deq | HirCicsOperation::Enq => {
             &["RESOURCE", "LENGTH", "MAXLIFETIME", "RESP", "RESP2"]
         }
-        HirCicsOperation::PopHandle | HirCicsOperation::PushHandle => &["RESP", "RESP2"],
+        HirCicsOperation::IgnoreCondition
+        | HirCicsOperation::PopHandle
+        | HirCicsOperation::PushHandle => &["RESP", "RESP2"],
         HirCicsOperation::Read => &["FILE", "DATASET", "RIDFLD", "INTO", "RESP", "RESP2"],
         HirCicsOperation::Rewrite => &["FILE", "DATASET", "FROM", "RESP", "RESP2"],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA", "RESP", "RESP2"],
@@ -757,6 +760,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     let allowed_options: &[&str] = match operation {
         HirCicsOperation::AddressSet
         | HirCicsOperation::ChangeTask
+        | HirCicsOperation::IgnoreCondition
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle
         | HirCicsOperation::SetAssociationUserCorrData
@@ -774,7 +778,10 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         .collect::<Vec<_>>();
     let unready_options = raw_options
         .iter()
-        .filter(|name| !allowed_options.contains(&name.as_str()))
+        .filter(|name| {
+            !allowed_options.contains(&name.as_str())
+                && !(operation == HirCicsOperation::IgnoreCondition && is_condition_name(name))
+        })
         .cloned()
         .collect::<Vec<_>>();
     if !unready_clauses.is_empty() || !unready_options.is_empty() {
@@ -802,6 +809,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     for required in match operation {
         HirCicsOperation::AddressSet => &["SET", "USING"][..],
         HirCicsOperation::ChangeTask
+        | HirCicsOperation::IgnoreCondition
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle
         | HirCicsOperation::Suspend => &[][..],
@@ -852,6 +860,17 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
                 value: HirCicsValue::Data(using),
             },
         ]);
+    }
+    if operation == HirCicsOperation::IgnoreCondition {
+        let names = raw_options
+            .iter()
+            .filter(|name| is_condition_name(name))
+            .cloned()
+            .collect::<Vec<_>>();
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::Conditions,
+            value: HirCicsValue::Literal(names.join("\n")),
+        });
     }
     for (name, identity) in [
         ("FILE", HirCicsOperandName::File),
@@ -919,6 +938,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     }
     let mut options = raw_options
         .iter()
+        .filter(|option| !is_condition_name(option))
         .map(|option| match option.as_str() {
             "UPDATE" => HirCicsOption::Update,
             "ROLLBACK" => HirCicsOption::Rollback,

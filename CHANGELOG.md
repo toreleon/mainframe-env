@@ -77,6 +77,10 @@ All notable changes to mainframe-env are documented here.
   stack. Nested frames suspend and restore condition/ABEND specifications,
   unmatched POP returns exact INVREQ behavior, and a compiled online route
   proves inner-to-outer exit restoration.
+- Added typed CICS `IGNORE CONDITION` for 1–16 unique generated EIBRESP names.
+  Ignored failures continue with the EIB set, HANDLE CONDITION overrides the
+  matching ignore, PUSH/POP preserves it, and hostile lists fail before task
+  state changes.
 - Added the frozen-with-bounded-ambiguities CIC-901 command contract and generated
   263-row compiler registry. The registry explicitly separates three typed runtime
   handlers, 20 legacy compatibility handlers, and 240 unready handlers; automatic

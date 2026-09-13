@@ -2,6 +2,7 @@ use super::super::{
     CicsLimits, CicsService, DatasetUndo, DurableContinuation, Reader, Run, Session,
     argument_bytes, argument_optional, argument_text, bounded, field, mutation_problem,
 };
+use crate::generated::CICS_CONDITION_NAMES;
 use mainframe_env_execution_api::{BoundedPayload, IdempotencyKey, Invocation, InvocationLimits};
 use mainframe_env_host_api::{
     AccessIntent, CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest, CicsResponse,
@@ -209,6 +210,7 @@ pub(in crate::service) fn invoke(
         }
         CicsOperation::HandleCondition => handle_condition(service, run, request),
         CicsOperation::HandleAbend => handle_abend(service, run, request),
+        CicsOperation::IgnoreCondition => ignore_condition(service, run, request),
         CicsOperation::PopHandle => pop_handle(service, run, request),
         CicsOperation::PushHandle => push_handle(service, run, request),
         CicsOperation::Assign => assign(service, run, request),
@@ -583,6 +585,52 @@ fn handle_condition(
         .ok_or(HostProblem::Malformed)?;
     run.ignored_conditions.remove(&condition);
     run.handlers.insert(condition, label);
+    service.response(
+        run,
+        CicsDisposition::Complete,
+        "NORMAL",
+        0,
+        0,
+        None,
+        None,
+        Vec::new(),
+    )
+}
+
+fn ignore_condition(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    let allowed = ["CONDITIONS", "OPTION.NOHANDLE", "RESP", "RESP2"];
+    if request.arguments.iter().any(|(name, value)| {
+        !allowed.contains(&name.as_str())
+            || name.starts_with("OPTION.") && !value.bytes().is_empty()
+    }) {
+        return Err(HostProblem::Malformed);
+    }
+    let value = request
+        .arguments
+        .get("CONDITIONS")
+        .ok_or(HostProblem::Malformed)?;
+    if value.schema() != "mainframe-env.cics.condition-list@1" {
+        return Err(HostProblem::Malformed);
+    }
+    let text = std::str::from_utf8(value.bytes()).map_err(|_| HostProblem::Malformed)?;
+    let names = text.split('\n').collect::<Vec<_>>();
+    let unique = names.iter().copied().collect::<BTreeSet<_>>();
+    if !matches!(names.len(), 1..=16)
+        || unique.len() != names.len()
+        || names
+            .iter()
+            .any(|name| CICS_CONDITION_NAMES.binary_search(name).is_err())
+    {
+        return Err(HostProblem::Malformed);
+    }
+    for name in names {
+        run.handlers.remove(name);
+        run.ignored_conditions.insert(name.into());
+    }
     service.response(
         run,
         CicsDisposition::Complete,

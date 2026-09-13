@@ -82,6 +82,13 @@ const HANDLE_STACK_EFFECTS: &[Effect] = &[
     Effect::Audit,
     Effect::Condition,
 ];
+const IGNORE_CONDITION_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+];
 
 /// Static executable facts owned by the typed CICS dialect.
 ///
@@ -432,7 +439,7 @@ pub fn cics_application_registry_for_runtime_operation(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 11] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 12] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -521,6 +528,14 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 11] = [
         effects: HANDLE_STACK_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::IgnoreCondition,
+        namespace: "cics.task",
+        name: "ignore-condition",
+        major: 1,
+        effects: IGNORE_CONDITION_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
 ];
 
 /// Resolves the executable descriptor for a decoded CICS plan operation.
@@ -540,6 +555,7 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::AddressSet => &CICS_EXECUTABLE_DESCRIPTORS[8],
         CicsPlanOperation::PopHandle => &CICS_EXECUTABLE_DESCRIPTORS[9],
         CicsPlanOperation::PushHandle => &CICS_EXECUTABLE_DESCRIPTORS[10],
+        CicsPlanOperation::IgnoreCondition => &CICS_EXECUTABLE_DESCRIPTORS[11],
     }
 }
 
@@ -600,7 +616,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 11);
+        assert_eq!(typed.len(), 12);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -618,7 +634,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 232);
+        assert_eq!(unready.len(), 231);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -783,6 +799,7 @@ mod tests {
                 CicsPlanOperation::ChangeTask,
                 CicsPlanOperation::Deq,
                 CicsPlanOperation::Enq,
+                CicsPlanOperation::IgnoreCondition,
                 CicsPlanOperation::PopHandle,
                 CicsPlanOperation::PushHandle,
                 CicsPlanOperation::Read,

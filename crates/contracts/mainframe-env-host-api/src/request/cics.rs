@@ -22,6 +22,8 @@ pub enum CicsOperation {
     FormatTime,
     HandleAbend,
     HandleCondition,
+    /// Ignore one bounded set of reviewed EIBRESP conditions for this program level.
+    IgnoreCondition,
     Inquire,
     Link,
     /// Restore one suspended HANDLE/IGNORE specification snapshot.
@@ -66,6 +68,7 @@ impl CicsOperation {
             Self::FormatTime => "FormatTime",
             Self::HandleAbend => "HandleAbend",
             Self::HandleCondition => "HandleCondition",
+            Self::IgnoreCondition => "IgnoreCondition",
             Self::Inquire => "Inquire",
             Self::Link => "Link",
             Self::PopHandle => "PopHandle",
@@ -134,6 +137,7 @@ impl CicsOperation {
             ("FORMATTIME", _) => Self::FormatTime,
             ("HANDLE", Some("ABEND")) => Self::HandleAbend,
             ("HANDLE", _) => Self::HandleCondition,
+            ("IGNORE", Some("CONDITION")) => Self::IgnoreCondition,
             ("INQUIRE", _) => Self::Inquire,
             ("LINK", _) => Self::Link,
             ("POP", Some("HANDLE")) => Self::PopHandle,

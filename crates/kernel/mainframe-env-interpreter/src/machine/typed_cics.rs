@@ -242,6 +242,9 @@ pub(super) fn execute(
     let mut arguments = BTreeMap::new();
     for operand in &plan.operands {
         let (schema, bytes) = match &operand.value {
+            CicsOperandValue::Literal(bytes) if operand.name == CicsOperandName::Conditions => {
+                ("mainframe-env.cics.condition-list@1", bytes.clone())
+            }
             CicsOperandValue::Literal(bytes) => ("mainframe-env.cics.literal@1", bytes.clone()),
             CicsOperandValue::Storage(slot)
                 if matches!(
@@ -958,6 +961,7 @@ const fn host_operation(operation: CicsPlanOperation) -> CicsOperation {
         CicsPlanOperation::ChangeTask => CicsOperation::ChangeTask,
         CicsPlanOperation::Deq => CicsOperation::Deq,
         CicsPlanOperation::Enq => CicsOperation::Enq,
+        CicsPlanOperation::IgnoreCondition => CicsOperation::IgnoreCondition,
         CicsPlanOperation::PopHandle => CicsOperation::PopHandle,
         CicsPlanOperation::PushHandle => CicsOperation::PushHandle,
         CicsPlanOperation::Read => CicsOperation::Read,
@@ -983,6 +987,7 @@ const fn operand_name(name: CicsOperandName) -> &'static str {
         CicsOperandName::SetPointer => "SET.POINTER",
         CicsOperandName::UsingAddress => "USING.ADDRESS",
         CicsOperandName::UsingPointer => "USING.POINTER",
+        CicsOperandName::Conditions => "CONDITIONS",
     }
 }
 

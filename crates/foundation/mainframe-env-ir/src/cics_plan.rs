@@ -51,6 +51,8 @@ pub enum CicsPlanOperation {
     Deq,
     /// Acquire one task-owned enqueue.
     Enq,
+    /// Ignore one bounded set of reviewed EIBRESP conditions.
+    IgnoreCondition,
     /// Restore one suspended HANDLE/IGNORE specification snapshot.
     PopHandle,
     /// Suspend the current HANDLE/IGNORE specifications in one nested snapshot.
@@ -105,6 +107,8 @@ pub enum CicsOperandName {
     UsingAddress,
     /// `USING(pointer-reference)` source.
     UsingPointer,
+    /// Canonical newline-separated EIBRESP condition names.
+    Conditions,
 }
 
 /// Literal bytes or a runtime read from resolved storage.
@@ -454,6 +458,16 @@ fn validate_operation_shape(
         CicsPlanOperation::PopHandle | CicsPlanOperation::PushHandle => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
+        CicsPlanOperation::IgnoreCondition => {
+            inputs.len() != 1
+                || !inputs.contains(&CicsOperandName::Conditions)
+                || plan.operands.iter().any(|operand| {
+                    operand.name != CicsOperandName::Conditions
+                        || !matches!(&operand.value, CicsOperandValue::Literal(bytes) if valid_condition_list(bytes))
+                })
+                || scheduling_options
+                || outputs.contains(&CicsOutputName::Into)
+        }
         CicsPlanOperation::Read => {
             resources != 1
                 || !inputs.contains(&CicsOperandName::Ridfld)
@@ -530,6 +544,21 @@ fn output_target(outputs: &[CicsOutputBinding], name: CicsOutputName) -> Option<
         .iter()
         .find(|output| output.name == name)
         .map(|output| &output.target)
+}
+
+fn valid_condition_list(bytes: &[u8]) -> bool {
+    let Ok(text) = std::str::from_utf8(bytes) else {
+        return false;
+    };
+    let names = text.split('\n').collect::<Vec<_>>();
+    let unique = names.iter().copied().collect::<BTreeSet<_>>();
+    matches!(names.len(), 1..=16)
+        && unique.len() == names.len()
+        && names.iter().all(|name| {
+            crate::CICS_APPLICATION_CONDITION_NAMES
+                .binary_search(name)
+                .is_ok()
+        })
 }
 
 fn validate_slot(
@@ -656,6 +685,7 @@ const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::AddressSet => 8,
         CicsPlanOperation::PopHandle => 9,
         CicsPlanOperation::PushHandle => 10,
+        CicsPlanOperation::IgnoreCondition => 11,
     }
 }
 
@@ -672,6 +702,7 @@ fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPlanCodecProbl
         8 => Ok(CicsPlanOperation::AddressSet),
         9 => Ok(CicsPlanOperation::PopHandle),
         10 => Ok(CicsPlanOperation::PushHandle),
+        11 => Ok(CicsPlanOperation::IgnoreCondition),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -691,6 +722,7 @@ const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::SetPointer => 10,
         CicsOperandName::UsingAddress => 11,
         CicsOperandName::UsingPointer => 12,
+        CicsOperandName::Conditions => 13,
     }
 }
 
@@ -709,6 +741,7 @@ fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCodecProblem> 
         10 => Ok(CicsOperandName::SetPointer),
         11 => Ok(CicsOperandName::UsingAddress),
         12 => Ok(CicsOperandName::UsingPointer),
+        13 => Ok(CicsOperandName::Conditions),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -1100,6 +1133,40 @@ mod tests {
             );
             let mut malformed = plan;
             malformed.options.insert(CicsPlanOption::Rollback);
+            assert_eq!(
+                encode_cics_effect_plan(&malformed, CicsPlanLimits::default()),
+                Err(CicsPlanCodecProblem::Malformed)
+            );
+        }
+    }
+
+    #[test]
+    fn ignore_condition_plan_requires_one_to_sixteen_reviewed_unique_names() {
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::IgnoreCondition,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::Conditions,
+                value: CicsOperandValue::Literal(b"ERROR\nLENGERR".to_vec()),
+            }],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
+            plan
+        );
+        for names in [
+            Vec::new(),
+            b"ERROR\nERROR".to_vec(),
+            b"NOT-A-REVIEWED-CONDITION".to_vec(),
+            crate::CICS_APPLICATION_CONDITION_NAMES[..17]
+                .join("\n")
+                .into_bytes(),
+        ] {
+            let mut malformed = plan.clone();
+            malformed.operands[0].value = CicsOperandValue::Literal(names);
             assert_eq!(
                 encode_cics_effect_plan(&malformed, CicsPlanLimits::default()),
                 Err(CicsPlanCodecProblem::Malformed)

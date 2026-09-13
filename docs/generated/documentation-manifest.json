@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:1241f58fb560afc6e1722835a6c55cb08e43052577e569b127445b12f124d974",
+      "sha256": "sha256:f46d7617f0f064a68f4b2ec079d8b5ace6477bddb8e26b6e701d87aa2ee0f399",
       "title": "Changelog",
       "xtask_commands": 1
     },
@@ -357,7 +357,7 @@
       "path": "docs/architecture/COBOL-RUNTIME-SEMANTICS.md",
       "relative_links": 0,
       "scope": "COBOL runtime semantic contracts",
-      "sha256": "sha256:27694bdddaf64aef044531beaeae82d93acc770d0cbb31a5266ac1c1f6a1e394",
+      "sha256": "sha256:4585726f0df2c62a70d74a5c3ddc077620ed69d6014d6a597b5d2bf34fe944eb",
       "status": "Frozen for mainframe-env 0.4.0 implementation",
       "title": "COBOL runtime semantic contracts",
       "xtask_commands": 0
@@ -545,7 +545,7 @@
       "path": "docs/contracts/EFFECT-CANONICAL-V1.md",
       "relative_links": 0,
       "scope": "canonical persisted host request/result digest representation",
-      "sha256": "sha256:3c81a95260ff53ae276a4e8d4cea756eee294d82184afe1c7e8d78136ec53dee",
+      "sha256": "sha256:bacd82701c13eaa68ca57dc0e24cbf31d6d43e0952ebd7cf68f039674e77e7e8",
       "status": "Frozen contract; implementation deviations tracked before 0.9.0",
       "title": "Canonical host effect representation, version 1",
       "xtask_commands": 0
@@ -1062,7 +1062,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:f48eee8fa89d66c7777506c86e8468e28f35702030378eac1b6adb9230584007",
+      "sha256": "sha256:9e726d66dd01b2abeb0f4f82d9a8811058c6deff7b0d3e0b6fd9d68dc8fe9580",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },

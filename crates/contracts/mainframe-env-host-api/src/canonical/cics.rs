@@ -17,6 +17,7 @@ impl Canonical for CicsOperation {
             Self::FormatTime => out.variant("CicsOperation", "FormatTime", 0),
             Self::HandleAbend => out.variant("CicsOperation", "HandleAbend", 0),
             Self::HandleCondition => out.variant("CicsOperation", "HandleCondition", 0),
+            Self::IgnoreCondition => out.variant("CicsOperation", "IgnoreCondition", 0),
             Self::Inquire => out.variant("CicsOperation", "Inquire", 0),
             Self::Link => out.variant("CicsOperation", "Link", 0),
             Self::PopHandle => out.variant("CicsOperation", "PopHandle", 0),

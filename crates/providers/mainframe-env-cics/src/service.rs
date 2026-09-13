@@ -1762,7 +1762,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 33);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 34);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -4457,6 +4457,15 @@ mod tests {
         .unwrap()
     }
 
+    fn condition_list(names: &[&str]) -> BoundedPayload {
+        BoundedPayload::new(
+            "mainframe-env.cics.condition-list@1",
+            names.join("\n").into_bytes(),
+            InvocationLimits::default(),
+        )
+        .unwrap()
+    }
+
     fn task_value(value: &[u8]) -> BoundedPayload {
         BoundedPayload::new(
             "mainframe-env.cics.storage-value@1",
@@ -4571,6 +4580,7 @@ mod tests {
             ("FORMATTIME", CicsOperation::FormatTime),
             ("HANDLE ABEND", CicsOperation::HandleAbend),
             ("HANDLE CONDITION", CicsOperation::HandleCondition),
+            ("IGNORE CONDITION ERROR", CicsOperation::IgnoreCondition),
             ("INQUIRE PROGRAM(PGM)", CicsOperation::Inquire),
             ("LINK", CicsOperation::Link),
             ("POP HANDLE", CicsOperation::PopHandle),
@@ -4606,7 +4616,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 33);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 34);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -5482,6 +5492,115 @@ mod tests {
             ),
             Err(HostProblem::ResourceExhausted)
         );
+    }
+
+    #[test]
+    fn ignore_condition_continues_overrides_and_restores_with_the_handle_stack() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+        let invoke = |operation, arguments, sequence| {
+            let request = request(operation, arguments, sequence);
+            service.invoke(
+                &effect(&invocation.run_unit_id, request.clone(), sequence),
+                request,
+            )
+        };
+        invoke(
+            CicsOperation::IgnoreCondition,
+            BTreeMap::from([("CONDITIONS".into(), condition_list(&["PGMIDERR", "INVREQ"]))]),
+            1,
+        )
+        .unwrap();
+        let ignored = invoke(
+            CicsOperation::Inquire,
+            BTreeMap::from([("PROGRAM".into(), argument(b"MISSING"))]),
+            2,
+        )
+        .unwrap();
+        assert_eq!(ignored.disposition, CicsDisposition::Ignored);
+        assert_eq!(
+            (
+                ignored.condition.as_str(),
+                ignored.response,
+                ignored.response2
+            ),
+            ("PGMIDERR", 27, 0)
+        );
+
+        invoke(
+            CicsOperation::HandleCondition,
+            BTreeMap::from([("PGMIDERR".into(), argument(b"ERROR-HANDLER"))]),
+            3,
+        )
+        .unwrap();
+        let handled = invoke(
+            CicsOperation::Inquire,
+            BTreeMap::from([("PROGRAM".into(), argument(b"MISSING"))]),
+            4,
+        )
+        .unwrap();
+        assert_eq!(handled.disposition, CicsDisposition::Handler);
+        assert_eq!(handled.target.as_deref(), Some("ERROR-HANDLER"));
+
+        invoke(
+            CicsOperation::IgnoreCondition,
+            BTreeMap::from([("CONDITIONS".into(), condition_list(&["PGMIDERR"]))]),
+            5,
+        )
+        .unwrap();
+        invoke(CicsOperation::PushHandle, BTreeMap::new(), 6).unwrap();
+        invoke(
+            CicsOperation::HandleCondition,
+            BTreeMap::from([("PGMIDERR".into(), argument(b"INNER-HANDLER"))]),
+            7,
+        )
+        .unwrap();
+        invoke(CicsOperation::PopHandle, BTreeMap::new(), 8).unwrap();
+        let restored = invoke(
+            CicsOperation::Inquire,
+            BTreeMap::from([("PROGRAM".into(), argument(b"MISSING"))]),
+            9,
+        )
+        .unwrap();
+        assert_eq!(restored.disposition, CicsDisposition::Ignored);
+
+        let seventeen = crate::generated::CICS_CONDITION_NAMES[..17].join("\n");
+        for (sequence, schema, value) in [
+            (10, "mainframe-env.cics.condition-list@1", ""),
+            (
+                11,
+                "mainframe-env.cics.condition-list@1",
+                "PGMIDERR\nPGMIDERR",
+            ),
+            (12, "mainframe-env.cics.condition-list@1", "MADEUP"),
+            (
+                13,
+                "mainframe-env.cics.condition-list@1",
+                seventeen.as_str(),
+            ),
+            (14, "mainframe-env.cics.literal@1", "PGMIDERR"),
+        ] {
+            let malformed = request(
+                CicsOperation::IgnoreCondition,
+                BTreeMap::from([(
+                    "CONDITIONS".into(),
+                    BoundedPayload::new(
+                        schema,
+                        value.as_bytes().to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                )]),
+                sequence,
+            );
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, malformed.clone(), sequence),
+                    malformed,
+                ),
+                Err(HostProblem::Malformed)
+            );
+        }
     }
 
     #[test]
