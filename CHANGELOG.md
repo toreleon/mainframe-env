@@ -164,6 +164,32 @@ All notable changes to mainframe-env are documented here.
   `crates/providers/mainframe-env-cics/src/handlers/file_control.rs:125-126`
   resolves `DATASET` before falling back to `FILE` for every one of these
   commands -- so no runtime change was needed.
+- Stopped a standard fixed-format comment line (`*` in column 7, IBM
+  Enterprise COBOL 6.5 Language Reference `rlfmtcom.html`) from reaching
+  statement operand/argument text when it sits inside a multi-line
+  statement. Pinned AWS CardDemo `59cc6c2f` writes such a comment inside
+  an `EXEC CICS ... END-EXEC` option list at seven sites across four
+  programs: `app/cbl/CORPT00C.cbl:575,590`, `app/cbl/COTRN00C.cbl:546,597`,
+  `app/cbl/COTRN02C.cbl:533`, and `app/cbl/COUSR00C.cbl:541,592`. Statement,
+  option, and branch text is sliced from the source by byte span
+  (`token_range` in `crates/kernel/mainframe-env-compiler/src/hir/statement_grammar.rs:960`,
+  14 call sites); the span slicing dates from `5c09dfa` ("Repair COBOL
+  statement grammar and token boundaries"), and comment lines between the
+  first and last token of a span were never excluded, so the comment's
+  text became part of the resolved text. `f1fe39e` ("enforce generated
+  compiler routing") then made the strict CICS top-level clause check
+  reject that leaked text with `CICS top-level clause is malformed`,
+  failing all four programs (`toreleon/mainframe-env#176`), and masked the
+  `DATASET(...)` compatibility gap this file's previous entry fixes for
+  `COTRN00C`, `COTRN02C`, and `COUSR00C`. Comment-line bytes (a fixed-format
+  column-7 comment normalizes to a floating `*>` comment in
+  `normalize_source`, `crates/kernel/mainframe-env-compiler/src/syntax.rs`)
+  are now blanked once, before the procedure grammar lexes the source
+  (`crates/kernel/mainframe-env-compiler/src/hir/source_text.rs`), so
+  every `token_range` call site is fixed at the shared layer with no
+  per-call-site change; quoted literals containing `*` or `*>`, and
+  comment-free statements, are unaffected. `*` is never stripped inside
+  CICS clause resolution itself.
 - Restored CICS application-command options whose pinned syntax diagram draws
   the parenthesized operand as an independently optional nested group: bare
   `CURSOR` on `SEND MAP`/`SEND CONTROL`, bare `DATESEP`/`TIMESEP` on

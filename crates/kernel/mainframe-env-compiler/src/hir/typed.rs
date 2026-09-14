@@ -1204,6 +1204,57 @@ mod tests {
         CobolCompiler::default().analyze(&bundle)
     }
 
+    fn analyze_fixed(source: &str) -> crate::CobolAnalysis {
+        let limits = SourceLimits::default();
+        let path = LogicalPath::new("typed.cbl", limits.max_path_bytes).unwrap();
+        let file = SourceFile::input(
+            "typed.cbl",
+            source.as_bytes().to_vec(),
+            SourceFormat::Fixed,
+            SourceEncoding::Utf8,
+            limits,
+        )
+        .unwrap();
+        let bundle =
+            SourceBundle::new(&path, vec![file], BTreeMap::new(), Vec::new(), limits).unwrap();
+        CobolCompiler::default().analyze(&bundle)
+    }
+
+    #[test]
+    fn cics_return_tolerates_a_column_seven_comment_between_options() {
+        // toreleon/mainframe-env#176: a standard fixed-format comment line
+        // (`*` in column 7) between EXEC CICS options must not reach the
+        // resolved clause text. Modeled on the AWS CardDemo (`59cc6c2f`)
+        // RETURN pattern in CORPT00C.cbl/COTRN02C.cbl, not copied verbatim.
+        // IBM Enterprise COBOL 6.5 Language Reference (`rlfmtcom.html`):
+        // a column-7 comment line carries no syntax and may appear
+        // anywhere in fixed-format source.
+        let source = concat!(
+            "       IDENTIFICATION DIVISION.\n",
+            "       PROGRAM-ID. CICSRTN.\n",
+            "       DATA DIVISION.\n",
+            "       WORKING-STORAGE SECTION.\n",
+            "       01 WS-TRAN-ID PIC X(4).\n",
+            "       01 WS-COMM-AREA PIC X(10).\n",
+            "       PROCEDURE DIVISION.\n",
+            "           EXEC CICS RETURN\n",
+            "               TRANSID (WS-TRAN-ID)\n",
+            "               COMMAREA (WS-COMM-AREA)\n",
+            "      *        LENGTH(LENGTH OF WS-COMM-AREA)\n",
+            "           END-EXEC.\n",
+            "           STOP RUN.\n",
+        );
+        let analysis = analyze_fixed(source);
+        let hir = analysis
+            .hir
+            .expect("EXEC CICS RETURN should compile with a column-7 comment between options");
+        assert!(
+            hir.statements
+                .iter()
+                .any(|statement| statement.kind == StatementKind::ExecCics)
+        );
+    }
+
     #[test]
     fn add_and_compute_resolve_values_receivers_pairs_and_length() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. TYPED. DATA DIVISION. WORKING-STORAGE SECTION. 01 A PIC 99 VALUE 1. 01 B PIC 99 VALUE 2. 01 C PIC 99 VALUE 3. 01 LEN-X PIC 9. 01 DYN-X PIC X DYNAMIC LENGTH LIMIT IS 8. 01 SOURCE-G. 05 COUNT-X PIC 99 VALUE 2. 05 NESTED-G. 10 AMOUNT-X PIC 99 VALUE 3. 01 TARGET-G. 05 COUNT-X PIC 99 VALUE 10. 05 NESTED-G. 10 AMOUNT-X PIC 99 VALUE 20. PROCEDURE DIVISION. ADD A TO B C ROUNDED ON SIZE ERROR CONTINUE NOT ON SIZE ERROR CONTINUE END-ADD. ADD A TO B GIVING C ROUNDED. ADD COUNT-X OF SOURCE-G TO COUNT-X OF TARGET-G. ADD CORRESPONDING SOURCE-G TO TARGET-G ROUNDED. COMPUTE C ROUNDED = ( A + B ) * 2 / 3. COMPUTE LEN-X = LENGTH OF DYN-X. STOP RUN.";

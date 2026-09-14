@@ -1104,7 +1104,7 @@ fn lex(source: &str) -> Result<Vec<Token<'_>>, HirProblem> {
     Ok(tokens)
 }
 
-fn quoted_length(text: &str, prefix: usize) -> Option<usize> {
+pub(super) fn quoted_length(text: &str, prefix: usize) -> Option<usize> {
     let bytes = text.as_bytes();
     let quote = *bytes.get(prefix)?;
     let mut index = prefix + 1;
