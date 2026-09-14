@@ -147,6 +147,7 @@ pub struct HirComputeStatement {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HirCicsOperation {
     AddressSet,
+    Asktime,
     AsktimeEib,
     ChangeTask,
     Deq,
@@ -209,6 +210,7 @@ pub enum HirCicsOption {
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HirCicsOutputName {
+    Abstime,
     Into,
     Resp,
     Resp2,
@@ -1935,7 +1937,7 @@ mod tests {
         ));
 
         let longer = analyze(
-            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLONG. DATA DIVISION. WORKING-STORAGE SECTION. 01 TIME-X PIC X(8). PROCEDURE DIVISION. EXEC CICS ASKTIME ABSTIME(TIME-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLONG. DATA DIVISION. WORKING-STORAGE SECTION. 01 TIME-X PIC S9(15) COMP-3. PROCEDURE DIVISION. EXEC CICS ASKTIME ABSTIME(TIME-X) END-EXEC. STOP RUN.",
         );
         let hir = longer
             .hir
@@ -1945,7 +1947,28 @@ mod tests {
             .iter()
             .find(|statement| statement.kind == StatementKind::ExecCics)
             .expect("EXEC CICS statement");
-        assert!(statement.resolved.is_none());
+        assert!(matches!(
+            statement.resolved,
+            Some(HirResolvedStatement::Cics(HirCicsStatement {
+                operation: HirCicsOperation::Asktime,
+                ref outputs,
+                ..
+            })) if outputs.iter().any(|output| {
+                output.name == HirCicsOutputName::Abstime
+                    && output.target.qualified_name == "TIME-X"
+            })
+        ));
+
+        let wrong_shape = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBAD. DATA DIVISION. WORKING-STORAGE SECTION. 01 TIME-X PIC S9(14) COMP-3. PROCEDURE DIVISION. EXEC CICS ASKTIME ABSTIME(TIME-X) END-EXEC. STOP RUN.",
+        );
+        assert!(wrong_shape.hir.is_none());
+        assert!(
+            wrong_shape
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.public_message().contains("PIC S9(15) COMP-3"))
+        );
     }
 
     #[test]
@@ -2225,7 +2248,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 19);
+        assert_eq!(legacy.len(), 18);
         assert!(
             legacy.iter().all(|descriptor| {
                 descriptor.advertised && descriptor.runtime_operation.is_some()

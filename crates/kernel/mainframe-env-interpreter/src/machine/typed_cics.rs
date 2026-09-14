@@ -42,73 +42,6 @@ pub(super) fn is_typed(operation: &Operation) -> bool {
     expected_operation(&operation.identity).is_some()
 }
 
-pub(super) fn write_context(
-    machine: &mut ReferenceMachine,
-    operation: CicsOperation,
-    response: &CicsResponse,
-) -> Result<(), MachineProblem> {
-    for (name, value) in [
-        ("EIBRESP", i128::from(response.response)),
-        ("EIBRESP2", i128::from(response.response2)),
-    ] {
-        machine.write_decimal(
-            name,
-            Decimal {
-                coefficient: value,
-                scale: 0,
-            },
-        )?;
-    }
-    if let Some(descriptor) =
-        mainframe_env_ir::cics_application_registry_for_runtime_operation(operation.runtime_name())
-    {
-        machine.write("EIBFN", &descriptor.eibfn)?;
-    }
-    if operation == CicsOperation::ReceiveMap {
-        machine.write("EIBAID", &[response.aid])?;
-    }
-    if matches!(
-        operation,
-        CicsOperation::Asktime | CicsOperation::AsktimeEib
-    ) {
-        match (
-            response.outputs.get("EIBDATE"),
-            response.outputs.get("EIBTIME"),
-        ) {
-            (Some(date), Some(time)) => {
-                write_eib_clock(machine, "EIBDATE", date)?;
-                write_eib_clock(machine, "EIBTIME", time)?;
-            }
-            // Retained ASKTIME ABSTIME responses from before the implicit EIB
-            // output contract remain replayable with their historical state.
-            (None, None) if operation == CicsOperation::Asktime => {}
-            _ => return Err(MachineProblem::UnexpectedHostResult),
-        }
-    }
-    machine.write("EIBTRNID", response.transaction.as_bytes())?;
-    Ok(())
-}
-
-fn write_eib_clock(
-    machine: &mut ReferenceMachine,
-    name: &str,
-    value: &BoundedPayload,
-) -> Result<(), MachineProblem> {
-    if value.schema() != "mainframe-env.cics.decimal@1" {
-        return Err(MachineProblem::UnexpectedHostResult);
-    }
-    let coefficient = String::from_utf8_lossy(value.bytes())
-        .parse::<i128>()
-        .map_err(|_| MachineProblem::UnexpectedHostResult)?;
-    machine.write_decimal(
-        name,
-        Decimal {
-            coefficient,
-            scale: 0,
-        },
-    )
-}
-
 pub(super) fn write_response_state(
     machine: &mut ReferenceMachine,
     response_target: Option<&CicsTarget>,
@@ -261,6 +194,7 @@ pub(super) fn validate_machine(machine: &ReferenceMachine) -> Result<(), Machine
         for output in &plan.outputs {
             let slot_use = match output.name {
                 CicsOutputName::Into => SlotUse::Output,
+                CicsOutputName::Abstime => SlotUse::AbstimeOutput,
                 CicsOutputName::Resp | CicsOutputName::Resp2 => SlotUse::NumericOutput,
             };
             validate_machine_slot(machine, operation, &output.target, slot_use)?;
@@ -365,7 +299,7 @@ pub(super) fn execute(
     }
 
     let mut into = None;
-    let outputs = BTreeMap::new();
+    let mut outputs = BTreeMap::new();
     let mut response = None;
     let mut response2 = None;
     for output in &plan.outputs {
@@ -379,6 +313,9 @@ pub(super) fn execute(
         );
         let target = CicsTarget::Resolved(output.target.clone());
         match output.name {
+            CicsOutputName::Abstime => {
+                outputs.insert(key.into(), target);
+            }
             CicsOutputName::Into => into = Some(target),
             CicsOutputName::Resp => response = Some(target),
             CicsOutputName::Resp2 => response2 = Some(target),
@@ -809,6 +746,7 @@ fn validate_runtime_plan(
             &output.target,
             match output.name {
                 CicsOutputName::Into => SlotUse::Output,
+                CicsOutputName::Abstime => SlotUse::AbstimeOutput,
                 CicsOutputName::Resp | CicsOutputName::Resp2 => SlotUse::NumericOutput,
             },
         )?;
@@ -820,6 +758,7 @@ fn validate_runtime_plan(
 enum SlotUse {
     Input,
     Output,
+    AbstimeOutput,
     NumericOutput,
     PointerInput,
     PointerOutput,
@@ -876,7 +815,11 @@ fn validate_machine_slot(
     }
     if matches!(
         slot_use,
-        SlotUse::Output | SlotUse::NumericOutput | SlotUse::PointerOutput | SlotUse::AddressOutput
+        SlotUse::Output
+            | SlotUse::AbstimeOutput
+            | SlotUse::NumericOutput
+            | SlotUse::PointerOutput
+            | SlotUse::AddressOutput
     ) && matches!(
         layout.category,
         LayoutCategory::Condition | LayoutCategory::Rename
@@ -885,6 +828,17 @@ fn validate_machine_slot(
     }
     if matches!(slot_use, SlotUse::NumericOutput) && !is_numeric(layout.category) {
         return Err(invalid_plan("RESP and RESP2 outputs must be numeric"));
+    }
+    if matches!(slot_use, SlotUse::AbstimeOutput)
+        && (layout.category != LayoutCategory::PackedDecimal
+            || layout.length != 8
+            || layout.digits != 15
+            || layout.scale != 0
+            || !layout.signed)
+    {
+        return Err(invalid_plan(
+            "ASKTIME ABSTIME output must be PIC S9(15) COMP-3",
+        ));
     }
     if matches!(slot_use, SlotUse::PointerInput | SlotUse::PointerOutput)
         && !matches!(
@@ -1010,6 +964,7 @@ fn expected_effects(operation: CicsPlanOperation) -> &'static [Effect] {
 const fn host_operation(operation: CicsPlanOperation) -> CicsOperation {
     match operation {
         CicsPlanOperation::AddressSet => CicsOperation::AddressSet,
+        CicsPlanOperation::Asktime => CicsOperation::Asktime,
         CicsPlanOperation::AsktimeEib => CicsOperation::AsktimeEib,
         CicsPlanOperation::ChangeTask => CicsOperation::ChangeTask,
         CicsPlanOperation::Deq => CicsOperation::Deq,
@@ -1049,6 +1004,7 @@ const fn operand_name(name: CicsOperandName) -> &'static str {
 
 const fn output_name(name: CicsOutputName) -> &'static str {
     match name {
+        CicsOutputName::Abstime => "ABSTIME",
         CicsOutputName::Into => "INTO",
         CicsOutputName::Resp => "RESP",
         CicsOutputName::Resp2 => "RESP2",

@@ -199,6 +199,7 @@ impl PlanContext<'_> {
     ) -> Result<CicsOutputBinding, CicsPlanProblem> {
         Ok(CicsOutputBinding {
             name: match output.name {
+                HirCicsOutputName::Abstime => CicsOutputName::Abstime,
                 HirCicsOutputName::Into => CicsOutputName::Into,
                 HirCicsOutputName::Resp => CicsOutputName::Resp,
                 HirCicsOutputName::Resp2 => CicsOutputName::Resp2,
@@ -246,6 +247,7 @@ impl PlanContext<'_> {
 const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
     match operation {
         HirCicsOperation::AddressSet => CicsPlanOperation::AddressSet,
+        HirCicsOperation::Asktime => CicsPlanOperation::Asktime,
         HirCicsOperation::AsktimeEib => CicsPlanOperation::AsktimeEib,
         HirCicsOperation::ChangeTask => CicsPlanOperation::ChangeTask,
         HirCicsOperation::Read => CicsPlanOperation::Read,

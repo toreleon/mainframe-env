@@ -2450,7 +2450,10 @@ mod tests {
 
     #[test]
     fn cics_decimal_outputs_update_exact_cobol_destinations() {
-        use mainframe_env_host_api::{CicsDisposition, CicsResponse, EffectResult, HostResult};
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
 
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTIME. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-X PIC S9(15) COMP-3 VALUE 0. 01 ABS-DISPLAY PIC 9(15). 01 EIBDATE PIC S9(7) COMP-3. 01 EIBTIME PIC S9(7) COMP-3. PROCEDURE DIVISION. EXEC CICS ASKTIME ABSTIME(ABS-X) END-EXEC. MOVE ABS-X TO ABS-DISPLAY. DISPLAY ABS-DISPLAY. STOP RUN.";
         let artifact = compile(source).unwrap();
@@ -2465,6 +2468,14 @@ mod tests {
         else {
             panic!("ASKTIME did not call host");
         };
+        assert!(matches!(
+            &effect.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::Asktime,
+                arguments,
+                ..
+            }) if arguments.contains_key("ABSTIME")
+        ));
         let response = CicsResponse {
             disposition: CicsDisposition::Complete,
             condition: "NORMAL".into(),
@@ -2513,6 +2524,37 @@ mod tests {
             ]),
             unit_of_work: None,
         };
+        let mut malformed = response.clone();
+        malformed.outputs.insert(
+            "ABSTIME".into(),
+            mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.decimal@1",
+                b"not-a-number".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        let mut rejected = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(rejected_effect) =
+            rejected.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("ASKTIME did not call host");
+        };
+        assert!(matches!(
+            rejected.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: rejected_effect.sequence,
+                    outcome: Ok(HostResult::Cics(malformed)),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Failed(_)
+        ));
         let result = machine.drive(
             MachineResume::HostResult(EffectResult {
                 sequence: effect.sequence,

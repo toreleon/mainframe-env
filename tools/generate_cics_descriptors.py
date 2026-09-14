@@ -353,6 +353,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
     {
         "ChangeTask",
         "AddressSet",
+        "Asktime",
         "AsktimeEib",
         "Deq",
         "Enq",
@@ -386,6 +387,7 @@ COMPILER_SPI_COMPATIBILITY = {
 }
 TYPED_RUNTIME_IR_EFFECTS = {
     "AddressSet": frozenset({"memory-read", "memory-write", "condition"}),
+    "Asktime": frozenset({"memory-write", "clock", "condition"}),
     "AsktimeEib": frozenset({"memory-write", "clock", "condition"}),
     "ChangeTask": frozenset(
         {"memory-read", "memory-write", "suspension", "condition"}
@@ -3439,8 +3441,8 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
     if (
         len(registry_rows) != 263
         or len(set(handler_ids)) != 263
-        or len(typed_rows) != 15
-        or len(legacy_rows) != 19
+        or len(typed_rows) != 16
+        or len(legacy_rows) != 18
         or {row["runtime_operation"] for row in typed_rows}
         != TYPED_RUNTIME_OPERATIONS
         or len(advertised_rows) != 34

@@ -45,6 +45,8 @@ impl Default for CicsPlanLimits {
 pub enum CicsPlanOperation {
     /// Copy one checked virtual pointer/address relationship.
     AddressSet,
+    /// Refresh the EIB clock fields and return one absolute-time value.
+    Asktime,
     /// Refresh the implicit EIB date and time fields.
     AsktimeEib,
     /// Change the issuing task's dispatch priority and optionally yield.
@@ -165,6 +167,8 @@ pub enum CicsOutputName {
     Resp,
     /// Secondary response code destination.
     Resp2,
+    /// `ABSTIME(...)` packed-decimal destination.
+    Abstime,
 }
 
 /// One pre-resolved result binding.
@@ -432,6 +436,22 @@ fn validate_operation_shape(
         .options
         .iter()
         .any(|option| !matches!(option, CicsPlanOption::NoHandle));
+    let allowed_outputs: &[CicsOutputName] = match plan.operation {
+        CicsPlanOperation::Asktime => &[
+            CicsOutputName::Abstime,
+            CicsOutputName::Resp,
+            CicsOutputName::Resp2,
+        ],
+        CicsPlanOperation::Read => &[
+            CicsOutputName::Into,
+            CicsOutputName::Resp,
+            CicsOutputName::Resp2,
+        ],
+        _ => &[CicsOutputName::Resp, CicsOutputName::Resp2],
+    };
+    let unexpected_output = outputs
+        .iter()
+        .any(|output| !allowed_outputs.contains(output));
     let malformed = match plan.operation {
         CicsPlanOperation::AddressSet => {
             let pointer_from_data = inputs.len() == 2
@@ -450,6 +470,11 @@ fn validate_operation_shape(
         }
         CicsPlanOperation::AsktimeEib => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
+        }
+        CicsPlanOperation::Asktime => {
+            !inputs.is_empty()
+                || scheduling_options
+                || !outputs.contains(&CicsOutputName::Abstime)
         }
         CicsPlanOperation::ChangeTask => {
             !inputs.is_subset(&BTreeSet::from([CicsOperandName::Priority]))
@@ -537,7 +562,8 @@ fn validate_operation_shape(
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
     };
-    if malformed
+    if unexpected_output
+        || malformed
         || (outputs.contains(&CicsOutputName::Resp2) && !outputs.contains(&CicsOutputName::Resp))
     {
         Err(CicsPlanCodecProblem::Malformed)
@@ -783,6 +809,7 @@ const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::HandleCondition => 12,
         CicsPlanOperation::HandleAid => 13,
         CicsPlanOperation::AsktimeEib => 14,
+        CicsPlanOperation::Asktime => 15,
     }
 }
 
@@ -803,6 +830,7 @@ fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPlanCodecProbl
         12 => Ok(CicsPlanOperation::HandleCondition),
         13 => Ok(CicsPlanOperation::HandleAid),
         14 => Ok(CicsPlanOperation::AsktimeEib),
+        15 => Ok(CicsPlanOperation::Asktime),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -876,6 +904,7 @@ const fn output_tag(value: CicsOutputName) -> u8 {
         CicsOutputName::Into => 0,
         CicsOutputName::Resp => 1,
         CicsOutputName::Resp2 => 2,
+        CicsOutputName::Abstime => 3,
     }
 }
 
@@ -884,6 +913,7 @@ fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodecProblem> {
         0 => Ok(CicsOutputName::Into),
         1 => Ok(CicsOutputName::Resp),
         2 => Ok(CicsOutputName::Resp2),
+        3 => Ok(CicsOutputName::Abstime),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -1124,14 +1154,36 @@ mod tests {
             outputs: Vec::new(),
             condition: CicsCondition::NoHandle,
         };
-        let asktime = CicsEffectPlan {
+        let asktime_eib = CicsEffectPlan {
             operation: CicsPlanOperation::AsktimeEib,
             operands: Vec::new(),
             options: BTreeSet::new(),
             outputs: Vec::new(),
             condition: CicsCondition::Default,
         };
-        for plan in [read, rewrite, syncpoint, asktime] {
+        let asktime = CicsEffectPlan {
+            operation: CicsPlanOperation::Asktime,
+            operands: Vec::new(),
+            options: BTreeSet::new(),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::Abstime,
+                target: slot(4, "RESULT.ABSTIME"),
+            }],
+            condition: CicsCondition::Default,
+        };
+        let mut missing_absolute = asktime.clone();
+        missing_absolute.outputs.clear();
+        assert_eq!(
+            encode_cics_effect_plan(&missing_absolute, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut bare_with_absolute = asktime.clone();
+        bare_with_absolute.operation = CicsPlanOperation::AsktimeEib;
+        assert_eq!(
+            encode_cics_effect_plan(&bare_with_absolute, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        for plan in [read, rewrite, syncpoint, asktime_eib, asktime] {
             let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
             let decoded = decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap();
             assert_eq!(decoded.operation, plan.operation);

@@ -76,7 +76,7 @@ const ADDRESS_SET_EFFECTS: &[Effect] = &[
     Effect::Audit,
     Effect::Condition,
 ];
-const ASKTIME_EIB_EFFECTS: &[Effect] = &[
+const ASKTIME_EFFECTS: &[Effect] = &[
     Effect::MemoryWrite,
     Effect::Clock,
     Effect::Security,
@@ -446,7 +446,7 @@ pub fn cics_application_registry_for_runtime_operation(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 15] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 16] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -564,7 +564,15 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 15] = [
         namespace: "cics.time",
         name: "asktime-eib",
         major: 1,
-        effects: ASKTIME_EIB_EFFECTS,
+        effects: ASKTIME_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Asktime,
+        namespace: "cics.time",
+        name: "asktime",
+        major: 1,
+        effects: ASKTIME_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
 ];
@@ -590,6 +598,7 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::HandleCondition => &CICS_EXECUTABLE_DESCRIPTORS[12],
         CicsPlanOperation::HandleAid => &CICS_EXECUTABLE_DESCRIPTORS[13],
         CicsPlanOperation::AsktimeEib => &CICS_EXECUTABLE_DESCRIPTORS[14],
+        CicsPlanOperation::Asktime => &CICS_EXECUTABLE_DESCRIPTORS[15],
     }
 }
 
@@ -650,7 +659,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 15);
+        assert_eq!(typed.len(), 16);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -660,7 +669,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 19);
+        assert_eq!(legacy.len(), 18);
         assert!(legacy.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && !descriptor.legacy_execution_options.is_empty()));
@@ -708,10 +717,11 @@ mod tests {
         assert_eq!(absolute.label_tokens, ["ASKTIME", "ABSTIME"]);
         assert_eq!(
             absolute.readiness,
-            CicsApplicationHandlerReadiness::LegacyCompatibility
+            CicsApplicationHandlerReadiness::TypedRuntime
         );
         assert!(absolute.advertised);
         assert_eq!(absolute.runtime_operation, Some("Asktime"));
+        assert!(absolute.legacy_execution_options.is_empty());
     }
 
     #[test]
@@ -834,6 +844,7 @@ mod tests {
                 .collect::<BTreeSet<_>>(),
             BTreeSet::from([
                 CicsPlanOperation::AddressSet,
+                CicsPlanOperation::Asktime,
                 CicsPlanOperation::AsktimeEib,
                 CicsPlanOperation::ChangeTask,
                 CicsPlanOperation::Deq,

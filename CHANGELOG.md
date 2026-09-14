@@ -54,10 +54,11 @@ All notable changes to mainframe-env are documented here.
   `CHANGE TASK` and `SUSPEND`. Priority omission and `-1` remain no-ops,
   priorities `0..255` update the task and yield once, invalid values return
   `INVREQ` 16/1, and SUSPEND produces a one-shot durable scheduler handoff.
-- Advertised bare ASKTIME as a distinct clock route that updates packed-decimal
-  EIBDATE/EIBTIME without producing an ABSTIME destination. ASKTIME ABSTIME now
-  refreshes the same implicit EIB fields while retaining its eight-byte packed
-  absolute-time output.
+- Advertised bare ASKTIME as a distinct typed clock route that updates
+  packed-decimal EIBDATE/EIBTIME without producing an ABSTIME destination.
+  ASKTIME ABSTIME now uses a typed, exact `PIC S9(15) COMP-3` output binding,
+  refreshes the same implicit EIB fields, and retains its eight-byte packed
+  absolute-time result.
 - Expanded the source-bounded CICS `ASSIGN` compatibility route with APPLID,
   SYSID, USERID, TASKPRIORITY, and the exact absent application/channel context
   defaults. It also reports absent CWA/TWA lengths, null OPERKEYS, and a normal

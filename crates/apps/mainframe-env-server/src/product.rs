@@ -10106,9 +10106,9 @@ mod tests {
     }
 
     #[test]
-    fn online_bare_asktime_updates_packed_eib_clock_fields() {
+    fn online_asktime_forms_update_packed_clock_destinations() {
         let limits = SourceLimits::default();
-        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. ASKTIME.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 EIBDATE PIC S9(7) COMP-3.\n01 EIBTIME PIC S9(7) COMP-3.\n01 ASKTIME-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS ASKTIME END-EXEC.\nMOVE EIBFN TO ASKTIME-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. ASKTIME.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 EIBDATE PIC S9(7) COMP-3.\n01 EIBTIME PIC S9(7) COMP-3.\n01 ABS-TIME PIC S9(15) COMP-3.\n01 ASKTIME-FN PIC X(2).\n01 ABSTIME-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS ASKTIME END-EXEC.\nMOVE EIBFN TO ASKTIME-FN.\nEXEC CICS ASKTIME ABSTIME(ABS-TIME) END-EXEC.\nMOVE EIBFN TO ABSTIME-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
         let path = LogicalPath::new("ASKTIME.cbl", limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
             &path,
@@ -10212,6 +10212,14 @@ mod tests {
             restored.variable("ASKTIME-FN").unwrap().bytes(),
             &[0x10, 0x02]
         );
+        assert_eq!(
+            restored.variable("ABSTIME-FN").unwrap().bytes(),
+            &[0x4a, 0x02]
+        );
+        let absolute = restored.variable("ABS-TIME").unwrap().bytes().to_vec();
+        assert_eq!(absolute.len(), 8);
+        assert_eq!(absolute[7] & 0x0f, 0x0c);
+        assert_ne!(absolute, &[0; 8]);
         let eib_date = restored.variable("EIBDATE").unwrap().bytes().to_vec();
         let eib_time = restored.variable("EIBTIME").unwrap().bytes().to_vec();
         assert_eq!(eib_date.len(), 4);

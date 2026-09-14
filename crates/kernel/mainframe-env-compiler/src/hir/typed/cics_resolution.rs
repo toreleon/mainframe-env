@@ -759,6 +759,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     }
     let operation = match descriptor.label_tokens {
         ["ADDRESS", "SET"] => HirCicsOperation::AddressSet,
+        ["ASKTIME", "ABSTIME"] => HirCicsOperation::Asktime,
         ["ASKTIME"] => HirCicsOperation::AsktimeEib,
         ["CHANGE", "TASK"] => HirCicsOperation::ChangeTask,
         ["DEQ"] => HirCicsOperation::Deq,
@@ -777,6 +778,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     };
     let allowed_clauses: &[&str] = match operation {
         HirCicsOperation::AddressSet => &["SET", "USING", "RESP", "RESP2"],
+        HirCicsOperation::Asktime => &["ABSTIME", "RESP", "RESP2"],
         HirCicsOperation::AsktimeEib => &["RESP", "RESP2"],
         HirCicsOperation::ChangeTask => &["PRIORITY", "RESP", "RESP2"],
         HirCicsOperation::Deq | HirCicsOperation::Enq => {
@@ -795,6 +797,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     };
     let allowed_options: &[&str] = match operation {
         HirCicsOperation::AddressSet
+        | HirCicsOperation::Asktime
         | HirCicsOperation::AsktimeEib
         | HirCicsOperation::ChangeTask
         | HirCicsOperation::HandleAid
@@ -855,6 +858,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     }
     for required in match operation {
         HirCicsOperation::AddressSet => &["SET", "USING"][..],
+        HirCicsOperation::Asktime => &["ABSTIME"][..],
         HirCicsOperation::AsktimeEib
         | HirCicsOperation::ChangeTask
         | HirCicsOperation::HandleAid
@@ -1014,6 +1018,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     }
     let mut outputs = Vec::new();
     for (name, identity) in [
+        ("ABSTIME", HirCicsOutputName::Abstime),
         ("INTO", HirCicsOutputName::Into),
         ("RESP", HirCicsOutputName::Resp),
         ("RESP2", HirCicsOutputName::Resp2),
@@ -1021,8 +1026,22 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         if let Some(value) = clauses.get(name) {
             let target = complete_data_reference(value, semantic)?;
             require_writable(&target)?;
-            if matches!(identity, HirCicsOutputName::Resp | HirCicsOutputName::Resp2) {
+            if matches!(
+                identity,
+                HirCicsOutputName::Abstime | HirCicsOutputName::Resp | HirCicsOutputName::Resp2
+            ) {
                 require_numeric(&target)?;
+            }
+            if identity == HirCicsOutputName::Abstime
+                && (target.usage != CobolUsage::PackedDecimal
+                    || target.length != 8
+                    || target.digits != 15
+                    || target.scale != 0
+                    || !target.signed)
+            {
+                return Err(ResolutionFailure::Invalid(
+                    "CICS ASKTIME ABSTIME requires PIC S9(15) COMP-3 storage".into(),
+                ));
             }
             outputs.push(HirCicsOutputBinding {
                 name: identity,

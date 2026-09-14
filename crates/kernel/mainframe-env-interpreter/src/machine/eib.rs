@@ -1,4 +1,6 @@
-use super::{CobolValue, Decimal, MachineProblem};
+use super::{CobolValue, Decimal, MachineProblem, ReferenceMachine};
+use mainframe_env_execution_api::BoundedPayload;
+use mainframe_env_host_api::{CicsOperation, CicsResponse};
 use std::collections::BTreeMap;
 
 pub(super) fn implicit_values(
@@ -50,4 +52,71 @@ pub(super) fn implicit_values(
             CobolValue::Bytes(transaction.unwrap_or_default().to_vec()),
         ),
     ]))
+}
+
+pub(super) fn write_context(
+    machine: &mut ReferenceMachine,
+    operation: CicsOperation,
+    response: &CicsResponse,
+) -> Result<(), MachineProblem> {
+    for (name, value) in [
+        ("EIBRESP", i128::from(response.response)),
+        ("EIBRESP2", i128::from(response.response2)),
+    ] {
+        machine.write_decimal(
+            name,
+            Decimal {
+                coefficient: value,
+                scale: 0,
+            },
+        )?;
+    }
+    if let Some(descriptor) =
+        mainframe_env_ir::cics_application_registry_for_runtime_operation(operation.runtime_name())
+    {
+        machine.write("EIBFN", &descriptor.eibfn)?;
+    }
+    if operation == CicsOperation::ReceiveMap {
+        machine.write("EIBAID", &[response.aid])?;
+    }
+    if matches!(
+        operation,
+        CicsOperation::Asktime | CicsOperation::AsktimeEib
+    ) {
+        match (
+            response.outputs.get("EIBDATE"),
+            response.outputs.get("EIBTIME"),
+        ) {
+            (Some(date), Some(time)) => {
+                write_clock(machine, "EIBDATE", date)?;
+                write_clock(machine, "EIBTIME", time)?;
+            }
+            // Retained ASKTIME ABSTIME responses from before the implicit EIB
+            // output contract remain replayable with their historical state.
+            (None, None) if operation == CicsOperation::Asktime => {}
+            _ => return Err(MachineProblem::UnexpectedHostResult),
+        }
+    }
+    machine.write("EIBTRNID", response.transaction.as_bytes())?;
+    Ok(())
+}
+
+fn write_clock(
+    machine: &mut ReferenceMachine,
+    name: &str,
+    value: &BoundedPayload,
+) -> Result<(), MachineProblem> {
+    if value.schema() != "mainframe-env.cics.decimal@1" {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
+    let coefficient = String::from_utf8_lossy(value.bytes())
+        .parse::<i128>()
+        .map_err(|_| MachineProblem::UnexpectedHostResult)?;
+    machine.write_decimal(
+        name,
+        Decimal {
+            coefficient,
+            scale: 0,
+        },
+    )
 }

@@ -86,7 +86,9 @@ current accepted source projection before emitting the registry.
 The current 34 API routes are the only advertised application commands.
 `ASKTIME ABSTIME` returns its packed-decimal destination and refreshes EIBDATE
 and EIBTIME. Bare `ASKTIME` is a distinct route that refreshes only those two
-packed-decimal EIB fields; it cannot manufacture an ABSTIME destination.
+packed-decimal EIB fields; it cannot manufacture an ABSTIME destination. Both
+forms lower through distinct typed plan operations, while retained raw
+ASKTIME artifacts remain readable by the compatibility interpreter.
 Each legacy route admits only the source-valid option subset whose behavior is
 implemented by that raw handler. A catalog-known option outside that subset
 fails explicitly before compatibility lowering instead of being silently

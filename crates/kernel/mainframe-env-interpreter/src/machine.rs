@@ -2003,7 +2003,7 @@ impl ReferenceMachine {
                         )?;
                     }
                 }
-                typed_cics::write_context(self, operation, &response)?;
+                eib::write_context(self, operation, &response)?;
                 self.deferred_drive = match response.disposition {
                     CicsDisposition::Complete => (response.response != 0 && !responded).then_some(
                         MachineDrive::Condition(Condition {
