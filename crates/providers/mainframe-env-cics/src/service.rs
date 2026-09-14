@@ -4716,7 +4716,9 @@ mod tests {
         let local_only = request(
             CicsOperation::Assign,
             BTreeMap::from([
+                ("CMDSEC".into(), argument(b"CMDSEC-OUT")),
                 ("OPSECURITY".into(), argument(b"OPSECURITY-OUT")),
+                ("RESSEC".into(), argument(b"RESSEC-OUT")),
                 ("TCTUALENG".into(), argument(b"TCTUA-LENGTH-OUT")),
             ]),
             29,
@@ -4727,7 +4729,9 @@ mod tests {
                 local_only,
             )
             .unwrap();
+        assert_eq!(local_only.outputs["CMDSEC"].bytes(), b"X");
         assert_eq!(local_only.outputs["OPSECURITY"].bytes(), &[0; 3]);
+        assert_eq!(local_only.outputs["RESSEC"].bytes(), b"X");
         assert_eq!(local_only.outputs["TCTUALENG"].bytes(), b"0");
 
         let initparm = request(
@@ -5221,8 +5225,10 @@ mod tests {
             CicsOperation::Assign,
             BTreeMap::from([
                 ("BRIDGE".into(), argument(b"BRIDGE-OUT")),
+                ("CMDSEC".into(), argument(b"CMDSEC-OUT")),
                 ("INITPARM".into(), argument(b"INITPARM-OUT")),
                 ("INITPARMLEN".into(), argument(b"INITPARM-LENGTH-OUT")),
+                ("RESSEC".into(), argument(b"RESSEC-OUT")),
             ]),
             4,
         );
@@ -5236,6 +5242,8 @@ mod tests {
         assert!(!initparm.outputs.contains_key("INITPARM"));
         assert_eq!(initparm.outputs["INITPARMLEN"].bytes(), b"0");
         assert_eq!(initparm.outputs["BRIDGE"].bytes(), &[b' '; 4]);
+        assert_eq!(initparm.outputs["CMDSEC"].bytes(), b"X");
+        assert_eq!(initparm.outputs["RESSEC"].bytes(), b"X");
 
         let diagnostics = request(
             CicsOperation::Assign,

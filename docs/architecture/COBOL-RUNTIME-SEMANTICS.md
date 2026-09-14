@@ -101,6 +101,9 @@ contract explicitly permits it.
   Optional keyboard, display, print, partition, symbol, DBCS, reader, and
   validation capabilities that the minimal terminal does not implement return
   `X'00'`; they are not inferred from received byte values.
+  CMDSEC and RESSEC return `X`: CICS command dispatch always requires the
+  execution grant and transaction authorization, and resource-owning handlers
+  add their typed SAF checks before access.
   Other source-valid ASSIGN options remain rejected until their terminal,
   program-level, or failure context has an owned runtime representation.
 - Terminal execution outcomes carry an explicit transaction-dump disposition.

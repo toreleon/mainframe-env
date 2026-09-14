@@ -31,6 +31,7 @@ pub(super) fn validate(
         "BRIDGE",
         "BTRANS",
         "CHANNEL",
+        "CMDSEC",
         "COLOR",
         "CWALENG",
         "DEFSCRNHT",
@@ -60,6 +61,7 @@ pub(super) fn validate(
         "PLATFORM",
         "PROGRAM",
         "PS",
+        "RESSEC",
         "RESTART",
         "SCRNHT",
         "SCRNWD",
@@ -113,7 +115,8 @@ pub(super) fn validate(
                 "CICS ASSIGN {name} requires a halfword binary data area"
             ));
         }
-        if (name == "ABCODE" && target.length != 4)
+        if (["CMDSEC", "RESSEC"].contains(&name) && target.length != 1)
+            || (name == "ABCODE" && target.length != 4)
             || (name == "ABDUMP" && target.length != 1)
             || (name == "ABPROGRAM" && target.length != 8)
             || (name == "ASRAPSW" && target.length != 8)

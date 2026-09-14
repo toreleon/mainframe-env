@@ -230,6 +230,13 @@ pub(in crate::service) fn assign(
                 .insert(name.into(), bounded(vec![b' '; length])?);
         }
     }
+    for name in ["CMDSEC", "RESSEC"] {
+        if request.arguments.contains_key(name) {
+            response
+                .outputs
+                .insert(name.into(), bounded(b"X".to_vec())?);
+        }
+    }
     for name in ["MAJORVERSION", "MICROVERSION", "MINORVERSION"] {
         if request.arguments.contains_key(name) {
             response.outputs.insert(name.into(), decimal_payload(-1)?);
@@ -340,6 +347,7 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "BRIDGE",
         "BTRANS",
         "CHANNEL",
+        "CMDSEC",
         "COLOR",
         "CWALENG",
         "DEFSCRNHT",
@@ -372,6 +380,7 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "PS",
         "RESP",
         "RESP2",
+        "RESSEC",
         "RESTART",
         "SCRNHT",
         "SCRNWD",
