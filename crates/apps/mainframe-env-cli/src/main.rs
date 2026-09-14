@@ -362,6 +362,109 @@ mod tests {
         Cli::command().debug_assert();
     }
 
+    /// Level-88 condition-names declared on an alphanumeric group item,
+    /// before the group's subordinate items, must compile, evaluate in
+    /// `IF`, and write correctly in `SET ... TO TRUE`. Mirrors
+    /// `app/cbl/COACTUPC.cbl:101-112`'s `WS-EDIT-US-PHONE-NUM-FLGS` group.
+    ///
+    /// Per IBM Enterprise COBOL 6.5:
+    /// - condition-names may be attached to an alphanumeric group
+    ///   (`SS6SG3_6.5/lr/ref/rlddeva2.html`);
+    /// - `SET ... TO TRUE` stores the condition-name's value under the VALUE
+    ///   clause rules (`SS6SG3_6.5/lr/ref/rlpssetd.html`);
+    /// - a figurative constant in a VALUE clause takes the length of the
+    ///   associated data item (`SS6SG3_6.5/lr/ref/rllancon.html`), so
+    ///   `LOW-VALUES` on this 3-byte group fills all 3 bytes.
+    #[test]
+    fn level88_group_condition_names_evaluate_and_set_to_true_writes_bytes() {
+        let fixture = Fixture::new();
+        let source = fixture.0.join("LEVEL88G.cbl");
+        fs::write(
+            &source,
+            b"IDENTIFICATION DIVISION.\nPROGRAM-ID. LEVEL88G.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 WS-GROUP.\n 88 WS-GROUP-INVALID VALUE '000'.\n 88 WS-GROUP-VALID VALUE LOW-VALUES.\n 05 WS-FLAG-A PIC X(01) VALUE '0'.\n 05 WS-FLAG-B PIC X(01) VALUE '0'.\n 05 WS-FLAG-C PIC X(01) VALUE '0'.\nPROCEDURE DIVISION.\nIF WS-GROUP-INVALID DISPLAY 'BEFORE-TRUE' ELSE DISPLAY 'BEFORE-FALSE' END-IF.\nSET WS-GROUP-VALID TO TRUE.\nDISPLAY WS-GROUP.\nIF WS-GROUP-INVALID DISPLAY 'AFTER-TRUE' ELSE DISPLAY 'AFTER-FALSE' END-IF.\nIF WS-GROUP-VALID DISPLAY 'VALID-TRUE' ELSE DISPLAY 'VALID-FALSE' END-IF.\nSTOP RUN.\n",
+        )
+        .unwrap();
+        let result = compile(&source, Format::Free, &[], CompilationMode::Executable).unwrap();
+        let CompilerResult::Published { artifact, .. } = result else {
+            panic!("group-level condition-name program did not publish: {result:?}");
+        };
+        let limits = InvocationLimits::default();
+        let request_invocation =
+            invocation(ArtifactRef::new(artifact.content_id().to_reference(), limits).unwrap())
+                .unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            request_invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        match ExecutionCoordinator::local(CoordinatorLimits::default()).execute(
+            &mut machine,
+            &request_invocation,
+            ExecutionControl::default(),
+        ) {
+            ExecutionOutcome::Completed(completion) => {
+                assert_eq!(completion.return_code, 0);
+                let mut expected = Vec::new();
+                expected.extend_from_slice(b"BEFORE-TRUE\n");
+                expected.extend_from_slice(&[0x00, 0x00, 0x00]);
+                expected.extend_from_slice(b"\n");
+                expected.extend_from_slice(b"AFTER-FALSE\n");
+                expected.extend_from_slice(b"VALID-TRUE\n");
+                assert_eq!(completion.output.bytes(), expected.as_slice());
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    /// `app/cbl/CSUTLDTC.cbl:60-62`: `FEEDBACK-TOKEN-VALUE` puts
+    /// hexadecimal-notation level-88 values on a mixed-usage 8-byte group
+    /// (a BINARY subgroup plus two PIC X items). Per IBM Enterprise COBOL 6.5
+    /// (`SS6SG3_6.5/lr/ref/rllitahx.html`), a hexadecimal-notation literal is
+    /// an alphanumeric literal and is valid wherever one is; its decoded
+    /// bytes are what `IF` compares and what `SET ... TO TRUE` stores.
+    #[test]
+    fn level88_hexadecimal_notation_on_a_group_evaluates_and_sets_to_true_writes_bytes() {
+        let fixture = Fixture::new();
+        let source = fixture.0.join("LEVEL88H.cbl");
+        fs::write(
+            &source,
+            b"IDENTIFICATION DIVISION.\nPROGRAM-ID. LEVEL88H.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 FEEDBACK-CODE.\n 02 FEEDBACK-TOKEN-VALUE.\n 88 FC-INVALID-DATE VALUE X'0000000000000000'.\n 88 FC-INSUFFICIENT-DATA VALUE X'000309CB59C3C5C5'.\n 03 CASE-1-CONDITION-ID.\n 04 SEVERITY PIC S9(4) BINARY VALUE 0.\n 04 MSG-NO PIC S9(4) BINARY VALUE 0.\n 03 CASE-SEV-CTL PIC X VALUE X'00'.\n 03 FACILITY-ID PIC XXX VALUE X'000000'.\nPROCEDURE DIVISION.\nIF FC-INVALID-DATE DISPLAY 'BEFORE-TRUE' ELSE DISPLAY 'BEFORE-FALSE' END-IF.\nSET FC-INSUFFICIENT-DATA TO TRUE.\nDISPLAY FEEDBACK-TOKEN-VALUE.\nIF FC-INVALID-DATE DISPLAY 'AFTER-TRUE' ELSE DISPLAY 'AFTER-FALSE' END-IF.\nIF FC-INSUFFICIENT-DATA DISPLAY 'INSUFFICIENT-TRUE' ELSE DISPLAY 'INSUFFICIENT-FALSE' END-IF.\nSTOP RUN.\n",
+        )
+        .unwrap();
+        let result = compile(&source, Format::Free, &[], CompilationMode::Executable).unwrap();
+        let CompilerResult::Published { artifact, .. } = result else {
+            panic!("hexadecimal group-level condition-name program did not publish: {result:?}");
+        };
+        let limits = InvocationLimits::default();
+        let request_invocation =
+            invocation(ArtifactRef::new(artifact.content_id().to_reference(), limits).unwrap())
+                .unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            request_invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        match ExecutionCoordinator::local(CoordinatorLimits::default()).execute(
+            &mut machine,
+            &request_invocation,
+            ExecutionControl::default(),
+        ) {
+            ExecutionOutcome::Completed(completion) => {
+                assert_eq!(completion.return_code, 0);
+                let mut expected = Vec::new();
+                expected.extend_from_slice(b"BEFORE-TRUE\n");
+                expected.extend_from_slice(&[0x00, 0x03, 0x09, 0xCB, 0x59, 0xC3, 0xC5, 0xC5]);
+                expected.extend_from_slice(b"\n");
+                expected.extend_from_slice(b"AFTER-FALSE\n");
+                expected.extend_from_slice(b"INSUFFICIENT-TRUE\n");
+                assert_eq!(completion.output.bytes(), expected.as_slice());
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
     #[test]
     fn cli_builds_ordered_fixed_libraries_with_subsystem_abi_sources() {
         let fixture = Fixture::new();

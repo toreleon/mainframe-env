@@ -109,6 +109,20 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Accepted, evaluated, and executed level-88 condition-names on an alphanumeric
+  group item (including a group declared with a mixed-usage subordinate, such as
+  a BINARY subgroup), whose entries may precede the group's subordinate items,
+  per IBM Enterprise COBOL 6.5 "Format 2" (`SS6SG3_6.5/lr/ref/rlddeva2.html`),
+  "Group comparisons" (`SS6SG3_6.5/lr/ref/rlpdsgrp.html`), "Alphanumeric
+  comparisons" (`SS6SG3_6.5/lr/ref/rlpdsalp.html`), figurative constants
+  (`SS6SG3_6.5/lr/ref/rllancon.html`), "SET for condition-names"
+  (`SS6SG3_6.5/lr/ref/rlpssetd.html`), and hexadecimal-notation alphanumeric
+  literals (`SS6SG3_6.5/lr/ref/rllitahx.html`); national and UTF-8 groups
+  remain outside the executable subset. This unblocks
+  `app/cbl/COACTUPC.cbl`'s `WS-EDIT-US-PHONE-NUM-FLGS`,
+  `app/cbl/CSUTLDTC.cbl`'s `FEEDBACK-TOKEN-VALUE`, and the corresponding
+  group in `app/cpy/CSUTLDWY.cpy` used by `app/cbl/COTRTUPC.cbl`, which
+  previously failed `MECOB0101: InvalidDeclaration` at commit `5de3ce4`.
 - Moved CICS READ/REWRITE `LENGTH`/`KEYLENGTH` clause lowering, dataset-name lock-conflict
   and delete-lock retention checks, and the CardDemo job-wait/spool-failure helpers into
   sibling modules, and tightened the reviewed module-review production-line ceilings for
