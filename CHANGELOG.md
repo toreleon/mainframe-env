@@ -108,6 +108,13 @@ All notable changes to mainframe-env are documented here.
   data area, and optional numeric LENGTH truncates the persisted record before
   idempotency comparison. Remote SYSID routing and unimplemented TDQUEUE
   definition/open/disabled condition semantics remain fail-closed.
+- Migrated bounded local `RECEIVE MAP`, `SEND MAP`, and `SEND TEXT` subsets to
+  typed terminal plans. MAP and optional MAPSET are validated 1–7 character
+  selectors, MAPSET defaults to MAP, and FROM/INTO storage is resolved before
+  dispatch. RECEIVE uses the requested durable definition for terminal-fit and
+  field normalization. SET pointers, omitted-map AID-only receive, implicit
+  symbolic map storage, lengths, paging, device and other terminal controls
+  remain fail-closed.
 - Expanded the source-bounded CICS `ASSIGN` compatibility route with APPLID,
   SYSID, USERID, TASKPRIORITY, and the exact absent application/channel context
   defaults. It also reports absent CWA/TWA lengths, null OPERKEYS, and a normal

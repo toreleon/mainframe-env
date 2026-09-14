@@ -11,6 +11,7 @@ mod handle_abend;
 mod output_shape;
 mod program_control;
 mod queue_control;
+mod terminal_control;
 
 use codec_tags::{
     operand_from_tag, operand_tag, operation_from_tag, operation_tag, option_from_tag, option_tag,
@@ -106,6 +107,12 @@ pub enum CicsPlanOperation {
     Write,
     /// Write one bounded record to a transient data queue.
     WriteTransientData,
+    /// Receive one mapped terminal input message.
+    ReceiveMap,
+    /// Send one mapped terminal output message.
+    SendMap,
+    /// Send one unmapped terminal text message.
+    SendText,
     /// Rewrite the record held by the current update context.
     Rewrite,
     /// Commit or roll back the current unit of work.
@@ -148,6 +155,10 @@ pub enum CicsOperandName {
     Ridfld,
     /// `QUEUE(...)` transient-data destination.
     Queue,
+    /// `MAP(...)` BMS map name.
+    Map,
+    /// `MAPSET(...)` BMS mapset name.
+    Mapset,
     /// `RESOURCE(...)` enqueue identity.
     Resource,
     /// `LENGTH(...)` content-identity length.
@@ -638,6 +649,9 @@ fn validate_operation_shape(
         CicsPlanOperation::WriteTransientData => {
             queue_control::invalid_write_transient_data_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::ReceiveMap
+        | CicsPlanOperation::SendMap
+        | CicsPlanOperation::SendText => terminal_control::invalid_shape(plan, inputs, outputs),
         CicsPlanOperation::Rewrite => {
             resources != 1
                 || !inputs.contains(&CicsOperandName::From)
@@ -1372,6 +1386,49 @@ mod tests {
             outputs: Vec::new(),
             condition: CicsCondition::Default,
         };
+        let receive_map = CicsEffectPlan {
+            operation: CicsPlanOperation::ReceiveMap,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::Map,
+                    value: CicsOperandValue::Literal(b"MENU".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Mapset,
+                    value: CicsOperandValue::Literal(b"MAIN".to_vec()),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::Into,
+                target: slot(15, "BMS.INPUT"),
+            }],
+            condition: CicsCondition::Default,
+        };
+        let send_map = CicsEffectPlan {
+            operation: CicsPlanOperation::SendMap,
+            operands: vec![
+                receive_map.operands[0].clone(),
+                receive_map.operands[1].clone(),
+                CicsNamedOperand {
+                    name: CicsOperandName::From,
+                    value: CicsOperandValue::Storage(slot(16, "BMS.OUTPUT")),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let send_text = CicsEffectPlan {
+            operation: CicsPlanOperation::SendText,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::From,
+                value: CicsOperandValue::Storage(slot(17, "BMS.TEXT")),
+            }],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
         let mut missing_delete_key = delete.clone();
         missing_delete_key
             .operands
@@ -1419,6 +1476,9 @@ mod tests {
             delete,
             write,
             write_transient,
+            receive_map,
+            send_map,
+            send_text,
         ] {
             let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
             let decoded = decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap();

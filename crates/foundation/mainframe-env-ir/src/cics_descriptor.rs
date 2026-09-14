@@ -129,6 +129,25 @@ const QUEUE_WRITE_EFFECTS: &[Effect] = &[
     Effect::Condition,
     Effect::Transaction,
 ];
+const TERMINAL_RECEIVE_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::TerminalRead,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Suspension,
+    Effect::Condition,
+    Effect::Transaction,
+];
+const TERMINAL_SEND_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::TerminalWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+    Effect::Transaction,
+];
 
 /// Static executable facts owned by the typed CICS dialect.
 ///
@@ -479,7 +498,7 @@ pub fn cics_application_registry_for_runtime_operation(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 29] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 32] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -712,6 +731,30 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 29] = [
         effects: QUEUE_WRITE_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::ReceiveMap,
+        namespace: "cics.terminal",
+        name: "receive-map",
+        major: 1,
+        effects: TERMINAL_RECEIVE_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::SendMap,
+        namespace: "cics.terminal",
+        name: "send-map",
+        major: 1,
+        effects: TERMINAL_SEND_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::SendText,
+        namespace: "cics.terminal",
+        name: "send-text",
+        major: 1,
+        effects: TERMINAL_SEND_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
 ];
 
 /// Resolves the executable descriptor for a decoded CICS plan operation.
@@ -749,6 +792,9 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::Delete => &CICS_EXECUTABLE_DESCRIPTORS[26],
         CicsPlanOperation::Write => &CICS_EXECUTABLE_DESCRIPTORS[27],
         CicsPlanOperation::WriteTransientData => &CICS_EXECUTABLE_DESCRIPTORS[28],
+        CicsPlanOperation::ReceiveMap => &CICS_EXECUTABLE_DESCRIPTORS[29],
+        CicsPlanOperation::SendMap => &CICS_EXECUTABLE_DESCRIPTORS[30],
+        CicsPlanOperation::SendText => &CICS_EXECUTABLE_DESCRIPTORS[31],
     }
 }
 
@@ -809,7 +855,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 29);
+        assert_eq!(typed.len(), 32);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -819,7 +865,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 5);
+        assert_eq!(legacy.len(), 2);
         assert!(legacy.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && !descriptor.legacy_execution_options.is_empty()));
@@ -1015,6 +1061,9 @@ mod tests {
                 CicsPlanOperation::Delete,
                 CicsPlanOperation::Write,
                 CicsPlanOperation::WriteTransientData,
+                CicsPlanOperation::ReceiveMap,
+                CicsPlanOperation::SendMap,
+                CicsPlanOperation::SendText,
                 CicsPlanOperation::PopHandle,
                 CicsPlanOperation::PushHandle,
                 CicsPlanOperation::Read,

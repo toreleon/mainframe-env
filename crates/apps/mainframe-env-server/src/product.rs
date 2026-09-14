@@ -9792,7 +9792,7 @@ mod tests {
             )
             .replace(
                 "PROCEDURE DIVISION.\nEXEC CICS CHANGE TASK",
-                "PROCEDURE DIVISION.\nEXEC CICS SEND MAP('SCHEDULE') MAPSET('SCHEDULE') END-EXEC.\nEXEC CICS CHANGE TASK",
+                "PROCEDURE DIVISION.\nEXEC CICS SEND MAP('SCHEDUL') MAPSET('SCHEDUL') END-EXEC.\nEXEC CICS CHANGE TASK",
             )
             .replace(
                 "HILIGHT(CAPABILITY-X) RESP(RESP-X)",
@@ -9845,8 +9845,8 @@ mod tests {
                 }],
                 transactions: BTreeMap::from([("SC00".into(), "SCHEDULE".into())]),
                 maps: vec![BmsMapDefinition {
-                    mapset: "SCHEDULE".into(),
-                    map: "SCHEDULE".into(),
+                    mapset: "SCHEDUL".into(),
+                    map: "SCHEDUL".into(),
                     line: 3,
                     column: 4,
                     rows: 10,

@@ -9771,7 +9771,14 @@ mod tests {
                 12,
             )
             .unwrap();
-        let mut receive = request(CicsOperation::ReceiveMap, BTreeMap::new(), 2);
+        let mut receive = request(
+            CicsOperation::ReceiveMap,
+            BTreeMap::from([
+                ("MAPSET".into(), argument(b"COSGN00")),
+                ("MAP".into(), argument(b"COSGN0A")),
+            ]),
+            2,
+        );
         receive.mutation.as_mut().unwrap().transaction = Some("CC00".into());
         let input = initial
             .invoke(

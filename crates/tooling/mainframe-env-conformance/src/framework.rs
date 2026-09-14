@@ -2264,6 +2264,115 @@ mod tests {
     }
 
     #[test]
+    fn cics_bms_subset_uses_typed_map_text_and_receive_bindings() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBMS. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUT-X PIC X(4) VALUE 'DATA'. 01 IN-X PIC X(5). PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') MAPSET('MAIN') FROM(OUT-X) END-EXEC. EXEC CICS RECEIVE MAP('MENU') MAPSET('MAIN') INTO(IN-X) END-EXEC. EXEC CICS SEND TEXT FROM(OUT-X) END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let response = |bytes: &[u8]| CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0x7d,
+            target: None,
+            next_transaction: None,
+            payload: mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                bytes.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            outputs: BTreeMap::new(),
+            unit_of_work: None,
+        };
+
+        let MachineDrive::HostCall(send_map) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("SEND MAP did not call host");
+        };
+        assert!(matches!(
+            &send_map.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::SendMap,
+                arguments,
+                mutation: Some(_),
+                ..
+            }) if arguments["MAP"].bytes() == b"MENU"
+                && arguments["MAPSET"].bytes() == b"MAIN"
+                && arguments["FROM"].bytes() == b"DATA"
+        ));
+
+        let MachineDrive::HostCall(receive_map) = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: send_map.sequence,
+                outcome: Ok(HostResult::Cics(response(b""))),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        ) else {
+            panic!("RECEIVE MAP did not call host");
+        };
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x18, 0x04]);
+        assert!(matches!(
+            &receive_map.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::ReceiveMap,
+                arguments,
+                mutation: Some(_),
+                ..
+            }) if arguments["MAP"].bytes() == b"MENU"
+                && arguments["MAPSET"].bytes() == b"MAIN"
+                && arguments["INTO"].bytes() == b"IN-X"
+        ));
+
+        let MachineDrive::HostCall(send_text) = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: receive_map.sequence,
+                outcome: Ok(HostResult::Cics(response(b"INPUT"))),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        ) else {
+            panic!("SEND TEXT did not call host");
+        };
+        assert_eq!(machine.variable("IN-X").unwrap().bytes(), b"INPUT");
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x18, 0x02]);
+        assert!(matches!(
+            &send_text.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::SendText,
+                arguments,
+                mutation: Some(_),
+                ..
+            }) if arguments["FROM"].bytes() == b"DATA"
+        ));
+
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: send_text.sequence,
+                    outcome: Ok(HostResult::Cics(response(b""))),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x18, 0x06]);
+    }
+
+    #[test]
     fn cics_nested_subscript_operand_reads_selected_element() {
         use mainframe_env_host_api::{CicsOperation, HostRequest};
 

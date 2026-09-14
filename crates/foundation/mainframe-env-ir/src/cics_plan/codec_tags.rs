@@ -33,6 +33,9 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::Delete => 26,
         CicsPlanOperation::Write => 27,
         CicsPlanOperation::WriteTransientData => 28,
+        CicsPlanOperation::ReceiveMap => 29,
+        CicsPlanOperation::SendMap => 30,
+        CicsPlanOperation::SendText => 31,
     }
 }
 
@@ -67,6 +70,9 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         26 => Ok(CicsPlanOperation::Delete),
         27 => Ok(CicsPlanOperation::Write),
         28 => Ok(CicsPlanOperation::WriteTransientData),
+        29 => Ok(CicsPlanOperation::ReceiveMap),
+        30 => Ok(CicsPlanOperation::SendMap),
+        31 => Ok(CicsPlanOperation::SendText),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -97,6 +103,8 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::Commarea => 21,
         CicsOperandName::TransId => 22,
         CicsOperandName::Queue => 23,
+        CicsOperandName::Map => 24,
+        CicsOperandName::Mapset => 25,
     }
 }
 
@@ -126,6 +134,8 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         21 => Ok(CicsOperandName::Commarea),
         22 => Ok(CicsOperandName::TransId),
         23 => Ok(CicsOperandName::Queue),
+        24 => Ok(CicsOperandName::Map),
+        25 => Ok(CicsOperandName::Mapset),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

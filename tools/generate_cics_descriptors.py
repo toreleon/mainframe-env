@@ -373,6 +373,9 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Delete",
         "Write",
         "WriteTransientData",
+        "ReceiveMap",
+        "SendMap",
+        "SendText",
         "PopHandle",
         "PushHandle",
         "Read",
@@ -470,6 +473,22 @@ TYPED_RUNTIME_IR_EFFECTS = {
     ),
     "WriteTransientData": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "ReceiveMap": frozenset(
+        {
+            "memory-read",
+            "memory-write",
+            "terminal-read",
+            "suspension",
+            "condition",
+            "transaction",
+        }
+    ),
+    "SendMap": frozenset(
+        {"memory-read", "memory-write", "terminal-write", "condition", "transaction"}
+    ),
+    "SendText": frozenset(
+        {"memory-read", "memory-write", "terminal-write", "condition", "transaction"}
     ),
     "PopHandle": frozenset({"memory-write", "condition"}),
     "PushHandle": frozenset({"memory-write", "condition"}),
@@ -3513,8 +3532,8 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
     if (
         len(registry_rows) != 263
         or len(set(handler_ids)) != 263
-        or len(typed_rows) != 29
-        or len(legacy_rows) != 5
+        or len(typed_rows) != 32
+        or len(legacy_rows) != 2
         or {row["runtime_operation"] for row in typed_rows}
         != TYPED_RUNTIME_OPERATIONS
         or len(advertised_rows) != 34

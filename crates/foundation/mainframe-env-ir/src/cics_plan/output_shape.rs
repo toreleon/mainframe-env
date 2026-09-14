@@ -34,6 +34,11 @@ pub(super) const fn allowed(operation: CicsPlanOperation) -> &'static [CicsOutpu
             CicsOutputName::Resp,
             CicsOutputName::Resp2,
         ],
+        CicsPlanOperation::ReceiveMap => &[
+            CicsOutputName::Into,
+            CicsOutputName::Resp,
+            CicsOutputName::Resp2,
+        ],
         _ => &[CicsOutputName::Resp, CicsOutputName::Resp2],
     }
 }

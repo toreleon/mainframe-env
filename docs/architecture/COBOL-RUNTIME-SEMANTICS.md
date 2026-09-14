@@ -66,6 +66,17 @@ contract explicitly permits it.
   writes source-sized character date/time fields plus a fullword binary
   millisecond value. Typed provider output schemas are checked before any
   receiving field is accepted.
+- Typed CICS BMS plans admit a bounded local subset of `RECEIVE MAP`, `SEND MAP`,
+  and `SEND TEXT`. MAP is a required 1–7 character literal or alpha/alphanumeric
+  field for the two map commands; MAPSET is optional and defaults to MAP.
+  `SEND MAP` optionally captures FROM bytes, `RECEIVE MAP` optionally binds a
+  writable INTO area, and `SEND TEXT` requires captured FROM bytes. The provider
+  checks the requested durable map definition, makes a successfully sent map
+  current, and normalizes received named fields against that exact definition.
+  The selected typed route reports EIBFN `1802`, `1804`, or `1806` respectively.
+  SET pointers, omitted-MAP/AID-only receive, implicit symbolic map storage,
+  explicit length, paging, device and remaining terminal-control options are
+  rejected before executable publication.
 - The bounded legacy CICS `ASSIGN` route returns APPLID, SYSID, USERID, and the
   current TASKPRIORITY from owned invocation context. Because no CICS
   application, platform, operation, version, or channel context is currently

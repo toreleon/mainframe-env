@@ -1,7 +1,7 @@
 use super::super::{
-    CicsService, Run, argument_bytes, argument_text, bounded, decimal_payload, decode_map_payload,
-    encode_symbolic_map_output, field, normalize_bms_input, symbolic_map_modified,
-    symbolic_map_protection, symbolic_map_values,
+    CicsService, Run, argument_bytes, argument_optional, argument_text, bounded, decimal_payload,
+    decode_map_payload, encode_symbolic_map_output, field, normalize_bms_input,
+    symbolic_map_modified, symbolic_map_protection, symbolic_map_values,
 };
 use super::bms_map::map_fits_terminal;
 use mainframe_env_host_api::{
@@ -28,7 +28,7 @@ pub(in crate::service) fn invoke(
 ) -> Result<CicsResponse, HostProblem> {
     match request.operation {
         CicsOperation::SendMap | CicsOperation::SendText => send(service, run, request),
-        CicsOperation::ReceiveMap => receive(service, run),
+        CicsOperation::ReceiveMap => receive(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }
@@ -38,6 +38,9 @@ fn send(
     run: &Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
+    let map_names = (request.operation == CicsOperation::SendMap)
+        .then(|| map_names(request))
+        .transpose()?;
     let mut state = service.lock()?;
     let mut payload = argument_bytes(request, "FROM")
         .or_else(|| argument_bytes(request, "DATA"))
@@ -46,11 +49,10 @@ fn send(
     let mut field_modified = None;
     let mut field_values = None;
     if request.operation == CicsOperation::SendMap {
-        let mapset = argument_text(request, "MAPSET")?;
-        let map = argument_text(request, "MAP")?;
+        let (mapset, map) = map_names.as_ref().expect("SEND MAP names");
         let definition = state
             .maps
-            .get(&(mapset.to_ascii_uppercase(), map.to_ascii_uppercase()))
+            .get(&(mapset.clone(), map.clone()))
             .ok_or(HostProblem::NotFound)?;
         field_protection = Some(symbolic_map_protection(definition, &payload));
         field_modified = Some(symbolic_map_modified(definition, &payload));
@@ -85,11 +87,10 @@ fn send(
         .ok_or(HostProblem::NotFound)?;
     let mut next = current.clone();
     if request.operation == CicsOperation::SendMap {
-        let mapset = argument_text(request, "MAPSET")?.to_ascii_uppercase();
-        let map = argument_text(request, "MAP")?.to_ascii_uppercase();
+        let (mapset, map) = map_names.as_ref().expect("SEND MAP names");
         let definition = state
             .maps
-            .get(&(mapset, map))
+            .get(&(mapset.clone(), map.clone()))
             .ok_or(HostProblem::NotFound)?;
         if !map_fits_terminal(&current, definition) {
             return Err(HostProblem::Condition {
@@ -102,8 +103,9 @@ fn send(
     next.version += 1;
     next.screen = payload.clone();
     if request.operation == CicsOperation::SendMap {
-        next.mapset = Some(argument_text(request, "MAPSET")?.to_ascii_uppercase());
-        next.map = Some(argument_text(request, "MAP")?.to_ascii_uppercase());
+        let (mapset, map) = map_names.expect("SEND MAP names");
+        next.mapset = Some(mapset);
+        next.map = Some(map);
         next.field_protection = field_protection.unwrap_or_default();
         next.field_modified = field_modified.unwrap_or_default();
         next.field_values = field_values.unwrap_or_default();
@@ -122,13 +124,39 @@ fn send(
     )
 }
 
-fn receive(service: &CicsService, run: &Run) -> Result<CicsResponse, HostProblem> {
+fn receive(
+    service: &CicsService,
+    run: &Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
     let mut state = service.lock()?;
     let current = state
         .sessions
         .get(&run.session)
         .cloned()
         .ok_or(HostProblem::NotFound)?;
+    let requested_names = if request.arguments.contains_key("MAP") {
+        Some(map_names(request)?)
+    } else {
+        current.mapset.clone().zip(current.map.clone())
+    };
+    let definition = requested_names
+        .as_ref()
+        .and_then(|names| state.maps.get(names))
+        .cloned();
+    if requested_names.is_some() && definition.is_none() {
+        return Err(HostProblem::NotFound);
+    }
+    if definition
+        .as_ref()
+        .is_some_and(|definition| !map_fits_terminal(&current, definition))
+    {
+        return Err(HostProblem::Condition {
+            name: "INVMPSZ".into(),
+            response: 38,
+            response2: 0,
+        });
+    }
     let mut next = current.clone();
     next.version += 1;
     let (disposition, target, payload, fields) = if let Some(input) = next.input.take() {
@@ -159,13 +187,11 @@ fn receive(service: &CicsService, run: &Run) -> Result<CicsResponse, HostProblem
     response.aid = current.aid;
     for (name, value) in fields {
         let input_length = value.len();
-        let value = current
-            .mapset
+        let value = definition
             .as_ref()
-            .zip(current.map.as_ref())
-            .and_then(|(mapset, map)| state.maps.get(&(mapset.clone(), map.clone())))
-            .and_then(|map| {
-                map.fields
+            .and_then(|definition| {
+                definition
+                    .fields
                     .iter()
                     .find(|field| field.name.eq_ignore_ascii_case(&name))
             })
@@ -181,6 +207,20 @@ fn receive(service: &CicsService, run: &Run) -> Result<CicsResponse, HostProblem
         );
     }
     Ok(response)
+}
+
+fn map_names(request: &CicsRequest) -> Result<(String, String), HostProblem> {
+    let map = argument_text(request, "MAP")?.trim().to_ascii_uppercase();
+    let mapset = argument_optional(request, "MAPSET")
+        .unwrap_or_else(|| map.clone())
+        .trim()
+        .to_ascii_uppercase();
+    if [&map, &mapset].iter().any(|name| {
+        name.is_empty() || name.len() > 7 || !name.bytes().all(|byte| byte.is_ascii_alphanumeric())
+    }) {
+        return Err(HostProblem::Malformed);
+    }
+    Ok((mapset, map))
 }
 
 fn aid_handler_target(handlers: &BTreeMap<String, String>, aid: u8) -> Option<String> {

@@ -168,6 +168,9 @@ pub enum HirCicsOperation {
     Delete,
     Write,
     WriteTransientData,
+    ReceiveMap,
+    SendMap,
+    SendText,
     PopHandle,
     PushHandle,
     Read,
@@ -189,6 +192,8 @@ pub enum HirCicsOperandName {
     From,
     Ridfld,
     Queue,
+    Map,
+    Mapset,
     Resource,
     Length,
     MaxLifetime,
@@ -2551,6 +2556,98 @@ mod tests {
     }
 
     #[test]
+    fn cics_bms_subset_resolves_explicit_maps_and_storage_areas() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBMS. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUT-X PIC X(4) VALUE 'DATA'. 01 IN-X PIC X(8). PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') MAPSET('MAIN') FROM(OUT-X) END-EXEC. EXEC CICS RECEIVE MAP('MENU') MAPSET('MAIN') INTO(IN-X) END-EXEC. EXEC CICS SEND TEXT FROM(OUT-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("BMS: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            commands
+                .iter()
+                .map(|command| command.operation)
+                .collect::<Vec<_>>(),
+            [
+                HirCicsOperation::SendMap,
+                HirCicsOperation::ReceiveMap,
+                HirCicsOperation::SendText,
+            ]
+        );
+        for command in &commands[..2] {
+            assert!(command.operands.iter().any(|operand| {
+                operand.name == HirCicsOperandName::Map
+                    && operand.value == HirCicsValue::Literal("MENU".into())
+            }));
+            assert!(command.operands.iter().any(|operand| {
+                operand.name == HirCicsOperandName::Mapset
+                    && operand.value == HirCicsValue::Literal("MAIN".into())
+            }));
+        }
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::From
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference) if reference.qualified_name == "OUT-X"
+                )
+        }));
+        assert!(commands[1].outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::Into && output.target.qualified_name == "IN-X"
+        }));
+        assert!(commands[2].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::From
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference) if reference.qualified_name == "OUT-X"
+                )
+        }));
+
+        let defaults = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BMSDEF. PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') END-EXEC. EXEC CICS RECEIVE MAP('MENU') END-EXEC.",
+        );
+        assert!(defaults.hir.is_some(), "{:?}", defaults.diagnostics);
+
+        for (command, expected) in [
+            (
+                "SEND MAPSET('MAIN')",
+                "missing a required command discriminator",
+            ),
+            (
+                "RECEIVE MAPSET('MAIN')",
+                "missing a required command discriminator",
+            ),
+            ("SEND TEXT", "requires FROM"),
+            (
+                "SEND MAP('TOOLONG8') MAPSET('MAIN')",
+                "MAP requires a 1-7 character name",
+            ),
+            ("SEND TEXT FROM('DATA')", "FROM requires a data area"),
+            ("SEND MAP('MENU') ERASE", "unready for ERASE"),
+            ("RECEIVE MAP('MENU') SET(PTR-X)", "unready for SET"),
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADBMS. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
+    #[test]
     fn cics_shared_heads_resolve_with_valued_discriminators() {
         for (command, expected_label) in [
             ("ACQUIRE ACTIVITYID('A1')", "ACQUIRE ACTIVITYID"),
@@ -2827,7 +2924,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 5);
+        assert_eq!(legacy.len(), 2);
         assert!(
             legacy.iter().all(|descriptor| {
                 descriptor.advertised && descriptor.runtime_operation.is_some()
@@ -2851,6 +2948,9 @@ mod tests {
                     | ["DELETE"]
                     | ["WRITE", "FILE"]
                     | ["WRITEQ", "TD"]
+                    | ["RECEIVE", "MAP"]
+                    | ["SEND", "MAP"]
+                    | ["SEND", "TEXT"]
                     | ["READ"]
                     | ["REWRITE"]
                     | ["SYNCPOINT"]
@@ -2941,28 +3041,6 @@ mod tests {
             let message = diagnostic.public_message();
             message.contains("INQUIRE ACTIVITYID") && message.contains("handler is unready")
         }));
-    }
-
-    #[test]
-    fn existing_legacy_cics_label_tail_clauses_are_not_consumed_as_command_words() {
-        for command in [
-            "SEND MAP('MENU') MAPSET('MAIN')",
-            "RECEIVE MAP('MENU') MAPSET('MAIN')",
-        ] {
-            let source = format!(
-                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTAIL. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
-            );
-            let analysis = analyze(&source);
-            let hir = analysis
-                .hir
-                .unwrap_or_else(|| panic!("{command}: {:?}", analysis.diagnostics));
-            let statement = hir
-                .statements
-                .iter()
-                .find(|statement| statement.kind == StatementKind::ExecCics)
-                .expect("EXEC CICS statement");
-            assert!(statement.resolved.is_none(), "{command}");
-        }
     }
 
     #[test]

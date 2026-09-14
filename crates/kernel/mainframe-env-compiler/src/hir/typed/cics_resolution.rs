@@ -21,10 +21,12 @@ mod assign_validation;
 mod file_operands;
 mod format_time;
 mod handle_abend;
+mod operation;
 mod output_bindings;
 mod program_control;
 mod program_name;
 mod queue_control;
+mod terminal_control;
 mod transaction_name;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -755,38 +757,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             )));
         }
     }
-    let operation = match descriptor.label_tokens {
-        ["ABEND"] => HirCicsOperation::Abend,
-        ["ADDRESS", "SET"] => HirCicsOperation::AddressSet,
-        ["ASKTIME", "ABSTIME"] => HirCicsOperation::Asktime,
-        ["ASKTIME"] => HirCicsOperation::AsktimeEib,
-        ["FORMATTIME"] => HirCicsOperation::FormatTime,
-        ["CHANGE", "TASK"] => HirCicsOperation::ChangeTask,
-        ["DEQ"] => HirCicsOperation::Deq,
-        ["ENQ"] => HirCicsOperation::Enq,
-        ["HANDLE", "ABEND"] => HirCicsOperation::HandleAbend,
-        ["HANDLE", "AID"] => HirCicsOperation::HandleAid,
-        ["HANDLE", "CONDITION"] => HirCicsOperation::HandleCondition,
-        ["IGNORE", "CONDITION"] => HirCicsOperation::IgnoreCondition,
-        ["LINK"] => HirCicsOperation::Link,
-        ["XCTL"] => HirCicsOperation::Xctl,
-        ["RETURN"] => HirCicsOperation::Return,
-        ["STARTBR"] => HirCicsOperation::StartBrowse,
-        ["READNEXT"] => HirCicsOperation::ReadNext,
-        ["READPREV"] => HirCicsOperation::ReadPrev,
-        ["ENDBR"] => HirCicsOperation::EndBrowse,
-        ["DELETE"] => HirCicsOperation::Delete,
-        ["WRITE", "FILE"] => HirCicsOperation::Write,
-        ["WRITEQ", "TD"] => HirCicsOperation::WriteTransientData,
-        ["POP", "HANDLE"] => HirCicsOperation::PopHandle,
-        ["PUSH", "HANDLE"] => HirCicsOperation::PushHandle,
-        ["READ"] => HirCicsOperation::Read,
-        ["REWRITE"] => HirCicsOperation::Rewrite,
-        ["SET", "ASSOCIATION", "USERCORRDATA"] => HirCicsOperation::SetAssociationUserCorrData,
-        ["SYNCPOINT"] => HirCicsOperation::Syncpoint,
-        ["SUSPEND"] => HirCicsOperation::Suspend,
-        _ => return Err(ResolutionFailure::Unsupported),
-    };
+    let operation = operation::resolve(descriptor)?;
     let allowed_clauses: &[&str] = match operation {
         HirCicsOperation::Abend => &["ABCODE", "RESP", "RESP2"],
         HirCicsOperation::AddressSet => &["SET", "USING", "RESP", "RESP2"],
@@ -828,6 +799,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Delete => &["FILE", "DATASET", "RIDFLD", "RESP", "RESP2"],
         HirCicsOperation::Write => &["FILE", "DATASET", "FROM", "RIDFLD", "RESP", "RESP2"],
         HirCicsOperation::WriteTransientData => &["QUEUE", "FROM", "LENGTH", "RESP", "RESP2"],
+        HirCicsOperation::ReceiveMap => &["MAP", "MAPSET", "INTO", "RESP", "RESP2"],
+        HirCicsOperation::SendMap => &["MAP", "MAPSET", "FROM", "RESP", "RESP2"],
+        HirCicsOperation::SendText => &["FROM", "RESP", "RESP2"],
         HirCicsOperation::Read => &["FILE", "DATASET", "RIDFLD", "INTO", "RESP", "RESP2"],
         HirCicsOperation::Rewrite => &["FILE", "DATASET", "FROM", "RESP", "RESP2"],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA", "RESP", "RESP2"],
@@ -855,6 +829,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::Delete
         | HirCicsOperation::Write
         | HirCicsOperation::WriteTransientData
+        | HirCicsOperation::ReceiveMap
+        | HirCicsOperation::SendMap
+        | HirCicsOperation::SendText
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle
         | HirCicsOperation::SetAssociationUserCorrData
@@ -900,6 +877,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     program_control::validate_constraints(operation, &clauses)?;
     file_operands::validate_constraints(&clauses, operation)?;
     queue_control::validate_constraints(&clauses, operation)?;
+    terminal_control::validate_constraints(&clauses, operation)?;
     for required in match operation {
         HirCicsOperation::AddressSet => &["SET", "USING"][..],
         HirCicsOperation::Asktime => &["ABSTIME"][..],
@@ -923,6 +901,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::Read
         | HirCicsOperation::Rewrite
         | HirCicsOperation::WriteTransientData
+        | HirCicsOperation::ReceiveMap
+        | HirCicsOperation::SendMap
+        | HirCicsOperation::SendText
         | HirCicsOperation::Suspend => &[][..],
         HirCicsOperation::Deq | HirCicsOperation::Enq => &["RESOURCE"][..],
         HirCicsOperation::Link | HirCicsOperation::Xctl => &["PROGRAM"][..],
@@ -1037,6 +1018,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     }
     operands.extend(file_operands::resolve(&clauses, operation, semantic)?);
     operands.extend(queue_control::operands(&clauses, operation, semantic)?);
+    operands.extend(terminal_control::operands(&clauses, operation, semantic)?);
     if matches!(operation, HirCicsOperation::Deq | HirCicsOperation::Enq) {
         let resource = complete_data_reference(&clauses["RESOURCE"], semantic)?;
         operands.push(HirCicsNamedOperand {
