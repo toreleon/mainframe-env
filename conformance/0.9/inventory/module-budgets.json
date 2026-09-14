@@ -114,7 +114,7 @@
     },
     {
       "path": "crates/providers/mainframe-env-cics/src/service.rs",
-      "max_production_lines": 3739,
+      "max_production_lines": 3718,
       "responsibility": "The CICS pilot service owns session, BMS, file, queue, program, and unit-of-work semantics and persistence.",
       "split_boundary": "Freeze this pilot and route future catalog descriptors through generated modules and semantics through handler-family modules."
     },
@@ -198,7 +198,7 @@
     },
     {
       "path": "crates/tooling/mainframe-env-conformance/src/carddemo.rs",
-      "max_production_lines": 14183,
+      "max_production_lines": 14017,
       "responsibility": "CardDemo conformance provisions the full fixture, drives online and batch journeys, and checks persistence and failures.",
       "split_boundary": "Separate fixture provisioning, online transactions, batch jobs, authorization, and durability/failure scenario families."
     },
@@ -282,6 +282,7 @@
     "descriptor_directory": "crates/providers/mainframe-env-cics/src/generated",
     "handler_directory": "crates/providers/mainframe-env-cics/src/handlers",
     "handler_modules": [
+      "crates/providers/mainframe-env-cics/src/handlers/bms_map.rs",
       "crates/providers/mainframe-env-cics/src/handlers/condition.rs",
       "crates/providers/mainframe-env-cics/src/handlers/file_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/handle_state.rs",

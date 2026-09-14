@@ -9650,6 +9650,8 @@ mod tests {
                 maps: vec![BmsMapDefinition {
                     mapset: "ONLINE".into(),
                     map: "ONLINE".into(),
+                    line: 1,
+                    column: 1,
                     rows: 24,
                     columns: 80,
                     fields: vec![mainframe_env_cics::BmsFieldDefinition {
@@ -9752,7 +9754,7 @@ mod tests {
             )
             .replace(
                 "01 LINK-LEVEL-X PIC S9(4) COMP.",
-                "01 LINK-LEVEL-X PIC S9(4) COMP.\n01 MAP-HEIGHT-X PIC S9(4) COMP VALUE 1.\n01 MAP-WIDTH-X PIC S9(4) COMP VALUE 1.",
+                "01 LINK-LEVEL-X PIC S9(4) COMP.\n01 MAP-COLUMN-X PIC S9(4) COMP VALUE 1.\n01 MAP-HEIGHT-X PIC S9(4) COMP VALUE 1.\n01 MAP-LINE-X PIC S9(4) COMP VALUE 1.\n01 MAP-WIDTH-X PIC S9(4) COMP VALUE 1.",
             )
             .replace(
                 "PROCEDURE DIVISION.\nEXEC CICS CHANGE TASK",
@@ -9760,7 +9762,7 @@ mod tests {
             )
             .replace(
                 "HILIGHT(CAPABILITY-X) RESP(RESP-X)",
-                "HILIGHT(CAPABILITY-X) MAPHEIGHT(MAP-HEIGHT-X) MAPWIDTH(MAP-WIDTH-X) RESP(RESP-X)",
+                "HILIGHT(CAPABILITY-X) MAPCOLUMN(MAP-COLUMN-X) MAPHEIGHT(MAP-HEIGHT-X) MAPLINE(MAP-LINE-X) MAPWIDTH(MAP-WIDTH-X) RESP(RESP-X)",
             );
         let path = LogicalPath::new("SCHEDULE.cbl", limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
@@ -9811,8 +9813,10 @@ mod tests {
                 maps: vec![BmsMapDefinition {
                     mapset: "SCHEDULE".into(),
                     map: "SCHEDULE".into(),
-                    rows: 24,
-                    columns: 80,
+                    line: 3,
+                    column: 4,
+                    rows: 10,
+                    columns: 20,
                     fields: Vec::new(),
                 }],
             })
@@ -9978,8 +9982,10 @@ mod tests {
             &[0; 2]
         );
         assert_eq!(restored.variable("LINK-LEVEL-X").unwrap().bytes(), &[0, 1]);
-        assert_eq!(restored.variable("MAP-HEIGHT-X").unwrap().bytes(), &[0, 24]);
-        assert_eq!(restored.variable("MAP-WIDTH-X").unwrap().bytes(), &[0, 80]);
+        assert_eq!(restored.variable("MAP-COLUMN-X").unwrap().bytes(), &[0, 4]);
+        assert_eq!(restored.variable("MAP-HEIGHT-X").unwrap().bytes(), &[0, 10]);
+        assert_eq!(restored.variable("MAP-LINE-X").unwrap().bytes(), &[0, 3]);
+        assert_eq!(restored.variable("MAP-WIDTH-X").unwrap().bytes(), &[0, 20]);
         assert_eq!(restored.variable("MAJOR-X").unwrap().bytes(), &[0xff; 4]);
         assert_eq!(restored.variable("MICRO-X").unwrap().bytes(), &[0xff; 4]);
         assert_eq!(restored.variable("MINOR-X").unwrap().bytes(), &[0xff; 4]);
@@ -10114,6 +10120,8 @@ mod tests {
                 maps: vec![BmsMapDefinition {
                     mapset: "ASSOC".into(),
                     map: "ASSOC".into(),
+                    line: 1,
+                    column: 1,
                     rows: 24,
                     columns: 80,
                     fields: Vec::new(),
@@ -10249,6 +10257,8 @@ mod tests {
                 maps: vec![BmsMapDefinition {
                     mapset: "ADDRSET".into(),
                     map: "ADDRSET".into(),
+                    line: 1,
+                    column: 1,
                     rows: 24,
                     columns: 80,
                     fields: Vec::new(),
@@ -10385,6 +10395,8 @@ mod tests {
                 maps: vec![BmsMapDefinition {
                     mapset: "HABRESET".into(),
                     map: "HABRESET".into(),
+                    line: 1,
+                    column: 1,
                     rows: 24,
                     columns: 80,
                     fields: Vec::new(),
@@ -10564,6 +10576,8 @@ mod tests {
                 maps: vec![BmsMapDefinition {
                     mapset: "HABPROG".into(),
                     map: "HABPROG".into(),
+                    line: 1,
+                    column: 1,
                     rows: 24,
                     columns: 80,
                     fields: Vec::new(),
@@ -10792,6 +10806,8 @@ mod tests {
                 maps: vec![BmsMapDefinition {
                     mapset: "HSTACK".into(),
                     map: "HSTACK".into(),
+                    line: 1,
+                    column: 1,
                     rows: 24,
                     columns: 80,
                     fields: Vec::new(),
@@ -10926,6 +10942,8 @@ mod tests {
                 maps: vec![BmsMapDefinition {
                     mapset: "IGNCOND".into(),
                     map: "IGNCOND".into(),
+                    line: 1,
+                    column: 1,
                     rows: 24,
                     columns: 80,
                     fields: Vec::new(),
@@ -11064,6 +11082,8 @@ mod tests {
                 maps: vec![BmsMapDefinition {
                     mapset: "HCOND".into(),
                     map: "HCOND".into(),
+                    line: 1,
+                    column: 1,
                     rows: 24,
                     columns: 80,
                     fields: Vec::new(),
@@ -11207,6 +11227,8 @@ mod tests {
                 maps: vec![BmsMapDefinition {
                     mapset: "HAID".into(),
                     map: "HAID".into(),
+                    line: 1,
+                    column: 1,
                     rows: 24,
                     columns: 80,
                     fields: Vec::new(),
@@ -11339,6 +11361,8 @@ mod tests {
                 maps: vec![BmsMapDefinition {
                     mapset: "HARES".into(),
                     map: "HARES".into(),
+                    line: 1,
+                    column: 1,
                     rows: 24,
                     columns: 80,
                     fields: Vec::new(),
@@ -11487,6 +11511,8 @@ mod tests {
                 maps: vec![BmsMapDefinition {
                     mapset: "WAITENQ".into(),
                     map: "WAITENQ".into(),
+                    line: 1,
+                    column: 1,
                     rows: 24,
                     columns: 80,
                     fields: vec![mainframe_env_cics::BmsFieldDefinition {
@@ -11818,6 +11844,8 @@ mod tests {
                 maps: vec![BmsMapDefinition {
                     mapset: "PSEUDO".into(),
                     map: "PSEUDO".into(),
+                    line: 1,
+                    column: 1,
                     rows: 24,
                     columns: 80,
                     fields: vec![mainframe_env_cics::BmsFieldDefinition {
@@ -12217,6 +12245,8 @@ mod tests {
                 maps: vec![BmsMapDefinition {
                     mapset: "RECOVER".into(),
                     map: "RECOVER".into(),
+                    line: 1,
+                    column: 1,
                     rows: 24,
                     columns: 80,
                     fields: Vec::new(),

@@ -38,6 +38,17 @@
       "coverage_credit": 0
     },
     {
+      "scope_id": "cics-bms-map-origin",
+      "subsystem": "cics",
+      "baseline_id": "ibm-cics-ts-6x-bms-map-origin-2026-09-14",
+      "manifest": "conformance/0.9/manifests/cics-bms-map-origin-topics.json",
+      "manifest_sha256": "sha256:d74e469a45f1b6baef4add13cdf7941eca2f0615921aa9ab416e76ce675237af",
+      "topic_count": 2,
+      "topic_manifest_sha256": "sha256:a848e11cb75baf44edbff10234516207756ec2d17beab3619cddf8ec413003cc",
+      "semantic_authority": false,
+      "coverage_credit": 0
+    },
+    {
       "scope_id": "cics-file-uow-pilot",
       "subsystem": "cics",
       "baseline_id": "ibm-cics-ts-6x-file-uow-pilot-2026-09-08",

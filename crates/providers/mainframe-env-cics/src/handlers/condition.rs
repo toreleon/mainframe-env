@@ -1,4 +1,5 @@
 use super::super::{CicsService, Run};
+use crate::generated::CICS_CONDITION_NAMES;
 use mainframe_env_host_api::{CicsConditionPolicy, CicsDisposition, CicsResponse, HostProblem};
 
 pub(crate) fn respond(
@@ -96,20 +97,9 @@ fn condition_for(problem: &HostProblem) -> (&'static str, i32, i32) {
 }
 
 fn condition_name(name: &str) -> &'static str {
-    match name {
-        "DUPREC" => "DUPREC",
-        "INVREQ" => "INVREQ",
-        "LENGERR" => "LENGERR",
-        "ENDFILE" => "ENDFILE",
-        "ENQBUSY" => "ENQBUSY",
-        "PGMIDERR" => "PGMIDERR",
-        "NOTAUTH" => "NOTAUTH",
-        "NOTFND" => "NOTFND",
-        "NOTOPEN" => "NOTOPEN",
-        "IOERR" => "IOERR",
-        "LOCKED" => "LOCKED",
-        "RECORDBUSY" => "RECORDBUSY",
-        "ROLLEDBACK" => "ROLLEDBACK",
-        _ => "ERROR",
-    }
+    CICS_CONDITION_NAMES
+        .iter()
+        .copied()
+        .find(|candidate| *candidate == name)
+        .unwrap_or("ERROR")
 }

@@ -3,6 +3,7 @@ use super::super::{
     encode_symbolic_map_output, field, normalize_bms_input, symbolic_map_modified,
     symbolic_map_protection, symbolic_map_values,
 };
+use super::bms_map::map_fits_terminal;
 use mainframe_env_host_api::{
     CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
 };
@@ -83,6 +84,21 @@ fn send(
         .cloned()
         .ok_or(HostProblem::NotFound)?;
     let mut next = current.clone();
+    if request.operation == CicsOperation::SendMap {
+        let mapset = argument_text(request, "MAPSET")?.to_ascii_uppercase();
+        let map = argument_text(request, "MAP")?.to_ascii_uppercase();
+        let definition = state
+            .maps
+            .get(&(mapset, map))
+            .ok_or(HostProblem::NotFound)?;
+        if !map_fits_terminal(&current, definition) {
+            return Err(HostProblem::Condition {
+                name: "INVMPSZ".into(),
+                response: 38,
+                response2: 0,
+            });
+        }
+    }
     next.version += 1;
     next.screen = payload.clone();
     if request.operation == CicsOperation::SendMap {

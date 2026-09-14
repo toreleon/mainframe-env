@@ -791,7 +791,7 @@
       "web-control": 14,
       "web-service-control": 8
     },
-    "registry_sha256": "sha256:053795fc9934a0b50e46270a936585aee9e15165bf695d7425b7e0f159143ea8"
+    "registry_sha256": "sha256:e765bb086e3526efdb8e4bee31fa5d3b82d2c6fe2aab84e4a285fa6c4a7eb7bd"
   },
   "counts": {
     "batches": 3,
@@ -25038,7 +25038,9 @@
                 "KATAKANA",
                 "LINKLEVEL",
                 "MAJORVERSION",
+                "MAPCOLUMN",
                 "MAPHEIGHT",
+                "MAPLINE",
                 "MAPWIDTH",
                 "MICROVERSION",
                 "MINORVERSION",
@@ -25077,10 +25079,10 @@
                 "VALIDATION"
               ],
               "unready_result": null,
-              "handler_sha256": "sha256:f37fa8e143638b9985cdc5f834e6ec01ee9dade1898615e5c7400c7f7006351d"
+              "handler_sha256": "sha256:597f0079b9bffbe45887ecbf24998e215b8af2178862855f928d0081070b3ea4"
             }
           },
-          "row_contract_sha256": "sha256:6b354a3fad8375540495986bf58fa1eef4421685b2d5afecf77b5074d5096054"
+          "row_contract_sha256": "sha256:8aabc1ead58a6bb3bed405cd7f7b9ca967b58102eafe6e16d1c8348737c1c030"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0012",
@@ -446881,5 +446883,5 @@
       ]
     }
   ],
-  "contract_sha256": "sha256:15a1f67052c557e3f4a1db987a690474959dc9c36025a039c6d2af52f74f30e2"
+  "contract_sha256": "sha256:524c49bc0c1968c7067265b1bf7f0312cef2aa5357ed4ada001a9bf090362a3d"
 }

@@ -99,6 +99,12 @@ contract explicitly permits it.
   PARTNSET returns six blanks for an owned terminal with no application
   partition set; nonterminal and DPL contexts follow the screen-option INVREQ
   rules.
+  MAPCOLUMN/MAPLINE and MAPHEIGHT/MAPWIDTH come from the durable definition of
+  the map most recently positioned by SEND MAP. `MECM6` persists its numeric
+  DFHMDI origin, while `MECM1`–`MECM5` retain their historical top-left origin.
+  A terminal task with no positioned map receives `INVREQ` 16/2; DPL receives
+  16/200. SEND MAP rejects a definition that exceeds the terminal with
+  source-named `INVMPSZ` 38 before session mutation.
   The virtual terminal's data-stream contract is 3270, not basic SCS, so
   DS3270 and DSSCS return `X'FF'` and `X'00'` respectively when it is attached.
   Optional keyboard, display, print, partition, symbol, DBCS, reader, and
@@ -119,6 +125,12 @@ contract explicitly permits it.
   DESTID and DESTIDLENG are negative-only until a BDI path exists: local calls
   return `INVREQ` 16/3 and DPL calls return `INVREQ` 16/200 without changing
   their eight-byte and halfword output areas.
+  PRINSYSID is negative-only until an MRO, LU6.1, or APPC principal facility
+  exists; local and DPL calls return `INVREQ` 16/5 without changing its
+  four-byte output area.
+  Handler-supplied condition names are admitted only through the generated CICS
+  condition catalog, preserving names such as INVMPSZ without accepting
+  arbitrary provider text.
   Other source-valid ASSIGN options remain rejected until their terminal,
   program-level, or failure context has an owned runtime representation.
 - Terminal execution outcomes carry an explicit transaction-dump disposition.

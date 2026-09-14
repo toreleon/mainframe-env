@@ -55,7 +55,9 @@ pub(super) fn validate(
         "KATAKANA",
         "LINKLEVEL",
         "MAJORVERSION",
+        "MAPCOLUMN",
         "MAPHEIGHT",
+        "MAPLINE",
         "MAPWIDTH",
         "MICROVERSION",
         "MINORVERSION",
@@ -122,7 +124,9 @@ pub(super) fn validate(
                 | "ERRORMSGLEN"
                 | "INITPARMLEN"
                 | "LINKLEVEL"
+                | "MAPCOLUMN"
                 | "MAPHEIGHT"
+                | "MAPLINE"
                 | "MAPWIDTH"
                 | "SCRNHT"
                 | "SCRNWD"

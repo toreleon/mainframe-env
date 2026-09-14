@@ -8,6 +8,9 @@ use crate::retention::{
     UowRetentionMetadata,
 };
 pub use handlers::CicsEnqueueModelDefinition;
+use handlers::{
+    decode_terminal_address, encode_terminal_address, terminal_field_address, validate_map,
+};
 use mainframe_env_encoding::CodePage;
 use mainframe_env_execution_api::{
     BoundedPayload, CapabilityId, ExecutionId, IdempotencyKey, Invocation, InvocationLimits,
@@ -84,6 +87,10 @@ pub struct BmsFieldDefinition {
 pub struct BmsMapDefinition {
     pub mapset: String,
     pub map: String,
+    /// One-based terminal line at which the map is positioned.
+    pub line: u16,
+    /// One-based terminal column at which the map is positioned.
+    pub column: u16,
     pub rows: u16,
     pub columns: u16,
     pub fields: Vec<BmsFieldDefinition>,
@@ -2414,7 +2421,7 @@ fn encode_tn3270_screen(
     let mut fields = map.fields.iter().collect::<Vec<_>>();
     fields.sort_by_key(|field| (field.row, field.column, field.name.as_str()));
     for definition in fields {
-        let address = terminal_field_address(session, definition)?;
+        let address = terminal_field_address(session, map, definition)?;
         out.push(0x11);
         out.extend_from_slice(&encode_terminal_address(address)?);
         out.push(0x1d);
@@ -2465,7 +2472,7 @@ fn decode_tn3270_input(
         let definition = map
             .fields
             .iter()
-            .find(|field| terminal_field_address(session, field) == Ok(address))
+            .find(|field| terminal_field_address(session, map, field) == Ok(address))
             .ok_or(HostProblem::Malformed)?;
         let value = record[at..end].to_vec();
         if definition.protected
@@ -2480,32 +2487,6 @@ fn decode_tn3270_input(
         at = end;
     }
     Ok(fields)
-}
-
-fn terminal_field_address(
-    session: &Session,
-    field: &BmsFieldDefinition,
-) -> Result<u16, HostProblem> {
-    let row = field.row.checked_sub(1).ok_or(HostProblem::Malformed)?;
-    let column = field.column.checked_sub(1).ok_or(HostProblem::Malformed)?;
-    row.checked_mul(session.columns)
-        .and_then(|value| value.checked_add(column))
-        .filter(|value| *value < session.rows.saturating_mul(session.columns))
-        .ok_or(HostProblem::Malformed)
-}
-
-fn encode_terminal_address(address: u16) -> Result<[u8; 2], HostProblem> {
-    if address > 0x3fff {
-        return Err(HostProblem::ResourceExhausted);
-    }
-    Ok([(address >> 8) as u8, address as u8])
-}
-
-fn decode_terminal_address(first: u8, second: u8) -> Result<u16, HostProblem> {
-    if first & 0xc0 != 0 {
-        return Err(HostProblem::Unsupported);
-    }
-    Ok((u16::from(first) << 8) | u16::from(second))
 }
 
 fn decode_map_payload(
@@ -2527,30 +2508,6 @@ fn decode_map_payload(
         }
     }
     Ok(fields)
-}
-
-fn validate_map(map: &BmsMapDefinition, limits: CicsLimits) -> Result<(), HostProblem> {
-    if map.mapset.is_empty()
-        || map.map.is_empty()
-        || map.rows == 0
-        || map.columns == 0
-        || map.fields.len() > limits.max_fields
-    {
-        return Err(HostProblem::Malformed);
-    }
-    for field in &map.fields {
-        if field.name.is_empty()
-            || field.length == 0
-            || field.row == 0
-            || field.column == 0
-            || field.row > map.rows
-            || field.column > map.columns
-            || field.initial.len() > usize::from(field.length)
-        {
-            return Err(HostProblem::Malformed);
-        }
-    }
-    Ok(())
 }
 
 fn argument_bytes(request: &CicsRequest, name: &str) -> Option<Vec<u8>> {
@@ -2902,9 +2859,11 @@ fn decode_dataset_bytes(ccsid: Option<u16>, bytes: &[u8]) -> Result<Vec<u8>, Hos
 }
 
 fn encode_map(map: &BmsMapDefinition) -> Result<Vec<u8>, HostProblem> {
-    let mut out = b"MECM5".to_vec();
+    let mut out = b"MECM6".to_vec();
     field(&mut out, map.mapset.as_bytes())?;
     field(&mut out, map.map.as_bytes())?;
+    out.extend_from_slice(&map.line.to_be_bytes());
+    out.extend_from_slice(&map.column.to_be_bytes());
     out.extend_from_slice(&map.rows.to_be_bytes());
     out.extend_from_slice(&map.columns.to_be_bytes());
     out.extend_from_slice(
@@ -2957,12 +2916,30 @@ fn decode_map(bytes: &[u8], limits: CicsLimits) -> Result<BmsMapDefinition, Host
         b"MECM3" => 3,
         b"MECM4" => 4,
         b"MECM5" => 5,
+        b"MECM6" => 6,
         _ => return Err(HostProblem::InfrastructureFailure),
     };
     let mapset =
         String::from_utf8(reader.field(16)?).map_err(|_| HostProblem::InfrastructureFailure)?;
     let map =
         String::from_utf8(reader.field(16)?).map_err(|_| HostProblem::InfrastructureFailure)?;
+    let (line, column) = if version >= 6 {
+        let line = u16::from_be_bytes(
+            reader
+                .take(2)?
+                .try_into()
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+        );
+        let column = u16::from_be_bytes(
+            reader
+                .take(2)?
+                .try_into()
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+        );
+        (line, column)
+    } else {
+        (1, 1)
+    };
     let rows = u16::from_be_bytes(
         reader
             .take(2)?
@@ -3097,6 +3074,8 @@ fn decode_map(bytes: &[u8], limits: CicsLimits) -> Result<BmsMapDefinition, Host
     let definition = BmsMapDefinition {
         mapset,
         map,
+        line,
+        column,
         rows,
         columns,
         fields,
@@ -5088,7 +5067,9 @@ mod tests {
             CicsOperation::Assign,
             BTreeMap::from([
                 ("APPLID".into(), argument(b"APP-OUT")),
+                ("MAPCOLUMN".into(), argument(b"MAP-COLUMN-OUT")),
                 ("MAPHEIGHT".into(), argument(b"MAP-HEIGHT-OUT")),
+                ("MAPLINE".into(), argument(b"MAP-LINE-OUT")),
                 ("MAPWIDTH".into(), argument(b"MAP-WIDTH-OUT")),
             ]),
             205,
@@ -5116,7 +5097,9 @@ mod tests {
             ("INVREQ", 16, 2)
         );
         assert_eq!(no_positioned_map.outputs["APPLID"].bytes(), b"ME01");
+        assert!(!no_positioned_map.outputs.contains_key("MAPCOLUMN"));
         assert!(!no_positioned_map.outputs.contains_key("MAPHEIGHT"));
+        assert!(!no_positioned_map.outputs.contains_key("MAPLINE"));
         assert!(!no_positioned_map.outputs.contains_key("MAPWIDTH"));
 
         let missing_program = request(
@@ -5491,7 +5474,9 @@ mod tests {
             CicsOperation::Assign,
             BTreeMap::from([
                 ("APPLID".into(), argument(b"APP-OUT")),
+                ("MAPCOLUMN".into(), argument(b"MAP-COLUMN-OUT")),
                 ("MAPHEIGHT".into(), argument(b"MAP-HEIGHT-OUT")),
+                ("MAPLINE".into(), argument(b"MAP-LINE-OUT")),
                 ("MAPWIDTH".into(), argument(b"MAP-WIDTH-OUT")),
             ]),
             63,
@@ -5519,7 +5504,9 @@ mod tests {
             ("INVREQ", 16, 200)
         );
         assert_eq!(prohibited_map_dimensions.outputs["APPLID"].bytes(), b"ME01");
+        assert!(!prohibited_map_dimensions.outputs.contains_key("MAPCOLUMN"));
         assert!(!prohibited_map_dimensions.outputs.contains_key("MAPHEIGHT"));
+        assert!(!prohibited_map_dimensions.outputs.contains_key("MAPLINE"));
         assert!(!prohibited_map_dimensions.outputs.contains_key("MAPWIDTH"));
 
         let diagnostics = request(
@@ -9419,6 +9406,8 @@ mod tests {
             .register_map(BmsMapDefinition {
                 mapset: "COSGN00".into(),
                 map: "COSGN0A".into(),
+                line: 1,
+                column: 1,
                 rows: 24,
                 columns: 80,
                 fields: vec![
@@ -9646,8 +9635,10 @@ mod tests {
             .register_map(BmsMapDefinition {
                 mapset: "DYNAMIC".into(),
                 map: "DYNMAP".into(),
-                rows: 24,
-                columns: 80,
+                line: 2,
+                column: 3,
+                rows: 23,
+                columns: 78,
                 fields: vec![BmsFieldDefinition {
                     name: "SELECT".into(),
                     row: 1,
@@ -9693,6 +9684,30 @@ mod tests {
         initial
             .invoke(&effect(&invocation.run_unit_id, send.clone(), 1), send)
             .unwrap();
+        let wire = initial
+            .tn3270_screen(&session, invocation.principal.id(), 11)
+            .unwrap();
+        assert_eq!(&wire[..5], &[0xf5, 0xc3, 0x11, 0x00, 82]);
+        let current_map = store
+            .get_provider_state("cics-map", "DYNAMIC/DYNMAP")
+            .unwrap()
+            .unwrap();
+        assert_eq!(&current_map.payload[..5], b"MECM6");
+        let decoded = decode_map(&current_map.payload, CicsLimits::default()).unwrap();
+        assert_eq!((decoded.line, decoded.column), (2, 3));
+        let mut legacy5 = current_map.payload;
+        let mut origin_at = 5usize;
+        for _ in 0..2 {
+            let length = usize::try_from(u32::from_be_bytes(
+                legacy5[origin_at..origin_at + 4].try_into().unwrap(),
+            ))
+            .unwrap();
+            origin_at += 4 + length;
+        }
+        legacy5.drain(origin_at..origin_at + 4);
+        legacy5[..5].copy_from_slice(b"MECM5");
+        let decoded = decode_map(&legacy5, CicsLimits::default()).unwrap();
+        assert_eq!((decoded.line, decoded.column), (1, 1));
         drop(initial);
         let restarted = service(store);
         restarted
@@ -9715,6 +9730,8 @@ mod tests {
             .register_map(BmsMapDefinition {
                 mapset: "MENUMS".into(),
                 map: "MENU".into(),
+                line: 1,
+                column: 1,
                 rows: 24,
                 columns: 80,
                 fields: vec![BmsFieldDefinition {
@@ -10242,6 +10259,8 @@ mod tests {
         let invalid = BmsMapDefinition {
             mapset: "M".into(),
             map: "X".into(),
+            line: 1,
+            column: 1,
             rows: 1,
             columns: 1,
             fields: vec![BmsFieldDefinition {
@@ -10262,6 +10281,41 @@ mod tests {
             }],
         };
         assert_eq!(service.register_map(invalid), Err(HostProblem::Malformed));
+
+        service
+            .register_map(BmsMapDefinition {
+                mapset: "M".into(),
+                map: "TOOBIG".into(),
+                line: 2,
+                column: 1,
+                rows: 24,
+                columns: 80,
+                fields: Vec::new(),
+            })
+            .unwrap();
+        let mut send = request(
+            CicsOperation::SendMap,
+            BTreeMap::from([
+                ("MAPSET".into(), argument(b"M")),
+                ("MAP".into(), argument(b"TOOBIG")),
+            ]),
+            2,
+        );
+        send.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let rejected = service
+            .invoke(&effect(&invocation.run_unit_id, send.clone(), 2), send)
+            .unwrap();
+        assert_eq!(
+            (
+                rejected.condition.as_str(),
+                rejected.response,
+                rejected.response2
+            ),
+            ("INVMPSZ", 38, 0)
+        );
     }
 
     #[test]

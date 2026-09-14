@@ -1,3 +1,4 @@
+mod bms_map;
 mod condition;
 mod file_control;
 mod handle_state;
@@ -11,6 +12,9 @@ mod terminal_control;
 mod terminal_run;
 mod time;
 
+pub(super) use bms_map::{
+    decode_terminal_address, encode_terminal_address, terminal_field_address, validate_map,
+};
 pub(super) use condition::respond as condition;
 pub(super) use file_control::invoke as invoke_file_control;
 pub(super) use handle_state::{

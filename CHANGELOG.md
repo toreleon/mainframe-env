@@ -80,9 +80,12 @@ All notable changes to mainframe-env are documented here.
   local program and two for a DPL target behind its level-one mirror; unmodeled
   deeper local stacks fail closed. With no application partition set, PARTNSET
   returns six blanks on a terminal task and follows the local/DPL `INVREQ`
-  matrix. MAPHEIGHT and MAPWIDTH resolve the durable definition of the most
-  recently sent map, return `INVREQ` 16/2 before a map is positioned, and are
-  prohibited with 16/200 in DPL. The same owned virtual terminal reports a
+  matrix. MAPCOLUMN, MAPHEIGHT, MAPLINE, and MAPWIDTH resolve the `MECM6`
+  durable definition of the most recently sent map; historical `MECM1`–`MECM5`
+  definitions retain their prior top-left origin. Numeric DFHMDI LINE/COLUMN
+  now offset TN3270 fields, maps that exceed the terminal receive source-named
+  `INVMPSZ` 38, absent maps receive `INVREQ` 16/2, and DPL returns 16/200. The
+  same owned virtual terminal reports a
   3270 data stream and no basic SCS data stream; its unsupported optional
   device capabilities return false indicators, and its interactive session
   profile returns the attended indicator. CMDSEC and RESSEC return `X` because
