@@ -223,6 +223,7 @@ impl PlanContext<'_> {
                 HirCicsOutputName::Yyddd => CicsOutputName::Yyddd,
                 HirCicsOutputName::Yymmdd => CicsOutputName::Yymmdd,
                 HirCicsOutputName::Yyyymmdd => CicsOutputName::Yyyymmdd,
+                HirCicsOutputName::Assign(output) => CicsOutputName::Assign(output),
             },
             target: self.slot(&output.target)?,
         })
@@ -298,6 +299,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::ReceiveMap => CicsPlanOperation::ReceiveMap,
         HirCicsOperation::SendMap => CicsPlanOperation::SendMap,
         HirCicsOperation::SendText => CicsPlanOperation::SendText,
+        HirCicsOperation::Assign => CicsPlanOperation::Assign,
         HirCicsOperation::PopHandle => CicsPlanOperation::PopHandle,
         HirCicsOperation::PushHandle => CicsPlanOperation::PushHandle,
     }

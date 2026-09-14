@@ -1,5 +1,7 @@
 use mainframe_env_host_api::CicsOperation;
-use mainframe_env_ir::{CicsOperandName, CicsOutputName, CicsPlanOperation, CicsPlanOption};
+use mainframe_env_ir::{
+    CicsAssignOutput, CicsOperandName, CicsOutputName, CicsPlanOperation, CicsPlanOption,
+};
 
 #[derive(Clone, Copy)]
 pub(super) enum SlotUse {
@@ -17,6 +19,7 @@ pub(super) enum SlotUse {
     PointerOutput,
     AddressInput,
     AddressOutput,
+    AssignOutput(CicsAssignOutput),
 }
 
 pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
@@ -42,6 +45,7 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         CicsOutputName::Mmddyyyy | CicsOutputName::Yyyymmdd => SlotUse::FormatTextOutput(10),
         CicsOutputName::Yyddd => SlotUse::FormatTextOutput(6),
         CicsOutputName::Resp | CicsOutputName::Resp2 => SlotUse::NumericOutput,
+        CicsOutputName::Assign(output) => SlotUse::AssignOutput(output),
     }
 }
 
@@ -79,6 +83,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::SetAssociationUserCorrData => CicsOperation::SetAssociationUserCorrData,
         CicsPlanOperation::Syncpoint => CicsOperation::Syncpoint,
         CicsPlanOperation::Suspend => CicsOperation::Suspend,
+        CicsPlanOperation::Assign => CicsOperation::Assign,
     }
 }
 
@@ -128,6 +133,7 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::Yyddd => "YYDDD",
         CicsOutputName::Yymmdd => "YYMMDD",
         CicsOutputName::Yyyymmdd => "YYYYMMDD",
+        CicsOutputName::Assign(output) => output.name(),
     }
 }
 

@@ -1,6 +1,9 @@
 use super::{
-    CicsOperandName, CicsOutputName, CicsPlanCodecProblem, CicsPlanOperation, CicsPlanOption,
+    CicsAssignOutput, CicsOperandName, CicsOutputName, CicsPlanCodecProblem, CicsPlanOperation,
+    CicsPlanOption,
 };
+
+const ASSIGN_OUTPUT_TAG_BASE: u8 = 13;
 
 pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
     match value {
@@ -36,6 +39,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::ReceiveMap => 29,
         CicsPlanOperation::SendMap => 30,
         CicsPlanOperation::SendText => 31,
+        CicsPlanOperation::Assign => 32,
     }
 }
 
@@ -73,6 +77,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         29 => Ok(CicsPlanOperation::ReceiveMap),
         30 => Ok(CicsPlanOperation::SendMap),
         31 => Ok(CicsPlanOperation::SendText),
+        32 => Ok(CicsPlanOperation::Assign),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -184,6 +189,7 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u8 {
         CicsOutputName::Yyyymmdd => 10,
         CicsOutputName::Commarea => 11,
         CicsOutputName::Ridfld => 12,
+        CicsOutputName::Assign(output) => ASSIGN_OUTPUT_TAG_BASE + output.tag(),
     }
 }
 
@@ -202,6 +208,12 @@ pub(super) fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodec
         10 => Ok(CicsOutputName::Yyyymmdd),
         11 => Ok(CicsOutputName::Commarea),
         12 => Ok(CicsOutputName::Ridfld),
-        _ => Err(CicsPlanCodecProblem::Malformed),
+        value => CicsAssignOutput::from_tag(
+            value
+                .checked_sub(ASSIGN_OUTPUT_TAG_BASE)
+                .ok_or(CicsPlanCodecProblem::Malformed)?,
+        )
+        .map(CicsOutputName::Assign)
+        .ok_or(CicsPlanCodecProblem::Malformed),
     }
 }

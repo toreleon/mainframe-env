@@ -36,10 +36,10 @@ pub use cics_descriptor::{
     cics_executable_descriptor, cics_executable_descriptor_for_identity,
 };
 pub use cics_plan::{
-    CICS_EFFECT_PLAN_CONTRACT, CicsCondition, CicsEffectPlan, CicsNamedOperand, CicsOperandName,
-    CicsOperandValue, CicsOutputBinding, CicsOutputName, CicsPlanCodecProblem, CicsPlanLimits,
-    CicsPlanOperation, CicsPlanOption, CicsStorageSlot, decode_cics_effect_plan,
-    encode_cics_effect_plan,
+    CICS_ASSIGN_OUTPUT_NAMES, CICS_EFFECT_PLAN_CONTRACT, CicsAssignOutput, CicsCondition,
+    CicsEffectPlan, CicsNamedOperand, CicsOperandName, CicsOperandValue, CicsOutputBinding,
+    CicsOutputName, CicsPlanCodecProblem, CicsPlanLimits, CicsPlanOperation, CicsPlanOption,
+    CicsStorageSlot, decode_cics_effect_plan, encode_cics_effect_plan,
 };
 pub use cobol_config::{
     COBOL_EFFECTIVE_ARITH_OPTION, COBOL_EFFECTIVE_DISPSIGN_OPTION, COBOL_EFFECTIVE_LP_OPTION,

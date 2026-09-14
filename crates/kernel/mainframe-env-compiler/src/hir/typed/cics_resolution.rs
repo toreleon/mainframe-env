@@ -802,6 +802,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::ReceiveMap => &["MAP", "MAPSET", "INTO", "RESP", "RESP2"],
         HirCicsOperation::SendMap => &["MAP", "MAPSET", "FROM", "RESP", "RESP2"],
         HirCicsOperation::SendText => &["FROM", "RESP", "RESP2"],
+        HirCicsOperation::Assign => &["RESP", "RESP2"],
         HirCicsOperation::Read => &["FILE", "DATASET", "RIDFLD", "INTO", "RESP", "RESP2"],
         HirCicsOperation::Rewrite => &["FILE", "DATASET", "FROM", "RESP", "RESP2"],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA", "RESP", "RESP2"],
@@ -832,6 +833,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::ReceiveMap
         | HirCicsOperation::SendMap
         | HirCicsOperation::SendText
+        | HirCicsOperation::Assign
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle
         | HirCicsOperation::SetAssociationUserCorrData
@@ -846,6 +848,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         .keys()
         .filter(|name| {
             !allowed_clauses.contains(&name.as_str())
+                && !(operation == HirCicsOperation::Assign
+                    && mainframe_env_ir::CicsAssignOutput::from_name(name).is_some())
                 && !(operation == HirCicsOperation::HandleCondition && is_condition_name(name))
                 && !(operation == HirCicsOperation::HandleAid && is_aid_name(name))
         })
@@ -904,6 +908,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::ReceiveMap
         | HirCicsOperation::SendMap
         | HirCicsOperation::SendText
+        | HirCicsOperation::Assign
         | HirCicsOperation::Suspend => &[][..],
         HirCicsOperation::Deq | HirCicsOperation::Enq => &["RESOURCE"][..],
         HirCicsOperation::Link | HirCicsOperation::Xctl => &["PROGRAM"][..],

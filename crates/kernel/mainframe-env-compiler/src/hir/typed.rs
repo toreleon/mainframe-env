@@ -1,6 +1,7 @@
 use super::{HirProblem, HirStatement, StatementKind, StatementOption, StatementOptionKind};
 use crate::{CobolLayout, CobolUsage, DataCategory, LosslessSyntax, SemanticModel, SourceSpan};
 use mainframe_env_diagnostics::SourceSpan as IrSourceSpan;
+use mainframe_env_ir::CicsAssignOutput;
 use mainframe_env_source::SourceBundle;
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
@@ -171,6 +172,7 @@ pub enum HirCicsOperation {
     ReceiveMap,
     SendMap,
     SendText,
+    Assign,
     PopHandle,
     PushHandle,
     Read,
@@ -253,6 +255,7 @@ pub enum HirCicsOutputName {
     Yyddd,
     Yymmdd,
     Yyyymmdd,
+    Assign(CicsAssignOutput),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2924,7 +2927,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 2);
+        assert_eq!(legacy.len(), 1);
         assert!(
             legacy.iter().all(|descriptor| {
                 descriptor.advertised && descriptor.runtime_operation.is_some()
@@ -2934,6 +2937,7 @@ mod tests {
             !matches!(
                 descriptor.label_tokens,
                 ["ABEND"]
+                    | ["ASSIGN"]
                     | ["DEQ"]
                     | ["ENQ"]
                     | ["HANDLE", "ABEND"]
@@ -3093,7 +3097,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_cics_routes_reject_catalog_options_without_runtime_semantics() {
+    fn typed_cics_routes_reject_catalog_options_without_runtime_semantics() {
         let command = "ASSIGN FACILITY(USER-X)";
         let source = format!(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLEG. DATA DIVISION. WORKING-STORAGE SECTION. 01 USER-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
@@ -3103,7 +3107,7 @@ mod tests {
         assert!(
             analysis.diagnostics.iter().any(|diagnostic| {
                 let message = diagnostic.public_message();
-                message.contains("catalog-known but legacy execution is unready")
+                message.contains("catalog-known but typed lowering is unready")
                     && message.contains("FACILITY")
             }),
             "{command}: {:?}",
@@ -3122,7 +3126,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_cics_routes_keep_only_implemented_forms_and_the_file_alias() {
+    fn typed_assign_keeps_only_implemented_output_forms() {
         for command in [
             "ASSIGN APPLID(APPL-X)",
             "ASSIGN ABCODE(ABCODE-X) ABDUMP(ABDUMP-X) ABOFFSET(ABOFFSET-X) ABPROGRAM(ABPROGRAM-X) ASRAINTRPT(ASRA-PSW-X) ASRAPSW(ASRA-PSW-X) ASRAPSW16(ASRA-PSW16-X) ASRAREGS(ASRA-REGS-X) ASRAREGS64(ASRA-REGS64-X) ORGABCODE(ABCODE-X)",
@@ -3154,12 +3158,22 @@ mod tests {
             let hir = analysis
                 .hir
                 .unwrap_or_else(|| panic!("{command}: {:?}", analysis.diagnostics));
-            let statement = hir
+            let command = hir
                 .statements
                 .iter()
-                .find(|statement| statement.kind == StatementKind::ExecCics)
-                .expect("EXEC CICS statement");
-            assert!(statement.resolved.is_none(), "{command}");
+                .find_map(|statement| match statement.resolved.as_ref() {
+                    Some(HirResolvedStatement::Cics(command)) => Some(command),
+                    _ => None,
+                })
+                .expect("typed EXEC CICS ASSIGN statement");
+            assert_eq!(command.operation, HirCicsOperation::Assign);
+            assert!(
+                command
+                    .outputs
+                    .iter()
+                    .all(|output| matches!(output.name, HirCicsOutputName::Assign(_))),
+                "{command:?}"
+            );
         }
 
         for (name, width) in [

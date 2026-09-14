@@ -67,13 +67,13 @@ It contains all 263 API registry shapes with deterministic recognition,
 option-shape, family, EIBFN and handler identities. Readiness is deliberately
 split:
 
-- 32 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
+- 33 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
   `SYNCPOINT` routes and the reviewed incremental family slices;
-- 2 `legacy-compatibility` API routes that remain on the pre-existing raw
+- 1 `legacy-compatibility` API route that remains on the pre-existing raw
   compatibility path; and
 - 229 `unready` rows that are recognized but fail explicitly as unsupported.
 
-The two raw compatibility routes' implemented option subsets are owned by the
+The remaining raw compatibility route's implemented option subset is owned by the
 separate versioned
 [`legacy-execution-options.json`](../../conformance/0.9/cics/legacy-execution-options.json)
 catalog and its
@@ -145,7 +145,13 @@ uses the requested durable map definition for terminal-fit validation and
 input-field normalization. SET pointers, omitted-map AID-only receive,
 implicit symbolic map storage, explicit length, paging, device and other
 terminal controls remain explicit compiler rejections.
-Each legacy route admits only the source-valid option subset whose behavior is
+The typed ASSIGN subset carries each of its 78 admitted context values as a
+pre-resolved output binding under one bounded output-name authority. It retains
+the existing 16-option maximum, exact receiver checks, partial-INVREQ behavior,
+local/DPL matrix, EIBFN and provider semantics without carrying source command
+text across the executable boundary. The other 35 generated ASSIGN semantic
+options remain compiler rejections until their contexts are implemented.
+The legacy route admits only the source-valid option subset whose behavior is
 implemented by that raw handler. A catalog-known option outside that subset
 fails explicitly before compatibility lowering instead of being silently
 dropped. The pre-registry `DATASET` spelling remains an exact alias for `FILE`

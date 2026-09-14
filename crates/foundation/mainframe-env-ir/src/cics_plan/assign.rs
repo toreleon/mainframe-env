@@ -1,4 +1,9 @@
-pub(super) const OUTPUT_NAMES: &[&str] = &[
+/// One source-reviewed output admitted by the typed CICS `ASSIGN` subset.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct CicsAssignOutput(u8);
+
+/// Canonical names of every output admitted by the typed CICS `ASSIGN` subset.
+pub const CICS_ASSIGN_OUTPUT_NAMES: &[&str] = &[
     "ABCODE",
     "ABDUMP",
     "ABOFFSET",
@@ -78,3 +83,27 @@ pub(super) const OUTPUT_NAMES: &[&str] = &[
     "USERID",
     "VALIDATION",
 ];
+
+impl CicsAssignOutput {
+    /// Resolves one canonical output name without accepting aliases.
+    pub fn from_name(name: &str) -> Option<Self> {
+        CICS_ASSIGN_OUTPUT_NAMES
+            .iter()
+            .position(|candidate| *candidate == name)
+            .and_then(|index| u8::try_from(index).ok())
+            .map(Self)
+    }
+
+    /// Returns this output's canonical host-request name.
+    pub const fn name(self) -> &'static str {
+        CICS_ASSIGN_OUTPUT_NAMES[self.0 as usize]
+    }
+
+    pub(super) const fn tag(self) -> u8 {
+        self.0
+    }
+
+    pub(super) fn from_tag(tag: u8) -> Option<Self> {
+        (usize::from(tag) < CICS_ASSIGN_OUTPUT_NAMES.len()).then_some(Self(tag))
+    }
+}

@@ -3,6 +3,7 @@ use super::super::{
 };
 use super::{Clauses, complete_data_reference, format_time, program_control};
 use crate::SemanticModel;
+use mainframe_env_ir::CicsAssignOutput;
 
 pub(super) fn resolve(
     clauses: &Clauses,
@@ -41,6 +42,19 @@ pub(super) fn resolve(
             format_time::require_output_shape(identity, &target)?;
             outputs.push(HirCicsOutputBinding {
                 name: identity,
+                target,
+            });
+        }
+    }
+    if operation == HirCicsOperation::Assign {
+        for (name, value) in clauses {
+            let Some(identity) = CicsAssignOutput::from_name(name) else {
+                continue;
+            };
+            let target = complete_data_reference(value, semantic)?;
+            require_writable(&target)?;
+            outputs.push(HirCicsOutputBinding {
+                name: HirCicsOutputName::Assign(identity),
                 target,
             });
         }

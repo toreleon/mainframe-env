@@ -1492,7 +1492,7 @@ mod tests {
     fn typed_cics_is_proof_bound_in_hir_and_the_published_executable() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSP. DATA DIVISION. WORKING-STORAGE SECTION. 01 AB-CODE PIC X(4) VALUE 'B001'. 01 ABS-X PIC S9(15) COMP-3. 01 DATE-X PIC X(10). 01 TIME-X PIC X(8). 01 MS-X PIC S9(9) COMP. 01 RECORD-X PIC X(4). 01 KEY-X PIC X(3) VALUE '003'. 01 LOCK-X PIC X(4) VALUE 'LOCK'. 01 PTR-X POINTER. 01 CORR-X PIC X(80) VALUE ALL 'A'. 01 PRIORITY-X PIC S9(4) COMP VALUE 200. 01 CODE-A PIC S9(9) COMP. 01 CODE-B PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS ASKTIME END-EXEC. EXEC CICS ASKTIME ABSTIME(ABS-X) END-EXEC. EXEC CICS FORMATTIME ABSTIME(ABS-X) DATESEP('-') YYYYMMDD(DATE-X) TIMESEP(':') TIME(TIME-X) MILLISECONDS(MS-X) END-EXEC. EXEC CICS LINK PROGRAM('CHILD') COMMAREA(RECORD-X) END-EXEC. EXEC CICS XCTL PROGRAM('NEXT') COMMAREA(RECORD-X) END-EXEC. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) END-EXEC. EXEC CICS READNEXT FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS READPREV DATASET('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS ENDBR FILE('ACCTDAT') END-EXEC. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS DELETE FILE('ACCTDAT') RIDFLD(KEY-X) END-EXEC. EXEC CICS READ FILE('ACCTDAT') UPDATE INTO(RECORD-X) RIDFLD(KEY-X) RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS REWRITE DATASET('ACCTDAT') FROM(RECORD-X) END-EXEC. EXEC CICS ENQ RESOURCE(LOCK-X) LENGTH(4) UOW NOSUSPEND END-EXEC. EXEC CICS DEQ RESOURCE(LOCK-X) LENGTH(4) UOW END-EXEC. EXEC CICS ADDRESS SET(PTR-X) USING(ADDRESS OF RECORD-X) END-EXEC. EXEC CICS CHANGE TASK PRIORITY(PRIORITY-X) RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS HANDLE AID ANYKEY(AID-HANDLER) ENTER END-EXEC. EXEC CICS HANDLE ABEND PROGRAM('ABEXIT') END-EXEC. EXEC CICS HANDLE CONDITION ERROR(ERROR-HANDLER) LENGERR END-EXEC. EXEC CICS IGNORE CONDITION PGMIDERR END-EXEC. EXEC CICS PUSH HANDLE END-EXEC. EXEC CICS POP HANDLE RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS SET ASSOCIATION USERCORRDATA(CORR-X) RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS SUSPEND END-EXEC. EXEC CICS SYNCPOINT ROLLBACK NOHANDLE END-EXEC. EXEC CICS ABEND ABCODE(AB-CODE) NODUMP END-EXEC. EXEC CICS RETURN TRANSID('NEXT') COMMAREA(RECORD-X) END-EXEC.";
         let source = format!(
-            "{source} EXEC CICS WRITEQ TD QUEUE('OUTQ') FROM(RECORD-X) LENGTH(4) END-EXEC. EXEC CICS SEND MAP('MENU') MAPSET('MAIN') FROM(RECORD-X) END-EXEC. EXEC CICS RECEIVE MAP('MENU') MAPSET('MAIN') END-EXEC. EXEC CICS SEND TEXT FROM(RECORD-X) END-EXEC."
+            "{source} EXEC CICS WRITEQ TD QUEUE('OUTQ') FROM(RECORD-X) LENGTH(4) END-EXEC. EXEC CICS SEND MAP('MENU') MAPSET('MAIN') FROM(RECORD-X) END-EXEC. EXEC CICS RECEIVE MAP('MENU') MAPSET('MAIN') END-EXEC. EXEC CICS SEND TEXT FROM(RECORD-X) END-EXEC. EXEC CICS ASSIGN ABCODE(AB-CODE) END-EXEC."
         );
         let compiler = CobolCompiler::default();
         let analysis = compiler.analyze(&bundle(&source));
@@ -1525,7 +1525,7 @@ mod tests {
                     && operation.identity.major() == 2
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed_hir.len(), 32);
+        assert_eq!(typed_hir.len(), 33);
         let mut hir_plans = Vec::new();
         for operation in typed_hir {
             assert!(!operation.attributes.contains_key("arguments"));
@@ -1597,6 +1597,7 @@ mod tests {
                 CicsPlanOperation::ReceiveMap => crate::HirCicsOperation::ReceiveMap,
                 CicsPlanOperation::SendMap => crate::HirCicsOperation::SendMap,
                 CicsPlanOperation::SendText => crate::HirCicsOperation::SendText,
+                CicsPlanOperation::Assign => crate::HirCicsOperation::Assign,
                 CicsPlanOperation::PopHandle => crate::HirCicsOperation::PopHandle,
                 CicsPlanOperation::PushHandle => crate::HirCicsOperation::PushHandle,
                 CicsPlanOperation::Read => crate::HirCicsOperation::Read,
@@ -1651,6 +1652,7 @@ mod tests {
                 CicsPlanOperation::ReceiveMap,
                 CicsPlanOperation::SendMap,
                 CicsPlanOperation::SendText,
+                CicsPlanOperation::Assign,
                 CicsPlanOperation::PopHandle,
                 CicsPlanOperation::PushHandle,
                 CicsPlanOperation::Read,
@@ -1768,7 +1770,7 @@ mod tests {
                 )
             })
             .collect::<Vec<_>>();
-        assert_eq!(operations.len(), 32);
+        assert_eq!(operations.len(), 33);
         assert_eq!(
             operations
                 .iter()

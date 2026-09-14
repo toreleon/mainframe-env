@@ -865,7 +865,8 @@ fn cics_slots(plan: &CicsEffectPlan) -> Vec<PlanSlot<'_>> {
             | CicsOutputName::Time
             | CicsOutputName::Yyddd
             | CicsOutputName::Yymmdd
-            | CicsOutputName::Yyyymmdd => SlotUse::WRITE,
+            | CicsOutputName::Yyyymmdd
+            | CicsOutputName::Assign(_) => SlotUse::WRITE,
             CicsOutputName::Abstime
             | CicsOutputName::Milliseconds
             | CicsOutputName::Resp

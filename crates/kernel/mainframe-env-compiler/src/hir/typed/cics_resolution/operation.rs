@@ -30,6 +30,7 @@ pub(super) fn resolve(
         ["RECEIVE", "MAP"] => HirCicsOperation::ReceiveMap,
         ["SEND", "MAP"] => HirCicsOperation::SendMap,
         ["SEND", "TEXT"] => HirCicsOperation::SendText,
+        ["ASSIGN"] => HirCicsOperation::Assign,
         ["POP", "HANDLE"] => HirCicsOperation::PopHandle,
         ["PUSH", "HANDLE"] => HirCicsOperation::PushHandle,
         ["READ"] => HirCicsOperation::Read,

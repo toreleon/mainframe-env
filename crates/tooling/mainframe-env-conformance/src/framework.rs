@@ -2373,6 +2373,92 @@ mod tests {
     }
 
     #[test]
+    fn cics_assign_uses_typed_bounded_output_bindings() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSASGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 APPL-X PIC X(8). 01 PRIORITY-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS ASSIGN APPLID(APPL-X) TASKPRIORITY(PRIORITY-X) END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+
+        let MachineDrive::HostCall(call) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("ASSIGN did not call host");
+        };
+        assert!(matches!(
+            &call.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::Assign,
+                arguments,
+                mutation: None,
+                ..
+            }) if arguments["APPLID"].bytes() == b"APPL-X"
+                && arguments["TASKPRIORITY"].bytes() == b"PRIORITY-X"
+        ));
+
+        let response = CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                Vec::new(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            outputs: BTreeMap::from([
+                (
+                    "APPLID".into(),
+                    mainframe_env_execution_api::BoundedPayload::new(
+                        "mainframe-env.cics.payload@1",
+                        b"REGION01".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                (
+                    "TASKPRIORITY".into(),
+                    mainframe_env_execution_api::BoundedPayload::new(
+                        "mainframe-env.cics.decimal@1",
+                        b"200".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+            ]),
+            unit_of_work: None,
+        };
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: call.sequence,
+                    outcome: Ok(HostResult::Cics(response)),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("APPL-X").unwrap().bytes(), b"REGION01");
+        assert_eq!(machine.variable("PRIORITY-X").unwrap().bytes(), &[0, 200]);
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x02, 0x08]);
+    }
+
+    #[test]
     fn cics_nested_subscript_operand_reads_selected_element() {
         use mainframe_env_host_api::{CicsOperation, HostRequest};
 

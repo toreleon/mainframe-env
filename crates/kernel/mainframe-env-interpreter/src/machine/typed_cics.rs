@@ -1,14 +1,15 @@
 use super::*;
 use mainframe_env_host_api::CicsResponse;
 use mainframe_env_ir::{
-    CICS_EXECUTABLE_DESCRIPTORS, CicsCondition, CicsEffectPlan, CicsExecutableDescriptor,
-    CicsOperandName, CicsOperandValue, CicsOperationContract, CicsOutputName, CicsPlanLimits,
-    CicsPlanOperation, CicsStorageSlot, Effect, Module, OperationCatalog, OperationSchema,
-    OperationSemanticContract, cics_executable_descriptor, cics_executable_descriptor_for_identity,
-    cobol_layout_definition_identity, decode_cics_effect_plan, verify_semantic_contracts,
+    CICS_ASSIGN_OUTPUT_NAMES, CICS_EXECUTABLE_DESCRIPTORS, CicsCondition, CicsEffectPlan,
+    CicsExecutableDescriptor, CicsOperandName, CicsOperandValue, CicsOperationContract,
+    CicsOutputName, CicsPlanLimits, CicsPlanOperation, CicsStorageSlot, Effect, Module,
+    OperationCatalog, OperationSchema, OperationSemanticContract, cics_executable_descriptor,
+    cics_executable_descriptor_for_identity, cobol_layout_definition_identity,
+    decode_cics_effect_plan, verify_semantic_contracts,
 };
 
-mod legacy_assign;
+mod assign;
 mod names;
 use names::SlotUse;
 
@@ -331,7 +332,8 @@ pub(super) fn execute(
             | CicsOutputName::Time
             | CicsOutputName::Yyddd
             | CicsOutputName::Yymmdd
-            | CicsOutputName::Yyyymmdd => {
+            | CicsOutputName::Yyyymmdd
+            | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }
             CicsOutputName::Into => into = Some(target),
@@ -409,7 +411,7 @@ pub(super) fn execute_legacy(
     let output_names: &[&str] = match operation {
         CicsOperation::Asktime => &["ABSTIME"],
         CicsOperation::AsktimeEib => &[],
-        CicsOperation::Assign => legacy_assign::OUTPUT_NAMES,
+        CicsOperation::Assign => CICS_ASSIGN_OUTPUT_NAMES,
         CicsOperation::FormatTime => &[
             "YYYYMMDD",
             "YYMMDD",
@@ -865,6 +867,7 @@ fn validate_machine_slot(
             | SlotUse::NumericOutput
             | SlotUse::PointerOutput
             | SlotUse::AddressOutput
+            | SlotUse::AssignOutput(_)
     ) && matches!(
         layout.category,
         LayoutCategory::Condition | LayoutCategory::Rename
@@ -873,6 +876,9 @@ fn validate_machine_slot(
     }
     if matches!(slot_use, SlotUse::NumericOutput) && !is_numeric(layout.category) {
         return Err(invalid_plan("RESP and RESP2 outputs must be numeric"));
+    }
+    if let SlotUse::AssignOutput(output) = slot_use {
+        assign::validate_output(layout, output)?;
     }
     if matches!(slot_use, SlotUse::AbcodeInput)
         && (!matches!(layout.length, 1..=4)

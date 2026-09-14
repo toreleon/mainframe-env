@@ -77,7 +77,7 @@ contract explicitly permits it.
   SET pointers, omitted-MAP/AID-only receive, implicit symbolic map storage,
   explicit length, paging, device and remaining terminal-control options are
   rejected before executable publication.
-- The bounded legacy CICS `ASSIGN` route returns APPLID, SYSID, USERID, and the
+- The typed CICS `ASSIGN` route returns APPLID, SYSID, USERID, and the
   current TASKPRIORITY from owned invocation context. Because no CICS
   application, platform, operation, version, or channel context is currently
   bound, their source-defined absence values are returned as fixed blanks or
@@ -86,6 +86,9 @@ contract explicitly permits it.
   Product installation names are not reinterpreted as IBM application context.
   Output references resolve before dispatch, numeric and fixed binary fields
   require their exact shapes, and no command can exceed IBM's 16-option limit.
+  One append-only plan operation and a bounded 78-name output authority retain
+  those resolved storage identities through publication and defensive runtime
+  admission; retained raw artifacts still use the compatibility decoder.
   OPSECURITY is three null bytes and absent TCTUALENG is halfword zero locally;
   in a DPL server either option raises `INVREQ` 16/200 while other requested
   outputs are still applied when the condition policy permits return.

@@ -4,6 +4,7 @@ use crate::StorageId;
 use std::collections::BTreeSet;
 use std::fmt;
 
+mod assign;
 mod browse;
 mod codec_tags;
 mod file_mutation;
@@ -12,6 +13,8 @@ mod output_shape;
 mod program_control;
 mod queue_control;
 mod terminal_control;
+
+pub use assign::{CICS_ASSIGN_OUTPUT_NAMES, CicsAssignOutput};
 
 use codec_tags::{
     operand_from_tag, operand_tag, operation_from_tag, operation_tag, option_from_tag, option_tag,
@@ -121,6 +124,8 @@ pub enum CicsPlanOperation {
     SetAssociationUserCorrData,
     /// Yield the issuing task once for redispatch.
     Suspend,
+    /// Return one bounded set of task, terminal, and invocation context values.
+    Assign,
 }
 
 /// A resolved storage slot in the containing IR module.
@@ -261,6 +266,8 @@ pub enum CicsOutputName {
     Yymmdd,
     /// `YYYYMMDD(...)` character destination.
     Yyyymmdd,
+    /// One source-reviewed `ASSIGN` output destination.
+    Assign(CicsAssignOutput),
 }
 
 /// One pre-resolved result binding.
@@ -528,10 +535,9 @@ fn validate_operation_shape(
         .options
         .iter()
         .any(|option| !matches!(option, CicsPlanOption::NoHandle));
-    let allowed_outputs = output_shape::allowed(plan.operation);
     let unexpected_output = outputs
         .iter()
-        .any(|output| !allowed_outputs.contains(output));
+        .any(|output| !output_shape::allowed(plan.operation, *output));
     let malformed = match plan.operation {
         CicsPlanOperation::Abend => handle_abend::invalid_abend_shape(plan, inputs, outputs),
         CicsPlanOperation::AddressSet => {
@@ -678,6 +684,20 @@ fn validate_operation_shape(
         }
         CicsPlanOperation::Suspend => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
+        }
+        CicsPlanOperation::Assign => {
+            !inputs.is_empty()
+                || scheduling_options
+                || outputs
+                    .iter()
+                    .any(|output| {
+                        !matches!(
+                            output,
+                            CicsOutputName::Assign(_)
+                                | CicsOutputName::Resp
+                                | CicsOutputName::Resp2
+                        )
+                    })
         }
     };
     if unexpected_output
@@ -1429,6 +1449,18 @@ mod tests {
             outputs: Vec::new(),
             condition: CicsCondition::Default,
         };
+        let assign = CicsEffectPlan {
+            operation: CicsPlanOperation::Assign,
+            operands: Vec::new(),
+            options: BTreeSet::new(),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::Assign(
+                    CicsAssignOutput::from_name("APPLID").expect("ASSIGN output"),
+                ),
+                target: slot(18, "ASSIGN.APPLID"),
+            }],
+            condition: CicsCondition::Default,
+        };
         let mut missing_delete_key = delete.clone();
         missing_delete_key
             .operands
@@ -1479,6 +1511,7 @@ mod tests {
             receive_map,
             send_map,
             send_text,
+            assign,
         ] {
             let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
             let decoded = decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap();
@@ -1499,6 +1532,31 @@ mod tests {
             decoded.operands[1].value,
             CicsOperandValue::Literal(ref bytes) if bytes == b"003"
         ));
+        assert_eq!(CICS_ASSIGN_OUTPUT_NAMES.len(), 78);
+        assert!(
+            CICS_ASSIGN_OUTPUT_NAMES
+                .windows(2)
+                .all(|pair| pair[0] < pair[1])
+        );
+        for name in CICS_ASSIGN_OUTPUT_NAMES {
+            let output = CicsAssignOutput::from_name(name).expect("canonical ASSIGN output");
+            assert_eq!(output.name(), *name);
+            let plan = CicsEffectPlan {
+                operation: CicsPlanOperation::Assign,
+                operands: Vec::new(),
+                options: BTreeSet::new(),
+                outputs: vec![CicsOutputBinding {
+                    name: CicsOutputName::Assign(output),
+                    target: slot(19, "ASSIGN.OUTPUT"),
+                }],
+                condition: CicsCondition::Default,
+            };
+            let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+            assert_eq!(
+                decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
+                plan
+            );
+        }
     }
 
     #[test]

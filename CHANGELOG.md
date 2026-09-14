@@ -115,7 +115,13 @@ All notable changes to mainframe-env are documented here.
   field normalization. SET pointers, omitted-map AID-only receive, implicit
   symbolic map storage, lengths, paging, device and other terminal controls
   remain fail-closed.
-- Expanded the source-bounded CICS `ASSIGN` compatibility route with APPLID,
+- Migrated the 78 source-bounded `ASSIGN` context outputs from raw command-text
+  compatibility lowering to one typed task plan. Each output carries an
+  append-only semantic name and pre-resolved writable storage identity through
+  publication and defensive admission, while the existing 16-option, receiver,
+  partial-INVREQ, DPL, EIBFN, provider and retained-artifact behavior is
+  preserved.
+- Expanded the source-bounded CICS `ASSIGN` route with APPLID,
   SYSID, USERID, TASKPRIORITY, and the exact absent application/channel context
   defaults. It also reports absent CWA/TWA lengths, null OPERKEYS, and a normal
   task start without inventing state. The compiler enforces the 16-option limit
