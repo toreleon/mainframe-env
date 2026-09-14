@@ -165,6 +165,8 @@ pub enum HirCicsOperation {
     ReadNext,
     ReadPrev,
     EndBrowse,
+    Delete,
+    Write,
     PopHandle,
     PushHandle,
     Read,
@@ -2374,6 +2376,10 @@ mod tests {
 
         for (command, expected) in [
             ("STARTBR FILE('ACCTDAT')", "requires RIDFLD"),
+            (
+                "STARTBR FILE('ACCTDAT') RIDFLD('AA')",
+                "RIDFLD requires a data area",
+            ),
             ("READNEXT FILE('ACCTDAT') RIDFLD(KEY-X)", "requires INTO"),
             (
                 "READPREV FILE('ACCTDAT') DATASET('OTHER') INTO(RECORD-X) RIDFLD(KEY-X)",
@@ -2397,6 +2403,86 @@ mod tests {
                 "{command}: {:?}",
                 analysis.diagnostics
             );
+        }
+    }
+
+    #[test]
+    fn cics_keyed_file_mutations_require_resolved_record_and_key_inputs() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSMUT. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3) VALUE '003'. 01 RECORD-X PIC X(4) VALUE 'DATA'. PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS DELETE DATASET('ACCTDAT') RIDFLD(KEY-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("file mutations: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            commands
+                .iter()
+                .map(|command| command.operation)
+                .collect::<Vec<_>>(),
+            [HirCicsOperation::Write, HirCicsOperation::Delete]
+        );
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::From
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference)
+                        if reference.qualified_name == "RECORD-X"
+                )
+        }));
+        for command in &commands {
+            assert!(command.operands.iter().any(|operand| {
+                operand.name == HirCicsOperandName::Ridfld
+                    && matches!(
+                        operand.value,
+                        HirCicsValue::Data(ref reference)
+                            if reference.qualified_name == "KEY-X"
+                    )
+            }));
+            assert!(command.outputs.is_empty());
+        }
+
+        for (command, expected) in [
+            ("DELETE FILE('ACCTDAT')", "requires RIDFLD"),
+            ("WRITE FILE('ACCTDAT') FROM(RECORD-X)", "requires RIDFLD"),
+            ("WRITE FILE('ACCTDAT') RIDFLD(KEY-X)", "requires FROM"),
+            (
+                "DELETE FILE('ACCTDAT') RIDFLD(KEY-X) TOKEN(KEY-X)",
+                "unready for TOKEN",
+            ),
+            (
+                "WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) LENGTH(4)",
+                "unready for LENGTH",
+            ),
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADMUT. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+
+        for command in [
+            "DELETE FILE('ACCTDAT') RIDFLD('003')",
+            "WRITE FILE('ACCTDAT') FROM('DATA') RIDFLD(KEY-X)",
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADMUT. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
         }
     }
 
@@ -2677,7 +2763,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 8);
+        assert_eq!(legacy.len(), 6);
         assert!(
             legacy.iter().all(|descriptor| {
                 descriptor.advertised && descriptor.runtime_operation.is_some()
@@ -2698,6 +2784,8 @@ mod tests {
                     | ["READNEXT"]
                     | ["READPREV"]
                     | ["ENDBR"]
+                    | ["DELETE"]
+                    | ["WRITE", "FILE"]
                     | ["READ"]
                     | ["REWRITE"]
                     | ["SYNCPOINT"]
@@ -2795,7 +2883,6 @@ mod tests {
         for command in [
             "SEND MAP('MENU') MAPSET('MAIN')",
             "RECEIVE MAP('MENU') MAPSET('MAIN')",
-            "WRITE FILE('ACCTDAT') FROM('AA11')",
         ] {
             let source = format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTAIL. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."

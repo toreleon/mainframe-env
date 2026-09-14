@@ -67,13 +67,13 @@ It contains all 263 API registry shapes with deterministic recognition,
 option-shape, family, EIBFN and handler identities. Readiness is deliberately
 split:
 
-- 26 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
+- 28 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
   `SYNCPOINT` routes and the reviewed incremental family slices;
-- 8 `legacy-compatibility` API routes that remain on the pre-existing raw
+- 6 `legacy-compatibility` API routes that remain on the pre-existing raw
   compatibility path; and
 - 229 `unready` rows that are recognized but fail explicitly as unsupported.
 
-The eight raw compatibility routes' implemented option subsets are owned by the
+The six raw compatibility routes' implemented option subsets are owned by the
 separate versioned
 [`legacy-execution-options.json`](../../conformance/0.9/cics/legacy-execution-options.json)
 catalog and its
@@ -124,6 +124,13 @@ model RIDFLD as the same input/output storage identity so the host-updated key
 feeds the next browse request; ENDBR closes the resource browse. REQID/SYSID,
 KEYLENGTH/LENGTH, SET, alternate RBA/RRN/XRBA and generic key modes, and
 UPDATE/TOKEN/RLS locking remain explicit compiler rejections.
+The typed keyed-mutation subset admits DELETE only with an explicit RIDFLD and
+WRITE FILE only with explicit FROM and RIDFLD data areas. Both use the same
+single FILE/DATASET resource binding and typed mutation envelope. DELETE after
+a prior READ UPDATE without RIDFLD, TOKEN correlation, SYSID/length handling,
+generic and alternate record identities, WRITE MASSINSERT, and RLS NOSUSPEND
+remain fail-closed until their update-context and data-definition contracts are
+owned.
 Each legacy route admits only the source-valid option subset whose behavior is
 implemented by that raw handler. A catalog-known option outside that subset
 fails explicitly before compatibility lowering instead of being silently

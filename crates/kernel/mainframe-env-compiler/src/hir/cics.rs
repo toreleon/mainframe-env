@@ -289,6 +289,8 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::ReadNext => CicsPlanOperation::ReadNext,
         HirCicsOperation::ReadPrev => CicsPlanOperation::ReadPrev,
         HirCicsOperation::EndBrowse => CicsPlanOperation::EndBrowse,
+        HirCicsOperation::Delete => CicsPlanOperation::Delete,
+        HirCicsOperation::Write => CicsPlanOperation::Write,
         HirCicsOperation::PopHandle => CicsPlanOperation::PopHandle,
         HirCicsOperation::PushHandle => CicsPlanOperation::PushHandle,
     }

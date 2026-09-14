@@ -10,11 +10,6 @@
       "execution_options": ["ABCODE", "ABDUMP", "ABOFFSET", "ABPROGRAM", "ACTIVITY", "ACTIVITYID", "ALTSCRNHT", "ALTSCRNWD", "APLKYBD", "APLTEXT", "APPLICATION", "APPLID", "ASRAINTRPT", "ASRAPSW", "ASRAPSW16", "ASRAREGS", "ASRAREGS64", "BRIDGE", "BTRANS", "CHANNEL", "CMDSEC", "COLOR", "CWALENG", "DEFSCRNHT", "DEFSCRNWD", "DESTID", "DESTIDLENG", "DS3270", "DSSCS", "ERRORMSG", "ERRORMSGLEN", "EWASUPP", "EXTDS", "FCI", "GMMI", "HILIGHT", "INITPARM", "INITPARMLEN", "KATAKANA", "LINKLEVEL", "LOCALCCSID", "MAJORVERSION", "MAPCOLUMN", "MAPHEIGHT", "MAPLINE", "MAPWIDTH", "MICROVERSION", "MINORVERSION", "MSRCONTROL", "NEXTTRANSID", "NOHANDLE", "OPERATION", "OPERKEYS", "OPSECURITY", "ORGABCODE", "OUTLINE", "PARTNS", "PARTNSET", "PLATFORM", "PRINSYSID", "PROCESS", "PROCESSTYPE", "PROGRAM", "PS", "QNAME", "RESP", "RESP2", "RESSEC", "RESTART", "SCRNHT", "SCRNWD", "SOSI", "SYSID", "TASKPRIORITY", "TCTUALENG", "TEXTKYBD", "TEXTPRINT", "TWALENG", "UNATTEND", "USERID", "VALIDATION"]
     },
     {
-      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0040",
-      "runtime_operation": "Delete",
-      "execution_options": ["FILE", "NOHANDLE", "RESP", "RESP2", "RIDFLD"]
-    },
-    {
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0163",
       "runtime_operation": "ReceiveMap",
       "execution_options": ["INTO", "MAP", "MAPSET", "NOHANDLE", "RESP", "RESP2"]
@@ -33,11 +28,6 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0192",
       "runtime_operation": "SendText",
       "execution_options": ["FROM", "NOHANDLE", "RESP", "RESP2"]
-    },
-    {
-      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0253",
-      "runtime_operation": "Write",
-      "execution_options": ["FILE", "FROM", "NOHANDLE", "RESP", "RESP2", "RIDFLD"]
     },
     {
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0257",

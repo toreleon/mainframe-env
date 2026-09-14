@@ -471,7 +471,7 @@ pub fn cics_application_registry_for_runtime_operation(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 26] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 28] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -680,6 +680,22 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 26] = [
         effects: READ_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Delete,
+        namespace: "cics.file",
+        name: "delete",
+        major: 1,
+        effects: REWRITE_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Write,
+        namespace: "cics.file",
+        name: "write",
+        major: 1,
+        effects: REWRITE_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
 ];
 
 /// Resolves the executable descriptor for a decoded CICS plan operation.
@@ -714,6 +730,8 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::ReadNext => &CICS_EXECUTABLE_DESCRIPTORS[23],
         CicsPlanOperation::ReadPrev => &CICS_EXECUTABLE_DESCRIPTORS[24],
         CicsPlanOperation::EndBrowse => &CICS_EXECUTABLE_DESCRIPTORS[25],
+        CicsPlanOperation::Delete => &CICS_EXECUTABLE_DESCRIPTORS[26],
+        CicsPlanOperation::Write => &CICS_EXECUTABLE_DESCRIPTORS[27],
     }
 }
 
@@ -774,7 +792,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 26);
+        assert_eq!(typed.len(), 28);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -784,7 +802,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 8);
+        assert_eq!(legacy.len(), 6);
         assert!(legacy.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && !descriptor.legacy_execution_options.is_empty()));
@@ -977,6 +995,8 @@ mod tests {
                 CicsPlanOperation::ReadNext,
                 CicsPlanOperation::ReadPrev,
                 CicsPlanOperation::EndBrowse,
+                CicsPlanOperation::Delete,
+                CicsPlanOperation::Write,
                 CicsPlanOperation::PopHandle,
                 CicsPlanOperation::PushHandle,
                 CicsPlanOperation::Read,

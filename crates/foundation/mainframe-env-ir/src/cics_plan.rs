@@ -6,6 +6,7 @@ use std::fmt;
 
 mod browse;
 mod codec_tags;
+mod file_mutation;
 mod handle_abend;
 mod output_shape;
 mod program_control;
@@ -98,6 +99,10 @@ pub enum CicsPlanOperation {
     PushHandle,
     /// Read one file record.
     Read,
+    /// Delete one explicitly identified file record.
+    Delete,
+    /// Write one explicitly keyed file record.
+    Write,
     /// Rewrite the record held by the current update context.
     Rewrite,
     /// Commit or roll back the current unit of work.
@@ -621,6 +626,9 @@ fn validate_operation_shape(
                 || plan.options.contains(&CicsPlanOption::Task)
                 || plan.options.contains(&CicsPlanOption::Uow)
                 || plan.options.contains(&CicsPlanOption::NoSuspend)
+        }
+        CicsPlanOperation::Delete | CicsPlanOperation::Write => {
+            file_mutation::invalid_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::Rewrite => {
             resources != 1
@@ -1305,6 +1313,51 @@ mod tests {
             outputs: Vec::new(),
             condition: CicsCondition::Default,
         };
+        let mutation_key = slot(12, "FILE.KEY");
+        let delete = CicsEffectPlan {
+            operation: CicsPlanOperation::Delete,
+            operands: vec![
+                start_browse.operands[0].clone(),
+                CicsNamedOperand {
+                    name: CicsOperandName::Ridfld,
+                    value: CicsOperandValue::Storage(mutation_key.clone()),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let write = CicsEffectPlan {
+            operation: CicsPlanOperation::Write,
+            operands: vec![
+                start_browse.operands[0].clone(),
+                CicsNamedOperand {
+                    name: CicsOperandName::From,
+                    value: CicsOperandValue::Storage(slot(13, "FILE.RECORD")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Ridfld,
+                    value: CicsOperandValue::Storage(mutation_key),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let mut missing_delete_key = delete.clone();
+        missing_delete_key
+            .operands
+            .retain(|operand| operand.name != CicsOperandName::Ridfld);
+        assert_eq!(
+            encode_cics_effect_plan(&missing_delete_key, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut literal_write_record = write.clone();
+        literal_write_record.operands[1].value = CicsOperandValue::Literal(b"DATA".to_vec());
+        assert_eq!(
+            encode_cics_effect_plan(&literal_write_record, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
         let mut missing_browse_key_output = read_next.clone();
         missing_browse_key_output
             .outputs
@@ -1329,6 +1382,8 @@ mod tests {
             read_next,
             read_prev,
             end_browse,
+            delete,
+            write,
         ] {
             let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
             let decoded = decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap();

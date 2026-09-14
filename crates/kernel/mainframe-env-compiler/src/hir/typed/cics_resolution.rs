@@ -775,6 +775,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         ["READNEXT"] => HirCicsOperation::ReadNext,
         ["READPREV"] => HirCicsOperation::ReadPrev,
         ["ENDBR"] => HirCicsOperation::EndBrowse,
+        ["DELETE"] => HirCicsOperation::Delete,
+        ["WRITE", "FILE"] => HirCicsOperation::Write,
         ["POP", "HANDLE"] => HirCicsOperation::PopHandle,
         ["PUSH", "HANDLE"] => HirCicsOperation::PushHandle,
         ["READ"] => HirCicsOperation::Read,
@@ -822,6 +824,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             &["FILE", "DATASET", "INTO", "RIDFLD", "RESP", "RESP2"]
         }
         HirCicsOperation::EndBrowse => &["FILE", "DATASET", "RESP", "RESP2"],
+        HirCicsOperation::Delete => &["FILE", "DATASET", "RIDFLD", "RESP", "RESP2"],
+        HirCicsOperation::Write => &["FILE", "DATASET", "FROM", "RIDFLD", "RESP", "RESP2"],
         HirCicsOperation::Read => &["FILE", "DATASET", "RIDFLD", "INTO", "RESP", "RESP2"],
         HirCicsOperation::Rewrite => &["FILE", "DATASET", "FROM", "RESP", "RESP2"],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA", "RESP", "RESP2"],
@@ -846,6 +850,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::ReadNext
         | HirCicsOperation::ReadPrev
         | HirCicsOperation::EndBrowse
+        | HirCicsOperation::Delete
+        | HirCicsOperation::Write
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle
         | HirCicsOperation::SetAssociationUserCorrData
@@ -889,22 +895,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         )));
     }
     program_control::validate_constraints(operation, &clauses)?;
-    let resources =
-        usize::from(clauses.contains_key("FILE")) + usize::from(clauses.contains_key("DATASET"));
-    if matches!(
-        operation,
-        HirCicsOperation::Read
-            | HirCicsOperation::Rewrite
-            | HirCicsOperation::StartBrowse
-            | HirCicsOperation::ReadNext
-            | HirCicsOperation::ReadPrev
-            | HirCicsOperation::EndBrowse
-    ) && resources != 1
-    {
-        return Err(ResolutionFailure::Invalid(
-            "CICS file command requires exactly one FILE or DATASET".into(),
-        ));
-    }
+    file_operands::validate_constraints(&clauses, operation)?;
     for required in match operation {
         HirCicsOperation::AddressSet => &["SET", "USING"][..],
         HirCicsOperation::Asktime => &["ABSTIME"][..],
@@ -919,14 +910,17 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle
         | HirCicsOperation::Return
+        | HirCicsOperation::StartBrowse
+        | HirCicsOperation::ReadNext
+        | HirCicsOperation::ReadPrev
         | HirCicsOperation::EndBrowse
+        | HirCicsOperation::Delete
+        | HirCicsOperation::Write
+        | HirCicsOperation::Read
+        | HirCicsOperation::Rewrite
         | HirCicsOperation::Suspend => &[][..],
         HirCicsOperation::Deq | HirCicsOperation::Enq => &["RESOURCE"][..],
         HirCicsOperation::Link | HirCicsOperation::Xctl => &["PROGRAM"][..],
-        HirCicsOperation::StartBrowse => &["RIDFLD"][..],
-        HirCicsOperation::ReadNext | HirCicsOperation::ReadPrev => &["RIDFLD", "INTO"][..],
-        HirCicsOperation::Read => &["RIDFLD", "INTO"][..],
-        HirCicsOperation::Rewrite => &["FROM"][..],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA"][..],
         HirCicsOperation::Syncpoint => &[][..],
     } {

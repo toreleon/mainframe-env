@@ -3156,6 +3156,93 @@ mod tests {
     }
 
     #[test]
+    fn cics_keyed_write_and_delete_use_typed_mutation_inputs() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSMUT. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3) VALUE '003'. 01 RECORD-X PIC X(4) VALUE 'DATA'. PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS DELETE DATASET('ACCTDAT') RIDFLD(KEY-X) END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let response = || CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                Vec::new(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            outputs: BTreeMap::new(),
+            unit_of_work: None,
+        };
+
+        let MachineDrive::HostCall(write) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("WRITE FILE did not call host");
+        };
+        assert!(matches!(
+            &write.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::Write,
+                arguments,
+                mutation: Some(_),
+                ..
+            }) if arguments["FILE"].bytes() == b"ACCTDAT"
+                && arguments["FROM"].bytes() == b"DATA"
+                && arguments["RIDFLD"].bytes() == b"003"
+        ));
+
+        let MachineDrive::HostCall(delete) = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: write.sequence,
+                outcome: Ok(HostResult::Cics(response())),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        ) else {
+            panic!("DELETE did not call host");
+        };
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x06, 0x04]);
+        assert!(matches!(
+            &delete.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::Delete,
+                arguments,
+                mutation: Some(_),
+                ..
+            }) if arguments["DATASET"].bytes() == b"ACCTDAT"
+                && arguments["RIDFLD"].bytes() == b"003"
+        ));
+
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: delete.sequence,
+                    outcome: Ok(HostResult::Cics(response())),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x06, 0x08]);
+    }
+
+    #[test]
     fn bare_asktime_requires_and_updates_both_implicit_eib_fields() {
         use mainframe_env_host_api::{
             CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,

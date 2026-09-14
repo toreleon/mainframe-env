@@ -30,6 +30,8 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::ReadNext => 23,
         CicsPlanOperation::ReadPrev => 24,
         CicsPlanOperation::EndBrowse => 25,
+        CicsPlanOperation::Delete => 26,
+        CicsPlanOperation::Write => 27,
     }
 }
 
@@ -61,6 +63,8 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         23 => Ok(CicsPlanOperation::ReadNext),
         24 => Ok(CicsPlanOperation::ReadPrev),
         25 => Ok(CicsPlanOperation::EndBrowse),
+        26 => Ok(CicsPlanOperation::Delete),
+        27 => Ok(CicsPlanOperation::Write),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

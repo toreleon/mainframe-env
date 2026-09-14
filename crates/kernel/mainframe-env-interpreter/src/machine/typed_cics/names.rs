@@ -66,6 +66,8 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::ReadNext => CicsOperation::ReadNext,
         CicsPlanOperation::ReadPrev => CicsOperation::ReadPrev,
         CicsPlanOperation::EndBrowse => CicsOperation::EndBrowse,
+        CicsPlanOperation::Delete => CicsOperation::Delete,
+        CicsPlanOperation::Write => CicsOperation::Write,
         CicsPlanOperation::PopHandle => CicsOperation::PopHandle,
         CicsPlanOperation::PushHandle => CicsOperation::PushHandle,
         CicsPlanOperation::Read => CicsOperation::Read,

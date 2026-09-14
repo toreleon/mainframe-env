@@ -97,6 +97,12 @@ All notable changes to mainframe-env are documented here.
   on reads, and writes the returned record into a pre-resolved INTO area.
   REQID/SYSID, alternate key modes and lengths, SET, and UPDATE/TOKEN/RLS
   semantics remain fail-closed.
+- Migrated the explicit-key `DELETE` and `WRITE FILE` compatibility subsets to
+  typed file-mutation plans. RIDFLD and WRITE FROM are resolved data-area
+  inputs, FILE/DATASET remains one exact resource alias, and both operations
+  carry typed mutation identity. Prior-update/TOKEN deletes, remote and length
+  forms, generic and alternate record identifiers, mass insert, and RLS wait
+  controls remain deferred.
 - Expanded the source-bounded CICS `ASSIGN` compatibility route with APPLID,
   SYSID, USERID, TASKPRIORITY, and the exact absent application/channel context
   defaults. It also reports absent CWA/TWA lengths, null OPERKEYS, and a normal

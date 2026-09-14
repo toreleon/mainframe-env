@@ -205,6 +205,15 @@ updates EIBFN to `060C`, `060E`, `0610`, and `0612`; forms needing named cursor,
 remote routing, alternate record identities, SET storage, or RLS update-token
 state do not enter this typed route.
 
+Typed keyed file mutation resolves all data-bearing operands before dispatch.
+DELETE reads one explicit RIDFLD storage slot; WRITE FILE reads FROM and
+RIDFLD storage slots, preserving record and key bytes in the typed request.
+Both operations require exactly one FILE/DATASET alias, carry a mutation
+identity, and update EIBFN to `0608` or `0604`. Forms whose key or record is a
+literal, whose DELETE key comes from prior update context, or whose semantics
+depend on TOKEN, remote routing, lengths, alternate identities, mass insert, or
+RLS suspension do not publish the typed executable.
+
 CICS PUSH HANDLE moves the current condition mappings, ignored-condition set,
 and active/canceled typed ABEND exits into one bounded task-local frame, leaving a
 clear specification set for the nested routine. POP HANDLE discards the nested
