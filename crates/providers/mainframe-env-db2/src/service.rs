@@ -1569,11 +1569,11 @@ fn db2_resources(
             .ok_or(HostProblem::Malformed)?;
             tables.insert(table_for_operation(statement, "FROM")?);
         }
-        Db2Operation::Commit | Db2Operation::Rollback => {
-            if let Some(pending) = state.pending.get(run) {
-                tables.extend(pending.tables.keys().cloned());
-            }
-        }
+        // Nothing pending: don't authorize a phantom unit of work.
+        Db2Operation::Commit | Db2Operation::Rollback => match state.pending.get(run) {
+            Some(pending) => tables.extend(pending.tables.keys().cloned()),
+            None => return Ok(Vec::new()),
+        },
     }
     if tables.is_empty() {
         return Ok(vec![EnterpriseResource::new(
@@ -3531,6 +3531,71 @@ mod tests {
         );
         assert_eq!(denied, Err(HostProblem::Unauthorized));
         assert_eq!(service.table_rows("APP.CODE").unwrap().len(), 1);
+        assert_eq!(
+            policy.seen.lock().unwrap().as_slice(),
+            &[EnterpriseResource::new(
+                EnterpriseResourceClass::Db2Table,
+                "APP.CODE",
+                AccessIntent::Update,
+            )
+            .unwrap()]
+        );
+    }
+
+    /// #183 regression: a run that never opened a Db2 unit of work must be
+    /// able to ROLLBACK even under an authorizer that denies every
+    /// resource, without being asked to authorize a phantom "CURRENT" uow.
+    #[test]
+    fn db2_rollback_with_no_pending_work_is_not_authorized_against_a_phantom_unit_of_work() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let policy = Arc::new(DenyEnterprise::default());
+        let service =
+            Db2Service::open_authorized(store, Db2Limits::default(), policy.clone()).unwrap();
+        // No `install_catalog` and no prior mutating Db2 request under this
+        // run: this run unit never opened a Db2 unit of work.
+        let rolled_back = service.execute(
+            &invocation("never-touched-db2"),
+            &request(Db2Operation::Rollback, 1, "", BTreeMap::new()),
+        );
+        assert_eq!(rolled_back, Ok(success(0, "ROLLBACK", Vec::new())));
+        assert!(
+            policy.seen.lock().unwrap().is_empty(),
+            "a rollback with nothing pending must not ask the authorizer about a phantom unit of work"
+        );
+    }
+
+    /// #183: a run that opened a real Db2 unit of work must still be
+    /// authorized to ROLLBACK it against the staged table -- this is the
+    /// surviving branch the phantom-unit-of-work fix must not break.
+    #[test]
+    fn db2_rollback_with_pending_insert_is_authorized_against_the_staged_table() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let unauthorized = Db2Service::open(store.clone(), Db2Limits::default()).unwrap();
+        unauthorized.install_catalog(installed_catalog(1)).unwrap();
+        let staging = invocation("pending-db2");
+        unauthorized
+            .execute(
+                &staging,
+                &request(
+                    Db2Operation::Insert,
+                    1,
+                    "INSERT INTO APP.CODE",
+                    BTreeMap::from([
+                        ("CODE".into(), variable("70")),
+                        ("DESCRIPTION".into(), varchar_variable("STAGED")),
+                    ]),
+                ),
+            )
+            .unwrap();
+
+        let policy = Arc::new(DenyEnterprise::default());
+        let service =
+            Db2Service::open_authorized(store, Db2Limits::default(), policy.clone()).unwrap();
+        let rolled_back = service.execute(
+            &staging,
+            &request(Db2Operation::Rollback, 2, "", BTreeMap::new()),
+        );
+        assert_eq!(rolled_back, Err(HostProblem::Unauthorized));
         assert_eq!(
             policy.seen.lock().unwrap().as_slice(),
             &[EnterpriseResource::new(

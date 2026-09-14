@@ -368,13 +368,13 @@ impl MqService {
                 }
             }
         }
+        let run = invocation.run_unit_id.as_str();
         let mut next = durable.state.scoped_snapshot();
-        let result = apply_request(
-            &mut next,
-            invocation.run_unit_id.as_str(),
-            request,
-            self.limits,
-        )?;
+        let result = apply_request(&mut next, run, request, self.limits)?;
+        let uow = [MqOperation::Commit, MqOperation::Rollback].contains(&request.operation);
+        if uow && durable.state.definitions.is_none() && !durable.state.pending.contains_key(run) {
+            return Ok(result);
+        }
         if next.replay.len() >= self.limits.max_replays {
             return Err(HostProblem::ResourceExhausted);
         }
@@ -888,12 +888,12 @@ fn mq_resources(
     };
     let mut queues = BTreeSet::new();
     match request.operation {
-        MqOperation::Commit | MqOperation::Rollback => {
-            if let Some(pending) = state.pending.get(run) {
-                queues.extend(pending.puts.iter().map(|(queue, _)| queue.clone()));
-                queues.extend(pending.gets.iter().map(|(queue, _)| queue.clone()));
-            }
+        MqOperation::Commit | MqOperation::Rollback if state.pending.contains_key(run) => {
+            let pending = &state.pending[run];
+            queues.extend(pending.puts.iter().map(|(queue, _)| queue.clone()));
+            queues.extend(pending.gets.iter().map(|(queue, _)| queue.clone()));
         }
+        MqOperation::Commit | MqOperation::Rollback => return Ok(Vec::new()),
         _ => {
             queues.insert(resolve_queue(state, run, request)?);
         }
@@ -1734,6 +1734,112 @@ mod tests {
                 AccessIntent::Update,
             )
             .unwrap()]
+        );
+    }
+
+    /// #183 regression: a run that never opened an MQ unit of work, with
+    /// MQ never installed at all, must be able to ROLLBACK even under a
+    /// denying authorizer and without persisting a durable replay row.
+    #[test]
+    fn mq_rollback_with_no_pending_work_is_not_authorized_against_a_phantom_unit_of_work() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let policy = Arc::new(DenyEnterprise::default());
+        let service =
+            MqService::open_authorized(store, MqLimits::default(), policy.clone()).unwrap();
+        // No `install` and no prior mutating MQ request under this run:
+        // this run unit never opened an MQ unit of work, and MQ itself has
+        // no installed definitions.
+        let rolled_back = service.execute(
+            &invocation("never-touched-mq"),
+            &request(MqOperation::Rollback, 1),
+        );
+        assert_eq!(rolled_back, Ok(success()));
+        assert!(
+            policy.seen.lock().unwrap().is_empty(),
+            "a rollback with nothing pending must not ask the authorizer about a phantom unit of work"
+        );
+    }
+
+    /// #183: a run that opened a real MQ unit of work must still be
+    /// authorized to ROLLBACK it against the staged queue -- this is the
+    /// surviving branch the phantom-unit-of-work fix must not break.
+    #[test]
+    fn mq_rollback_with_pending_put_is_authorized_against_the_staged_queue() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let unauthorized = MqService::open(store.clone(), MqLimits::default()).unwrap();
+        unauthorized
+            .install(vec![MqQueueDefinition {
+                name: "REQUEST.Q".into(),
+                trigger_program: None,
+            }])
+            .unwrap();
+        let staging = invocation("pending-mq");
+        let mut open = request(MqOperation::Open, 1);
+        open.queue = Some("REQUEST.Q".into());
+        let handle = unauthorized
+            .execute(&staging, &open)
+            .unwrap()
+            .handle
+            .unwrap();
+        let mut put = request(MqOperation::Put, 2);
+        put.handle = Some(handle);
+        put.options = 2;
+        put.message = b"STAGED".to_vec();
+        unauthorized.execute(&staging, &put).unwrap();
+
+        let policy = Arc::new(DenyEnterprise::default());
+        let service =
+            MqService::open_authorized(store, MqLimits::default(), policy.clone()).unwrap();
+        let rolled_back = service.execute(&staging, &request(MqOperation::Rollback, 3));
+        assert_eq!(rolled_back, Err(HostProblem::Unauthorized));
+        assert_eq!(
+            policy.seen.lock().unwrap().as_slice(),
+            &[EnterpriseResource::new(
+                EnterpriseResourceClass::MqQueue,
+                "REQUEST.Q",
+                AccessIntent::Update,
+            )
+            .unwrap()]
+        );
+    }
+
+    /// #183: an installed provider's no-op Commit/Rollback must persist its
+    /// replay row like any other mutating request, so a redelivery of the
+    /// same idempotency key replays the recorded no-op instead of acting on
+    /// whatever real unit of work the run has since opened.
+    #[test]
+    fn mq_no_op_rollback_replay_survives_later_staged_work_on_the_same_run() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = MqService::open(store, MqLimits::default()).unwrap();
+        service
+            .install(vec![MqQueueDefinition {
+                name: "REQUEST.Q".into(),
+                trigger_program: None,
+            }])
+            .unwrap();
+        let invocation = invocation("redeliver-mq");
+        let noop = request(MqOperation::Rollback, 1);
+        let first = service.execute(&invocation, &noop).unwrap();
+
+        let mut open = request(MqOperation::Open, 2);
+        open.queue = Some("REQUEST.Q".into());
+        let handle = service.execute(&invocation, &open).unwrap().handle.unwrap();
+        let mut put = request(MqOperation::Put, 3);
+        put.handle = Some(handle);
+        put.options = 2;
+        put.message = b"STAGED".to_vec();
+        service.execute(&invocation, &put).unwrap();
+
+        let redelivered = service.execute(&invocation, &noop).unwrap();
+        assert_eq!(redelivered, first);
+        assert!(
+            service
+                .lock()
+                .unwrap()
+                .state
+                .pending
+                .contains_key("redeliver-mq"),
+            "a replayed no-op rollback must not roll back work staged after it"
         );
     }
 

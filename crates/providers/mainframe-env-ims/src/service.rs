@@ -429,19 +429,20 @@ impl ImsService {
             }
         }
         let mut next = durable.state.scoped_snapshot();
-        let result = apply_request(
-            &mut next,
-            invocation.run_unit_id.as_str(),
-            request,
-            self.limits,
-        )?;
+        let run = invocation.run_unit_id.as_str();
+        let result = apply_request(&mut next, run, request, self.limits)?;
         if invocation.service_class == ServiceClass::Batch
             && matches!(
                 request.operation,
                 ImsOperation::Insert | ImsOperation::Replace | ImsOperation::Delete
             )
         {
-            next.pending_undo.remove(invocation.run_unit_id.as_str());
+            next.pending_undo.remove(run);
+        }
+        let uow = request.operation == ImsOperation::Commit
+            || request.operation == ImsOperation::Rollback;
+        if uow && next.definitions.is_none() && !durable.state.pending_undo.contains_key(run) {
+            return Ok(result);
         }
         if request.operation.is_mutating() {
             let key = replay_key.ok_or(HostProblem::MissingIdempotency)?;
@@ -1006,11 +1007,10 @@ fn ims_resources(
                 databases.insert(context(state, run)?.0);
             }
         }
-        ImsOperation::Commit | ImsOperation::Rollback => {
-            if let Some(pending) = state.pending_undo.get(run) {
-                databases.extend(pending.keys().cloned());
-            }
-        }
+        ImsOperation::Commit | ImsOperation::Rollback => match state.pending_undo.get(run) {
+            Some(pending) => databases.extend(pending.keys().cloned()),
+            None => return Ok(resources),
+        },
         ImsOperation::Schedule => {
             let psb = normalize(request.psb.as_deref().ok_or(HostProblem::Malformed)?);
             let definition = state
@@ -2116,6 +2116,13 @@ mod tests {
     }
 
     fn invocation(run: &str) -> Invocation {
+        invocation_as(run, ServiceClass::Batch)
+    }
+
+    /// Like `invocation`, but for a caller-chosen service class -- e.g. an
+    /// Interactive run, whose Insert/Replace/Delete does not clear
+    /// `pending_undo` the way `execute_at` clears it for Batch.
+    fn invocation_as(run: &str, service_class: ServiceClass) -> Invocation {
         let limits = InvocationLimits::default();
         let grants = ["host.ims.read", "host.ims.write"]
             .into_iter()
@@ -2129,7 +2136,7 @@ mod tests {
             Selector::new("ims:test", limits).unwrap(),
             ArtifactRef::new("ims:test", limits).unwrap(),
             Principal::new(PrincipalId::new("IBMUSER", limits).unwrap(), grants, limits).unwrap(),
-            ServiceClass::Batch,
+            service_class,
             0,
             100,
             TraceId::new(format!("trace-{run}"), limits).unwrap(),
@@ -2165,6 +2172,129 @@ mod tests {
                 transaction: Some("IMS-TEST".into()),
             }),
         }
+    }
+
+    /// #183 regression: a run that never opened an IMS unit of work, with
+    /// IMS never installed at all, must be able to ROLLBACK even under a
+    /// denying authorizer and without persisting a durable replay row.
+    #[test]
+    fn ims_rollback_with_no_pending_work_is_not_authorized_against_a_phantom_unit_of_work() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let policy = Arc::new(DenyEnterprise::default());
+        let service =
+            ImsService::open_authorized(store, ImsLimits::default(), policy.clone()).unwrap();
+        // No `install` and no prior mutating IMS request under this run:
+        // this run unit never opened an IMS unit of work, and IMS itself
+        // has no installed definitions.
+        let rolled_back = service.execute(
+            &invocation("never-touched-ims"),
+            &request(ImsOperation::Rollback, 1, &[], &[], Vec::new()),
+        );
+        assert_eq!(rolled_back, Ok(status("  ")));
+        assert!(
+            policy.seen.lock().unwrap().is_empty(),
+            "a rollback with nothing pending must not ask the authorizer about a phantom unit of work"
+        );
+    }
+
+    /// #183: a run that opened a real IMS unit of work must still be
+    /// authorized to ROLLBACK it against the staged database -- this is
+    /// the surviving branch the phantom-unit-of-work fix must not break.
+    #[test]
+    fn ims_rollback_with_pending_work_is_authorized_against_the_staged_database() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let unauthorized = ImsService::open(store.clone(), ImsLimits::default()).unwrap();
+        unauthorized.install(definition()).unwrap();
+        let staging = invocation_as("pending-ims", ServiceClass::Interactive);
+        unauthorized
+            .execute(
+                &staging,
+                &request(ImsOperation::Schedule, 1, &[], &[], Vec::new()),
+            )
+            .unwrap();
+        unauthorized
+            .execute(
+                &staging,
+                &request(
+                    ImsOperation::Insert,
+                    2,
+                    &["ROOT"],
+                    b"000801ROOT",
+                    Vec::new(),
+                ),
+            )
+            .unwrap();
+        // Drop the session (not the staged unit of work) so this Rollback's
+        // only enterprise resource is the staged database, not the PSB.
+        unauthorized
+            .execute(
+                &staging,
+                &request(ImsOperation::Terminate, 3, &[], &[], Vec::new()),
+            )
+            .unwrap();
+
+        let policy = Arc::new(DenyEnterprise::default());
+        let service =
+            ImsService::open_authorized(store, ImsLimits::default(), policy.clone()).unwrap();
+        let rolled_back = service.execute(
+            &staging,
+            &request(ImsOperation::Rollback, 4, &[], &[], Vec::new()),
+        );
+        assert_eq!(rolled_back, Err(HostProblem::Unauthorized));
+        assert_eq!(
+            policy.seen.lock().unwrap().as_slice(),
+            &[EnterpriseResource::new(
+                EnterpriseResourceClass::ImsDatabase,
+                "AUTHDB",
+                AccessIntent::Update,
+            )
+            .unwrap()]
+        );
+    }
+
+    /// #183: an installed provider's no-op Commit/Rollback must persist its
+    /// replay row like any other mutating request, so a redelivery of the
+    /// same idempotency key replays the recorded no-op instead of acting on
+    /// whatever real unit of work the run has since opened.
+    #[test]
+    fn ims_no_op_rollback_replay_survives_later_staged_work_on_the_same_run() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = ImsService::open(store, ImsLimits::default()).unwrap();
+        service.install(definition()).unwrap();
+        let invocation = invocation_as("redeliver-ims", ServiceClass::Interactive);
+        let noop = request(ImsOperation::Rollback, 1, &[], &[], Vec::new());
+        let first = service.execute(&invocation, &noop).unwrap();
+
+        service
+            .execute(
+                &invocation,
+                &request(ImsOperation::Schedule, 2, &[], &[], Vec::new()),
+            )
+            .unwrap();
+        service
+            .execute(
+                &invocation,
+                &request(
+                    ImsOperation::Insert,
+                    3,
+                    &["ROOT"],
+                    b"000801ROOT",
+                    Vec::new(),
+                ),
+            )
+            .unwrap();
+
+        let redelivered = service.execute(&invocation, &noop).unwrap();
+        assert_eq!(redelivered, first);
+        assert!(
+            service
+                .lock()
+                .unwrap()
+                .state
+                .pending_undo
+                .contains_key("redeliver-ims"),
+            "a replayed no-op rollback must not roll back work staged after it"
+        );
     }
 
     fn retain_as_legacy_replay(

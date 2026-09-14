@@ -109,6 +109,32 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Fixed CardDemo's account-update `SYNCPOINT ROLLBACK` failing with a bare
+  `Unauthorized` (surfaced as `host call failed: Unauthorized`) even though
+  the compensating dataset rewrite it protects was itself authorized.
+  `db2_resources`, `ims_resources`, and `mq_resources`
+  (`crates/providers/mainframe-env-{db2,ims,mq}/src/service.rs`) manufactured
+  a synthetic "CURRENT" unit-of-work resource and asked the enterprise
+  authorizer to approve it for every `Commit`/`Rollback`, even when the run
+  unit never opened a Db2, IMS, or MQ unit of work -- a regression from
+  `a51f274`'s enterprise-resource authorization, which 0.1.1
+  (`44f3081`) predates. `CicsService`'s `syncpoint_db2`/`syncpoint_ims`/
+  `syncpoint_mq` call all three unconditionally on every `SYNCPOINT`, so a
+  CardDemo transaction that never touches Db2/IMS/MQ was denied trying to
+  roll back work it never did. Each `*_resources` function now returns no
+  resources (nothing to authorize) when the run has no pending unit of work
+  for that provider. Fixing the authorization also exposed a second,
+  independent bug in `mainframe-env-ims`/`mainframe-env-mq`'s
+  `execute_at`: an untouched Commit/Rollback still persisted a durable
+  replay row, which `validate_state`'s `f87eaaa` invariant (state must be
+  empty absent an installed definition) then rejected as
+  `InfrastructureFailure` in an environment where IMS/MQ have no installed
+  definitions. Both now skip replay persistence for a Commit/Rollback only
+  when the provider has no installed definitions *and* the run has nothing
+  pending -- an installed-but-untouched Commit/Rollback still persists its
+  replay row, so a redelivered idempotency key still replays the recorded
+  no-op instead of acting on whatever real unit of work the run has since
+  opened. `toreleon/mainframe-env#183`.
 - Fixed `CicsResume` rejecting the ordinary pseudo-conversational hand-off
   between two different online transactions as a 503
   `infrastructure_failure`. `crates/apps/mainframe-env-server/src/product.rs`
