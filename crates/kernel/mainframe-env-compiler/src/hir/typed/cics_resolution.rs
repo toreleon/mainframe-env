@@ -12,17 +12,33 @@ use std::collections::{BTreeMap, BTreeSet};
 
 type Clauses = BTreeMap<String, Vec<String>>;
 
+/// One reviewed, compiler-only compatibility route: a bounded legacy clause
+/// shape admitted straight to a pre-existing raw runtime operation. Every
+/// entry is isolated from the 263-row application registry: it changes no
+/// row's readiness, advertising, or counts.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) struct CicsLegacySpiCompatibilityDescriptor {
+pub(super) struct CicsLegacyCompatibilityDescriptor {
+    /// The official row this profile admits (its own identity; for a
+    /// bare-application form such as row 0187 this differs from
+    /// `runtime_official_row`, the row the bound runtime operation is
+    /// itself reviewed against).
     pub(super) official_row: &'static str,
     pub(super) label_tokens: &'static [&'static str],
     pub(super) recognition_head: &'static [&'static str],
     pub(super) runtime_operation: &'static str,
+    pub(super) runtime_official_row: &'static str,
     pub(super) required_value_options: &'static [&'static str],
     pub(super) optional_value_options: &'static [&'static str],
     pub(super) optional_flag_options: &'static [&'static str],
     pub(super) application_discriminator_options: &'static [&'static str],
     pub(super) resp2_requires_resp: bool,
+    /// Whether a shape outside the bounded form is a hard compiler error
+    /// (true, e.g. INQUIRE PROGRAM's narrow SPI form) or falls through to
+    /// the pre-existing application-registry route (false, e.g. bare SEND's
+    /// much larger reviewed option set, where a real IBM option must keep
+    /// failing with the existing "handler is unready" diagnosis instead of
+    /// a fabricated one).
+    pub(super) reject_unknown_options: bool,
 }
 
 include!("generated_cics_spi_compatibility.rs");
@@ -39,10 +55,40 @@ struct CandidateFailure {
     detail: String,
 }
 
-pub(super) fn validated_legacy_spi_compatibility(
+/// Try every generated compatibility entry in turn, returning the first
+/// match. Recognition heads are disjoint reviewed command words (`INQUIRE`,
+/// `SEND`, ...), so at most one entry can ever match a given `body`.
+pub(super) fn validated_legacy_compatibility(
     body: &[String],
-) -> Resolution<Option<&'static CicsLegacySpiCompatibilityDescriptor>> {
-    let descriptor = &CICS_LEGACY_SPI_COMPATIBILITY;
+) -> Resolution<Option<&'static CicsLegacyCompatibilityDescriptor>> {
+    for descriptor in CICS_LEGACY_COMPATIBILITY {
+        if let Some(matched) = validated_against_legacy_descriptor(descriptor, body)? {
+            return Ok(Some(matched));
+        }
+    }
+    Ok(None)
+}
+
+/// A hard compiler error when `descriptor.reject_unknown_options` (its
+/// narrow, closed option set), or a silent `Ok(None)` fallthrough to the
+/// pre-existing application-registry route otherwise -- so a real,
+/// catalog-known option outside the bounded compatibility shape keeps
+/// failing with that route's own diagnosis instead of a fabricated one.
+fn legacy_compatibility_shape_mismatch(
+    descriptor: &'static CicsLegacyCompatibilityDescriptor,
+    message: String,
+) -> Resolution<Option<&'static CicsLegacyCompatibilityDescriptor>> {
+    if descriptor.reject_unknown_options {
+        Err(ResolutionFailure::Invalid(message))
+    } else {
+        Ok(None)
+    }
+}
+
+fn validated_against_legacy_descriptor(
+    descriptor: &'static CicsLegacyCompatibilityDescriptor,
+    body: &[String],
+) -> Resolution<Option<&'static CicsLegacyCompatibilityDescriptor>> {
     if descriptor.recognition_head.len() > body.len()
         || !descriptor
             .recognition_head
@@ -55,7 +101,7 @@ pub(super) fn validated_legacy_spi_compatibility(
     let remainder = &body[descriptor.recognition_head.len()..];
     let Some(selector) = descriptor.required_value_options.first() else {
         return Err(ResolutionFailure::Invalid(
-            "compiler SPI compatibility descriptor has no selector".into(),
+            "compiler legacy compatibility descriptor has no selector".into(),
         ));
     };
     let (clauses, options) = clauses(remainder, None)?;
@@ -86,30 +132,42 @@ pub(super) fn validated_legacy_spi_compatibility(
         .collect::<BTreeSet<_>>();
     for name in clauses.keys() {
         if flag_options.contains(name.as_str()) {
-            return Err(ResolutionFailure::Invalid(format!(
-                "CICS {} option {name} is a flag and rejects a parenthesized operand",
-                descriptor.label_tokens.join(" ")
-            )));
+            return legacy_compatibility_shape_mismatch(
+                descriptor,
+                format!(
+                    "CICS {} option {name} is a flag and rejects a parenthesized operand",
+                    descriptor.label_tokens.join(" ")
+                ),
+            );
         }
         if !value_options.contains(name.as_str()) {
-            return Err(ResolutionFailure::Invalid(format!(
-                "CICS {} has unknown legacy SPI option {name}",
-                descriptor.label_tokens.join(" ")
-            )));
+            return legacy_compatibility_shape_mismatch(
+                descriptor,
+                format!(
+                    "CICS {} has unknown legacy SPI option {name}",
+                    descriptor.label_tokens.join(" ")
+                ),
+            );
         }
     }
     for name in &options {
         if value_options.contains(name.as_str()) {
-            return Err(ResolutionFailure::Invalid(format!(
-                "CICS {} option {name} requires a parenthesized operand",
-                descriptor.label_tokens.join(" ")
-            )));
+            return legacy_compatibility_shape_mismatch(
+                descriptor,
+                format!(
+                    "CICS {} option {name} requires a parenthesized operand",
+                    descriptor.label_tokens.join(" ")
+                ),
+            );
         }
         if !flag_options.contains(name.as_str()) {
-            return Err(ResolutionFailure::Invalid(format!(
-                "CICS {} has unknown legacy SPI option {name}",
-                descriptor.label_tokens.join(" ")
-            )));
+            return legacy_compatibility_shape_mismatch(
+                descriptor,
+                format!(
+                    "CICS {} has unknown legacy SPI option {name}",
+                    descriptor.label_tokens.join(" ")
+                ),
+            );
         }
     }
     if let Some(required) = descriptor
@@ -117,22 +175,31 @@ pub(super) fn validated_legacy_spi_compatibility(
         .iter()
         .find(|required| !clauses.contains_key(**required))
     {
-        return Err(ResolutionFailure::Invalid(format!(
-            "CICS {} requires option {required}",
-            descriptor.label_tokens.join(" ")
-        )));
+        return legacy_compatibility_shape_mismatch(
+            descriptor,
+            format!(
+                "CICS {} requires option {required}",
+                descriptor.label_tokens.join(" ")
+            ),
+        );
     }
     if descriptor.resp2_requires_resp
         && clauses.contains_key("RESP2")
         && !clauses.contains_key("RESP")
     {
-        return Err(ResolutionFailure::Invalid(format!(
-            "CICS {} option RESP2 requires RESP",
-            descriptor.label_tokens.join(" ")
-        )));
+        return legacy_compatibility_shape_mismatch(
+            descriptor,
+            format!(
+                "CICS {} option RESP2 requires RESP",
+                descriptor.label_tokens.join(" ")
+            ),
+        );
     }
-    debug_assert_eq!(descriptor.runtime_operation, "Inquire");
-    debug_assert!(descriptor.official_row.contains(":spi-commands-unique:"));
+    debug_assert!(!descriptor.runtime_operation.is_empty());
+    debug_assert!(
+        descriptor.official_row.contains(":spi-commands-unique:")
+            || descriptor.official_row.contains(":api-commands:")
+    );
     Ok(Some(descriptor))
 }
 
@@ -596,8 +663,8 @@ fn statically_known_value_bytes(tokens: &[String], semantic: &SemanticModel) -> 
 /// parenthesized operand) is still rejected exactly as before.
 ///
 /// `descriptor` supplies the registry shape lookup; pass `None` to keep
-/// strict rejection of every repeat (used by the legacy SPI compatibility
-/// path, whose flag options aren't `CicsApplicationOptionValueShape`-typed).
+/// strict rejection of every repeat (used by every legacy compatibility
+/// route, whose flag options aren't `CicsApplicationOptionValueShape`-typed).
 fn clauses(
     tokens: &[String],
     descriptor: Option<&CicsApplicationRegistryDescriptor>,

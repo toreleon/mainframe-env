@@ -933,7 +933,7 @@ fn resolve_cics(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCi
     {
         body = &body[..body.len() - 1];
     }
-    if cics_resolution::validated_legacy_spi_compatibility(body)?.is_some() {
+    if cics_resolution::validated_legacy_compatibility(body)?.is_some() {
         return Err(ResolutionFailure::Unsupported);
     }
     let (descriptor, clauses, raw_options) = cics_resolution::validated_command(body, semantic)?;
@@ -2607,6 +2607,70 @@ mod tests {
             let message = diagnostic.public_message();
             message.contains("INQUIRE ACTIVITYID") && message.contains("handler is unready")
         }));
+    }
+
+    #[test]
+    fn legacy_send_compatibility_is_exactly_bare_send() {
+        // toreleon/mainframe-env#177: pinned AWS CardDemo (`59cc6c2f`) issues
+        // a bare 3270-logical `SEND FROM(...) LENGTH(...) NOHANDLE ERASE` in
+        // its ABEND-ROUTINE paragraphs (e.g. COACTUPC.cbl:4211). Row 0187 is
+        // `Unready`; this second compiler-only compatibility descriptor
+        // admits exactly that bounded shape to the pre-existing raw
+        // `SendText` route the same way `INQUIRE PROGRAM` reaches `Inquire`.
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBSND. DATA DIVISION. WORKING-STORAGE SECTION. 01 WS-DATA PIC X(10). PROCEDURE DIVISION. EXEC CICS SEND FROM(WS-DATA) LENGTH(10) NOHANDLE ERASE END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("bare SEND: {:?}", analysis.diagnostics));
+        let statement = hir
+            .statements
+            .iter()
+            .find(|statement| statement.kind == StatementKind::ExecCics)
+            .expect("EXEC CICS statement");
+        assert!(statement.resolved.is_none());
+
+        // A real IBM SEND option outside the bounded compatibility shape, and
+        // a bare SEND missing FROM, both fall through to today's behavior:
+        // row 0187 is still recognized by the 263-row registry and still
+        // `Unready`, so both fail with the pre-existing diagnosis rather than
+        // a fabricated "unknown option" from the new compatibility route.
+        for command in [
+            "SEND CTLCHAR(WS-DATA) FROM(WS-DATA)",
+            "SEND LENGTH(10) ERASE",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBSNE. DATA DIVISION. WORKING-STORAGE SECTION. 01 WS-DATA PIC X(10). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis.diagnostics.iter().any(|diagnostic| {
+                    let message = diagnostic.public_message();
+                    message.contains("SEND") && message.contains("handler is unready")
+                }),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+
+        // `SEND TEXT` and `SEND MAP` keep compiling exactly as before: their
+        // own catalog labels are application discriminators for the bare
+        // form, so it never claims them.
+        for command in ["SEND TEXT FROM(WS-DATA)", "SEND MAP('MENU') MAPSET('MAIN')"] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBSNU. DATA DIVISION. WORKING-STORAGE SECTION. 01 WS-DATA PIC X(10). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{command}: {:?}", analysis.diagnostics));
+            let statement = hir
+                .statements
+                .iter()
+                .find(|statement| statement.kind == StatementKind::ExecCics)
+                .unwrap_or_else(|| panic!("{command}: no EXEC CICS statement"));
+            assert!(statement.resolved.is_none(), "{command}");
+        }
     }
 
     #[test]

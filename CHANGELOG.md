@@ -109,6 +109,22 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Admitted pinned AWS CardDemo (`59cc6c2f`)'s bare 3270-logical
+  `EXEC CICS SEND FROM(...) LENGTH(...) NOHANDLE ERASE END-EXEC` -- issued in
+  five ABEND-ROUTINE paragraphs, `app/cbl/COACTUPC.cbl:4211`,
+  `COACTVWC.cbl:924`, `COCRDSLC.cbl:865`, `COCRDUPC.cbl:1539`, and
+  `app/app-transaction-type-db2/cbl/COTRTUPC.cbl:1684` -- through a second
+  generated, compiler-only compatibility descriptor bound to the
+  pre-existing raw `SendText` route the legacy runtime has executed since
+  0.1.1 (`44f3081`). Only the compile gate added in `f8d44ec`/`f1fe39e`
+  rejected it: registry row `ibm-cics-ts-6x-2026-08-31:api-commands:0187`
+  stays `Unready` and `advertised: false`, per the Syntax section of
+  `SSJL4D_6.x/reference-applications/commands-api/dfhp4_send3270logical.html`.
+  `toreleon/mainframe-env#177`. The reviewed runtime-operations table is left
+  unchanged, because editing it moves source-map, extraction, and review
+  receipt digests that cannot be re-verified while `toreleon/mainframe-env#173`
+  blocks the source review. Folding row 0187 into that table and deleting this
+  descriptor is tracked in `toreleon/mainframe-env#180`.
 - Gave every CardDemo conformance-harness check (`toreleon/mainframe-env#175`)
   that compiles an `app/app-transaction-type-db2/cbl` program the same Db2 DCL library
   (`app/app-transaction-type-db2/dcl`, as library `db2-dcl`) and

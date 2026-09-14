@@ -252,6 +252,69 @@ class CicsDescriptorTests(unittest.TestCase):
             self.assertTrue(all(not row["unresolved_dimensions"] for row in contract_rows))
         self.assertEqual(contracts["contract_sha256"], cics_descriptors.contract_digest(contracts))
 
+    def test_compiler_legacy_compatibility_includes_bare_send_bound_to_send_text(self):
+        # toreleon/mainframe-env#177: row 0187 (bare `SEND FROM(...)`) is a
+        # second generated compiler-only compatibility descriptor, bound to
+        # the pre-existing `SendText` runtime operation and its own reviewed
+        # runtime row (`api-commands:0192`, `SEND TEXT`). Row 0187 itself
+        # stays `Unready` in the 263-row registry; this route never touches it.
+        compiler_legacy = cics_descriptors.render_compiler_spi_compatibility(ROOT)
+        self.assertIn(
+            'official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0187"',
+            compiler_legacy,
+        )
+        self.assertIn('runtime_operation: "SendText"', compiler_legacy)
+        self.assertIn(
+            'runtime_official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0192"',
+            compiler_legacy,
+        )
+        self.assertIn('label_tokens: &["SEND"]', compiler_legacy)
+        self.assertIn('required_value_options: &["FROM"]', compiler_legacy)
+        self.assertIn('optional_value_options: &["LENGTH", "RESP", "RESP2"]', compiler_legacy)
+        self.assertIn('optional_flag_options: &["ERASE", "NOHANDLE"]', compiler_legacy)
+        self.assertIn(
+            'application_discriminator_options: '
+            '&["CONTROL", "MAP", "PAGE", "PARTNSET", "TEXT"]',
+            compiler_legacy,
+        )
+        self.assertIn("reject_unknown_options: false", compiler_legacy)
+        # The pre-existing INQUIRE PROGRAM compatibility entry is untouched.
+        self.assertIn(
+            'official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0155"',
+            compiler_legacy,
+        )
+        self.assertIn('runtime_operation: "Inquire"', compiler_legacy)
+        self.assertIn("reject_unknown_options: true", compiler_legacy)
+        self.assertNotIn("SetFileStatus", compiler_legacy)
+        self.assertNotIn("SET FILE", compiler_legacy)
+        # Row 0187 itself remains Unready and unadvertised; this route does
+        # not touch the 263-row application registry.
+        ir_registry = cics_descriptors.render_ir_registry(ROOT)
+        row_start = ir_registry.find('official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0187"')
+        self.assertNotEqual(row_start, -1)
+        row_end = ir_registry.find("CicsApplicationRegistryDescriptor {", row_start)
+        row_text = ir_registry[row_start:row_end]
+        self.assertIn("readiness: CicsApplicationHandlerReadiness::Unready", row_text)
+        self.assertIn("advertised: false", row_text)
+
+    def test_compiler_legacy_compatibility_cross_check_rejects_unbound_runtime_operation(self):
+        catalog = cics_descriptors.load_catalog(ROOT)
+        bogus = dict(cics_descriptors.COMPILER_SEND_COMPATIBILITY)
+        bogus["operation"] = "NotAReviewedRuntimeOperation"
+        with self.assertRaisesRegex(cics_descriptors.DescriptorError, "is not unique"):
+            cics_descriptors._compiler_legacy_compatibility_runtime_operation(catalog, bogus)
+
+        mismatched_row = dict(cics_descriptors.COMPILER_SEND_COMPATIBILITY)
+        mismatched_row["runtime_official_row"] = (
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0189"
+        )
+        with self.assertRaisesRegex(
+            cics_descriptors.DescriptorError, "differs from the reviewed runtime table"
+        ):
+            cics_descriptors._compiler_legacy_compatibility_runtime_operation(
+                catalog, mismatched_row
+            )
+
     def test_identity_digest_is_logical_stable_and_field_sensitive(self):
         catalog = cics_descriptors.load_catalog(ROOT)
         commands = catalog["_application_commands"]

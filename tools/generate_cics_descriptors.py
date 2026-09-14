@@ -319,16 +319,53 @@ POLICY_BINDINGS = {
 }
 
 TYPED_RUNTIME_OPERATIONS = frozenset({"Read", "Rewrite", "Syncpoint"})
+# Each profile below is a reviewed, compiler-only compatibility route: it
+# admits one narrow legacy clause shape directly to a pre-existing raw
+# runtime operation without enlarging the 263-row application registry or
+# changing any row's readiness. `official_row` is the row this profile
+# admits; `runtime_official_row` is the row the bound runtime `operation` is
+# itself reviewed against (the same row for `COMPILER_SPI_COMPATIBILITY`,
+# since INQUIRE PROGRAM has no separate application-catalog identity, and a
+# different row for `COMPILER_SEND_COMPATIBILITY`, whose runtime operation
+# is reviewed against `SEND TEXT`). `reject_unknown_options` selects, per
+# profile, whether a shape outside the bounded form is a hard compiler error
+# (INQUIRE PROGRAM's narrow SPI form) or falls through to the pre-existing
+# application-registry route (bare SEND's much larger reviewed option set,
+# where a real IBM option such as CTLCHAR must keep failing with the
+# existing "handler is unready" diagnosis rather than a fabricated one).
 COMPILER_SPI_COMPATIBILITY = {
     "operation": "Inquire",
     "official_row": f"{OFFICIAL_BASELINE}:spi-commands-unique:0155",
+    "runtime_official_row": f"{OFFICIAL_BASELINE}:spi-commands-unique:0155",
+    "interface": "spi-compatibility",
+    "family": "program-control",
+    "mutating": False,
     "label": "INQUIRE PROGRAM",
     "recognition_head": ["INQUIRE"],
     "required_value_options": ["PROGRAM"],
     "optional_value_options": ["RESP", "RESP2"],
     "optional_flag_options": ["NOHANDLE"],
     "resp2_requires_resp": True,
+    "expected_discriminators": ["ACTIVITYID", "CONTAINER", "EVENT", "PROCESS", "TIMER"],
+    "reject_unknown_options": True,
 }
+COMPILER_SEND_COMPATIBILITY = {
+    "operation": "SendText",
+    "official_row": f"{OFFICIAL_BASELINE}:api-commands:0187",
+    "runtime_official_row": f"{OFFICIAL_BASELINE}:api-commands:0192",
+    "interface": "api",
+    "family": "terminal-control",
+    "mutating": True,
+    "label": "SEND",
+    "recognition_head": ["SEND"],
+    "required_value_options": ["FROM"],
+    "optional_value_options": ["LENGTH", "RESP", "RESP2"],
+    "optional_flag_options": ["ERASE", "NOHANDLE"],
+    "resp2_requires_resp": True,
+    "expected_discriminators": ["CONTROL", "MAP", "PAGE", "PARTNSET", "TEXT"],
+    "reject_unknown_options": False,
+}
+COMPILER_LEGACY_COMPATIBILITY = (COMPILER_SPI_COMPATIBILITY, COMPILER_SEND_COMPATIBILITY)
 TYPED_RUNTIME_IR_EFFECTS = {
     "Read": frozenset(
         {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
@@ -3330,64 +3367,124 @@ def _rust_string_slice(values: list[str]) -> str:
     return "&[" + ", ".join(_rust_string(value) for value in values) + "]"
 
 
-def render_compiler_spi_compatibility(root: Path = ROOT) -> str:
-    """Render the one narrow legacy SPI form accepted by the COBOL compiler."""
-    catalog = load_catalog(root)
-    profile = COMPILER_SPI_COMPATIBILITY
+def _compiler_legacy_compatibility_runtime_operation(
+    catalog: dict[str, Any], profile: dict[str, Any]
+) -> dict[str, Any]:
+    """Cross-check `profile` against the one reviewed runtime table row it binds to."""
     matches = [
         row
         for row in catalog["_runtime_operations"]
         if row["operation"] == profile["operation"]
     ]
     if len(matches) != 1:
-        raise DescriptorError("compiler SPI compatibility operation is not unique")
+        raise DescriptorError(
+            f"compiler legacy compatibility operation {profile['operation']} is not unique "
+            "in the reviewed runtime table"
+        )
     operation = matches[0]
     if (
-        operation["interface"] != "spi-compatibility"
-        or operation["official_row"] != profile["official_row"]
-        or operation["label"] != profile["label"]
-        or operation["family"] != "program-control"
-        or operation["mutating"]
+        operation["interface"] != profile["interface"]
+        or operation["official_row"] != profile["runtime_official_row"]
+        or operation["family"] != profile["family"]
+        or operation["mutating"] != profile["mutating"]
     ):
-        raise DescriptorError("compiler SPI compatibility descriptor differs from runtime")
-    application_discriminators = sorted(
+        raise DescriptorError(
+            f"compiler legacy compatibility descriptor for {profile['operation']} "
+            "differs from the reviewed runtime table"
+        )
+    return operation
+
+
+def _compiler_legacy_compatibility_admitted_row(
+    catalog: dict[str, Any], profile: dict[str, Any]
+) -> None:
+    """Verify the admitted `official_row` matches its catalog unit and label, when known."""
+    official_row = profile["official_row"]
+    if ":api-commands:" in official_row:
+        matches = [
+            command
+            for command in catalog["_application_commands"]
+            if command["official_row"] == official_row
+        ]
+        if len(matches) != 1 or matches[0]["label"] != profile["label"]:
+            raise DescriptorError(
+                f"compiler legacy compatibility admitted row {official_row} "
+                "differs from the application catalog"
+            )
+    elif ":spi-commands-unique:" not in official_row:
+        raise DescriptorError(
+            f"compiler legacy compatibility official_row {official_row} must be an "
+            "api-commands or spi-commands-unique row"
+        )
+
+
+def _compiler_legacy_compatibility_discriminators(
+    catalog: dict[str, Any], profile: dict[str, Any]
+) -> list[str]:
+    """Derive sibling-form discriminators from the catalog labels, not a hand-list."""
+    head = profile["recognition_head"]
+    if len(head) != 1:
+        raise DescriptorError(
+            "compiler legacy compatibility recognition_head must be exactly one token"
+        )
+    prefix = f"{head[0]} "
+    discriminators = sorted(
         command["label"].split()[1]
         for command in catalog["_application_commands"]
-        if command["label"].startswith("INQUIRE ")
-        and len(command["label"].split()) == 2
+        if command["label"].startswith(prefix) and len(command["label"].split()) == 2
     )
-    if application_discriminators != [
-        "ACTIVITYID",
-        "CONTAINER",
-        "EVENT",
-        "PROCESS",
-        "TIMER",
-    ]:
-        raise DescriptorError("application INQUIRE discriminator set differs")
-    return "\n".join(
-        [
-            "// @generated by `python3 -B tools/generate_cics_descriptors.py`; do not edit.",
-            "",
-            "pub(super) const CICS_LEGACY_SPI_COMPATIBILITY:",
-            "    CicsLegacySpiCompatibilityDescriptor = CicsLegacySpiCompatibilityDescriptor {",
-            f"        official_row: {_rust_string(profile['official_row'])},",
-            f"        label_tokens: {_rust_string_slice(profile['label'].split())},",
-            f"        recognition_head: {_rust_string_slice(profile['recognition_head'])},",
-            f"        runtime_operation: {_rust_string(profile['operation'])},",
-            "        required_value_options: "
-            f"{_rust_string_slice(profile['required_value_options'])},",
-            "        optional_value_options: "
-            f"{_rust_string_slice(profile['optional_value_options'])},",
-            "        optional_flag_options: "
-            f"{_rust_string_slice(profile['optional_flag_options'])},",
-            "        application_discriminator_options: "
-            f"{_rust_string_slice(application_discriminators)},",
-            "        resp2_requires_resp: "
-            f"{str(profile['resp2_requires_resp']).lower()},",
-            "    };",
-            "",
-        ]
-    )
+    if discriminators != profile["expected_discriminators"]:
+        raise DescriptorError(
+            f"application {head[0]} discriminator set differs from the reviewed list"
+        )
+    return discriminators
+
+
+def render_compiler_spi_compatibility(root: Path = ROOT) -> str:
+    """Render the narrow legacy forms accepted directly by the COBOL compiler.
+
+    Each reviewed profile in `COMPILER_LEGACY_COMPATIBILITY` admits one bounded
+    legacy clause shape to a pre-existing raw runtime operation, isolated from
+    the 263-row application registry: it changes no row's readiness,
+    advertising, or counts.
+    """
+    catalog = load_catalog(root)
+    lines = [
+        "// @generated by `python3 -B tools/generate_cics_descriptors.py`; do not edit.",
+        "",
+        "pub(super) const CICS_LEGACY_COMPATIBILITY: "
+        "&[CicsLegacyCompatibilityDescriptor] = &[",
+    ]
+    for profile in COMPILER_LEGACY_COMPATIBILITY:
+        _compiler_legacy_compatibility_runtime_operation(catalog, profile)
+        _compiler_legacy_compatibility_admitted_row(catalog, profile)
+        discriminators = _compiler_legacy_compatibility_discriminators(catalog, profile)
+        lines.extend(
+            [
+                "    CicsLegacyCompatibilityDescriptor {",
+                f"        official_row: {_rust_string(profile['official_row'])},",
+                f"        label_tokens: {_rust_string_slice(profile['label'].split())},",
+                f"        recognition_head: {_rust_string_slice(profile['recognition_head'])},",
+                f"        runtime_operation: {_rust_string(profile['operation'])},",
+                "        runtime_official_row: "
+                f"{_rust_string(profile['runtime_official_row'])},",
+                "        required_value_options: "
+                f"{_rust_string_slice(profile['required_value_options'])},",
+                "        optional_value_options: "
+                f"{_rust_string_slice(profile['optional_value_options'])},",
+                "        optional_flag_options: "
+                f"{_rust_string_slice(profile['optional_flag_options'])},",
+                "        application_discriminator_options: "
+                f"{_rust_string_slice(discriminators)},",
+                "        resp2_requires_resp: "
+                f"{str(profile['resp2_requires_resp']).lower()},",
+                "        reject_unknown_options: "
+                f"{str(profile['reject_unknown_options']).lower()},",
+                "    },",
+            ]
+        )
+    lines.extend(["];", ""])
+    return "\n".join(lines)
 
 
 def render_ir_registry(root: Path = ROOT, contracts: dict[str, Any] | None = None) -> str:

@@ -86,11 +86,33 @@ the 263-row registry and its digest, and does not admit `SET FILE`, other
 operations otherwise remain confined to the separate legacy runtime
 collection; SPI/FEPI completion belongs to 0.10.
 
+A second generated, compiler-only compatibility descriptor
+(`toreleon/mainframe-env#177`) admits exactly a bare, non-MAP 3270-logical
+`SEND FROM(...)` -- with optional `LENGTH`, `RESP`, `RESP2` and flags `ERASE`,
+`NOHANDLE`, and no other options -- to the pre-existing raw `SendText` route
+the legacy runtime has executed since 0.1.1. It is bound to application row
+`0187`, whose own reviewed runtime operation (row `0192`, `SEND TEXT`) is
+`SendText`; every sibling `SEND *` form (`MAP`, `TEXT`, `CONTROL`, `PAGE`,
+`PARTNSET`) is an application discriminator and is excluded. Unlike the
+`INQUIRE PROGRAM` route, an option outside this bounded shape does not fail
+closed from the compatibility descriptor itself: it falls through to the
+pre-existing 263-row registry route, so a real, catalog-known SEND option
+(`CTLCHAR`, `WAIT`, `STRFIELD`, `CONVID`, ...) keeps failing with the
+existing "handler is unready" diagnosis for row `0187` instead of a
+fabricated "unknown option" from the compatibility route. This route changes
+no readiness, advertising, count or credit: row `0187` stays `Unready` and
+`advertised: false` in the 263-row registry, and the runtime is unchanged --
+the legacy route already passes `LENGTH` into the `SendText` request exactly
+the way `SEND TEXT` does, since both surface forms share
+`CicsOperation::SendText` and `typed_cics::execute_legacy`. Folding row
+`0187` into the reviewed runtime table itself is deferred until
+`toreleon/mainframe-env#173` lets the source review re-run.
+
 [`tools/generate_cics_descriptors.py`](../../tools/generate_cics_descriptors.py)
 deterministically writes the provider descriptors, host-API identity table,
 263-row contract, compact IR registry, and the isolated compiler-only
-`INQUIRE PROGRAM` SPI compatibility descriptor. `--check` compares all
-generated outputs without writing. Schema, freshness, digest and
+`INQUIRE PROGRAM` and bare-`SEND` legacy compatibility descriptors. `--check`
+compares all generated outputs without writing. Schema, freshness, digest and
 module-boundary checks run under `cargo xtask architecture-fast --check`;
 hand-editing a generated artifact or changing an authority without
 regeneration fails the gate.
