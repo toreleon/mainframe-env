@@ -121,6 +121,14 @@ const IGNORE_CONDITION_EFFECTS: &[Effect] = &[
     Effect::Audit,
     Effect::Condition,
 ];
+const QUEUE_WRITE_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+    Effect::Transaction,
+];
 
 /// Static executable facts owned by the typed CICS dialect.
 ///
@@ -471,7 +479,7 @@ pub fn cics_application_registry_for_runtime_operation(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 28] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 29] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -696,6 +704,14 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 28] = [
         effects: REWRITE_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::WriteTransientData,
+        namespace: "cics.queue",
+        name: "write-transient-data",
+        major: 1,
+        effects: QUEUE_WRITE_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
 ];
 
 /// Resolves the executable descriptor for a decoded CICS plan operation.
@@ -732,6 +748,7 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::EndBrowse => &CICS_EXECUTABLE_DESCRIPTORS[25],
         CicsPlanOperation::Delete => &CICS_EXECUTABLE_DESCRIPTORS[26],
         CicsPlanOperation::Write => &CICS_EXECUTABLE_DESCRIPTORS[27],
+        CicsPlanOperation::WriteTransientData => &CICS_EXECUTABLE_DESCRIPTORS[28],
     }
 }
 
@@ -792,7 +809,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 28);
+        assert_eq!(typed.len(), 29);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -802,7 +819,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 6);
+        assert_eq!(legacy.len(), 5);
         assert!(legacy.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && !descriptor.legacy_execution_options.is_empty()));
@@ -997,6 +1014,7 @@ mod tests {
                 CicsPlanOperation::EndBrowse,
                 CicsPlanOperation::Delete,
                 CicsPlanOperation::Write,
+                CicsPlanOperation::WriteTransientData,
                 CicsPlanOperation::PopHandle,
                 CicsPlanOperation::PushHandle,
                 CicsPlanOperation::Read,

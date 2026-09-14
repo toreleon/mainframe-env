@@ -5788,6 +5788,53 @@ mod tests {
     }
 
     #[test]
+    fn transient_data_length_selects_prefix_and_rejects_excess() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+        let write = request(
+            CicsOperation::WriteTransientData,
+            BTreeMap::from([
+                ("QUEUE".into(), argument(b"OUTQ")),
+                ("FROM".into(), argument(b"ABCDEF")),
+                ("LENGTH".into(), argument(b"3")),
+            ]),
+            1,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, write.clone(), 1), write)
+            .unwrap();
+        assert_eq!(
+            service.transient_records("OUTQ").unwrap(),
+            [b"ABC".to_vec()]
+        );
+
+        let excessive = request(
+            CicsOperation::WriteTransientData,
+            BTreeMap::from([
+                ("QUEUE".into(), argument(b"OUTQ")),
+                ("FROM".into(), argument(b"ABCDEF")),
+                ("LENGTH".into(), argument(b"7")),
+            ]),
+            2,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, excessive.clone(), 2),
+                excessive,
+            ),
+            Err(HostProblem::Condition {
+                name: "LENGERR".into(),
+                response: 22,
+                response2: 0,
+            })
+        );
+        assert_eq!(
+            service.transient_records("OUTQ").unwrap(),
+            [b"ABC".to_vec()]
+        );
+    }
+
+    #[test]
     fn pseudo_conversation_tdq_and_syncpoint_survive_restart_and_replay() {
         let memory = Arc::new(MemoryStore::new(Default::default()));
         let store: Arc<dyn ProviderStateStore> = memory.clone();
@@ -5815,6 +5862,7 @@ mod tests {
             BTreeMap::from([
                 ("QUEUE".into(), argument(b"JOBS")),
                 ("FROM".into(), argument(b"//REPORT JOB")),
+                ("LENGTH".into(), argument(b"8")),
             ]),
             2,
         );
@@ -5857,7 +5905,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             initial.transient_records("JOBS").unwrap(),
-            [b"//REPORT JOB".to_vec(), b"//SECOND JOB".to_vec()]
+            [b"//REPORT".to_vec(), b"//SECOND JOB".to_vec()]
         );
 
         let commit = request(CicsOperation::Syncpoint, BTreeMap::new(), 3);
@@ -5897,7 +5945,7 @@ mod tests {
         let restarted = service(store.clone());
         assert_eq!(
             restarted.transient_records("JOBS").unwrap(),
-            [b"//REPORT JOB".to_vec(), b"//SECOND JOB".to_vec()]
+            [b"//REPORT".to_vec(), b"//SECOND JOB".to_vec()]
         );
         let resumed_invocation = invocation_for("resumed-run", BTreeMap::new());
         let continuation = restarted

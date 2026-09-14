@@ -32,6 +32,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::EndBrowse => 25,
         CicsPlanOperation::Delete => 26,
         CicsPlanOperation::Write => 27,
+        CicsPlanOperation::WriteTransientData => 28,
     }
 }
 
@@ -65,6 +66,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         25 => Ok(CicsPlanOperation::EndBrowse),
         26 => Ok(CicsPlanOperation::Delete),
         27 => Ok(CicsPlanOperation::Write),
+        28 => Ok(CicsPlanOperation::WriteTransientData),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -94,6 +96,7 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::Program => 20,
         CicsOperandName::Commarea => 21,
         CicsOperandName::TransId => 22,
+        CicsOperandName::Queue => 23,
     }
 }
 
@@ -122,6 +125,7 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         20 => Ok(CicsOperandName::Program),
         21 => Ok(CicsOperandName::Commarea),
         22 => Ok(CicsOperandName::TransId),
+        23 => Ok(CicsOperandName::Queue),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

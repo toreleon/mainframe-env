@@ -2205,7 +2205,9 @@ mod tests {
 
     #[test]
     fn cics_outbound_operands_read_storage_bytes() {
-        use mainframe_env_host_api::{CicsOperation, HostRequest};
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsResponse, EffectResult, HostRequest, HostResult,
+        };
 
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSABI. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(3) VALUE 'ABC'. PROCEDURE DIVISION. EXEC CICS WRITEQ TD QUEUE('Q1') FROM(DATA-X) LENGTH(3) END-EXEC. STOP RUN.";
         let artifact = compile(source).unwrap();
@@ -2220,13 +2222,45 @@ mod tests {
         else {
             panic!("CICS operation did not call host");
         };
-        let HostRequest::Cics(request) = effect.request else {
+        let HostRequest::Cics(request) = &effect.request else {
             panic!("unexpected host request");
         };
         assert_eq!(request.operation, CicsOperation::WriteTransientData);
         assert_eq!(request.arguments["FROM"].bytes(), b"ABC");
         assert_eq!(request.arguments["QUEUE"].bytes(), b"Q1");
         assert_eq!(request.arguments["LENGTH"].bytes(), b"3");
+        assert!(request.mutation.is_some());
+        let response = CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                Vec::new(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            outputs: BTreeMap::new(),
+            unit_of_work: None,
+        };
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: effect.sequence,
+                    outcome: Ok(HostResult::Cics(response)),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x08, 0x02]);
     }
 
     #[test]

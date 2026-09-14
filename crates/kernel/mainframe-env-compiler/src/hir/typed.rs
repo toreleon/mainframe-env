@@ -167,6 +167,7 @@ pub enum HirCicsOperation {
     EndBrowse,
     Delete,
     Write,
+    WriteTransientData,
     PopHandle,
     PushHandle,
     Read,
@@ -187,6 +188,7 @@ pub enum HirCicsOperandName {
     Dataset,
     From,
     Ridfld,
+    Queue,
     Resource,
     Length,
     MaxLifetime,
@@ -2487,6 +2489,68 @@ mod tests {
     }
 
     #[test]
+    fn cics_transient_data_write_resolves_queue_record_and_optional_length() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTDQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(6) VALUE 'ABCDEF'. PROCEDURE DIVISION. EXEC CICS WRITEQ TD QUEUE('OUTQ') FROM(DATA-X) LENGTH(3) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("WRITEQ TD: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed WRITEQ TD");
+        assert_eq!(command.operation, HirCicsOperation::WriteTransientData);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Queue
+                && operand.value == HirCicsValue::Literal("OUTQ".into())
+        }));
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::From
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference) if reference.qualified_name == "DATA-X"
+                )
+        }));
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length && operand.value == HirCicsValue::Integer(3)
+        }));
+
+        for (command, expected) in [
+            ("WRITEQ TD FROM(DATA-X)", "requires QUEUE"),
+            ("WRITEQ TD QUEUE('OUTQ')", "requires FROM"),
+            (
+                "WRITEQ TD QUEUE('TOOLONG') FROM(DATA-X)",
+                "QUEUE requires a 1-4 character name",
+            ),
+            (
+                "WRITEQ TD QUEUE('OUTQ') FROM('ABC')",
+                "FROM requires a data area",
+            ),
+            (
+                "WRITEQ TD QUEUE('OUTQ') FROM(DATA-X) SYSID('R1')",
+                "unready for SYSID",
+            ),
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADTDQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(6). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
+    #[test]
     fn cics_shared_heads_resolve_with_valued_discriminators() {
         for (command, expected_label) in [
             ("ACQUIRE ACTIVITYID('A1')", "ACQUIRE ACTIVITYID"),
@@ -2763,7 +2827,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 6);
+        assert_eq!(legacy.len(), 5);
         assert!(
             legacy.iter().all(|descriptor| {
                 descriptor.advertised && descriptor.runtime_operation.is_some()
@@ -2786,6 +2850,7 @@ mod tests {
                     | ["ENDBR"]
                     | ["DELETE"]
                     | ["WRITE", "FILE"]
+                    | ["WRITEQ", "TD"]
                     | ["READ"]
                     | ["REWRITE"]
                     | ["SYNCPOINT"]
@@ -2951,25 +3016,21 @@ mod tests {
 
     #[test]
     fn legacy_cics_routes_reject_catalog_options_without_runtime_semantics() {
-        for (command, option) in [
-            ("ASSIGN FACILITY(USER-X)", "FACILITY"),
-            ("WRITEQ TD QUEUE('Q1') FROM('A') SYSID('R1')", "SYSID"),
-        ] {
-            let source = format!(
-                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLEG. DATA DIVISION. WORKING-STORAGE SECTION. 01 USER-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
-            );
-            let analysis = analyze(&source);
-            assert!(analysis.hir.is_none(), "{command}");
-            assert!(
-                analysis.diagnostics.iter().any(|diagnostic| {
-                    let message = diagnostic.public_message();
-                    message.contains("catalog-known but legacy execution is unready")
-                        && message.contains(option)
-                }),
-                "{command}: {:?}",
-                analysis.diagnostics
-            );
-        }
+        let command = "ASSIGN FACILITY(USER-X)";
+        let source = format!(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLEG. DATA DIVISION. WORKING-STORAGE SECTION. 01 USER-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+        );
+        let analysis = analyze(&source);
+        assert!(analysis.hir.is_none(), "{command}");
+        assert!(
+            analysis.diagnostics.iter().any(|diagnostic| {
+                let message = diagnostic.public_message();
+                message.contains("catalog-known but legacy execution is unready")
+                    && message.contains("FACILITY")
+            }),
+            "{command}: {:?}",
+            analysis.diagnostics
+        );
 
         let conflict = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSCONF. PROCEDURE DIVISION. EXEC CICS HANDLE ABEND CANCEL RESET END-EXEC. STOP RUN.",

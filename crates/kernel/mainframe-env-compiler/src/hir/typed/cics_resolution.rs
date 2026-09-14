@@ -16,7 +16,6 @@ use mainframe_env_ir::{
 use std::collections::{BTreeMap, BTreeSet};
 
 type Clauses = BTreeMap<String, Vec<String>>;
-
 mod abend;
 mod assign_validation;
 mod file_operands;
@@ -25,6 +24,7 @@ mod handle_abend;
 mod output_bindings;
 mod program_control;
 mod program_name;
+mod queue_control;
 mod transaction_name;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -777,6 +777,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         ["ENDBR"] => HirCicsOperation::EndBrowse,
         ["DELETE"] => HirCicsOperation::Delete,
         ["WRITE", "FILE"] => HirCicsOperation::Write,
+        ["WRITEQ", "TD"] => HirCicsOperation::WriteTransientData,
         ["POP", "HANDLE"] => HirCicsOperation::PopHandle,
         ["PUSH", "HANDLE"] => HirCicsOperation::PushHandle,
         ["READ"] => HirCicsOperation::Read,
@@ -826,6 +827,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::EndBrowse => &["FILE", "DATASET", "RESP", "RESP2"],
         HirCicsOperation::Delete => &["FILE", "DATASET", "RIDFLD", "RESP", "RESP2"],
         HirCicsOperation::Write => &["FILE", "DATASET", "FROM", "RIDFLD", "RESP", "RESP2"],
+        HirCicsOperation::WriteTransientData => &["QUEUE", "FROM", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::Read => &["FILE", "DATASET", "RIDFLD", "INTO", "RESP", "RESP2"],
         HirCicsOperation::Rewrite => &["FILE", "DATASET", "FROM", "RESP", "RESP2"],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA", "RESP", "RESP2"],
@@ -852,6 +854,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::EndBrowse
         | HirCicsOperation::Delete
         | HirCicsOperation::Write
+        | HirCicsOperation::WriteTransientData
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle
         | HirCicsOperation::SetAssociationUserCorrData
@@ -896,6 +899,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     }
     program_control::validate_constraints(operation, &clauses)?;
     file_operands::validate_constraints(&clauses, operation)?;
+    queue_control::validate_constraints(&clauses, operation)?;
     for required in match operation {
         HirCicsOperation::AddressSet => &["SET", "USING"][..],
         HirCicsOperation::Asktime => &["ABSTIME"][..],
@@ -918,6 +922,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::Write
         | HirCicsOperation::Read
         | HirCicsOperation::Rewrite
+        | HirCicsOperation::WriteTransientData
         | HirCicsOperation::Suspend => &[][..],
         HirCicsOperation::Deq | HirCicsOperation::Enq => &["RESOURCE"][..],
         HirCicsOperation::Link | HirCicsOperation::Xctl => &["PROGRAM"][..],
@@ -1031,6 +1036,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         });
     }
     operands.extend(file_operands::resolve(&clauses, operation, semantic)?);
+    operands.extend(queue_control::operands(&clauses, operation, semantic)?);
     if matches!(operation, HirCicsOperation::Deq | HirCicsOperation::Enq) {
         let resource = complete_data_reference(&clauses["RESOURCE"], semantic)?;
         operands.push(HirCicsNamedOperand {

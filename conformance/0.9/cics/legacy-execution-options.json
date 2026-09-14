@@ -28,11 +28,6 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0192",
       "runtime_operation": "SendText",
       "execution_options": ["FROM", "NOHANDLE", "RESP", "RESP2"]
-    },
-    {
-      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0257",
-      "runtime_operation": "WriteTransientData",
-      "execution_options": ["FROM", "LENGTH", "NOHANDLE", "QUEUE", "RESP", "RESP2"]
     }
   ]
 }

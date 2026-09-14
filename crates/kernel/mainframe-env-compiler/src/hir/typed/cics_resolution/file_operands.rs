@@ -41,6 +41,19 @@ pub(super) fn resolve(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
+    if !matches!(
+        operation,
+        HirCicsOperation::StartBrowse
+            | HirCicsOperation::ReadNext
+            | HirCicsOperation::ReadPrev
+            | HirCicsOperation::EndBrowse
+            | HirCicsOperation::Delete
+            | HirCicsOperation::Write
+            | HirCicsOperation::Read
+            | HirCicsOperation::Rewrite
+    ) {
+        return Ok(Vec::new());
+    }
     let browse = matches!(
         operation,
         HirCicsOperation::StartBrowse | HirCicsOperation::ReadNext | HirCicsOperation::ReadPrev

@@ -176,6 +176,7 @@ impl PlanContext<'_> {
                 HirCicsOperandName::Dataset => CicsOperandName::Dataset,
                 HirCicsOperandName::From => CicsOperandName::From,
                 HirCicsOperandName::Ridfld => CicsOperandName::Ridfld,
+                HirCicsOperandName::Queue => CicsOperandName::Queue,
                 HirCicsOperandName::Resource => CicsOperandName::Resource,
                 HirCicsOperandName::Length => CicsOperandName::Length,
                 HirCicsOperandName::MaxLifetime => CicsOperandName::MaxLifetime,
@@ -291,6 +292,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::EndBrowse => CicsPlanOperation::EndBrowse,
         HirCicsOperation::Delete => CicsPlanOperation::Delete,
         HirCicsOperation::Write => CicsPlanOperation::Write,
+        HirCicsOperation::WriteTransientData => CicsPlanOperation::WriteTransientData,
         HirCicsOperation::PopHandle => CicsPlanOperation::PopHandle,
         HirCicsOperation::PushHandle => CicsPlanOperation::PushHandle,
     }

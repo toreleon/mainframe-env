@@ -10,6 +10,7 @@ mod file_mutation;
 mod handle_abend;
 mod output_shape;
 mod program_control;
+mod queue_control;
 
 use codec_tags::{
     operand_from_tag, operand_tag, operation_from_tag, operation_tag, option_from_tag, option_tag,
@@ -103,6 +104,8 @@ pub enum CicsPlanOperation {
     Delete,
     /// Write one explicitly keyed file record.
     Write,
+    /// Write one bounded record to a transient data queue.
+    WriteTransientData,
     /// Rewrite the record held by the current update context.
     Rewrite,
     /// Commit or roll back the current unit of work.
@@ -143,6 +146,8 @@ pub enum CicsOperandName {
     From,
     /// `RIDFLD(...)` record identifier.
     Ridfld,
+    /// `QUEUE(...)` transient-data destination.
+    Queue,
     /// `RESOURCE(...)` enqueue identity.
     Resource,
     /// `LENGTH(...)` content-identity length.
@@ -629,6 +634,9 @@ fn validate_operation_shape(
         }
         CicsPlanOperation::Delete | CicsPlanOperation::Write => {
             file_mutation::invalid_shape(plan, inputs, outputs)
+        }
+        CicsPlanOperation::WriteTransientData => {
+            queue_control::invalid_write_transient_data_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::Rewrite => {
             resources != 1
@@ -1344,6 +1352,26 @@ mod tests {
             outputs: Vec::new(),
             condition: CicsCondition::Default,
         };
+        let write_transient = CicsEffectPlan {
+            operation: CicsPlanOperation::WriteTransientData,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::Queue,
+                    value: CicsOperandValue::Literal(b"OUTQ".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::From,
+                    value: CicsOperandValue::Storage(slot(14, "TDQ.RECORD")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Length,
+                    value: CicsOperandValue::Integer(4),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
         let mut missing_delete_key = delete.clone();
         missing_delete_key
             .operands
@@ -1356,6 +1384,12 @@ mod tests {
         literal_write_record.operands[1].value = CicsOperandValue::Literal(b"DATA".to_vec());
         assert_eq!(
             encode_cics_effect_plan(&literal_write_record, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut literal_transient_record = write_transient.clone();
+        literal_transient_record.operands[1].value = CicsOperandValue::Literal(b"DATA".to_vec());
+        assert_eq!(
+            encode_cics_effect_plan(&literal_transient_record, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
         let mut missing_browse_key_output = read_next.clone();
@@ -1384,6 +1418,7 @@ mod tests {
             end_browse,
             delete,
             write,
+            write_transient,
         ] {
             let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
             let decoded = decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap();

@@ -67,13 +67,13 @@ It contains all 263 API registry shapes with deterministic recognition,
 option-shape, family, EIBFN and handler identities. Readiness is deliberately
 split:
 
-- 28 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
+- 29 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
   `SYNCPOINT` routes and the reviewed incremental family slices;
-- 6 `legacy-compatibility` API routes that remain on the pre-existing raw
+- 5 `legacy-compatibility` API routes that remain on the pre-existing raw
   compatibility path; and
 - 229 `unready` rows that are recognized but fail explicitly as unsupported.
 
-The six raw compatibility routes' implemented option subsets are owned by the
+The five raw compatibility routes' implemented option subsets are owned by the
 separate versioned
 [`legacy-execution-options.json`](../../conformance/0.9/cics/legacy-execution-options.json)
 catalog and its
@@ -131,6 +131,11 @@ a prior READ UPDATE without RIDFLD, TOKEN correlation, SYSID/length handling,
 generic and alternate record identities, WRITE MASSINSERT, and RLS NOSUSPEND
 remain fail-closed until their update-context and data-definition contracts are
 owned.
+The typed local WRITEQ TD subset requires a bounded QUEUE selector and FROM
+storage input, with optional numeric LENGTH. The provider writes exactly the
+selected prefix under the request's mutation identity, so retries compare the
+semantic record rather than ignored trailing bytes. Remote SYSID routing and
+TDQUEUE definition-state conditions remain deferred.
 Each legacy route admits only the source-valid option subset whose behavior is
 implemented by that raw handler. A catalog-known option outside that subset
 fails explicitly before compatibility lowering instead of being silently

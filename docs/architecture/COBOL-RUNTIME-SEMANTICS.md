@@ -214,6 +214,13 @@ literal, whose DELETE key comes from prior update context, or whose semantics
 depend on TOKEN, remote routing, lengths, alternate identities, mass insert, or
 RLS suspension do not publish the typed executable.
 
+Typed local WRITEQ TD captures a 1–4 character QUEUE name and one FROM storage
+area. An omitted LENGTH selects the complete area; a present integer LENGTH
+selects that exact leading byte count and raises LENGERR before mutation when
+it exceeds the captured area. The persisted prefix and mutation identity drive
+idempotent replay, and normal completion updates EIBFN to `0802`. Remote SYSID
+and unavailable queue-definition state remain outside this typed subset.
+
 CICS PUSH HANDLE moves the current condition mappings, ignored-condition set,
 and active/canceled typed ABEND exits into one bounded task-local frame, leaving a
 clear specification set for the nested routine. POP HANDLE discards the nested

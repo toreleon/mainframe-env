@@ -103,6 +103,11 @@ All notable changes to mainframe-env are documented here.
   carry typed mutation identity. Prior-update/TOKEN deletes, remote and length
   forms, generic and alternate record identifiers, mass insert, and RLS wait
   controls remain deferred.
+- Migrated the local `WRITEQ TD` compatibility subset to a typed queue-write
+  plan. QUEUE is a validated 1–4 character literal or field, FROM is a resolved
+  data area, and optional numeric LENGTH truncates the persisted record before
+  idempotency comparison. Remote SYSID routing and unimplemented TDQUEUE
+  definition/open/disabled condition semantics remain fail-closed.
 - Expanded the source-bounded CICS `ASSIGN` compatibility route with APPLID,
   SYSID, USERID, TASKPRIORITY, and the exact absent application/channel context
   defaults. It also reports absent CWA/TWA lengths, null OPERKEYS, and a normal
