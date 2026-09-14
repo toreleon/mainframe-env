@@ -133,10 +133,11 @@ All notable changes to mainframe-env are documented here.
   CAS, roll back on failed persistence, survive a terminal-input handoff and
   SQLite reopen, and clear when the task completes or recovery discards a
   non-handoff terminal task. `MECS6` label-only state remains readable.
-- Extended the session state to `MECS8` with the latest explicit EXEC CICS
-  ABEND code, dump request, and failing program. ASSIGN ABCODE, ABDUMP, and
-  ABPROGRAM now survive handler and program-transfer handoffs and SQLite reopen;
-  `MECS7` remains readable with no abend history.
+- Extended the session state to `MECS9` with the first and latest explicit EXEC
+  CICS ABEND codes, dump request, and failing program. ASSIGN ABCODE, ORGABCODE,
+  ABDUMP, and ABPROGRAM now survive repeated-handler and program-transfer
+  handoffs and SQLite reopen; `MECS8` remains readable by treating its sole
+  code as both original and current, and `MECS7` retains no abend history.
 - Added current-level CICS `HANDLE ABEND PROGRAM(name)` with exact local-program
   SAF and PGMIDERR checks, issuing-program COMMAREA transfer, CANCEL/RESET and
   PUSH/POP participation, a compiled two-program selected route, and recoverable

@@ -16,6 +16,7 @@ pub(in crate::service) fn session_schema_version(schema: &[u8]) -> Option<u8> {
         b"MECS6" => Some(6),
         b"MECS7" => Some(7),
         b"MECS8" => Some(8),
+        b"MECS9" => Some(9),
         _ => None,
     }
 }
@@ -38,6 +39,7 @@ impl AbendExit {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::service) struct AbendRecord {
     pub(in crate::service) code: Vec<u8>,
+    pub(in crate::service) original_code: Vec<u8>,
     pub(in crate::service) dump_requested: bool,
     pub(in crate::service) program: Option<String>,
 }
@@ -155,6 +157,7 @@ fn encode_abend_record(out: &mut Vec<u8>, record: Option<&AbendRecord>) -> Resul
         return Ok(());
     };
     if !valid_abend_code(&record.code)
+        || !valid_abend_code(&record.original_code)
         || record
             .program
             .as_deref()
@@ -166,6 +169,7 @@ fn encode_abend_record(out: &mut Vec<u8>, record: Option<&AbendRecord>) -> Resul
     field(out, &record.code)?;
     out.push(u8::from(record.dump_requested));
     field(out, record.program.as_deref().unwrap_or("").as_bytes())?;
+    field(out, &record.original_code)?;
     Ok(())
 }
 
@@ -245,7 +249,7 @@ fn encode_abend_exit(out: &mut Vec<u8>, exit: Option<&AbendExit>) -> Result<(), 
 pub(in crate::service) fn decode_handle_state(
     reader: &mut Reader<'_>,
     legacy_abend_labels: bool,
-    has_abend_record: bool,
+    abend_record_version: u8,
 ) -> Result<HandleState, HostProblem> {
     let (handlers, aid_handlers, ignored_conditions, abend_handler, cancelled_abend_handler) =
         decode_handle_specifications(reader, legacy_abend_labels)?;
@@ -271,8 +275,8 @@ pub(in crate::service) fn decode_handle_state(
             cancelled_abend_handler,
         });
     }
-    let latest_abend = if has_abend_record {
-        decode_abend_record(reader)?
+    let latest_abend = if abend_record_version > 0 {
+        decode_abend_record(reader, abend_record_version)?
     } else {
         None
     };
@@ -292,14 +296,18 @@ pub(in crate::service) fn decode_session_handle_state(
     schema: u8,
 ) -> Result<HandleState, HostProblem> {
     match schema {
-        6 => decode_handle_state(reader, true, false),
-        7 => decode_handle_state(reader, false, false),
-        8 => decode_handle_state(reader, false, true),
+        6 => decode_handle_state(reader, true, 0),
+        7 => decode_handle_state(reader, false, 0),
+        8 => decode_handle_state(reader, false, 1),
+        9 => decode_handle_state(reader, false, 2),
         _ => Ok(HandleState::default()),
     }
 }
 
-fn decode_abend_record(reader: &mut Reader<'_>) -> Result<Option<AbendRecord>, HostProblem> {
+fn decode_abend_record(
+    reader: &mut Reader<'_>,
+    record_version: u8,
+) -> Result<Option<AbendRecord>, HostProblem> {
     match reader.take(1)?[0] {
         0 => Ok(None),
         1 => {
@@ -311,11 +319,20 @@ fn decode_abend_record(reader: &mut Reader<'_>) -> Result<Option<AbendRecord>, H
             };
             let program = String::from_utf8(reader.field(8)?)
                 .map_err(|_| HostProblem::InfrastructureFailure)?;
-            if !valid_abend_code(&code) || !program.is_empty() && !valid_program_name(&program) {
+            let original_code = if record_version >= 2 {
+                reader.field(4)?
+            } else {
+                code.clone()
+            };
+            if !valid_abend_code(&code)
+                || !valid_abend_code(&original_code)
+                || !program.is_empty() && !valid_program_name(&program)
+            {
                 return Err(HostProblem::InfrastructureFailure);
             }
             Ok(Some(AbendRecord {
                 code,
+                original_code,
                 dump_requested,
                 program: (!program.is_empty()).then_some(program),
             }))

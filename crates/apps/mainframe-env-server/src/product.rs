@@ -9744,7 +9744,7 @@ mod tests {
             )
             .replace(
                 "ABPROGRAM(ABPROGRAM-X) ASRAPSW(ASRA-PSW-X)",
-                "ABPROGRAM(ABPROGRAM-X) ASRAINTRPT(ASRA-PSW-X) ASRAPSW(ASRA-PSW-X) ERRORMSG(ERROR-MSG-X) ERRORMSGLEN(ERROR-MSG-LENGTH-X)",
+                "ABPROGRAM(ABPROGRAM-X) ASRAINTRPT(ASRA-PSW-X) ASRAPSW(ASRA-PSW-X) ERRORMSG(ERROR-MSG-X) ERRORMSGLEN(ERROR-MSG-LENGTH-X) ORGABCODE(ABCODE-X)",
             )
             .replace(
                 "01 FCI-X PIC X VALUE 'Z'.",
@@ -10311,13 +10311,23 @@ mod tests {
     fn online_handle_abend_reset_reactivates_the_selected_exit_once() {
         let limits = SourceLimits::default();
         let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. HABRESET.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 COUNT-X PIC 9 VALUE 0.\n01 FIRST-FN PIC X(2).\n01 SECOND-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS HANDLE ABEND LABEL(ABEND-HANDLER) END-EXEC.\nEXEC CICS ABEND ABCODE('B001') END-EXEC.\nSTOP RUN.\nABEND-HANDLER.\nADD 1 TO COUNT-X.\nMOVE EIBFN TO FIRST-FN.\nIF COUNT-X = 1\n  EXEC CICS HANDLE ABEND RESET END-EXEC\n  EXEC CICS ABEND ABCODE('B002') END-EXEC\nEND-IF.\nMOVE EIBFN TO SECOND-FN.\nEXEC CICS HANDLE ABEND END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let source = std::str::from_utf8(source)
+            .unwrap()
+            .replace(
+                "01 COUNT-X PIC 9 VALUE 0.\n",
+                "01 COUNT-X PIC 9 VALUE 0.\n01 CURRENT-ABCODE PIC X(4).\n01 ORIGINAL-ABCODE PIC X(4).\n",
+            )
+            .replace(
+                "END-IF.\nMOVE EIBFN TO SECOND-FN.",
+                "END-IF.\nMOVE EIBFN TO SECOND-FN.\nEXEC CICS ASSIGN ABCODE(CURRENT-ABCODE) ORGABCODE(ORIGINAL-ABCODE) END-EXEC.",
+            );
         let path = LogicalPath::new("HABRESET.cbl", limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
             &path,
             vec![
                 SourceFile::input(
                     "HABRESET.cbl",
-                    source.to_vec(),
+                    source.as_bytes().to_vec(),
                     SourceFormat::Free,
                     SourceEncoding::Utf8,
                     limits,
@@ -10409,6 +10419,14 @@ mod tests {
             .unwrap();
         assert_eq!(restored.variable("COUNT-X").unwrap().bytes(), b"2");
         assert_eq!(
+            restored.variable("CURRENT-ABCODE").unwrap().bytes(),
+            b"B002"
+        );
+        assert_eq!(
+            restored.variable("ORIGINAL-ABCODE").unwrap().bytes(),
+            b"B001"
+        );
+        assert_eq!(
             restored.variable("FIRST-FN").unwrap().bytes(),
             &[0x0e, 0x0c]
         );
@@ -10425,7 +10443,7 @@ mod tests {
                 .filter(|record| record.capability.as_str() == "host.cics.execute")
                 .map(|record| (record.effect_sequence, record.decision))
                 .collect::<Vec<_>>(),
-            (1..=6)
+            (1..=7)
                 .map(|sequence| {
                     (
                         sequence,

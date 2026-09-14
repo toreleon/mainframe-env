@@ -107,7 +107,7 @@ pub(in crate::service) fn encode_session(session: &Session) -> Result<Vec<u8>, H
         IdempotencyKey::new(key, InvocationLimits::default())
             .map_err(|_| HostProblem::InfrastructureFailure)?;
     }
-    let mut out = b"MECS8".to_vec();
+    let mut out = b"MECS9".to_vec();
     out.extend_from_slice(&session.rows.to_be_bytes());
     out.extend_from_slice(&session.columns.to_be_bytes());
     field(&mut out, session.principal.as_bytes())?;
@@ -531,8 +531,13 @@ fn abend(
     } else {
         None
     };
+    let original_code = run
+        .latest_abend
+        .as_ref()
+        .map_or_else(|| code.clone(), |record| record.original_code.clone());
     run.latest_abend = valid_abend_code(&code).then(|| AbendRecord {
         code: code.clone(),
+        original_code,
         dump_requested,
         program: run.current_program.clone(),
     });

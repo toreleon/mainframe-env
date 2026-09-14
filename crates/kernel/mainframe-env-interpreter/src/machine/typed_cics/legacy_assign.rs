@@ -47,6 +47,7 @@ pub(super) const OUTPUT_NAMES: &[&str] = &[
     "OPERATION",
     "OPERKEYS",
     "OPSECURITY",
+    "ORGABCODE",
     "OUTLINE",
     "PARTNS",
     "PARTNSET",

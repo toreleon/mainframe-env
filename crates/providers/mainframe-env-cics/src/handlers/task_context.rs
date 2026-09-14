@@ -177,6 +177,13 @@ pub(in crate::service) fn assign(
         }
         response.outputs.insert("ABCODE".into(), bounded(value)?);
     }
+    if request.arguments.contains_key("ORGABCODE") {
+        let mut value = vec![b' '; 4];
+        if let Some(record) = &run.latest_abend {
+            value[..record.original_code.len()].copy_from_slice(&record.original_code);
+        }
+        response.outputs.insert("ORGABCODE".into(), bounded(value)?);
+    }
     if request.arguments.contains_key("ABDUMP") {
         let value = run
             .latest_abend
@@ -413,6 +420,7 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "OPERATION",
         "OPERKEYS",
         "OPSECURITY",
+        "ORGABCODE",
         "OUTLINE",
         "PARTNS",
         "PARTNSET",

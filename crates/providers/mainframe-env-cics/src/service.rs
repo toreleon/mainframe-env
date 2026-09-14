@@ -4850,6 +4850,7 @@ mod tests {
                 ("ERRORMSG".into(), argument(b"ERROR-MSG-OUT")),
                 ("ERRORMSGLEN".into(), argument(b"ERROR-MSG-LENGTH-OUT")),
                 ("LINKLEVEL".into(), argument(b"LINK-LEVEL-OUT")),
+                ("ORGABCODE".into(), argument(b"ORIGINAL-ABCODE-OUT")),
             ]),
             27,
         );
@@ -4866,6 +4867,7 @@ mod tests {
         assert_eq!(diagnostics.outputs["ERRORMSG"].bytes(), &[0; 500]);
         assert_eq!(diagnostics.outputs["ERRORMSGLEN"].bytes(), b"0");
         assert_eq!(diagnostics.outputs["LINKLEVEL"].bytes(), b"1");
+        assert_eq!(diagnostics.outputs["ORGABCODE"].bytes(), b"    ");
         for (name, length) in [
             ("ASRAINTRPT", 8),
             ("ASRAPSW", 8),
@@ -5403,6 +5405,7 @@ mod tests {
                 ("ERRORMSG".into(), argument(b"ERROR-MSG-OUT")),
                 ("ERRORMSGLEN".into(), argument(b"ERROR-MSG-LENGTH-OUT")),
                 ("LINKLEVEL".into(), argument(b"LINK-LEVEL-OUT")),
+                ("ORGABCODE".into(), argument(b"ORIGINAL-ABCODE-OUT")),
             ]),
             5,
         );
@@ -5420,6 +5423,7 @@ mod tests {
         assert_eq!(diagnostics.outputs["ERRORMSG"].bytes(), &[0; 500]);
         assert_eq!(diagnostics.outputs["ERRORMSGLEN"].bytes(), b"0");
         assert_eq!(diagnostics.outputs["LINKLEVEL"].bytes(), b"2");
+        assert_eq!(diagnostics.outputs["ORGABCODE"].bytes(), b"    ");
         for (name, length) in [
             ("ASRAINTRPT", 8),
             ("ASRAPSW", 8),
@@ -5971,7 +5975,7 @@ mod tests {
             .unwrap();
         let abend = request(
             CicsOperation::Abend,
-            BTreeMap::from([("ABCODE".into(), argument(b"9999"))]),
+            BTreeMap::from([("ABCODE".into(), argument(b"8888"))]),
             7,
         );
         let handled_again = service
@@ -5979,6 +5983,23 @@ mod tests {
             .unwrap();
         assert_eq!(handled_again.disposition, CicsDisposition::Handler);
         assert_eq!(handled_again.target.as_deref(), Some("ABEND-ROUTINE"));
+
+        let assign_codes = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("ABCODE".into(), argument(b"CURRENT-ABCODE-OUT")),
+                ("ORGABCODE".into(), argument(b"ORIGINAL-ABCODE-OUT")),
+            ]),
+            70,
+        );
+        let assigned_codes = service
+            .invoke(
+                &effect(&invocation.run_unit_id, assign_codes.clone(), 70),
+                assign_codes,
+            )
+            .unwrap();
+        assert_eq!(assigned_codes.outputs["ABCODE"].bytes(), b"8888");
+        assert_eq!(assigned_codes.outputs["ORGABCODE"].bytes(), b"9999");
 
         let reset = request(
             CicsOperation::HandleAbend,
@@ -7124,8 +7145,22 @@ mod tests {
             ));
             let latest = expected.latest_abend.as_ref().unwrap();
             assert_eq!(latest.code, b"B777");
+            assert_eq!(latest.original_code, b"B777");
             assert!(!latest.dump_requested);
             assert_eq!(latest.program, None);
+            let mut legacy8 = handlers::encode_session(&state.sessions[session.as_str()]).unwrap();
+            assert_eq!(&legacy8[..5], b"MECS9");
+            legacy8.truncate(legacy8.len() - 8);
+            legacy8[..5].copy_from_slice(b"MECS8");
+            let decoded = decode_session(
+                &legacy8,
+                state.sessions[session.as_str()].version,
+                CicsLimits::default(),
+            )
+            .unwrap();
+            let legacy_abend = decoded.handle_state.latest_abend.unwrap();
+            assert_eq!(legacy_abend.code, b"B777");
+            assert_eq!(legacy_abend.original_code, b"B777");
             assert_eq!(expected.stack[0].handlers["INVREQ"], "OUTER-COND");
             assert_eq!(expected.stack[0].aid_handlers["PF1"], "OUTER-AID");
             assert!(expected.stack[0].ignored_conditions.contains("LENGERR"));
@@ -7794,7 +7829,7 @@ mod tests {
                 .unwrap();
             let current = service.lock().unwrap().sessions[session.as_str()].clone();
             let encoded = handlers::encode_session(&current).unwrap();
-            assert_eq!(&encoded[..5], b"MECS8");
+            assert_eq!(&encoded[..5], b"MECS9");
             let mut corrupted = encoded.clone();
             let depth = corrupted.len() - 5;
             corrupted[depth..depth + 4].copy_from_slice(&65_u32.to_be_bytes());
@@ -7802,7 +7837,11 @@ mod tests {
                 decode_session(&corrupted, current.version, CicsLimits::default()),
                 Err(HostProblem::ResourceExhausted)
             ));
-            let mut legacy7 = encoded;
+            let mut legacy8 = encoded;
+            legacy8[..5].copy_from_slice(b"MECS8");
+            let decoded = decode_session(&legacy8, current.version, CicsLimits::default()).unwrap();
+            assert_eq!(decoded.handle_state, handlers::HandleState::default());
+            let mut legacy7 = legacy8;
             legacy7.pop();
             legacy7[..5].copy_from_slice(b"MECS7");
             let decoded = decode_session(&legacy7, current.version, CicsLimits::default()).unwrap();

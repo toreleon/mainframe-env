@@ -62,6 +62,7 @@ pub(super) fn validate(
         "OPERATION",
         "OPERKEYS",
         "OPSECURITY",
+        "ORGABCODE",
         "OUTLINE",
         "PARTNS",
         "PARTNSET",
@@ -146,6 +147,7 @@ pub(super) fn validate(
             || (name == "INITPARM" && target.length != 60)
             || (name == "OPERKEYS" && target.length != 8)
             || (name == "OPSECURITY" && target.length != 3)
+            || (name == "ORGABCODE" && target.length != 4)
             || (name == "NEXTTRANSID" && target.length != 4)
             || (name == "PARTNSET" && target.length != 6)
             || (name == "PROCESS" && target.length != 36)
