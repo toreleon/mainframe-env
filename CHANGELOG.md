@@ -109,6 +109,30 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Restored CICS application-command options whose pinned syntax diagram draws
+  the parenthesized operand as an independently optional nested group: bare
+  `CURSOR` on `SEND MAP`/`SEND CONTROL`, bare `DATESEP`/`TIMESEP` on
+  `FORMATTIME`, and bare `ERRTERM` on `ROUTE` and `FORMFIELD`/`QUERYPARM` on
+  `WEB STARTBROWSE` once again compile, matching each option's IBM default
+  when its operand is omitted (`dfhp4_sendmap.html`, `dfhp4_formattime.html`,
+  `dfhp4_route.html`, `dfhp4_webstartbrowseformfield.html`,
+  `dfhp4_webstartbrowsequeryparm.html`, all under
+  `SSJL4D_6.x/reference-applications/commands-api/`). `tools/generate_cics_descriptors.py`
+  now derives a new `CicsApplicationOptionValueShape::OptionalValue` shape
+  directly from that nested-group structure in the pinned syntax projection
+  (`conformance/0.9/generated/cics-application-command-contracts.json`)
+  instead of any hand-listed option name, so the fix generalizes to every
+  option the pinned diagrams mark this way. This unblocks
+  `app/cbl/COSGN00C.cbl` and 16 other CardDemo programs that regressed to
+  `MECOB0102: "... requires a parenthesized operand"` at `f8d44ec`
+  ("freeze 263-command contract and registry") and `f1fe39e` ("enforce
+  generated compiler routing"). `app/app-authorization-ims-db2-mq/cbl/COPAUS2C.cbl`'s
+  repeated top-level `NOHANDLE` on one `ASKTIME` command (also regressed by
+  the same two commits) is intentionally left rejected: the pinned sources
+  cached for this contract (`dfhp4_apiformat.html` "Common options for all
+  EXEC CICS commands", `dfhp4_asktime.html`) describe NOHANDLE's effect but
+  do not state whether repeating it is legal, so duplicate-option detection
+  is unchanged pending that source question.
 - Accepted, evaluated, and executed level-88 condition-names on an alphanumeric
   group item (including a group declared with a mixed-usage subordinate, such as
   a BINARY subgroup), whose entries may precede the group's subordinate items,

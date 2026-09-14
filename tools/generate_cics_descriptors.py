@@ -1145,6 +1145,47 @@ def _option_value_shape(markers: set[str]) -> str:
     return "bounded-ambiguity"
 
 
+def _detachable_operand_options(variants: list[dict[str, Any]]) -> set[str]:
+    """Option names whose pinned syntax diagram draws the parenthesized
+    operand as an independently optional nested group.
+
+    IBM's syntax diagrams fuse a mandatory-if-present operand into the
+    keyword's own token (for example ``FROM(``): the opening delimiter is
+    not a separate diagram element, so the operand cannot be dropped once
+    the keyword is written. When the operand clause is instead reachable by
+    a separate loop-back path around the keyword -- the keyword is its own
+    token (``CURSOR``, not ``CURSOR(``) and the very next token is a ``(``
+    delimiter whose group path is a strict descendant of the keyword's own
+    group path -- the diagram is drawing a bare-keyword branch that skips
+    the whole parenthesized clause. That structural shape, not any option
+    name list, is the evidence this function looks for.
+    """
+    detachable: set[str] = set()
+    for variant in variants:
+        if variant.get("type") != "syntax":
+            continue
+        tokens = _array(variant.get("tokens"), "grammar variant tokens")
+        for index, raw_token in enumerate(tokens[:-1]):
+            token = _object(raw_token, "grammar token")
+            if token.get("kind") != "keyword":
+                continue
+            name = _text(token.get("value"), "grammar keyword value")
+            if not name or name.endswith("("):
+                continue
+            keyword_path = _text(
+                token.get("group_path"), "grammar keyword group path"
+            )
+            next_token = _object(tokens[index + 1], "grammar token")
+            if next_token.get("kind") != "delimiter" or next_token.get("value") != "(":
+                continue
+            next_path = _text(
+                next_token.get("group_path"), "grammar delimiter group path"
+            )
+            if next_path != keyword_path and next_path.startswith(f"{keyword_path}/"):
+                detachable.add(name)
+    return detachable
+
+
 def _source_option_bound(value: dict[str, Any], name: str) -> int | None:
     # Bounds are accepted only when they are carried by a pinned source fact.
     # Host marker-based ceilings are deliberately handled separately and can
@@ -1418,6 +1459,9 @@ def _option_contract(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
             entry["directions"].update(directions)
             entry["authorities"].add("global-command-format")
 
+    grammar = _grammar_contract(dimensions)
+    detachable_operand_options = _detachable_operand_options(grammar["variants"])
+
     entries = []
     for name in sorted(options):
         raw = options[name]
@@ -1426,6 +1470,8 @@ def _option_contract(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
         if not directions and markers == {"none"}:
             directions.add("none")
         value_shape = _option_value_shape(markers)
+        if value_shape == "value" and name in detachable_operand_options:
+            value_shape = "optional-value"
         direction_status = (
             "resolved"
             if len(directions) == 1 and "unknown" not in directions
@@ -1435,7 +1481,7 @@ def _option_contract(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
         if value_shape == "flag":
             bound_status = "not-applicable"
             source_max_value_bytes = None
-        elif value_shape == "value" and len(source_bounds) == 1:
+        elif value_shape in ("value", "optional-value") and len(source_bounds) == 1:
             bound_status = "resolved"
             source_max_value_bytes = next(iter(source_bounds))
         else:
@@ -1475,7 +1521,6 @@ def _option_contract(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
             if "bounded-ambiguity" in entry_bound_statuses
             else "resolved"
         )
-    grammar = _grammar_contract(dimensions)
     top_level_options = set(_top_level_source_option_names(dimensions))
     option_status = _source_contract_status(option_dimension)
     source_entries = [
@@ -3419,6 +3464,7 @@ def render_ir_registry(root: Path = ROOT, contracts: dict[str, Any] | None = Non
             value_shape = {
                 "flag": "Flag",
                 "value": "Value",
+                "optional-value": "OptionalValue",
                 "bounded-ambiguity": "BoundedAmbiguity",
             }[option["value_shape"]]
             direction = {

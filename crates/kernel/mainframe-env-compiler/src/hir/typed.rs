@@ -2161,6 +2161,66 @@ mod tests {
         }
     }
 
+    /// Regression coverage for `toreleon/mainframe-env` issue #170: pinned
+    /// syntax diagrams (dfhp4_sendmap.html CURSOR(data-value), and
+    /// dfhp4_formattime.html DATESEP(data-value)/TIMESEP(data-value)) draw
+    /// the parenthesized operand as an independently optional nested group,
+    /// so both the bare keyword and the keyword with its operand must
+    /// compile. `f8d44ec`/`f1fe39e` regressed this to always requiring the
+    /// operand.
+    #[test]
+    fn cics_registry_accepts_bare_and_valued_optional_operand_options() {
+        for command in [
+            "SEND MAP('MENU') MAPSET('MAIN') CURSOR",
+            "SEND MAP('MENU') MAPSET('MAIN') CURSOR(5)",
+            "FORMATTIME ABSTIME(ABS-TIME-X) DATESEP TIMESEP",
+            "FORMATTIME ABSTIME(ABS-TIME-X) DATESEP('-') TIMESEP('.')",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSOPT. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-TIME-X PIC S9(15) COMP-3. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            assert!(
+                analysis.hir.is_some(),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+
+        // A bare Value-shape option (its parenthesized operand is fused into
+        // the keyword in the pinned diagram, so it is not independently
+        // optional) must still be rejected exactly as before.
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSOPTN. PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') MAPSET END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        assert!(analysis.hir.is_none());
+        assert!(analysis.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("MAPSET requires a parenthesized operand")
+        }));
+    }
+
+    /// `toreleon/mainframe-env` issue #171: `COPAUS2C.cbl` repeats
+    /// `NOHANDLE` on one `ASKTIME` command. The pinned IBM sources cached for
+    /// this contract (dfhp4_apiformat.html "Common options for all EXEC CICS
+    /// commands", dfhp4_asktime.html) describe NOHANDLE's effect but do not
+    /// state whether repeating it is legal, so duplicate detection is left
+    /// exactly as strict as before pending that decision (see task
+    /// needs_decision). This test freezes that current, unchanged behavior
+    /// as a regression guard: it must keep failing, not silently start
+    /// passing, until the source question above is resolved.
+    #[test]
+    fn cics_registry_still_rejects_a_repeated_nohandle_pending_source_review() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSDUPN. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-TIME-X PIC S9(15) COMP-3. PROCEDURE DIVISION. EXEC CICS ASKTIME NOHANDLE ABSTIME(ABS-TIME-X) NOHANDLE END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        assert!(analysis.hir.is_none());
+        assert!(analysis.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("option NOHANDLE is duplicated")
+        }));
+    }
+
     #[test]
     fn cics_registry_enforces_known_dependencies_and_groups() {
         let cases = [
