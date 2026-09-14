@@ -106,6 +106,11 @@ dispatch. COMMAREA is one input/output storage identity, so registering its
 return destination cannot replace the captured request bytes. Channel, explicit
 length, input-message, remote-system, transaction, and SYNCONRETURN forms remain
 compiler rejections until their separate contracts are implemented.
+The typed local XCTL subset binds the same PROGRAM and optional COMMAREA inputs,
+but declares no COMMAREA output because control does not return to the caller.
+Its complete provider result becomes a frame-replacing transfer to the selected
+program. Channel, explicit length, and input-message forms remain compiler
+rejections until their separate contracts are implemented.
 Each legacy route admits only the source-valid option subset whose behavior is
 implemented by that raw handler. A catalog-known option outside that subset
 fails explicitly before compatibility lowering instead of being silently

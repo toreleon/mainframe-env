@@ -99,7 +99,7 @@ const ABEND_EFFECTS: &[Effect] = &[
     Effect::Condition,
     Effect::Transaction,
 ];
-const LINK_EFFECTS: &[Effect] = &[
+const PROGRAM_TRANSFER_EFFECTS: &[Effect] = &[
     Effect::MemoryRead,
     Effect::MemoryWrite,
     Effect::ProgramControl,
@@ -471,7 +471,7 @@ pub fn cics_application_registry_for_runtime_operation(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 20] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 21] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -629,7 +629,15 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 20] = [
         namespace: "cics.program",
         name: "link",
         major: 1,
-        effects: LINK_EFFECTS,
+        effects: PROGRAM_TRANSFER_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Xctl,
+        namespace: "cics.program",
+        name: "xctl",
+        major: 1,
+        effects: PROGRAM_TRANSFER_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
 ];
@@ -660,6 +668,7 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::Abend => &CICS_EXECUTABLE_DESCRIPTORS[17],
         CicsPlanOperation::HandleAbend => &CICS_EXECUTABLE_DESCRIPTORS[18],
         CicsPlanOperation::Link => &CICS_EXECUTABLE_DESCRIPTORS[19],
+        CicsPlanOperation::Xctl => &CICS_EXECUTABLE_DESCRIPTORS[20],
     }
 }
 
@@ -720,7 +729,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 20);
+        assert_eq!(typed.len(), 21);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -730,7 +739,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 14);
+        assert_eq!(legacy.len(), 13);
         assert!(legacy.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && !descriptor.legacy_execution_options.is_empty()));
@@ -917,6 +926,7 @@ mod tests {
                 CicsPlanOperation::HandleCondition,
                 CicsPlanOperation::IgnoreCondition,
                 CicsPlanOperation::Link,
+                CicsPlanOperation::Xctl,
                 CicsPlanOperation::PopHandle,
                 CicsPlanOperation::PushHandle,
                 CicsPlanOperation::Read,

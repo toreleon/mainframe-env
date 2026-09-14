@@ -159,6 +159,7 @@ pub enum HirCicsOperation {
     HandleCondition,
     IgnoreCondition,
     Link,
+    Xctl,
     PopHandle,
     PushHandle,
     Read,
@@ -2178,6 +2179,59 @@ mod tests {
     }
 
     #[test]
+    fn cics_xctl_resolves_program_and_one_input_only_commarea() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSXCTL. DATA DIVISION. WORKING-STORAGE SECTION. 01 AREA-X PIC X(16) VALUE 'REQUEST'. PROCEDURE DIVISION. EXEC CICS XCTL PROGRAM('CHILD') COMMAREA(AREA-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("XCTL: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("resolved XCTL command");
+        assert_eq!(command.operation, HirCicsOperation::Xctl);
+        assert!(command.operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::Program,
+                    value: HirCicsValue::Literal(value),
+                } if value == "CHILD"
+            )
+        }));
+        assert!(command.operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::Commarea,
+                    value: HirCicsValue::Data(reference),
+                } if reference.qualified_name == "AREA-X"
+            )
+        }));
+        assert!(
+            !command
+                .outputs
+                .iter()
+                .any(|output| output.name == HirCicsOutputName::Commarea)
+        );
+
+        for clause in ["CHANNEL('DATA')", "LENGTH(16)", "INPUTMSG(AREA-X)"] {
+            let deferred = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. LATERXCT. DATA DIVISION. WORKING-STORAGE SECTION. 01 AREA-X PIC X(16). PROCEDURE DIVISION. EXEC CICS XCTL PROGRAM('CHILD') {clause} END-EXEC. STOP RUN."
+            ));
+            assert!(deferred.hir.is_none());
+            assert!(deferred.diagnostics.iter().any(|diagnostic| {
+                let message = diagnostic.public_message();
+                message.contains("XCTL") && message.contains(clause.split('(').next().unwrap())
+            }));
+        }
+    }
+
+    #[test]
     fn cics_shared_heads_resolve_with_valued_discriminators() {
         for (command, expected_label) in [
             ("ACQUIRE ACTIVITYID('A1')", "ACQUIRE ACTIVITYID"),
@@ -2454,7 +2508,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 14);
+        assert_eq!(legacy.len(), 13);
         assert!(
             legacy.iter().all(|descriptor| {
                 descriptor.advertised && descriptor.runtime_operation.is_some()
@@ -2469,6 +2523,7 @@ mod tests {
                     | ["HANDLE", "ABEND"]
                     | ["HANDLE", "CONDITION"]
                     | ["LINK"]
+                    | ["XCTL"]
                     | ["READ"]
                     | ["REWRITE"]
                     | ["SYNCPOINT"]

@@ -59,6 +59,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::HandleCondition => CicsOperation::HandleCondition,
         CicsPlanOperation::IgnoreCondition => CicsOperation::IgnoreCondition,
         CicsPlanOperation::Link => CicsOperation::Link,
+        CicsPlanOperation::Xctl => CicsOperation::Xctl,
         CicsPlanOperation::PopHandle => CicsOperation::PopHandle,
         CicsPlanOperation::PushHandle => CicsOperation::PushHandle,
         CicsPlanOperation::Read => CicsOperation::Read,

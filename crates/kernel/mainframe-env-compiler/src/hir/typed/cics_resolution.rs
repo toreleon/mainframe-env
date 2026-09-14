@@ -768,6 +768,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         ["HANDLE", "CONDITION"] => HirCicsOperation::HandleCondition,
         ["IGNORE", "CONDITION"] => HirCicsOperation::IgnoreCondition,
         ["LINK"] => HirCicsOperation::Link,
+        ["XCTL"] => HirCicsOperation::Xctl,
         ["POP", "HANDLE"] => HirCicsOperation::PopHandle,
         ["PUSH", "HANDLE"] => HirCicsOperation::PushHandle,
         ["READ"] => HirCicsOperation::Read,
@@ -806,7 +807,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::IgnoreCondition
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle => &["RESP", "RESP2"],
-        HirCicsOperation::Link => &["PROGRAM", "COMMAREA", "RESP", "RESP2"],
+        HirCicsOperation::Link | HirCicsOperation::Xctl => {
+            &["PROGRAM", "COMMAREA", "RESP", "RESP2"]
+        }
         HirCicsOperation::Read => &["FILE", "DATASET", "RIDFLD", "INTO", "RESP", "RESP2"],
         HirCicsOperation::Rewrite => &["FILE", "DATASET", "FROM", "RESP", "RESP2"],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA", "RESP", "RESP2"],
@@ -825,6 +828,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::HandleCondition
         | HirCicsOperation::IgnoreCondition
         | HirCicsOperation::Link
+        | HirCicsOperation::Xctl
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle
         | HirCicsOperation::SetAssociationUserCorrData
@@ -893,7 +897,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::PushHandle
         | HirCicsOperation::Suspend => &[][..],
         HirCicsOperation::Deq | HirCicsOperation::Enq => &["RESOURCE"][..],
-        HirCicsOperation::Link => &["PROGRAM"][..],
+        HirCicsOperation::Link | HirCicsOperation::Xctl => &["PROGRAM"][..],
         HirCicsOperation::Read => &["RIDFLD", "INTO"][..],
         HirCicsOperation::Rewrite => &["FROM"][..],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA"][..],
@@ -914,8 +918,16 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     if operation == HirCicsOperation::HandleAbend {
         operands.extend(handle_abend::operands(&clauses, &raw_options, semantic)?);
     }
-    if operation == HirCicsOperation::Link {
-        operands.extend(program_control::link_operands(&clauses, semantic)?);
+    if matches!(operation, HirCicsOperation::Link | HirCicsOperation::Xctl) {
+        operands.extend(program_control::transfer_operands(
+            &clauses,
+            semantic,
+            if operation == HirCicsOperation::Link {
+                "LINK"
+            } else {
+                "XCTL"
+            },
+        )?);
     }
     if operation == HirCicsOperation::AddressSet {
         let (set_is_address, set) = cics_address_value(&clauses["SET"], semantic)?;

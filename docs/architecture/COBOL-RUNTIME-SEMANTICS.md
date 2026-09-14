@@ -182,6 +182,13 @@ schema, and writes the response to that exact slot before continuing after
 LINK. The provider performs `FACILITY CICS.PROGRAM.<name>` execute authorization
 before nested program dispatch.
 
+The typed local XCTL subset captures the same bounded PROGRAM and optional
+COMMAREA inputs without registering a return binding. After the same exact
+program authorization, its provider result becomes an unconditional
+frame-replacing transfer. The online handoff carries the captured bytes into
+the target program's `DFHCOMMAREA`; execution never resumes after XCTL in the
+calling frame.
+
 CICS PUSH HANDLE moves the current condition mappings, ignored-condition set,
 and active/canceled typed ABEND exits into one bounded task-local frame, leaving a
 clear specification set for the nested routine. POP HANDLE discards the nested

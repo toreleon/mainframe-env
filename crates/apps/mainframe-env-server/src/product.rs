@@ -10405,6 +10405,165 @@ mod tests {
     }
 
     #[test]
+    fn online_xctl_replaces_the_frame_and_passes_typed_commarea() {
+        let limits = SourceLimits::default();
+        let compile = |name: &str, source: &[u8]| {
+            let filename = format!("{name}.cbl");
+            let path = LogicalPath::new(&filename, limits.max_path_bytes).unwrap();
+            let bundle = SourceBundle::new(
+                &path,
+                vec![
+                    SourceFile::input(
+                        &filename,
+                        source.to_vec(),
+                        SourceFormat::Free,
+                        SourceEncoding::Utf8,
+                        limits,
+                    )
+                    .unwrap(),
+                ],
+                BTreeMap::new(),
+                Vec::new(),
+                limits,
+            )
+            .unwrap();
+            let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+                .compile(CompilerRequest {
+                    source: bundle,
+                    mode: CompilationMode::Executable,
+                    target: CompileTarget::new("reference").unwrap(),
+                    options: CompileOptions::new(BTreeMap::new()).unwrap(),
+                })
+                .unwrap()
+            else {
+                panic!("{name} XCTL fixture did not publish");
+            };
+            artifact
+        };
+        let main = compile(
+            "XCTLMAIN",
+            b"IDENTIFICATION DIVISION.\nPROGRAM-ID. XCTLMAIN.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 XCTL-AREA PIC X(8) VALUE 'REQUEST'.\n01 UNEXPECTED-HIT PIC X VALUE '0'.\nPROCEDURE DIVISION.\nEXEC CICS XCTL PROGRAM('NEXT') COMMAREA(XCTL-AREA) END-EXEC.\nMOVE '1' TO UNEXPECTED-HIT.\nSTOP RUN.\n",
+        );
+        let next = compile(
+            "NEXT",
+            b"IDENTIFICATION DIVISION.\nPROGRAM-ID. NEXT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 TARGET-HIT PIC X VALUE '0'.\nLINKAGE SECTION.\n01 DFHCOMMAREA PIC X(8).\nPROCEDURE DIVISION.\nMOVE '1' TO TARGET-HIT.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .racf
+            .define_profile("FACILITY", "CICS.PROGRAM.NEXT", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "FACILITY",
+                "CICS.PROGRAM.NEXT",
+                "IBMUSER",
+                AccessIntent::Execute,
+            )
+            .unwrap();
+        let main_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(main.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let next_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(next.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![
+                    OnlineProgramDefinition {
+                        name: "XCTLMAIN".into(),
+                        artifact: main_ref.clone(),
+                        payload: main.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(main.manifest().clone()),
+                        semantic_identity: main.semantic_id().to_reference(),
+                    },
+                    OnlineProgramDefinition {
+                        name: "NEXT".into(),
+                        artifact: next_ref.clone(),
+                        payload: next.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(next.manifest().clone()),
+                        semantic_identity: next.semantic_id().to_reference(),
+                    },
+                ],
+                transactions: BTreeMap::from([("XC00".into(), "XCTLMAIN".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "XCTLMAIN".into(),
+                    map: "XCTLMAIN".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("typed-xctl", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "XC00", Some(main_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "XC00",
+                24,
+                80,
+                "typed-xctl-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "XCTLMAIN", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "XCTLMAIN", 2)
+            .unwrap();
+
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        assert_eq!(continuation.program, "NEXT");
+        assert_eq!(continuation.artifact, next_ref);
+        let mut restored = ReferenceMachine::from_binary(
+            next.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(
+            restored.variable("DFHCOMMAREA").unwrap().bytes(),
+            b"REQUEST "
+        );
+        assert_eq!(restored.variable("TARGET-HIT").unwrap().bytes(), b"1");
+        assert_eq!(
+            server
+                .store
+                .get_execution(&invocation.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Completed
+        );
+    }
+
+    #[test]
     fn online_task_association_uses_selected_security_and_durable_session_route() {
         let limits = SourceLimits::default();
         let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. ASSOC.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 CORR-X PIC X(80) VALUE ALL 'A'.\n01 SET-FN PIC X(2).\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS SET ASSOCIATION USERCORRDATA(CORR-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO SET-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";

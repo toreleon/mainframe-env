@@ -281,6 +281,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::HandleCondition => CicsPlanOperation::HandleCondition,
         HirCicsOperation::IgnoreCondition => CicsPlanOperation::IgnoreCondition,
         HirCicsOperation::Link => CicsPlanOperation::Link,
+        HirCicsOperation::Xctl => CicsPlanOperation::Xctl,
         HirCicsOperation::PopHandle => CicsPlanOperation::PopHandle,
         HirCicsOperation::PushHandle => CicsPlanOperation::PushHandle,
     }

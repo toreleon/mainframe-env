@@ -5,13 +5,14 @@ use super::super::{
 use super::{Clauses, complete_data_reference, program_name};
 use crate::SemanticModel;
 
-pub(super) fn link_operands(
+pub(super) fn transfer_operands(
     clauses: &Clauses,
     semantic: &SemanticModel,
+    command: &str,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
     let mut operands = vec![HirCicsNamedOperand {
         name: HirCicsOperandName::Program,
-        value: program_name::value(&clauses["PROGRAM"], semantic, "LINK")?,
+        value: program_name::value(&clauses["PROGRAM"], semantic, command)?,
     }];
     if let Some(tokens) = clauses.get("COMMAREA") {
         let reference = complete_data_reference(tokens, semantic)?;

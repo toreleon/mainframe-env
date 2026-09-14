@@ -73,6 +73,8 @@ pub enum CicsPlanOperation {
     IgnoreCondition,
     /// Invoke one installed program at the next logical level and return.
     Link,
+    /// Transfer to one installed program at the same logical level without returning.
+    Xctl,
     /// Restore one suspended HANDLE/IGNORE specification snapshot.
     PopHandle,
     /// Suspend the current HANDLE/IGNORE specifications in one nested snapshot.
@@ -583,6 +585,7 @@ fn validate_operation_shape(
                 || outputs.contains(&CicsOutputName::Into)
         }
         CicsPlanOperation::Link => program_control::invalid_link_shape(plan, inputs, outputs),
+        CicsPlanOperation::Xctl => program_control::invalid_xctl_shape(plan, inputs, outputs),
         CicsPlanOperation::Read => {
             resources != 1
                 || !inputs.contains(&CicsOperandName::Ridfld)
@@ -873,6 +876,7 @@ const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::Abend => 17,
         CicsPlanOperation::HandleAbend => 18,
         CicsPlanOperation::Link => 19,
+        CicsPlanOperation::Xctl => 20,
     }
 }
 
@@ -898,6 +902,7 @@ fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPlanCodecProbl
         17 => Ok(CicsPlanOperation::Abend),
         18 => Ok(CicsPlanOperation::HandleAbend),
         19 => Ok(CicsPlanOperation::Link),
+        20 => Ok(CicsPlanOperation::Xctl),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -1369,6 +1374,17 @@ mod tests {
             encode_cics_effect_plan(&missing_link_output, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
+        let xctl = CicsEffectPlan {
+            operation: CicsPlanOperation::Xctl,
+            outputs: Vec::new(),
+            ..link.clone()
+        };
+        let mut returning_xctl = xctl.clone();
+        returning_xctl.outputs = link.outputs.clone();
+        assert_eq!(
+            encode_cics_effect_plan(&returning_xctl, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
         for plan in [
             read,
             rewrite,
@@ -1379,6 +1395,7 @@ mod tests {
             abend,
             handle_abend,
             link,
+            xctl,
         ] {
             let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
             let decoded = decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap();

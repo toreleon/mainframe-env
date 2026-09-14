@@ -9,6 +9,23 @@ pub(super) fn invalid_link_shape(
     inputs: &BTreeSet<CicsOperandName>,
     outputs: &BTreeSet<CicsOutputName>,
 ) -> bool {
+    invalid_transfer_shape(plan, inputs, outputs, true)
+}
+
+pub(super) fn invalid_xctl_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    invalid_transfer_shape(plan, inputs, outputs, false)
+}
+
+fn invalid_transfer_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+    returns_commarea: bool,
+) -> bool {
     let allowed_inputs = BTreeSet::from([CicsOperandName::Program, CicsOperandName::Commarea]);
     let program = plan
         .operands
@@ -29,7 +46,10 @@ pub(super) fn invalid_link_shape(
         })
         || commarea.is_some_and(|operand| !matches!(operand.value, CicsOperandValue::Storage(_)))
         || match commarea.map(|operand| &operand.value) {
-            Some(CicsOperandValue::Storage(slot)) => commarea_output != Some(slot),
+            Some(CicsOperandValue::Storage(slot)) if returns_commarea => {
+                commarea_output != Some(slot)
+            }
+            Some(CicsOperandValue::Storage(_)) => commarea_output.is_some(),
             Some(_) => true,
             None => commarea_output.is_some(),
         }

@@ -79,6 +79,12 @@ All notable changes to mainframe-env are documented here.
   its captured bytes when registering the return binding. A compiled selected
   route verifies authorization, EIBFN `0E02`, returned bytes, audit, and durable
   suspension; remote/channel/length forms remain deferred.
+- Migrated the local `XCTL PROGRAM ... COMMAREA` compatibility subset to a
+  typed program-control plan. Its COMMAREA is input-only, the provider returns
+  an unconditional frame-replacing transfer, and the selected online route
+  initializes the target program's `DFHCOMMAREA` while preserving EIBFN `0E04`.
+  Channel, input-message, explicit-length, DPL, and licensed forms remain
+  deferred.
 - Expanded the source-bounded CICS `ASSIGN` compatibility route with APPLID,
   SYSID, USERID, TASKPRIORITY, and the exact absent application/channel context
   defaults. It also reports absent CWA/TWA lengths, null OPERKEYS, and a normal

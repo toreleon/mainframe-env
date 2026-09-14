@@ -2869,6 +2869,79 @@ mod tests {
     }
 
     #[test]
+    fn cics_xctl_uses_typed_input_commarea_and_transfers() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSXCTL. DATA DIVISION. WORKING-STORAGE SECTION. 01 AREA-X PIC X(8) VALUE 'REQUEST'. PROCEDURE DIVISION. EXEC CICS XCTL PROGRAM('CHILD') COMMAREA(AREA-X) END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("XCTL did not call host");
+        };
+        assert!(
+            matches!(
+                &effect.request,
+                HostRequest::Cics(CicsRequest {
+                    operation: CicsOperation::Xctl,
+                    arguments,
+                    mutation: Some(_),
+                    ..
+                }) if arguments["PROGRAM"].bytes() == b"CHILD"
+                    && arguments["COMMAREA"].bytes() == b"REQUEST "
+                    && arguments["COMMAREA"].schema()
+                        == "mainframe-env.cics.storage-value@1"
+            ),
+            "{:#?}",
+            effect.request
+        );
+        let payload = mainframe_env_execution_api::BoundedPayload::new(
+            "mainframe-env.cics.payload@1",
+            b"REQUEST ".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: effect.sequence,
+                    outcome: Ok(HostResult::Cics(CicsResponse {
+                        disposition: CicsDisposition::Transfer,
+                        condition: "NORMAL".into(),
+                        response: 0,
+                        response2: 0,
+                        applid: "APP".into(),
+                        sysid: "SYS".into(),
+                        transaction: "T001".into(),
+                        aid: 0,
+                        target: Some("CHILD".into()),
+                        next_transaction: None,
+                        payload: payload.clone(),
+                        outputs: BTreeMap::new(),
+                        unit_of_work: None,
+                    })),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Transfer(transfer)
+                if transfer.selector.as_str() == "CHILD"
+                    && transfer.payload == payload
+                    && transfer.replace_frame
+        ));
+        assert_eq!(machine.variable("AREA-X").unwrap().bytes(), b"REQUEST ");
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x0e, 0x04]);
+    }
+
+    #[test]
     fn bare_asktime_requires_and_updates_both_implicit_eib_fields() {
         use mainframe_env_host_api::{
             CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
