@@ -77,6 +77,12 @@ contract explicitly permits it.
   SET pointers, omitted-MAP/AID-only receive, implicit symbolic map storage,
   explicit length, paging, device and remaining terminal-control options are
   rejected before executable publication.
+- Typed `PURGE MESSAGE` has no operands beyond the common condition controls.
+  The runtime exposes no full-BMS ACCUM/page-building path, so local execution
+  purges the exact reachable empty logical-message state without clearing the
+  displayed screen or current map. It still carries a mutation identity and
+  audit effect; DPL execution returns `INVREQ` 16/200. Nonempty accumulated
+  pages and temporary-storage `TSIOERR` remain unimplemented.
 - The typed CICS `ASSIGN` route returns APPLID, SYSID, USERID, and the
   current TASKPRIORITY from owned invocation context. Because no CICS
   application, platform, operation, version, or channel context is currently

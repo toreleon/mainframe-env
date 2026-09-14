@@ -126,6 +126,8 @@ pub enum CicsPlanOperation {
     Suspend,
     /// Return one bounded set of task, terminal, and invocation context values.
     Assign,
+    /// Discard the current full-BMS logical message, if one is being built.
+    PurgeMessage,
 }
 
 /// A resolved storage slot in the containing IR module.
@@ -698,6 +700,9 @@ fn validate_operation_shape(
                                 | CicsOutputName::Resp2
                         )
                     })
+        }
+        CicsPlanOperation::PurgeMessage => {
+            !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
     };
     if unexpected_output
@@ -1461,6 +1466,13 @@ mod tests {
             }],
             condition: CicsCondition::Default,
         };
+        let purge_message = CicsEffectPlan {
+            operation: CicsPlanOperation::PurgeMessage,
+            operands: Vec::new(),
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
         let mut missing_delete_key = delete.clone();
         missing_delete_key
             .operands
@@ -1512,6 +1524,7 @@ mod tests {
             send_map,
             send_text,
             assign,
+            purge_message,
         ] {
             let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
             let decoded = decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap();

@@ -35,6 +35,8 @@ pub enum CicsOperation {
     PopHandle,
     /// Suspend the current HANDLE/IGNORE specifications in one nested snapshot.
     PushHandle,
+    /// Discard the current full-BMS logical message, if one is being built.
+    PurgeMessage,
     Read,
     ReadNext,
     ReadPrev,
@@ -80,6 +82,7 @@ impl CicsOperation {
             Self::Link => "Link",
             Self::PopHandle => "PopHandle",
             Self::PushHandle => "PushHandle",
+            Self::PurgeMessage => "PurgeMessage",
             Self::Read => "Read",
             Self::ReadNext => "ReadNext",
             Self::ReadPrev => "ReadPrev",
@@ -112,6 +115,7 @@ impl CicsOperation {
                 | Self::WriteTransientData
                 | Self::Link
                 | Self::ReceiveMap
+                | Self::PurgeMessage
                 | Self::SendMap
                 | Self::SendText
                 | Self::SetAssociationUserCorrData
@@ -157,6 +161,7 @@ impl CicsOperation {
             ("LINK", _) => Self::Link,
             ("POP", Some("HANDLE")) => Self::PopHandle,
             ("PUSH", Some("HANDLE")) => Self::PushHandle,
+            ("PURGE", Some("MESSAGE")) => Self::PurgeMessage,
             ("READ", _) => Self::Read,
             ("READNEXT", _) => Self::ReadNext,
             ("READPREV", _) => Self::ReadPrev,

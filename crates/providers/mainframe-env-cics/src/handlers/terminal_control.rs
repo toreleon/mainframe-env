@@ -29,7 +29,69 @@ pub(in crate::service) fn invoke(
     match request.operation {
         CicsOperation::SendMap | CicsOperation::SendText => send(service, run, request),
         CicsOperation::ReceiveMap => receive(service, run, request),
+        CicsOperation::PurgeMessage => purge_message(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
+    }
+}
+
+fn purge_message(
+    service: &CicsService,
+    run: &Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    validate_purge_message_request(request)?;
+    validate_purge_message_context(run)?;
+    // The local runtime exposes no ACCUM/page-building route, so its reachable
+    // logical-message state is empty. Purging that state is deliberately
+    // idempotent and must not erase the already displayed terminal image.
+    service.response(
+        run,
+        CicsDisposition::Complete,
+        "NORMAL",
+        0,
+        0,
+        None,
+        None,
+        Vec::new(),
+    )
+}
+
+fn validate_purge_message_request(request: &CicsRequest) -> Result<(), HostProblem> {
+    if request
+        .arguments
+        .iter()
+        .any(|(name, value)| match name.as_str() {
+            "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
+            "OPTION.NOHANDLE" => {
+                value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+            }
+            _ => true,
+        })
+        || request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_purge_message_context(run: &Run) -> Result<(), HostProblem> {
+    let Some(context) = run.invocation.bindings.get("cics.execution-context") else {
+        return Ok(());
+    };
+    if context.schema() != "mainframe-env.cics.execution-context@1" {
+        return Err(HostProblem::Malformed);
+    }
+    match context.bytes() {
+        b"local" => Ok(()),
+        b"dpl-synconreturn" | b"dpl-without-synconreturn" | b"dpl-executionset-subset" => {
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 200,
+            })
+        }
+        _ => Err(HostProblem::Malformed),
     }
 }
 

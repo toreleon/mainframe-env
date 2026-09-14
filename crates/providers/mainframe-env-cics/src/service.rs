@@ -1705,7 +1705,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 36);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 37);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -4518,6 +4518,7 @@ mod tests {
             ("ASKTIME", CicsOperation::AsktimeEib),
             ("ASKTIME ABSTIME(ABS-TIME)", CicsOperation::Asktime),
             ("ASSIGN", CicsOperation::Assign),
+            ("PURGE MESSAGE", CicsOperation::PurgeMessage),
             ("CHANGE TASK", CicsOperation::ChangeTask),
             ("DEQ", CicsOperation::Deq),
             ("DELETE", CicsOperation::Delete),
@@ -4563,7 +4564,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 36);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 37);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -10057,6 +10058,88 @@ mod tests {
             .unwrap();
         assert_eq!(transferred.disposition, CicsDisposition::Transfer);
         assert_eq!(transferred.target.as_deref(), Some("COCRDLIC"));
+    }
+
+    #[test]
+    fn purge_message_preserves_displayed_screen_and_rejects_dpl() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, session) = registered(&service);
+        let send = request(
+            CicsOperation::SendText,
+            BTreeMap::from([("FROM".into(), argument(b"DISPLAYED"))]),
+            1,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, send.clone(), 1), send)
+            .unwrap();
+        let before = {
+            let state = service.lock().unwrap();
+            let session = &state.sessions[session.as_str()];
+            (
+                session.screen.clone(),
+                session.mapset.clone(),
+                session.map.clone(),
+                session.version,
+            )
+        };
+
+        let purge = request(CicsOperation::PurgeMessage, BTreeMap::new(), 2);
+        let response = service
+            .invoke(&effect(&invocation.run_unit_id, purge.clone(), 2), purge)
+            .unwrap();
+        assert_eq!(
+            (
+                response.disposition,
+                response.condition.as_str(),
+                response.response,
+                response.response2,
+            ),
+            (CicsDisposition::Complete, "NORMAL", 0, 0)
+        );
+        let after = {
+            let state = service.lock().unwrap();
+            let session = &state.sessions[session.as_str()];
+            (
+                session.screen.clone(),
+                session.mapset.clone(),
+                session.map.clone(),
+                session.version,
+            )
+        };
+        assert_eq!(after, before);
+
+        let context = BoundedPayload::new(
+            "mainframe-env.cics.execution-context@1",
+            b"dpl-synconreturn".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let dpl = invocation_for(
+            "purge-dpl",
+            BTreeMap::from([("cics.execution-context".into(), context)]),
+        );
+        let dpl_session = SessionId::new("purge-dpl", 64).unwrap();
+        service.create_session(&dpl_session, 24, 80).unwrap();
+        service
+            .register_run(dpl.clone(), &dpl_session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let mut purge = request(CicsOperation::PurgeMessage, BTreeMap::new(), 3);
+        purge.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let response = service
+            .invoke(&effect(&dpl.run_unit_id, purge.clone(), 3), purge)
+            .unwrap();
+        assert_eq!(
+            (
+                response.disposition,
+                response.condition.as_str(),
+                response.response,
+                response.response2,
+            ),
+            (CicsDisposition::Complete, "INVREQ", 16, 200)
+        );
     }
 
     #[test]

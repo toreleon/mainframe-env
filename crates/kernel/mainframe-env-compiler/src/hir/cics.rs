@@ -300,6 +300,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::SendMap => CicsPlanOperation::SendMap,
         HirCicsOperation::SendText => CicsPlanOperation::SendText,
         HirCicsOperation::Assign => CicsPlanOperation::Assign,
+        HirCicsOperation::PurgeMessage => CicsPlanOperation::PurgeMessage,
         HirCicsOperation::PopHandle => CicsPlanOperation::PopHandle,
         HirCicsOperation::PushHandle => CicsPlanOperation::PushHandle,
     }

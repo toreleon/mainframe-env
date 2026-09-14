@@ -84,6 +84,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::Syncpoint => CicsOperation::Syncpoint,
         CicsPlanOperation::Suspend => CicsOperation::Suspend,
         CicsPlanOperation::Assign => CicsOperation::Assign,
+        CicsPlanOperation::PurgeMessage => CicsOperation::PurgeMessage,
     }
 }
 

@@ -67,11 +67,11 @@ It contains all 263 API registry shapes with deterministic recognition,
 option-shape, family, EIBFN and handler identities. Readiness is deliberately
 split:
 
-- 33 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
+- 34 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
   `SYNCPOINT` routes and the reviewed incremental family slices;
 - 1 `legacy-compatibility` API route that remains on the pre-existing raw
   compatibility path; and
-- 229 `unready` rows that are recognized but fail explicitly as unsupported.
+- 228 `unready` rows that are recognized but fail explicitly as unsupported.
 
 The remaining raw compatibility route's implemented option subset is owned by the
 separate versioned
@@ -84,7 +84,7 @@ source receipts. The generator requires its route identities to match the
 legacy API runtime set exactly and verifies every admitted option against a
 current accepted source projection before emitting the registry.
 
-The current 34 API routes are the only advertised application commands.
+The current 35 API routes are the only advertised application commands.
 `ASKTIME ABSTIME` returns its packed-decimal destination and refreshes EIBDATE
 and EIBTIME. Bare `ASKTIME` is a distinct route that refreshes only those two
 packed-decimal EIB fields; it cannot manufacture an ABSTIME destination. Both
@@ -145,6 +145,12 @@ uses the requested durable map definition for terminal-fit validation and
 input-field normalization. SET pointers, omitted-map AID-only receive,
 implicit symbolic map storage, explicit length, paging, device and other
 terminal controls remain explicit compiler rejections.
+`PURGE MESSAGE` is a separate typed terminal mutation. Because this runtime has
+no ACCUM or page-building route, its reachable full-BMS logical-message state
+is empty: local purge succeeds idempotently without changing the already
+displayed screen or current map. DPL use returns `INVREQ` 16/200. Deleting a
+nonempty accumulated message and surfacing temporary-storage `TSIOERR` remain
+unready until that logical-message authority exists.
 The typed ASSIGN subset carries each of its 78 admitted context values as a
 pre-resolved output binding under one bounded output-name authority. It retains
 the existing 16-option maximum, exact receiver checks, partial-INVREQ behavior,

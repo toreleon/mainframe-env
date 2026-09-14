@@ -40,6 +40,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::SendMap => 30,
         CicsPlanOperation::SendText => 31,
         CicsPlanOperation::Assign => 32,
+        CicsPlanOperation::PurgeMessage => 33,
     }
 }
 
@@ -78,6 +79,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         30 => Ok(CicsPlanOperation::SendMap),
         31 => Ok(CicsPlanOperation::SendText),
         32 => Ok(CicsPlanOperation::Assign),
+        33 => Ok(CicsPlanOperation::PurgeMessage),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

@@ -2459,6 +2459,65 @@ mod tests {
     }
 
     #[test]
+    fn cics_purge_message_uses_a_typed_mutating_host_request() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsResponse, EffectResult, HostRequest, HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSPURG. PROCEDURE DIVISION. EXEC CICS PURGE MESSAGE END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(call) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("PURGE MESSAGE did not call host");
+        };
+        let HostRequest::Cics(request) = &call.request else {
+            panic!("unexpected host request");
+        };
+        assert_eq!(request.operation, CicsOperation::PurgeMessage);
+        assert!(request.arguments.is_empty());
+        assert!(request.mutation.is_some());
+
+        let response = CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                Vec::new(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            outputs: BTreeMap::new(),
+            unit_of_work: None,
+        };
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: call.sequence,
+                    outcome: Ok(HostResult::Cics(response)),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x18, 0x0a]);
+    }
+
+    #[test]
     fn cics_nested_subscript_operand_reads_selected_element() {
         use mainframe_env_host_api::{CicsOperation, HostRequest};
 

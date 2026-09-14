@@ -9791,8 +9791,12 @@ mod tests {
                 "FCI(FCI-X) LINKLEVEL(LINK-LEVEL-X) LOCALCCSID(LOCAL-CCSID-X)",
             )
             .replace(
+                "01 ASSIGN-FN PIC X(2).",
+                "01 ASSIGN-FN PIC X(2).\n01 PURGE-FN PIC X(2).",
+            )
+            .replace(
                 "PROCEDURE DIVISION.\nEXEC CICS CHANGE TASK",
-                "PROCEDURE DIVISION.\nEXEC CICS SEND MAP('SCHEDUL') MAPSET('SCHEDUL') END-EXEC.\nEXEC CICS CHANGE TASK",
+                "PROCEDURE DIVISION.\nEXEC CICS SEND MAP('SCHEDUL') MAPSET('SCHEDUL') END-EXEC.\nEXEC CICS PURGE MESSAGE END-EXEC.\nMOVE EIBFN TO PURGE-FN.\nEXEC CICS CHANGE TASK",
             )
             .replace(
                 "HILIGHT(CAPABILITY-X) RESP(RESP-X)",
@@ -9955,6 +9959,10 @@ mod tests {
         restored.restore_checkpoint(&second.checkpoint).unwrap();
         assert_eq!(restored.variable("EIBFN").unwrap().bytes(), &[0x12, 0x08]);
         assert_eq!(
+            restored.variable("PURGE-FN").unwrap().bytes(),
+            &[0x18, 0x0a]
+        );
+        assert_eq!(
             restored.variable("ASSIGN-FN").unwrap().bytes(),
             &[0x02, 0x08]
         );
@@ -10101,6 +10109,7 @@ mod tests {
                 (8, mainframe_env_execution_api::AuditDecision::Success),
                 (9, mainframe_env_execution_api::AuditDecision::Success),
                 (10, mainframe_env_execution_api::AuditDecision::Success),
+                (11, mainframe_env_execution_api::AuditDecision::Success),
             ]
         );
     }

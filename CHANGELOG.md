@@ -115,6 +115,11 @@ All notable changes to mainframe-env are documented here.
   field normalization. SET pointers, omitted-map AID-only receive, implicit
   symbolic map storage, lengths, paging, device and other terminal controls
   remain fail-closed.
+- Added a typed `PURGE MESSAGE` route for the runtime's reachable empty
+  full-BMS logical-message state. Local execution is an idempotent audited
+  mutation that preserves the displayed terminal image; DPL execution returns
+  the source-defined `INVREQ` 16/200. Accumulated pages and `TSIOERR` remain
+  fail-closed until a full-BMS ACCUM/page authority exists.
 - Migrated the 78 source-bounded `ASSIGN` context outputs from raw command-text
   compatibility lowering to one typed task plan. Each output carries an
   append-only semantic name and pre-resolved writable storage identity through

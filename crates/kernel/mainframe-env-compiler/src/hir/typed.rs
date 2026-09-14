@@ -173,6 +173,7 @@ pub enum HirCicsOperation {
     SendMap,
     SendText,
     Assign,
+    PurgeMessage,
     PopHandle,
     PushHandle,
     Read,
@@ -2859,6 +2860,29 @@ mod tests {
     }
 
     #[test]
+    fn cics_purge_message_accepts_only_common_condition_controls() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSPURG. DATA DIVISION. \
+             WORKING-STORAGE SECTION. 01 RESP-X PIC S9(9) COMP. \
+             01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. \
+             EXEC CICS PURGE MESSAGE NOHANDLE RESP(RESP-X) RESP2(RESP2-X) END-EXEC. \
+             STOP RUN.",
+        );
+        assert!(analysis.hir.is_some(), "{:?}", analysis.diagnostics);
+
+        let invalid = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSPURB. PROCEDURE DIVISION. \
+             EXEC CICS PURGE MESSAGE ERASE END-EXEC. STOP RUN.",
+        );
+        assert!(invalid.hir.is_none());
+        assert!(invalid.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("unknown or unreviewed top-level option ERASE")
+        }));
+    }
+
+    #[test]
     fn cics_registry_enforces_known_dependencies_and_groups() {
         let cases = [
             ("RETURN RESP2(RESP-X)", "option RESP2 requires RESP"),
@@ -2938,6 +2962,7 @@ mod tests {
                 descriptor.label_tokens,
                 ["ABEND"]
                     | ["ASSIGN"]
+                    | ["PURGE", "MESSAGE"]
                     | ["DEQ"]
                     | ["ENQ"]
                     | ["HANDLE", "ABEND"]
