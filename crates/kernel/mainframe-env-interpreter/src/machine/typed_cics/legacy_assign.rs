@@ -52,6 +52,7 @@ pub(super) const OUTPUT_NAMES: &[&str] = &[
     "PARTNS",
     "PARTNSET",
     "PLATFORM",
+    "PRINSYSID",
     "PROCESS",
     "PROCESSTYPE",
     "PROGRAM",

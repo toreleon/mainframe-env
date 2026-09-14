@@ -4835,6 +4835,39 @@ mod tests {
         assert!(!no_bdi.outputs.contains_key("DESTID"));
         assert!(!no_bdi.outputs.contains_key("DESTIDLENG"));
 
+        let mut no_intersystem_facility = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("APPLID".into(), argument(b"APP-OUT")),
+                ("PRINSYSID".into(), argument(b"PRINCIPAL-SYSTEM-OUT")),
+            ]),
+            323,
+        );
+        no_intersystem_facility.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let no_intersystem_facility = service
+            .invoke(
+                &effect(
+                    &invocation.run_unit_id,
+                    no_intersystem_facility.clone(),
+                    323,
+                ),
+                no_intersystem_facility,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                no_intersystem_facility.condition.as_str(),
+                no_intersystem_facility.response,
+                no_intersystem_facility.response2,
+            ),
+            ("INVREQ", 16, 5)
+        );
+        assert_eq!(no_intersystem_facility.outputs["APPLID"].bytes(), b"MEAPPL");
+        assert!(!no_intersystem_facility.outputs.contains_key("PRINSYSID"));
+
         let diagnostics = request(
             CicsOperation::Assign,
             BTreeMap::from([
@@ -5389,6 +5422,35 @@ mod tests {
         assert_eq!(no_bdi.outputs["APPLID"].bytes(), b"ME01");
         assert!(!no_bdi.outputs.contains_key("DESTID"));
         assert!(!no_bdi.outputs.contains_key("DESTIDLENG"));
+
+        let mut no_intersystem_facility = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("APPLID".into(), argument(b"APP-OUT")),
+                ("PRINSYSID".into(), argument(b"PRINCIPAL-SYSTEM-OUT")),
+            ]),
+            62,
+        );
+        no_intersystem_facility.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let no_intersystem_facility = service
+            .invoke(
+                &effect(&invocation.run_unit_id, no_intersystem_facility.clone(), 62),
+                no_intersystem_facility,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                no_intersystem_facility.condition.as_str(),
+                no_intersystem_facility.response,
+                no_intersystem_facility.response2,
+            ),
+            ("INVREQ", 16, 5)
+        );
+        assert_eq!(no_intersystem_facility.outputs["APPLID"].bytes(), b"ME01");
+        assert!(!no_intersystem_facility.outputs.contains_key("PRINSYSID"));
 
         let diagnostics = request(
             CicsOperation::Assign,

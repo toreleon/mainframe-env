@@ -67,6 +67,7 @@ pub(super) fn validate(
         "PARTNS",
         "PARTNSET",
         "PLATFORM",
+        "PRINSYSID",
         "PROCESS",
         "PROCESSTYPE",
         "PROGRAM",
@@ -150,6 +151,7 @@ pub(super) fn validate(
             || (name == "ORGABCODE" && target.length != 4)
             || (name == "NEXTTRANSID" && target.length != 4)
             || (name == "PARTNSET" && target.length != 6)
+            || (name == "PRINSYSID" && target.length != 4)
             || (name == "PROCESS" && target.length != 36)
             || (name == "PROCESSTYPE" && target.length != 8)
             || (name == "PROGRAM" && target.length != 8)

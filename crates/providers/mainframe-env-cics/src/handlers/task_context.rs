@@ -81,6 +81,7 @@ pub(in crate::service) fn assign(
         None
     };
     let terminal_missing = !dpl && terminal_required && dimensions.is_none();
+    let intersystem_facility_missing = request.arguments.contains_key("PRINSYSID");
     let ati_missing = !dpl && request.arguments.contains_key("QNAME");
     let bts_missing = ["ACTIVITY", "ACTIVITYID", "PROCESS", "PROCESSTYPE"]
         .iter()
@@ -114,40 +115,45 @@ pub(in crate::service) fn assign(
             ]
             .iter()
             .any(|name| request.arguments.contains_key(*name)));
-    let mut response =
-        if dpl_prohibited || terminal_missing || ati_missing || bts_missing || bdi_missing {
-            super::condition::respond(
-                service,
-                run,
-                &request.condition_policy,
-                HostProblem::Condition {
-                    name: "INVREQ".into(),
-                    response: 16,
-                    response2: if dpl_prohibited {
-                        200
-                    } else if terminal_missing {
-                        5
-                    } else if ati_missing {
-                        4
-                    } else if bts_missing {
-                        6
-                    } else {
-                        3
-                    },
+    let mut response = if dpl_prohibited
+        || terminal_missing
+        || intersystem_facility_missing
+        || ati_missing
+        || bts_missing
+        || bdi_missing
+    {
+        super::condition::respond(
+            service,
+            run,
+            &request.condition_policy,
+            HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: if dpl_prohibited {
+                    200
+                } else if terminal_missing || intersystem_facility_missing {
+                    5
+                } else if ati_missing {
+                    4
+                } else if bts_missing {
+                    6
+                } else {
+                    3
                 },
-            )?
-        } else {
-            service.response(
-                run,
-                CicsDisposition::Complete,
-                "NORMAL",
-                0,
-                0,
-                None,
-                None,
-                Vec::new(),
-            )?
-        };
+            },
+        )?
+    } else {
+        service.response(
+            run,
+            CicsDisposition::Complete,
+            "NORMAL",
+            0,
+            0,
+            None,
+            None,
+            Vec::new(),
+        )?
+    };
     for (name, value) in [
         ("APPLID", run.applid.as_bytes()),
         ("SYSID", run.sysid.as_bytes()),
@@ -425,6 +431,7 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "PARTNS",
         "PARTNSET",
         "PLATFORM",
+        "PRINSYSID",
         "PROCESS",
         "PROCESSTYPE",
         "PROGRAM",

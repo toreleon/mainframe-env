@@ -89,7 +89,8 @@ All notable changes to mainframe-env are documented here.
   trigger, and with 16/200 in DPL. ACTIVITY, ACTIVITYID, PROCESS, and
   PROCESSTYPE fail with exact `INVREQ` 16/6 because no BTS activity path exists.
   DESTID and DESTIDLENG similarly report 16/3 before any BDI command and
-  16/200 in DPL.
+  16/200 in DPL. PRINSYSID reports 16/5 because the runtime has no MRO, LU6.1,
+  or APPC principal facility, including in a DPL server program.
 - Added online continuation format `MEOM4`, which retains the current task
   priority and an optional staged program-transfer handoff. Readers preserve
   `MEOM3` priority rows and historical `MEOM2` rows without that field.
