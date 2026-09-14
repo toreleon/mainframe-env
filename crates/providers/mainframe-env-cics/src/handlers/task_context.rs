@@ -85,6 +85,10 @@ pub(in crate::service) fn assign(
     let bts_missing = ["ACTIVITY", "ACTIVITYID", "PROCESS", "PROCESSTYPE"]
         .iter()
         .any(|name| request.arguments.contains_key(*name));
+    let bdi_missing = !dpl
+        && ["DESTID", "DESTIDLENG"]
+            .iter()
+            .any(|name| request.arguments.contains_key(*name));
     let link_level = request
         .arguments
         .contains_key("LINKLEVEL")
@@ -97,6 +101,8 @@ pub(in crate::service) fn assign(
                 "ALTSCRNWD",
                 "DEFSCRNHT",
                 "DEFSCRNWD",
+                "DESTID",
+                "DESTIDLENG",
                 "FCI",
                 "NEXTTRANSID",
                 "OPSECURITY",
@@ -108,37 +114,40 @@ pub(in crate::service) fn assign(
             ]
             .iter()
             .any(|name| request.arguments.contains_key(*name)));
-    let mut response = if dpl_prohibited || terminal_missing || ati_missing || bts_missing {
-        super::condition::respond(
-            service,
-            run,
-            &request.condition_policy,
-            HostProblem::Condition {
-                name: "INVREQ".into(),
-                response: 16,
-                response2: if dpl_prohibited {
-                    200
-                } else if terminal_missing {
-                    5
-                } else if ati_missing {
-                    4
-                } else {
-                    6
+    let mut response =
+        if dpl_prohibited || terminal_missing || ati_missing || bts_missing || bdi_missing {
+            super::condition::respond(
+                service,
+                run,
+                &request.condition_policy,
+                HostProblem::Condition {
+                    name: "INVREQ".into(),
+                    response: 16,
+                    response2: if dpl_prohibited {
+                        200
+                    } else if terminal_missing {
+                        5
+                    } else if ati_missing {
+                        4
+                    } else if bts_missing {
+                        6
+                    } else {
+                        3
+                    },
                 },
-            },
-        )?
-    } else {
-        service.response(
-            run,
-            CicsDisposition::Complete,
-            "NORMAL",
-            0,
-            0,
-            None,
-            None,
-            Vec::new(),
-        )?
-    };
+            )?
+        } else {
+            service.response(
+                run,
+                CicsDisposition::Complete,
+                "NORMAL",
+                0,
+                0,
+                None,
+                None,
+                Vec::new(),
+            )?
+        };
     for (name, value) in [
         ("APPLID", run.applid.as_bytes()),
         ("SYSID", run.sysid.as_bytes()),
@@ -380,6 +389,8 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "CWALENG",
         "DEFSCRNHT",
         "DEFSCRNWD",
+        "DESTID",
+        "DESTIDLENG",
         "DS3270",
         "DSSCS",
         "ERRORMSG",

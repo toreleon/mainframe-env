@@ -2505,6 +2505,24 @@ mod tests {
             );
         }
 
+        let bdi = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BDIASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 DESTINATION-X PIC X(8). 01 DESTINATION-LENGTH-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS ASSIGN DESTID(DESTINATION-X) DESTIDLENG(DESTINATION-LENGTH-X) END-EXEC. STOP RUN.",
+        );
+        assert!(bdi.hir.is_some(), "{:?}", bdi.diagnostics);
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADBDIASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 DESTINATION-X PIC X(7). PROCEDURE DIVISION. EXEC CICS ASSIGN DESTID(DESTINATION-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADBDIASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 DESTINATION-LENGTH-X PIC X(2). PROCEDURE DIVISION. EXEC CICS ASSIGN DESTIDLENG(DESTINATION-LENGTH-X) END-EXEC. STOP RUN.",
+        ] {
+            let analysis = analyze(source);
+            assert!(analysis.hir.is_none());
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains("CICS ASSIGN"))
+            );
+        }
+
         let duplicate_resource = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSALIAS. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2). 01 REC-X PIC X(8). PROCEDURE DIVISION. EXEC CICS READNEXT FILE('A') DATASET('B') RIDFLD(KEY-X) INTO(REC-X) END-EXEC. STOP RUN.",
         );

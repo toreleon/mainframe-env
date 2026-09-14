@@ -39,6 +39,8 @@ pub(super) fn validate(
         "CWALENG",
         "DEFSCRNHT",
         "DEFSCRNWD",
+        "DESTID",
+        "DESTIDLENG",
         "DS3270",
         "DSSCS",
         "ERRORMSG",
@@ -112,6 +114,7 @@ pub(super) fn validate(
                 | "CWALENG"
                 | "DEFSCRNHT"
                 | "DEFSCRNWD"
+                | "DESTIDLENG"
                 | "ERRORMSGLEN"
                 | "INITPARMLEN"
                 | "LINKLEVEL"
@@ -137,6 +140,7 @@ pub(super) fn validate(
             || (name == "ASRAREGS" && target.length != 64)
             || (name == "ASRAREGS64" && target.length != 128)
             || (name == "BRIDGE" && target.length != 4)
+            || (name == "DESTID" && target.length != 8)
             || (name == "ERRORMSG" && target.length != 500)
             || (name == "FCI" && target.length != 1)
             || (name == "INITPARM" && target.length != 60)

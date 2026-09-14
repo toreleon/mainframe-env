@@ -88,6 +88,8 @@ All notable changes to mainframe-env are documented here.
   QNAME fails with exact `INVREQ` 16/4 because no task can be started by an ATI
   trigger, and with 16/200 in DPL. ACTIVITY, ACTIVITYID, PROCESS, and
   PROCESSTYPE fail with exact `INVREQ` 16/6 because no BTS activity path exists.
+  DESTID and DESTIDLENG similarly report 16/3 before any BDI command and
+  16/200 in DPL.
 - Added online continuation format `MEOM4`, which retains the current task
   priority and an optional staged program-transfer handoff. Readers preserve
   `MEOM3` priority rows and historical `MEOM2` rows without that field.

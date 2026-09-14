@@ -116,6 +116,9 @@ contract explicitly permits it.
   ACTIVITY, ACTIVITYID, PROCESS, and PROCESSTYPE are negative-only until a BTS
   activity context exists; local and DPL calls return `INVREQ` 16/6 without
   changing their fixed-width output areas.
+  DESTID and DESTIDLENG are negative-only until a BDI path exists: local calls
+  return `INVREQ` 16/3 and DPL calls return `INVREQ` 16/200 without changing
+  their eight-byte and halfword output areas.
   Other source-valid ASSIGN options remain rejected until their terminal,
   program-level, or failure context has an owned runtime representation.
 - Terminal execution outcomes carry an explicit transaction-dump disposition.

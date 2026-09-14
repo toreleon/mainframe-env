@@ -4808,6 +4808,33 @@ mod tests {
             assert!(!no_bts.outputs.contains_key(name));
         }
 
+        let mut no_bdi = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("APPLID".into(), argument(b"APP-OUT")),
+                ("DESTID".into(), argument(b"DESTINATION-OUT")),
+                ("DESTIDLENG".into(), argument(b"DESTINATION-LENGTH-OUT")),
+            ]),
+            322,
+        );
+        no_bdi.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let no_bdi = service
+            .invoke(
+                &effect(&invocation.run_unit_id, no_bdi.clone(), 322),
+                no_bdi,
+            )
+            .unwrap();
+        assert_eq!(
+            (no_bdi.condition.as_str(), no_bdi.response, no_bdi.response2),
+            ("INVREQ", 16, 3)
+        );
+        assert_eq!(no_bdi.outputs["APPLID"].bytes(), b"MEAPPL");
+        assert!(!no_bdi.outputs.contains_key("DESTID"));
+        assert!(!no_bdi.outputs.contains_key("DESTIDLENG"));
+
         let diagnostics = request(
             CicsOperation::Assign,
             BTreeMap::from([
@@ -5336,6 +5363,30 @@ mod tests {
         for name in ["ACTIVITY", "ACTIVITYID", "PROCESS", "PROCESSTYPE"] {
             assert!(!no_bts.outputs.contains_key(name));
         }
+
+        let mut no_bdi = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("APPLID".into(), argument(b"APP-OUT")),
+                ("DESTID".into(), argument(b"DESTINATION-OUT")),
+                ("DESTIDLENG".into(), argument(b"DESTINATION-LENGTH-OUT")),
+            ]),
+            61,
+        );
+        no_bdi.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let no_bdi = service
+            .invoke(&effect(&invocation.run_unit_id, no_bdi.clone(), 61), no_bdi)
+            .unwrap();
+        assert_eq!(
+            (no_bdi.condition.as_str(), no_bdi.response, no_bdi.response2),
+            ("INVREQ", 16, 200)
+        );
+        assert_eq!(no_bdi.outputs["APPLID"].bytes(), b"ME01");
+        assert!(!no_bdi.outputs.contains_key("DESTID"));
+        assert!(!no_bdi.outputs.contains_key("DESTIDLENG"));
 
         let diagnostics = request(
             CicsOperation::Assign,
