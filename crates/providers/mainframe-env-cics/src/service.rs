@@ -4753,6 +4753,31 @@ mod tests {
         assert_eq!(initparm.outputs["INITPARMLEN"].bytes(), b"0");
         assert_eq!(initparm.outputs["BRIDGE"].bytes(), &[b' '; 4]);
 
+        let mut no_ati = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("APPLID".into(), argument(b"APP-OUT")),
+                ("QNAME".into(), argument(b"QNAME-OUT")),
+            ]),
+            320,
+        );
+        no_ati.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let no_ati = service
+            .invoke(
+                &effect(&invocation.run_unit_id, no_ati.clone(), 320),
+                no_ati,
+            )
+            .unwrap();
+        assert_eq!(
+            (no_ati.condition.as_str(), no_ati.response, no_ati.response2),
+            ("INVREQ", 16, 4)
+        );
+        assert_eq!(no_ati.outputs["APPLID"].bytes(), b"MEAPPL");
+        assert!(!no_ati.outputs.contains_key("QNAME"));
+
         let diagnostics = request(
             CicsOperation::Assign,
             BTreeMap::from([
@@ -5303,6 +5328,7 @@ mod tests {
                 ("NEXTTRANSID".into(), argument(b"NEXT-TRANS-OUT")),
                 ("OPSECURITY".into(), argument(b"OPSECURITY-OUT")),
                 ("PARTNSET".into(), argument(b"PARTITION-SET-OUT")),
+                ("QNAME".into(), argument(b"QNAME-OUT")),
                 ("SCRNHT".into(), argument(b"SCREEN-HEIGHT-OUT")),
                 ("SCRNWD".into(), argument(b"SCREEN-WIDTH-OUT")),
                 ("TCTUALENG".into(), argument(b"TCTUA-LENGTH-OUT")),
@@ -5341,6 +5367,7 @@ mod tests {
             "NEXTTRANSID",
             "OPSECURITY",
             "PARTNSET",
+            "QNAME",
             "SCRNHT",
             "SCRNWD",
             "TCTUALENG",

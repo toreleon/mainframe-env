@@ -81,6 +81,7 @@ pub(in crate::service) fn assign(
         None
     };
     let terminal_missing = !dpl && terminal_required && dimensions.is_none();
+    let ati_missing = !dpl && request.arguments.contains_key("QNAME");
     let link_level = request
         .arguments
         .contains_key("LINKLEVEL")
@@ -97,13 +98,14 @@ pub(in crate::service) fn assign(
                 "NEXTTRANSID",
                 "OPSECURITY",
                 "PARTNSET",
+                "QNAME",
                 "SCRNHT",
                 "SCRNWD",
                 "TCTUALENG",
             ]
             .iter()
             .any(|name| request.arguments.contains_key(*name)));
-    let mut response = if dpl_prohibited || terminal_missing {
+    let mut response = if dpl_prohibited || terminal_missing || ati_missing {
         super::condition::respond(
             service,
             run,
@@ -111,7 +113,13 @@ pub(in crate::service) fn assign(
             HostProblem::Condition {
                 name: "INVREQ".into(),
                 response: 16,
-                response2: if dpl_prohibited { 200 } else { 5 },
+                response2: if dpl_prohibited {
+                    200
+                } else if terminal_missing {
+                    5
+                } else {
+                    4
+                },
             },
         )?
     } else {
@@ -381,6 +389,7 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "PLATFORM",
         "PROGRAM",
         "PS",
+        "QNAME",
         "RESP",
         "RESP2",
         "RESSEC",

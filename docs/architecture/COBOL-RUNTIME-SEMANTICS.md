@@ -108,6 +108,9 @@ contract explicitly permits it.
   CMDSEC and RESSEC return `X`: CICS command dispatch always requires the
   execution grant and transaction authorization, and resource-owning handlers
   add their typed SAF checks before access.
+  QNAME is a negative-only form until an ATI trigger path exists: local calls
+  return `INVREQ` 16/4 and DPL calls return `INVREQ` 16/200 without changing
+  the output area.
   Other source-valid ASSIGN options remain rejected until their terminal,
   program-level, or failure context has an owned runtime representation.
 - Terminal execution outcomes carry an explicit transaction-dump disposition.

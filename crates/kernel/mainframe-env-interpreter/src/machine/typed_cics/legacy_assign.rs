@@ -47,6 +47,7 @@ pub(super) const OUTPUT_NAMES: &[&str] = &[
     "PLATFORM",
     "PROGRAM",
     "PS",
+    "QNAME",
     "RESSEC",
     "RESTART",
     "SCRNHT",

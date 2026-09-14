@@ -62,6 +62,7 @@ pub(super) fn validate(
         "PLATFORM",
         "PROGRAM",
         "PS",
+        "QNAME",
         "RESSEC",
         "RESTART",
         "SCRNHT",
@@ -134,6 +135,7 @@ pub(super) fn validate(
             || (name == "NEXTTRANSID" && target.length != 4)
             || (name == "PARTNSET" && target.length != 6)
             || (name == "PROGRAM" && target.length != 8)
+            || (name == "QNAME" && target.length != 4)
             || (name == "RESTART" && target.length != 1)
             || (matches!(
                 name,
