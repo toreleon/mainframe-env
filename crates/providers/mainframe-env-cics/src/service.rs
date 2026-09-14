@@ -6326,17 +6326,30 @@ mod tests {
             Err(HostProblem::Malformed)
         );
 
+        let malformed_code = request(
+            CicsOperation::Abend,
+            BTreeMap::from([("ABCODE".into(), cics_decimal(9999))]),
+            17,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, malformed_code.clone(), 17),
+                malformed_code,
+            ),
+            Err(HostProblem::Malformed)
+        );
+
         let conflicting_handler = request(
             CicsOperation::HandleAbend,
             BTreeMap::from([
                 ("OPTION.CANCEL".into(), argument(b"")),
                 ("OPTION.RESET".into(), argument(b"")),
             ]),
-            17,
+            18,
         );
         assert_eq!(
             service.invoke(
-                &effect(&invocation.run_unit_id, conflicting_handler.clone(), 17,),
+                &effect(&invocation.run_unit_id, conflicting_handler.clone(), 18,),
                 conflicting_handler,
             ),
             Err(HostProblem::Malformed)

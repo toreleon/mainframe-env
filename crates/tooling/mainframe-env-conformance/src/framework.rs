@@ -2688,6 +2688,78 @@ mod tests {
     }
 
     #[test]
+    fn cics_abend_uses_typed_code_flags_and_terminal_metadata() {
+        use mainframe_env_execution_api::AbendDumpDisposition;
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSABND. DATA DIVISION. WORKING-STORAGE SECTION. 01 AB-CODE PIC X(4) VALUE 'B001'. PROCEDURE DIVISION. EXEC CICS ABEND ABCODE(AB-CODE) CANCEL NODUMP END-EXEC.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("ABEND did not call host");
+        };
+        assert!(matches!(
+            &effect.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::Abend,
+                arguments,
+                ..
+            }) if arguments["ABCODE"].bytes() == b"B001"
+                && arguments.contains_key("OPTION.CANCEL")
+                && arguments.contains_key("OPTION.NODUMP")
+        ));
+        let payload = |schema: &str, bytes: &[u8]| {
+            mainframe_env_execution_api::BoundedPayload::new(
+                schema,
+                bytes.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let result = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: effect.sequence,
+                outcome: Ok(HostResult::Cics(CicsResponse {
+                    disposition: CicsDisposition::Abended,
+                    condition: "ERROR".into(),
+                    response: 27,
+                    response2: 0,
+                    applid: "APP".into(),
+                    sysid: "SYS".into(),
+                    transaction: "T001".into(),
+                    aid: 0,
+                    target: None,
+                    next_transaction: None,
+                    payload: payload("mainframe-env.cics.payload@1", b"B001"),
+                    outputs: BTreeMap::from([(
+                        "ABEND.DUMP".into(),
+                        payload("mainframe-env.cics.abend-dump@1", b"suppressed"),
+                    )]),
+                    unit_of_work: None,
+                })),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        );
+        assert!(matches!(
+            result,
+            MachineDrive::Abend(abend)
+                if abend.code == "B001"
+                    && abend.dump == AbendDumpDisposition::Suppressed
+        ));
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x0e, 0x0c]);
+    }
+
+    #[test]
     fn bare_asktime_requires_and_updates_both_implicit_eib_fields() {
         use mainframe_env_host_api::{
             CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,

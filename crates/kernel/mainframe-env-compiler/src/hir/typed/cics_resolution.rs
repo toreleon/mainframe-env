@@ -18,6 +18,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 type Clauses = BTreeMap<String, Vec<String>>;
 
+mod abend;
 mod assign_validation;
 mod format_time;
 
@@ -759,6 +760,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         }
     }
     let operation = match descriptor.label_tokens {
+        ["ABEND"] => HirCicsOperation::Abend,
         ["ADDRESS", "SET"] => HirCicsOperation::AddressSet,
         ["ASKTIME", "ABSTIME"] => HirCicsOperation::Asktime,
         ["ASKTIME"] => HirCicsOperation::AsktimeEib,
@@ -779,6 +781,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         _ => return Err(ResolutionFailure::Unsupported),
     };
     let allowed_clauses: &[&str] = match operation {
+        HirCicsOperation::Abend => &["ABCODE", "RESP", "RESP2"],
         HirCicsOperation::AddressSet => &["SET", "USING", "RESP", "RESP2"],
         HirCicsOperation::Asktime => &["ABSTIME", "RESP", "RESP2"],
         HirCicsOperation::AsktimeEib => &["RESP", "RESP2"],
@@ -812,6 +815,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Suspend => &["RESP", "RESP2"],
     };
     let allowed_options: &[&str] = match operation {
+        HirCicsOperation::Abend => &["CANCEL", "NODUMP", "NOHANDLE"],
         HirCicsOperation::AddressSet
         | HirCicsOperation::Asktime
         | HirCicsOperation::AsktimeEib
@@ -877,7 +881,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::AddressSet => &["SET", "USING"][..],
         HirCicsOperation::Asktime => &["ABSTIME"][..],
         HirCicsOperation::FormatTime => &["ABSTIME"][..],
-        HirCicsOperation::AsktimeEib
+        HirCicsOperation::Abend
+        | HirCicsOperation::AsktimeEib
         | HirCicsOperation::ChangeTask
         | HirCicsOperation::HandleAid
         | HirCicsOperation::HandleCondition
@@ -898,6 +903,11 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         }
     }
     let mut operands = Vec::new();
+    if operation == HirCicsOperation::Abend
+        && let Some(operand) = abend::operand(&clauses, semantic)?
+    {
+        operands.push(operand);
+    }
     if operation == HirCicsOperation::AddressSet {
         let (set_is_address, set) = cics_address_value(&clauses["SET"], semantic)?;
         let (using_is_address, using) = cics_address_value(&clauses["USING"], semantic)?;
@@ -1074,6 +1084,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
                 && !(operation == HirCicsOperation::HandleAid && is_aid_name(option))
         })
         .map(|option| match option.as_str() {
+            "CANCEL" => HirCicsOption::Cancel,
+            "NODUMP" => HirCicsOption::NoDump,
             "UPDATE" => HirCicsOption::Update,
             "ROLLBACK" => HirCicsOption::Rollback,
             "NOHANDLE" => HirCicsOption::NoHandle,

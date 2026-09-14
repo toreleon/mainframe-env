@@ -794,6 +794,7 @@ fn validate_runtime_plan(
 #[derive(Clone, Copy)]
 enum SlotUse {
     Input,
+    AbcodeInput,
     AbstimeInput,
     SeparatorInput,
     Output,
@@ -809,6 +810,7 @@ enum SlotUse {
 
 const fn input_slot_use(name: CicsOperandName) -> SlotUse {
     match name {
+        CicsOperandName::Abcode => SlotUse::AbcodeInput,
         CicsOperandName::Abstime => SlotUse::AbstimeInput,
         CicsOperandName::DateSep | CicsOperandName::TimeSep => SlotUse::SeparatorInput,
         _ => SlotUse::Input,
@@ -893,6 +895,17 @@ fn validate_machine_slot(
     }
     if matches!(slot_use, SlotUse::NumericOutput) && !is_numeric(layout.category) {
         return Err(invalid_plan("RESP and RESP2 outputs must be numeric"));
+    }
+    if matches!(slot_use, SlotUse::AbcodeInput)
+        && (!matches!(layout.length, 1..=4)
+            || !matches!(
+                layout.category,
+                LayoutCategory::Alphabetic | LayoutCategory::Alphanumeric
+            ))
+    {
+        return Err(invalid_plan(
+            "ABEND ABCODE input must be a 1-4 character field",
+        ));
     }
     if matches!(slot_use, SlotUse::AbstimeInput | SlotUse::AbstimeOutput)
         && (layout.category != LayoutCategory::PackedDecimal

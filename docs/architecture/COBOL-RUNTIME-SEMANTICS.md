@@ -144,10 +144,12 @@ contract explicitly permits it.
   Other source-valid ASSIGN options remain rejected until their terminal,
   program-level, or failure context has an owned runtime representation.
 - Terminal execution outcomes carry an explicit transaction-dump disposition.
-  CICS ABEND results translate the provider's typed `ABEND.DUMP` metadata to
-  requested or suppressed while retained responses from before that metadata
-  remain unspecified. The interpreter preserves the supplied ABCODE as the
-  terminal code instead of replacing it with the generic CICS condition name.
+  New CICS ABEND compilations use a typed task plan with an optional
+  pre-resolved 1–4 character ABCODE input and distinct CANCEL/NODUMP flags.
+  Results translate the provider's typed `ABEND.DUMP` metadata to requested or
+  suppressed while retained responses from before that metadata remain
+  unspecified. The interpreter preserves the supplied ABCODE as the terminal
+  code instead of replacing it with the generic CICS condition name.
 
 ## Control, conditions, calls, and effects
 

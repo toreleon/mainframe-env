@@ -351,6 +351,7 @@ POLICY_BINDINGS = {
 
 TYPED_RUNTIME_OPERATIONS = frozenset(
     {
+        "Abend",
         "ChangeTask",
         "AddressSet",
         "Asktime",
@@ -387,6 +388,15 @@ COMPILER_SPI_COMPATIBILITY = {
     "resp2_requires_resp": True,
 }
 TYPED_RUNTIME_IR_EFFECTS = {
+    "Abend": frozenset(
+        {
+            "memory-read",
+            "memory-write",
+            "program-control",
+            "condition",
+            "transaction",
+        }
+    ),
     "AddressSet": frozenset({"memory-read", "memory-write", "condition"}),
     "Asktime": frozenset({"memory-write", "clock", "condition"}),
     "AsktimeEib": frozenset({"memory-write", "clock", "condition"}),
@@ -3443,8 +3453,8 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
     if (
         len(registry_rows) != 263
         or len(set(handler_ids)) != 263
-        or len(typed_rows) != 17
-        or len(legacy_rows) != 17
+        or len(typed_rows) != 18
+        or len(legacy_rows) != 16
         or {row["runtime_operation"] for row in typed_rows}
         != TYPED_RUNTIME_OPERATIONS
         or len(advertised_rows) != 34

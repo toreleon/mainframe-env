@@ -3,6 +3,7 @@ use mainframe_env_ir::{CicsOperandName, CicsOutputName, CicsPlanOperation, CicsP
 
 pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperation {
     match operation {
+        CicsPlanOperation::Abend => CicsOperation::Abend,
         CicsPlanOperation::AddressSet => CicsOperation::AddressSet,
         CicsPlanOperation::Asktime => CicsOperation::Asktime,
         CicsPlanOperation::AsktimeEib => CicsOperation::AsktimeEib,
@@ -25,6 +26,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
 
 pub(super) const fn operand(name: CicsOperandName) -> &'static str {
     match name {
+        CicsOperandName::Abcode => "ABCODE",
         CicsOperandName::File => "FILE",
         CicsOperandName::Dataset => "DATASET",
         CicsOperandName::From => "FROM",
@@ -64,6 +66,8 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
 
 pub(super) const fn option(option: CicsPlanOption) -> &'static str {
     match option {
+        CicsPlanOption::Cancel => "CANCEL",
+        CicsPlanOption::NoDump => "NODUMP",
         CicsPlanOption::Update => "UPDATE",
         CicsPlanOption::Rollback => "ROLLBACK",
         CicsPlanOption::NoHandle => "NOHANDLE",

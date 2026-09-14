@@ -151,8 +151,8 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertEqual(contracts["coverage_credit"], 0)
         self.assertEqual(contracts["semantic_credit"], 0)
         self.assertEqual(contracts["counts"]["runtime_backed_commands"], 34)
-        self.assertEqual(contracts["counts"]["typed_runtime_commands"], 17)
-        self.assertEqual(contracts["counts"]["legacy_compatibility_commands"], 17)
+        self.assertEqual(contracts["counts"]["typed_runtime_commands"], 18)
+        self.assertEqual(contracts["counts"]["legacy_compatibility_commands"], 16)
         self.assertEqual(contracts["counts"]["advertised_commands"], 34)
         contract_rows = [
             command for batch in contracts["batches"] for command in batch["commands"]
@@ -178,6 +178,8 @@ class CicsDescriptorTests(unittest.TestCase):
             229,
         )
         rows_by_label = {row["label"]: row for row in contract_rows}
+        self.assertEqual(rows_by_label["ABEND"]["registration_status"], "typed-runtime")
+        self.assertEqual(rows_by_label["ABEND"]["existing_runtime_operation"], "Abend")
         self.assertEqual(
             rows_by_label["ASKTIME"]["registration_status"],
             "typed-runtime",
@@ -204,8 +206,8 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertIn("CICS_APPLICATION_REGISTRY_FROZEN", ir_registry)
         self.assertIn("CICS_APPLICATION_REGISTRY_SHA256", ir_registry)
         self.assertEqual(contracts["registry"]["shape_commands"], 263)
-        self.assertEqual(contracts["registry"]["typed_handlers"], 17)
-        self.assertEqual(contracts["registry"]["legacy_compatibility_handlers"], 17)
+        self.assertEqual(contracts["registry"]["typed_handlers"], 18)
+        self.assertEqual(contracts["registry"]["legacy_compatibility_handlers"], 16)
         self.assertEqual(contracts["registry"]["advertised_commands"], 34)
         self.assertEqual(contracts["registry"]["unready_handlers"], 229)
         self.assertIsNone(contracts["registry"]["default_handler"])
@@ -510,7 +512,7 @@ class CicsDescriptorTests(unittest.TestCase):
             for operation in catalog["_runtime_operations"]
             if operation["legacy_execution_options"]
         ]
-        self.assertEqual(len(legacy), 17)
+        self.assertEqual(len(legacy), 16)
         self.assertTrue(
             all(
                 operation["interface"] == "api"
@@ -599,9 +601,9 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertTrue(all(":api-commands:" in row["official_row"] for row in rows))
         self.assertFalse(any(":spi-" in row["official_row"] for row in rows))
         self.assertFalse(any(":fepi-" in row["official_row"] for row in rows))
-        self.assertEqual(sum(row["readiness"] == "typed-runtime" for row in registry), 17)
+        self.assertEqual(sum(row["readiness"] == "typed-runtime" for row in registry), 18)
         self.assertEqual(
-            sum(row["readiness"] == "legacy-compatibility" for row in registry), 17
+            sum(row["readiness"] == "legacy-compatibility" for row in registry), 16
         )
         self.assertEqual(sum(row["advertised"] for row in registry), 34)
         self.assertEqual(sum(row["readiness"] == "unready" for row in registry), 229)
@@ -611,8 +613,8 @@ class CicsDescriptorTests(unittest.TestCase):
             contracts["participant_contract"]["mutating_rows"],
             sum(row["contract"]["effect"]["mutating"] is True for row in rows),
         )
-        self.assertEqual(contracts["participant_contract"]["mutating_rows"], 5)
-        self.assertEqual(contracts["participant_contract"]["bounded_effect_rows"], 246)
+        self.assertEqual(contracts["participant_contract"]["mutating_rows"], 6)
+        self.assertEqual(contracts["participant_contract"]["bounded_effect_rows"], 245)
         self.assertEqual(contracts["participant_contract"]["explicit_uow_boundary_rows"], 1)
         self.assertFalse(
             contracts["participant_contract"]["unknown_outcome"]["automatic_redispatch"]
@@ -912,6 +914,7 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertEqual(
             typed,
             {
+                "ABEND",
                 "ADDRESS SET",
                 "ASKTIME",
                 "ASKTIME ABSTIME",

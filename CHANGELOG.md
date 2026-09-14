@@ -64,6 +64,11 @@ All notable changes to mainframe-env are documented here.
   MMDDYYYY/YYDDD/TIME fields, and fullword MILLISECONDS output. Negative or
   malformed absolute time returns INVREQ 16/1, while the remaining official
   formats stay explicitly deferred.
+- Migrated `EXEC CICS ABEND` from raw compatibility lowering to a typed task
+  plan with an optional 1–4 character ABCODE and explicit CANCEL/NODUMP flags.
+  Typed execution preserves HANDLE ABEND transfer, task-enqueue cleanup,
+  terminal dump disposition, EIBFN, audit, and durable replay behavior without
+  retaining command source text.
 - Expanded the source-bounded CICS `ASSIGN` compatibility route with APPLID,
   SYSID, USERID, TASKPRIORITY, and the exact absent application/channel context
   defaults. It also reports absent CWA/TWA lengths, null OPERKEYS, and a normal

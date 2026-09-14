@@ -94,6 +94,10 @@ subset: packed ABSTIME input, valued DATESEP/TIMESEP, five explicit date
 formats, TIME, MILLISECONDS, and common response options. Other official
 FORMATTIME fields remain explicit compiler rejections until their output and
 timezone contracts are implemented.
+`ABEND` also lowers through a typed task plan: ABCODE is captured as a bounded
+literal or a pre-resolved 1–4 character storage input, and CANCEL/NODUMP remain
+distinct flags. Retained raw ABEND artifacts remain readable, but new
+compilations do not carry their command text across the executable boundary.
 Each legacy route admits only the source-valid option subset whose behavior is
 implemented by that raw handler. A catalog-known option outside that subset
 fails explicitly before compatibility lowering instead of being silently

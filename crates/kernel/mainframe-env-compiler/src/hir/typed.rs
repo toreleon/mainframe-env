@@ -146,6 +146,7 @@ pub struct HirComputeStatement {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HirCicsOperation {
+    Abend,
     AddressSet,
     Asktime,
     AsktimeEib,
@@ -167,6 +168,7 @@ pub enum HirCicsOperation {
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HirCicsOperandName {
+    Abcode,
     File,
     Dataset,
     From,
@@ -204,6 +206,8 @@ pub struct HirCicsNamedOperand {
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HirCicsOption {
+    Cancel,
+    NoDump,
     Update,
     Rollback,
     NoHandle,
@@ -2045,6 +2049,45 @@ mod tests {
     }
 
     #[test]
+    fn cics_abend_resolves_code_and_dump_control_without_source_text() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSABND. DATA DIVISION. WORKING-STORAGE SECTION. 01 AB-CODE PIC X(4) VALUE 'B001'. PROCEDURE DIVISION. EXEC CICS ABEND ABCODE(AB-CODE) CANCEL NODUMP END-EXEC.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("ABEND: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("resolved ABEND command");
+        assert_eq!(command.operation, HirCicsOperation::Abend);
+        assert!(matches!(
+            command.operands.as_slice(),
+            [HirCicsNamedOperand {
+                name: HirCicsOperandName::Abcode,
+                value: HirCicsValue::Data(reference),
+            }] if reference.qualified_name == "AB-CODE"
+        ));
+        assert_eq!(
+            command.options,
+            BTreeSet::from([HirCicsOption::Cancel, HirCicsOption::NoDump])
+        );
+
+        let wrong_shape = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADABND. DATA DIVISION. WORKING-STORAGE SECTION. 01 AB-CODE PIC 9(4). PROCEDURE DIVISION. EXEC CICS ABEND ABCODE(AB-CODE) END-EXEC.",
+        );
+        assert!(wrong_shape.hir.is_none());
+        assert!(wrong_shape.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("ABCODE requires a 1-4 character value")
+        }));
+    }
+
+    #[test]
     fn cics_shared_heads_resolve_with_valued_discriminators() {
         for (command, expected_label) in [
             ("ACQUIRE ACTIVITYID('A1')", "ACQUIRE ACTIVITYID"),
@@ -2321,7 +2364,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 17);
+        assert_eq!(legacy.len(), 16);
         assert!(
             legacy.iter().all(|descriptor| {
                 descriptor.advertised && descriptor.runtime_operation.is_some()
@@ -2330,7 +2373,8 @@ mod tests {
         assert!(legacy.iter().all(|descriptor| {
             !matches!(
                 descriptor.label_tokens,
-                ["DEQ"]
+                ["ABEND"]
+                    | ["DEQ"]
                     | ["ENQ"]
                     | ["HANDLE", "CONDITION"]
                     | ["READ"]
@@ -2522,10 +2566,6 @@ mod tests {
     #[test]
     fn legacy_cics_routes_keep_only_implemented_forms_and_the_file_alias() {
         for command in [
-            "ABEND ABCODE('C001')",
-            "ABEND ABCODE('B001') CANCEL",
-            "ABEND ABCODE('B002') NODUMP",
-            "ABEND NODUMP",
             "ASSIGN APPLID(APPL-X)",
             "ASSIGN ABCODE(ABCODE-X) ABDUMP(ABDUMP-X) ABOFFSET(ABOFFSET-X) ABPROGRAM(ABPROGRAM-X) ASRAINTRPT(ASRA-PSW-X) ASRAPSW(ASRA-PSW-X) ASRAPSW16(ASRA-PSW16-X) ASRAREGS(ASRA-REGS-X) ASRAREGS64(ASRA-REGS64-X) ORGABCODE(ABCODE-X)",
             "ASSIGN APPLICATION(APP-X) CHANNEL(CHANNEL-X) MAJORVERSION(MAJOR-X) MICROVERSION(MICRO-X) MINORVERSION(MINOR-X) OPERATION(OPERATION-X) PLATFORM(PLATFORM-X)",

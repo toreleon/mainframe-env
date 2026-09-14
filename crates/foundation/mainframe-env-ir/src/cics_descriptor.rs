@@ -90,6 +90,15 @@ const FORMAT_TIME_EFFECTS: &[Effect] = &[
     Effect::Audit,
     Effect::Condition,
 ];
+const ABEND_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::ProgramControl,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+    Effect::Transaction,
+];
 const HANDLE_STACK_EFFECTS: &[Effect] = &[
     Effect::MemoryWrite,
     Effect::Security,
@@ -453,7 +462,7 @@ pub fn cics_application_registry_for_runtime_operation(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 17] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 18] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -590,6 +599,14 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 17] = [
         effects: FORMAT_TIME_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Abend,
+        namespace: "cics.task",
+        name: "abend",
+        major: 1,
+        effects: ABEND_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
 ];
 
 /// Resolves the executable descriptor for a decoded CICS plan operation.
@@ -615,6 +632,7 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::AsktimeEib => &CICS_EXECUTABLE_DESCRIPTORS[14],
         CicsPlanOperation::Asktime => &CICS_EXECUTABLE_DESCRIPTORS[15],
         CicsPlanOperation::FormatTime => &CICS_EXECUTABLE_DESCRIPTORS[16],
+        CicsPlanOperation::Abend => &CICS_EXECUTABLE_DESCRIPTORS[17],
     }
 }
 
@@ -675,7 +693,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 17);
+        assert_eq!(typed.len(), 18);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -685,7 +703,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 17);
+        assert_eq!(legacy.len(), 16);
         assert!(legacy.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && !descriptor.legacy_execution_options.is_empty()));
@@ -859,6 +877,7 @@ mod tests {
                 .map(|descriptor| descriptor.operation)
                 .collect::<BTreeSet<_>>(),
             BTreeSet::from([
+                CicsPlanOperation::Abend,
                 CicsPlanOperation::AddressSet,
                 CicsPlanOperation::Asktime,
                 CicsPlanOperation::AsktimeEib,
