@@ -109,6 +109,32 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Accepted `DATASET(...)` as `FILE`'s compatibility spelling on every CICS
+  file-control command whose registry row declares a `FILE` option and does
+  not itself declare `DATASET`: READ, READNEXT, READPREV, REWRITE, WRITE,
+  DELETE, STARTBR, RESETBR, ENDBR, and UNLOCK. Pinned AWS CardDemo `59cc6c2f`
+  writes `DATASET(...)` at `app/cbl/COBIL00C.cbl:443` (STARTBR),
+  `app/cbl/COCRDLIC.cbl:1129` (STARTBR, plus three more masked sites in the
+  same program), `app/cbl/COUSR01C.cbl:240` (WRITE), and
+  `app/cbl/COUSR03C.cbl:306` (DELETE); `COTRN00C`, `COTRN02C`, and `COUSR00C`
+  were masked by an earlier comment-line failure. Since `f1fe39e` ("enforce
+  generated compiler routing") these failed to compile with `CICS <cmd> has
+  unknown or unreviewed top-level option DATASET`, because the only existing
+  alias -- the shipped typed file plan -- covered just READ and REWRITE. The
+  alias is now derived from the registry descriptor (`family: "file-control"`
+  plus a declared `FILE` option and no declared `DATASET`) instead of a
+  hand-listed command name, following the same compiler-side compatibility
+  precedent as `49ae7c9` ("preserve reviewed compatibility routes"); it never
+  widens any catalog row, the generator, or the conformance JSON. `FILE(...)`
+  and `DATASET(...)` together on one command, and a repeated `DATASET`, are
+  still rejected. No cached pinned IBM topic confirms `DATASET` as a
+  documented synonym for `FILE`; this is a bounded compatibility alias with
+  the same standing as the pre-existing READ/REWRITE one, not a confirmed IBM
+  rule. The legacy-compatibility execution route already carried `DATASET`
+  through unchanged --
+  `crates/providers/mainframe-env-cics/src/handlers/file_control.rs:125-126`
+  resolves `DATASET` before falling back to `FILE` for every one of these
+  commands -- so no runtime change was needed.
 - Restored CICS application-command options whose pinned syntax diagram draws
   the parenthesized operand as an independently optional nested group: bare
   `CURSOR` on `SEND MAP`/`SEND CONTROL`, bare `DATESEP`/`TIMESEP` on

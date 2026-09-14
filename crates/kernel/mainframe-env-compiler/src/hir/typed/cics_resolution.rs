@@ -5,8 +5,8 @@ use crate::SemanticModel;
 use mainframe_env_ir::{
     CICS_APPLICATION_CONDITION_NAMES, CicsApplicationCobolApplicability,
     CicsApplicationConditionLabelOperand, CicsApplicationConstraintStatus,
-    CicsApplicationOptionValueShape, CicsApplicationRegistryDescriptor,
-    cics_application_registry_candidates_for_tokens,
+    CicsApplicationOptionDescriptor, CicsApplicationOptionValueShape,
+    CicsApplicationRegistryDescriptor, cics_application_registry_candidates_for_tokens,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -346,10 +346,20 @@ fn validate_candidate(
         ));
     }
 
+    if dataset_alias_file_option(descriptor).is_some()
+        && present.contains("FILE")
+        && present.contains("DATASET")
+    {
+        return Err(format!(
+            "CICS {} options FILE and DATASET are mutually exclusive",
+            command_label(descriptor)
+        ));
+    }
+
     if !descriptor
         .required_discriminator_options
         .iter()
-        .all(|name| present.contains(name))
+        .all(|name| option_present(descriptor, present, name))
     {
         return Err(format!(
             "CICS {} is missing a required command discriminator",
@@ -359,7 +369,7 @@ fn validate_candidate(
     if let Some(name) = descriptor
         .forbidden_discriminator_options
         .iter()
-        .find(|name| present.contains(**name))
+        .find(|name| option_present(descriptor, present, name))
     {
         return Err(format!(
             "CICS {} forbids discriminator {name}",
@@ -372,7 +382,7 @@ fn validate_candidate(
         && !descriptor
             .discriminator_options
             .iter()
-            .any(|name| present.contains(name))
+            .any(|name| option_present(descriptor, present, name))
     {
         return Err(format!(
             "CICS {} is missing a source-reviewed command discriminator",
@@ -400,7 +410,7 @@ fn validate_candidate(
     if let Some(name) = descriptor
         .required_options
         .iter()
-        .find(|name| !present.contains(**name))
+        .find(|name| !option_present(descriptor, present, name))
     {
         return Err(format!(
             "CICS {} requires option {name}",
@@ -411,7 +421,7 @@ fn validate_candidate(
         let count = alternative
             .members
             .iter()
-            .filter(|name| present.contains(**name))
+            .filter(|name| option_present(descriptor, present, name))
             .count();
         if alternative.required && count == 0 {
             return Err(format!(
@@ -422,11 +432,11 @@ fn validate_candidate(
         }
     }
     for dependency in descriptor.dependencies {
-        if present.contains(dependency.option)
+        if option_present(descriptor, present, dependency.option)
             && let Some(required) = dependency
                 .requires
                 .iter()
-                .find(|required| !present.contains(**required))
+                .find(|required| !option_present(descriptor, present, required))
         {
             return Err(format!(
                 "CICS {} option {} requires {required}",
@@ -438,7 +448,7 @@ fn validate_candidate(
     for group in descriptor.mutual_exclusion_groups {
         let selected = group
             .iter()
-            .filter(|name| present.contains(**name))
+            .filter(|name| option_present(descriptor, present, name))
             .copied()
             .collect::<Vec<_>>();
         if selected.len() > 1 {
@@ -502,18 +512,57 @@ fn option_value_shape(
         .find(|option| option.name == name)
         .map(|option| option.value_shape)
         .or_else(|| {
-            is_typed_compatibility_option(descriptor, name)
-                .then_some(CicsApplicationOptionValueShape::Value)
+            (name == "DATASET")
+                .then(|| dataset_alias_file_option(descriptor))
+                .flatten()
+                .map(|option| option.value_shape)
         })
 }
 
-fn is_typed_compatibility_option(
+/// CardDemo (`59cc6c2f`) spells the file-control resource operand `DATASET`
+/// on several commands whose pinned registry row spells it `FILE` (the
+/// STARTBR/READNEXT/READPREV/ENDBR browse family, WRITE, DELETE, RESETBR and
+/// UNLOCK). Accept `DATASET` as `FILE`'s compatibility alias on every
+/// `family: "file-control"` registry row that declares a `FILE` option and
+/// does not itself declare `DATASET`, the same standing as the pre-existing
+/// READ/REWRITE alias. This never widens the catalog row: it is a
+/// compiler-side synonym only, resolved from the descriptor rather than a
+/// hard-coded command list.
+fn dataset_alias_file_option(
     descriptor: &CicsApplicationRegistryDescriptor,
+) -> Option<&'static CicsApplicationOptionDescriptor> {
+    if descriptor.family != "file-control" {
+        return None;
+    }
+    let mut file_option = None;
+    for option in descriptor.options {
+        if option.name == "DATASET" {
+            return None;
+        }
+        if option.name == "FILE" {
+            file_option = Some(option);
+        }
+    }
+    file_option
+}
+
+/// Whether `name` counts as present for every option-membership check below
+/// (required options, alternative groups, dependencies, mutual-exclusion
+/// groups, and discriminators): literally, or -- for `FILE` on a row that
+/// accepts the `DATASET` alias -- because `DATASET(...)` was written
+/// instead. `WRITE` shares its head with `WRITE JOURNALNAME`/`JOURNALNUM`/
+/// `OPERATOR` and picks the file-control row by which option is present, and
+/// `ENDBR`/`WRITE FILE` both require `FILE`, so `DATASET(...)` must satisfy
+/// those the same way `FILE(...)` does.
+fn option_present(
+    descriptor: &CicsApplicationRegistryDescriptor,
+    present: &BTreeSet<&str>,
     name: &str,
 ) -> bool {
-    // The shipped typed file plan already accepts DATASET as FILE's spelling.
-    // Keep that one compiler ABI alias without widening any catalog row.
-    name == "DATASET" && matches!(descriptor.label_tokens, ["READ"] | ["REWRITE"])
+    present.contains(name)
+        || (name == "FILE"
+            && present.contains("DATASET")
+            && dataset_alias_file_option(descriptor).is_some())
 }
 
 fn command_label(descriptor: &CicsApplicationRegistryDescriptor) -> String {

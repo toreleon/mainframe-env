@@ -1887,6 +1887,111 @@ mod tests {
     }
 
     #[test]
+    fn cics_dataset_alias_covers_the_browse_family() {
+        // CardDemo (`59cc6c2f`) writes DATASET(...) on STARTBR/READNEXT/ENDBR;
+        // COBIL00C.cbl:443 and COCRDLIC.cbl:1129 are pinned STARTBR sites.
+        // These three are LegacyCompatibility readiness, so a successful
+        // compile resolves the EXEC CICS statement to `None` (the generic
+        // legacy route) rather than to a typed HIR command.
+        for command in [
+            "STARTBR DATASET('TRANSACT') RIDFLD(KEY-X) KEYLENGTH(LENGTH OF KEY-X) RESP(RESP-X) RESP2(RESP2-X)",
+            "READNEXT DATASET('TRANSACT') INTO(REC-X) RIDFLD(KEY-X) RESP(RESP-X) RESP2(RESP2-X)",
+            "ENDBR DATASET('TRANSACT') RESP(RESP-X) RESP2(RESP2-X)",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBR. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(3). 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{command}: {:?}", analysis.diagnostics));
+            let statement = hir
+                .statements
+                .iter()
+                .find(|statement| statement.kind == StatementKind::ExecCics)
+                .unwrap_or_else(|| panic!("{command}: no EXEC CICS statement"));
+            assert!(statement.resolved.is_none(), "{command}");
+        }
+
+        // RESETBR is a `family: "file-control"` row that declares `FILE` and
+        // not `DATASET`, so the alias still applies and the command no
+        // longer fails with "unknown or unreviewed top-level option
+        // DATASET". It is a pre-existing `Unready` handler even for
+        // `FILE(...)`, so it still fails to compile -- for that unrelated,
+        // pre-existing reason, which this asserts by name so the DATASET
+        // option-acceptance regression cannot hide behind it.
+        let resetbr = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBR. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS RESETBR DATASET('TRANSACT') RIDFLD(KEY-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.",
+        );
+        assert!(resetbr.hir.is_none());
+        assert!(resetbr.diagnostics.iter().any(|diagnostic| {
+            let message = diagnostic.public_message();
+            message.contains("RESETBR") && message.contains("handler is unready")
+        }));
+        assert!(!resetbr.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("unknown or unreviewed top-level option")
+        }));
+    }
+
+    #[test]
+    fn cics_dataset_alias_resolves_write_and_delete() {
+        // COUSR01C.cbl:240 (WRITE) and COUSR03C.cbl:306 (DELETE) both write
+        // DATASET(...). WRITE shares its head with WRITE JOURNALNAME/
+        // JOURNALNUM/OPERATOR and picks the file-control row by which option
+        // is present, so this also proves the DATASET alias satisfies that
+        // discriminator the same way FILE(...) does.
+        let write = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSWR. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(3). 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS WRITE DATASET('USRSEC') FROM(REC-X) LENGTH(LENGTH OF REC-X) RIDFLD(KEY-X) KEYLENGTH(LENGTH OF KEY-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.",
+        );
+        let hir = write
+            .hir
+            .unwrap_or_else(|| panic!("WRITE DATASET: {:?}", write.diagnostics));
+        let statement = hir
+            .statements
+            .iter()
+            .find(|statement| statement.kind == StatementKind::ExecCics)
+            .expect("WRITE EXEC CICS statement");
+        assert!(statement.resolved.is_none());
+
+        let delete = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSDL. DATA DIVISION. WORKING-STORAGE SECTION. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS DELETE DATASET('USRSEC') RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.",
+        );
+        let hir = delete
+            .hir
+            .unwrap_or_else(|| panic!("DELETE DATASET: {:?}", delete.diagnostics));
+        let statement = hir
+            .statements
+            .iter()
+            .find(|statement| statement.kind == StatementKind::ExecCics)
+            .expect("DELETE EXEC CICS statement");
+        assert!(statement.resolved.is_none());
+    }
+
+    #[test]
+    fn cics_dataset_and_file_together_are_rejected() {
+        let both = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBOTH. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS STARTBR FILE('TRANSACT') DATASET('TRANSACT') RIDFLD(KEY-X) RESP(RESP-X) END-EXEC. STOP RUN.",
+        );
+        assert!(both.hir.is_none());
+        assert!(both.diagnostics.iter().any(|diagnostic| {
+            let message = diagnostic.public_message();
+            message.contains("STARTBR")
+                && message.contains("FILE and DATASET are mutually exclusive")
+        }));
+
+        let repeated = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSDUP. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS STARTBR DATASET('TRANSACT') DATASET('TRANSACT') RIDFLD(KEY-X) RESP(RESP-X) END-EXEC. STOP RUN.",
+        );
+        assert!(repeated.hir.is_none());
+        assert!(repeated.diagnostics.iter().any(|diagnostic| {
+            let message = diagnostic.public_message();
+            message.contains("DATASET") && message.contains("is duplicated")
+        }));
+    }
+
+    #[test]
     fn cics_file_length_data_items_require_halfword_binary_storage() {
         for command in [
             "READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) LENGTH(TEXT-X)",

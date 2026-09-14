@@ -893,6 +893,88 @@ mod tests {
         );
     }
 
+    #[test]
+    fn legacy_dataset_alias_reaches_file_control_commands_unchanged() {
+        // CardDemo (`59cc6c2f`) writes DATASET(...) where these commands'
+        // pinned registry rows spell the option FILE (compiler-side alias in
+        // `crates/kernel/mainframe-env-compiler/src/hir/typed/cics_resolution.rs`).
+        // `legacy_arguments` is generic over whichever clause name source
+        // wrote (see the token loop above in this file), and
+        // `crates/providers/mainframe-env-cics/src/handlers/file_control.rs:125-126`
+        // already tries DATASET before falling back to FILE, so the legacy
+        // execution route needs no change: this asserts that evidence at the
+        // interpreter boundary for the STARTBR/WRITE/DELETE families named in
+        // the task contract.
+        for (label, tokens) in [
+            (
+                "STARTBR",
+                vec![
+                    "EXEC",
+                    "CICS",
+                    "STARTBR",
+                    "DATASET",
+                    "(",
+                    "TRANSACT-FILE",
+                    ")",
+                    "RIDFLD",
+                    "(",
+                    "TRAN-ID",
+                    ")",
+                    "END-EXEC",
+                ],
+            ),
+            (
+                "WRITE",
+                vec![
+                    "EXEC",
+                    "CICS",
+                    "WRITE",
+                    "DATASET",
+                    "(",
+                    "USRSEC-FILE",
+                    ")",
+                    "FROM",
+                    "(",
+                    "SEC-USER-DATA",
+                    ")",
+                    "END-EXEC",
+                ],
+            ),
+            (
+                "DELETE",
+                vec![
+                    "EXEC",
+                    "CICS",
+                    "DELETE",
+                    "DATASET",
+                    "(",
+                    "USRSEC-FILE",
+                    ")",
+                    "RESP",
+                    "(",
+                    "WS-RESP-CD",
+                    ")",
+                    "END-EXEC",
+                ],
+            ),
+        ] {
+            let tokens = tokens.into_iter().map(str::to_string).collect::<Vec<_>>();
+            assert!(
+                CicsOperation::from_tokens(&tokens).is_some(),
+                "{label}: DATASET spelling must not change operation recognition"
+            );
+            let arguments = legacy_arguments(&tokens).expect("legacy arguments");
+            assert!(
+                arguments.contains_key("DATASET"),
+                "{label}: expected a DATASET argument key, got {arguments:?}"
+            );
+            assert!(
+                !arguments.contains_key("FILE"),
+                "{label}: source wrote DATASET, not FILE"
+            );
+        }
+    }
+
     fn module(
         identity: OperationIdentity,
         plan: &CicsEffectPlan,
