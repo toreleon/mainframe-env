@@ -13719,13 +13719,25 @@ fn explicit_carddemo_bundles(
         );
     }
     libraries.extend(compatibility_libraries);
+    let (dcl_files, dcl_library) = carddemo_db2_dcl_library(corpus_dir, limits)?;
     let mut bundles = Vec::new();
     for primary_path in source_paths {
+        let is_db2 = primary_path.starts_with("app/app-transaction-type-db2/cbl/");
         let primary = source_file(corpus_dir, &primary_path, limits)?;
         let mut files = Vec::with_capacity(1 + copybooks.len() + compatibility.len());
         files.push(primary);
         files.extend(copybooks.iter().cloned());
         files.extend(compatibility.iter().cloned());
+        let mut bundle_libraries = libraries.clone();
+        let mut options = BTreeMap::new();
+        if is_db2 {
+            files.extend(dcl_files.iter().cloned());
+            bundle_libraries.insert(
+                bundle_libraries.len().saturating_sub(1),
+                dcl_library.clone(),
+            );
+            options.insert("cobol.sql-precompile".into(), "true".into());
+        }
         let logical = LogicalPath::new(&primary_path, limits.max_path_bytes).map_err(|error| {
             CorpusProblem::new(
                 "carddemo.layout.closure_invalid",
@@ -13735,8 +13747,8 @@ fn explicit_carddemo_bundles(
         let bundle = SourceBundle::with_libraries(
             &logical,
             files,
-            libraries.clone(),
-            BTreeMap::new(),
+            bundle_libraries,
+            options,
             Vec::new(),
             limits,
         )
@@ -13751,8 +13763,11 @@ fn explicit_carddemo_bundles(
     Ok(bundles)
 }
 
-fn carddemo_db2_bundles(corpus_dir: &Path) -> Result<Vec<(String, SourceBundle)>, CorpusProblem> {
-    let limits = SourceLimits::default();
+/// Loads the Db2 DCLGEN library shared by every Db2-program bundle.
+fn carddemo_db2_dcl_library(
+    corpus_dir: &Path,
+    limits: SourceLimits,
+) -> Result<(Vec<SourceFile>, SourceLibrary), CorpusProblem> {
     let dcl_paths = collect_paths(corpus_dir, &["app/app-transaction-type-db2/dcl"], "dcl")?;
     let dcl_files = dcl_paths
         .iter()
@@ -13774,33 +13789,16 @@ fn carddemo_db2_bundles(corpus_dir: &Path) -> Result<Vec<(String, SourceBundle)>
             format!("Db2 DCL library is invalid: {problem}"),
         )
     })?;
-    explicit_carddemo_bundles(corpus_dir)?
+    Ok((dcl_files, dcl_library))
+}
+
+/// Db2-program bundles, built by `explicit_carddemo_bundles` itself; this is
+/// only a filter, so no bundle construction is duplicated.
+fn carddemo_db2_bundles(corpus_dir: &Path) -> Result<Vec<(String, SourceBundle)>, CorpusProblem> {
+    Ok(explicit_carddemo_bundles(corpus_dir)?
         .into_iter()
         .filter(|(relative, _)| relative.starts_with("app/app-transaction-type-db2/cbl/"))
-        .map(|(relative, bundle)| {
-            let mut files = bundle.files().to_vec();
-            files.extend(dcl_files.iter().cloned());
-            let mut libraries = bundle.libraries().to_vec();
-            libraries.insert(libraries.len().saturating_sub(1), dcl_library.clone());
-            let mut options = bundle.options().clone();
-            options.insert("cobol.sql-precompile".into(), "true".into());
-            let primary =
-                LogicalPath::new(&relative, limits.max_path_bytes).map_err(|problem| {
-                    CorpusProblem::new(
-                        "carddemo.db2.closure_invalid",
-                        format!("Db2 primary path is invalid: {problem}"),
-                    )
-                })?;
-            SourceBundle::with_libraries(&primary, files, libraries, options, Vec::new(), limits)
-                .map(|bundle| (relative, bundle))
-                .map_err(|problem| {
-                    CorpusProblem::new(
-                        "carddemo.db2.closure_invalid",
-                        format!("Db2 source closure is invalid: {problem}"),
-                    )
-                })
-        })
-        .collect()
+        .collect())
 }
 
 fn collect_paths(
@@ -14550,5 +14548,128 @@ mod tests {
         assert_eq!(exercise.sqlite_backup_restore_controls, 1);
         assert_eq!(exercise.postgres_restart_controls, 1);
         assert_eq!(exercise.cross_principal_controls, 2);
+    }
+
+    struct BundleCorpus {
+        root: PathBuf,
+    }
+
+    impl BundleCorpus {
+        fn create() -> Self {
+            let nonce = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let root = env::temp_dir().join(format!(
+                "mainframe-env-carddemo-bundle-corpus-{}-{nonce}-{}",
+                std::process::id(),
+                NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed)
+            ));
+            for directory in [
+                "app/cbl",
+                "app/cpy",
+                "app/cpy-bms",
+                "app/app-authorization-ims-db2-mq/cbl",
+                "app/app-authorization-ims-db2-mq/cpy",
+                "app/app-authorization-ims-db2-mq/cpy-bms",
+                "app/app-transaction-type-db2/cbl",
+                "app/app-transaction-type-db2/cpy",
+                "app/app-transaction-type-db2/cpy-bms",
+                "app/app-transaction-type-db2/dcl",
+                "app/app-vsam-mq/cbl",
+            ] {
+                fs::create_dir_all(root.join(directory)).unwrap();
+            }
+            fs::write(
+                root.join("app/cbl/CORTL01.cbl"),
+                b"       IDENTIFICATION DIVISION.\n       PROGRAM-ID. CORTL01.\n",
+            )
+            .unwrap();
+            fs::write(
+                root.join("app/app-transaction-type-db2/cbl/COTRTLIC.cbl"),
+                b"       IDENTIFICATION DIVISION.\n       PROGRAM-ID. COTRTLIC.\n",
+            )
+            .unwrap();
+            fs::write(
+                root.join("app/app-transaction-type-db2/dcl/DCLTRTYP.dcl"),
+                b"       01  DCL-TRAN-TYPE.\n           05  DCL-TR-TYPE PIC X(02).\n",
+            )
+            .unwrap();
+            for (directory, name) in [
+                ("app/cpy", "CVACT01Y.cpy"),
+                ("app/cpy-bms", "CVACT02Y.cpy"),
+                ("app/app-authorization-ims-db2-mq/cpy", "CVACT03Y.cpy"),
+                ("app/app-authorization-ims-db2-mq/cpy-bms", "CVACT04Y.cpy"),
+                ("app/app-transaction-type-db2/cpy", "CVACT05Y.cpy"),
+                ("app/app-transaction-type-db2/cpy-bms", "CVACT06Y.cpy"),
+            ] {
+                fs::write(
+                    root.join(directory).join(name),
+                    b"       01  DUMMY-COPYBOOK-FIELD PIC X(01).\n",
+                )
+                .unwrap();
+            }
+            Self { root }
+        }
+    }
+
+    impl Drop for BundleCorpus {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
+
+    #[test]
+    fn explicit_bundles_apply_db2_dcl_library_and_precompile_option_only_to_db2_programs() {
+        let corpus = BundleCorpus::create();
+        let bundles = explicit_carddemo_bundles(&corpus.root).unwrap();
+        let db2_bundle = bundles
+            .iter()
+            .find(|(relative, _)| relative == "app/app-transaction-type-db2/cbl/COTRTLIC.cbl")
+            .map(|(_, bundle)| bundle)
+            .expect("db2 program bundle is present");
+        assert_eq!(
+            db2_bundle.options().get("cobol.sql-precompile"),
+            Some(&"true".to_string()),
+            "db2 program bundle must enable SQL precompilation"
+        );
+        assert!(
+            db2_bundle
+                .libraries()
+                .iter()
+                .any(|library| library.name() == "db2-dcl"),
+            "db2 program bundle must carry the db2-dcl library"
+        );
+
+        let non_db2_bundle = bundles
+            .iter()
+            .find(|(relative, _)| relative == "app/cbl/CORTL01.cbl")
+            .map(|(_, bundle)| bundle)
+            .expect("non-db2 program bundle is present");
+        assert!(
+            !non_db2_bundle
+                .options()
+                .contains_key("cobol.sql-precompile"),
+            "non-db2 program bundle must not enable SQL precompilation"
+        );
+        assert!(
+            !non_db2_bundle
+                .libraries()
+                .iter()
+                .any(|library| library.name() == "db2-dcl"),
+            "non-db2 program bundle must not carry the db2-dcl library"
+        );
+    }
+
+    #[test]
+    fn db2_bundles_are_a_filter_over_explicit_bundles_with_no_duplicated_construction() {
+        let corpus = BundleCorpus::create();
+        let explicit = explicit_carddemo_bundles(&corpus.root).unwrap();
+        let db2 = carddemo_db2_bundles(&corpus.root).unwrap();
+        let expected: Vec<_> = explicit
+            .into_iter()
+            .filter(|(relative, _)| relative.starts_with("app/app-transaction-type-db2/cbl/"))
+            .collect();
+        assert_eq!(db2, expected);
     }
 }

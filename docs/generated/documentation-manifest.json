@@ -3,7 +3,7 @@
     "markdown_documents": 186,
     "navigation_groups": 5,
     "normative_documents": 39,
-    "xtask_commands": 162
+    "xtask_commands": 165
   },
   "documents": [
     {
@@ -18,9 +18,9 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:f290c3faf29c618a33935870af755bcfa9cfe7d3063cc45835375b8fef95e5f9",
+      "sha256": "sha256:243b45f0b16c2a12337e818ba4a770d0b1940a4a2c06f9bbcebeaec7d12b615b",
       "title": "Changelog",
-      "xtask_commands": 1
+      "xtask_commands": 4
     },
     {
       "normative": false,

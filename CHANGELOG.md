@@ -109,6 +109,35 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Gave every CardDemo conformance-harness check (`toreleon/mainframe-env#175`)
+  that compiles an `app/app-transaction-type-db2/cbl` program the same Db2 DCL library
+  (`app/app-transaction-type-db2/dcl`, as library `db2-dcl`) and
+  `cobol.sql-precompile=true` option that `carddemo_db2_bundles` already gave
+  its own callers. Previously only `carddemo_db2_bundles` did this;
+  `explicit_carddemo_bundles` -- used by `verify_carddemo_data_layouts_from_env`,
+  `verify_carddemo_control_flow_from_env`, `verify_carddemo_core_semantics_from_env`,
+  `verify_carddemo_file_call_semantics_from_env`, `verify_carddemo_host_operands_from_env`,
+  `verify_carddemo_cics_abi_from_env`, `verify_carddemo_cics_runtime_from_env`,
+  `verify_carddemo_vsam_from_env`, `verify_carddemo_batch_programs_from_env`,
+  `verify_carddemo_base_batch_from_env`, `verify_carddemo_ims_from_env`,
+  `verify_carddemo_mq_authorization_from_env`, and `carddemo_base_online_definition`
+  -- built Db2-program bundles without it, so `EXEC SQL INCLUDE DCLTRTYP
+  END-EXEC` was never expanded and the DCLGEN group was absent. Since typed
+  receiver resolution landed (`229077a`, `00f25a9`), `cargo xtask
+  carddemo-operator-install --check` and `cargo xtask carddemo-cics --check`
+  failed closed with `carddemo.cics.hir_failed: app/app-transaction-type-db2
+  /cbl/COTRTLIC.cbl missing HIR` because `COMPUTE DCL-TR-DESCRIPTION-LEN`
+  could not resolve its typed receiver. `explicit_carddemo_bundles` now
+  builds every Db2-program bundle with the DCL library and precompile option
+  itself, and `carddemo_db2_bundles` is a plain filter over it with no
+  duplicated construction; non-Db2 program bundles are unchanged.
+  COTRTLIC now compiles; both checks still fail closed, now on
+  `app/app-transaction-type-db2/cbl/COTRTUPC.cbl`, on a pre-existing, unrelated
+  gap (`InvalidResolvedStatement(ExecCics, 1459, "CICS application command
+  SEND is catalog-known but its handler is unready")`) that already
+  reproduces on this base commit via `cargo xtask carddemo-db2 --check`,
+  which already built COTRTUPC's bundle correctly through
+  `carddemo_db2_bundles`; tracked in `toreleon/mainframe-env#177`.
 - Accepted `DATASET(...)` as `FILE`'s compatibility spelling on every CICS
   file-control command whose registry row declares a `FILE` option and does
   not itself declare `DATASET`: READ, READNEXT, READPREV, REWRITE, WRITE,
