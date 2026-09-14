@@ -26,6 +26,8 @@ pub(super) const OUTPUT_NAMES: &[&str] = &[
     "DEFSCRNWD",
     "DS3270",
     "DSSCS",
+    "ERRORMSG",
+    "ERRORMSGLEN",
     "EWASUPP",
     "EXTDS",
     "FCI",

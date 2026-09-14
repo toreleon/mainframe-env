@@ -2483,6 +2483,28 @@ mod tests {
             }));
         }
 
+        let error_message = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. ERRORASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 ERROR-X PIC X(500). 01 ERROR-LENGTH-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS ASSIGN ERRORMSG(ERROR-X) ERRORMSGLEN(ERROR-LENGTH-X) END-EXEC. STOP RUN.",
+        );
+        assert!(
+            error_message.hir.is_some(),
+            "{:?}",
+            error_message.diagnostics
+        );
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADERRORASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 ERROR-X PIC X(499). PROCEDURE DIVISION. EXEC CICS ASSIGN ERRORMSG(ERROR-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADERRORASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 ERROR-LENGTH-X PIC X(2). PROCEDURE DIVISION. EXEC CICS ASSIGN ERRORMSGLEN(ERROR-LENGTH-X) END-EXEC. STOP RUN.",
+        ] {
+            let analysis = analyze(source);
+            assert!(analysis.hir.is_none());
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains("CICS ASSIGN"))
+            );
+        }
+
         let duplicate_resource = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSALIAS. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2). 01 REC-X PIC X(8). PROCEDURE DIVISION. EXEC CICS READNEXT FILE('A') DATASET('B') RIDFLD(KEY-X) INTO(REC-X) END-EXEC. STOP RUN.",
         );

@@ -186,6 +186,16 @@ pub(in crate::service) fn assign(
             .map_or_else(|| vec![0; 8], |program| program.as_bytes().to_vec());
         response.outputs.insert("ABPROGRAM".into(), bounded(value)?);
     }
+    if request.arguments.contains_key("ERRORMSG") {
+        response
+            .outputs
+            .insert("ERRORMSG".into(), bounded(vec![0; 500])?);
+    }
+    if request.arguments.contains_key("ERRORMSGLEN") {
+        response
+            .outputs
+            .insert("ERRORMSGLEN".into(), decimal_payload(0)?);
+    }
     if let Some(link_level) = link_level {
         response
             .outputs
@@ -372,6 +382,8 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "DEFSCRNWD",
         "DS3270",
         "DSSCS",
+        "ERRORMSG",
+        "ERRORMSGLEN",
         "EWASUPP",
         "EXTDS",
         "FCI",

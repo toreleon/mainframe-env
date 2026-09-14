@@ -9744,7 +9744,11 @@ mod tests {
             )
             .replace(
                 "ABPROGRAM(ABPROGRAM-X) ASRAPSW(ASRA-PSW-X)",
-                "ABPROGRAM(ABPROGRAM-X) ASRAINTRPT(ASRA-PSW-X) ASRAPSW(ASRA-PSW-X)",
+                "ABPROGRAM(ABPROGRAM-X) ASRAINTRPT(ASRA-PSW-X) ASRAPSW(ASRA-PSW-X) ERRORMSG(ERROR-MSG-X) ERRORMSGLEN(ERROR-MSG-LENGTH-X)",
+            )
+            .replace(
+                "01 FCI-X PIC X VALUE 'Z'.",
+                "01 ERROR-MSG-X PIC X(500) VALUE ALL 'Z'.\n01 ERROR-MSG-LENGTH-X PIC S9(4) COMP VALUE 1.\n01 FCI-X PIC X VALUE 'Z'.",
             );
         let path = LogicalPath::new("SCHEDULE.cbl", limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
@@ -9947,6 +9951,11 @@ mod tests {
         );
         assert_eq!(restored.variable("DS3270-X").unwrap().bytes(), &[0xff]);
         assert_eq!(restored.variable("DSSCS-X").unwrap().bytes(), &[0]);
+        assert_eq!(restored.variable("ERROR-MSG-X").unwrap().bytes(), &[0; 500]);
+        assert_eq!(
+            restored.variable("ERROR-MSG-LENGTH-X").unwrap().bytes(),
+            &[0; 2]
+        );
         assert_eq!(restored.variable("FCI-X").unwrap().bytes(), &[1]);
         assert_eq!(
             restored.variable("INITPARM-X").unwrap().bytes(),

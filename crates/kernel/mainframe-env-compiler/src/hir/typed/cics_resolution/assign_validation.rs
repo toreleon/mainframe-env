@@ -41,6 +41,8 @@ pub(super) fn validate(
         "DEFSCRNWD",
         "DS3270",
         "DSSCS",
+        "ERRORMSG",
+        "ERRORMSGLEN",
         "EWASUPP",
         "EXTDS",
         "FCI",
@@ -110,6 +112,7 @@ pub(super) fn validate(
                 | "CWALENG"
                 | "DEFSCRNHT"
                 | "DEFSCRNWD"
+                | "ERRORMSGLEN"
                 | "INITPARMLEN"
                 | "LINKLEVEL"
                 | "SCRNHT"
@@ -134,6 +137,7 @@ pub(super) fn validate(
             || (name == "ASRAREGS" && target.length != 64)
             || (name == "ASRAREGS64" && target.length != 128)
             || (name == "BRIDGE" && target.length != 4)
+            || (name == "ERRORMSG" && target.length != 500)
             || (name == "FCI" && target.length != 1)
             || (name == "INITPARM" && target.length != 60)
             || (name == "OPERKEYS" && target.length != 8)

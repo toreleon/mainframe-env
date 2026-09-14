@@ -85,6 +85,8 @@ contract explicitly permits it.
   zero and ASRAINTRPT/ASRAPSW/ASRAPSW16/ASRAREGS/ASRAREGS64 are their exact
   zero-filled widths; an explicit EXEC CICS ABEND is not treated as a
   processor fault.
+  ERRORMSG and ERRORMSGLEN return 500 binary nulls and halfword zero because
+  the runtime has no transaction-abend-control-block message authority.
   ALTSCRNHT/ALTSCRNWD, DEFSCRNHT/DEFSCRNWD, and SCRNHT/SCRNWD come from the
   owned durable terminal geometry. Nonterminal tasks receive `INVREQ` 16/5,
   while DPL returns the qualified `INVREQ` 16/200 and leaves those receivers

@@ -71,7 +71,9 @@ All notable changes to mainframe-env are documented here.
   register diagnostics because no recoverable ASRA-class machine-check handoff
   exists. They observe these values, the durable terminal's
   current/default/alternate screen geometry, and priority changes through the
-  selected route. Screen options fail with
+  selected route. With no transaction-abend-control-block message, ERRORMSG
+  and ERRORMSGLEN return 500 null bytes and halfword zero. Screen options fail
+  with
   `INVREQ` 16/5 for nonterminal tasks and `INVREQ` 16/200 in DPL; FCI
   distinguishes the supported terminal facility (`X'01'`) from no facility
   (`X'00'`) and is also DPL-prohibited. LINKLEVEL returns one for a top-level
