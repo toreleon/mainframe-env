@@ -78,11 +78,18 @@ fn format_time(
     run: &Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
+    validate_format_time_request(request)?;
     let absolute = argument_text(request, "ABSTIME")?
         .trim()
         .parse::<i64>()
-        .map_err(|_| HostProblem::Malformed)?;
-    let instant = instant_from_absolute(absolute)?;
+        .map_err(|_| invalid_absolute_time())?;
+    let instant = instant_from_absolute(absolute).map_err(|problem| {
+        if problem == HostProblem::Malformed {
+            invalid_absolute_time()
+        } else {
+            problem
+        }
+    })?;
     let date_separator = separator(request, "DATESEP", b'/')?;
     let time_separator = separator(request, "TIMESEP", b':')?;
     let mut response = service.response(
@@ -110,10 +117,59 @@ fn format_time(
     if request.arguments.contains_key("MILLISECONDS") {
         response.outputs.insert(
             "MILLISECONDS".into(),
-            bounded(format!("{:03}", instant.millisecond).into_bytes())?,
+            decimal_payload(i64::from(instant.millisecond))?,
         );
     }
     Ok(response)
+}
+
+fn validate_format_time_request(request: &CicsRequest) -> Result<(), HostProblem> {
+    const OUTPUTS: &[&str] = &[
+        "MILLISECONDS",
+        "MMDDYY",
+        "MMDDYYYY",
+        "TIME",
+        "YYDDD",
+        "YYMMDD",
+        "YYYYMMDD",
+    ];
+    if !request.arguments.contains_key("ABSTIME") {
+        return Err(HostProblem::Malformed);
+    }
+    for (name, value) in &request.arguments {
+        let valid = match name.as_str() {
+            "ABSTIME" => matches!(
+                value.schema(),
+                "mainframe-env.cics.decimal@1" | "mainframe-env.cics.argument@1"
+            ),
+            "DATESEP" | "TIMESEP" => {
+                matches!(
+                    value.schema(),
+                    "mainframe-env.cics.literal@1"
+                        | "mainframe-env.cics.storage-value@1"
+                        | "mainframe-env.cics.argument@1"
+                ) && value.bytes().len() == 1
+            }
+            "OPTION.DATESEP" | "OPTION.NOHANDLE" | "OPTION.TIMESEP" => {
+                value.schema() == "mainframe-env.cics.option@1" && value.bytes().is_empty()
+            }
+            "RESP" | "RESP2" => value.schema() == "mainframe-env.cics.argument@1",
+            name if OUTPUTS.contains(&name) => value.schema() == "mainframe-env.cics.argument@1",
+            _ => false,
+        };
+        if !valid {
+            return Err(HostProblem::Malformed);
+        }
+    }
+    Ok(())
+}
+
+fn invalid_absolute_time() -> HostProblem {
+    HostProblem::Condition {
+        name: "INVREQ".into(),
+        response: 16,
+        response2: 1,
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -89,6 +89,11 @@ and EIBTIME. Bare `ASKTIME` is a distinct route that refreshes only those two
 packed-decimal EIB fields; it cannot manufacture an ABSTIME destination. Both
 forms lower through distinct typed plan operations, while retained raw
 ASKTIME artifacts remain readable by the compatibility interpreter.
+The typed FORMATTIME route currently admits only its source-checked legacy
+subset: packed ABSTIME input, valued DATESEP/TIMESEP, five explicit date
+formats, TIME, MILLISECONDS, and common response options. Other official
+FORMATTIME fields remain explicit compiler rejections until their output and
+timezone contracts are implemented.
 Each legacy route admits only the source-valid option subset whose behavior is
 implemented by that raw handler. A catalog-known option outside that subset
 fails explicitly before compatibility lowering instead of being silently

@@ -25,11 +25,6 @@
       "execution_options": ["FILE", "NOHANDLE", "RESP", "RESP2"]
     },
     {
-      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0080",
-      "runtime_operation": "FormatTime",
-      "execution_options": ["ABSTIME", "DATESEP", "MILLISECONDS", "MMDDYY", "MMDDYYYY", "NOHANDLE", "RESP", "RESP2", "TIME", "TIMESEP", "YYDDD", "YYMMDD", "YYYYMMDD"]
-    },
-    {
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0097",
       "runtime_operation": "HandleAbend",
       "execution_options": ["CANCEL", "LABEL", "NOHANDLE", "PROGRAM", "RESET", "RESP", "RESP2"]

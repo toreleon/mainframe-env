@@ -10106,9 +10106,9 @@ mod tests {
     }
 
     #[test]
-    fn online_asktime_forms_update_packed_clock_destinations() {
+    fn online_time_commands_update_packed_and_formatted_destinations() {
         let limits = SourceLimits::default();
-        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. ASKTIME.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 EIBDATE PIC S9(7) COMP-3.\n01 EIBTIME PIC S9(7) COMP-3.\n01 ABS-TIME PIC S9(15) COMP-3.\n01 ASKTIME-FN PIC X(2).\n01 ABSTIME-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS ASKTIME END-EXEC.\nMOVE EIBFN TO ASKTIME-FN.\nEXEC CICS ASKTIME ABSTIME(ABS-TIME) END-EXEC.\nMOVE EIBFN TO ABSTIME-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. ASKTIME.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 EIBDATE PIC S9(7) COMP-3.\n01 EIBTIME PIC S9(7) COMP-3.\n01 ABS-TIME PIC S9(15) COMP-3.\n01 DATE-OUT PIC X(10).\n01 TIME-OUT PIC X(8).\n01 MS-OUT PIC S9(9) COMP.\n01 ASKTIME-FN PIC X(2).\n01 ABSTIME-FN PIC X(2).\n01 FORMAT-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS ASKTIME END-EXEC.\nMOVE EIBFN TO ASKTIME-FN.\nEXEC CICS ASKTIME ABSTIME(ABS-TIME) END-EXEC.\nMOVE EIBFN TO ABSTIME-FN.\nEXEC CICS FORMATTIME ABSTIME(ABS-TIME) DATESEP('-') YYYYMMDD(DATE-OUT) TIMESEP(':') TIME(TIME-OUT) MILLISECONDS(MS-OUT) END-EXEC.\nMOVE EIBFN TO FORMAT-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
         let path = LogicalPath::new("ASKTIME.cbl", limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
             &path,
@@ -10216,10 +10216,39 @@ mod tests {
             restored.variable("ABSTIME-FN").unwrap().bytes(),
             &[0x4a, 0x02]
         );
+        assert_eq!(
+            restored.variable("FORMAT-FN").unwrap().bytes(),
+            &[0x4a, 0x04]
+        );
         let absolute = restored.variable("ABS-TIME").unwrap().bytes().to_vec();
         assert_eq!(absolute.len(), 8);
         assert_eq!(absolute[7] & 0x0f, 0x0c);
         assert_ne!(absolute, &[0; 8]);
+        let date = restored.variable("DATE-OUT").unwrap().bytes().to_vec();
+        let time = restored.variable("TIME-OUT").unwrap().bytes().to_vec();
+        let milliseconds = i32::from_be_bytes(
+            restored
+                .variable("MS-OUT")
+                .unwrap()
+                .bytes()
+                .try_into()
+                .unwrap(),
+        );
+        assert_eq!(date.len(), 10);
+        assert_eq!((date[4], date[7]), (b'-', b'-'));
+        assert!(
+            date.iter()
+                .enumerate()
+                .all(|(index, byte)| matches!(index, 4 | 7) || byte.is_ascii_digit())
+        );
+        assert_eq!(time.len(), 8);
+        assert_eq!((time[2], time[5]), (b':', b':'));
+        assert!(
+            time.iter()
+                .enumerate()
+                .all(|(index, byte)| matches!(index, 2 | 5) || byte.is_ascii_digit())
+        );
+        assert!((0..=999).contains(&milliseconds));
         let eib_date = restored.variable("EIBDATE").unwrap().bytes().to_vec();
         let eib_time = restored.variable("EIBTIME").unwrap().bytes().to_vec();
         assert_eq!(eib_date.len(), 4);

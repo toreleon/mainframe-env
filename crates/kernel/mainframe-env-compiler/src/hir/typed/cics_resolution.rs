@@ -19,6 +19,7 @@ use std::collections::{BTreeMap, BTreeSet};
 type Clauses = BTreeMap<String, Vec<String>>;
 
 mod assign_validation;
+mod format_time;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) struct CicsLegacySpiCompatibilityDescriptor {
@@ -761,6 +762,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         ["ADDRESS", "SET"] => HirCicsOperation::AddressSet,
         ["ASKTIME", "ABSTIME"] => HirCicsOperation::Asktime,
         ["ASKTIME"] => HirCicsOperation::AsktimeEib,
+        ["FORMATTIME"] => HirCicsOperation::FormatTime,
         ["CHANGE", "TASK"] => HirCicsOperation::ChangeTask,
         ["DEQ"] => HirCicsOperation::Deq,
         ["ENQ"] => HirCicsOperation::Enq,
@@ -780,6 +782,20 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::AddressSet => &["SET", "USING", "RESP", "RESP2"],
         HirCicsOperation::Asktime => &["ABSTIME", "RESP", "RESP2"],
         HirCicsOperation::AsktimeEib => &["RESP", "RESP2"],
+        HirCicsOperation::FormatTime => &[
+            "ABSTIME",
+            "DATESEP",
+            "MILLISECONDS",
+            "MMDDYY",
+            "MMDDYYYY",
+            "RESP",
+            "RESP2",
+            "TIME",
+            "TIMESEP",
+            "YYDDD",
+            "YYMMDD",
+            "YYYYMMDD",
+        ],
         HirCicsOperation::ChangeTask => &["PRIORITY", "RESP", "RESP2"],
         HirCicsOperation::Deq | HirCicsOperation::Enq => {
             &["RESOURCE", "LENGTH", "MAXLIFETIME", "RESP", "RESP2"]
@@ -799,6 +815,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::AddressSet
         | HirCicsOperation::Asktime
         | HirCicsOperation::AsktimeEib
+        | HirCicsOperation::FormatTime
         | HirCicsOperation::ChangeTask
         | HirCicsOperation::HandleAid
         | HirCicsOperation::HandleCondition
@@ -859,6 +876,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     for required in match operation {
         HirCicsOperation::AddressSet => &["SET", "USING"][..],
         HirCicsOperation::Asktime => &["ABSTIME"][..],
+        HirCicsOperation::FormatTime => &["ABSTIME"][..],
         HirCicsOperation::AsktimeEib
         | HirCicsOperation::ChangeTask
         | HirCicsOperation::HandleAid
@@ -1016,33 +1034,30 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             value: cics_value(&clauses["USERCORRDATA"], semantic)?,
         });
     }
+    if operation == HirCicsOperation::FormatTime {
+        operands.extend(format_time::operands(&clauses, semantic)?);
+    }
     let mut outputs = Vec::new();
     for (name, identity) in [
         ("ABSTIME", HirCicsOutputName::Abstime),
         ("INTO", HirCicsOutputName::Into),
+        ("MILLISECONDS", HirCicsOutputName::Milliseconds),
+        ("MMDDYY", HirCicsOutputName::Mmddyy),
+        ("MMDDYYYY", HirCicsOutputName::Mmddyyyy),
         ("RESP", HirCicsOutputName::Resp),
         ("RESP2", HirCicsOutputName::Resp2),
+        ("TIME", HirCicsOutputName::Time),
+        ("YYDDD", HirCicsOutputName::Yyddd),
+        ("YYMMDD", HirCicsOutputName::Yymmdd),
+        ("YYYYMMDD", HirCicsOutputName::Yyyymmdd),
     ] {
+        if name == "ABSTIME" && operation == HirCicsOperation::FormatTime {
+            continue;
+        }
         if let Some(value) = clauses.get(name) {
             let target = complete_data_reference(value, semantic)?;
             require_writable(&target)?;
-            if matches!(
-                identity,
-                HirCicsOutputName::Abstime | HirCicsOutputName::Resp | HirCicsOutputName::Resp2
-            ) {
-                require_numeric(&target)?;
-            }
-            if identity == HirCicsOutputName::Abstime
-                && (target.usage != CobolUsage::PackedDecimal
-                    || target.length != 8
-                    || target.digits != 15
-                    || target.scale != 0
-                    || !target.signed)
-            {
-                return Err(ResolutionFailure::Invalid(
-                    "CICS ASKTIME ABSTIME requires PIC S9(15) COMP-3 storage".into(),
-                ));
-            }
+            format_time::require_output_shape(identity, &target)?;
             outputs.push(HirCicsOutputBinding {
                 name: identity,
                 target,

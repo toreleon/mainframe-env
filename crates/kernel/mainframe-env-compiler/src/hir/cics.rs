@@ -182,6 +182,9 @@ impl PlanContext<'_> {
                 HirCicsOperandName::UsingPointer => CicsOperandName::UsingPointer,
                 HirCicsOperandName::Conditions => CicsOperandName::Conditions,
                 HirCicsOperandName::Aids => CicsOperandName::Aids,
+                HirCicsOperandName::Abstime => CicsOperandName::Abstime,
+                HirCicsOperandName::DateSep => CicsOperandName::DateSep,
+                HirCicsOperandName::TimeSep => CicsOperandName::TimeSep,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -201,8 +204,15 @@ impl PlanContext<'_> {
             name: match output.name {
                 HirCicsOutputName::Abstime => CicsOutputName::Abstime,
                 HirCicsOutputName::Into => CicsOutputName::Into,
+                HirCicsOutputName::Milliseconds => CicsOutputName::Milliseconds,
+                HirCicsOutputName::Mmddyy => CicsOutputName::Mmddyy,
+                HirCicsOutputName::Mmddyyyy => CicsOutputName::Mmddyyyy,
                 HirCicsOutputName::Resp => CicsOutputName::Resp,
                 HirCicsOutputName::Resp2 => CicsOutputName::Resp2,
+                HirCicsOutputName::Time => CicsOutputName::Time,
+                HirCicsOutputName::Yyddd => CicsOutputName::Yyddd,
+                HirCicsOutputName::Yymmdd => CicsOutputName::Yymmdd,
+                HirCicsOutputName::Yyyymmdd => CicsOutputName::Yyyymmdd,
             },
             target: self.slot(&output.target)?,
         })
@@ -249,6 +259,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::AddressSet => CicsPlanOperation::AddressSet,
         HirCicsOperation::Asktime => CicsPlanOperation::Asktime,
         HirCicsOperation::AsktimeEib => CicsPlanOperation::AsktimeEib,
+        HirCicsOperation::FormatTime => CicsPlanOperation::FormatTime,
         HirCicsOperation::ChangeTask => CicsPlanOperation::ChangeTask,
         HirCicsOperation::Read => CicsPlanOperation::Read,
         HirCicsOperation::Rewrite => CicsPlanOperation::Rewrite,

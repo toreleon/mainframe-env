@@ -62,6 +62,10 @@ contract explicitly permits it.
   instant. ASKTIME ABSTIME refreshes the same implicit fields and separately
   returns its packed absolute-time destination. Historical retained ABSTIME
   responses without implicit outputs retain their prior EIB state.
+- CICS FORMATTIME decodes an exact `PIC S9(15) COMP-3` absolute-time input and
+  writes source-sized character date/time fields plus a fullword binary
+  millisecond value. Typed provider output schemas are checked before any
+  receiving field is accepted.
 - The bounded legacy CICS `ASSIGN` route returns APPLID, SYSID, USERID, and the
   current TASKPRIORITY from owned invocation context. Because no CICS
   application, platform, operation, version, or channel context is currently

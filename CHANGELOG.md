@@ -59,6 +59,11 @@ All notable changes to mainframe-env are documented here.
   ASKTIME ABSTIME now uses a typed, exact `PIC S9(15) COMP-3` output binding,
   refreshes the same implicit EIB fields, and retains its eight-byte packed
   absolute-time result.
+- Migrated the source-checked FORMATTIME subset to typed plans for packed
+  ABSTIME input, one-byte DATESEP/TIMESEP values, fixed YYYYMMDD/YYMMDD/MMDDYY/
+  MMDDYYYY/YYDDD/TIME fields, and fullword MILLISECONDS output. Negative or
+  malformed absolute time returns INVREQ 16/1, while the remaining official
+  formats stay explicitly deferred.
 - Expanded the source-bounded CICS `ASSIGN` compatibility route with APPLID,
   SYSID, USERID, TASKPRIORITY, and the exact absent application/channel context
   defaults. It also reports absent CWA/TWA lengths, null OPERKEYS, and a normal

@@ -49,6 +49,8 @@ pub enum CicsPlanOperation {
     Asktime,
     /// Refresh the implicit EIB date and time fields.
     AsktimeEib,
+    /// Transform one absolute-time value into selected display/binary fields.
+    FormatTime,
     /// Change the issuing task's dispatch priority and optionally yield.
     ChangeTask,
     /// Release one task-owned enqueue.
@@ -119,6 +121,12 @@ pub enum CicsOperandName {
     Conditions,
     /// Canonical terminal AID handler specifications.
     Aids,
+    /// `ABSTIME(...)` packed-decimal input.
+    Abstime,
+    /// Optional one-byte date separator.
+    DateSep,
+    /// Optional one-byte time separator.
+    TimeSep,
 }
 
 /// Literal bytes or a runtime read from resolved storage.
@@ -169,6 +177,20 @@ pub enum CicsOutputName {
     Resp2,
     /// `ABSTIME(...)` packed-decimal destination.
     Abstime,
+    /// `MILLISECONDS(...)` fullword-binary destination.
+    Milliseconds,
+    /// `MMDDYY(...)` character destination.
+    Mmddyy,
+    /// `MMDDYYYY(...)` character destination.
+    Mmddyyyy,
+    /// `TIME(...)` character destination.
+    Time,
+    /// `YYDDD(...)` character destination.
+    Yyddd,
+    /// `YYMMDD(...)` character destination.
+    Yymmdd,
+    /// `YYYYMMDD(...)` character destination.
+    Yyyymmdd,
 }
 
 /// One pre-resolved result binding.
@@ -447,6 +469,17 @@ fn validate_operation_shape(
             CicsOutputName::Resp,
             CicsOutputName::Resp2,
         ],
+        CicsPlanOperation::FormatTime => &[
+            CicsOutputName::Milliseconds,
+            CicsOutputName::Mmddyy,
+            CicsOutputName::Mmddyyyy,
+            CicsOutputName::Time,
+            CicsOutputName::Yyddd,
+            CicsOutputName::Yymmdd,
+            CicsOutputName::Yyyymmdd,
+            CicsOutputName::Resp,
+            CicsOutputName::Resp2,
+        ],
         _ => &[CicsOutputName::Resp, CicsOutputName::Resp2],
     };
     let unexpected_output = outputs
@@ -475,6 +508,26 @@ fn validate_operation_shape(
             !inputs.is_empty()
                 || scheduling_options
                 || !outputs.contains(&CicsOutputName::Abstime)
+        }
+        CicsPlanOperation::FormatTime => {
+            let allowed_inputs = BTreeSet::from([
+                CicsOperandName::Abstime,
+                CicsOperandName::DateSep,
+                CicsOperandName::TimeSep,
+            ]);
+            !inputs.contains(&CicsOperandName::Abstime)
+                || !inputs.is_subset(&allowed_inputs)
+                || plan.operands.iter().any(|operand| match operand.name {
+                    CicsOperandName::Abstime => {
+                        !matches!(operand.value, CicsOperandValue::Storage(_))
+                    }
+                    CicsOperandName::DateSep | CicsOperandName::TimeSep => !matches!(
+                        operand.value,
+                        CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+                    ),
+                    _ => true,
+                })
+                || scheduling_options
         }
         CicsPlanOperation::ChangeTask => {
             !inputs.is_subset(&BTreeSet::from([CicsOperandName::Priority]))
@@ -810,6 +863,7 @@ const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::HandleAid => 13,
         CicsPlanOperation::AsktimeEib => 14,
         CicsPlanOperation::Asktime => 15,
+        CicsPlanOperation::FormatTime => 16,
     }
 }
 
@@ -831,6 +885,7 @@ fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPlanCodecProbl
         13 => Ok(CicsPlanOperation::HandleAid),
         14 => Ok(CicsPlanOperation::AsktimeEib),
         15 => Ok(CicsPlanOperation::Asktime),
+        16 => Ok(CicsPlanOperation::FormatTime),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -852,6 +907,9 @@ const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::UsingPointer => 12,
         CicsOperandName::Conditions => 13,
         CicsOperandName::Aids => 14,
+        CicsOperandName::Abstime => 15,
+        CicsOperandName::DateSep => 16,
+        CicsOperandName::TimeSep => 17,
     }
 }
 
@@ -872,6 +930,9 @@ fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCodecProblem> 
         12 => Ok(CicsOperandName::UsingPointer),
         13 => Ok(CicsOperandName::Conditions),
         14 => Ok(CicsOperandName::Aids),
+        15 => Ok(CicsOperandName::Abstime),
+        16 => Ok(CicsOperandName::DateSep),
+        17 => Ok(CicsOperandName::TimeSep),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -905,6 +966,13 @@ const fn output_tag(value: CicsOutputName) -> u8 {
         CicsOutputName::Resp => 1,
         CicsOutputName::Resp2 => 2,
         CicsOutputName::Abstime => 3,
+        CicsOutputName::Milliseconds => 4,
+        CicsOutputName::Mmddyy => 5,
+        CicsOutputName::Mmddyyyy => 6,
+        CicsOutputName::Time => 7,
+        CicsOutputName::Yyddd => 8,
+        CicsOutputName::Yymmdd => 9,
+        CicsOutputName::Yyyymmdd => 10,
     }
 }
 
@@ -914,6 +982,13 @@ fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodecProblem> {
         1 => Ok(CicsOutputName::Resp),
         2 => Ok(CicsOutputName::Resp2),
         3 => Ok(CicsOutputName::Abstime),
+        4 => Ok(CicsOutputName::Milliseconds),
+        5 => Ok(CicsOutputName::Mmddyy),
+        6 => Ok(CicsOutputName::Mmddyyyy),
+        7 => Ok(CicsOutputName::Time),
+        8 => Ok(CicsOutputName::Yyddd),
+        9 => Ok(CicsOutputName::Yymmdd),
+        10 => Ok(CicsOutputName::Yyyymmdd),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -1183,7 +1258,32 @@ mod tests {
             encode_cics_effect_plan(&bare_with_absolute, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
-        for plan in [read, rewrite, syncpoint, asktime_eib, asktime] {
+        let format_time = CicsEffectPlan {
+            operation: CicsPlanOperation::FormatTime,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::Abstime,
+                    value: CicsOperandValue::Storage(slot(5, "REQUEST.ABSTIME")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::DateSep,
+                    value: CicsOperandValue::Literal(b"-".to_vec()),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: vec![
+                CicsOutputBinding {
+                    name: CicsOutputName::Milliseconds,
+                    target: slot(6, "RESULT.MILLISECONDS"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::Yyyymmdd,
+                    target: slot(7, "RESULT.YYYYMMDD"),
+                },
+            ],
+            condition: CicsCondition::Default,
+        };
+        for plan in [read, rewrite, syncpoint, asktime_eib, asktime, format_time] {
             let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
             let decoded = decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap();
             assert_eq!(decoded.operation, plan.operation);

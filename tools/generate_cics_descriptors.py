@@ -357,6 +357,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "AsktimeEib",
         "Deq",
         "Enq",
+        "FormatTime",
         "HandleAid",
         "HandleCondition",
         "IgnoreCondition",
@@ -396,6 +397,7 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "Enq": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
     ),
+    "FormatTime": frozenset({"memory-read", "memory-write", "condition"}),
     "HandleAid": frozenset({"memory-read", "memory-write", "condition"}),
     "HandleCondition": frozenset({"memory-read", "memory-write", "condition"}),
     "IgnoreCondition": frozenset({"memory-read", "memory-write", "condition"}),
@@ -3441,8 +3443,8 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
     if (
         len(registry_rows) != 263
         or len(set(handler_ids)) != 263
-        or len(typed_rows) != 16
-        or len(legacy_rows) != 18
+        or len(typed_rows) != 17
+        or len(legacy_rows) != 17
         or {row["runtime_operation"] for row in typed_rows}
         != TYPED_RUNTIME_OPERATIONS
         or len(advertised_rows) != 34

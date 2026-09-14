@@ -857,10 +857,17 @@ fn cics_slots(plan: &CicsEffectPlan) -> Vec<PlanSlot<'_>> {
         storage: output.target.storage,
         name: output.target.qualified_layout_name.as_str(),
         usage: match output.name {
-            CicsOutputName::Into => SlotUse::WRITE,
-            CicsOutputName::Abstime | CicsOutputName::Resp | CicsOutputName::Resp2 => {
-                SlotUse::NUMERIC_WRITE
-            }
+            CicsOutputName::Into
+            | CicsOutputName::Mmddyy
+            | CicsOutputName::Mmddyyyy
+            | CicsOutputName::Time
+            | CicsOutputName::Yyddd
+            | CicsOutputName::Yymmdd
+            | CicsOutputName::Yyyymmdd => SlotUse::WRITE,
+            CicsOutputName::Abstime
+            | CicsOutputName::Milliseconds
+            | CicsOutputName::Resp
+            | CicsOutputName::Resp2 => SlotUse::NUMERIC_WRITE,
         },
     }));
     if let CicsCondition::Respond {

@@ -149,6 +149,7 @@ pub enum HirCicsOperation {
     AddressSet,
     Asktime,
     AsktimeEib,
+    FormatTime,
     ChangeTask,
     Deq,
     Enq,
@@ -183,6 +184,9 @@ pub enum HirCicsOperandName {
     Conditions,
     /// Canonical terminal AID handler specifications.
     Aids,
+    Abstime,
+    DateSep,
+    TimeSep,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -212,8 +216,15 @@ pub enum HirCicsOption {
 pub enum HirCicsOutputName {
     Abstime,
     Into,
+    Milliseconds,
+    Mmddyy,
+    Mmddyyyy,
     Resp,
     Resp2,
+    Time,
+    Yyddd,
+    Yymmdd,
+    Yyyymmdd,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1972,6 +1983,68 @@ mod tests {
     }
 
     #[test]
+    fn cics_formattime_resolves_only_the_source_checked_output_subset() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFMT. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-X PIC S9(15) COMP-3. 01 DATE-X PIC X(10). 01 TIME-X PIC X(8). 01 MS-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS FORMATTIME ABSTIME(ABS-X) DATESEP('-') YYYYMMDD(DATE-X) TIMESEP(':') TIME(TIME-X) MILLISECONDS(MS-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("FORMATTIME: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("resolved FORMATTIME command");
+        assert_eq!(command.operation, HirCicsOperation::FormatTime);
+        assert_eq!(
+            command
+                .operands
+                .iter()
+                .map(|operand| operand.name)
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                HirCicsOperandName::Abstime,
+                HirCicsOperandName::DateSep,
+                HirCicsOperandName::TimeSep,
+            ])
+        );
+        assert_eq!(
+            command
+                .outputs
+                .iter()
+                .map(|output| output.name)
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                HirCicsOutputName::Milliseconds,
+                HirCicsOutputName::Time,
+                HirCicsOutputName::Yyyymmdd,
+            ])
+        );
+
+        let short_binary = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADFMT. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-X PIC S9(15) COMP-3. 01 MS-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS FORMATTIME ABSTIME(ABS-X) MILLISECONDS(MS-X) END-EXEC. STOP RUN.",
+        );
+        assert!(short_binary.hir.is_none());
+        assert!(
+            short_binary
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.public_message().contains("fullword binary"))
+        );
+
+        let deferred = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. LATERFMT. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-X PIC S9(15) COMP-3. 01 DAY-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS FORMATTIME ABSTIME(ABS-X) DAYCOUNT(DAY-X) END-EXEC. STOP RUN.",
+        );
+        assert!(deferred.hir.is_none());
+        assert!(deferred.diagnostics.iter().any(|diagnostic| {
+            let message = diagnostic.public_message();
+            message.contains("FORMATTIME") && message.contains("DAYCOUNT")
+        }));
+    }
+
+    #[test]
     fn cics_shared_heads_resolve_with_valued_discriminators() {
         for (command, expected_label) in [
             ("ACQUIRE ACTIVITYID('A1')", "ACQUIRE ACTIVITYID"),
@@ -2248,7 +2321,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 18);
+        assert_eq!(legacy.len(), 17);
         assert!(
             legacy.iter().all(|descriptor| {
                 descriptor.advertised && descriptor.runtime_operation.is_some()

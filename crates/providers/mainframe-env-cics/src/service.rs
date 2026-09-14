@@ -4674,6 +4674,41 @@ mod tests {
         assert_eq!(formatted.outputs["YYYYMMDD"].bytes(), b"2026-08-30");
         assert_eq!(formatted.outputs["TIME"].bytes(), b"12:34:56");
         assert_eq!(formatted.outputs["MILLISECONDS"].bytes(), b"789");
+        assert_eq!(
+            formatted.outputs["MILLISECONDS"].schema(),
+            "mainframe-env.cics.decimal@1"
+        );
+        let negative = request(
+            CicsOperation::FormatTime,
+            BTreeMap::from([("ABSTIME".into(), argument(b"-1"))]),
+            332,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, negative.clone(), 332),
+                negative,
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 1,
+            })
+        );
+        let unsupported = request(
+            CicsOperation::FormatTime,
+            BTreeMap::from([
+                ("ABSTIME".into(), argument(absolute.as_bytes())),
+                ("DAYCOUNT".into(), argument(b"DAY-OUT")),
+            ]),
+            333,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, unsupported.clone(), 333),
+                unsupported,
+            ),
+            Err(HostProblem::Malformed)
+        );
 
         let assign = request(
             CicsOperation::Assign,

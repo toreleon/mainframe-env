@@ -3,13 +3,13 @@ use mainframe_env_host_api::CicsResponse;
 use mainframe_env_ir::{
     CICS_EXECUTABLE_DESCRIPTORS, CicsCondition, CicsEffectPlan, CicsExecutableDescriptor,
     CicsOperandName, CicsOperandValue, CicsOperationContract, CicsOutputName, CicsPlanLimits,
-    CicsPlanOperation, CicsPlanOption, CicsStorageSlot, Effect, Module, OperationCatalog,
-    OperationSchema, OperationSemanticContract, cics_executable_descriptor,
-    cics_executable_descriptor_for_identity, cobol_layout_definition_identity,
-    decode_cics_effect_plan, verify_semantic_contracts,
+    CicsPlanOperation, CicsStorageSlot, Effect, Module, OperationCatalog, OperationSchema,
+    OperationSemanticContract, cics_executable_descriptor, cics_executable_descriptor_for_identity,
+    cobol_layout_definition_identity, decode_cics_effect_plan, verify_semantic_contracts,
 };
 
 mod legacy_assign;
+mod names;
 
 const PLAN_ATTRIBUTE: &str = "cics_plan";
 
@@ -190,13 +190,14 @@ pub(super) fn validate_machine(machine: &ReferenceMachine) -> Result<(), Machine
         for slot in plan_slots(&plan)? {
             validate_machine_slot(machine, operation, &slot, SlotUse::Input)?;
         }
+        for operand in &plan.operands {
+            if let CicsOperandValue::Storage(slot) = &operand.value {
+                validate_machine_slot(machine, operation, slot, input_slot_use(operand.name))?;
+            }
+        }
         validate_address_set_slots(machine, operation, &plan)?;
         for output in &plan.outputs {
-            let slot_use = match output.name {
-                CicsOutputName::Into => SlotUse::Output,
-                CicsOutputName::Abstime => SlotUse::AbstimeOutput,
-                CicsOutputName::Resp | CicsOutputName::Resp2 => SlotUse::NumericOutput,
-            };
+            let slot_use = output_slot_use(output.name);
             validate_machine_slot(machine, operation, &output.target, slot_use)?;
         }
     }
@@ -211,7 +212,7 @@ pub(super) fn execute(
     validate_declared_slots(operation, &plan)?;
     validate_runtime_plan(machine, operation, &plan)?;
 
-    let host_operation = host_operation(plan.operation);
+    let host_operation = names::host_operation(plan.operation);
     let address_set = address_set_action(&plan)?;
     let mut arguments = BTreeMap::new();
     for operand in &plan.operands {
@@ -261,6 +262,7 @@ pub(super) fn execute(
                     CicsOperandName::Length
                         | CicsOperandName::MaxLifetime
                         | CicsOperandName::Priority
+                        | CicsOperandName::Abstime
                 ) =>
             {
                 (
@@ -295,7 +297,7 @@ pub(super) fn execute(
                 value.to_string().into_bytes(),
             ),
         };
-        arguments.insert(operand_name(operand.name).into(), payload(schema, bytes)?);
+        arguments.insert(names::operand(operand.name).into(), payload(schema, bytes)?);
     }
 
     let mut into = None;
@@ -303,7 +305,7 @@ pub(super) fn execute(
     let mut response = None;
     let mut response2 = None;
     for output in &plan.outputs {
-        let key = output_name(output.name);
+        let key = names::output(output.name);
         arguments.insert(
             key.into(),
             payload(
@@ -313,7 +315,14 @@ pub(super) fn execute(
         );
         let target = CicsTarget::Resolved(output.target.clone());
         match output.name {
-            CicsOutputName::Abstime => {
+            CicsOutputName::Abstime
+            | CicsOutputName::Milliseconds
+            | CicsOutputName::Mmddyy
+            | CicsOutputName::Mmddyyyy
+            | CicsOutputName::Time
+            | CicsOutputName::Yyddd
+            | CicsOutputName::Yymmdd
+            | CicsOutputName::Yyyymmdd => {
                 outputs.insert(key.into(), target);
             }
             CicsOutputName::Into => into = Some(target),
@@ -323,7 +332,7 @@ pub(super) fn execute(
     }
     for option in &plan.options {
         arguments.insert(
-            format!("OPTION.{}", option_name(*option)),
+            format!("OPTION.{}", names::option(*option)),
             payload("mainframe-env.cics.option@1", Vec::new())?,
         );
     }
@@ -543,6 +552,38 @@ pub(super) fn write_target(
     }
 }
 
+pub(super) fn write_output(
+    machine: &mut ReferenceMachine,
+    name: &str,
+    target: &CicsTarget,
+    value: &BoundedPayload,
+) -> Result<(), MachineProblem> {
+    if matches!(name, "ABSTIME" | "MILLISECONDS")
+        && value.schema() != "mainframe-env.cics.decimal@1"
+        || matches!(
+            name,
+            "MMDDYY" | "MMDDYYYY" | "TIME" | "YYDDD" | "YYMMDD" | "YYYYMMDD"
+        ) && value.schema() != "mainframe-env.cics.payload@1"
+    {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
+    if value.schema() == "mainframe-env.cics.decimal@1" {
+        let coefficient = String::from_utf8_lossy(value.bytes())
+            .parse::<i128>()
+            .map_err(|_| MachineProblem::UnexpectedHostResult)?;
+        write_target(
+            machine,
+            target,
+            &CobolValue::Decimal(Decimal {
+                coefficient,
+                scale: 0,
+            }),
+        )
+    } else {
+        write_target(machine, target, &CobolValue::Bytes(value.bytes().to_vec()))
+    }
+}
+
 fn address_set_action(plan: &CicsEffectPlan) -> Result<Option<CicsAddressSet>, MachineProblem> {
     if plan.operation != CicsPlanOperation::AddressSet {
         return Ok(None);
@@ -735,7 +776,7 @@ fn validate_runtime_plan(
 ) -> Result<(), MachineProblem> {
     for operand in &plan.operands {
         if let CicsOperandValue::Storage(slot) = &operand.value {
-            validate_machine_slot(machine, operation, slot, SlotUse::Input)?;
+            validate_machine_slot(machine, operation, slot, input_slot_use(operand.name))?;
         }
     }
     validate_address_set_slots(machine, operation, plan)?;
@@ -744,11 +785,7 @@ fn validate_runtime_plan(
             machine,
             operation,
             &output.target,
-            match output.name {
-                CicsOutputName::Into => SlotUse::Output,
-                CicsOutputName::Abstime => SlotUse::AbstimeOutput,
-                CicsOutputName::Resp | CicsOutputName::Resp2 => SlotUse::NumericOutput,
-            },
+            output_slot_use(output.name),
         )?;
     }
     Ok(())
@@ -757,13 +794,39 @@ fn validate_runtime_plan(
 #[derive(Clone, Copy)]
 enum SlotUse {
     Input,
+    AbstimeInput,
+    SeparatorInput,
     Output,
     AbstimeOutput,
+    FormatTextOutput(usize),
+    MillisecondsOutput,
     NumericOutput,
     PointerInput,
     PointerOutput,
     AddressInput,
     AddressOutput,
+}
+
+const fn input_slot_use(name: CicsOperandName) -> SlotUse {
+    match name {
+        CicsOperandName::Abstime => SlotUse::AbstimeInput,
+        CicsOperandName::DateSep | CicsOperandName::TimeSep => SlotUse::SeparatorInput,
+        _ => SlotUse::Input,
+    }
+}
+
+const fn output_slot_use(name: CicsOutputName) -> SlotUse {
+    match name {
+        CicsOutputName::Abstime => SlotUse::AbstimeOutput,
+        CicsOutputName::Into => SlotUse::Output,
+        CicsOutputName::Milliseconds => SlotUse::MillisecondsOutput,
+        CicsOutputName::Mmddyy | CicsOutputName::Time | CicsOutputName::Yymmdd => {
+            SlotUse::FormatTextOutput(8)
+        }
+        CicsOutputName::Mmddyyyy | CicsOutputName::Yyyymmdd => SlotUse::FormatTextOutput(10),
+        CicsOutputName::Yyddd => SlotUse::FormatTextOutput(6),
+        CicsOutputName::Resp | CicsOutputName::Resp2 => SlotUse::NumericOutput,
+    }
 }
 
 fn validate_address_set_slots(
@@ -817,6 +880,8 @@ fn validate_machine_slot(
         slot_use,
         SlotUse::Output
             | SlotUse::AbstimeOutput
+            | SlotUse::FormatTextOutput(_)
+            | SlotUse::MillisecondsOutput
             | SlotUse::NumericOutput
             | SlotUse::PointerOutput
             | SlotUse::AddressOutput
@@ -829,15 +894,42 @@ fn validate_machine_slot(
     if matches!(slot_use, SlotUse::NumericOutput) && !is_numeric(layout.category) {
         return Err(invalid_plan("RESP and RESP2 outputs must be numeric"));
     }
-    if matches!(slot_use, SlotUse::AbstimeOutput)
+    if matches!(slot_use, SlotUse::AbstimeInput | SlotUse::AbstimeOutput)
         && (layout.category != LayoutCategory::PackedDecimal
             || layout.length != 8
             || layout.digits != 15
             || layout.scale != 0
             || !layout.signed)
     {
+        return Err(invalid_plan("CICS absolute time must be PIC S9(15) COMP-3"));
+    }
+    if matches!(slot_use, SlotUse::SeparatorInput)
+        && (layout.length != 1
+            || !matches!(
+                layout.category,
+                LayoutCategory::Alphabetic | LayoutCategory::Alphanumeric
+            ))
+    {
         return Err(invalid_plan(
-            "ASKTIME ABSTIME output must be PIC S9(15) COMP-3",
+            "FORMATTIME separator input must be one character",
+        ));
+    }
+    if let SlotUse::FormatTextOutput(expected) = slot_use
+        && (layout.length != expected
+            || !matches!(
+                layout.category,
+                LayoutCategory::Alphabetic | LayoutCategory::Alphanumeric
+            ))
+    {
+        return Err(invalid_plan(
+            "FORMATTIME character output has the wrong layout",
+        ));
+    }
+    if matches!(slot_use, SlotUse::MillisecondsOutput)
+        && (layout.category != LayoutCategory::Binary || layout.length != 4 || layout.scale != 0)
+    {
+        return Err(invalid_plan(
+            "FORMATTIME MILLISECONDS output must be fullword binary",
         ));
     }
     if matches!(slot_use, SlotUse::PointerInput | SlotUse::PointerOutput)
@@ -959,67 +1051,6 @@ fn expected_operation(identity: &OperationIdentity) -> Option<CicsPlanOperation>
 
 fn expected_effects(operation: CicsPlanOperation) -> &'static [Effect] {
     cics_executable_descriptor(operation).effects
-}
-
-const fn host_operation(operation: CicsPlanOperation) -> CicsOperation {
-    match operation {
-        CicsPlanOperation::AddressSet => CicsOperation::AddressSet,
-        CicsPlanOperation::Asktime => CicsOperation::Asktime,
-        CicsPlanOperation::AsktimeEib => CicsOperation::AsktimeEib,
-        CicsPlanOperation::ChangeTask => CicsOperation::ChangeTask,
-        CicsPlanOperation::Deq => CicsOperation::Deq,
-        CicsPlanOperation::Enq => CicsOperation::Enq,
-        CicsPlanOperation::HandleAid => CicsOperation::HandleAid,
-        CicsPlanOperation::HandleCondition => CicsOperation::HandleCondition,
-        CicsPlanOperation::IgnoreCondition => CicsOperation::IgnoreCondition,
-        CicsPlanOperation::PopHandle => CicsOperation::PopHandle,
-        CicsPlanOperation::PushHandle => CicsOperation::PushHandle,
-        CicsPlanOperation::Read => CicsOperation::Read,
-        CicsPlanOperation::Rewrite => CicsOperation::Rewrite,
-        CicsPlanOperation::SetAssociationUserCorrData => CicsOperation::SetAssociationUserCorrData,
-        CicsPlanOperation::Syncpoint => CicsOperation::Syncpoint,
-        CicsPlanOperation::Suspend => CicsOperation::Suspend,
-    }
-}
-
-const fn operand_name(name: CicsOperandName) -> &'static str {
-    match name {
-        CicsOperandName::File => "FILE",
-        CicsOperandName::Dataset => "DATASET",
-        CicsOperandName::From => "FROM",
-        CicsOperandName::Ridfld => "RIDFLD",
-        CicsOperandName::Resource => "RESOURCE",
-        CicsOperandName::Length => "LENGTH",
-        CicsOperandName::MaxLifetime => "MAXLIFETIME",
-        CicsOperandName::Priority => "PRIORITY",
-        CicsOperandName::UserCorrData => "USERCORRDATA",
-        CicsOperandName::SetAddress => "SET.ADDRESS",
-        CicsOperandName::SetPointer => "SET.POINTER",
-        CicsOperandName::UsingAddress => "USING.ADDRESS",
-        CicsOperandName::UsingPointer => "USING.POINTER",
-        CicsOperandName::Conditions => "CONDITIONS",
-        CicsOperandName::Aids => "AIDS",
-    }
-}
-
-const fn output_name(name: CicsOutputName) -> &'static str {
-    match name {
-        CicsOutputName::Abstime => "ABSTIME",
-        CicsOutputName::Into => "INTO",
-        CicsOutputName::Resp => "RESP",
-        CicsOutputName::Resp2 => "RESP2",
-    }
-}
-
-const fn option_name(option: CicsPlanOption) -> &'static str {
-    match option {
-        CicsPlanOption::Update => "UPDATE",
-        CicsPlanOption::Rollback => "ROLLBACK",
-        CicsPlanOption::NoHandle => "NOHANDLE",
-        CicsPlanOption::Task => "TASK",
-        CicsPlanOption::Uow => "UOW",
-        CicsPlanOption::NoSuspend => "NOSUSPEND",
-    }
 }
 
 fn payload(schema: &str, bytes: Vec<u8>) -> Result<BoundedPayload, MachineProblem> {

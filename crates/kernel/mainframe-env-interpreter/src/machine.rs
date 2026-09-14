@@ -1983,25 +1983,7 @@ impl ReferenceMachine {
                     let Some(target) = outputs.get(name) else {
                         continue;
                     };
-                    if value.schema() == "mainframe-env.cics.decimal@1" {
-                        let coefficient = String::from_utf8_lossy(value.bytes())
-                            .parse::<i128>()
-                            .map_err(|_| MachineProblem::UnexpectedHostResult)?;
-                        typed_cics::write_target(
-                            self,
-                            target,
-                            &CobolValue::Decimal(Decimal {
-                                coefficient,
-                                scale: 0,
-                            }),
-                        )?;
-                    } else {
-                        typed_cics::write_target(
-                            self,
-                            target,
-                            &CobolValue::Bytes(value.bytes().to_vec()),
-                        )?;
-                    }
+                    typed_cics::write_output(self, name, target, value)?;
                 }
                 eib::write_context(self, operation, &response)?;
                 self.deferred_drive = match response.disposition {

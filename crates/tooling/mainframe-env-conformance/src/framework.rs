@@ -2581,6 +2581,113 @@ mod tests {
     }
 
     #[test]
+    fn cics_formattime_writes_typed_character_and_binary_outputs() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFMT. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-X PIC S9(15) COMP-3 VALUE 3997082096789. 01 DATE-X PIC X(10). 01 TIME-X PIC X(8). 01 MS-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS FORMATTIME ABSTIME(ABS-X) DATESEP('-') YYYYMMDD(DATE-X) TIMESEP(':') TIME(TIME-X) MILLISECONDS(MS-X) END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let start = |machine: &mut ReferenceMachine| {
+            let MachineDrive::HostCall(effect) =
+                machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+            else {
+                panic!("FORMATTIME did not call host");
+            };
+            assert!(matches!(
+                &effect.request,
+                HostRequest::Cics(CicsRequest {
+                    operation: CicsOperation::FormatTime,
+                    arguments,
+                    ..
+                }) if arguments["ABSTIME"].bytes() == b"3997082096789"
+            ));
+            effect
+        };
+        let payload = |schema: &str, bytes: &[u8]| {
+            mainframe_env_execution_api::BoundedPayload::new(
+                schema,
+                bytes.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let response = CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: payload("mainframe-env.cics.payload@1", b""),
+            outputs: BTreeMap::from([
+                (
+                    "MILLISECONDS".into(),
+                    payload("mainframe-env.cics.decimal@1", b"789"),
+                ),
+                (
+                    "TIME".into(),
+                    payload("mainframe-env.cics.payload@1", b"12:34:56"),
+                ),
+                (
+                    "YYYYMMDD".into(),
+                    payload("mainframe-env.cics.payload@1", b"2026-08-30"),
+                ),
+            ]),
+            unit_of_work: None,
+        };
+        let mut malformed = response.clone();
+        malformed.outputs.insert(
+            "TIME".into(),
+            payload("mainframe-env.cics.decimal@1", b"123456"),
+        );
+        let mut rejected = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let rejected_effect = start(&mut rejected);
+        assert!(matches!(
+            rejected.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: rejected_effect.sequence,
+                    outcome: Ok(HostResult::Cics(malformed)),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Failed(_)
+        ));
+
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let effect = start(&mut machine);
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: effect.sequence,
+                    outcome: Ok(HostResult::Cics(response)),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(done) if done.output.bytes().is_empty()
+        ));
+        assert_eq!(machine.variable("DATE-X").unwrap().bytes(), b"2026-08-30");
+        assert_eq!(machine.variable("TIME-X").unwrap().bytes(), b"12:34:56");
+        assert_eq!(machine.variable("MS-X").unwrap().bytes(), &[0, 0, 3, 21]);
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x4a, 0x04]);
+    }
+
+    #[test]
     fn bare_asktime_requires_and_updates_both_implicit_eib_fields() {
         use mainframe_env_host_api::{
             CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
