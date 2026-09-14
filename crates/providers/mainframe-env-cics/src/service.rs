@@ -4760,6 +4760,7 @@ mod tests {
                 ("ABDUMP".into(), argument(b"ABDUMP-OUT")),
                 ("ABOFFSET".into(), argument(b"ABOFFSET-OUT")),
                 ("ABPROGRAM".into(), argument(b"ABPROGRAM-OUT")),
+                ("ASRAINTRPT".into(), argument(b"ASRA-INTRPT-OUT")),
                 ("ASRAPSW".into(), argument(b"ASRA-PSW-OUT")),
                 ("ASRAPSW16".into(), argument(b"ASRA-PSW16-OUT")),
                 ("ASRAREGS".into(), argument(b"ASRA-REGS-OUT")),
@@ -4780,6 +4781,7 @@ mod tests {
         assert_eq!(diagnostics.outputs["ABPROGRAM"].bytes(), &[0; 8]);
         assert_eq!(diagnostics.outputs["LINKLEVEL"].bytes(), b"1");
         for (name, length) in [
+            ("ASRAINTRPT", 8),
             ("ASRAPSW", 8),
             ("ASRAPSW16", 16),
             ("ASRAREGS", 64),
@@ -5256,6 +5258,7 @@ mod tests {
                 ("ABDUMP".into(), argument(b"ABDUMP-OUT")),
                 ("ABOFFSET".into(), argument(b"ABOFFSET-OUT")),
                 ("ABPROGRAM".into(), argument(b"ABPROGRAM-OUT")),
+                ("ASRAINTRPT".into(), argument(b"ASRA-INTRPT-OUT")),
                 ("ASRAPSW".into(), argument(b"ASRA-PSW-OUT")),
                 ("ASRAPSW16".into(), argument(b"ASRA-PSW16-OUT")),
                 ("ASRAREGS".into(), argument(b"ASRA-REGS-OUT")),
@@ -5277,6 +5280,7 @@ mod tests {
         assert_eq!(diagnostics.outputs["ABPROGRAM"].bytes(), &[0; 8]);
         assert_eq!(diagnostics.outputs["LINKLEVEL"].bytes(), b"2");
         for (name, length) in [
+            ("ASRAINTRPT", 8),
             ("ASRAPSW", 8),
             ("ASRAPSW16", 16),
             ("ASRAREGS", 64),

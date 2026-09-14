@@ -67,10 +67,11 @@ All notable changes to mainframe-env are documented here.
   local tasks with no pending next transaction receive four blanks from
   NEXTTRANSID, while DPL use returns `INVREQ` 16/200. BRIDGE returns four
   blanks because bridge-started tasks are outside the runtime. Compiled online
-  tasks also receive exact zero ABOFFSET, PSW, and register diagnostics because
-  no recoverable ASRA-class machine-check handoff exists. They observe these
-  values, the durable terminal's current/default/alternate screen geometry,
-  and priority changes through the selected route. Screen options fail with
+  tasks also receive exact zero ABOFFSET, instruction-interrupt, PSW, and
+  register diagnostics because no recoverable ASRA-class machine-check handoff
+  exists. They observe these values, the durable terminal's
+  current/default/alternate screen geometry, and priority changes through the
+  selected route. Screen options fail with
   `INVREQ` 16/5 for nonterminal tasks and `INVREQ` 16/200 in DPL; FCI
   distinguishes the supported terminal facility (`X'01'`) from no facility
   (`X'00'`) and is also DPL-prohibited. LINKLEVEL returns one for a top-level

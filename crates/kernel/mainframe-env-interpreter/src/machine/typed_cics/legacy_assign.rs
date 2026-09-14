@@ -9,6 +9,7 @@ pub(super) const OUTPUT_NAMES: &[&str] = &[
     "APLTEXT",
     "APPLICATION",
     "APPLID",
+    "ASRAINTRPT",
     "ASRAPSW",
     "ASRAPSW16",
     "ASRAREGS",

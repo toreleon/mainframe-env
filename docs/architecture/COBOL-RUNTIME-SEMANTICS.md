@@ -82,8 +82,9 @@ contract explicitly permits it.
   ABCODE, ABDUMP, and ABPROGRAM return the latest explicit EXEC CICS ABEND
   record from durable task state, or their documented blank/null absence values.
   Without a recoverable ASRA-class machine-check handoff, ABOFFSET is fullword
-  zero and ASRAPSW/ASRAPSW16/ASRAREGS/ASRAREGS64 are their exact zero-filled
-  widths; an explicit EXEC CICS ABEND is not treated as a processor fault.
+  zero and ASRAINTRPT/ASRAPSW/ASRAPSW16/ASRAREGS/ASRAREGS64 are their exact
+  zero-filled widths; an explicit EXEC CICS ABEND is not treated as a
+  processor fault.
   ALTSCRNHT/ALTSCRNWD, DEFSCRNHT/DEFSCRNWD, and SCRNHT/SCRNWD come from the
   owned durable terminal geometry. Nonterminal tasks receive `INVREQ` 16/5,
   while DPL returns the qualified `INVREQ` 16/200 and leaves those receivers

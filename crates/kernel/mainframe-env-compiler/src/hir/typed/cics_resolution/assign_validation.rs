@@ -24,6 +24,7 @@ pub(super) fn validate(
         "APLTEXT",
         "APPLICATION",
         "APPLID",
+        "ASRAINTRPT",
         "ASRAPSW",
         "ASRAPSW16",
         "ASRAREGS",
@@ -120,6 +121,7 @@ pub(super) fn validate(
             || (name == "ABCODE" && target.length != 4)
             || (name == "ABDUMP" && target.length != 1)
             || (name == "ABPROGRAM" && target.length != 8)
+            || (name == "ASRAINTRPT" && target.length != 8)
             || (name == "ASRAPSW" && target.length != 8)
             || (name == "ASRAPSW16" && target.length != 16)
             || (name == "ASRAREGS" && target.length != 64)

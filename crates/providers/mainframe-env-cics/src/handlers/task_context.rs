@@ -266,6 +266,7 @@ pub(in crate::service) fn assign(
         }
     }
     for (name, length) in [
+        ("ASRAINTRPT", 8),
         ("ASRAPSW", 8),
         ("ASRAPSW16", 16),
         ("ASRAREGS", 64),
@@ -341,6 +342,7 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "APLTEXT",
         "APPLICATION",
         "APPLID",
+        "ASRAINTRPT",
         "ASRAPSW",
         "ASRAPSW16",
         "ASRAREGS",

@@ -791,7 +791,7 @@
       "web-control": 14,
       "web-service-control": 8
     },
-    "registry_sha256": "sha256:49f8c908ee7ced8edbf16fc8c54bc246eda60997a2b6c45a43c836ec054a726d"
+    "registry_sha256": "sha256:8d1b66a728ad72cf25329ce2c2214983d7f1c1dbcb73532e5554e944c50b2a61"
   },
   "counts": {
     "batches": 3,
@@ -25007,6 +25007,7 @@
                 "APLTEXT",
                 "APPLICATION",
                 "APPLID",
+                "ASRAINTRPT",
                 "ASRAPSW",
                 "ASRAPSW16",
                 "ASRAREGS",
@@ -25063,10 +25064,10 @@
                 "VALIDATION"
               ],
               "unready_result": null,
-              "handler_sha256": "sha256:998d881bec212cc28f13e4d984e7cf999ca4fa2ceef679ee6bdc3d1690e3a93d"
+              "handler_sha256": "sha256:368da69fcc1439c5a9b5b7a556d41d673fa47acc7e106feffbfb4212369782e5"
             }
           },
-          "row_contract_sha256": "sha256:b5ef2d6240bdda4cbbb6e72406aad7a27c501796ae59c1deac4e4b4c204ea21c"
+          "row_contract_sha256": "sha256:f6fb40bfd738f98b3e7a117def5bf26d303bfffb44b74820a9a8443fca61bff5"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0012",
@@ -446867,5 +446868,5 @@
       ]
     }
   ],
-  "contract_sha256": "sha256:370aec92eebab4a571aa1dd7deda504d0e67b8211cc09b19273baf110e006cdc"
+  "contract_sha256": "sha256:1f8dbb1898061992fb7df0327cb8ccb6c8bf050ec1fb8997304409b60e4dd2c2"
 }
