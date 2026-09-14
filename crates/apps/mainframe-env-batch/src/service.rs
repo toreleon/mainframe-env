@@ -5,6 +5,7 @@ use crate::controller::{
     BatchControllerRegistry, BatchControllerRegistryState, MAX_CONTROLLER_STATE_BYTES,
     ResolvedBatchController,
 };
+use crate::dd_hydration::{is_program_library_dd, retains_flattened_dataset_bytes};
 use crate::program::{
     ProgramRegistration, RegisteredProgramHandler, TsoProgramExecution,
     resolve_program_registration, tso_program_execution,
@@ -4620,7 +4621,9 @@ impl BatchService {
                 else {
                     return Err(HostProblem::ProviderFailure);
                 };
-                append_inline_records(&mut payload, &dataset_records);
+                if retains_flattened_dataset_bytes(&name) {
+                    append_inline_records(&mut payload, &dataset_records);
+                }
                 records.extend(dataset_records);
             } else {
                 for (ordinal, dd) in dds.iter().enumerate().take(end).skip(start) {
@@ -4631,7 +4634,9 @@ impl BatchService {
                         if allocation.disposition.status != DdStatusDisposition::New {
                             let dataset_records =
                                 self.read_dataset_records(invocation, allocation, effect_sequence)?;
-                            append_inline_records(&mut payload, &dataset_records);
+                            if retains_flattened_dataset_bytes(&name) {
+                                append_inline_records(&mut payload, &dataset_records);
+                            }
                             records.extend(dataset_records);
                         }
                     } else {
@@ -5880,18 +5885,6 @@ fn inline_records(bytes: &[u8]) -> Vec<Vec<u8>> {
         records.pop();
     }
     records
-}
-
-fn is_program_library_dd(dd: &crate::DdPlan) -> bool {
-    dd.name.eq_ignore_ascii_case("STEPLIB")
-        || dd.name.eq_ignore_ascii_case("JOBLIB")
-        || dd.name.eq_ignore_ascii_case("DBRMLIB")
-        || dd.name.eq_ignore_ascii_case("DFSRESLB")
-        || dd.name.eq_ignore_ascii_case("IMS")
-        || dd.name.eq_ignore_ascii_case("DFSVSAMP")
-        || dd.name.eq_ignore_ascii_case("PROCLIB")
-        || dd.name.eq_ignore_ascii_case("DFSSEL")
-        || dd.name.to_ascii_uppercase().starts_with("DDPAUT")
 }
 
 fn normalize_records(
@@ -9151,6 +9144,154 @@ mod tests {
         assert_eq!(
             records.lock().unwrap()["IBMUSER.OUTPUT"],
             vec![b"FIRST".to_vec(), b"SECOND".to_vec()]
+        );
+    }
+
+    /// #182: a modest SHR input volume must fit the 1 MiB program-input payload.
+    /// `hydrate_dds` used to embed dataset records twice, flattened in
+    /// `inline_data` and again in `dd_records`.
+    #[test]
+    fn a_realistic_shr_input_volume_does_not_exhaust_the_program_input_payload() {
+        let (service, dataset) = service_with_real_datasets();
+        let record = vec![b'A'; 200];
+        seed_real_dataset(&dataset, "IBMUSER.BIGIN", vec![record; 1_000], 800);
+        seed_real_dataset(&dataset, "IBMUSER.BIGOUT", Vec::new(), 900);
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//BIGJOB JOB CLASS=A\n//COPY EXEC PGM=IEBGENER\n//SYSUT1 DD DSN=IBMUSER.BIGIN,DISP=SHR\n//SYSUT2 DD DSN=IBMUSER.BIGOUT,DISP=OLD\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("realistic-shr-volume", InvocationLimits::default())
+                    .unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed,
+            "a 200,000-byte input volume must not trip the 1 MiB program-input \
+             payload cap; see #182"
+        );
+    }
+
+    /// Wraps a `HostProvider` and records every `ProgramInput` sent through a
+    /// `ProgramRequest::Call`, then delegates to the wrapped provider so the
+    /// job still runs to completion.
+    struct ProgramInputCapture {
+        inner: Arc<dyn HostProvider>,
+        captured: Arc<Mutex<Vec<ProgramInput>>>,
+    }
+
+    impl HostProvider for ProgramInputCapture {
+        fn descriptor(&self) -> &CapabilityDescriptor {
+            self.inner.descriptor()
+        }
+
+        fn invoke(&self, invocation: &Invocation, effect: EffectRequest) -> EffectResult {
+            if let HostRequest::Program(ProgramRequest::Call { ref payload, .. }) = effect.request
+                && payload.schema() == "mainframe-env.program.input@1"
+                && let Ok(input) = serde_json::from_slice::<ProgramInput>(payload.bytes())
+            {
+                self.captured.lock().unwrap().push(input);
+            }
+            self.inner.invoke(invocation, effect)
+        }
+    }
+
+    /// After `hydrate_dds`, only `SYSIN` and `SYSLIB*` DDs keep a flattened
+    /// `inline_data` copy of dataset-backed records; every dataset-backed DD
+    /// carries its records exactly once, in `dd_records` (#182).
+    #[test]
+    fn hydrate_dds_carries_dataset_records_once_except_for_sysin_and_syslib() {
+        let plain = vec![b"A".to_vec(), Vec::new(), b"B".to_vec(), b"X\nY".to_vec()];
+        let sysin = vec![b"SYSIN1".to_vec(), b"SYSIN2".to_vec()];
+        let syslib = vec![b"COPYBOOK".to_vec()];
+        let concat1 = vec![b"FIRST".to_vec()];
+        let concat2 = vec![b"SECOND".to_vec()];
+        let records = Arc::new(Mutex::new(BTreeMap::from([
+            ("IBMUSER.INPUT".into(), vec![b"COPY".to_vec()]),
+            ("IBMUSER.OUTPUT".into(), Vec::new()),
+            ("IBMUSER.PLAIN".into(), plain.clone()),
+            ("IBMUSER.SYSINSRC".into(), sysin.clone()),
+            ("IBMUSER.SYSLIB".into(), syslib.clone()),
+            ("IBMUSER.CONCAT1".into(), concat1),
+            ("IBMUSER.CONCAT2".into(), concat2),
+        ])));
+        let captured = Arc::new(Mutex::new(Vec::new()));
+        let program = Arc::new(ProgramInputCapture {
+            inner: builtins(),
+            captured: captured.clone(),
+        });
+        let service = service_with_datasets_and_program(records.clone(), program, false);
+        let invocation = invocation();
+        service
+            .submit(
+                &invocation,
+                &JclBundle {
+                    primary: "//HYDRATE JOB CLASS=A\n\
+//COPY EXEC PGM=IEBGENER\n\
+//SYSUT1 DD DSN=IBMUSER.INPUT,DISP=SHR\n\
+//SYSUT2 DD DSN=IBMUSER.OUTPUT,DISP=OLD\n\
+//PLAIN DD DSN=IBMUSER.PLAIN,DISP=SHR\n\
+//SYSIN DD DSN=IBMUSER.SYSINSRC,DISP=SHR\n\
+//SYSLIB01 DD DSN=IBMUSER.SYSLIB,DISP=SHR\n\
+//CONCATDD DD DSN=IBMUSER.CONCAT1,DISP=SHR\n\
+// DD DSN=IBMUSER.CONCAT2,DISP=SHR\n\
+//INSTRM DD *\nLINE1\nLINE2\n/*\n"
+                        .into(),
+                    ..Default::default()
+                },
+                &IdempotencyKey::new("hydrate-dds-focused", InvocationLimits::default()).unwrap(),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            service.run_next(&invocation, false).unwrap().unwrap().state,
+            JobState::Completed
+        );
+        let captured = captured.lock().unwrap();
+        let input = captured.first().expect("program controller was invoked");
+        let dd = |name: &str| {
+            input
+                .dds
+                .iter()
+                .find(|dd| dd.name == name)
+                .unwrap_or_else(|| panic!("missing DD {name}"))
+        };
+
+        // A dataset-backed non-SYSIN/SYSLIB* DD: empty `inline_data`, exact
+        // `dd_records` with empty records and embedded-newline bytes intact.
+        assert_eq!(dd("PLAIN").inline_data, Vec::<u8>::new());
+        assert_eq!(input.dd_records.get("PLAIN"), Some(&plain));
+
+        // A dataset-backed SYSIN and SYSLIB* DD: unchanged flattened
+        // `inline_data`, byte-identical to the pre-fix behaviour.
+        assert_eq!(dd("SYSIN").inline_data, b"SYSIN1\nSYSIN2\n".to_vec());
+        assert_eq!(dd("SYSLIB01").inline_data, b"COPYBOOK\n".to_vec());
+
+        // An instream `DD *` keeps its `inline_data` untouched.
+        assert_eq!(dd("INSTRM").inline_data, b"LINE1\nLINE2\n".to_vec());
+
+        // A concatenation keeps the current group semantics: the flattened
+        // payload (when retained) lands on the first DD and the rest of the
+        // group is cleared; here the group name isn't SYSIN/SYSLIB*, so the
+        // first DD's `inline_data` stays empty too, with the combined
+        // records carried once in `dd_records`.
+        let concat_dds = input
+            .dds
+            .iter()
+            .filter(|dd| dd.name == "CONCATDD")
+            .collect::<Vec<_>>();
+        assert_eq!(concat_dds.len(), 2);
+        assert_eq!(concat_dds[0].inline_data, Vec::<u8>::new());
+        assert_eq!(concat_dds[1].inline_data, Vec::<u8>::new());
+        assert_eq!(
+            input.dd_records.get("CONCATDD"),
+            Some(&vec![b"FIRST".to_vec(), b"SECOND".to_vec()])
         );
     }
 

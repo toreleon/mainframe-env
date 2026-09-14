@@ -421,6 +421,21 @@ All notable changes to mainframe-env are documented here.
   through a generated compiler descriptor without exposing other SPI commands.
 - Corrected Jenkins checkout/temp storage, tool selection, parameter handling,
   shell portability, and release-target selection.
+- Fixed CREASTMT `STEP040` (`PGM=CBSTM03A`) failing `cargo xtask
+  carddemo-operator-submit --check` with `ResourceExhausted` before the program
+  ran (#182). `hydrate_dds` (`crates/apps/mainframe-env-batch/src/service.rs`)
+  embedded each dataset-backed DD's hydrated records twice -- flattened into
+  `DdPlan::inline_data` and exactly in `ProgramInput::dd_records` (added by
+  `c6b487d`, after `mainframe-env-v0.1.1`'s single flattened copy) -- and
+  `execute_program_controller`'s JSON-encoded `BoundedPayload`
+  (`mainframe-env.program.input@1`, 1 MiB cap) inflated STEP040's 151,700 raw
+  SHR-input bytes to 1,051,400 encoded bytes. `hydrate_dds` now flattens a
+  dataset-backed DD's records into `inline_data` only for `SYSIN` and
+  `SYSLIB*` -- the only DD names whose flattened bytes are still read after
+  hydration (COBOL terminal input and compile-on-run source/copybooks in
+  `mainframe-env-server/src/cobol.rs`, and the IDCAMS builtin's control
+  statements in `program.rs`); every other dataset-backed DD now carries its
+  records exactly once, in `dd_records`.
 
 ### Known issues
 
