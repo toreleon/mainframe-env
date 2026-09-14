@@ -80,11 +80,14 @@ All notable changes to mainframe-env are documented here.
   local program and two for a DPL target behind its level-one mirror; unmodeled
   deeper local stacks fail closed. With no application partition set, PARTNSET
   returns six blanks on a terminal task and follows the local/DPL `INVREQ`
-  matrix. The same owned virtual terminal reports a 3270 data stream and no
-  basic SCS data stream; its unsupported optional device capabilities return
-  false indicators, and its interactive session profile returns the attended
-  indicator. CMDSEC and RESSEC return `X` because command admission and
-  resource-owning operations use the platform's mandatory authorization routes.
+  matrix. MAPHEIGHT and MAPWIDTH resolve the durable definition of the most
+  recently sent map, return `INVREQ` 16/2 before a map is positioned, and are
+  prohibited with 16/200 in DPL. The same owned virtual terminal reports a
+  3270 data stream and no basic SCS data stream; its unsupported optional
+  device capabilities return false indicators, and its interactive session
+  profile returns the attended indicator. CMDSEC and RESSEC return `X` because
+  command admission and resource-owning operations use the platform's mandatory
+  authorization routes.
   QNAME fails with exact `INVREQ` 16/4 because no task can be started by an ATI
   trigger, and with 16/200 in DPL. ACTIVITY, ACTIVITYID, PROCESS, and
   PROCESSTYPE fail with exact `INVREQ` 16/6 because no BTS activity path exists.

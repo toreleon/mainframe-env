@@ -40,6 +40,8 @@ pub(super) const OUTPUT_NAMES: &[&str] = &[
     "KATAKANA",
     "LINKLEVEL",
     "MAJORVERSION",
+    "MAPHEIGHT",
+    "MAPWIDTH",
     "MICROVERSION",
     "MINORVERSION",
     "MSRCONTROL",

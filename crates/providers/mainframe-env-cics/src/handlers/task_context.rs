@@ -72,15 +72,26 @@ pub(in crate::service) fn assign(
     let terminal_indicator_requested = TERMINAL_CAPABILITY_INDICATORS
         .iter()
         .any(|(name, _)| request.arguments.contains_key(*name));
+    let map_dimension_requested = ["MAPHEIGHT", "MAPWIDTH"]
+        .iter()
+        .any(|name| request.arguments.contains_key(*name));
     let terminal_required = screen_requested
         || terminal_indicator_requested
-        || request.arguments.contains_key("PARTNSET");
+        || request.arguments.contains_key("PARTNSET")
+        || map_dimension_requested;
     let dimensions = if !dpl && (terminal_required || request.arguments.contains_key("FCI")) {
         terminal_dimensions(service, run)?
     } else {
         None
     };
     let terminal_missing = !dpl && terminal_required && dimensions.is_none();
+    let map_dimensions = if !dpl && map_dimension_requested && dimensions.is_some() {
+        positioned_map_dimensions(service, run)?
+    } else {
+        None
+    };
+    let map_missing =
+        !dpl && map_dimension_requested && dimensions.is_some() && map_dimensions.is_none();
     let intersystem_facility_missing = request.arguments.contains_key("PRINSYSID");
     let ati_missing = !dpl && request.arguments.contains_key("QNAME");
     let bts_missing = ["ACTIVITY", "ACTIVITYID", "PROCESS", "PROCESSTYPE"]
@@ -105,6 +116,8 @@ pub(in crate::service) fn assign(
                 "DESTID",
                 "DESTIDLENG",
                 "FCI",
+                "MAPHEIGHT",
+                "MAPWIDTH",
                 "NEXTTRANSID",
                 "OPSECURITY",
                 "PARTNSET",
@@ -117,6 +130,7 @@ pub(in crate::service) fn assign(
             .any(|name| request.arguments.contains_key(*name)));
     let mut response = if dpl_prohibited
         || terminal_missing
+        || map_missing
         || intersystem_facility_missing
         || ati_missing
         || bts_missing
@@ -133,6 +147,8 @@ pub(in crate::service) fn assign(
                     200
                 } else if terminal_missing || intersystem_facility_missing {
                     5
+                } else if map_missing {
+                    2
                 } else if ati_missing {
                     4
                 } else if bts_missing {
@@ -249,6 +265,15 @@ pub(in crate::service) fn assign(
             }
         }
     }
+    if let Some((rows, columns)) = map_dimensions {
+        for (name, value) in [("MAPHEIGHT", rows), ("MAPWIDTH", columns)] {
+            if request.arguments.contains_key(name) {
+                response
+                    .outputs
+                    .insert(name.into(), decimal_payload(i64::from(value))?);
+            }
+        }
+    }
     if !dpl_prohibited && request.arguments.contains_key("FCI") {
         response
             .outputs
@@ -351,6 +376,31 @@ fn terminal_dimensions(
         .then_some((session.rows, session.columns)))
 }
 
+fn positioned_map_dimensions(
+    service: &CicsService,
+    run: &Run,
+) -> Result<Option<(u16, u16)>, HostProblem> {
+    let state = service.lock()?;
+    let session = state
+        .sessions
+        .get(&run.session)
+        .ok_or(HostProblem::InfrastructureFailure)?;
+    if session.principal != run.invocation.principal.id().as_str()
+        || session.run_unit != run.invocation.run_unit_id.as_str()
+        || session.transaction != run.transaction
+    {
+        return Ok(None);
+    }
+    let Some((mapset, map)) = session.mapset.as_ref().zip(session.map.as_ref()) else {
+        return Ok(None);
+    };
+    let definition = state
+        .maps
+        .get(&(mapset.clone(), map.clone()))
+        .ok_or(HostProblem::InfrastructureFailure)?;
+    Ok(Some((definition.rows, definition.columns)))
+}
+
 fn assign_link_level(run: &Run, dpl: bool) -> Result<i64, HostProblem> {
     if dpl {
         Ok(2)
@@ -418,6 +468,8 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "KATAKANA",
         "LINKLEVEL",
         "MAJORVERSION",
+        "MAPHEIGHT",
+        "MAPWIDTH",
         "MICROVERSION",
         "MINORVERSION",
         "MSRCONTROL",

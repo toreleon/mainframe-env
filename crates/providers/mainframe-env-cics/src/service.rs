@@ -5084,6 +5084,41 @@ mod tests {
             }
         }
 
+        let mut no_positioned_map = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("APPLID".into(), argument(b"APP-OUT")),
+                ("MAPHEIGHT".into(), argument(b"MAP-HEIGHT-OUT")),
+                ("MAPWIDTH".into(), argument(b"MAP-WIDTH-OUT")),
+            ]),
+            205,
+        );
+        no_positioned_map.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let no_positioned_map = terminal_service
+            .invoke(
+                &effect(
+                    &terminal_invocation.run_unit_id,
+                    no_positioned_map.clone(),
+                    205,
+                ),
+                no_positioned_map,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                no_positioned_map.condition.as_str(),
+                no_positioned_map.response,
+                no_positioned_map.response2,
+            ),
+            ("INVREQ", 16, 2)
+        );
+        assert_eq!(no_positioned_map.outputs["APPLID"].bytes(), b"ME01");
+        assert!(!no_positioned_map.outputs.contains_key("MAPHEIGHT"));
+        assert!(!no_positioned_map.outputs.contains_key("MAPWIDTH"));
+
         let missing_program = request(
             CicsOperation::Assign,
             BTreeMap::from([("PROGRAM".into(), argument(b"PROGRAM-OUT"))]),
@@ -5451,6 +5486,41 @@ mod tests {
         );
         assert_eq!(no_intersystem_facility.outputs["APPLID"].bytes(), b"ME01");
         assert!(!no_intersystem_facility.outputs.contains_key("PRINSYSID"));
+
+        let mut prohibited_map_dimensions = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("APPLID".into(), argument(b"APP-OUT")),
+                ("MAPHEIGHT".into(), argument(b"MAP-HEIGHT-OUT")),
+                ("MAPWIDTH".into(), argument(b"MAP-WIDTH-OUT")),
+            ]),
+            63,
+        );
+        prohibited_map_dimensions.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let prohibited_map_dimensions = service
+            .invoke(
+                &effect(
+                    &invocation.run_unit_id,
+                    prohibited_map_dimensions.clone(),
+                    63,
+                ),
+                prohibited_map_dimensions,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                prohibited_map_dimensions.condition.as_str(),
+                prohibited_map_dimensions.response,
+                prohibited_map_dimensions.response2,
+            ),
+            ("INVREQ", 16, 200)
+        );
+        assert_eq!(prohibited_map_dimensions.outputs["APPLID"].bytes(), b"ME01");
+        assert!(!prohibited_map_dimensions.outputs.contains_key("MAPHEIGHT"));
+        assert!(!prohibited_map_dimensions.outputs.contains_key("MAPWIDTH"));
 
         let diagnostics = request(
             CicsOperation::Assign,

@@ -9749,6 +9749,18 @@ mod tests {
             .replace(
                 "01 FCI-X PIC X VALUE 'Z'.",
                 "01 ERROR-MSG-X PIC X(500) VALUE ALL 'Z'.\n01 ERROR-MSG-LENGTH-X PIC S9(4) COMP VALUE 1.\n01 FCI-X PIC X VALUE 'Z'.",
+            )
+            .replace(
+                "01 LINK-LEVEL-X PIC S9(4) COMP.",
+                "01 LINK-LEVEL-X PIC S9(4) COMP.\n01 MAP-HEIGHT-X PIC S9(4) COMP VALUE 1.\n01 MAP-WIDTH-X PIC S9(4) COMP VALUE 1.",
+            )
+            .replace(
+                "PROCEDURE DIVISION.\nEXEC CICS CHANGE TASK",
+                "PROCEDURE DIVISION.\nEXEC CICS SEND MAP('SCHEDULE') MAPSET('SCHEDULE') END-EXEC.\nEXEC CICS CHANGE TASK",
+            )
+            .replace(
+                "HILIGHT(CAPABILITY-X) RESP(RESP-X)",
+                "HILIGHT(CAPABILITY-X) MAPHEIGHT(MAP-HEIGHT-X) MAPWIDTH(MAP-WIDTH-X) RESP(RESP-X)",
             );
         let path = LogicalPath::new("SCHEDULE.cbl", limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
@@ -9966,6 +9978,8 @@ mod tests {
             &[0; 2]
         );
         assert_eq!(restored.variable("LINK-LEVEL-X").unwrap().bytes(), &[0, 1]);
+        assert_eq!(restored.variable("MAP-HEIGHT-X").unwrap().bytes(), &[0, 24]);
+        assert_eq!(restored.variable("MAP-WIDTH-X").unwrap().bytes(), &[0, 80]);
         assert_eq!(restored.variable("MAJOR-X").unwrap().bytes(), &[0xff; 4]);
         assert_eq!(restored.variable("MICRO-X").unwrap().bytes(), &[0xff; 4]);
         assert_eq!(restored.variable("MINOR-X").unwrap().bytes(), &[0xff; 4]);
@@ -10042,6 +10056,7 @@ mod tests {
                 (7, mainframe_env_execution_api::AuditDecision::Success),
                 (8, mainframe_env_execution_api::AuditDecision::Success),
                 (9, mainframe_env_execution_api::AuditDecision::Success),
+                (10, mainframe_env_execution_api::AuditDecision::Success),
             ]
         );
     }
