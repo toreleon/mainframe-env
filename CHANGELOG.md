@@ -79,7 +79,8 @@ All notable changes to mainframe-env are documented here.
   returns six blanks on a terminal task and follows the local/DPL `INVREQ`
   matrix. The same owned virtual terminal reports a 3270 data stream and no
   basic SCS data stream; its unsupported optional device capabilities return
-  false indicators. CMDSEC and RESSEC return `X` because command admission and
+  false indicators, and its interactive session profile returns the attended
+  indicator. CMDSEC and RESSEC return `X` because command admission and
   resource-owning operations use the platform's mandatory authorization routes.
 - Added online continuation format `MEOM4`, which retains the current task
   priority and an optional staged program-transfer handoff. Readers preserve

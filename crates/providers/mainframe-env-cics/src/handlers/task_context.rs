@@ -3,7 +3,7 @@ use mainframe_env_execution_api::{Invocation, RunUnitId};
 use mainframe_env_host_api::{CicsDisposition, CicsRequest, CicsResponse, HostProblem};
 use std::collections::BTreeMap;
 
-const TERMINAL_CAPABILITY_INDICATORS: [(&str, u8); 19] = [
+const TERMINAL_CAPABILITY_INDICATORS: [(&str, u8); 20] = [
     ("APLKYBD", 0x00),
     ("APLTEXT", 0x00),
     ("BTRANS", 0x00),
@@ -22,6 +22,7 @@ const TERMINAL_CAPABILITY_INDICATORS: [(&str, u8); 19] = [
     ("SOSI", 0x00),
     ("TEXTKYBD", 0x00),
     ("TEXTPRINT", 0x00),
+    ("UNATTEND", 0x00),
     ("VALIDATION", 0x00),
 ];
 
@@ -391,6 +392,7 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "TEXTKYBD",
         "TEXTPRINT",
         "TWALENG",
+        "UNATTEND",
         "USERID",
         "VALIDATION",
     ];

@@ -72,6 +72,7 @@ pub(super) fn validate(
         "TEXTKYBD",
         "TEXTPRINT",
         "TWALENG",
+        "UNATTEND",
         "USERID",
         "VALIDATION",
     ] {
@@ -152,6 +153,7 @@ pub(super) fn validate(
                     | "SOSI"
                     | "TEXTKYBD"
                     | "TEXTPRINT"
+                    | "UNATTEND"
                     | "VALIDATION"
             ) && target.length != 1)
         {

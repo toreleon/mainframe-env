@@ -4802,6 +4802,7 @@ mod tests {
                 ("PARTNSET".into(), argument(b"PARTITION-SET-OUT")),
                 ("SCRNHT".into(), argument(b"SCREEN-HEIGHT-OUT")),
                 ("SCRNWD".into(), argument(b"SCREEN-WIDTH-OUT")),
+                ("UNATTEND".into(), argument(b"UNATTEND-OUT")),
             ]),
             26,
         );
@@ -4835,6 +4836,7 @@ mod tests {
             "PARTNSET",
             "SCRNHT",
             "SCRNWD",
+            "UNATTEND",
         ] {
             assert!(!no_terminal.outputs.contains_key(name));
         }
@@ -4855,6 +4857,7 @@ mod tests {
             "SOSI",
             "TEXTKYBD",
             "TEXTPRINT",
+            "UNATTEND",
             "VALIDATION",
         ]
         .into_iter()
@@ -4929,6 +4932,7 @@ mod tests {
             "SOSI",
             "TEXTKYBD",
             "TEXTPRINT",
+            "UNATTEND",
             "VALIDATION",
         ];
         for (offset, names) in capability_names.chunks(15).enumerate() {
@@ -5298,6 +5302,7 @@ mod tests {
                 ("SCRNHT".into(), argument(b"SCREEN-HEIGHT-OUT")),
                 ("SCRNWD".into(), argument(b"SCREEN-WIDTH-OUT")),
                 ("TCTUALENG".into(), argument(b"TCTUA-LENGTH-OUT")),
+                ("UNATTEND".into(), argument(b"UNATTEND-OUT")),
             ]),
             2,
         );
@@ -5335,6 +5340,7 @@ mod tests {
             "SCRNHT",
             "SCRNWD",
             "TCTUALENG",
+            "UNATTEND",
         ] {
             assert!(!partial.outputs.contains_key(name));
         }
@@ -5355,6 +5361,7 @@ mod tests {
             "SOSI",
             "TEXTKYBD",
             "TEXTPRINT",
+            "UNATTEND",
             "VALIDATION",
         ]
         .into_iter()

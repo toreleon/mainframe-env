@@ -57,6 +57,7 @@ pub(super) const OUTPUT_NAMES: &[&str] = &[
     "TEXTKYBD",
     "TEXTPRINT",
     "TWALENG",
+    "UNATTEND",
     "USERID",
     "VALIDATION",
 ];
