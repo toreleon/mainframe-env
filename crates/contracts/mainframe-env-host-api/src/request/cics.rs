@@ -10,6 +10,8 @@ pub enum CicsOperation {
     /// Copy one checked virtual pointer/address relationship.
     AddressSet,
     Asktime,
+    /// Refresh only the implicit EIB date and time fields.
+    AsktimeEib,
     Assign,
     /// Change the issuing CICS task's dispatch priority.
     ChangeTask,
@@ -62,6 +64,7 @@ impl CicsOperation {
             Self::Abend => "Abend",
             Self::AddressSet => "AddressSet",
             Self::Asktime => "Asktime",
+            Self::AsktimeEib => "AsktimeEib",
             Self::Assign => "Assign",
             Self::ChangeTask => "ChangeTask",
             Self::Deq => "Deq",
@@ -131,7 +134,14 @@ impl CicsOperation {
         Some(match (first, words.get(1).map(String::as_str)) {
             ("ABEND", _) => Self::Abend,
             ("ADDRESS", Some("SET")) => Self::AddressSet,
-            ("ASKTIME", _) => Self::Asktime,
+            ("ASKTIME", _)
+                if words
+                    .iter()
+                    .any(|word| word == "ABSTIME" || word.starts_with("ABSTIME(")) =>
+            {
+                Self::Asktime
+            }
+            ("ASKTIME", _) => Self::AsktimeEib,
             ("ASSIGN", _) => Self::Assign,
             ("CHANGE", Some("TASK")) => Self::ChangeTask,
             ("DEQ", _) => Self::Deq,

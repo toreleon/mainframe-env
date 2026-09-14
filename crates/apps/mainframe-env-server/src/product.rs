@@ -5373,8 +5373,8 @@ impl SystemClockProvider {
                 generation: "1".into(),
                 request_schema: "mainframe-env.clock.request@1".into(),
                 result_schema: "mainframe-env.clock.response@1".into(),
-                max_request_bytes: 64,
-                max_result_bytes: 64,
+                max_request_bytes: 256,
+                max_result_bytes: 256,
                 ready: true,
             },
         }
@@ -6399,6 +6399,36 @@ mod tests {
         assert!(timestamp.bytes().all(|byte| byte.is_ascii_digit()));
         assert!(date.bytes().all(|byte| byte.is_ascii_digit()));
         assert!(time.bytes().all(|byte| byte.is_ascii_digit()));
+
+        let server = ProductServer::memory(config()).unwrap();
+        let invocation = server
+            .invocation(
+                "IBMUSER",
+                "clock:test",
+                ServiceClass::Interactive,
+                &["host.clock"],
+            )
+            .unwrap();
+        let selected = server
+            .host
+            .invoke(
+                &invocation,
+                invocation.deadline_tick.saturating_sub(1),
+                false,
+                EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence: 1,
+                    deadline_tick: invocation.deadline_tick,
+                    idempotency_key: None,
+                    request: HostRequest::Clock(ClockRequest::UtcTimestamp),
+                },
+            )
+            .into_transaction_parts()
+            .0;
+        assert!(matches!(
+            selected.outcome,
+            Ok(HostResult::Clock(value)) if value.len() == 17
+        ));
     }
 
     #[test]
@@ -10072,6 +10102,132 @@ mod tests {
                 (9, mainframe_env_execution_api::AuditDecision::Success),
                 (10, mainframe_env_execution_api::AuditDecision::Success),
             ]
+        );
+    }
+
+    #[test]
+    fn online_bare_asktime_updates_packed_eib_clock_fields() {
+        let limits = SourceLimits::default();
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. ASKTIME.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 EIBDATE PIC S9(7) COMP-3.\n01 EIBTIME PIC S9(7) COMP-3.\n01 ASKTIME-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS ASKTIME END-EXEC.\nMOVE EIBFN TO ASKTIME-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let path = LogicalPath::new("ASKTIME.cbl", limits.max_path_bytes).unwrap();
+        let bundle = SourceBundle::new(
+            &path,
+            vec![
+                SourceFile::input(
+                    "ASKTIME.cbl",
+                    source.to_vec(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("bare ASKTIME fixture did not publish");
+        };
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "ASKTIME".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("AT00".into(), "ASKTIME".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "ASKTIME".into(),
+                    map: "ASKTIME".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("bare-asktime", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "AT00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "AT00",
+                24,
+                80,
+                "bare-asktime-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "ASKTIME", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "ASKTIME", 2)
+            .unwrap();
+
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(
+            restored.variable("ASKTIME-FN").unwrap().bytes(),
+            &[0x10, 0x02]
+        );
+        let eib_date = restored.variable("EIBDATE").unwrap().bytes().to_vec();
+        let eib_time = restored.variable("EIBTIME").unwrap().bytes().to_vec();
+        assert_eq!(eib_date.len(), 4);
+        assert_eq!(eib_time.len(), 4);
+        assert_eq!(eib_date[3] & 0x0f, 0x0c);
+        assert_eq!(eib_time[3] & 0x0f, 0x0c);
+        assert_ne!(eib_date, &[0; 4]);
+        assert_ne!(eib_time, &[0; 4]);
+        assert_eq!(
+            server
+                .store
+                .get_execution(&invocation.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Suspended
         );
     }
 

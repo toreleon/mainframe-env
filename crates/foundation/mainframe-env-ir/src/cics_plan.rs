@@ -45,6 +45,8 @@ impl Default for CicsPlanLimits {
 pub enum CicsPlanOperation {
     /// Copy one checked virtual pointer/address relationship.
     AddressSet,
+    /// Refresh the implicit EIB date and time fields.
+    AsktimeEib,
     /// Change the issuing task's dispatch priority and optionally yield.
     ChangeTask,
     /// Release one task-owned enqueue.
@@ -446,6 +448,9 @@ fn validate_operation_shape(
                 || scheduling_options
                 || outputs.contains(&CicsOutputName::Into)
         }
+        CicsPlanOperation::AsktimeEib => {
+            !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
+        }
         CicsPlanOperation::ChangeTask => {
             !inputs.is_subset(&BTreeSet::from([CicsOperandName::Priority]))
                 || scheduling_options
@@ -777,6 +782,7 @@ const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::IgnoreCondition => 11,
         CicsPlanOperation::HandleCondition => 12,
         CicsPlanOperation::HandleAid => 13,
+        CicsPlanOperation::AsktimeEib => 14,
     }
 }
 
@@ -796,6 +802,7 @@ fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPlanCodecProbl
         11 => Ok(CicsPlanOperation::IgnoreCondition),
         12 => Ok(CicsPlanOperation::HandleCondition),
         13 => Ok(CicsPlanOperation::HandleAid),
+        14 => Ok(CicsPlanOperation::AsktimeEib),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -1117,7 +1124,14 @@ mod tests {
             outputs: Vec::new(),
             condition: CicsCondition::NoHandle,
         };
-        for plan in [read, rewrite, syncpoint] {
+        let asktime = CicsEffectPlan {
+            operation: CicsPlanOperation::AsktimeEib,
+            operands: Vec::new(),
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        for plan in [read, rewrite, syncpoint, asktime] {
             let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
             let decoded = decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap();
             assert_eq!(decoded.operation, plan.operation);

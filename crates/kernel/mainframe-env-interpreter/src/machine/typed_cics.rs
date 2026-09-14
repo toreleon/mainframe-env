@@ -67,8 +67,46 @@ pub(super) fn write_context(
     if operation == CicsOperation::ReceiveMap {
         machine.write("EIBAID", &[response.aid])?;
     }
+    if matches!(
+        operation,
+        CicsOperation::Asktime | CicsOperation::AsktimeEib
+    ) {
+        match (
+            response.outputs.get("EIBDATE"),
+            response.outputs.get("EIBTIME"),
+        ) {
+            (Some(date), Some(time)) => {
+                write_eib_clock(machine, "EIBDATE", date)?;
+                write_eib_clock(machine, "EIBTIME", time)?;
+            }
+            // Retained ASKTIME ABSTIME responses from before the implicit EIB
+            // output contract remain replayable with their historical state.
+            (None, None) if operation == CicsOperation::Asktime => {}
+            _ => return Err(MachineProblem::UnexpectedHostResult),
+        }
+    }
     machine.write("EIBTRNID", response.transaction.as_bytes())?;
     Ok(())
+}
+
+fn write_eib_clock(
+    machine: &mut ReferenceMachine,
+    name: &str,
+    value: &BoundedPayload,
+) -> Result<(), MachineProblem> {
+    if value.schema() != "mainframe-env.cics.decimal@1" {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
+    let coefficient = String::from_utf8_lossy(value.bytes())
+        .parse::<i128>()
+        .map_err(|_| MachineProblem::UnexpectedHostResult)?;
+    machine.write_decimal(
+        name,
+        Decimal {
+            coefficient,
+            scale: 0,
+        },
+    )
 }
 
 pub(super) fn write_response_state(
@@ -412,6 +450,7 @@ pub(super) fn execute_legacy(
     let into = legacy_destination(&arguments, "INTO").map(CicsTarget::Legacy);
     let output_names: &[&str] = match operation {
         CicsOperation::Asktime => &["ABSTIME"],
+        CicsOperation::AsktimeEib => &[],
         CicsOperation::Assign => legacy_assign::OUTPUT_NAMES,
         CicsOperation::FormatTime => &[
             "YYYYMMDD",
@@ -971,6 +1010,7 @@ fn expected_effects(operation: CicsPlanOperation) -> &'static [Effect] {
 const fn host_operation(operation: CicsPlanOperation) -> CicsOperation {
     match operation {
         CicsPlanOperation::AddressSet => CicsOperation::AddressSet,
+        CicsPlanOperation::AsktimeEib => CicsOperation::AsktimeEib,
         CicsPlanOperation::ChangeTask => CicsOperation::ChangeTask,
         CicsPlanOperation::Deq => CicsOperation::Deq,
         CicsPlanOperation::Enq => CicsOperation::Enq,

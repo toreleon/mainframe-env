@@ -58,6 +58,10 @@ contract explicitly permits it.
   before dispatch and applies the alias only after a successful audited CICS
   response, so denial, cancellation, malformed input, and audit failure cannot
   change storage.
+- Bare CICS ASKTIME refreshes packed EIBDATE/EIBTIME from one checked clock
+  instant. ASKTIME ABSTIME refreshes the same implicit fields and separately
+  returns its packed absolute-time destination. Historical retained ABSTIME
+  responses without implicit outputs retain their prior EIB state.
 - The bounded legacy CICS `ASSIGN` route returns APPLID, SYSID, USERID, and the
   current TASKPRIORITY from owned invocation context. Because no CICS
   application, platform, operation, version, or channel context is currently

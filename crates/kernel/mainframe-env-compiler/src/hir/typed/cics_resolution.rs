@@ -759,6 +759,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     }
     let operation = match descriptor.label_tokens {
         ["ADDRESS", "SET"] => HirCicsOperation::AddressSet,
+        ["ASKTIME"] => HirCicsOperation::AsktimeEib,
         ["CHANGE", "TASK"] => HirCicsOperation::ChangeTask,
         ["DEQ"] => HirCicsOperation::Deq,
         ["ENQ"] => HirCicsOperation::Enq,
@@ -776,6 +777,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     };
     let allowed_clauses: &[&str] = match operation {
         HirCicsOperation::AddressSet => &["SET", "USING", "RESP", "RESP2"],
+        HirCicsOperation::AsktimeEib => &["RESP", "RESP2"],
         HirCicsOperation::ChangeTask => &["PRIORITY", "RESP", "RESP2"],
         HirCicsOperation::Deq | HirCicsOperation::Enq => {
             &["RESOURCE", "LENGTH", "MAXLIFETIME", "RESP", "RESP2"]
@@ -793,6 +795,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     };
     let allowed_options: &[&str] = match operation {
         HirCicsOperation::AddressSet
+        | HirCicsOperation::AsktimeEib
         | HirCicsOperation::ChangeTask
         | HirCicsOperation::HandleAid
         | HirCicsOperation::HandleCondition
@@ -852,7 +855,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     }
     for required in match operation {
         HirCicsOperation::AddressSet => &["SET", "USING"][..],
-        HirCicsOperation::ChangeTask
+        HirCicsOperation::AsktimeEib
+        | HirCicsOperation::ChangeTask
         | HirCicsOperation::HandleAid
         | HirCicsOperation::HandleCondition
         | HirCicsOperation::IgnoreCondition

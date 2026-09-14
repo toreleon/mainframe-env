@@ -83,10 +83,10 @@ source receipts. The generator requires its route identities to match the
 legacy API runtime set exactly and verifies every admitted option against a
 current accepted source projection before emitting the registry.
 
-The 23 existing API routes are the only advertised application commands.
-`ASKTIME ABSTIME` is the advertised time form because the existing handler
-returns its packed-decimal destination; bare `ASKTIME` remains unready until
-the runtime also implements its distinct EIBDATE/EIBTIME update contract.
+The current 34 API routes are the only advertised application commands.
+`ASKTIME ABSTIME` returns its packed-decimal destination and refreshes EIBDATE
+and EIBTIME. Bare `ASKTIME` is a distinct route that refreshes only those two
+packed-decimal EIB fields; it cannot manufacture an ABSTIME destination.
 Each legacy route admits only the source-valid option subset whose behavior is
 implemented by that raw handler. A catalog-known option outside that subset
 fails explicitly before compatibility lowering instead of being silently

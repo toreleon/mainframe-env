@@ -246,6 +246,7 @@ impl PlanContext<'_> {
 const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
     match operation {
         HirCicsOperation::AddressSet => CicsPlanOperation::AddressSet,
+        HirCicsOperation::AsktimeEib => CicsPlanOperation::AsktimeEib,
         HirCicsOperation::ChangeTask => CicsPlanOperation::ChangeTask,
         HirCicsOperation::Read => CicsPlanOperation::Read,
         HirCicsOperation::Rewrite => CicsPlanOperation::Rewrite,

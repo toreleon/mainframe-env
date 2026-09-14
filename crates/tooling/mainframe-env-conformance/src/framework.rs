@@ -2452,7 +2452,7 @@ mod tests {
     fn cics_decimal_outputs_update_exact_cobol_destinations() {
         use mainframe_env_host_api::{CicsDisposition, CicsResponse, EffectResult, HostResult};
 
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTIME. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-X PIC S9(15) COMP-3 VALUE 0. 01 ABS-DISPLAY PIC 9(15). PROCEDURE DIVISION. EXEC CICS ASKTIME ABSTIME(ABS-X) END-EXEC. MOVE ABS-X TO ABS-DISPLAY. DISPLAY ABS-DISPLAY. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTIME. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-X PIC S9(15) COMP-3 VALUE 0. 01 ABS-DISPLAY PIC 9(15). 01 EIBDATE PIC S9(7) COMP-3. 01 EIBTIME PIC S9(7) COMP-3. PROCEDURE DIVISION. EXEC CICS ASKTIME ABSTIME(ABS-X) END-EXEC. MOVE ABS-X TO ABS-DISPLAY. DISPLAY ABS-DISPLAY. STOP RUN.";
         let artifact = compile(source).unwrap();
         let mut machine = ReferenceMachine::from_binary(
             artifact.payload(),
@@ -2482,17 +2482,155 @@ mod tests {
                 InvocationLimits::default(),
             )
             .unwrap(),
-            outputs: BTreeMap::from([(
-                "ABSTIME".into(),
-                mainframe_env_execution_api::BoundedPayload::new(
-                    "mainframe-env.cics.decimal@1",
-                    b"3997082096789".to_vec(),
-                    InvocationLimits::default(),
-                )
-                .unwrap(),
-            )]),
+            outputs: BTreeMap::from([
+                (
+                    "ABSTIME".into(),
+                    mainframe_env_execution_api::BoundedPayload::new(
+                        "mainframe-env.cics.decimal@1",
+                        b"3997082096789".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                (
+                    "EIBDATE".into(),
+                    mainframe_env_execution_api::BoundedPayload::new(
+                        "mainframe-env.cics.decimal@1",
+                        b"126242".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                (
+                    "EIBTIME".into(),
+                    mainframe_env_execution_api::BoundedPayload::new(
+                        "mainframe-env.cics.decimal@1",
+                        b"123456".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+            ]),
             unit_of_work: None,
         };
+        let result = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: effect.sequence,
+                outcome: Ok(HostResult::Cics(response)),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        );
+        assert!(
+            matches!(
+                result,
+                MachineDrive::Completed(ref done)
+                    if done.output.bytes() == b"003997082096789\n"
+            ),
+            "{result:?}"
+        );
+        assert_eq!(
+            machine.variable("EIBDATE").unwrap().bytes(),
+            &[0x01, 0x26, 0x24, 0x2c]
+        );
+        assert_eq!(
+            machine.variable("EIBTIME").unwrap().bytes(),
+            &[0x01, 0x23, 0x45, 0x6c]
+        );
+    }
+
+    #[test]
+    fn bare_asktime_requires_and_updates_both_implicit_eib_fields() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSEIBTIME. DATA DIVISION. WORKING-STORAGE SECTION. 01 EIBDATE PIC S9(7) COMP-3. 01 EIBTIME PIC S9(7) COMP-3. PROCEDURE DIVISION. EXEC CICS ASKTIME END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("bare ASKTIME did not call host");
+        };
+        assert!(matches!(
+            effect.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::AsktimeEib,
+                ..
+            })
+        ));
+        let decimal = |bytes: &[u8]| {
+            mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.decimal@1",
+                bytes.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let response = CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                Vec::new(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            outputs: BTreeMap::from([
+                ("EIBDATE".into(), decimal(b"126242")),
+                ("EIBTIME".into(), decimal(b"123456")),
+            ]),
+            unit_of_work: None,
+        };
+        let mut incomplete = response.clone();
+        incomplete.outputs.remove("EIBTIME");
+        let mut malformed = response.clone();
+        malformed.outputs.insert(
+            "EIBTIME".into(),
+            mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                b"123456".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        for rejected in [incomplete, malformed] {
+            let mut rejected_machine = ReferenceMachine::from_binary(
+                artifact.payload(),
+                invocation(&artifact, 1024),
+                CodecLimits::default(),
+            )
+            .unwrap();
+            let MachineDrive::HostCall(rejected_effect) =
+                rejected_machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+            else {
+                panic!("bare ASKTIME did not call host");
+            };
+            assert!(matches!(
+                rejected_machine.drive(
+                    MachineResume::HostResult(EffectResult {
+                        sequence: rejected_effect.sequence,
+                        outcome: Ok(HostResult::Cics(rejected)),
+                    }),
+                    Quantum::new(64, 1024).unwrap(),
+                ),
+                MachineDrive::Failed(_)
+            ));
+        }
         assert!(matches!(
             machine.drive(
                 MachineResume::HostResult(EffectResult {
@@ -2501,8 +2639,16 @@ mod tests {
                 }),
                 Quantum::new(64, 1024).unwrap(),
             ),
-            MachineDrive::Completed(done) if done.output.bytes() == b"003997082096789\n"
+            MachineDrive::Completed(done) if done.output.bytes().is_empty()
         ));
+        assert_eq!(
+            machine.variable("EIBDATE").unwrap().bytes(),
+            &[0x01, 0x26, 0x24, 0x2c]
+        );
+        assert_eq!(
+            machine.variable("EIBTIME").unwrap().bytes(),
+            &[0x01, 0x23, 0x45, 0x6c]
+        );
     }
 
     #[test]

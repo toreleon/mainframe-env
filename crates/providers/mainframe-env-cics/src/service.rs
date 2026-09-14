@@ -1705,7 +1705,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 35);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 36);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -4515,6 +4515,7 @@ mod tests {
         let cases = [
             ("ABEND", CicsOperation::Abend),
             ("ADDRESS SET", CicsOperation::AddressSet),
+            ("ASKTIME", CicsOperation::AsktimeEib),
             ("ASKTIME ABSTIME(ABS-TIME)", CicsOperation::Asktime),
             ("ASSIGN", CicsOperation::Assign),
             ("CHANGE TASK", CicsOperation::ChangeTask),
@@ -4562,7 +4563,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 35);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 36);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -4580,6 +4581,12 @@ mod tests {
         assert_eq!(
             asktime.official_row,
             "ibm-cics-ts-6x-2026-08-31:api-commands:0010"
+        );
+        let bare_asktime = command_descriptor(CicsOperation::AsktimeEib);
+        assert_eq!(bare_asktime.syntax, "ASKTIME");
+        assert_eq!(
+            bare_asktime.official_row,
+            "ibm-cics-ts-6x-2026-08-31:api-commands:0009"
         );
     }
 
@@ -4622,6 +4629,32 @@ mod tests {
         let absolute =
             String::from_utf8(asked.outputs.get("ABSTIME").unwrap().bytes().to_vec()).unwrap();
         assert_eq!(absolute.parse::<i64>().unwrap(), 3_997_082_096_789);
+        assert_eq!(asked.outputs["EIBDATE"].bytes(), b"126242");
+        assert_eq!(asked.outputs["EIBTIME"].bytes(), b"123456");
+
+        let bare_asktime = request(CicsOperation::AsktimeEib, BTreeMap::new(), 330);
+        let bare_asktime = service
+            .invoke(
+                &effect(&invocation.run_unit_id, bare_asktime.clone(), 330),
+                bare_asktime,
+            )
+            .unwrap();
+        assert_eq!(bare_asktime.condition, "NORMAL");
+        assert!(!bare_asktime.outputs.contains_key("ABSTIME"));
+        assert_eq!(bare_asktime.outputs["EIBDATE"].bytes(), b"126242");
+        assert_eq!(bare_asktime.outputs["EIBTIME"].bytes(), b"123456");
+        let malformed = request(
+            CicsOperation::AsktimeEib,
+            BTreeMap::from([("ABSTIME".into(), argument(b"ABS-TIME"))]),
+            331,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, malformed.clone(), 331),
+                malformed,
+            ),
+            Err(HostProblem::Malformed)
+        );
 
         let format = request(
             CicsOperation::FormatTime,
@@ -10231,6 +10264,23 @@ mod tests {
                 .outcome,
             Ok(HostResult::Cics(CicsResponse { outputs, .. }))
                 if outputs.contains_key("ABSTIME")
+        ));
+        let bare_asktime = request(CicsOperation::AsktimeEib, BTreeMap::new(), 3);
+        assert!(matches!(
+            outer
+                .invoke(
+                    &invocation,
+                    1,
+                    false,
+                    effect(&invocation.run_unit_id, bare_asktime, 3),
+                )
+                .into_transaction_parts()
+                .0
+                .outcome,
+            Ok(HostResult::Cics(CicsResponse { outputs, .. }))
+                if !outputs.contains_key("ABSTIME")
+                    && outputs["EIBDATE"].bytes() == b"126242"
+                    && outputs["EIBTIME"].bytes() == b"123456"
         ));
     }
 

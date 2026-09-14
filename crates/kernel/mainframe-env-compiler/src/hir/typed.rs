@@ -147,6 +147,7 @@ pub struct HirComputeStatement {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HirCicsOperation {
     AddressSet,
+    AsktimeEib,
     ChangeTask,
     Deq,
     Enq,
@@ -1917,11 +1918,21 @@ mod tests {
         let bare = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBASE. PROCEDURE DIVISION. EXEC CICS ASKTIME END-EXEC. STOP RUN.",
         );
-        assert!(bare.hir.is_none());
-        assert!(bare.diagnostics.iter().any(|diagnostic| {
-            let message = diagnostic.public_message();
-            message.contains("ASKTIME") && message.contains("handler is unready")
-        }));
+        let bare_hir = bare
+            .hir
+            .unwrap_or_else(|| panic!("ASKTIME: {:?}", bare.diagnostics));
+        let statement = bare_hir
+            .statements
+            .iter()
+            .find(|statement| statement.kind == StatementKind::ExecCics)
+            .expect("bare ASKTIME statement");
+        assert!(matches!(
+            statement.resolved,
+            Some(HirResolvedStatement::Cics(HirCicsStatement {
+                operation: HirCicsOperation::AsktimeEib,
+                ..
+            }))
+        ));
 
         let longer = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLONG. DATA DIVISION. WORKING-STORAGE SECTION. 01 TIME-X PIC X(8). PROCEDURE DIVISION. EXEC CICS ASKTIME ABSTIME(TIME-X) END-EXEC. STOP RUN.",

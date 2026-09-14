@@ -2417,6 +2417,7 @@ mod tests {
             CicsOperation::Abend,
             CicsOperation::AddressSet,
             CicsOperation::Asktime,
+            CicsOperation::AsktimeEib,
             CicsOperation::Assign,
             CicsOperation::ChangeTask,
             CicsOperation::Deq,
@@ -2450,7 +2451,7 @@ mod tests {
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-        assert_eq!(forms.len(), 35);
+        assert_eq!(forms.len(), 36);
         let names = forms
             .iter()
             .map(|operation| operation.runtime_name())

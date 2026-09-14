@@ -28,6 +28,7 @@ use std::sync::OnceLock;
 use typed_decimal::{decimal_add, decimal_divide, decimal_multiply, decimal_subtract};
 mod corresponding;
 mod decimal_commit;
+mod eib;
 mod layout_admission;
 mod layout_resolution;
 mod typed_cics;
@@ -495,38 +496,9 @@ impl ReferenceMachine {
                     .map_err(|_| MachineProblem::InvalidOperation)
             })
             .transpose()?;
-        let mut implicit = BTreeMap::from([
-            (
-                "EIBRESP".into(),
-                CobolValue::Decimal(Decimal {
-                    coefficient: 0,
-                    scale: 0,
-                }),
-            ),
-            (
-                "EIBRESP2".into(),
-                CobolValue::Decimal(Decimal {
-                    coefficient: 0,
-                    scale: 0,
-                }),
-            ),
-            ("EIBFN".into(), CobolValue::Bytes(vec![0, 0])),
-            (
-                "EIBCALEN".into(),
-                CobolValue::Decimal(Decimal {
-                    coefficient: i128::try_from(entry_commarea_len.unwrap_or(0))
-                        .map_err(|_| MachineProblem::InvalidOperation)?,
-                    scale: 0,
-                }),
-            ),
-            (
-                "EIBAID".into(),
-                CobolValue::Bytes(vec![entry_aid.unwrap_or(0)]),
-            ),
-            (
-                "EIBTRNID".into(),
-                CobolValue::Bytes(entry_transaction.clone().unwrap_or_default()),
-            ),
+        let mut implicit =
+            eib::implicit_values(entry_commarea_len, entry_aid, entry_transaction.as_deref())?;
+        implicit.extend([
             (
                 "RETURN-CODE".into(),
                 CobolValue::Decimal(Decimal {

@@ -11,6 +11,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0006"
     },
     {
+      "operation": "AsktimeEib",
+      "interface": "api",
+      "family": "time",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0009"
+    },
+    {
       "operation": "ChangeTask",
       "interface": "api",
       "family": "task-control",
