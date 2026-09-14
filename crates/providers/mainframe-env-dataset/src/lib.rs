@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 mod codec;
+mod dataset_locks;
 mod dependency;
 mod retention;
 mod service;

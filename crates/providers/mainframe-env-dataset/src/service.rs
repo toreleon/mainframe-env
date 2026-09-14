@@ -1,4 +1,5 @@
 use crate::codec::{Entry, MemberGeneration, decode, encode, encode_definition_digest_v3};
+use crate::dataset_locks;
 use crate::dependency::{DependencyGraph, DependencyLimits};
 use crate::retention::{
     CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
@@ -700,13 +701,13 @@ struct SeedSelection {
     generation: String,
     version: u64,
 }
-struct State {
+pub(crate) struct State {
     entries: BTreeMap<String, Entry>,
     alternate_indexes: BTreeMap<String, AlternateIndex>,
     generation_groups: BTreeMap<String, GenerationGroup>,
     catalogs: BTreeMap<String, CatalogRecord>,
     catalog_aliases: BTreeMap<String, CatalogAlias>,
-    locks: BTreeMap<String, mainframe_env_host_api::DatasetLockReceipt>,
+    pub(crate) locks: BTreeMap<String, mainframe_env_host_api::DatasetLockReceipt>,
     tvs_units: BTreeMap<String, TvsUnitOfWork>,
     seed_generations: BTreeMap<(String, String), SeedGeneration>,
     seed_selections: BTreeMap<String, SeedSelection>,
@@ -2325,7 +2326,7 @@ impl DatasetService {
                 attributes,
                 mutation,
             } => {
-                if dataset_name_lock_conflicts(state, dataset, mutation) {
+                if dataset_locks::dataset_name_lock_conflicts(state, dataset, mutation) {
                     return Err(condition("LOCKED", 16));
                 }
                 let definition = validated_compatibility_definition(attributes, self.limits)?;
@@ -2358,7 +2359,7 @@ impl DatasetService {
                 mutation,
             } => {
                 validate_dataset_definition(definition, self.limits)?;
-                if dataset_name_lock_conflicts(state, dataset, mutation) {
+                if dataset_locks::dataset_name_lock_conflicts(state, dataset, mutation) {
                     return Err(condition("LOCKED", 16));
                 }
                 if definition.lifecycle.migration_level != 0
@@ -4400,12 +4401,7 @@ impl DatasetService {
                     return Ok(result);
                 }
                 if member.is_none()
-                    && state.locks.values().any(|lock| {
-                        lock.dataset == *dataset
-                            && lock.transaction.is_some()
-                            && delete_mutation.transaction.as_deref() != lock.transaction.as_deref()
-                            && delete_mutation.transaction.as_deref() != Some(lock.lock_id.as_str())
-                    })
+                    && dataset_locks::dataset_delete_lock_conflicts(state, dataset, delete_mutation)
                 {
                     return Err(condition("LOCKED", 16));
                 }
@@ -4472,18 +4468,8 @@ impl DatasetService {
                         .filter(|lock| lock.dataset == *dataset)
                         .cloned()
                         .collect::<Vec<_>>();
-                    let removed_locks = locks
-                        .iter()
-                        .filter(|lock| {
-                            !matches!(
-                                lock.target,
-                                mainframe_env_host_api::DatasetLockTarget::Dataset
-                            ) || delete_mutation.transaction.is_none()
-                                || delete_mutation.transaction.as_deref()
-                                    != lock.transaction.as_deref()
-                        })
-                        .cloned()
-                        .collect::<Vec<_>>();
+                    let removed_locks =
+                        dataset_locks::dataset_delete_lock_retention(&locks, delete_mutation);
                     let invalidation = state
                         .dependencies
                         .invalidation_order(dataset.as_str(), dependency_limits(self.limits))?;
@@ -5478,22 +5464,6 @@ fn lock_conflicts(
             mainframe_env_host_api::DatasetLockMode::Shared
         )
     )
-}
-
-fn dataset_name_lock_conflicts(
-    state: &State,
-    dataset: &DatasetName,
-    mutation: &mainframe_env_host_api::Mutation,
-) -> bool {
-    state.locks.values().any(|lock| {
-        lock.dataset == *dataset
-            && matches!(
-                lock.target,
-                mainframe_env_host_api::DatasetLockTarget::Dataset
-            )
-            && lock.expires_at > mutation.sequence
-            && lock.transaction.as_deref() != mutation.transaction.as_deref()
-    })
 }
 
 fn same_lock_isolation_owner(

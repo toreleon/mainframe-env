@@ -109,6 +109,10 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Moved CICS READ/REWRITE `LENGTH`/`KEYLENGTH` clause lowering, dataset-name lock-conflict
+  and delete-lock retention checks, and the CardDemo job-wait/spool-failure helpers into
+  sibling modules, and tightened the reviewed module-review production-line ceilings for
+  `mainframe-env-dataset/src/service.rs` and `mainframe-env-conformance/src/carddemo.rs`.
 - Allowed dataset deletion by the transaction that owns an active allocation lock while
   preserving lock rejection for unrelated transactions.
 - Kept a job's exclusive dataset-name lock through its own IDCAMS `DELETE` until step end, so
