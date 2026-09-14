@@ -8,6 +8,7 @@ mod recovery;
 mod task_context;
 mod task_control;
 mod task_enqueue;
+mod task_return;
 mod terminal_control;
 mod terminal_run;
 mod time;

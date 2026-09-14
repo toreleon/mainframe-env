@@ -189,6 +189,13 @@ frame-replacing transfer. The online handoff carries the captured bytes into
 the target program's `DFHCOMMAREA`; execution never resumes after XCTL in the
 calling frame.
 
+Typed local RETURN either completes the current top-level task or records a
+1–4 character next TRANSID with a copied COMMAREA. COMMAREA is input-only and
+requires TRANSID in this bounded runtime subset. The durable online handoff
+terminalizes the old execution before the next terminal task can claim the
+continuation; malformed schemas, unsupported DPL context, and unowned options
+fail before continuation mutation.
+
 CICS PUSH HANDLE moves the current condition mappings, ignored-condition set,
 and active/canceled typed ABEND exits into one bounded task-local frame, leaving a
 clear specification set for the nested routine. POP HANDLE discards the nested

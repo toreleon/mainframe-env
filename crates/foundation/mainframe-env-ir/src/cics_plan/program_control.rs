@@ -20,6 +20,36 @@ pub(super) fn invalid_xctl_shape(
     invalid_transfer_shape(plan, inputs, outputs, false)
 }
 
+pub(super) fn invalid_return_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let allowed_inputs = BTreeSet::from([CicsOperandName::TransId, CicsOperandName::Commarea]);
+    let transid = plan
+        .operands
+        .iter()
+        .find(|operand| operand.name == CicsOperandName::TransId);
+    !inputs.is_subset(&allowed_inputs)
+        || inputs.contains(&CicsOperandName::Commarea)
+            && !inputs.contains(&CicsOperandName::TransId)
+        || transid.is_some_and(|operand| {
+            !matches!(
+                &operand.value,
+                CicsOperandValue::Literal(bytes) if valid_transaction_name(bytes)
+            ) && !matches!(operand.value, CicsOperandValue::Storage(_))
+        })
+        || plan.operands.iter().any(|operand| {
+            operand.name == CicsOperandName::Commarea
+                && !matches!(operand.value, CicsOperandValue::Storage(_))
+        })
+        || plan
+            .options
+            .iter()
+            .any(|option| !matches!(option, CicsPlanOption::NoHandle))
+        || outputs.contains(&CicsOutputName::Into)
+}
+
 fn invalid_transfer_shape(
     plan: &CicsEffectPlan,
     inputs: &BTreeSet<CicsOperandName>,
@@ -62,4 +92,11 @@ fn invalid_transfer_shape(
 
 fn valid_program_name(bytes: &[u8]) -> bool {
     matches!(bytes.len(), 1..=8) && bytes.iter().all(u8::is_ascii_alphanumeric)
+}
+
+fn valid_transaction_name(bytes: &[u8]) -> bool {
+    matches!(bytes.len(), 1..=4)
+        && bytes
+            .iter()
+            .all(|byte| byte.is_ascii_alphanumeric() || *byte == b'-')
 }

@@ -75,6 +75,8 @@ pub enum CicsPlanOperation {
     Link,
     /// Transfer to one installed program at the same logical level without returning.
     Xctl,
+    /// Return from the current top-level task and optionally schedule its next transaction.
+    Return,
     /// Restore one suspended HANDLE/IGNORE specification snapshot.
     PopHandle,
     /// Suspend the current HANDLE/IGNORE specifications in one nested snapshot.
@@ -111,6 +113,8 @@ pub enum CicsOperandName {
     Program,
     /// `COMMAREA(...)` input-output data area.
     Commarea,
+    /// `TRANSID(...)` next-transaction name.
+    TransId,
     /// `FILE(...)` resource binding.
     File,
     /// `DATASET(...)` resource alias.
@@ -586,6 +590,7 @@ fn validate_operation_shape(
         }
         CicsPlanOperation::Link => program_control::invalid_link_shape(plan, inputs, outputs),
         CicsPlanOperation::Xctl => program_control::invalid_xctl_shape(plan, inputs, outputs),
+        CicsPlanOperation::Return => program_control::invalid_return_shape(plan, inputs, outputs),
         CicsPlanOperation::Read => {
             resources != 1
                 || !inputs.contains(&CicsOperandName::Ridfld)
@@ -877,6 +882,7 @@ const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::HandleAbend => 18,
         CicsPlanOperation::Link => 19,
         CicsPlanOperation::Xctl => 20,
+        CicsPlanOperation::Return => 21,
     }
 }
 
@@ -903,6 +909,7 @@ fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPlanCodecProbl
         18 => Ok(CicsPlanOperation::HandleAbend),
         19 => Ok(CicsPlanOperation::Link),
         20 => Ok(CicsPlanOperation::Xctl),
+        21 => Ok(CicsPlanOperation::Return),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -931,6 +938,7 @@ const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::Label => 19,
         CicsOperandName::Program => 20,
         CicsOperandName::Commarea => 21,
+        CicsOperandName::TransId => 22,
     }
 }
 
@@ -958,6 +966,7 @@ fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCodecProblem> 
         19 => Ok(CicsOperandName::Label),
         20 => Ok(CicsOperandName::Program),
         21 => Ok(CicsOperandName::Commarea),
+        22 => Ok(CicsOperandName::TransId),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -1385,6 +1394,28 @@ mod tests {
             encode_cics_effect_plan(&returning_xctl, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
+        let return_plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Return,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::TransId,
+                    value: CicsOperandValue::Literal(b"NEXT".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Commarea,
+                    value: CicsOperandValue::Storage(slot(9, "REQUEST.RETURN-AREA")),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let mut invalid_return = return_plan.clone();
+        invalid_return.operands[0].value = CicsOperandValue::Literal(b"TOOLONG".to_vec());
+        assert_eq!(
+            encode_cics_effect_plan(&invalid_return, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
         for plan in [
             read,
             rewrite,
@@ -1396,6 +1427,7 @@ mod tests {
             handle_abend,
             link,
             xctl,
+            return_plan,
         ] {
             let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
             let decoded = decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap();

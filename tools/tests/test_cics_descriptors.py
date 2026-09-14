@@ -151,8 +151,8 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertEqual(contracts["coverage_credit"], 0)
         self.assertEqual(contracts["semantic_credit"], 0)
         self.assertEqual(contracts["counts"]["runtime_backed_commands"], 34)
-        self.assertEqual(contracts["counts"]["typed_runtime_commands"], 21)
-        self.assertEqual(contracts["counts"]["legacy_compatibility_commands"], 13)
+        self.assertEqual(contracts["counts"]["typed_runtime_commands"], 22)
+        self.assertEqual(contracts["counts"]["legacy_compatibility_commands"], 12)
         self.assertEqual(contracts["counts"]["advertised_commands"], 34)
         contract_rows = [
             command for batch in contracts["batches"] for command in batch["commands"]
@@ -191,6 +191,8 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertEqual(rows_by_label["LINK"]["existing_runtime_operation"], "Link")
         self.assertEqual(rows_by_label["XCTL"]["registration_status"], "typed-runtime")
         self.assertEqual(rows_by_label["XCTL"]["existing_runtime_operation"], "Xctl")
+        self.assertEqual(rows_by_label["RETURN"]["registration_status"], "typed-runtime")
+        self.assertEqual(rows_by_label["RETURN"]["existing_runtime_operation"], "Return")
         self.assertEqual(
             rows_by_label["ASKTIME"]["registration_status"],
             "typed-runtime",
@@ -217,8 +219,8 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertIn("CICS_APPLICATION_REGISTRY_FROZEN", ir_registry)
         self.assertIn("CICS_APPLICATION_REGISTRY_SHA256", ir_registry)
         self.assertEqual(contracts["registry"]["shape_commands"], 263)
-        self.assertEqual(contracts["registry"]["typed_handlers"], 21)
-        self.assertEqual(contracts["registry"]["legacy_compatibility_handlers"], 13)
+        self.assertEqual(contracts["registry"]["typed_handlers"], 22)
+        self.assertEqual(contracts["registry"]["legacy_compatibility_handlers"], 12)
         self.assertEqual(contracts["registry"]["advertised_commands"], 34)
         self.assertEqual(contracts["registry"]["unready_handlers"], 229)
         self.assertIsNone(contracts["registry"]["default_handler"])
@@ -523,7 +525,7 @@ class CicsDescriptorTests(unittest.TestCase):
             for operation in catalog["_runtime_operations"]
             if operation["legacy_execution_options"]
         ]
-        self.assertEqual(len(legacy), 13)
+        self.assertEqual(len(legacy), 12)
         self.assertTrue(
             all(
                 operation["interface"] == "api"
@@ -612,9 +614,9 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertTrue(all(":api-commands:" in row["official_row"] for row in rows))
         self.assertFalse(any(":spi-" in row["official_row"] for row in rows))
         self.assertFalse(any(":fepi-" in row["official_row"] for row in rows))
-        self.assertEqual(sum(row["readiness"] == "typed-runtime" for row in registry), 21)
+        self.assertEqual(sum(row["readiness"] == "typed-runtime" for row in registry), 22)
         self.assertEqual(
-            sum(row["readiness"] == "legacy-compatibility" for row in registry), 13
+            sum(row["readiness"] == "legacy-compatibility" for row in registry), 12
         )
         self.assertEqual(sum(row["advertised"] for row in registry), 34)
         self.assertEqual(sum(row["readiness"] == "unready" for row in registry), 229)
@@ -624,8 +626,8 @@ class CicsDescriptorTests(unittest.TestCase):
             contracts["participant_contract"]["mutating_rows"],
             sum(row["contract"]["effect"]["mutating"] is True for row in rows),
         )
-        self.assertEqual(contracts["participant_contract"]["mutating_rows"], 8)
-        self.assertEqual(contracts["participant_contract"]["bounded_effect_rows"], 242)
+        self.assertEqual(contracts["participant_contract"]["mutating_rows"], 9)
+        self.assertEqual(contracts["participant_contract"]["bounded_effect_rows"], 241)
         self.assertEqual(contracts["participant_contract"]["explicit_uow_boundary_rows"], 1)
         self.assertFalse(
             contracts["participant_contract"]["unknown_outcome"]["automatic_redispatch"]
@@ -954,6 +956,7 @@ class CicsDescriptorTests(unittest.TestCase):
                 "SUSPEND",
                 "SYNCPOINT",
                 "XCTL",
+                "RETURN",
             },
         )
         self.assertEqual(

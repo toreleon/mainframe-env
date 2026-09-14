@@ -171,6 +171,7 @@ impl PlanContext<'_> {
                 HirCicsOperandName::Label => CicsOperandName::Label,
                 HirCicsOperandName::Program => CicsOperandName::Program,
                 HirCicsOperandName::Commarea => CicsOperandName::Commarea,
+                HirCicsOperandName::TransId => CicsOperandName::TransId,
                 HirCicsOperandName::File => CicsOperandName::File,
                 HirCicsOperandName::Dataset => CicsOperandName::Dataset,
                 HirCicsOperandName::From => CicsOperandName::From,
@@ -282,6 +283,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::IgnoreCondition => CicsPlanOperation::IgnoreCondition,
         HirCicsOperation::Link => CicsPlanOperation::Link,
         HirCicsOperation::Xctl => CicsPlanOperation::Xctl,
+        HirCicsOperation::Return => CicsPlanOperation::Return,
         HirCicsOperation::PopHandle => CicsPlanOperation::PopHandle,
         HirCicsOperation::PushHandle => CicsPlanOperation::PushHandle,
     }

@@ -85,6 +85,12 @@ All notable changes to mainframe-env are documented here.
   initializes the target program's `DFHCOMMAREA` while preserving EIBFN `0E04`.
   Channel, input-message, explicit-length, DPL, and licensed forms remain
   deferred.
+- Migrated bare `EXEC CICS RETURN` and the local TRANSID/COMMAREA
+  pseudo-conversation subset to a typed task-control plan. TRANSID is a
+  prevalidated 1–4 character literal or field, COMMAREA is captured as an
+  input-only copy, and the durable selected route completes the old execution
+  before the next terminal task. Length, channel, input-message, immediate,
+  BTS, higher-level, and DPL ownership remain deferred.
 - Expanded the source-bounded CICS `ASSIGN` compatibility route with APPLID,
   SYSID, USERID, TASKPRIORITY, and the exact absent application/channel context
   defaults. It also reports absent CWA/TWA lengths, null OPERKEYS, and a normal

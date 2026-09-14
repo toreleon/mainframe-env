@@ -1,6 +1,6 @@
 use super::super::{
-    CicsLimits, CicsService, DatasetUndo, DurableContinuation, Reader, Run, Session,
-    argument_bytes, argument_optional, argument_text, field, mutation_problem,
+    CicsLimits, CicsService, DatasetUndo, Reader, Run, Session, argument_bytes, argument_text,
+    field,
 };
 use super::handle_state::{
     AbendExit, AbendRecord, HandleFrame, HandleState, MAX_HANDLE_STACK_DEPTH, encode_handle_state,
@@ -235,7 +235,7 @@ pub(in crate::service) fn invoke(
             None,
             run.retrieve.clone(),
         ),
-        CicsOperation::Return => return_transaction(service, run, request),
+        CicsOperation::Return => super::task_return::invoke(service, run, request),
         CicsOperation::SetAssociationUserCorrData => {
             set_association_user_corr_data(service, run, request)
         }
@@ -1081,85 +1081,4 @@ fn pop_handle_invreq(
         persist_handle_state(service, run, previous)?;
     }
     service.response(run, disposition, "INVREQ", 16, 0, target, None, payload)
-}
-
-fn return_transaction(
-    service: &CicsService,
-    run: &Run,
-    request: &CicsRequest,
-) -> Result<CicsResponse, HostProblem> {
-    let mut state = service.lock()?;
-    let next_transaction = argument_optional(request, "TRANSID")
-        .map(|value| value.trim().to_ascii_uppercase())
-        .filter(|value| !value.is_empty());
-    let commarea = argument_bytes(request, "COMMAREA").unwrap_or_default();
-    if commarea.len() > service.limits.max_screen_bytes {
-        return Err(HostProblem::ResourceExhausted);
-    }
-    if let Some(transaction) = &next_transaction {
-        if transaction.len() > 16
-            || !transaction
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
-        {
-            return Err(HostProblem::Malformed);
-        }
-        let effect_key = request
-            .mutation
-            .as_ref()
-            .ok_or(HostProblem::MissingIdempotency)?
-            .idempotency_key
-            .as_str()
-            .to_string();
-        let current = state.continuations.get(&run.session).cloned();
-        if let Some(current) = &current
-            && current.effect_key == effect_key
-        {
-            if current.transaction != *transaction || current.commarea != commarea {
-                return Err(HostProblem::IdempotencyConflict);
-            }
-        } else {
-            let version = current.as_ref().map_or(Ok(1), |value| {
-                value
-                    .version
-                    .checked_add(1)
-                    .ok_or(HostProblem::ResourceExhausted)
-            })?;
-            let next = DurableContinuation {
-                transaction: transaction.clone(),
-                commarea: commarea.clone(),
-                claimed_by: None,
-                effect_key,
-                version,
-            };
-            service
-                .persist_continuation(
-                    &run.session,
-                    &next,
-                    current.as_ref().map(|value| value.version),
-                )
-                .map_err(mutation_problem)?;
-            state.continuations.insert(run.session.clone(), next);
-        }
-    } else if let Some(current) = state.continuations.get(&run.session).cloned()
-        && current.claimed_by.as_deref() == Some(run.invocation.run_unit_id.as_str())
-    {
-        service
-            .store
-            .delete_provider_state("cics-continuation", &run.session, current.version)
-            .map_err(super::super::store_error)
-            .map_err(mutation_problem)?;
-        state.continuations.remove(&run.session);
-    }
-    super::release_task_enqueues(service, run)?;
-    service.response(
-        run,
-        CicsDisposition::Returned,
-        "NORMAL",
-        0,
-        0,
-        None,
-        next_transaction,
-        commarea,
-    )
 }

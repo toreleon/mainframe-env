@@ -99,7 +99,7 @@ const ABEND_EFFECTS: &[Effect] = &[
     Effect::Condition,
     Effect::Transaction,
 ];
-const PROGRAM_TRANSFER_EFFECTS: &[Effect] = &[
+const CONTROL_TRANSFER_EFFECTS: &[Effect] = &[
     Effect::MemoryRead,
     Effect::MemoryWrite,
     Effect::ProgramControl,
@@ -471,7 +471,7 @@ pub fn cics_application_registry_for_runtime_operation(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 21] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 22] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -629,7 +629,7 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 21] = [
         namespace: "cics.program",
         name: "link",
         major: 1,
-        effects: PROGRAM_TRANSFER_EFFECTS,
+        effects: CONTROL_TRANSFER_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
     CicsExecutableDescriptor {
@@ -637,7 +637,15 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 21] = [
         namespace: "cics.program",
         name: "xctl",
         major: 1,
-        effects: PROGRAM_TRANSFER_EFFECTS,
+        effects: CONTROL_TRANSFER_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Return,
+        namespace: "cics.task",
+        name: "return",
+        major: 1,
+        effects: CONTROL_TRANSFER_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
 ];
@@ -669,6 +677,7 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::HandleAbend => &CICS_EXECUTABLE_DESCRIPTORS[18],
         CicsPlanOperation::Link => &CICS_EXECUTABLE_DESCRIPTORS[19],
         CicsPlanOperation::Xctl => &CICS_EXECUTABLE_DESCRIPTORS[20],
+        CicsPlanOperation::Return => &CICS_EXECUTABLE_DESCRIPTORS[21],
     }
 }
 
@@ -729,7 +738,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 21);
+        assert_eq!(typed.len(), 22);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -739,7 +748,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 13);
+        assert_eq!(legacy.len(), 12);
         assert!(legacy.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && !descriptor.legacy_execution_options.is_empty()));
@@ -927,6 +936,7 @@ mod tests {
                 CicsPlanOperation::IgnoreCondition,
                 CicsPlanOperation::Link,
                 CicsPlanOperation::Xctl,
+                CicsPlanOperation::Return,
                 CicsPlanOperation::PopHandle,
                 CicsPlanOperation::PushHandle,
                 CicsPlanOperation::Read,

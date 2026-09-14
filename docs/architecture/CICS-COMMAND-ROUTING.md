@@ -111,6 +111,11 @@ but declares no COMMAREA output because control does not return to the caller.
 Its complete provider result becomes a frame-replacing transfer to the selected
 program. Channel, explicit length, and input-message forms remain compiler
 rejections until their separate contracts are implemented.
+The typed local RETURN subset admits bare completion and an optional TRANSID;
+COMMAREA is admitted only with TRANSID so the copied bytes have an owned durable
+continuation identity. RETURN carries no COMMAREA output. Explicit length,
+channel, input-message, IMMEDIATE, ENDACTIVITY, higher-level, and DPL forms
+remain fail-closed.
 Each legacy route admits only the source-valid option subset whose behavior is
 implemented by that raw handler. A catalog-known option outside that subset
 fails explicitly before compatibility lowering instead of being silently

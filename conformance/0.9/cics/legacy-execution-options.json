@@ -40,11 +40,6 @@
       "execution_options": ["INTO", "NOHANDLE", "RESP", "RESP2"]
     },
     {
-      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0178",
-      "runtime_operation": "Return",
-      "execution_options": ["COMMAREA", "NOHANDLE", "RESP", "RESP2", "TRANSID"]
-    },
-    {
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0189",
       "runtime_operation": "SendMap",
       "execution_options": ["FROM", "MAP", "MAPSET", "NOHANDLE", "RESP", "RESP2"]

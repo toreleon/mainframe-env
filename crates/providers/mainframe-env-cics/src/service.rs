@@ -5959,6 +5959,90 @@ mod tests {
         );
     }
 
+    #[test]
+    fn return_request_is_bounded_typed_and_local_only() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, session) = registered(&service);
+        for (sequence, arguments) in [
+            (
+                51,
+                BTreeMap::from([("COMMAREA".into(), argument(b"STATE"))]),
+            ),
+            (
+                52,
+                BTreeMap::from([("TRANSID".into(), argument(b"TOOLONG"))]),
+            ),
+            (53, BTreeMap::from([("UNKNOWN".into(), argument(b"VALUE"))])),
+            (
+                54,
+                BTreeMap::from([
+                    ("TRANSID".into(), argument(b"NEXT")),
+                    ("RESP".into(), task_value(b"RESP-X")),
+                ]),
+            ),
+        ] {
+            let invalid = request(CicsOperation::Return, arguments, sequence);
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, invalid.clone(), sequence),
+                    invalid,
+                ),
+                Err(HostProblem::Malformed)
+            );
+        }
+        assert!(
+            !service
+                .lock()
+                .unwrap()
+                .continuations
+                .contains_key(session.as_str())
+        );
+
+        let context = BoundedPayload::new(
+            "mainframe-env.cics.execution-context@1",
+            b"dpl-synconreturn".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let dpl = invocation_for(
+            "return-dpl",
+            BTreeMap::from([("cics.execution-context".into(), context)]),
+        );
+        let dpl_session = SessionId::new("return-dpl", 64).unwrap();
+        service.create_session(&dpl_session, 24, 80).unwrap();
+        service
+            .register_run(dpl.clone(), &dpl_session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let mut denied = request(
+            CicsOperation::Return,
+            BTreeMap::from([("TRANSID".into(), argument(b"NEXT"))]),
+            55,
+        );
+        denied.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let response = service
+            .invoke(&effect(&dpl.run_unit_id, denied.clone(), 55), denied)
+            .unwrap();
+        assert_eq!(
+            (
+                response.disposition,
+                response.condition.as_str(),
+                response.response,
+                response.response2,
+            ),
+            (CicsDisposition::Complete, "INVREQ", 16, 200)
+        );
+        assert!(
+            !service
+                .lock()
+                .unwrap()
+                .continuations
+                .contains_key(dpl_session.as_str())
+        );
+    }
+
     #[cfg(feature = "fault-injection")]
     #[test]
     fn file_queue_program_and_syncpoint_replay_once_across_process_crash() {

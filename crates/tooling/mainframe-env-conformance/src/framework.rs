@@ -2942,6 +2942,78 @@ mod tests {
     }
 
     #[test]
+    fn cics_return_uses_typed_transaction_and_commarea_before_completion() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSRET. DATA DIVISION. WORKING-STORAGE SECTION. 01 STATE-X PIC X(8) VALUE 'STATE'. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS RETURN TRANSID('NEXT') COMMAREA(STATE-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("RETURN did not call host");
+        };
+        assert!(
+            matches!(
+                &effect.request,
+                HostRequest::Cics(CicsRequest {
+                    operation: CicsOperation::Return,
+                    arguments,
+                    mutation: Some(_),
+                    ..
+                }) if arguments["TRANSID"].bytes() == b"NEXT"
+                    && arguments["COMMAREA"].bytes() == b"STATE   "
+                    && arguments["RESP"].bytes() == b"RESP-X"
+                    && arguments["RESP2"].bytes() == b"RESP2-X"
+            ),
+            "{:#?}",
+            effect.request
+        );
+        let payload = mainframe_env_execution_api::BoundedPayload::new(
+            "mainframe-env.cics.payload@1",
+            b"STATE   ".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: effect.sequence,
+                    outcome: Ok(HostResult::Cics(CicsResponse {
+                        disposition: CicsDisposition::Returned,
+                        condition: "NORMAL".into(),
+                        response: 0,
+                        response2: 0,
+                        applid: "APP".into(),
+                        sysid: "SYS".into(),
+                        transaction: "T001".into(),
+                        aid: 0,
+                        target: None,
+                        next_transaction: Some("NEXT".into()),
+                        payload,
+                        outputs: BTreeMap::new(),
+                        unit_of_work: None,
+                    })),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("STATE-X").unwrap().bytes(), b"STATE   ");
+        assert_eq!(machine.variable("RESP-X").unwrap().bytes(), &[0; 4]);
+        assert_eq!(machine.variable("RESP2-X").unwrap().bytes(), &[0; 4]);
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x0e, 0x08]);
+    }
+
+    #[test]
     fn bare_asktime_requires_and_updates_both_implicit_eib_fields() {
         use mainframe_env_host_api::{
             CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,

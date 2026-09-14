@@ -160,6 +160,7 @@ pub enum HirCicsOperation {
     IgnoreCondition,
     Link,
     Xctl,
+    Return,
     PopHandle,
     PushHandle,
     Read,
@@ -175,6 +176,7 @@ pub enum HirCicsOperandName {
     Label,
     Program,
     Commarea,
+    TransId,
     File,
     Dataset,
     From,
@@ -2232,6 +2234,91 @@ mod tests {
     }
 
     #[test]
+    fn cics_return_resolves_bounded_transaction_and_copied_commarea() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSRET. DATA DIVISION. WORKING-STORAGE SECTION. 01 TRANS-X PIC X(4) VALUE 'NEXT'. 01 AREA-X PIC X(8) VALUE 'STATE'. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS RETURN TRANSID(TRANS-X) COMMAREA(AREA-X) RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("RETURN: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("resolved RETURN command");
+        assert_eq!(command.operation, HirCicsOperation::Return);
+        assert!(command.operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::TransId,
+                    value: HirCicsValue::Data(reference),
+                } if reference.qualified_name == "TRANS-X"
+            )
+        }));
+        assert!(command.operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::Commarea,
+                    value: HirCicsValue::Data(reference),
+                } if reference.qualified_name == "AREA-X"
+            )
+        }));
+        assert!(
+            !command
+                .outputs
+                .iter()
+                .any(|output| output.name == HirCicsOutputName::Commarea)
+        );
+        assert!(matches!(
+            command.condition_policy,
+            HirCicsConditionPolicy::Respond { .. }
+        ));
+
+        let bare = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BARERET. PROCEDURE DIVISION. EXEC CICS RETURN END-EXEC.",
+        );
+        assert!(bare.hir.is_some(), "{:?}", bare.diagnostics);
+        let missing_transaction = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADRET. DATA DIVISION. WORKING-STORAGE SECTION. 01 AREA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS RETURN COMMAREA(AREA-X) END-EXEC.",
+        );
+        assert!(missing_transaction.hir.is_none());
+        assert!(missing_transaction.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("COMMAREA requires TRANSID")
+        }));
+        let oversized = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADRET. DATA DIVISION. WORKING-STORAGE SECTION. 01 TRANS-X PIC X(5). PROCEDURE DIVISION. EXEC CICS RETURN TRANSID(TRANS-X) END-EXEC.",
+        );
+        assert!(oversized.hir.is_none());
+        assert!(oversized.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("TRANSID requires a 1-4 character name")
+        }));
+        for option in [
+            "LENGTH(8)",
+            "CHANNEL('DATA')",
+            "INPUTMSG(AREA-X)",
+            "IMMEDIATE",
+            "ENDACTIVITY",
+        ] {
+            let deferred = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. LATERRET. DATA DIVISION. WORKING-STORAGE SECTION. 01 AREA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS RETURN TRANSID('NEXT') {option} END-EXEC."
+            ));
+            assert!(deferred.hir.is_none());
+            assert!(deferred.diagnostics.iter().any(|diagnostic| {
+                let message = diagnostic.public_message();
+                message.contains("RETURN") && message.contains(option.split('(').next().unwrap())
+            }));
+        }
+    }
+
+    #[test]
     fn cics_shared_heads_resolve_with_valued_discriminators() {
         for (command, expected_label) in [
             ("ACQUIRE ACTIVITYID('A1')", "ACQUIRE ACTIVITYID"),
@@ -2508,7 +2595,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 13);
+        assert_eq!(legacy.len(), 12);
         assert!(
             legacy.iter().all(|descriptor| {
                 descriptor.advertised && descriptor.runtime_operation.is_some()
@@ -2524,6 +2611,7 @@ mod tests {
                     | ["HANDLE", "CONDITION"]
                     | ["LINK"]
                     | ["XCTL"]
+                    | ["RETURN"]
                     | ["READ"]
                     | ["REWRITE"]
                     | ["SYNCPOINT"]
@@ -2692,7 +2780,6 @@ mod tests {
     fn legacy_cics_routes_reject_catalog_options_without_runtime_semantics() {
         for (command, option) in [
             ("ASSIGN FACILITY(USER-X)", "FACILITY"),
-            ("RETURN IMMEDIATE", "IMMEDIATE"),
             ("WRITEQ TD QUEUE('Q1') FROM('A') SYSID('R1')", "SYSID"),
         ] {
             let source = format!(
