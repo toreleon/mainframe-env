@@ -15,6 +15,7 @@ mod jcl_schema;
 mod jcl_statement;
 mod jcl_syntax;
 mod jes;
+mod jes_children;
 mod program;
 mod service;
 

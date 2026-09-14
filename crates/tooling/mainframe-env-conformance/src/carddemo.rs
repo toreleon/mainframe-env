@@ -12,8 +12,8 @@ use mainframe_env_application::{
     parse_bms, parse_csd,
 };
 use mainframe_env_batch::{
-    JclBundle, JclConversionLimits, JclLimits, JclRecordKind, JclStatementId, JobPlan, JobState,
-    StepCondition, UtilityDisposition, analyze_jcl_syntax, convert_jcl, parse_jcl,
+    JclBundle, JclConversionLimits, JclLimits, JclRecordKind, JclStatementId, JobPlan, JobSnapshot,
+    JobState, StepCondition, UtilityDisposition, analyze_jcl_syntax, convert_jcl, parse_jcl,
     utility_disposition, validate_idcams_control,
 };
 use mainframe_env_cics::{
@@ -9237,7 +9237,7 @@ async fn exercise_base_batch_routes(
     job_ids.insert("INTRDRJ1".into(), internal_id);
     let principal =
         PrincipalId::new("IBMUSER", InvocationLimits::default()).expect("static batch principal");
-    let (jobs, more) = server
+    let (_, more) = server
         .batch_service()
         .list(Some(&principal), None, 128)
         .map_err(terminal_problem)?;
@@ -9247,22 +9247,22 @@ async fn exercise_base_batch_routes(
             "job list exceeded the base-cycle observation bound",
         ));
     }
-    let child = jobs
-        .iter()
-        .find(|job| job.name == "INTRDRJ2")
-        .ok_or_else(|| {
-            CorpusProblem::new(
-                "carddemo.base_batch.internal_missing",
-                "INTRDRJ2 was not submitted",
-            )
-        })?;
+    let child = wait_for_listed_job(
+        &server,
+        &principal,
+        "INTRDRJ2",
+        128,
+        "carddemo.base_batch.internal_missing",
+        "carddemo.base_batch.internal_incomplete",
+    )
+    .await?;
     if child.state != JobState::Completed || child.return_code != Some(0) {
         return Err(CorpusProblem::new(
             "carddemo.base_batch.internal_incomplete",
             format!("INTRDRJ2 did not complete: {child:?}"),
         ));
     }
-    job_ids.insert("INTRDRJ2".into(), child.id.clone());
+    job_ids.insert("INTRDRJ2".into(), child.id);
     if utility_records(&server, "AWS.M2.CARDEMO.FTP.TEST.BKUP.INTRDR", None)?
         != utility_records(&server, "AWS.M2.CARDEMO.FTP.TEST.BKUP", None)?
     {
@@ -9787,10 +9787,7 @@ fn base_batch_spool_digests(
     let mut observations = BTreeMap::new();
     for (label, id) in job_ids {
         let job = server.batch_service().get(id).map_err(terminal_problem)?;
-        if !matches!(
-            job.state,
-            JobState::Completed | JobState::Failed | JobState::Cancelled
-        ) {
+        if !job.state.terminal() {
             return Err(CorpusProblem::new(
                 "carddemo.base_batch.job_incomplete",
                 format!("{label}/{id} is not terminal"),
@@ -10620,13 +10617,16 @@ async fn exercise_utility_routes() -> Result<UtilityExercise, CorpusProblem> {
     .await?;
     let principal =
         PrincipalId::new("IBMUSER", InvocationLimits::default()).expect("static principal");
-    let (jobs, _) = server
-        .batch_service()
-        .list(Some(&principal), None, 64)
-        .map_err(terminal_problem)?;
-    if !jobs.iter().any(|job| {
-        job.name == "CHILD" && job.state == JobState::Completed && job.return_code == Some(0)
-    }) {
+    let child = wait_for_listed_job(
+        &server,
+        &principal,
+        "CHILD",
+        64,
+        "carddemo.utility.internal_reader_drift",
+        "carddemo.utility.internal_reader_drift",
+    )
+    .await?;
+    if child.state != JobState::Completed || child.return_code != Some(0) {
         return Err(CorpusProblem::new(
             "carddemo.utility.internal_reader_drift",
             "internal reader child job did not complete",
@@ -10915,6 +10915,56 @@ async fn wait_for_submitted_job(
         }
         if tokio::time::Instant::now() >= deadline {
             return Err(utility_job_failure(server, &job)?);
+        }
+        tokio::time::sleep(JOB_POLL_INTERVAL).await;
+    }
+}
+
+async fn wait_for_listed_job(
+    server: &ProductServer,
+    principal: &PrincipalId,
+    name: &str,
+    bound: usize,
+    missing_code: &str,
+    incomplete_code: &str,
+) -> Result<JobSnapshot, CorpusProblem> {
+    let deadline = tokio::time::Instant::now() + JOB_COMPLETION_TIMEOUT;
+    let mut last_state = None;
+    loop {
+        let (jobs, _) = server
+            .batch_service()
+            .list(Some(principal), None, bound)
+            .map_err(terminal_problem)?;
+        // JES job IDs increase monotonically, so the greatest ID is the newest matching job.
+        if let Some(job) = jobs
+            .into_iter()
+            .filter(|job| job.name == name)
+            .max_by(|left, right| left.id.cmp(&right.id))
+        {
+            last_state = Some(job.state);
+            if job.state.terminal() {
+                return Ok(job);
+            }
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return Err(last_state.map_or_else(
+                || {
+                    CorpusProblem::new(
+                        missing_code,
+                        format!(
+                            "{name} did not reach a terminal state in time because it never appeared"
+                        ),
+                    )
+                },
+                |state| {
+                    CorpusProblem::new(
+                        incomplete_code,
+                        format!(
+                            "{name} did not reach a terminal state in time; last observed state: {state:?}"
+                        ),
+                    )
+                },
+            ));
         }
         tokio::time::sleep(JOB_POLL_INTERVAL).await;
     }
@@ -14521,6 +14571,68 @@ mod tests {
                 server.batch_service().get(&id).unwrap().state,
                 JobState::Completed
             );
+            drop(app);
+            assert!(server.graceful_shutdown().await);
+            drop(server);
+        });
+        let _ = fs::remove_dir_all(artifact_root);
+    }
+
+    #[test]
+    fn internal_reader_child_reaches_terminal_state_on_background_worker() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let artifact_root = env::temp_dir().join(format!(
+            "mainframe-env-carddemo-intrdr-poll-{}-{nonce}",
+            std::process::id()
+        ));
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let server = ProductServer::open(
+                ServerConfig {
+                    store_profile: StoreProfile::Memory,
+                    artifact_root: artifact_root.clone(),
+                    tls: TlsConfig {
+                        enabled: false,
+                        certificate_path: None,
+                        private_key_reference: None,
+                    },
+                    ..ServerConfig::default()
+                },
+                Arc::new(MemoryStore::new(Default::default())),
+                Arc::new(MemorySecretResolver::default()),
+                default_program_router(),
+            )
+            .unwrap();
+            server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+            let app = server.router();
+            submit_job_with_retcode(
+                &server,
+                &app,
+                "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IEFBR14\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n",
+                "CC 0000",
+            )
+            .await
+            .unwrap();
+            let principal =
+                PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+            let child = wait_for_listed_job(
+                &server,
+                &principal,
+                "CHILD",
+                16,
+                "test.internal_reader.missing",
+                "test.internal_reader.incomplete",
+            )
+            .await
+            .unwrap();
+            assert_eq!(child.state, JobState::Completed);
+            assert_eq!(child.return_code, Some(0));
             drop(app);
             assert!(server.graceful_shutdown().await);
             drop(server);

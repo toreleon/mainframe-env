@@ -106,7 +106,7 @@ pub struct JobSnapshot {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct Job {
+pub(crate) struct Job {
     #[serde(default = "legacy_jes_job_contract")]
     schema_version: String,
     id: String,
@@ -115,7 +115,7 @@ struct Job {
     #[serde(default)]
     kind: JesJobKind,
     #[serde(default)]
-    origin: JesSubmissionOrigin,
+    pub(crate) origin: JesSubmissionOrigin,
     #[serde(default)]
     route: JesJobRoute,
     #[serde(default)]
@@ -143,7 +143,7 @@ struct Job {
     attempt: u32,
     version: u64,
     submit_key: String,
-    plan: JobPlan,
+    pub(crate) plan: JobPlan,
     #[serde(default)]
     program_registrations: BTreeMap<String, ProgramRegistration>,
     #[serde(default)]
@@ -171,8 +171,8 @@ struct DdRuntimeAllocation {
     lock_owner: PrincipalId,
 }
 
-struct State {
-    jobs: BTreeMap<String, Job>,
+pub(crate) struct State {
+    pub(crate) jobs: BTreeMap<String, Job>,
     replay: BTreeMap<String, String>,
     next_id: u64,
 }
@@ -5815,7 +5815,7 @@ impl BatchService {
         Ok(())
     }
 
-    fn lock(&self) -> Result<std::sync::MutexGuard<'_, State>, HostProblem> {
+    pub(crate) fn lock(&self) -> Result<std::sync::MutexGuard<'_, State>, HostProblem> {
         self.state
             .lock()
             .map_err(|_| HostProblem::InfrastructureFailure)
@@ -7222,7 +7222,7 @@ fn push_job_event(
     Ok(())
 }
 
-fn snapshot(job: &Job) -> JobSnapshot {
+pub(crate) fn snapshot(job: &Job) -> JobSnapshot {
     JobSnapshot {
         id: job.id.clone(),
         name: job.name.clone(),

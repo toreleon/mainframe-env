@@ -116,6 +116,14 @@ All notable changes to mainframe-env are documented here.
   dataset and other transactions still receive `LOCKED` on the reserved name.
 - Repaired CardDemo conformance harnesses to run submitted jobs on JES background workers,
   observe terminal state through authenticated z/OSMF routes, and stop workers at gate shutdown.
+- Admitted one durable JES work record for each internal-reader child after its worker-run parent
+  returns, using the child's own validated-plan capabilities and crash-safe duplicate checks.
+- Made CardDemo gates wait for internal-reader child jobs to appear and reach terminal state before
+  checking their completion and output.
+- Attempted admission for every internal-reader child even after an earlier sibling fails, released
+  the parent's own work for a bounded retry on a transient admission failure instead of dead-lettering
+  it immediately, and validated an already-admitted child's record against its frozen identity on
+  reclaim instead of a fresh, possibly drifted capability recomputation.
 - Moved the authentication wall-clock fixture wholly behind the server test
   boundary and tightened the reviewed product-module production-line ceiling.
 - Anchored authentication-session expiry and rotation to the shared durable

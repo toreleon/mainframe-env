@@ -172,9 +172,24 @@ Every job records its submission kind and origin. External jobs retain an
 external origin, internal-reader jobs retain the parent job and producing step,
 and started tasks retain the authorized started-task name. Internal-reader
 records are reparsed and admitted through the normal converter and durable job
-authority; denied admission creates no child job. Started-task start and stop
-use the `STARTED` SAF class, while subsequent selection and job/output controls
-remain protected by the job resource.
+authority; denied admission creates no child job. At the parent's claimed-work
+boundary, each admitted internal-reader child receives one typed work record
+using the child's own validated-plan capability set. This happens after the
+parent's claimed run returns, so child ordering is deterministic and stricter
+than z/OS, where an internal-reader child may start while its parent is still
+running. Every child gets an admission attempt even if an earlier sibling
+fails: a permanent failure (a capability outside the JES work allow-list or an
+owner mismatch) cancels that child and verifies the cancellation before
+continuing, while a transient failure (durable-store capacity or another
+infrastructure problem) leaves the child queued with no work record and
+releases the parent's own work for a later retry, bounded by that work's
+`max_attempts`, instead of completing or dead-lettering it. Reclaiming an
+already-admitted child validates its existing work record against the frozen
+identity recorded at admission time, never against a fresh capability
+recomputation, so a mutable registry change after admission cannot cancel or
+duplicate it. Started-task start and stop use the `STARTED` SAF class, while
+subsequent selection and job/output controls remain protected by the job
+resource.
 
 `mainframe-env.jes-topology@1` is the bounded NJE/MAS projection. Nodes expose
 connected/enabled state and inbound capacity. MAS members name exactly one node
