@@ -4199,36 +4199,12 @@ impl ProductServer {
                     }
                 }
                 if start_fresh_task {
-                    let snapshot = self
-                        .cics
-                        .terminal_snapshot(&session, &principal_id, current_tick()?)
-                        .map_err(gateway_problem)?;
-                    let online = self.online_transaction(&snapshot.transaction)?;
-                    if let Some((_, artifact)) = online.as_ref() {
-                        artifact::preflight_one(self.artifacts.as_ref(), artifact)
-                            .map_err(gateway_problem)?;
-                    }
-                    let invocation = self.cics_invocation(
+                    self.resume_fresh_online_task(
+                        &session,
                         &principal,
-                        &snapshot.transaction,
-                        online.as_ref().map(|(_, artifact)| artifact.clone()),
+                        &principal_id,
+                        &csrf_token,
                     )?;
-                    let resumed = self
-                        .cics
-                        .resume_terminal(invocation, &session, &csrf_token, current_tick()?)
-                        .map_err(gateway_problem)?;
-                    if resumed.transaction != snapshot.transaction {
-                        return Err(gateway_problem(HostProblem::InfrastructureFailure));
-                    }
-                    if let Some((program, _)) = online {
-                        self.run_online_exchange(
-                            &session,
-                            &principal_id,
-                            &program,
-                            current_tick()?,
-                        )
-                        .map_err(gateway_problem)?;
-                    }
                 }
                 let snapshot = self
                     .cics
@@ -11371,5 +11347,148 @@ mod tests {
         }
         let _ = std::fs::remove_file(path);
         let _ = std::fs::remove_dir(directory);
+    }
+
+    // Regression for #181: CicsResume rejected the ordinary pseudo-conversational
+    // hand-off between two different online transactions (EXEC CICS RETURN
+    // TRANSID(x) followed by the terminal resuming into transaction x) as a 503
+    // infrastructure_failure. The handler compared resume_terminal's admitted
+    // transaction against the terminal's stale pre-resume snapshot instead of
+    // re-resolving the online program for the transaction actually resumed.
+    #[test]
+    fn cics_resume_follows_return_transid_to_a_different_transaction() {
+        fn compile(name: &str, source: &[u8]) -> PublishedArtifact {
+            let limits = SourceLimits::default();
+            let file_name = format!("{name}.cbl");
+            let path = LogicalPath::new(file_name.clone(), limits.max_path_bytes).unwrap();
+            let bundle = SourceBundle::new(
+                &path,
+                vec![
+                    SourceFile::input(
+                        file_name,
+                        source.to_vec(),
+                        SourceFormat::Free,
+                        SourceEncoding::Utf8,
+                        limits,
+                    )
+                    .unwrap(),
+                ],
+                BTreeMap::new(),
+                Vec::new(),
+                limits,
+            )
+            .unwrap();
+            let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+                .compile(CompilerRequest {
+                    source: bundle,
+                    mode: CompilationMode::Executable,
+                    target: CompileTarget::new("reference").unwrap(),
+                    options: CompileOptions::new(BTreeMap::new()).unwrap(),
+                })
+                .unwrap()
+            else {
+                panic!("{name} fixture did not publish");
+            };
+            artifact
+        }
+
+        let from_artifact = compile(
+            "XFERFROM",
+            b"IDENTIFICATION DIVISION.\nPROGRAM-ID. XFERFROM.\nPROCEDURE DIVISION.\nEXEC CICS RETURN TRANSID('XFTO') END-EXEC.\n",
+        );
+        let to_artifact = compile(
+            "XFERTO",
+            b"IDENTIFICATION DIVISION.\nPROGRAM-ID. XFERTO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MSG PIC X(5) VALUE 'HELLO'.\nPROCEDURE DIVISION.\nEXEC CICS SEND TEXT FROM(MSG) END-EXEC.\nEXEC CICS RETURN END-EXEC.\n",
+        );
+
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let from_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(from_artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let to_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(to_artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![
+                    OnlineProgramDefinition {
+                        name: "XFERFROM".into(),
+                        artifact: from_ref.clone(),
+                        payload: from_artifact.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(from_artifact.manifest().clone()),
+                        semantic_identity: from_artifact.semantic_id().to_reference(),
+                    },
+                    OnlineProgramDefinition {
+                        name: "XFERTO".into(),
+                        artifact: to_ref.clone(),
+                        payload: to_artifact.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(to_artifact.manifest().clone()),
+                        semantic_identity: to_artifact.semantic_id().to_reference(),
+                    },
+                ],
+                transactions: BTreeMap::from([
+                    ("XFFR".into(), "XFERFROM".into()),
+                    ("XFTO".into(), "XFERTO".into()),
+                ]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "XFERTO".into(),
+                    map: "XFERTO".into(),
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+
+        let launch = server
+            .handle(
+                Authentication::Basic {
+                    user: "IBMUSER".into(),
+                    secret: b"TESTPASS".to_vec(),
+                },
+                GatewayRequest::CicsLaunch {
+                    transaction: "XFFR".into(),
+                    rows: 24,
+                    columns: 80,
+                },
+            )
+            .unwrap();
+        let mainframe_env_zosmf::GatewayBody::Json(launched) = launch.body else {
+            panic!("launch response was not JSON")
+        };
+        let session = launched["session"].as_str().unwrap().to_string();
+        let csrf_token = launched["csrf_token"].as_str().unwrap().to_string();
+
+        // XFERFROM's own RETURN TRANSID('XFTO') already ran during launch, so
+        // the pending continuation now targets transaction XFTO while the
+        // terminal's own snapshot still reports the launch transaction XFFR.
+        let sends_before = server
+            .online_operation_count(CicsOperation::SendText)
+            .unwrap();
+        let response = server
+            .handle(
+                Authentication::Basic {
+                    user: "IBMUSER".into(),
+                    secret: b"TESTPASS".to_vec(),
+                },
+                GatewayRequest::CicsResume { session, csrf_token },
+            )
+            .expect(
+                "resume must follow resume_terminal's admitted transaction (XFTO) instead of \
+                 rejecting the terminal's stale pre-resume snapshot (XFFR) as an infrastructure failure",
+            );
+        assert_eq!(response.status, StatusCode::OK);
+        assert_eq!(
+            server
+                .online_operation_count(CicsOperation::SendText)
+                .unwrap(),
+            sends_before + 1,
+            "XFERTO did not run after the XFFR -> XFTO transaction hand-off"
+        );
     }
 }

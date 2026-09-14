@@ -109,6 +109,18 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Fixed `CicsResume` rejecting the ordinary pseudo-conversational hand-off
+  between two different online transactions as a 503
+  `infrastructure_failure`. `crates/apps/mainframe-env-server/src/product.rs`
+  compared `resume_terminal`'s admitted transaction against the terminal's
+  stale pre-resume snapshot instead of re-resolving the online program for
+  whichever transaction `resume_terminal` actually admitted -- a regression
+  from `00f25a9`'s online transfer-loop rewrite, which dropped the
+  `mainframe-env-v0.1.1` (`44f3081`) behavior of always deriving the resumed
+  program from `resume_terminal`'s own result. This broke every CardDemo
+  online transaction transfer via `EXEC CICS RETURN TRANSID(...)`, including
+  `COMEN01C`'s hand-off to `COACTVWC` for the account view.
+  `toreleon/mainframe-env#181`.
 - Admitted pinned AWS CardDemo (`59cc6c2f`)'s bare 3270-logical
   `EXEC CICS SEND FROM(...) LENGTH(...) NOHANDLE ERASE END-EXEC` -- issued in
   five ABEND-ROUTINE paragraphs, `app/cbl/COACTUPC.cbl:4211`,
