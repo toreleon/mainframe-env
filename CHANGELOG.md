@@ -69,6 +69,10 @@ All notable changes to mainframe-env are documented here.
   Typed execution preserves HANDLE ABEND transfer, task-enqueue cleanup,
   terminal dump disposition, EIBFN, audit, and durable replay behavior without
   retaining command source text.
+- Migrated `HANDLE ABEND` to a typed task plan with distinct LABEL and PROGRAM
+  operands plus CANCEL/default-cancel and RESET actions. Compiler, plan-codec,
+  interpreter, provider, and selected-route checks preserve the bounded action
+  alternatives, program authorization, and durable active/canceled exit state.
 - Expanded the source-bounded CICS `ASSIGN` compatibility route with APPLID,
   SYSID, USERID, TASKPRIORITY, and the exact absent application/channel context
   defaults. It also reports absent CWA/TWA lengths, null OPERKEYS, and a normal

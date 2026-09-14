@@ -2760,6 +2760,45 @@ mod tests {
     }
 
     #[test]
+    fn cics_handle_abend_uses_typed_label_and_program_inputs() {
+        use mainframe_env_host_api::{CicsOperation, CicsRequest, HostRequest};
+
+        for (source, expected_name, expected_value) in [
+            (
+                "IDENTIFICATION DIVISION. PROGRAM-ID. HABLAB. PROCEDURE DIVISION. EXEC CICS HANDLE ABEND LABEL(EXIT-PARA) END-EXEC. STOP RUN. EXIT-PARA. STOP RUN.",
+                "LABEL",
+                b"EXIT-PARA".as_slice(),
+            ),
+            (
+                "IDENTIFICATION DIVISION. PROGRAM-ID. HABPGM. DATA DIVISION. WORKING-STORAGE SECTION. 01 PROGRAM-X PIC X(8) VALUE 'ABEXIT'. PROCEDURE DIVISION. EXEC CICS HANDLE ABEND PROGRAM(PROGRAM-X) END-EXEC. STOP RUN.",
+                "PROGRAM",
+                b"ABEXIT  ".as_slice(),
+            ),
+        ] {
+            let artifact = compile(source).unwrap();
+            let mut machine = ReferenceMachine::from_binary(
+                artifact.payload(),
+                invocation(&artifact, 1024),
+                CodecLimits::default(),
+            )
+            .unwrap();
+            let MachineDrive::HostCall(effect) =
+                machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+            else {
+                panic!("HANDLE ABEND did not call host");
+            };
+            assert!(matches!(
+                &effect.request,
+                HostRequest::Cics(CicsRequest {
+                    operation: CicsOperation::HandleAbend,
+                    arguments,
+                    ..
+                }) if arguments[expected_name].bytes() == expected_value
+            ));
+        }
+    }
+
+    #[test]
     fn bare_asktime_requires_and_updates_both_implicit_eib_fields() {
         use mainframe_env_host_api::{
             CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,

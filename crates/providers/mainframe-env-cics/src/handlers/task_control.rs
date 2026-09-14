@@ -918,6 +918,18 @@ fn handle_abend_action(request: &CicsRequest) -> Result<AbendHandlerAction, Host
     if request.arguments.iter().any(|(name, value)| {
         !allowed.contains(&name.as_str())
             || name.starts_with("OPTION.") && !value.bytes().is_empty()
+            || name == "LABEL"
+                && !matches!(
+                    value.schema(),
+                    "mainframe-env.cics.literal@1" | "mainframe-env.cics.argument@1"
+                )
+            || name == "PROGRAM"
+                && !matches!(
+                    value.schema(),
+                    "mainframe-env.cics.literal@1"
+                        | "mainframe-env.cics.storage-value@1"
+                        | "mainframe-env.cics.argument@1"
+                )
     }) {
         return Err(HostProblem::Malformed);
     }

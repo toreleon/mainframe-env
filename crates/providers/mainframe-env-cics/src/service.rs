@@ -6354,6 +6354,19 @@ mod tests {
             ),
             Err(HostProblem::Malformed)
         );
+
+        let malformed_handler = request(
+            CicsOperation::HandleAbend,
+            BTreeMap::from([("PROGRAM".into(), cics_decimal(1))]),
+            19,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, malformed_handler.clone(), 19),
+                malformed_handler,
+            ),
+            Err(HostProblem::Malformed)
+        );
     }
 
     #[test]

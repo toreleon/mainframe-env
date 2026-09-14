@@ -4,6 +4,8 @@ use crate::StorageId;
 use std::collections::BTreeSet;
 use std::fmt;
 
+mod handle_abend;
+
 /// Stable wire identity for a typed CICS effect plan.
 pub const CICS_EFFECT_PLAN_CONTRACT: &str = "mainframe-env.cics-effect-plan@1";
 
@@ -61,6 +63,8 @@ pub enum CicsPlanOperation {
     Enq,
     /// Install or deactivate one bounded set of terminal AID handlers.
     HandleAid,
+    /// Activate, cancel, or reactivate one abnormal-termination exit.
+    HandleAbend,
     /// Install or deactivate one bounded set of reviewed condition handlers.
     HandleCondition,
     /// Ignore one bounded set of reviewed EIBRESP conditions.
@@ -95,6 +99,10 @@ pub struct CicsStorageSlot {
 pub enum CicsOperandName {
     /// Optional application transaction abend code.
     Abcode,
+    /// Source label used by a task-local control transfer.
+    Label,
+    /// Program name selected for a program-control transfer.
+    Program,
     /// `FILE(...)` resource binding.
     File,
     /// `DATASET(...)` resource alias.
@@ -160,6 +168,8 @@ pub enum CicsPlanOption {
     Cancel,
     /// Suppress transaction-dump creation.
     NoDump,
+    /// Reactivate the most recently canceled abnormal-termination exit.
+    Reset,
     /// Establish a read-for-update context.
     Update,
     /// Roll back rather than commit at syncpoint.
@@ -494,25 +504,7 @@ fn validate_operation_shape(
         .iter()
         .any(|output| !allowed_outputs.contains(output));
     let malformed = match plan.operation {
-        CicsPlanOperation::Abend => {
-            !inputs.is_subset(&BTreeSet::from([CicsOperandName::Abcode]))
-                || plan.operands.iter().any(|operand| {
-                    operand.name != CicsOperandName::Abcode
-                        || !matches!(
-                            &operand.value,
-                            CicsOperandValue::Literal(bytes) if matches!(bytes.len(), 1..=4)
-                        ) && !matches!(operand.value, CicsOperandValue::Storage(_))
-                })
-                || plan.options.iter().any(|option| {
-                    !matches!(
-                        option,
-                        CicsPlanOption::Cancel
-                            | CicsPlanOption::NoDump
-                            | CicsPlanOption::NoHandle
-                    )
-                })
-                || outputs.contains(&CicsOutputName::Into)
-        }
+        CicsPlanOperation::Abend => handle_abend::invalid_abend_shape(plan, inputs, outputs),
         CicsPlanOperation::AddressSet => {
             let pointer_from_data = inputs.len() == 2
                 && inputs.contains(&CicsOperandName::SetPointer)
@@ -594,6 +586,7 @@ fn validate_operation_shape(
                 || scheduling_options
                 || outputs.contains(&CicsOutputName::Into)
         }
+        CicsPlanOperation::HandleAbend => handle_abend::invalid_shape(plan, inputs, outputs),
         CicsPlanOperation::IgnoreCondition => {
             inputs.len() != 1
                 || !inputs.contains(&CicsOperandName::Conditions)
@@ -892,6 +885,7 @@ const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::Asktime => 15,
         CicsPlanOperation::FormatTime => 16,
         CicsPlanOperation::Abend => 17,
+        CicsPlanOperation::HandleAbend => 18,
     }
 }
 
@@ -915,6 +909,7 @@ fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPlanCodecProbl
         15 => Ok(CicsPlanOperation::Asktime),
         16 => Ok(CicsPlanOperation::FormatTime),
         17 => Ok(CicsPlanOperation::Abend),
+        18 => Ok(CicsPlanOperation::HandleAbend),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -940,6 +935,8 @@ const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::DateSep => 16,
         CicsOperandName::TimeSep => 17,
         CicsOperandName::Abcode => 18,
+        CicsOperandName::Label => 19,
+        CicsOperandName::Program => 20,
     }
 }
 
@@ -964,6 +961,8 @@ fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCodecProblem> 
         16 => Ok(CicsOperandName::DateSep),
         17 => Ok(CicsOperandName::TimeSep),
         18 => Ok(CicsOperandName::Abcode),
+        19 => Ok(CicsOperandName::Label),
+        20 => Ok(CicsOperandName::Program),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -978,6 +977,7 @@ const fn option_tag(value: CicsPlanOption) -> u8 {
         CicsPlanOption::NoSuspend => 5,
         CicsPlanOption::Cancel => 6,
         CicsPlanOption::NoDump => 7,
+        CicsPlanOption::Reset => 8,
     }
 }
 
@@ -991,6 +991,7 @@ fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodecProblem> {
         5 => Ok(CicsPlanOption::NoSuspend),
         6 => Ok(CicsPlanOption::Cancel),
         7 => Ok(CicsPlanOption::NoDump),
+        8 => Ok(CicsPlanOption::Reset),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -1334,6 +1335,22 @@ mod tests {
             encode_cics_effect_plan(&invalid_abend, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
+        let handle_abend = CicsEffectPlan {
+            operation: CicsPlanOperation::HandleAbend,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::Program,
+                value: CicsOperandValue::Literal(b"ABEXIT".to_vec()),
+            }],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let mut conflicting_handle = handle_abend.clone();
+        conflicting_handle.options.insert(CicsPlanOption::Reset);
+        assert_eq!(
+            encode_cics_effect_plan(&conflicting_handle, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
         for plan in [
             read,
             rewrite,
@@ -1342,6 +1359,7 @@ mod tests {
             asktime,
             format_time,
             abend,
+            handle_abend,
         ] {
             let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
             let decoded = decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap();

@@ -21,6 +21,7 @@ type Clauses = BTreeMap<String, Vec<String>>;
 mod abend;
 mod assign_validation;
 mod format_time;
+mod handle_abend;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) struct CicsLegacySpiCompatibilityDescriptor {
@@ -637,15 +638,6 @@ fn validate_legacy_execution_subset(
             unready.join(", ")
         ));
     }
-    if descriptor.runtime_operation == Some("HandleAbend")
-        && ["CANCEL", "LABEL", "PROGRAM", "RESET"]
-            .into_iter()
-            .filter(|name| option_is_present(descriptor, present, name))
-            .count()
-            > 1
-    {
-        return Err("CICS HANDLE ABEND action options are mutually exclusive".into());
-    }
     Ok(())
 }
 
@@ -768,6 +760,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         ["CHANGE", "TASK"] => HirCicsOperation::ChangeTask,
         ["DEQ"] => HirCicsOperation::Deq,
         ["ENQ"] => HirCicsOperation::Enq,
+        ["HANDLE", "ABEND"] => HirCicsOperation::HandleAbend,
         ["HANDLE", "AID"] => HirCicsOperation::HandleAid,
         ["HANDLE", "CONDITION"] => HirCicsOperation::HandleCondition,
         ["IGNORE", "CONDITION"] => HirCicsOperation::IgnoreCondition,
@@ -803,6 +796,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Deq | HirCicsOperation::Enq => {
             &["RESOURCE", "LENGTH", "MAXLIFETIME", "RESP", "RESP2"]
         }
+        HirCicsOperation::HandleAbend => &["LABEL", "PROGRAM", "RESP", "RESP2"],
         HirCicsOperation::HandleAid
         | HirCicsOperation::HandleCondition
         | HirCicsOperation::IgnoreCondition
@@ -816,6 +810,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     };
     let allowed_options: &[&str] = match operation {
         HirCicsOperation::Abend => &["CANCEL", "NODUMP", "NOHANDLE"],
+        HirCicsOperation::HandleAbend => &["CANCEL", "RESET", "NOHANDLE"],
         HirCicsOperation::AddressSet
         | HirCicsOperation::Asktime
         | HirCicsOperation::AsktimeEib
@@ -885,6 +880,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::AsktimeEib
         | HirCicsOperation::ChangeTask
         | HirCicsOperation::HandleAid
+        | HirCicsOperation::HandleAbend
         | HirCicsOperation::HandleCondition
         | HirCicsOperation::IgnoreCondition
         | HirCicsOperation::PopHandle
@@ -907,6 +903,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         && let Some(operand) = abend::operand(&clauses, semantic)?
     {
         operands.push(operand);
+    }
+    if operation == HirCicsOperation::HandleAbend {
+        operands.extend(handle_abend::operands(&clauses, &raw_options, semantic)?);
     }
     if operation == HirCicsOperation::AddressSet {
         let (set_is_address, set) = cics_address_value(&clauses["SET"], semantic)?;
@@ -1086,6 +1085,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         .map(|option| match option.as_str() {
             "CANCEL" => HirCicsOption::Cancel,
             "NODUMP" => HirCicsOption::NoDump,
+            "RESET" => HirCicsOption::Reset,
             "UPDATE" => HirCicsOption::Update,
             "ROLLBACK" => HirCicsOption::Rollback,
             "NOHANDLE" => HirCicsOption::NoHandle,

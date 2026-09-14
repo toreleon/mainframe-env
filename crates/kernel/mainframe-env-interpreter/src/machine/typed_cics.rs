@@ -10,6 +10,7 @@ use mainframe_env_ir::{
 
 mod legacy_assign;
 mod names;
+use names::SlotUse;
 
 const PLAN_ATTRIBUTE: &str = "cics_plan";
 
@@ -192,12 +193,17 @@ pub(super) fn validate_machine(machine: &ReferenceMachine) -> Result<(), Machine
         }
         for operand in &plan.operands {
             if let CicsOperandValue::Storage(slot) = &operand.value {
-                validate_machine_slot(machine, operation, slot, input_slot_use(operand.name))?;
+                validate_machine_slot(
+                    machine,
+                    operation,
+                    slot,
+                    names::input_slot_use(operand.name),
+                )?;
             }
         }
         validate_address_set_slots(machine, operation, &plan)?;
         for output in &plan.outputs {
-            let slot_use = output_slot_use(output.name);
+            let slot_use = names::output_slot_use(output.name);
             validate_machine_slot(machine, operation, &output.target, slot_use)?;
         }
     }
@@ -776,7 +782,12 @@ fn validate_runtime_plan(
 ) -> Result<(), MachineProblem> {
     for operand in &plan.operands {
         if let CicsOperandValue::Storage(slot) = &operand.value {
-            validate_machine_slot(machine, operation, slot, input_slot_use(operand.name))?;
+            validate_machine_slot(
+                machine,
+                operation,
+                slot,
+                names::input_slot_use(operand.name),
+            )?;
         }
     }
     validate_address_set_slots(machine, operation, plan)?;
@@ -785,50 +796,10 @@ fn validate_runtime_plan(
             machine,
             operation,
             &output.target,
-            output_slot_use(output.name),
+            names::output_slot_use(output.name),
         )?;
     }
     Ok(())
-}
-
-#[derive(Clone, Copy)]
-enum SlotUse {
-    Input,
-    AbcodeInput,
-    AbstimeInput,
-    SeparatorInput,
-    Output,
-    AbstimeOutput,
-    FormatTextOutput(usize),
-    MillisecondsOutput,
-    NumericOutput,
-    PointerInput,
-    PointerOutput,
-    AddressInput,
-    AddressOutput,
-}
-
-const fn input_slot_use(name: CicsOperandName) -> SlotUse {
-    match name {
-        CicsOperandName::Abcode => SlotUse::AbcodeInput,
-        CicsOperandName::Abstime => SlotUse::AbstimeInput,
-        CicsOperandName::DateSep | CicsOperandName::TimeSep => SlotUse::SeparatorInput,
-        _ => SlotUse::Input,
-    }
-}
-
-const fn output_slot_use(name: CicsOutputName) -> SlotUse {
-    match name {
-        CicsOutputName::Abstime => SlotUse::AbstimeOutput,
-        CicsOutputName::Into => SlotUse::Output,
-        CicsOutputName::Milliseconds => SlotUse::MillisecondsOutput,
-        CicsOutputName::Mmddyy | CicsOutputName::Time | CicsOutputName::Yymmdd => {
-            SlotUse::FormatTextOutput(8)
-        }
-        CicsOutputName::Mmddyyyy | CicsOutputName::Yyyymmdd => SlotUse::FormatTextOutput(10),
-        CicsOutputName::Yyddd => SlotUse::FormatTextOutput(6),
-        CicsOutputName::Resp | CicsOutputName::Resp2 => SlotUse::NumericOutput,
-    }
 }
 
 fn validate_address_set_slots(
@@ -905,6 +876,17 @@ fn validate_machine_slot(
     {
         return Err(invalid_plan(
             "ABEND ABCODE input must be a 1-4 character field",
+        ));
+    }
+    if matches!(slot_use, SlotUse::ProgramNameInput)
+        && (!matches!(layout.length, 1..=8)
+            || !matches!(
+                layout.category,
+                LayoutCategory::Alphabetic | LayoutCategory::Alphanumeric
+            ))
+    {
+        return Err(invalid_plan(
+            "HANDLE ABEND PROGRAM input must be a 1-8 character field",
         ));
     }
     if matches!(slot_use, SlotUse::AbstimeInput | SlotUse::AbstimeOutput)

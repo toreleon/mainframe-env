@@ -155,6 +155,7 @@ pub enum HirCicsOperation {
     Deq,
     Enq,
     HandleAid,
+    HandleAbend,
     HandleCondition,
     IgnoreCondition,
     PopHandle,
@@ -169,6 +170,8 @@ pub enum HirCicsOperation {
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HirCicsOperandName {
     Abcode,
+    Label,
+    Program,
     File,
     Dataset,
     From,
@@ -208,6 +211,7 @@ pub struct HirCicsNamedOperand {
 pub enum HirCicsOption {
     Cancel,
     NoDump,
+    Reset,
     Update,
     Rollback,
     NoHandle,
@@ -2088,6 +2092,41 @@ mod tests {
     }
 
     #[test]
+    fn cics_handle_abend_resolves_program_storage_and_rejects_numeric_names() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSHAB. DATA DIVISION. WORKING-STORAGE SECTION. 01 PROGRAM-X PIC X(8) VALUE 'ABEXIT'. PROCEDURE DIVISION. EXEC CICS HANDLE ABEND PROGRAM(PROGRAM-X) END-EXEC.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("HANDLE ABEND: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("resolved HANDLE ABEND command");
+        assert_eq!(command.operation, HirCicsOperation::HandleAbend);
+        assert!(matches!(
+            command.operands.as_slice(),
+            [HirCicsNamedOperand {
+                name: HirCicsOperandName::Program,
+                value: HirCicsValue::Data(reference),
+            }] if reference.qualified_name == "PROGRAM-X"
+        ));
+
+        let wrong_shape = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADHAB. DATA DIVISION. WORKING-STORAGE SECTION. 01 PROGRAM-X PIC 9(8). PROCEDURE DIVISION. EXEC CICS HANDLE ABEND PROGRAM(PROGRAM-X) END-EXEC.",
+        );
+        assert!(wrong_shape.hir.is_none());
+        assert!(wrong_shape.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("PROGRAM requires a 1-8 character name")
+        }));
+    }
+
+    #[test]
     fn cics_shared_heads_resolve_with_valued_discriminators() {
         for (command, expected_label) in [
             ("ACQUIRE ACTIVITYID('A1')", "ACQUIRE ACTIVITYID"),
@@ -2364,7 +2403,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 16);
+        assert_eq!(legacy.len(), 15);
         assert!(
             legacy.iter().all(|descriptor| {
                 descriptor.advertised && descriptor.runtime_operation.is_some()
@@ -2376,6 +2415,7 @@ mod tests {
                 ["ABEND"]
                     | ["DEQ"]
                     | ["ENQ"]
+                    | ["HANDLE", "ABEND"]
                     | ["HANDLE", "CONDITION"]
                     | ["READ"]
                     | ["REWRITE"]
@@ -2505,7 +2545,20 @@ mod tests {
             .iter()
             .find(|statement| statement.kind == StatementKind::ExecCics)
             .expect("EXEC CICS statement");
-        assert!(statement.resolved.is_none());
+        assert!(matches!(
+            statement.resolved,
+            Some(HirResolvedStatement::Cics(HirCicsStatement {
+                operation: HirCicsOperation::HandleAbend,
+                ref operands,
+                ..
+            })) if matches!(
+                operands.as_slice(),
+                [HirCicsNamedOperand {
+                    name: HirCicsOperandName::Label,
+                    value: HirCicsValue::Literal(label),
+                }] if label == "ABEND-HANDLER"
+            )
+        ));
 
         for (command, expected_label) in [
             ("ISSUE ERASEAUP", "ISSUE ERASEAUP"),
@@ -2588,10 +2641,6 @@ mod tests {
             "ASSIGN PROGRAM(PROGRAM-X)",
             "ASSIGN QNAME(BRIDGE-X)",
             "ASSIGN TASKPRIORITY(PRIORITY-X) USERID(USER-X)",
-            "HANDLE ABEND",
-            "HANDLE ABEND LABEL(ABEND-HANDLER)",
-            "HANDLE ABEND PROGRAM('ABEXIT')",
-            "HANDLE ABEND RESET",
             "READNEXT DATASET('ACCTDAT') RIDFLD(KEY-X) INTO(REC-X) UPDATE",
         ] {
             let source = format!(

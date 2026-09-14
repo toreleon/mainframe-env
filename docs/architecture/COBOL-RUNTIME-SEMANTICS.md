@@ -169,6 +169,11 @@ programs return PGMIDERR 27/1; denied programs return NOTAUTH 70. RESET moves
 the typed single-level exit back to active, and an explicit or default CANCEL
 deactivates it. Autoinstall, current-channel transfer, and outward search across
 LINK-created logical levels remain pending.
+New HANDLE ABEND compilations encode those alternatives in the typed task plan:
+LABEL is canonical source-control identity, PROGRAM is a literal or pre-resolved
+1–8 character field, and CANCEL/RESET remain distinct append-only option tags.
+Retained raw artifacts still execute through the version-one compatibility
+interpreter.
 
 CICS PUSH HANDLE moves the current condition mappings, ignored-condition set,
 and active/canceled typed ABEND exits into one bounded task-local frame, leaving a

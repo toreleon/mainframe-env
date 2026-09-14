@@ -168,6 +168,8 @@ impl PlanContext<'_> {
         Ok(CicsNamedOperand {
             name: match operand.name {
                 HirCicsOperandName::Abcode => CicsOperandName::Abcode,
+                HirCicsOperandName::Label => CicsOperandName::Label,
+                HirCicsOperandName::Program => CicsOperandName::Program,
                 HirCicsOperandName::File => CicsOperandName::File,
                 HirCicsOperandName::Dataset => CicsOperandName::Dataset,
                 HirCicsOperandName::From => CicsOperandName::From,
@@ -273,6 +275,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::Deq => CicsPlanOperation::Deq,
         HirCicsOperation::Enq => CicsPlanOperation::Enq,
         HirCicsOperation::HandleAid => CicsPlanOperation::HandleAid,
+        HirCicsOperation::HandleAbend => CicsPlanOperation::HandleAbend,
         HirCicsOperation::HandleCondition => CicsPlanOperation::HandleCondition,
         HirCicsOperation::IgnoreCondition => CicsPlanOperation::IgnoreCondition,
         HirCicsOperation::PopHandle => CicsPlanOperation::PopHandle,
@@ -284,6 +287,7 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
     match option {
         HirCicsOption::Cancel => CicsPlanOption::Cancel,
         HirCicsOption::NoDump => CicsPlanOption::NoDump,
+        HirCicsOption::Reset => CicsPlanOption::Reset,
         HirCicsOption::Update => CicsPlanOption::Update,
         HirCicsOption::Rollback => CicsPlanOption::Rollback,
         HirCicsOption::NoHandle => CicsPlanOption::NoHandle,

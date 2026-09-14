@@ -98,6 +98,9 @@ timezone contracts are implemented.
 literal or a pre-resolved 1–4 character storage input, and CANCEL/NODUMP remain
 distinct flags. Retained raw ABEND artifacts remain readable, but new
 compilations do not carry their command text across the executable boundary.
+`HANDLE ABEND` uses the same typed task dialect with a source label or bounded
+program-name input and mutually exclusive CANCEL/RESET actions; its provider
+continues to own authorization and durable active/canceled exit state.
 Each legacy route admits only the source-valid option subset whose behavior is
 implemented by that raw handler. A catalog-known option outside that subset
 fails explicitly before compatibility lowering instead of being silently
