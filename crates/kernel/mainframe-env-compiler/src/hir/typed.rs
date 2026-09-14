@@ -158,6 +158,7 @@ pub enum HirCicsOperation {
     HandleAbend,
     HandleCondition,
     IgnoreCondition,
+    Link,
     PopHandle,
     PushHandle,
     Read,
@@ -172,6 +173,7 @@ pub enum HirCicsOperandName {
     Abcode,
     Label,
     Program,
+    Commarea,
     File,
     Dataset,
     From,
@@ -223,6 +225,7 @@ pub enum HirCicsOption {
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum HirCicsOutputName {
     Abstime,
+    Commarea,
     Into,
     Milliseconds,
     Mmddyy,
@@ -2127,6 +2130,54 @@ mod tests {
     }
 
     #[test]
+    fn cics_link_resolves_program_and_one_input_output_commarea() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLINK. DATA DIVISION. WORKING-STORAGE SECTION. 01 AREA-X PIC X(16) VALUE 'REQUEST'. PROCEDURE DIVISION. EXEC CICS LINK PROGRAM('CHILD') COMMAREA(AREA-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("LINK: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("resolved LINK command");
+        assert_eq!(command.operation, HirCicsOperation::Link);
+        assert!(command.operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::Program,
+                    value: HirCicsValue::Literal(value),
+                } if value == "CHILD"
+            )
+        }));
+        assert!(command.operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::Commarea,
+                    value: HirCicsValue::Data(reference),
+                } if reference.qualified_name == "AREA-X"
+            )
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::Commarea && output.target.qualified_name == "AREA-X"
+        }));
+
+        let deferred = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. LATERLNK. PROCEDURE DIVISION. EXEC CICS LINK PROGRAM('CHILD') CHANNEL('DATA') END-EXEC. STOP RUN.",
+        );
+        assert!(deferred.hir.is_none());
+        assert!(deferred.diagnostics.iter().any(|diagnostic| {
+            let message = diagnostic.public_message();
+            message.contains("LINK") && message.contains("CHANNEL")
+        }));
+    }
+
+    #[test]
     fn cics_shared_heads_resolve_with_valued_discriminators() {
         for (command, expected_label) in [
             ("ACQUIRE ACTIVITYID('A1')", "ACQUIRE ACTIVITYID"),
@@ -2403,7 +2454,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 15);
+        assert_eq!(legacy.len(), 14);
         assert!(
             legacy.iter().all(|descriptor| {
                 descriptor.advertised && descriptor.runtime_operation.is_some()
@@ -2417,6 +2468,7 @@ mod tests {
                     | ["ENQ"]
                     | ["HANDLE", "ABEND"]
                     | ["HANDLE", "CONDITION"]
+                    | ["LINK"]
                     | ["READ"]
                     | ["REWRITE"]
                     | ["SYNCPOINT"]
@@ -2585,7 +2637,6 @@ mod tests {
     fn legacy_cics_routes_reject_catalog_options_without_runtime_semantics() {
         for (command, option) in [
             ("ASSIGN FACILITY(USER-X)", "FACILITY"),
-            ("LINK PROGRAM('PGM1') CHANNEL('CHAN1')", "CHANNEL"),
             ("RETURN IMMEDIATE", "IMMEDIATE"),
             ("WRITEQ TD QUEUE('Q1') FROM('A') SYSID('R1')", "SYSID"),
         ] {

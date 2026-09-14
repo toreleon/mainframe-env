@@ -1,8 +1,8 @@
 use super::super::{
     HirCicsNamedOperand, HirCicsOperandName, HirCicsValue, Resolution, ResolutionFailure,
 };
-use super::{Clauses, cics_value, is_single_condition_label};
-use crate::{DataCategory, SemanticModel};
+use super::{Clauses, is_single_condition_label, program_name};
+use crate::SemanticModel;
 
 pub(super) fn operands(
     clauses: &Clauses,
@@ -32,27 +32,8 @@ pub(super) fn operands(
     let Some(tokens) = clauses.get("PROGRAM") else {
         return Ok(Vec::new());
     };
-    let value = cics_value(tokens, semantic)?;
-    let valid = match &value {
-        HirCicsValue::Literal(value) => {
-            matches!(value.len(), 1..=8) && value.bytes().all(|byte| byte.is_ascii_alphanumeric())
-        }
-        HirCicsValue::Data(reference) => {
-            matches!(reference.length, 1..=8)
-                && matches!(
-                    reference.category,
-                    DataCategory::Alphabetic | DataCategory::Alphanumeric
-                )
-        }
-        HirCicsValue::Integer(_) => false,
-    };
-    if !valid {
-        return Err(ResolutionFailure::Invalid(
-            "CICS HANDLE ABEND PROGRAM requires a 1-8 character name".into(),
-        ));
-    }
     Ok(vec![HirCicsNamedOperand {
         name: HirCicsOperandName::Program,
-        value,
+        value: program_name::value(tokens, semantic, "HANDLE ABEND")?,
     }])
 }

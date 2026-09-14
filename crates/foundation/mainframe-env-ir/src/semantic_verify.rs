@@ -857,7 +857,8 @@ fn cics_slots(plan: &CicsEffectPlan) -> Vec<PlanSlot<'_>> {
         storage: output.target.storage,
         name: output.target.qualified_layout_name.as_str(),
         usage: match output.name {
-            CicsOutputName::Into
+            CicsOutputName::Commarea
+            | CicsOutputName::Into
             | CicsOutputName::Mmddyy
             | CicsOutputName::Mmddyyyy
             | CicsOutputName::Time

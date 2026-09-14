@@ -175,6 +175,13 @@ LABEL is canonical source-control identity, PROGRAM is a literal or pre-resolved
 Retained raw artifacts still execute through the version-one compatibility
 interpreter.
 
+The typed local LINK subset captures a 1–8 character PROGRAM name and models
+COMMAREA as the same pre-resolved input/output storage slot. The interpreter
+sends its current bytes, requires the returned `mainframe-env.cics.payload@1`
+schema, and writes the response to that exact slot before continuing after
+LINK. The provider performs `FACILITY CICS.PROGRAM.<name>` execute authorization
+before nested program dispatch.
+
 CICS PUSH HANDLE moves the current condition mappings, ignored-condition set,
 and active/canceled typed ABEND exits into one bounded task-local frame, leaving a
 clear specification set for the nested routine. POP HANDLE discards the nested

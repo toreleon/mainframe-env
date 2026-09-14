@@ -363,6 +363,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "HandleAid",
         "HandleCondition",
         "IgnoreCondition",
+        "Link",
         "PopHandle",
         "PushHandle",
         "Read",
@@ -413,6 +414,15 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "HandleAid": frozenset({"memory-read", "memory-write", "condition"}),
     "HandleCondition": frozenset({"memory-read", "memory-write", "condition"}),
     "IgnoreCondition": frozenset({"memory-read", "memory-write", "condition"}),
+    "Link": frozenset(
+        {
+            "memory-read",
+            "memory-write",
+            "program-control",
+            "condition",
+            "transaction",
+        }
+    ),
     "PopHandle": frozenset({"memory-write", "condition"}),
     "PushHandle": frozenset({"memory-write", "condition"}),
     "Read": frozenset(
@@ -3455,8 +3465,8 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
     if (
         len(registry_rows) != 263
         or len(set(handler_ids)) != 263
-        or len(typed_rows) != 19
-        or len(legacy_rows) != 15
+        or len(typed_rows) != 20
+        or len(legacy_rows) != 14
         or {row["runtime_operation"] for row in typed_rows}
         != TYPED_RUNTIME_OPERATIONS
         or len(advertised_rows) != 34

@@ -170,6 +170,7 @@ impl PlanContext<'_> {
                 HirCicsOperandName::Abcode => CicsOperandName::Abcode,
                 HirCicsOperandName::Label => CicsOperandName::Label,
                 HirCicsOperandName::Program => CicsOperandName::Program,
+                HirCicsOperandName::Commarea => CicsOperandName::Commarea,
                 HirCicsOperandName::File => CicsOperandName::File,
                 HirCicsOperandName::Dataset => CicsOperandName::Dataset,
                 HirCicsOperandName::From => CicsOperandName::From,
@@ -206,6 +207,7 @@ impl PlanContext<'_> {
         Ok(CicsOutputBinding {
             name: match output.name {
                 HirCicsOutputName::Abstime => CicsOutputName::Abstime,
+                HirCicsOutputName::Commarea => CicsOutputName::Commarea,
                 HirCicsOutputName::Into => CicsOutputName::Into,
                 HirCicsOutputName::Milliseconds => CicsOutputName::Milliseconds,
                 HirCicsOutputName::Mmddyy => CicsOutputName::Mmddyy,
@@ -278,6 +280,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::HandleAbend => CicsPlanOperation::HandleAbend,
         HirCicsOperation::HandleCondition => CicsPlanOperation::HandleCondition,
         HirCicsOperation::IgnoreCondition => CicsPlanOperation::IgnoreCondition,
+        HirCicsOperation::Link => CicsPlanOperation::Link,
         HirCicsOperation::PopHandle => CicsPlanOperation::PopHandle,
         HirCicsOperation::PushHandle => CicsPlanOperation::PushHandle,
     }

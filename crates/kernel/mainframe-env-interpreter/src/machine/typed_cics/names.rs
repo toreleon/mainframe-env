@@ -32,6 +32,7 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
 pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
     match name {
         CicsOutputName::Abstime => SlotUse::AbstimeOutput,
+        CicsOutputName::Commarea => SlotUse::Output,
         CicsOutputName::Into => SlotUse::Output,
         CicsOutputName::Milliseconds => SlotUse::MillisecondsOutput,
         CicsOutputName::Mmddyy | CicsOutputName::Time | CicsOutputName::Yymmdd => {
@@ -57,6 +58,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::HandleAbend => CicsOperation::HandleAbend,
         CicsPlanOperation::HandleCondition => CicsOperation::HandleCondition,
         CicsPlanOperation::IgnoreCondition => CicsOperation::IgnoreCondition,
+        CicsPlanOperation::Link => CicsOperation::Link,
         CicsPlanOperation::PopHandle => CicsOperation::PopHandle,
         CicsPlanOperation::PushHandle => CicsOperation::PushHandle,
         CicsPlanOperation::Read => CicsOperation::Read,
@@ -72,6 +74,7 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::Abcode => "ABCODE",
         CicsOperandName::Label => "LABEL",
         CicsOperandName::Program => "PROGRAM",
+        CicsOperandName::Commarea => "COMMAREA",
         CicsOperandName::File => "FILE",
         CicsOperandName::Dataset => "DATASET",
         CicsOperandName::From => "FROM",
@@ -96,6 +99,7 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
 pub(super) const fn output(name: CicsOutputName) -> &'static str {
     match name {
         CicsOutputName::Abstime => "ABSTIME",
+        CicsOutputName::Commarea => "COMMAREA",
         CicsOutputName::Into => "INTO",
         CicsOutputName::Milliseconds => "MILLISECONDS",
         CicsOutputName::Mmddyy => "MMDDYY",

@@ -10269,6 +10269,142 @@ mod tests {
     }
 
     #[test]
+    fn online_link_updates_typed_commarea_through_selected_program_route() {
+        let limits = SourceLimits::default();
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. LINKER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 LINK-AREA PIC X(160) VALUE X'7B22706172616D65746572223A6E756C6C2C22646473223A5B5D7D'.\n01 LINK-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS LINK PROGRAM('IEFBR14') COMMAREA(LINK-AREA) END-EXEC.\nMOVE EIBFN TO LINK-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let path = LogicalPath::new("LINKER.cbl", limits.max_path_bytes).unwrap();
+        let bundle = SourceBundle::new(
+            &path,
+            vec![
+                SourceFile::input(
+                    "LINKER.cbl",
+                    source.to_vec(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let compiled = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap();
+        let artifact = match compiled {
+            CompilerResult::Published { artifact, .. } => artifact,
+            other => panic!("LINK fixture did not publish: {other:?}"),
+        };
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .racf
+            .define_profile("FACILITY", "CICS.PROGRAM.IEFBR14", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "FACILITY",
+                "CICS.PROGRAM.IEFBR14",
+                "IBMUSER",
+                AccessIntent::Execute,
+            )
+            .unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "LINKER".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("LK00".into(), "LINKER".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "LINKER".into(),
+                    map: "LINKER".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("typed-link", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "LK00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "LK00",
+                24,
+                80,
+                "typed-link-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "LINKER", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "LINKER", 2)
+            .unwrap();
+
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("LINK-FN").unwrap().bytes(), &[0x0e, 0x02]);
+        assert!(
+            restored
+                .variable("LINK-AREA")
+                .unwrap()
+                .bytes()
+                .starts_with(b"{\"return_code\":0")
+        );
+        assert_eq!(
+            server
+                .store
+                .get_execution(&invocation.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Suspended
+        );
+    }
+
+    #[test]
     fn online_task_association_uses_selected_security_and_durable_session_route() {
         let limits = SourceLimits::default();
         let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. ASSOC.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 CORR-X PIC X(80) VALUE ALL 'A'.\n01 SET-FN PIC X(2).\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS SET ASSOCIATION USERCORRDATA(CORR-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO SET-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";

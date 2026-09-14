@@ -312,16 +312,19 @@ pub(super) fn execute(
     let mut response2 = None;
     for output in &plan.outputs {
         let key = names::output(output.name);
-        arguments.insert(
-            key.into(),
-            payload(
-                "mainframe-env.cics.argument@1",
-                output.target.qualified_layout_name.as_bytes().to_vec(),
-            )?,
-        );
+        if !arguments.contains_key(key) {
+            arguments.insert(
+                key.into(),
+                payload(
+                    "mainframe-env.cics.argument@1",
+                    output.target.qualified_layout_name.as_bytes().to_vec(),
+                )?,
+            );
+        }
         let target = CicsTarget::Resolved(output.target.clone());
         match output.name {
             CicsOutputName::Abstime
+            | CicsOutputName::Commarea
             | CicsOutputName::Milliseconds
             | CicsOutputName::Mmddyy
             | CicsOutputName::Mmddyyyy
@@ -566,6 +569,7 @@ pub(super) fn write_output(
 ) -> Result<(), MachineProblem> {
     if matches!(name, "ABSTIME" | "MILLISECONDS")
         && value.schema() != "mainframe-env.cics.decimal@1"
+        || name == "COMMAREA" && value.schema() != "mainframe-env.cics.payload@1"
         || matches!(
             name,
             "MMDDYY" | "MMDDYYYY" | "TIME" | "YYDDD" | "YYMMDD" | "YYYYMMDD"

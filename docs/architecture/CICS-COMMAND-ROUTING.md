@@ -101,6 +101,11 @@ compilations do not carry their command text across the executable boundary.
 `HANDLE ABEND` uses the same typed task dialect with a source label or bounded
 program-name input and mutually exclusive CANCEL/RESET actions; its provider
 continues to own authorization and durable active/canceled exit state.
+The typed local LINK subset binds PROGRAM and an optional COMMAREA before
+dispatch. COMMAREA is one input/output storage identity, so registering its
+return destination cannot replace the captured request bytes. Channel, explicit
+length, input-message, remote-system, transaction, and SYNCONRETURN forms remain
+compiler rejections until their separate contracts are implemented.
 Each legacy route admits only the source-valid option subset whose behavior is
 implemented by that raw handler. A catalog-known option outside that subset
 fails explicitly before compatibility lowering instead of being silently

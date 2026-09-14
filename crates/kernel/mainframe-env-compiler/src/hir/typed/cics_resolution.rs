@@ -22,6 +22,9 @@ mod abend;
 mod assign_validation;
 mod format_time;
 mod handle_abend;
+mod output_bindings;
+mod program_control;
+mod program_name;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) struct CicsLegacySpiCompatibilityDescriptor {
@@ -764,6 +767,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         ["HANDLE", "AID"] => HirCicsOperation::HandleAid,
         ["HANDLE", "CONDITION"] => HirCicsOperation::HandleCondition,
         ["IGNORE", "CONDITION"] => HirCicsOperation::IgnoreCondition,
+        ["LINK"] => HirCicsOperation::Link,
         ["POP", "HANDLE"] => HirCicsOperation::PopHandle,
         ["PUSH", "HANDLE"] => HirCicsOperation::PushHandle,
         ["READ"] => HirCicsOperation::Read,
@@ -802,6 +806,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::IgnoreCondition
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle => &["RESP", "RESP2"],
+        HirCicsOperation::Link => &["PROGRAM", "COMMAREA", "RESP", "RESP2"],
         HirCicsOperation::Read => &["FILE", "DATASET", "RIDFLD", "INTO", "RESP", "RESP2"],
         HirCicsOperation::Rewrite => &["FILE", "DATASET", "FROM", "RESP", "RESP2"],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA", "RESP", "RESP2"],
@@ -819,6 +824,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::HandleAid
         | HirCicsOperation::HandleCondition
         | HirCicsOperation::IgnoreCondition
+        | HirCicsOperation::Link
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle
         | HirCicsOperation::SetAssociationUserCorrData
@@ -887,6 +893,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::PushHandle
         | HirCicsOperation::Suspend => &[][..],
         HirCicsOperation::Deq | HirCicsOperation::Enq => &["RESOURCE"][..],
+        HirCicsOperation::Link => &["PROGRAM"][..],
         HirCicsOperation::Read => &["RIDFLD", "INTO"][..],
         HirCicsOperation::Rewrite => &["FROM"][..],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA"][..],
@@ -906,6 +913,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     }
     if operation == HirCicsOperation::HandleAbend {
         operands.extend(handle_abend::operands(&clauses, &raw_options, semantic)?);
+    }
+    if operation == HirCicsOperation::Link {
+        operands.extend(program_control::link_operands(&clauses, semantic)?);
     }
     if operation == HirCicsOperation::AddressSet {
         let (set_is_address, set) = cics_address_value(&clauses["SET"], semantic)?;
@@ -1046,33 +1056,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     if operation == HirCicsOperation::FormatTime {
         operands.extend(format_time::operands(&clauses, semantic)?);
     }
-    let mut outputs = Vec::new();
-    for (name, identity) in [
-        ("ABSTIME", HirCicsOutputName::Abstime),
-        ("INTO", HirCicsOutputName::Into),
-        ("MILLISECONDS", HirCicsOutputName::Milliseconds),
-        ("MMDDYY", HirCicsOutputName::Mmddyy),
-        ("MMDDYYYY", HirCicsOutputName::Mmddyyyy),
-        ("RESP", HirCicsOutputName::Resp),
-        ("RESP2", HirCicsOutputName::Resp2),
-        ("TIME", HirCicsOutputName::Time),
-        ("YYDDD", HirCicsOutputName::Yyddd),
-        ("YYMMDD", HirCicsOutputName::Yymmdd),
-        ("YYYYMMDD", HirCicsOutputName::Yyyymmdd),
-    ] {
-        if name == "ABSTIME" && operation == HirCicsOperation::FormatTime {
-            continue;
-        }
-        if let Some(value) = clauses.get(name) {
-            let target = complete_data_reference(value, semantic)?;
-            require_writable(&target)?;
-            format_time::require_output_shape(identity, &target)?;
-            outputs.push(HirCicsOutputBinding {
-                name: identity,
-                target,
-            });
-        }
-    }
+    let outputs = output_bindings::resolve(&clauses, operation, semantic)?;
     let mut options = raw_options
         .iter()
         .filter(|option| {

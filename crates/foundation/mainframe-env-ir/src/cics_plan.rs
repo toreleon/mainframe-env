@@ -5,6 +5,8 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 mod handle_abend;
+mod output_shape;
+mod program_control;
 
 /// Stable wire identity for a typed CICS effect plan.
 pub const CICS_EFFECT_PLAN_CONTRACT: &str = "mainframe-env.cics-effect-plan@1";
@@ -69,6 +71,8 @@ pub enum CicsPlanOperation {
     HandleCondition,
     /// Ignore one bounded set of reviewed EIBRESP conditions.
     IgnoreCondition,
+    /// Invoke one installed program at the next logical level and return.
+    Link,
     /// Restore one suspended HANDLE/IGNORE specification snapshot.
     PopHandle,
     /// Suspend the current HANDLE/IGNORE specifications in one nested snapshot.
@@ -103,6 +107,8 @@ pub enum CicsOperandName {
     Label,
     /// Program name selected for a program-control transfer.
     Program,
+    /// `COMMAREA(...)` input-output data area.
+    Commarea,
     /// `FILE(...)` resource binding.
     File,
     /// `DATASET(...)` resource alias.
@@ -189,6 +195,8 @@ pub enum CicsPlanOption {
 pub enum CicsOutputName {
     /// Record payload destination.
     Into,
+    /// Returned communication-area destination.
+    Commarea,
     /// Primary response code destination.
     Resp,
     /// Secondary response code destination.
@@ -476,30 +484,7 @@ fn validate_operation_shape(
         .options
         .iter()
         .any(|option| !matches!(option, CicsPlanOption::NoHandle));
-    let allowed_outputs: &[CicsOutputName] = match plan.operation {
-        CicsPlanOperation::Asktime => &[
-            CicsOutputName::Abstime,
-            CicsOutputName::Resp,
-            CicsOutputName::Resp2,
-        ],
-        CicsPlanOperation::Read => &[
-            CicsOutputName::Into,
-            CicsOutputName::Resp,
-            CicsOutputName::Resp2,
-        ],
-        CicsPlanOperation::FormatTime => &[
-            CicsOutputName::Milliseconds,
-            CicsOutputName::Mmddyy,
-            CicsOutputName::Mmddyyyy,
-            CicsOutputName::Time,
-            CicsOutputName::Yyddd,
-            CicsOutputName::Yymmdd,
-            CicsOutputName::Yyyymmdd,
-            CicsOutputName::Resp,
-            CicsOutputName::Resp2,
-        ],
-        _ => &[CicsOutputName::Resp, CicsOutputName::Resp2],
-    };
+    let allowed_outputs = output_shape::allowed(plan.operation);
     let unexpected_output = outputs
         .iter()
         .any(|output| !allowed_outputs.contains(output));
@@ -597,6 +582,7 @@ fn validate_operation_shape(
                 || scheduling_options
                 || outputs.contains(&CicsOutputName::Into)
         }
+        CicsPlanOperation::Link => program_control::invalid_link_shape(plan, inputs, outputs),
         CicsPlanOperation::Read => {
             resources != 1
                 || !inputs.contains(&CicsOperandName::Ridfld)
@@ -886,6 +872,7 @@ const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::FormatTime => 16,
         CicsPlanOperation::Abend => 17,
         CicsPlanOperation::HandleAbend => 18,
+        CicsPlanOperation::Link => 19,
     }
 }
 
@@ -910,6 +897,7 @@ fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPlanCodecProbl
         16 => Ok(CicsPlanOperation::FormatTime),
         17 => Ok(CicsPlanOperation::Abend),
         18 => Ok(CicsPlanOperation::HandleAbend),
+        19 => Ok(CicsPlanOperation::Link),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -937,6 +925,7 @@ const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::Abcode => 18,
         CicsOperandName::Label => 19,
         CicsOperandName::Program => 20,
+        CicsOperandName::Commarea => 21,
     }
 }
 
@@ -963,6 +952,7 @@ fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCodecProblem> 
         18 => Ok(CicsOperandName::Abcode),
         19 => Ok(CicsOperandName::Label),
         20 => Ok(CicsOperandName::Program),
+        21 => Ok(CicsOperandName::Commarea),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -1009,6 +999,7 @@ const fn output_tag(value: CicsOutputName) -> u8 {
         CicsOutputName::Yyddd => 8,
         CicsOutputName::Yymmdd => 9,
         CicsOutputName::Yyyymmdd => 10,
+        CicsOutputName::Commarea => 11,
     }
 }
 
@@ -1025,6 +1016,7 @@ fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodecProblem> {
         8 => Ok(CicsOutputName::Yyddd),
         9 => Ok(CicsOutputName::Yymmdd),
         10 => Ok(CicsOutputName::Yyyymmdd),
+        11 => Ok(CicsOutputName::Commarea),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -1351,6 +1343,32 @@ mod tests {
             encode_cics_effect_plan(&conflicting_handle, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
+        let commarea = slot(8, "REQUEST.COMMAREA");
+        let link = CicsEffectPlan {
+            operation: CicsPlanOperation::Link,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::Program,
+                    value: CicsOperandValue::Literal(b"CHILD".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Commarea,
+                    value: CicsOperandValue::Storage(commarea.clone()),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::Commarea,
+                target: commarea,
+            }],
+            condition: CicsCondition::Default,
+        };
+        let mut missing_link_output = link.clone();
+        missing_link_output.outputs.clear();
+        assert_eq!(
+            encode_cics_effect_plan(&missing_link_output, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
         for plan in [
             read,
             rewrite,
@@ -1360,6 +1378,7 @@ mod tests {
             format_time,
             abend,
             handle_abend,
+            link,
         ] {
             let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
             let decoded = decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap();

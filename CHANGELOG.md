@@ -73,6 +73,12 @@ All notable changes to mainframe-env are documented here.
   operands plus CANCEL/default-cancel and RESET actions. Compiler, plan-codec,
   interpreter, provider, and selected-route checks preserve the bounded action
   alternatives, program authorization, and durable active/canceled exit state.
+- Migrated the local `LINK PROGRAM ... COMMAREA` compatibility subset to a
+  typed program-control plan. PROGRAM is a bounded literal or resolved field,
+  COMMAREA is one identity-checked input/output slot, and the adapter preserves
+  its captured bytes when registering the return binding. A compiled selected
+  route verifies authorization, EIBFN `0E02`, returned bytes, audit, and durable
+  suspension; remote/channel/length forms remain deferred.
 - Expanded the source-bounded CICS `ASSIGN` compatibility route with APPLID,
   SYSID, USERID, TASKPRIORITY, and the exact absent application/channel context
   defaults. It also reports absent CWA/TWA lengths, null OPERKEYS, and a normal

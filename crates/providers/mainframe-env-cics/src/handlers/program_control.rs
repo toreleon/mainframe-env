@@ -72,9 +72,13 @@ fn transfer(
     run: &mut Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
+    validate_transfer_request(request)?;
     let target = argument_text(request, "PROGRAM")?
         .trim()
         .to_ascii_uppercase();
+    if !matches!(target.len(), 1..=8) || !target.bytes().all(|byte| byte.is_ascii_alphanumeric()) {
+        return Err(HostProblem::Malformed);
+    }
     service.authorize(
         run,
         "FACILITY",
@@ -124,4 +128,30 @@ fn transfer(
             .insert("COMMAREA".into(), bounded(payload)?);
     }
     Ok(response)
+}
+
+fn validate_transfer_request(request: &CicsRequest) -> Result<(), HostProblem> {
+    let allowed = ["COMMAREA", "OPTION.NOHANDLE", "PROGRAM", "RESP", "RESP2"];
+    if !request.arguments.contains_key("PROGRAM")
+        || request.arguments.iter().any(|(name, value)| {
+            !allowed.contains(&name.as_str())
+                || name.starts_with("OPTION.") && !value.bytes().is_empty()
+                || name == "PROGRAM"
+                    && !matches!(
+                        value.schema(),
+                        "mainframe-env.cics.literal@1"
+                            | "mainframe-env.cics.storage-value@1"
+                            | "mainframe-env.cics.argument@1"
+                    )
+                || name == "COMMAREA"
+                    && !matches!(
+                        value.schema(),
+                        "mainframe-env.cics.storage-value@1" | "mainframe-env.cics.argument@1"
+                    )
+        })
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
 }
