@@ -2204,21 +2204,92 @@ mod tests {
     /// `NOHANDLE` on one `ASKTIME` command. The pinned IBM sources cached for
     /// this contract (dfhp4_apiformat.html "Common options for all EXEC CICS
     /// commands", dfhp4_asktime.html) describe NOHANDLE's effect but do not
-    /// state whether repeating it is legal, so duplicate detection is left
-    /// exactly as strict as before pending that decision (see task
-    /// needs_decision). This test freezes that current, unchanged behavior
-    /// as a regression guard: it must keep failing, not silently start
-    /// passing, until the source question above is resolved.
+    /// say whether repeating it is legal. An exact bare repeat of a
+    /// registry `Flag`-shape option adds no operand, so there is nothing to
+    /// reconcile: accept it as idempotent and require the resolved CICS HIR
+    /// to match the single-occurrence form exactly. Every other repeat
+    /// (a parenthesized operand, or a non-`Flag` shape) still fails with
+    /// "is duplicated"; see `cics_registry_still_rejects_other_repeated_options`.
     #[test]
-    fn cics_registry_still_rejects_a_repeated_nohandle_pending_source_review() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSDUPN. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-TIME-X PIC S9(15) COMP-3. PROCEDURE DIVISION. EXEC CICS ASKTIME NOHANDLE ABSTIME(ABS-TIME-X) NOHANDLE END-EXEC. STOP RUN.";
-        let analysis = analyze(source);
-        assert!(analysis.hir.is_none());
-        assert!(analysis.diagnostics.iter().any(|diagnostic| {
-            diagnostic
-                .public_message()
-                .contains("option NOHANDLE is duplicated")
-        }));
+    fn cics_registry_accepts_an_exact_repeated_bare_flag_option() {
+        let repeated = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSDUPN. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-TIME-X PIC S9(15) COMP-3. PROCEDURE DIVISION. EXEC CICS ASKTIME NOHANDLE ABSTIME(ABS-TIME-X) NOHANDLE END-EXEC. STOP RUN.",
+        );
+        let repeated_hir = repeated.hir.unwrap_or_else(|| {
+            panic!(
+                "ASKTIME NOHANDLE ABSTIME NOHANDLE: {:?}",
+                repeated.diagnostics
+            )
+        });
+        let repeated_statement = repeated_hir
+            .statements
+            .iter()
+            .find(|statement| statement.kind == StatementKind::ExecCics)
+            .expect("EXEC CICS statement");
+
+        let once = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSDUPN. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-TIME-X PIC S9(15) COMP-3. PROCEDURE DIVISION. EXEC CICS ASKTIME NOHANDLE ABSTIME(ABS-TIME-X) END-EXEC. STOP RUN.",
+        );
+        let once_hir = once
+            .hir
+            .unwrap_or_else(|| panic!("ASKTIME NOHANDLE ABSTIME: {:?}", once.diagnostics));
+        let once_statement = once_hir
+            .statements
+            .iter()
+            .find(|statement| statement.kind == StatementKind::ExecCics)
+            .expect("EXEC CICS statement");
+
+        assert_eq!(repeated_statement.resolved, once_statement.resolved);
+    }
+
+    /// Every repeat that is not an exact bare repeat of a `Flag`-shape
+    /// option stays rejected: a `Value`-shape option repeated, mixed
+    /// `OptionalValue` forms, an `OptionalValue` option repeated bare, and
+    /// any repeat that carries a parenthesized operand.
+    #[test]
+    fn cics_registry_still_rejects_other_repeated_options() {
+        let cases = [
+            // A Value-shape option repeated: still rejected exactly as
+            // today (`cics_registry_rejects_unknown_duplicate_and_malformed_top_level_forms`
+            // already covers the RETURN TRANSID case; this repeats it here
+            // for full-command context).
+            (
+                "RETURN TRANSID('NEXT') TRANSID('OTHER')",
+                "option TRANSID is duplicated",
+            ),
+            (
+                "ASKTIME ABSTIME(ABS-TIME-X) ABSTIME(ABS-TIME-X)",
+                "option ABSTIME is duplicated",
+            ),
+            // Mixed OptionalValue forms: the bare flag and the valued form
+            // are different clause shapes, so an exact-repeat carve-out
+            // does not apply.
+            (
+                "SEND MAP('MENU') MAPSET('MAIN') CURSOR CURSOR(5)",
+                "option CURSOR is duplicated",
+            ),
+            // OptionalValue repeated bare: not a `Flag`-shape option, so
+            // still rejected.
+            (
+                "SEND MAP('MENU') MAPSET('MAIN') CURSOR CURSOR",
+                "option CURSOR is duplicated",
+            ),
+        ];
+        for (command, expected) in cases {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSDUPO. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-TIME-X PIC S9(15) COMP-3. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| { diagnostic.public_message().contains(expected) }),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
     }
 
     #[test]

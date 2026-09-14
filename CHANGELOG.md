@@ -128,11 +128,19 @@ All notable changes to mainframe-env are documented here.
   ("freeze 263-command contract and registry") and `f1fe39e` ("enforce
   generated compiler routing"). `app/app-authorization-ims-db2-mq/cbl/COPAUS2C.cbl`'s
   repeated top-level `NOHANDLE` on one `ASKTIME` command (also regressed by
-  the same two commits) is intentionally left rejected: the pinned sources
-  cached for this contract (`dfhp4_apiformat.html` "Common options for all
-  EXEC CICS commands", `dfhp4_asktime.html`) describe NOHANDLE's effect but
-  do not state whether repeating it is legal, so duplicate-option detection
-  is unchanged pending that source question.
+  the same two commits) now compiles too (`toreleon/mainframe-env#171`): an
+  exact bare repeat of an option whose registry shape is
+  `CicsApplicationOptionValueShape::Flag` is accepted as idempotent, and the
+  resolved CICS HIR is identical to the single-occurrence form, because a
+  repeated bare flag adds no operand and there is nothing to reconcile.
+  Every other repeat — a non-`Flag`-shape option, or any occurrence that
+  carries a parenthesized operand — is still rejected exactly as before.
+  This is a bounded-ambiguity acceptance the owner can veto in review, not a
+  confirmed IBM rule: the pinned sources cached for this contract
+  (`dfhp4_apiformat.html`, `dfhp4_asktime.html`) describe NOHANDLE's effect
+  but do not state whether repeating it is legal. It would be reversed by a
+  pinned CICS translator-message topic that calls a duplicated option an
+  error.
 - Accepted, evaluated, and executed level-88 condition-names on an alphanumeric
   group item (including a group declared with a mixed-usage subordinate, such as
   a BINARY subgroup), whose entries may precede the group's subordinate items,

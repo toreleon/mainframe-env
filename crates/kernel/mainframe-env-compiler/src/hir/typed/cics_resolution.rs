@@ -58,7 +58,7 @@ pub(super) fn validated_legacy_spi_compatibility(
             "compiler SPI compatibility descriptor has no selector".into(),
         ));
     };
-    let (clauses, options) = clauses(remainder)?;
+    let (clauses, options) = clauses(remainder, None)?;
     if descriptor
         .application_discriminator_options
         .iter()
@@ -156,7 +156,7 @@ pub(super) fn validated_command(
     let mut best_failure: Option<CandidateFailure> = None;
     for candidate in candidates {
         let tokens = clause_tokens(body, candidate.head_tokens, candidate.descriptor);
-        let (clauses, options) = match clauses(&tokens) {
+        let (clauses, options) = match clauses(&tokens, Some(candidate.descriptor)) {
             Ok(parsed) => parsed,
             Err(ResolutionFailure::Invalid(detail)) => {
                 keep_best_failure(
@@ -537,7 +537,22 @@ fn statically_known_value_bytes(tokens: &[String], semantic: &SemanticModel) -> 
         .map(|layout| layout.length)
 }
 
-fn clauses(tokens: &[String]) -> Resolution<(Clauses, Vec<String>)> {
+/// Parse top-level CICS clauses, rejecting repeated options.
+///
+/// `toreleon/mainframe-env` issue #171: an exact bare repeat of an option
+/// whose registry shape is `CicsApplicationOptionValueShape::Flag` (such as
+/// `NOHANDLE`) is idempotent — a repeated bare flag adds no operand, so
+/// there is nothing to reconcile. Accept it and keep the single occurrence.
+/// Every other repeat (a non-`Flag` shape, or any occurrence that carries a
+/// parenthesized operand) is still rejected exactly as before.
+///
+/// `descriptor` supplies the registry shape lookup; pass `None` to keep
+/// strict rejection of every repeat (used by the legacy SPI compatibility
+/// path, whose flag options aren't `CicsApplicationOptionValueShape`-typed).
+fn clauses(
+    tokens: &[String],
+    descriptor: Option<&CicsApplicationRegistryDescriptor>,
+) -> Resolution<(Clauses, Vec<String>)> {
     let mut clauses = BTreeMap::new();
     let mut options = Vec::new();
     let mut seen = BTreeSet::new();
@@ -553,12 +568,25 @@ fn clauses(tokens: &[String]) -> Resolution<(Clauses, Vec<String>)> {
                 "CICS top-level clause is malformed".into(),
             ));
         }
+        let has_operand = tokens.get(position + 1).is_some_and(|token| token == "(");
         if !seen.insert(name.clone()) {
+            let exact_bare_flag_repeat = !has_operand
+                && !clauses.contains_key(&name)
+                && descriptor.is_some_and(|descriptor| {
+                    matches!(
+                        option_value_shape(descriptor, &name),
+                        Some(CicsApplicationOptionValueShape::Flag)
+                    )
+                });
+            if exact_bare_flag_repeat {
+                position += 1;
+                continue;
+            }
             return Err(ResolutionFailure::Invalid(format!(
                 "CICS top-level option {name} is duplicated"
             )));
         }
-        if tokens.get(position + 1).is_some_and(|token| token == "(") {
+        if has_operand {
             let close = matching_close(tokens, position + 1)?;
             if close == position + 2 {
                 return Err(ResolutionFailure::Invalid(
