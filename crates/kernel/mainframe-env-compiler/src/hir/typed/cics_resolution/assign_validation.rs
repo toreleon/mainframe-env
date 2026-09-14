@@ -54,6 +54,7 @@ pub(super) fn validate(
         "INITPARMLEN",
         "KATAKANA",
         "LINKLEVEL",
+        "LOCALCCSID",
         "MAJORVERSION",
         "MAPCOLUMN",
         "MAPHEIGHT",
@@ -106,7 +107,7 @@ pub(super) fn validate(
         }
         if matches!(
             name,
-            "ABOFFSET" | "MAJORVERSION" | "MICROVERSION" | "MINORVERSION"
+            "ABOFFSET" | "LOCALCCSID" | "MAJORVERSION" | "MICROVERSION" | "MINORVERSION"
         ) && (target.usage != CobolUsage::Binary || target.length != 4 || target.scale != 0)
         {
             return Err(format!(

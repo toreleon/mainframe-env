@@ -4692,6 +4692,24 @@ mod tests {
         assert_eq!(assigned.outputs["TWALENG"].bytes(), b"0");
         assert_eq!(assigned.outputs["USERID"].bytes(), b"IBMUSER");
 
+        let local_ccsid = request(
+            CicsOperation::Assign,
+            BTreeMap::from([("LOCALCCSID".into(), argument(b"LOCAL-CCSID-OUT"))]),
+            324,
+        );
+        let local_ccsid = service
+            .invoke(
+                &effect(&invocation.run_unit_id, local_ccsid.clone(), 324),
+                local_ccsid,
+            )
+            .unwrap();
+        assert_eq!(local_ccsid.condition, "NORMAL");
+        assert_eq!(
+            local_ccsid.outputs["LOCALCCSID"].schema(),
+            "mainframe-env.cics.decimal@1"
+        );
+        assert_eq!(local_ccsid.outputs["LOCALCCSID"].bytes(), b"37");
+
         let local_only = request(
             CicsOperation::Assign,
             BTreeMap::from([
@@ -5365,6 +5383,20 @@ mod tests {
         assert_eq!(response.outputs["TASKPRIORITY"].bytes(), b"0");
         assert_eq!(response.outputs["TWALENG"].bytes(), b"0");
         assert_eq!(response.outputs["USERID"].bytes(), b"IBMUSER");
+
+        let local_ccsid = request(
+            CicsOperation::Assign,
+            BTreeMap::from([("LOCALCCSID".into(), argument(b"LOCAL-CCSID-OUT"))]),
+            2,
+        );
+        let local_ccsid = service
+            .invoke(
+                &effect(&invocation.run_unit_id, local_ccsid.clone(), 2),
+                local_ccsid,
+            )
+            .unwrap();
+        assert_eq!(local_ccsid.condition, "NORMAL");
+        assert_eq!(local_ccsid.outputs["LOCALCCSID"].bytes(), b"37");
 
         let initparm = request(
             CicsOperation::Assign,

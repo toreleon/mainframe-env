@@ -131,6 +131,8 @@ contract explicitly permits it.
   Handler-supplied condition names are admitted only through the generated CICS
   condition catalog, preserving names such as INVMPSZ without accepting
   arbitrary provider text.
+  LOCALCCSID returns fullword 37 from the runtime's fixed CP037 CICS-region
+  encoding authority in both local and DPL contexts.
   Other source-valid ASSIGN options remain rejected until their terminal,
   program-level, or failure context has an owned runtime representation.
 - Terminal execution outcomes carry an explicit transaction-dump disposition.

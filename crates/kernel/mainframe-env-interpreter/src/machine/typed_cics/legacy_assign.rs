@@ -39,6 +39,7 @@ pub(super) const OUTPUT_NAMES: &[&str] = &[
     "INITPARMLEN",
     "KATAKANA",
     "LINKLEVEL",
+    "LOCALCCSID",
     "MAJORVERSION",
     "MAPCOLUMN",
     "MAPHEIGHT",

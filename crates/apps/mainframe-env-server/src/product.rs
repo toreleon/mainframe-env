@@ -9754,7 +9754,11 @@ mod tests {
             )
             .replace(
                 "01 LINK-LEVEL-X PIC S9(4) COMP.",
-                "01 LINK-LEVEL-X PIC S9(4) COMP.\n01 MAP-COLUMN-X PIC S9(4) COMP VALUE 1.\n01 MAP-HEIGHT-X PIC S9(4) COMP VALUE 1.\n01 MAP-LINE-X PIC S9(4) COMP VALUE 1.\n01 MAP-WIDTH-X PIC S9(4) COMP VALUE 1.",
+                "01 LINK-LEVEL-X PIC S9(4) COMP.\n01 LOCAL-CCSID-X PIC S9(9) COMP.\n01 MAP-COLUMN-X PIC S9(4) COMP VALUE 1.\n01 MAP-HEIGHT-X PIC S9(4) COMP VALUE 1.\n01 MAP-LINE-X PIC S9(4) COMP VALUE 1.\n01 MAP-WIDTH-X PIC S9(4) COMP VALUE 1.",
+            )
+            .replace(
+                "FCI(FCI-X) LINKLEVEL(LINK-LEVEL-X)",
+                "FCI(FCI-X) LINKLEVEL(LINK-LEVEL-X) LOCALCCSID(LOCAL-CCSID-X)",
             )
             .replace(
                 "PROCEDURE DIVISION.\nEXEC CICS CHANGE TASK",
@@ -9982,6 +9986,10 @@ mod tests {
             &[0; 2]
         );
         assert_eq!(restored.variable("LINK-LEVEL-X").unwrap().bytes(), &[0, 1]);
+        assert_eq!(
+            restored.variable("LOCAL-CCSID-X").unwrap().bytes(),
+            &[0, 0, 0, 37]
+        );
         assert_eq!(restored.variable("MAP-COLUMN-X").unwrap().bytes(), &[0, 4]);
         assert_eq!(restored.variable("MAP-HEIGHT-X").unwrap().bytes(), &[0, 10]);
         assert_eq!(restored.variable("MAP-LINE-X").unwrap().bytes(), &[0, 3]);

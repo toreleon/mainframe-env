@@ -85,7 +85,8 @@ All notable changes to mainframe-env are documented here.
   definitions retain their prior top-left origin. Numeric DFHMDI LINE/COLUMN
   now offset TN3270 fields, maps that exceed the terminal receive source-named
   `INVMPSZ` 38, absent maps receive `INVREQ` 16/2, and DPL returns 16/200. The
-  same owned virtual terminal reports a
+  fixed CP037 region encoding is exposed as fullword LOCALCCSID 37 in both
+  local and DPL execution. The same owned virtual terminal reports a
   3270 data stream and no basic SCS data stream; its unsupported optional
   device capabilities return false indicators, and its interactive session
   profile returns the attended indicator. CMDSEC and RESSEC return `X` because

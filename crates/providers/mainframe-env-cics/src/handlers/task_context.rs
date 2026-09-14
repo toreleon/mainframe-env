@@ -26,6 +26,8 @@ const TERMINAL_CAPABILITY_INDICATORS: [(&str, u8); 20] = [
     ("VALIDATION", 0x00),
 ];
 
+const LOCAL_CCSID: i64 = 37;
+
 pub(in crate::service) fn current_program(invocation: &Invocation) -> Option<String> {
     invocation
         .selector
@@ -240,6 +242,11 @@ pub(in crate::service) fn assign(
         response
             .outputs
             .insert("LINKLEVEL".into(), decimal_payload(link_level)?);
+    }
+    if request.arguments.contains_key("LOCALCCSID") {
+        response
+            .outputs
+            .insert("LOCALCCSID".into(), decimal_payload(LOCAL_CCSID)?);
     }
     if let Some((rows, columns)) = dimensions {
         for (name, value) in [
@@ -479,6 +486,7 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "INITPARMLEN",
         "KATAKANA",
         "LINKLEVEL",
+        "LOCALCCSID",
         "MAJORVERSION",
         "MAPCOLUMN",
         "MAPHEIGHT",
