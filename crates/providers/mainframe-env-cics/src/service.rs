@@ -4778,6 +4778,36 @@ mod tests {
         assert_eq!(no_ati.outputs["APPLID"].bytes(), b"MEAPPL");
         assert!(!no_ati.outputs.contains_key("QNAME"));
 
+        let mut no_bts = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("ACTIVITY".into(), argument(b"ACTIVITY-OUT")),
+                ("ACTIVITYID".into(), argument(b"ACTIVITY-ID-OUT")),
+                ("APPLID".into(), argument(b"APP-OUT")),
+                ("PROCESS".into(), argument(b"PROCESS-OUT")),
+                ("PROCESSTYPE".into(), argument(b"PROCESS-TYPE-OUT")),
+            ]),
+            321,
+        );
+        no_bts.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let no_bts = service
+            .invoke(
+                &effect(&invocation.run_unit_id, no_bts.clone(), 321),
+                no_bts,
+            )
+            .unwrap();
+        assert_eq!(
+            (no_bts.condition.as_str(), no_bts.response, no_bts.response2),
+            ("INVREQ", 16, 6)
+        );
+        assert_eq!(no_bts.outputs["APPLID"].bytes(), b"MEAPPL");
+        for name in ["ACTIVITY", "ACTIVITYID", "PROCESS", "PROCESSTYPE"] {
+            assert!(!no_bts.outputs.contains_key(name));
+        }
+
         let diagnostics = request(
             CicsOperation::Assign,
             BTreeMap::from([
@@ -5029,7 +5059,7 @@ mod tests {
         );
 
         for (sequence, name, value) in [
-            (31, "ACTIVITY", argument(b"ACTIVITY-OUT")),
+            (31, "ASRAKEY", argument(b"ASRA-KEY-OUT")),
             (32, "USERID", cics_decimal(1)),
             (33, "OPTION.NOHANDLE", argument(b"")),
         ] {
@@ -5275,6 +5305,33 @@ mod tests {
         assert_eq!(initparm.outputs["BRIDGE"].bytes(), &[b' '; 4]);
         assert_eq!(initparm.outputs["CMDSEC"].bytes(), b"X");
         assert_eq!(initparm.outputs["RESSEC"].bytes(), b"X");
+
+        let mut no_bts = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("ACTIVITY".into(), argument(b"ACTIVITY-OUT")),
+                ("ACTIVITYID".into(), argument(b"ACTIVITY-ID-OUT")),
+                ("APPLID".into(), argument(b"APP-OUT")),
+                ("PROCESS".into(), argument(b"PROCESS-OUT")),
+                ("PROCESSTYPE".into(), argument(b"PROCESS-TYPE-OUT")),
+            ]),
+            60,
+        );
+        no_bts.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let no_bts = service
+            .invoke(&effect(&invocation.run_unit_id, no_bts.clone(), 60), no_bts)
+            .unwrap();
+        assert_eq!(
+            (no_bts.condition.as_str(), no_bts.response, no_bts.response2),
+            ("INVREQ", 16, 6)
+        );
+        assert_eq!(no_bts.outputs["APPLID"].bytes(), b"ME01");
+        for name in ["ACTIVITY", "ACTIVITYID", "PROCESS", "PROCESSTYPE"] {
+            assert!(!no_bts.outputs.contains_key(name));
+        }
 
         let diagnostics = request(
             CicsOperation::Assign,

@@ -111,6 +111,9 @@ contract explicitly permits it.
   QNAME is a negative-only form until an ATI trigger path exists: local calls
   return `INVREQ` 16/4 and DPL calls return `INVREQ` 16/200 without changing
   the output area.
+  ACTIVITY, ACTIVITYID, PROCESS, and PROCESSTYPE are negative-only until a BTS
+  activity context exists; local and DPL calls return `INVREQ` 16/6 without
+  changing their fixed-width output areas.
   Other source-valid ASSIGN options remain rejected until their terminal,
   program-level, or failure context has an owned runtime representation.
 - Terminal execution outcomes carry an explicit transaction-dump disposition.

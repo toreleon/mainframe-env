@@ -2380,7 +2380,7 @@ mod tests {
     #[test]
     fn legacy_cics_routes_reject_catalog_options_without_runtime_semantics() {
         for (command, option) in [
-            ("ASSIGN ACTIVITY(USER-X)", "ACTIVITY"),
+            ("ASSIGN FACILITY(USER-X)", "FACILITY"),
             ("LINK PROGRAM('PGM1') CHANNEL('CHAN1')", "CHANNEL"),
             ("RETURN IMMEDIATE", "IMMEDIATE"),
             ("WRITEQ TD QUEUE('Q1') FROM('A') SYSID('R1')", "SYSID"),
@@ -2457,6 +2457,30 @@ mod tests {
                 .find(|statement| statement.kind == StatementKind::ExecCics)
                 .expect("EXEC CICS statement");
             assert!(statement.resolved.is_none(), "{command}");
+        }
+
+        for (name, width) in [
+            ("ACTIVITY", 16),
+            ("ACTIVITYID", 52),
+            ("PROCESS", 36),
+            ("PROCESSTYPE", 8),
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BTSASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUTPUT-X PIC X({width}). PROCEDURE DIVISION. EXEC CICS ASSIGN {name}(OUTPUT-X) END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            assert!(analysis.hir.is_some(), "{name}: {:?}", analysis.diagnostics);
+
+            let wrong_width = width - 1;
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADBTSASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUTPUT-X PIC X({wrong_width}). PROCEDURE DIVISION. EXEC CICS ASSIGN {name}(OUTPUT-X) END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            assert!(analysis.hir.is_none(), "{name}");
+            assert!(analysis.diagnostics.iter().any(|diagnostic| {
+                let message = diagnostic.public_message();
+                message.contains(name) && message.contains("exact-width data area")
+            }));
         }
 
         let duplicate_resource = analyze(

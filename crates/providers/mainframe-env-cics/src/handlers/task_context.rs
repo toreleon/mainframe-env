@@ -82,6 +82,9 @@ pub(in crate::service) fn assign(
     };
     let terminal_missing = !dpl && terminal_required && dimensions.is_none();
     let ati_missing = !dpl && request.arguments.contains_key("QNAME");
+    let bts_missing = ["ACTIVITY", "ACTIVITYID", "PROCESS", "PROCESSTYPE"]
+        .iter()
+        .any(|name| request.arguments.contains_key(*name));
     let link_level = request
         .arguments
         .contains_key("LINKLEVEL")
@@ -105,7 +108,7 @@ pub(in crate::service) fn assign(
             ]
             .iter()
             .any(|name| request.arguments.contains_key(*name)));
-    let mut response = if dpl_prohibited || terminal_missing || ati_missing {
+    let mut response = if dpl_prohibited || terminal_missing || ati_missing || bts_missing {
         super::condition::respond(
             service,
             run,
@@ -117,8 +120,10 @@ pub(in crate::service) fn assign(
                     200
                 } else if terminal_missing {
                     5
-                } else {
+                } else if ati_missing {
                     4
+                } else {
+                    6
                 },
             },
         )?
@@ -344,6 +349,8 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "ABDUMP",
         "ABOFFSET",
         "ABPROGRAM",
+        "ACTIVITY",
+        "ACTIVITYID",
         "ALTSCRNHT",
         "ALTSCRNWD",
         "APLKYBD",
@@ -387,6 +394,8 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "PARTNS",
         "PARTNSET",
         "PLATFORM",
+        "PROCESS",
+        "PROCESSTYPE",
         "PROGRAM",
         "PS",
         "QNAME",
