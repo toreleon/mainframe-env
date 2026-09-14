@@ -161,6 +161,10 @@ pub enum HirCicsOperation {
     Link,
     Xctl,
     Return,
+    StartBrowse,
+    ReadNext,
+    ReadPrev,
+    EndBrowse,
     PopHandle,
     PushHandle,
     Read,
@@ -230,6 +234,7 @@ pub enum HirCicsOutputName {
     Abstime,
     Commarea,
     Into,
+    Ridfld,
     Milliseconds,
     Mmddyy,
     Mmddyyyy,
@@ -2319,6 +2324,83 @@ mod tests {
     }
 
     #[test]
+    fn cics_default_file_browse_resolves_shared_key_input_output_roles() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBROW. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2) VALUE 'AA'. 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) END-EXEC. EXEC CICS READNEXT FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS READPREV DATASET('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS ENDBR FILE('ACCTDAT') END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("browse: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            commands
+                .iter()
+                .map(|command| command.operation)
+                .collect::<Vec<_>>(),
+            [
+                HirCicsOperation::StartBrowse,
+                HirCicsOperation::ReadNext,
+                HirCicsOperation::ReadPrev,
+                HirCicsOperation::EndBrowse,
+            ]
+        );
+        for command in &commands[..3] {
+            let input = command
+                .operands
+                .iter()
+                .find(|operand| operand.name == HirCicsOperandName::Ridfld)
+                .expect("browse RIDFLD input");
+            assert!(matches!(
+                input.value,
+                HirCicsValue::Data(ref reference) if reference.qualified_name == "KEY-X"
+            ));
+        }
+        for command in &commands[1..3] {
+            assert!(command.outputs.iter().any(|output| {
+                output.name == HirCicsOutputName::Into && output.target.qualified_name == "RECORD-X"
+            }));
+            assert!(command.outputs.iter().any(|output| {
+                output.name == HirCicsOutputName::Ridfld && output.target.qualified_name == "KEY-X"
+            }));
+        }
+        assert!(commands[0].outputs.is_empty());
+        assert!(commands[3].outputs.is_empty());
+
+        for (command, expected) in [
+            ("STARTBR FILE('ACCTDAT')", "requires RIDFLD"),
+            ("READNEXT FILE('ACCTDAT') RIDFLD(KEY-X)", "requires INTO"),
+            (
+                "READPREV FILE('ACCTDAT') DATASET('OTHER') INTO(RECORD-X) RIDFLD(KEY-X)",
+                "mutually exclusive",
+            ),
+            (
+                "READNEXT FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) UPDATE",
+                "unready for UPDATE",
+            ),
+            ("ENDBR FILE('ACCTDAT') REQID(KEY-X)", "unready for REQID"),
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADBROW. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2). 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| { diagnostic.public_message().contains(expected) }),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
+    #[test]
     fn cics_shared_heads_resolve_with_valued_discriminators() {
         for (command, expected_label) in [
             ("ACQUIRE ACTIVITYID('A1')", "ACQUIRE ACTIVITYID"),
@@ -2595,7 +2677,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 12);
+        assert_eq!(legacy.len(), 8);
         assert!(
             legacy.iter().all(|descriptor| {
                 descriptor.advertised && descriptor.runtime_operation.is_some()
@@ -2612,6 +2694,10 @@ mod tests {
                     | ["LINK"]
                     | ["XCTL"]
                     | ["RETURN"]
+                    | ["STARTBR"]
+                    | ["READNEXT"]
+                    | ["READPREV"]
+                    | ["ENDBR"]
                     | ["READ"]
                     | ["REWRITE"]
                     | ["SYNCPOINT"]
@@ -2834,7 +2920,6 @@ mod tests {
             "ASSIGN PROGRAM(PROGRAM-X)",
             "ASSIGN QNAME(BRIDGE-X)",
             "ASSIGN TASKPRIORITY(PRIORITY-X) USERID(USER-X)",
-            "READNEXT DATASET('ACCTDAT') RIDFLD(KEY-X) INTO(REC-X) UPDATE",
         ] {
             let source = format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLEG. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABCODE-X PIC X(4). 01 ABDUMP-X PIC X. 01 ABOFFSET-X PIC S9(9) COMP. 01 ABPROGRAM-X PIC X(8). 01 ALTERNATE-HEIGHT-X PIC S9(4) COMP. 01 ALTERNATE-WIDTH-X PIC S9(4) COMP. 01 APP-X PIC X(64). 01 APPL-X PIC X(8). 01 ASRA-PSW-X PIC X(8). 01 ASRA-PSW16-X PIC X(16). 01 ASRA-REGS-X PIC X(64). 01 ASRA-REGS64-X PIC X(128). 01 BRIDGE-X PIC X(4). 01 CHANNEL-X PIC X(16). 01 CWA-LENGTH-X PIC S9(4) COMP. 01 DEFAULT-HEIGHT-X PIC S9(4) COMP. 01 DEFAULT-WIDTH-X PIC S9(4) COMP. 01 DS3270-X PIC X. 01 DSSCS-X PIC X. 01 FCI-X PIC X. 01 INDICATOR-X PIC X. 01 INITPARM-X PIC X(60). 01 INITPARM-LENGTH-X PIC S9(4) COMP. 01 LINK-LEVEL-X PIC S9(4) COMP. 01 MAJOR-X PIC S9(9) COMP. 01 MICRO-X PIC S9(9) COMP. 01 MINOR-X PIC S9(9) COMP. 01 NEXT-TRANS-X PIC X(4). 01 OPERATION-X PIC X(64). 01 OPERKEYS-X PIC X(8). 01 OPSECURITY-X PIC X(3). 01 PARTITION-SET-X PIC X(6). 01 PLATFORM-X PIC X(64). 01 PROGRAM-X PIC X(8). 01 RESTART-X PIC X. 01 SCREEN-HEIGHT-X PIC S9(4) COMP. 01 SCREEN-WIDTH-X PIC S9(4) COMP. 01 USER-X PIC X(8). 01 PRIORITY-X PIC S9(4) COMP. 01 TCTUA-LENGTH-X PIC S9(4) COMP. 01 TWA-LENGTH-X PIC S9(4) COMP. 01 KEY-X PIC X(2). 01 REC-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN. ABEND-HANDLER. STOP RUN."

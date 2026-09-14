@@ -28,6 +28,12 @@ pub(super) const fn allowed(operation: CicsPlanOperation) -> &'static [CicsOutpu
             CicsOutputName::Resp,
             CicsOutputName::Resp2,
         ],
+        CicsPlanOperation::ReadNext | CicsPlanOperation::ReadPrev => &[
+            CicsOutputName::Into,
+            CicsOutputName::Ridfld,
+            CicsOutputName::Resp,
+            CicsOutputName::Resp2,
+        ],
         _ => &[CicsOutputName::Resp, CicsOutputName::Resp2],
     }
 }

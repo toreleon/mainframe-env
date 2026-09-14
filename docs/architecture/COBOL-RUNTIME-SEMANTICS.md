@@ -196,6 +196,15 @@ terminalizes the old execution before the next terminal task can claim the
 continuation; malformed schemas, unsupported DPL context, and unowned options
 fail before continuation mutation.
 
+The typed default file-browse loop gives RIDFLD explicit storage identity.
+STARTBR reads its initial key but has no record output. READNEXT and READPREV
+send the current key, write the returned payload to INTO, and require a
+`mainframe-env.cics.payload@1` RIDFLD output before updating that same key
+slot. ENDBR carries only the resolved FILE/DATASET identity. The sequence
+updates EIBFN to `060C`, `060E`, `0610`, and `0612`; forms needing named cursor,
+remote routing, alternate record identities, SET storage, or RLS update-token
+state do not enter this typed route.
+
 CICS PUSH HANDLE moves the current condition mappings, ignored-condition set,
 and active/canceled typed ABEND exits into one bounded task-local frame, leaving a
 clear specification set for the nested routine. POP HANDLE discards the nested

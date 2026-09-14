@@ -4,9 +4,16 @@ use crate::StorageId;
 use std::collections::BTreeSet;
 use std::fmt;
 
+mod browse;
+mod codec_tags;
 mod handle_abend;
 mod output_shape;
 mod program_control;
+
+use codec_tags::{
+    operand_from_tag, operand_tag, operation_from_tag, operation_tag, option_from_tag, option_tag,
+    output_from_tag, output_tag,
+};
 
 /// Stable wire identity for a typed CICS effect plan.
 pub const CICS_EFFECT_PLAN_CONTRACT: &str = "mainframe-env.cics-effect-plan@1";
@@ -77,6 +84,14 @@ pub enum CicsPlanOperation {
     Xctl,
     /// Return from the current top-level task and optionally schedule its next transaction.
     Return,
+    /// Position one default-key file browse without reading a record.
+    StartBrowse,
+    /// Read the next record in one default-key file browse.
+    ReadNext,
+    /// Read the previous record in one default-key file browse.
+    ReadPrev,
+    /// End one default-key file browse.
+    EndBrowse,
     /// Restore one suspended HANDLE/IGNORE specification snapshot.
     PopHandle,
     /// Suspend the current HANDLE/IGNORE specifications in one nested snapshot.
@@ -201,6 +216,8 @@ pub enum CicsPlanOption {
 pub enum CicsOutputName {
     /// Record payload destination.
     Into,
+    /// Returned browse record identifier.
+    Ridfld,
     /// Returned communication-area destination.
     Commarea,
     /// Primary response code destination.
@@ -591,6 +608,10 @@ fn validate_operation_shape(
         CicsPlanOperation::Link => program_control::invalid_link_shape(plan, inputs, outputs),
         CicsPlanOperation::Xctl => program_control::invalid_xctl_shape(plan, inputs, outputs),
         CicsPlanOperation::Return => program_control::invalid_return_shape(plan, inputs, outputs),
+        CicsPlanOperation::StartBrowse
+        | CicsPlanOperation::ReadNext
+        | CicsPlanOperation::ReadPrev
+        | CicsPlanOperation::EndBrowse => browse::invalid_shape(plan, inputs, outputs),
         CicsPlanOperation::Read => {
             resources != 1
                 || !inputs.contains(&CicsOperandName::Ridfld)
@@ -856,182 +877,6 @@ fn require_order<T: Copy + Ord>(
         Some(previous) if previous == current => Err(CicsPlanCodecProblem::Malformed),
         Some(previous) if previous > current => Err(CicsPlanCodecProblem::NonCanonical),
         _ => Ok(()),
-    }
-}
-
-const fn operation_tag(value: CicsPlanOperation) -> u8 {
-    match value {
-        CicsPlanOperation::Read => 0,
-        CicsPlanOperation::Rewrite => 1,
-        CicsPlanOperation::Syncpoint => 2,
-        CicsPlanOperation::Deq => 3,
-        CicsPlanOperation::Enq => 4,
-        CicsPlanOperation::ChangeTask => 5,
-        CicsPlanOperation::Suspend => 6,
-        CicsPlanOperation::SetAssociationUserCorrData => 7,
-        CicsPlanOperation::AddressSet => 8,
-        CicsPlanOperation::PopHandle => 9,
-        CicsPlanOperation::PushHandle => 10,
-        CicsPlanOperation::IgnoreCondition => 11,
-        CicsPlanOperation::HandleCondition => 12,
-        CicsPlanOperation::HandleAid => 13,
-        CicsPlanOperation::AsktimeEib => 14,
-        CicsPlanOperation::Asktime => 15,
-        CicsPlanOperation::FormatTime => 16,
-        CicsPlanOperation::Abend => 17,
-        CicsPlanOperation::HandleAbend => 18,
-        CicsPlanOperation::Link => 19,
-        CicsPlanOperation::Xctl => 20,
-        CicsPlanOperation::Return => 21,
-    }
-}
-
-fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPlanCodecProblem> {
-    match value {
-        0 => Ok(CicsPlanOperation::Read),
-        1 => Ok(CicsPlanOperation::Rewrite),
-        2 => Ok(CicsPlanOperation::Syncpoint),
-        3 => Ok(CicsPlanOperation::Deq),
-        4 => Ok(CicsPlanOperation::Enq),
-        5 => Ok(CicsPlanOperation::ChangeTask),
-        6 => Ok(CicsPlanOperation::Suspend),
-        7 => Ok(CicsPlanOperation::SetAssociationUserCorrData),
-        8 => Ok(CicsPlanOperation::AddressSet),
-        9 => Ok(CicsPlanOperation::PopHandle),
-        10 => Ok(CicsPlanOperation::PushHandle),
-        11 => Ok(CicsPlanOperation::IgnoreCondition),
-        12 => Ok(CicsPlanOperation::HandleCondition),
-        13 => Ok(CicsPlanOperation::HandleAid),
-        14 => Ok(CicsPlanOperation::AsktimeEib),
-        15 => Ok(CicsPlanOperation::Asktime),
-        16 => Ok(CicsPlanOperation::FormatTime),
-        17 => Ok(CicsPlanOperation::Abend),
-        18 => Ok(CicsPlanOperation::HandleAbend),
-        19 => Ok(CicsPlanOperation::Link),
-        20 => Ok(CicsPlanOperation::Xctl),
-        21 => Ok(CicsPlanOperation::Return),
-        _ => Err(CicsPlanCodecProblem::Malformed),
-    }
-}
-
-const fn operand_tag(value: CicsOperandName) -> u8 {
-    match value {
-        CicsOperandName::File => 0,
-        CicsOperandName::Dataset => 1,
-        CicsOperandName::From => 2,
-        CicsOperandName::Ridfld => 3,
-        CicsOperandName::Resource => 4,
-        CicsOperandName::Length => 5,
-        CicsOperandName::MaxLifetime => 6,
-        CicsOperandName::Priority => 7,
-        CicsOperandName::UserCorrData => 8,
-        CicsOperandName::SetAddress => 9,
-        CicsOperandName::SetPointer => 10,
-        CicsOperandName::UsingAddress => 11,
-        CicsOperandName::UsingPointer => 12,
-        CicsOperandName::Conditions => 13,
-        CicsOperandName::Aids => 14,
-        CicsOperandName::Abstime => 15,
-        CicsOperandName::DateSep => 16,
-        CicsOperandName::TimeSep => 17,
-        CicsOperandName::Abcode => 18,
-        CicsOperandName::Label => 19,
-        CicsOperandName::Program => 20,
-        CicsOperandName::Commarea => 21,
-        CicsOperandName::TransId => 22,
-    }
-}
-
-fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCodecProblem> {
-    match value {
-        0 => Ok(CicsOperandName::File),
-        1 => Ok(CicsOperandName::Dataset),
-        2 => Ok(CicsOperandName::From),
-        3 => Ok(CicsOperandName::Ridfld),
-        4 => Ok(CicsOperandName::Resource),
-        5 => Ok(CicsOperandName::Length),
-        6 => Ok(CicsOperandName::MaxLifetime),
-        7 => Ok(CicsOperandName::Priority),
-        8 => Ok(CicsOperandName::UserCorrData),
-        9 => Ok(CicsOperandName::SetAddress),
-        10 => Ok(CicsOperandName::SetPointer),
-        11 => Ok(CicsOperandName::UsingAddress),
-        12 => Ok(CicsOperandName::UsingPointer),
-        13 => Ok(CicsOperandName::Conditions),
-        14 => Ok(CicsOperandName::Aids),
-        15 => Ok(CicsOperandName::Abstime),
-        16 => Ok(CicsOperandName::DateSep),
-        17 => Ok(CicsOperandName::TimeSep),
-        18 => Ok(CicsOperandName::Abcode),
-        19 => Ok(CicsOperandName::Label),
-        20 => Ok(CicsOperandName::Program),
-        21 => Ok(CicsOperandName::Commarea),
-        22 => Ok(CicsOperandName::TransId),
-        _ => Err(CicsPlanCodecProblem::Malformed),
-    }
-}
-
-const fn option_tag(value: CicsPlanOption) -> u8 {
-    match value {
-        CicsPlanOption::Update => 0,
-        CicsPlanOption::Rollback => 1,
-        CicsPlanOption::NoHandle => 2,
-        CicsPlanOption::Task => 3,
-        CicsPlanOption::Uow => 4,
-        CicsPlanOption::NoSuspend => 5,
-        CicsPlanOption::Cancel => 6,
-        CicsPlanOption::NoDump => 7,
-        CicsPlanOption::Reset => 8,
-    }
-}
-
-fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodecProblem> {
-    match value {
-        0 => Ok(CicsPlanOption::Update),
-        1 => Ok(CicsPlanOption::Rollback),
-        2 => Ok(CicsPlanOption::NoHandle),
-        3 => Ok(CicsPlanOption::Task),
-        4 => Ok(CicsPlanOption::Uow),
-        5 => Ok(CicsPlanOption::NoSuspend),
-        6 => Ok(CicsPlanOption::Cancel),
-        7 => Ok(CicsPlanOption::NoDump),
-        8 => Ok(CicsPlanOption::Reset),
-        _ => Err(CicsPlanCodecProblem::Malformed),
-    }
-}
-
-const fn output_tag(value: CicsOutputName) -> u8 {
-    match value {
-        CicsOutputName::Into => 0,
-        CicsOutputName::Resp => 1,
-        CicsOutputName::Resp2 => 2,
-        CicsOutputName::Abstime => 3,
-        CicsOutputName::Milliseconds => 4,
-        CicsOutputName::Mmddyy => 5,
-        CicsOutputName::Mmddyyyy => 6,
-        CicsOutputName::Time => 7,
-        CicsOutputName::Yyddd => 8,
-        CicsOutputName::Yymmdd => 9,
-        CicsOutputName::Yyyymmdd => 10,
-        CicsOutputName::Commarea => 11,
-    }
-}
-
-fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodecProblem> {
-    match value {
-        0 => Ok(CicsOutputName::Into),
-        1 => Ok(CicsOutputName::Resp),
-        2 => Ok(CicsOutputName::Resp2),
-        3 => Ok(CicsOutputName::Abstime),
-        4 => Ok(CicsOutputName::Milliseconds),
-        5 => Ok(CicsOutputName::Mmddyy),
-        6 => Ok(CicsOutputName::Mmddyyyy),
-        7 => Ok(CicsOutputName::Time),
-        8 => Ok(CicsOutputName::Yyddd),
-        9 => Ok(CicsOutputName::Yymmdd),
-        10 => Ok(CicsOutputName::Yyyymmdd),
-        11 => Ok(CicsOutputName::Commarea),
-        _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
 
@@ -1416,6 +1261,58 @@ mod tests {
             encode_cics_effect_plan(&invalid_return, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
+        let browse_key = slot(10, "BROWSE.KEY");
+        let start_browse = CicsEffectPlan {
+            operation: CicsPlanOperation::StartBrowse,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::File,
+                    value: CicsOperandValue::Literal(b"ACCTDAT".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Ridfld,
+                    value: CicsOperandValue::Storage(browse_key.clone()),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let read_next = CicsEffectPlan {
+            operation: CicsPlanOperation::ReadNext,
+            operands: start_browse.operands.clone(),
+            options: BTreeSet::new(),
+            outputs: vec![
+                CicsOutputBinding {
+                    name: CicsOutputName::Into,
+                    target: slot(11, "BROWSE.RECORD"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::Ridfld,
+                    target: browse_key,
+                },
+            ],
+            condition: CicsCondition::Default,
+        };
+        let read_prev = CicsEffectPlan {
+            operation: CicsPlanOperation::ReadPrev,
+            ..read_next.clone()
+        };
+        let end_browse = CicsEffectPlan {
+            operation: CicsPlanOperation::EndBrowse,
+            operands: vec![start_browse.operands[0].clone()],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let mut missing_browse_key_output = read_next.clone();
+        missing_browse_key_output
+            .outputs
+            .retain(|output| output.name != CicsOutputName::Ridfld);
+        assert_eq!(
+            encode_cics_effect_plan(&missing_browse_key_output, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
         for plan in [
             read,
             rewrite,
@@ -1428,6 +1325,10 @@ mod tests {
             link,
             xctl,
             return_plan,
+            start_browse,
+            read_next,
+            read_prev,
+            end_browse,
         ] {
             let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
             let decoded = decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap();

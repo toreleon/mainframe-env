@@ -3014,6 +3014,148 @@ mod tests {
     }
 
     #[test]
+    fn cics_default_file_browse_preserves_cursor_key_across_typed_operations() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBROWSE. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2) VALUE 'AA'. 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) END-EXEC. EXEC CICS READNEXT FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS READPREV FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS ENDBR FILE('ACCTDAT') END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let payload = |bytes: &[u8]| {
+            mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                bytes.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let response = |record: &[u8], outputs: BTreeMap<String, _>| CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: payload(record),
+            outputs,
+            unit_of_work: None,
+        };
+
+        let MachineDrive::HostCall(start) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("STARTBR did not call host");
+        };
+        assert!(matches!(
+            &start.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::StartBrowse,
+                arguments,
+                mutation: None,
+                ..
+            }) if arguments["FILE"].bytes() == b"ACCTDAT"
+                && arguments["RIDFLD"].bytes() == b"AA"
+        ));
+
+        let MachineDrive::HostCall(next) = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: start.sequence,
+                outcome: Ok(HostResult::Cics(response(b"", BTreeMap::new()))),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        ) else {
+            panic!("READNEXT did not call host");
+        };
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x06, 0x0c]);
+        assert!(matches!(
+            &next.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::ReadNext,
+                arguments,
+                mutation: None,
+                ..
+            }) if arguments["FILE"].bytes() == b"ACCTDAT"
+                && arguments["INTO"].bytes() == b"RECORD-X"
+                && arguments["RIDFLD"].bytes() == b"AA"
+        ));
+
+        let MachineDrive::HostCall(previous) = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: next.sequence,
+                outcome: Ok(HostResult::Cics(response(
+                    b"AA11",
+                    BTreeMap::from([("RIDFLD".into(), payload(b"AA"))]),
+                ))),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        ) else {
+            panic!("READPREV did not call host");
+        };
+        assert_eq!(machine.variable("RECORD-X").unwrap().bytes(), b"AA11");
+        assert_eq!(machine.variable("KEY-X").unwrap().bytes(), b"AA");
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x06, 0x0e]);
+        assert!(matches!(
+            &previous.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::ReadPrev,
+                arguments,
+                mutation: None,
+                ..
+            }) if arguments["FILE"].bytes() == b"ACCTDAT"
+                && arguments["INTO"].bytes() == b"RECORD-X"
+                && arguments["RIDFLD"].bytes() == b"AA"
+        ));
+
+        let MachineDrive::HostCall(end) = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: previous.sequence,
+                outcome: Ok(HostResult::Cics(response(
+                    b"A011",
+                    BTreeMap::from([("RIDFLD".into(), payload(b"A0"))]),
+                ))),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        ) else {
+            panic!("ENDBR did not call host");
+        };
+        assert_eq!(machine.variable("RECORD-X").unwrap().bytes(), b"A011");
+        assert_eq!(machine.variable("KEY-X").unwrap().bytes(), b"A0");
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x06, 0x10]);
+        assert!(matches!(
+            &end.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::EndBrowse,
+                arguments,
+                mutation: None,
+                ..
+            }) if arguments["FILE"].bytes() == b"ACCTDAT"
+        ));
+
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: end.sequence,
+                    outcome: Ok(HostResult::Cics(response(b"", BTreeMap::new()))),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x06, 0x12]);
+    }
+
+    #[test]
     fn bare_asktime_requires_and_updates_both_implicit_eib_fields() {
         use mainframe_env_host_api::{
             CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,

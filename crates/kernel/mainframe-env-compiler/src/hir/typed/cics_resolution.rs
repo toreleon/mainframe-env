@@ -1,5 +1,4 @@
 //! Catalog-bound recognition of top-level EXEC CICS command clauses.
-
 use super::{
     HirCicsConditionPolicy, HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation,
     HirCicsOption, HirCicsOutputBinding, HirCicsOutputName, HirCicsStatement, HirCicsValue,
@@ -20,6 +19,7 @@ type Clauses = BTreeMap<String, Vec<String>>;
 
 mod abend;
 mod assign_validation;
+mod file_operands;
 mod format_time;
 mod handle_abend;
 mod output_bindings;
@@ -771,6 +771,10 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         ["LINK"] => HirCicsOperation::Link,
         ["XCTL"] => HirCicsOperation::Xctl,
         ["RETURN"] => HirCicsOperation::Return,
+        ["STARTBR"] => HirCicsOperation::StartBrowse,
+        ["READNEXT"] => HirCicsOperation::ReadNext,
+        ["READPREV"] => HirCicsOperation::ReadPrev,
+        ["ENDBR"] => HirCicsOperation::EndBrowse,
         ["POP", "HANDLE"] => HirCicsOperation::PopHandle,
         ["PUSH", "HANDLE"] => HirCicsOperation::PushHandle,
         ["READ"] => HirCicsOperation::Read,
@@ -813,6 +817,11 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             &["PROGRAM", "COMMAREA", "RESP", "RESP2"]
         }
         HirCicsOperation::Return => &["TRANSID", "COMMAREA", "RESP", "RESP2"],
+        HirCicsOperation::StartBrowse => &["FILE", "DATASET", "RIDFLD", "RESP", "RESP2"],
+        HirCicsOperation::ReadNext | HirCicsOperation::ReadPrev => {
+            &["FILE", "DATASET", "INTO", "RIDFLD", "RESP", "RESP2"]
+        }
+        HirCicsOperation::EndBrowse => &["FILE", "DATASET", "RESP", "RESP2"],
         HirCicsOperation::Read => &["FILE", "DATASET", "RIDFLD", "INTO", "RESP", "RESP2"],
         HirCicsOperation::Rewrite => &["FILE", "DATASET", "FROM", "RESP", "RESP2"],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA", "RESP", "RESP2"],
@@ -833,6 +842,10 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::Link
         | HirCicsOperation::Xctl
         | HirCicsOperation::Return
+        | HirCicsOperation::StartBrowse
+        | HirCicsOperation::ReadNext
+        | HirCicsOperation::ReadPrev
+        | HirCicsOperation::EndBrowse
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle
         | HirCicsOperation::SetAssociationUserCorrData
@@ -880,7 +893,12 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         usize::from(clauses.contains_key("FILE")) + usize::from(clauses.contains_key("DATASET"));
     if matches!(
         operation,
-        HirCicsOperation::Read | HirCicsOperation::Rewrite
+        HirCicsOperation::Read
+            | HirCicsOperation::Rewrite
+            | HirCicsOperation::StartBrowse
+            | HirCicsOperation::ReadNext
+            | HirCicsOperation::ReadPrev
+            | HirCicsOperation::EndBrowse
     ) && resources != 1
     {
         return Err(ResolutionFailure::Invalid(
@@ -901,9 +919,12 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle
         | HirCicsOperation::Return
+        | HirCicsOperation::EndBrowse
         | HirCicsOperation::Suspend => &[][..],
         HirCicsOperation::Deq | HirCicsOperation::Enq => &["RESOURCE"][..],
         HirCicsOperation::Link | HirCicsOperation::Xctl => &["PROGRAM"][..],
+        HirCicsOperation::StartBrowse => &["RIDFLD"][..],
+        HirCicsOperation::ReadNext | HirCicsOperation::ReadPrev => &["RIDFLD", "INTO"][..],
         HirCicsOperation::Read => &["RIDFLD", "INTO"][..],
         HirCicsOperation::Rewrite => &["FROM"][..],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA"][..],
@@ -1015,19 +1036,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             value: HirCicsValue::Literal(names.join("\n")),
         });
     }
-    for (name, identity) in [
-        ("FILE", HirCicsOperandName::File),
-        ("DATASET", HirCicsOperandName::Dataset),
-        ("FROM", HirCicsOperandName::From),
-        ("RIDFLD", HirCicsOperandName::Ridfld),
-    ] {
-        if let Some(value) = clauses.get(name) {
-            operands.push(HirCicsNamedOperand {
-                name: identity,
-                value: cics_value(value, semantic)?,
-            });
-        }
-    }
+    operands.extend(file_operands::resolve(&clauses, operation, semantic)?);
     if matches!(operation, HirCicsOperation::Deq | HirCicsOperation::Enq) {
         let resource = complete_data_reference(&clauses["RESOURCE"], semantic)?;
         operands.push(HirCicsNamedOperand {

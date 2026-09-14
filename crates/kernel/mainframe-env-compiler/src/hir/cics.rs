@@ -210,6 +210,7 @@ impl PlanContext<'_> {
                 HirCicsOutputName::Abstime => CicsOutputName::Abstime,
                 HirCicsOutputName::Commarea => CicsOutputName::Commarea,
                 HirCicsOutputName::Into => CicsOutputName::Into,
+                HirCicsOutputName::Ridfld => CicsOutputName::Ridfld,
                 HirCicsOutputName::Milliseconds => CicsOutputName::Milliseconds,
                 HirCicsOutputName::Mmddyy => CicsOutputName::Mmddyy,
                 HirCicsOutputName::Mmddyyyy => CicsOutputName::Mmddyyyy,
@@ -284,6 +285,10 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::Link => CicsPlanOperation::Link,
         HirCicsOperation::Xctl => CicsPlanOperation::Xctl,
         HirCicsOperation::Return => CicsPlanOperation::Return,
+        HirCicsOperation::StartBrowse => CicsPlanOperation::StartBrowse,
+        HirCicsOperation::ReadNext => CicsPlanOperation::ReadNext,
+        HirCicsOperation::ReadPrev => CicsPlanOperation::ReadPrev,
+        HirCicsOperation::EndBrowse => CicsPlanOperation::EndBrowse,
         HirCicsOperation::PopHandle => CicsPlanOperation::PopHandle,
         HirCicsOperation::PushHandle => CicsPlanOperation::PushHandle,
     }

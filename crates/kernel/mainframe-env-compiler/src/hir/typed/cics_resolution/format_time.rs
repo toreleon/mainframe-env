@@ -115,6 +115,6 @@ pub(super) fn require_output_shape(
                 )))
             }
         }
-        HirCicsOutputName::Commarea | HirCicsOutputName::Into => Ok(()),
+        HirCicsOutputName::Commarea | HirCicsOutputName::Into | HirCicsOutputName::Ridfld => Ok(()),
     }
 }

@@ -335,6 +335,9 @@ pub(super) fn execute(
                 outputs.insert(key.into(), target);
             }
             CicsOutputName::Into => into = Some(target),
+            CicsOutputName::Ridfld => {
+                outputs.insert(key.into(), target);
+            }
             CicsOutputName::Resp => response = Some(target),
             CicsOutputName::Resp2 => response2 = Some(target),
         }
@@ -569,7 +572,7 @@ pub(super) fn write_output(
 ) -> Result<(), MachineProblem> {
     if matches!(name, "ABSTIME" | "MILLISECONDS")
         && value.schema() != "mainframe-env.cics.decimal@1"
-        || name == "COMMAREA" && value.schema() != "mainframe-env.cics.payload@1"
+        || matches!(name, "COMMAREA" | "RIDFLD") && value.schema() != "mainframe-env.cics.payload@1"
         || matches!(
             name,
             "MMDDYY" | "MMDDYYYY" | "TIME" | "YYDDD" | "YYMMDD" | "YYYYMMDD"

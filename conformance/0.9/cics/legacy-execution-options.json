@@ -15,21 +15,6 @@
       "execution_options": ["FILE", "NOHANDLE", "RESP", "RESP2", "RIDFLD"]
     },
     {
-      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0058",
-      "runtime_operation": "EndBrowse",
-      "execution_options": ["FILE", "NOHANDLE", "RESP", "RESP2"]
-    },
-    {
-      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0157",
-      "runtime_operation": "ReadNext",
-      "execution_options": ["FILE", "INTO", "NOHANDLE", "RESP", "RESP2", "RIDFLD", "UPDATE"]
-    },
-    {
-      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0158",
-      "runtime_operation": "ReadPrev",
-      "execution_options": ["FILE", "INTO", "NOHANDLE", "RESP", "RESP2", "RIDFLD", "UPDATE"]
-    },
-    {
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0163",
       "runtime_operation": "ReceiveMap",
       "execution_options": ["INTO", "MAP", "MAPSET", "NOHANDLE", "RESP", "RESP2"]
@@ -48,11 +33,6 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0192",
       "runtime_operation": "SendText",
       "execution_options": ["FROM", "NOHANDLE", "RESP", "RESP2"]
-    },
-    {
-      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0208",
-      "runtime_operation": "StartBrowse",
-      "execution_options": ["FILE", "NOHANDLE", "RESP", "RESP2", "RIDFLD"]
     },
     {
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0253",

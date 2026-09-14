@@ -1,0 +1,189 @@
+use super::{
+    CicsOperandName, CicsOutputName, CicsPlanCodecProblem, CicsPlanOperation, CicsPlanOption,
+};
+
+pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
+    match value {
+        CicsPlanOperation::Read => 0,
+        CicsPlanOperation::Rewrite => 1,
+        CicsPlanOperation::Syncpoint => 2,
+        CicsPlanOperation::Deq => 3,
+        CicsPlanOperation::Enq => 4,
+        CicsPlanOperation::ChangeTask => 5,
+        CicsPlanOperation::Suspend => 6,
+        CicsPlanOperation::SetAssociationUserCorrData => 7,
+        CicsPlanOperation::AddressSet => 8,
+        CicsPlanOperation::PopHandle => 9,
+        CicsPlanOperation::PushHandle => 10,
+        CicsPlanOperation::IgnoreCondition => 11,
+        CicsPlanOperation::HandleCondition => 12,
+        CicsPlanOperation::HandleAid => 13,
+        CicsPlanOperation::AsktimeEib => 14,
+        CicsPlanOperation::Asktime => 15,
+        CicsPlanOperation::FormatTime => 16,
+        CicsPlanOperation::Abend => 17,
+        CicsPlanOperation::HandleAbend => 18,
+        CicsPlanOperation::Link => 19,
+        CicsPlanOperation::Xctl => 20,
+        CicsPlanOperation::Return => 21,
+        CicsPlanOperation::StartBrowse => 22,
+        CicsPlanOperation::ReadNext => 23,
+        CicsPlanOperation::ReadPrev => 24,
+        CicsPlanOperation::EndBrowse => 25,
+    }
+}
+
+pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPlanCodecProblem> {
+    match value {
+        0 => Ok(CicsPlanOperation::Read),
+        1 => Ok(CicsPlanOperation::Rewrite),
+        2 => Ok(CicsPlanOperation::Syncpoint),
+        3 => Ok(CicsPlanOperation::Deq),
+        4 => Ok(CicsPlanOperation::Enq),
+        5 => Ok(CicsPlanOperation::ChangeTask),
+        6 => Ok(CicsPlanOperation::Suspend),
+        7 => Ok(CicsPlanOperation::SetAssociationUserCorrData),
+        8 => Ok(CicsPlanOperation::AddressSet),
+        9 => Ok(CicsPlanOperation::PopHandle),
+        10 => Ok(CicsPlanOperation::PushHandle),
+        11 => Ok(CicsPlanOperation::IgnoreCondition),
+        12 => Ok(CicsPlanOperation::HandleCondition),
+        13 => Ok(CicsPlanOperation::HandleAid),
+        14 => Ok(CicsPlanOperation::AsktimeEib),
+        15 => Ok(CicsPlanOperation::Asktime),
+        16 => Ok(CicsPlanOperation::FormatTime),
+        17 => Ok(CicsPlanOperation::Abend),
+        18 => Ok(CicsPlanOperation::HandleAbend),
+        19 => Ok(CicsPlanOperation::Link),
+        20 => Ok(CicsPlanOperation::Xctl),
+        21 => Ok(CicsPlanOperation::Return),
+        22 => Ok(CicsPlanOperation::StartBrowse),
+        23 => Ok(CicsPlanOperation::ReadNext),
+        24 => Ok(CicsPlanOperation::ReadPrev),
+        25 => Ok(CicsPlanOperation::EndBrowse),
+        _ => Err(CicsPlanCodecProblem::Malformed),
+    }
+}
+
+pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
+    match value {
+        CicsOperandName::File => 0,
+        CicsOperandName::Dataset => 1,
+        CicsOperandName::From => 2,
+        CicsOperandName::Ridfld => 3,
+        CicsOperandName::Resource => 4,
+        CicsOperandName::Length => 5,
+        CicsOperandName::MaxLifetime => 6,
+        CicsOperandName::Priority => 7,
+        CicsOperandName::UserCorrData => 8,
+        CicsOperandName::SetAddress => 9,
+        CicsOperandName::SetPointer => 10,
+        CicsOperandName::UsingAddress => 11,
+        CicsOperandName::UsingPointer => 12,
+        CicsOperandName::Conditions => 13,
+        CicsOperandName::Aids => 14,
+        CicsOperandName::Abstime => 15,
+        CicsOperandName::DateSep => 16,
+        CicsOperandName::TimeSep => 17,
+        CicsOperandName::Abcode => 18,
+        CicsOperandName::Label => 19,
+        CicsOperandName::Program => 20,
+        CicsOperandName::Commarea => 21,
+        CicsOperandName::TransId => 22,
+    }
+}
+
+pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCodecProblem> {
+    match value {
+        0 => Ok(CicsOperandName::File),
+        1 => Ok(CicsOperandName::Dataset),
+        2 => Ok(CicsOperandName::From),
+        3 => Ok(CicsOperandName::Ridfld),
+        4 => Ok(CicsOperandName::Resource),
+        5 => Ok(CicsOperandName::Length),
+        6 => Ok(CicsOperandName::MaxLifetime),
+        7 => Ok(CicsOperandName::Priority),
+        8 => Ok(CicsOperandName::UserCorrData),
+        9 => Ok(CicsOperandName::SetAddress),
+        10 => Ok(CicsOperandName::SetPointer),
+        11 => Ok(CicsOperandName::UsingAddress),
+        12 => Ok(CicsOperandName::UsingPointer),
+        13 => Ok(CicsOperandName::Conditions),
+        14 => Ok(CicsOperandName::Aids),
+        15 => Ok(CicsOperandName::Abstime),
+        16 => Ok(CicsOperandName::DateSep),
+        17 => Ok(CicsOperandName::TimeSep),
+        18 => Ok(CicsOperandName::Abcode),
+        19 => Ok(CicsOperandName::Label),
+        20 => Ok(CicsOperandName::Program),
+        21 => Ok(CicsOperandName::Commarea),
+        22 => Ok(CicsOperandName::TransId),
+        _ => Err(CicsPlanCodecProblem::Malformed),
+    }
+}
+
+pub(super) const fn option_tag(value: CicsPlanOption) -> u8 {
+    match value {
+        CicsPlanOption::Update => 0,
+        CicsPlanOption::Rollback => 1,
+        CicsPlanOption::NoHandle => 2,
+        CicsPlanOption::Task => 3,
+        CicsPlanOption::Uow => 4,
+        CicsPlanOption::NoSuspend => 5,
+        CicsPlanOption::Cancel => 6,
+        CicsPlanOption::NoDump => 7,
+        CicsPlanOption::Reset => 8,
+    }
+}
+
+pub(super) fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodecProblem> {
+    match value {
+        0 => Ok(CicsPlanOption::Update),
+        1 => Ok(CicsPlanOption::Rollback),
+        2 => Ok(CicsPlanOption::NoHandle),
+        3 => Ok(CicsPlanOption::Task),
+        4 => Ok(CicsPlanOption::Uow),
+        5 => Ok(CicsPlanOption::NoSuspend),
+        6 => Ok(CicsPlanOption::Cancel),
+        7 => Ok(CicsPlanOption::NoDump),
+        8 => Ok(CicsPlanOption::Reset),
+        _ => Err(CicsPlanCodecProblem::Malformed),
+    }
+}
+
+pub(super) const fn output_tag(value: CicsOutputName) -> u8 {
+    match value {
+        CicsOutputName::Into => 0,
+        CicsOutputName::Resp => 1,
+        CicsOutputName::Resp2 => 2,
+        CicsOutputName::Abstime => 3,
+        CicsOutputName::Milliseconds => 4,
+        CicsOutputName::Mmddyy => 5,
+        CicsOutputName::Mmddyyyy => 6,
+        CicsOutputName::Time => 7,
+        CicsOutputName::Yyddd => 8,
+        CicsOutputName::Yymmdd => 9,
+        CicsOutputName::Yyyymmdd => 10,
+        CicsOutputName::Commarea => 11,
+        CicsOutputName::Ridfld => 12,
+    }
+}
+
+pub(super) fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodecProblem> {
+    match value {
+        0 => Ok(CicsOutputName::Into),
+        1 => Ok(CicsOutputName::Resp),
+        2 => Ok(CicsOutputName::Resp2),
+        3 => Ok(CicsOutputName::Abstime),
+        4 => Ok(CicsOutputName::Milliseconds),
+        5 => Ok(CicsOutputName::Mmddyy),
+        6 => Ok(CicsOutputName::Mmddyyyy),
+        7 => Ok(CicsOutputName::Time),
+        8 => Ok(CicsOutputName::Yyddd),
+        9 => Ok(CicsOutputName::Yymmdd),
+        10 => Ok(CicsOutputName::Yyyymmdd),
+        11 => Ok(CicsOutputName::Commarea),
+        12 => Ok(CicsOutputName::Ridfld),
+        _ => Err(CicsPlanCodecProblem::Malformed),
+    }
+}

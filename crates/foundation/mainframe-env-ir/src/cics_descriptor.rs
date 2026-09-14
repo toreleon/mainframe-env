@@ -471,7 +471,7 @@ pub fn cics_application_registry_for_runtime_operation(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 22] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 26] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -648,6 +648,38 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 22] = [
         effects: CONTROL_TRANSFER_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::StartBrowse,
+        namespace: "cics.file",
+        name: "start-browse",
+        major: 1,
+        effects: READ_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::ReadNext,
+        namespace: "cics.file",
+        name: "read-next",
+        major: 1,
+        effects: READ_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::ReadPrev,
+        namespace: "cics.file",
+        name: "read-prev",
+        major: 1,
+        effects: READ_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::EndBrowse,
+        namespace: "cics.file",
+        name: "end-browse",
+        major: 1,
+        effects: READ_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
 ];
 
 /// Resolves the executable descriptor for a decoded CICS plan operation.
@@ -678,6 +710,10 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::Link => &CICS_EXECUTABLE_DESCRIPTORS[19],
         CicsPlanOperation::Xctl => &CICS_EXECUTABLE_DESCRIPTORS[20],
         CicsPlanOperation::Return => &CICS_EXECUTABLE_DESCRIPTORS[21],
+        CicsPlanOperation::StartBrowse => &CICS_EXECUTABLE_DESCRIPTORS[22],
+        CicsPlanOperation::ReadNext => &CICS_EXECUTABLE_DESCRIPTORS[23],
+        CicsPlanOperation::ReadPrev => &CICS_EXECUTABLE_DESCRIPTORS[24],
+        CicsPlanOperation::EndBrowse => &CICS_EXECUTABLE_DESCRIPTORS[25],
     }
 }
 
@@ -738,7 +774,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 22);
+        assert_eq!(typed.len(), 26);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -748,7 +784,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 12);
+        assert_eq!(legacy.len(), 8);
         assert!(legacy.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && !descriptor.legacy_execution_options.is_empty()));
@@ -937,6 +973,10 @@ mod tests {
                 CicsPlanOperation::Link,
                 CicsPlanOperation::Xctl,
                 CicsPlanOperation::Return,
+                CicsPlanOperation::StartBrowse,
+                CicsPlanOperation::ReadNext,
+                CicsPlanOperation::ReadPrev,
+                CicsPlanOperation::EndBrowse,
                 CicsPlanOperation::PopHandle,
                 CicsPlanOperation::PushHandle,
                 CicsPlanOperation::Read,

@@ -18,12 +18,21 @@ pub(super) fn resolve(
         ("MMDDYYYY", HirCicsOutputName::Mmddyyyy),
         ("RESP", HirCicsOutputName::Resp),
         ("RESP2", HirCicsOutputName::Resp2),
+        ("RIDFLD", HirCicsOutputName::Ridfld),
         ("TIME", HirCicsOutputName::Time),
         ("YYDDD", HirCicsOutputName::Yyddd),
         ("YYMMDD", HirCicsOutputName::Yymmdd),
         ("YYYYMMDD", HirCicsOutputName::Yyyymmdd),
     ] {
         if name == "ABSTIME" && operation == HirCicsOperation::FormatTime {
+            continue;
+        }
+        if name == "RIDFLD"
+            && !matches!(
+                operation,
+                HirCicsOperation::ReadNext | HirCicsOperation::ReadPrev
+            )
+        {
             continue;
         }
         if let Some(value) = clauses.get(name) {

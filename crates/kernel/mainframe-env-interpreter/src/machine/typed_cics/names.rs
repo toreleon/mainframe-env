@@ -34,6 +34,7 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         CicsOutputName::Abstime => SlotUse::AbstimeOutput,
         CicsOutputName::Commarea => SlotUse::Output,
         CicsOutputName::Into => SlotUse::Output,
+        CicsOutputName::Ridfld => SlotUse::Output,
         CicsOutputName::Milliseconds => SlotUse::MillisecondsOutput,
         CicsOutputName::Mmddyy | CicsOutputName::Time | CicsOutputName::Yymmdd => {
             SlotUse::FormatTextOutput(8)
@@ -61,6 +62,10 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::Link => CicsOperation::Link,
         CicsPlanOperation::Xctl => CicsOperation::Xctl,
         CicsPlanOperation::Return => CicsOperation::Return,
+        CicsPlanOperation::StartBrowse => CicsOperation::StartBrowse,
+        CicsPlanOperation::ReadNext => CicsOperation::ReadNext,
+        CicsPlanOperation::ReadPrev => CicsOperation::ReadPrev,
+        CicsPlanOperation::EndBrowse => CicsOperation::EndBrowse,
         CicsPlanOperation::PopHandle => CicsOperation::PopHandle,
         CicsPlanOperation::PushHandle => CicsOperation::PushHandle,
         CicsPlanOperation::Read => CicsOperation::Read,
@@ -104,6 +109,7 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::Abstime => "ABSTIME",
         CicsOutputName::Commarea => "COMMAREA",
         CicsOutputName::Into => "INTO",
+        CicsOutputName::Ridfld => "RIDFLD",
         CicsOutputName::Milliseconds => "MILLISECONDS",
         CicsOutputName::Mmddyy => "MMDDYY",
         CicsOutputName::Mmddyyyy => "MMDDYYYY",
