@@ -5,17 +5,17 @@ use mainframe_env_diagnostics::{
 };
 use mainframe_env_encoding::CodePage;
 use mainframe_env_execution_api::{
-    Abend, BoundedPayload, Completion, Condition, IdempotencyKey, Invocation, InvocationLimits,
-    Machine, MachineDrive, MachineResume, Quantum, Selector, Suspension, Transfer,
+    Abend, AbendDumpDisposition, BoundedPayload, Completion, Condition, IdempotencyKey, Invocation,
+    InvocationLimits, Machine, MachineDrive, MachineResume, Quantum, Selector, Suspension,
+    Transfer,
 };
 use mainframe_env_host_api::{
-    CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, ClassName,
-    ClockRequest, DatasetCloseControl, DatasetName, DatasetReadControl, DatasetReadLockMode,
-    DatasetReelUnit, DatasetRequest, Db2HostVariable, Db2Operation, Db2Request, EffectRequest,
-    EffectResult, HostLimits, HostProblem, HostRequest, HostResult, ImsOperation, ImsQualifier,
-    ImsRequest, KeyRelation, MethodName, MqOperation, MqRequest, Mutation, ProgramName,
-    ProgramRequest, RuntimeServiceKind, RuntimeServiceName, RuntimeServiceSelector,
-    TerminalRequest,
+    CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest, ClassName, ClockRequest,
+    DatasetCloseControl, DatasetName, DatasetReadControl, DatasetReadLockMode, DatasetReelUnit,
+    DatasetRequest, Db2HostVariable, Db2Operation, Db2Request, EffectRequest, EffectResult,
+    HostLimits, HostProblem, HostRequest, HostResult, ImsOperation, ImsQualifier, ImsRequest,
+    KeyRelation, MethodName, MqOperation, MqRequest, Mutation, ProgramName, ProgramRequest,
+    RuntimeServiceKind, RuntimeServiceName, RuntimeServiceSelector, TerminalRequest,
 };
 use mainframe_env_ir::{
     Attribute, CodecLimits, Module, Operation, OperationIdentity, StorageId, decode_binary,
@@ -29,6 +29,7 @@ use typed_decimal::{decimal_add, decimal_divide, decimal_multiply, decimal_subtr
 mod condition_literals;
 mod corresponding;
 mod decimal_commit;
+mod eib;
 mod layout_admission;
 mod layout_resolution;
 mod typed_cics;
@@ -345,6 +346,7 @@ enum PendingKind {
         outputs: BTreeMap<String, typed_cics::CicsTarget>,
         response: Option<typed_cics::CicsTarget>,
         response2: Option<typed_cics::CicsTarget>,
+        address_set: Option<typed_cics::CicsAddressSet>,
         no_handle: bool,
     },
     Ignore,
@@ -496,37 +498,9 @@ impl ReferenceMachine {
                     .map_err(|_| MachineProblem::InvalidOperation)
             })
             .transpose()?;
-        let mut implicit = BTreeMap::from([
-            (
-                "EIBRESP".into(),
-                CobolValue::Decimal(Decimal {
-                    coefficient: 0,
-                    scale: 0,
-                }),
-            ),
-            (
-                "EIBRESP2".into(),
-                CobolValue::Decimal(Decimal {
-                    coefficient: 0,
-                    scale: 0,
-                }),
-            ),
-            (
-                "EIBCALEN".into(),
-                CobolValue::Decimal(Decimal {
-                    coefficient: i128::try_from(entry_commarea_len.unwrap_or(0))
-                        .map_err(|_| MachineProblem::InvalidOperation)?,
-                    scale: 0,
-                }),
-            ),
-            (
-                "EIBAID".into(),
-                CobolValue::Bytes(vec![entry_aid.unwrap_or(0)]),
-            ),
-            (
-                "EIBTRNID".into(),
-                CobolValue::Bytes(entry_transaction.clone().unwrap_or_default()),
-            ),
+        let mut implicit =
+            eib::implicit_values(entry_commarea_len, entry_aid, entry_transaction.as_deref())?;
+        implicit.extend([
             (
                 "RETURN-CODE".into(),
                 CobolValue::Decimal(Decimal {
@@ -1176,6 +1150,11 @@ impl ReferenceMachine {
     pub fn output(&self) -> &[u8] {
         &self.output
     }
+    /// Current task priority after any completed CICS scheduling command.
+    #[must_use]
+    pub fn invocation_priority(&self) -> u8 {
+        self.invocation.priority
+    }
     #[must_use]
     pub fn dataset_cursors(&self) -> &BTreeMap<String, String> {
         &self.dataset_cursors
@@ -1806,6 +1785,7 @@ impl ReferenceMachine {
                     self.deferred_drive = Some(MachineDrive::Abend(Abend {
                         code,
                         reason: Some("compatible CEE3ABD service".into()),
+                        dump: AbendDumpDisposition::Unspecified,
                     }));
                     return Ok(());
                 }
@@ -1950,31 +1930,19 @@ impl ReferenceMachine {
                     outputs,
                     response: response_target,
                     response2: response2_target,
+                    address_set,
                     no_handle,
                 },
                 HostResult::Cics(response),
             ) => {
                 let responded = response_target.is_some() || no_handle;
-                if let Some(target) = response_target {
-                    typed_cics::write_target(
-                        self,
-                        &target,
-                        &CobolValue::Decimal(Decimal {
-                            coefficient: i128::from(response.response),
-                            scale: 0,
-                        }),
-                    )?;
-                }
-                if let Some(target) = response2_target {
-                    typed_cics::write_target(
-                        self,
-                        &target,
-                        &CobolValue::Decimal(Decimal {
-                            coefficient: i128::from(response.response2),
-                            scale: 0,
-                        }),
-                    )?;
-                }
+                typed_cics::write_response_state(
+                    self,
+                    response_target.as_ref(),
+                    response2_target.as_ref(),
+                    address_set.as_ref(),
+                    &response,
+                )?;
                 if let Some(target) = into
                     && matches!(
                         response.payload.schema(),
@@ -1988,6 +1956,9 @@ impl ReferenceMachine {
                     )?;
                 }
                 for (name, value) in &response.outputs {
+                    if typed_cics::write_runtime_output(self, name, value)? {
+                        continue;
+                    }
                     if let Some(field) = name.strip_prefix("BMS.") {
                         if let Some(field) = field.strip_suffix(".LENGTH") {
                             let target = format!("{field}L");
@@ -2014,27 +1985,9 @@ impl ReferenceMachine {
                     let Some(target) = outputs.get(name) else {
                         continue;
                     };
-                    if value.schema() == "mainframe-env.cics.decimal@1" {
-                        let coefficient = String::from_utf8_lossy(value.bytes())
-                            .parse::<i128>()
-                            .map_err(|_| MachineProblem::UnexpectedHostResult)?;
-                        typed_cics::write_target(
-                            self,
-                            target,
-                            &CobolValue::Decimal(Decimal {
-                                coefficient,
-                                scale: 0,
-                            }),
-                        )?;
-                    } else {
-                        typed_cics::write_target(
-                            self,
-                            target,
-                            &CobolValue::Bytes(value.bytes().to_vec()),
-                        )?;
-                    }
+                    typed_cics::write_output(self, name, target, value)?;
                 }
-                self.write_cics_context(operation, &response)?;
+                eib::write_context(self, operation, &response)?;
                 self.deferred_drive = match response.disposition {
                     CicsDisposition::Complete => (response.response != 0 && !responded).then_some(
                         MachineDrive::Condition(Condition {
@@ -2044,17 +1997,12 @@ impl ReferenceMachine {
                             handled: false,
                         }),
                     ),
-                    CicsDisposition::Suspended => {
-                        self.pc = self.pc.saturating_sub(1);
-                        Some(MachineDrive::Suspended(Suspension {
-                            kind: "cics-terminal".into(),
-                            resume_token: format!(
-                                "{}:{}",
-                                self.invocation.run_unit_id, self.effect_sequence
-                            ),
-                            state_bytes: response.payload.bytes().len() as u64,
-                        }))
-                    }
+                    CicsDisposition::Ignored => None,
+                    CicsDisposition::Suspended => Some(typed_cics::suspension(
+                        self,
+                        operation,
+                        response.payload.bytes().len(),
+                    )),
                     CicsDisposition::Transfer => {
                         let target = response
                             .target
@@ -2078,13 +2026,9 @@ impl ReferenceMachine {
                         None
                     }
                     CicsDisposition::Returned => Some(MachineDrive::Completed(self.complete()?)),
-                    CicsDisposition::Abended => Some(MachineDrive::Abend(Abend {
-                        code: response.condition,
-                        reason: Some(format!(
-                            "EIBRESP={} EIBRESP2={}",
-                            response.response, response.response2
-                        )),
-                    })),
+                    CicsDisposition::Abended => Some(MachineDrive::Abend(
+                        typed_cics::abend_outcome(operation, &response)?,
+                    )),
                 };
             }
             (
@@ -4321,30 +4265,6 @@ impl ReferenceMachine {
         };
         self.effect(HostRequest::Dataset(request), pending)
     }
-    fn write_cics_context(
-        &mut self,
-        operation: CicsOperation,
-        response: &CicsResponse,
-    ) -> Result<(), MachineProblem> {
-        for (name, value) in [
-            ("EIBRESP", i128::from(response.response)),
-            ("EIBRESP2", i128::from(response.response2)),
-        ] {
-            self.write_decimal(
-                name,
-                Decimal {
-                    coefficient: value,
-                    scale: 0,
-                },
-            )?;
-        }
-        if operation == CicsOperation::ReceiveMap {
-            self.write("EIBAID", &[response.aid])?;
-        }
-        self.write("EIBTRNID", response.transaction.as_bytes())?;
-        Ok(())
-    }
-
     fn ims_effect(&mut self, args: &[String]) -> Result<Step, MachineProblem> {
         let opcode = args
             .iter()

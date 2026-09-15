@@ -74,7 +74,7 @@ fn validate_journal(
         .filter(|operation| {
             matches!(
                 operation.identity.namespace(),
-                "cics.file" | "cics.recovery"
+                "cics.file" | "cics.recovery" | "cics.task"
             )
         })
         .collect::<Vec<_>>();
@@ -152,11 +152,12 @@ fn validate_journal(
     {
         return Err("CICS pilot coordinator audit sequence drifted".into());
     }
-    for (index, _) in cics_operations
-        .iter()
-        .enumerate()
-        .filter(|(_, operation)| matches!(operation.identity.name(), "rewrite" | "syncpoint"))
-    {
+    for (index, _) in cics_operations.iter().enumerate().filter(|(_, operation)| {
+        matches!(
+            operation.identity.name(),
+            "deq" | "enq" | "rewrite" | "syncpoint"
+        )
+    }) {
         let sequence = u64::try_from(index + 1).map_err(|_| "too many CICS effects")?;
         let key = IdempotencyKey::new(
             format!("{}:{sequence}", invocation.idempotency_key.as_str()),

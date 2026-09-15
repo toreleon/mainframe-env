@@ -167,11 +167,32 @@ impl PlanContext<'_> {
     ) -> Result<CicsNamedOperand, CicsPlanProblem> {
         Ok(CicsNamedOperand {
             name: match operand.name {
+                HirCicsOperandName::Abcode => CicsOperandName::Abcode,
+                HirCicsOperandName::Label => CicsOperandName::Label,
+                HirCicsOperandName::Program => CicsOperandName::Program,
+                HirCicsOperandName::Commarea => CicsOperandName::Commarea,
+                HirCicsOperandName::TransId => CicsOperandName::TransId,
                 HirCicsOperandName::File => CicsOperandName::File,
                 HirCicsOperandName::Dataset => CicsOperandName::Dataset,
                 HirCicsOperandName::From => CicsOperandName::From,
                 HirCicsOperandName::Ridfld => CicsOperandName::Ridfld,
+                HirCicsOperandName::Queue => CicsOperandName::Queue,
+                HirCicsOperandName::Map => CicsOperandName::Map,
+                HirCicsOperandName::Mapset => CicsOperandName::Mapset,
+                HirCicsOperandName::Resource => CicsOperandName::Resource,
                 HirCicsOperandName::Length => CicsOperandName::Length,
+                HirCicsOperandName::MaxLifetime => CicsOperandName::MaxLifetime,
+                HirCicsOperandName::Priority => CicsOperandName::Priority,
+                HirCicsOperandName::UserCorrData => CicsOperandName::UserCorrData,
+                HirCicsOperandName::SetAddress => CicsOperandName::SetAddress,
+                HirCicsOperandName::SetPointer => CicsOperandName::SetPointer,
+                HirCicsOperandName::UsingAddress => CicsOperandName::UsingAddress,
+                HirCicsOperandName::UsingPointer => CicsOperandName::UsingPointer,
+                HirCicsOperandName::Conditions => CicsOperandName::Conditions,
+                HirCicsOperandName::Aids => CicsOperandName::Aids,
+                HirCicsOperandName::Abstime => CicsOperandName::Abstime,
+                HirCicsOperandName::DateSep => CicsOperandName::DateSep,
+                HirCicsOperandName::TimeSep => CicsOperandName::TimeSep,
                 HirCicsOperandName::KeyLength => CicsOperandName::KeyLength,
             },
             value: match &operand.value {
@@ -179,6 +200,7 @@ impl PlanContext<'_> {
                     CicsOperandValue::Literal(value.as_bytes().to_vec())
                 }
                 HirCicsValue::Data(reference) => CicsOperandValue::Storage(self.slot(reference)?),
+                HirCicsValue::Integer(value) => CicsOperandValue::Integer(*value),
                 HirCicsValue::LengthOf(reference) => {
                     CicsOperandValue::LengthOf(self.slot(reference)?)
                 }
@@ -192,9 +214,20 @@ impl PlanContext<'_> {
     ) -> Result<CicsOutputBinding, CicsPlanProblem> {
         Ok(CicsOutputBinding {
             name: match output.name {
+                HirCicsOutputName::Abstime => CicsOutputName::Abstime,
+                HirCicsOutputName::Commarea => CicsOutputName::Commarea,
                 HirCicsOutputName::Into => CicsOutputName::Into,
+                HirCicsOutputName::Ridfld => CicsOutputName::Ridfld,
+                HirCicsOutputName::Milliseconds => CicsOutputName::Milliseconds,
+                HirCicsOutputName::Mmddyy => CicsOutputName::Mmddyy,
+                HirCicsOutputName::Mmddyyyy => CicsOutputName::Mmddyyyy,
                 HirCicsOutputName::Resp => CicsOutputName::Resp,
                 HirCicsOutputName::Resp2 => CicsOutputName::Resp2,
+                HirCicsOutputName::Time => CicsOutputName::Time,
+                HirCicsOutputName::Yyddd => CicsOutputName::Yyddd,
+                HirCicsOutputName::Yymmdd => CicsOutputName::Yymmdd,
+                HirCicsOutputName::Yyyymmdd => CicsOutputName::Yyyymmdd,
+                HirCicsOutputName::Assign(output) => CicsOutputName::Assign(output),
                 HirCicsOutputName::Length => CicsOutputName::Length,
             },
             target: self.slot(&output.target)?,
@@ -239,16 +272,61 @@ impl PlanContext<'_> {
 
 const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
     match operation {
+        HirCicsOperation::Abend => CicsPlanOperation::Abend,
+        HirCicsOperation::AddressSet => CicsPlanOperation::AddressSet,
+        HirCicsOperation::Asktime => CicsPlanOperation::Asktime,
+        HirCicsOperation::AsktimeEib => CicsPlanOperation::AsktimeEib,
+        HirCicsOperation::FormatTime => CicsPlanOperation::FormatTime,
+        HirCicsOperation::ChangeTask => CicsPlanOperation::ChangeTask,
         HirCicsOperation::Read => CicsPlanOperation::Read,
         HirCicsOperation::Rewrite => CicsPlanOperation::Rewrite,
+        HirCicsOperation::SetAssociationUserCorrData => {
+            CicsPlanOperation::SetAssociationUserCorrData
+        }
         HirCicsOperation::Syncpoint => CicsPlanOperation::Syncpoint,
+        HirCicsOperation::Suspend => CicsPlanOperation::Suspend,
+        HirCicsOperation::Deq => CicsPlanOperation::Deq,
+        HirCicsOperation::Enq => CicsPlanOperation::Enq,
+        HirCicsOperation::HandleAid => CicsPlanOperation::HandleAid,
+        HirCicsOperation::HandleAbend => CicsPlanOperation::HandleAbend,
+        HirCicsOperation::HandleCondition => CicsPlanOperation::HandleCondition,
+        HirCicsOperation::IgnoreCondition => CicsPlanOperation::IgnoreCondition,
+        HirCicsOperation::Link => CicsPlanOperation::Link,
+        HirCicsOperation::Xctl => CicsPlanOperation::Xctl,
+        HirCicsOperation::Return => CicsPlanOperation::Return,
+        HirCicsOperation::StartBrowse => CicsPlanOperation::StartBrowse,
+        HirCicsOperation::ReadNext => CicsPlanOperation::ReadNext,
+        HirCicsOperation::ReadPrev => CicsPlanOperation::ReadPrev,
+        HirCicsOperation::EndBrowse => CicsPlanOperation::EndBrowse,
+        HirCicsOperation::Delete => CicsPlanOperation::Delete,
+        HirCicsOperation::Write => CicsPlanOperation::Write,
+        HirCicsOperation::WriteTransientData => CicsPlanOperation::WriteTransientData,
+        HirCicsOperation::ReceiveMap => CicsPlanOperation::ReceiveMap,
+        HirCicsOperation::SendMap => CicsPlanOperation::SendMap,
+        HirCicsOperation::SendText => CicsPlanOperation::SendText,
+        HirCicsOperation::Assign => CicsPlanOperation::Assign,
+        HirCicsOperation::PurgeMessage => CicsPlanOperation::PurgeMessage,
+        HirCicsOperation::PopHandle => CicsPlanOperation::PopHandle,
+        HirCicsOperation::PushHandle => CicsPlanOperation::PushHandle,
     }
 }
 
 const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
     match option {
+        HirCicsOption::Cancel => CicsPlanOption::Cancel,
+        HirCicsOption::NoDump => CicsPlanOption::NoDump,
+        HirCicsOption::Reset => CicsPlanOption::Reset,
         HirCicsOption::Update => CicsPlanOption::Update,
         HirCicsOption::Rollback => CicsPlanOption::Rollback,
         HirCicsOption::NoHandle => CicsPlanOption::NoHandle,
+        HirCicsOption::Task => CicsPlanOption::Task,
+        HirCicsOption::Uow => CicsPlanOption::Uow,
+        HirCicsOption::NoSuspend => CicsPlanOption::NoSuspend,
+        HirCicsOption::Erase => CicsPlanOption::Erase,
+        HirCicsOption::Cursor => CicsPlanOption::Cursor,
+        HirCicsOption::DateSep => CicsPlanOption::DateSep,
+        HirCicsOption::TimeSep => CicsPlanOption::TimeSep,
+        HirCicsOption::FreeKb => CicsPlanOption::FreeKb,
+        HirCicsOption::Gteq => CicsPlanOption::Gteq,
     }
 }

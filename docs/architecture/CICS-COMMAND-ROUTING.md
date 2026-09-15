@@ -67,15 +67,109 @@ It contains all 263 API registry shapes with deterministic recognition,
 option-shape, family, EIBFN and handler identities. Readiness is deliberately
 split:
 
-- 3 `typed-runtime` API routes (`READ`, `REWRITE`, and `SYNCPOINT`);
-- 20 `legacy-compatibility` API routes that remain on the pre-existing raw
+- 34 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
+  `SYNCPOINT` routes and the reviewed incremental family slices;
+- 1 `legacy-compatibility` API route that remains on the pre-existing raw
   compatibility path; and
-- 240 `unready` rows that are recognized but fail explicitly as unsupported.
+- 228 `unready` rows that are recognized but fail explicitly as unsupported.
 
-The 23 existing API routes are the only advertised application commands.
-`ASKTIME ABSTIME` is the advertised time form because the existing handler
-returns its packed-decimal destination; bare `ASKTIME` remains unready until
-the runtime also implements its distinct EIBDATE/EIBTIME update contract.
+The remaining raw compatibility route's implemented option subset is owned by the
+separate versioned
+[`legacy-execution-options.json`](../../conformance/0.9/cics/legacy-execution-options.json)
+catalog and its
+[`schema`](../../conformance/0.9/schemas/cics-legacy-execution-options.schema.json).
+It binds the logical 263-row application identity digest, not the physical
+descriptor file, so runtime-readiness edits cannot invalidate frozen IBM
+source receipts. The generator requires its route identities to match the
+legacy API runtime set exactly and verifies every admitted option against a
+current accepted source projection before emitting the registry.
+
+The current 35 API routes are the only advertised application commands.
+`ASKTIME ABSTIME` returns its packed-decimal destination and refreshes EIBDATE
+and EIBTIME. Bare `ASKTIME` is a distinct route that refreshes only those two
+packed-decimal EIB fields; it cannot manufacture an ABSTIME destination. Both
+forms lower through distinct typed plan operations, while retained raw
+ASKTIME artifacts remain readable by the compatibility interpreter.
+The typed FORMATTIME route currently admits only its source-checked legacy
+subset: packed ABSTIME input, valued DATESEP/TIMESEP, five explicit date
+formats, TIME, MILLISECONDS, and common response options. Other official
+FORMATTIME fields remain explicit compiler rejections until their output and
+timezone contracts are implemented.
+`ABEND` also lowers through a typed task plan: ABCODE is captured as a bounded
+literal or a pre-resolved 1–4 character storage input, and CANCEL/NODUMP remain
+distinct flags. Retained raw ABEND artifacts remain readable, but new
+compilations do not carry their command text across the executable boundary.
+`HANDLE ABEND` uses the same typed task dialect with a source label or bounded
+program-name input and mutually exclusive CANCEL/RESET actions; its provider
+continues to own authorization and durable active/canceled exit state.
+The typed local LINK subset binds PROGRAM and an optional COMMAREA before
+dispatch. COMMAREA is one input/output storage identity, so registering its
+return destination cannot replace the captured request bytes. Channel, explicit
+length, input-message, remote-system, transaction, and SYNCONRETURN forms remain
+compiler rejections until their separate contracts are implemented.
+The typed local XCTL subset binds the same PROGRAM and optional COMMAREA inputs,
+but declares no COMMAREA output because control does not return to the caller.
+Its complete provider result becomes a frame-replacing transfer to the selected
+program. Channel, explicit length, and input-message forms remain compiler
+rejections until their separate contracts are implemented.
+The typed local RETURN subset admits bare completion and an optional TRANSID;
+COMMAREA is admitted only with TRANSID so the copied bytes have an owned durable
+continuation identity. RETURN carries no COMMAREA output. `LENGTH(LENGTH OF
+commarea)` selects the captured prefix; other explicit lengths, channel,
+input-message, IMMEDIATE, ENDACTIVITY, higher-level, and DPL forms remain
+fail-closed.
+The typed default-cursor file-browse subset binds STARTBR, READNEXT, READPREV,
+and ENDBR to exactly one FILE/DATASET alias. STARTBR captures a writable
+RIDFLD without returning a record and admits the default-equivalent `GTEQ`
+relation; READNEXT and READPREV require INTO and
+model RIDFLD as the same input/output storage identity so the host-updated key
+feeds the next browse request; ENDBR closes the resource browse. REQID/SYSID,
+KEYLENGTH/LENGTH, SET, alternate RBA/RRN/XRBA and other generic key modes, and
+UPDATE/TOKEN/RLS locking remain explicit compiler rejections.
+The typed keyed-mutation subset admits DELETE with either an explicit RIDFLD or
+the record held by the task's latest `READ UPDATE` on that file. WRITE FILE
+requires explicit FROM and RIDFLD data areas. Both use the same single
+FILE/DATASET resource binding and typed mutation envelope. TOKEN correlation,
+SYSID/length handling, generic and alternate record identities, WRITE
+MASSINSERT, and RLS NOSUSPEND remain fail-closed.
+The typed local WRITEQ TD subset requires a bounded QUEUE selector and FROM
+storage input, with optional numeric LENGTH or `LENGTH OF` that input. The
+provider writes exactly the selected prefix under the request's mutation
+identity, so retries compare the semantic record rather than ignored trailing
+bytes. Remote SYSID routing and TDQUEUE definition-state conditions remain
+deferred.
+The typed local BMS subset binds `RECEIVE MAP`, `SEND MAP`, and `SEND TEXT` to
+the terminal family. Map names are prevalidated 1–7 character literals or
+alpha/alphanumeric fields; a `RECEIVE MAP` MAPSET field may be eight bytes so
+its runtime value can contain a valid name plus a trailing blank. `SEND MAP`
+requires MAP, defaults MAPSET to MAP, and optionally captures FROM; `RECEIVE
+MAP` requires MAP, applies the same MAPSET default, and optionally writes INTO;
+`SEND TEXT` requires FROM. The provider uses the requested durable map
+definition for terminal-fit validation and input-field normalization. SET
+pointers, omitted-map AID-only receive, implicit symbolic map storage, explicit
+length, paging, device and other terminal controls remain explicit compiler
+rejections.
+`CURSOR` and `FREEKB` are admitted and forwarded but are not yet modeled by the
+terminal provider (`#210`). `ERASE` coincides with the provider's existing
+full-screen replacement behavior (`#203`).
+`PURGE MESSAGE` is a separate typed terminal mutation. Because this runtime has
+no ACCUM or page-building route, its reachable full-BMS logical-message state
+is empty: local purge succeeds idempotently without changing the already
+displayed screen or current map. DPL use returns `INVREQ` 16/200. Deleting a
+nonempty accumulated message and surfacing temporary-storage `TSIOERR` remain
+unready until that logical-message authority exists.
+The typed ASSIGN subset carries each of its 78 admitted context values as a
+pre-resolved output binding under one bounded output-name authority. It retains
+the existing 16-option maximum, exact receiver checks, partial-INVREQ behavior,
+local/DPL matrix, EIBFN and provider semantics without carrying source command
+text across the executable boundary. The other 35 generated ASSIGN semantic
+options remain compiler rejections until their contexts are implemented.
+The legacy route admits only the source-valid option subset whose behavior is
+implemented by that raw handler. A catalog-known option outside that subset
+fails explicitly before compatibility lowering instead of being silently
+dropped. The pre-registry `DATASET` spelling remains an exact alias for `FILE`
+on the existing file and browse operations; specifying both spellings fails as
+an ambiguous resource selection.
 `automatic_registration` remains false, the default handler is null, and an
 unready row cannot reach a generic-success fallback. The application registry
 does not accept or dispatch SPI or FEPI identities. A separate generated,
@@ -127,10 +221,10 @@ differentials, or make 0.9.0 release-ready.
 
 | Family | Owns |
 |---|---|
-| `task-control` | task context, HANDLE state, ASSIGN, RETRIEVE, ABEND, and pseudo-conversation RETURN |
+| `task-control` / `handle-state` | task context, durable HANDLE state, ASSIGN, RETRIEVE, ABEND, and pseudo-conversation RETURN |
 | `time` | ASKTIME clock acquisition and FORMATTIME conversion |
 | `program-control` | program inquiry, LINK, and XCTL |
-| `terminal-control` | BMS and text send/receive behavior |
+| `terminal-control` / `terminal-run` | BMS and text send/receive behavior plus terminal-task lifecycle cleanup |
 | `file-control` | file status, keyed I/O, and browse behavior |
 | `queue-control` | transient-data queue writes |
 | `recovery` | SYNCPOINT coordination, rollback, and subsystem unit-of-work completion |
@@ -156,6 +250,22 @@ and output destinations before execution, then emits the existing owned typed
 request through the execution coordinator. The provider never parses COBOL HIR
 or source syntax, and the migration cannot introduce a parallel CICS provider,
 store, unit-of-work protocol, or condition authority.
+
+Execution-context facts that are not command operands travel in bounded,
+versioned invocation bindings. `mainframe-env.cics.execution-context@1`
+currently distinguishes local execution, DPL with `SYNCONRETURN`, DPL without
+syncpoint ownership, and `EXECUTIONSET=DPLSUBSET`. The recovery handler uses
+that context before changing UOW state; CIC-905 owns populating it from a
+future public DPL route. It is not embedded in source tokens or inferred from a
+successful transport call.
+
+For a DPL invocation that owns the syncpoint, the bounded
+`mainframe-env.cics.syncpoint.remote-outcome@1` binding records whether the
+remote system is commit-capable or unable to commit. The latter drives the UOW
+into rollback, persists the rolled-back terminal state, backs out local
+recoverable work, and raises `ROLLEDBACK` with RESP 82. The binding is rejected
+outside a `dpl-synconreturn` context; CIC-905 owns populating both bindings from
+the eventual public DPL transport.
 
 ## Change contract
 

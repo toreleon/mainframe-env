@@ -10,19 +10,24 @@ pub(in crate::service) fn invoke(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     match request.operation {
-        CicsOperation::Asktime => asktime(service, run),
+        CicsOperation::Asktime | CicsOperation::AsktimeEib => asktime(service, run, request),
         CicsOperation::FormatTime => format_time(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }
 
-fn asktime(service: &CicsService, run: &mut Run) -> Result<CicsResponse, HostProblem> {
+fn asktime(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    validate_asktime_request(request)?;
     let timestamp = match service.nested(run, HostRequest::Clock(ClockRequest::UtcTimestamp))? {
         HostResult::Clock(value) => value,
         _ => return Err(HostProblem::ProviderFailure),
     };
     let instant = parse_clock_timestamp(&timestamp)?;
-    let absolute = absolute_milliseconds(instant)?;
+    let (eib_date, eib_time) = eib_date_time(instant)?;
     let mut response = service.response(
         run,
         CicsDisposition::Complete,
@@ -35,8 +40,37 @@ fn asktime(service: &CicsService, run: &mut Run) -> Result<CicsResponse, HostPro
     )?;
     response
         .outputs
-        .insert("ABSTIME".into(), decimal_payload(absolute)?);
+        .insert("EIBDATE".into(), decimal_payload(eib_date)?);
+    response
+        .outputs
+        .insert("EIBTIME".into(), decimal_payload(eib_time)?);
+    if request.operation == CicsOperation::Asktime {
+        response.outputs.insert(
+            "ABSTIME".into(),
+            decimal_payload(absolute_milliseconds(instant)?)?,
+        );
+    }
     Ok(response)
+}
+
+fn validate_asktime_request(request: &CicsRequest) -> Result<(), HostProblem> {
+    let allowed = if request.operation == CicsOperation::Asktime {
+        &["ABSTIME", "OPTION.NOHANDLE", "RESP", "RESP2"][..]
+    } else {
+        &["OPTION.NOHANDLE", "RESP", "RESP2"][..]
+    };
+    if request.arguments.iter().any(|(name, value)| {
+        !allowed.contains(&name.as_str())
+            || if name == "OPTION.NOHANDLE" {
+                value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+            } else {
+                value.schema() != "mainframe-env.cics.argument@1"
+            }
+    }) {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
 }
 
 fn format_time(
@@ -44,11 +78,18 @@ fn format_time(
     run: &Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
+    validate_format_time_request(request)?;
     let absolute = argument_text(request, "ABSTIME")?
         .trim()
         .parse::<i64>()
-        .map_err(|_| HostProblem::Malformed)?;
-    let instant = instant_from_absolute(absolute)?;
+        .map_err(|_| invalid_absolute_time())?;
+    let instant = instant_from_absolute(absolute).map_err(|problem| {
+        if problem == HostProblem::Malformed {
+            invalid_absolute_time()
+        } else {
+            problem
+        }
+    })?;
     let date_separator = separator(request, "DATESEP", b'/')?;
     let time_separator = separator(request, "TIMESEP", b':')?;
     let mut response = service.response(
@@ -76,10 +117,59 @@ fn format_time(
     if request.arguments.contains_key("MILLISECONDS") {
         response.outputs.insert(
             "MILLISECONDS".into(),
-            bounded(format!("{:03}", instant.millisecond).into_bytes())?,
+            decimal_payload(i64::from(instant.millisecond))?,
         );
     }
     Ok(response)
+}
+
+fn validate_format_time_request(request: &CicsRequest) -> Result<(), HostProblem> {
+    const OUTPUTS: &[&str] = &[
+        "MILLISECONDS",
+        "MMDDYY",
+        "MMDDYYYY",
+        "TIME",
+        "YYDDD",
+        "YYMMDD",
+        "YYYYMMDD",
+    ];
+    if !request.arguments.contains_key("ABSTIME") {
+        return Err(HostProblem::Malformed);
+    }
+    for (name, value) in &request.arguments {
+        let valid = match name.as_str() {
+            "ABSTIME" => matches!(
+                value.schema(),
+                "mainframe-env.cics.decimal@1" | "mainframe-env.cics.argument@1"
+            ),
+            "DATESEP" | "TIMESEP" => {
+                matches!(
+                    value.schema(),
+                    "mainframe-env.cics.literal@1"
+                        | "mainframe-env.cics.storage-value@1"
+                        | "mainframe-env.cics.argument@1"
+                ) && value.bytes().len() == 1
+            }
+            "OPTION.DATESEP" | "OPTION.NOHANDLE" | "OPTION.TIMESEP" => {
+                value.schema() == "mainframe-env.cics.option@1" && value.bytes().is_empty()
+            }
+            "RESP" | "RESP2" => value.schema() == "mainframe-env.cics.argument@1",
+            name if OUTPUTS.contains(&name) => value.schema() == "mainframe-env.cics.argument@1",
+            _ => false,
+        };
+        if !valid {
+            return Err(HostProblem::Malformed);
+        }
+    }
+    Ok(())
+}
+
+fn invalid_absolute_time() -> HostProblem {
+    HostProblem::Condition {
+        name: "INVREQ".into(),
+        response: 16,
+        response2: 1,
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -143,6 +233,27 @@ fn absolute_milliseconds(instant: ClockInstant) -> Result<i64, HostProblem> {
         .and_then(|value| value.checked_add(i64::from(instant.second) * 1_000))
         .and_then(|value| value.checked_add(i64::from(instant.millisecond)))
         .ok_or(HostProblem::ResourceExhausted)
+}
+
+fn eib_date_time(instant: ClockInstant) -> Result<(i64, i64), HostProblem> {
+    let century = match instant.year {
+        1900..=1999 => 0,
+        2000..=2099 => 1,
+        _ => return Err(HostProblem::ProviderFailure),
+    };
+    let january_first = days_from_civil(instant.year, 1, 1).ok_or(HostProblem::ProviderFailure)?;
+    let current = days_from_civil(instant.year, instant.month, instant.day)
+        .ok_or(HostProblem::ProviderFailure)?;
+    let ordinal = current
+        .checked_sub(january_first)
+        .and_then(|value| value.checked_add(1))
+        .ok_or(HostProblem::ProviderFailure)?;
+    let year = instant.year % 100;
+    let date = century * 100_000 + year * 1_000 + ordinal;
+    let time = i64::from(instant.hour) * 10_000
+        + i64::from(instant.minute) * 100
+        + i64::from(instant.second);
+    Ok((date, time))
 }
 
 fn instant_from_absolute(value: i64) -> Result<ClockInstant, HostProblem> {
@@ -289,6 +400,34 @@ mod tests {
     fn impossible_clock_dates_fail_closed() {
         assert_eq!(
             parse_clock_timestamp("20260230123456789"),
+            Err(HostProblem::ProviderFailure)
+        );
+    }
+
+    #[test]
+    fn eib_date_and_time_are_exact_packed_decimal_coefficients() {
+        assert_eq!(
+            eib_date_time(ClockInstant {
+                year: 2026,
+                month: 8,
+                day: 30,
+                hour: 12,
+                minute: 34,
+                second: 56,
+                millisecond: 789,
+            }),
+            Ok((126_242, 123_456))
+        );
+        assert_eq!(
+            eib_date_time(ClockInstant {
+                year: 2100,
+                month: 1,
+                day: 1,
+                hour: 0,
+                minute: 0,
+                second: 0,
+                millisecond: 0,
+            }),
             Err(HostProblem::ProviderFailure)
         );
     }

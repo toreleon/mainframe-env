@@ -36,6 +36,196 @@ All notable changes to mainframe-env are documented here.
   application commands in deterministic 88/88/87 batches. The accepted receipts
   contain 18,070 candidates: 16,307 objectively verified and 1,763 retained as
   bounded product ambiguity, with raw IBM publication bodies kept outside Git.
+- Added a zero-credit, five-topic IBM source scope for the CICS task-enqueue
+  slice. Alongside ENQ and DEQ it pins the command-level parameter page that
+  establishes `DFHVALUE(TASK)=233` and `DFHVALUE(UOW)=246`, plus the ENQMODEL
+  definition and global-enqueue tuning pages; publication bodies remain in the
+  external content-addressed cache.
+- Added typed local `EXEC CICS ENQ` and `DEQ` execution over a bounded durable
+  lock catalog. The runtime preserves address-versus-content resource identity,
+  nested UOW/TASK ownership, FIFO wait promotion, `NOSUSPEND`/active-handler
+  `ENQBUSY`, syncpoint/task cleanup, atomic replay, and durable resume across
+  memory, SQLite, and PostgreSQL store profiles.
+- Added durable installed ENQMODEL definitions with bounded generic matching,
+  local APPLID/SYSID isolation, nonblank-scope global serialization, disabled
+  model abends, address-enqueue locality, atomic catalog installation, and
+  restart validation.
+- Added a zero-credit two-topic IBM source scope and typed execution for CICS
+  `CHANGE TASK` and `SUSPEND`. Priority omission and `-1` remain no-ops,
+  priorities `0..255` update the task and yield once, invalid values return
+  `INVREQ` 16/1, and SUSPEND produces a one-shot durable scheduler handoff.
+- Advertised bare ASKTIME as a distinct typed clock route that updates
+  packed-decimal EIBDATE/EIBTIME without producing an ABSTIME destination.
+  ASKTIME ABSTIME now uses a typed, exact `PIC S9(15) COMP-3` output binding,
+  refreshes the same implicit EIB fields, and retains its eight-byte packed
+  absolute-time result.
+- Migrated the source-checked FORMATTIME subset to typed plans for packed
+  ABSTIME input, one-byte DATESEP/TIMESEP values, fixed YYYYMMDD/YYMMDD/MMDDYY/
+  MMDDYYYY/YYDDD/TIME fields, and fullword MILLISECONDS output. Negative or
+  malformed absolute time returns INVREQ 16/1, while the remaining official
+  formats stay explicitly deferred.
+- Migrated `EXEC CICS ABEND` from raw compatibility lowering to a typed task
+  plan with an optional 1–4 character ABCODE and explicit CANCEL/NODUMP flags.
+  Typed execution preserves HANDLE ABEND transfer, task-enqueue cleanup,
+  terminal dump disposition, EIBFN, audit, and durable replay behavior without
+  retaining command source text.
+- Migrated `HANDLE ABEND` to a typed task plan with distinct LABEL and PROGRAM
+  operands plus CANCEL/default-cancel and RESET actions. Compiler, plan-codec,
+  interpreter, provider, and selected-route checks preserve the bounded action
+  alternatives, program authorization, and durable active/canceled exit state.
+- Migrated the local `LINK PROGRAM ... COMMAREA` compatibility subset to a
+  typed program-control plan. PROGRAM is a bounded literal or resolved field,
+  COMMAREA is one identity-checked input/output slot, and the adapter preserves
+  its captured bytes when registering the return binding. A compiled selected
+  route verifies authorization, EIBFN `0E02`, returned bytes, audit, and durable
+  suspension; remote/channel/length forms remain deferred.
+- Migrated the local `XCTL PROGRAM ... COMMAREA` compatibility subset to a
+  typed program-control plan. Its COMMAREA is input-only, the provider returns
+  an unconditional frame-replacing transfer, and the selected online route
+  initializes the target program's `DFHCOMMAREA` while preserving EIBFN `0E04`.
+  Channel, input-message, explicit-length, DPL, and licensed forms remain
+  deferred.
+- Migrated bare `EXEC CICS RETURN` and the local TRANSID/COMMAREA
+  pseudo-conversation subset to a typed task-control plan. TRANSID is a
+  prevalidated 1–4 character literal or field, COMMAREA is captured as an
+  input-only copy, and the durable selected route completes the old execution
+  before the next terminal task. `LENGTH(LENGTH OF commarea)` selects the
+  captured prefix; other lengths, channel, input-message, immediate, BTS,
+  higher-level, and DPL ownership remain deferred.
+- Migrated the default-cursor `STARTBR`/`READNEXT`/`READPREV`/`ENDBR` file
+  browse subset to typed plans. The compiler binds exactly one FILE/DATASET
+  resource and a writable RIDFLD, admits STARTBR's default-equivalent `GTEQ`,
+  models RIDFLD as the same input/output slot on reads, and writes the returned
+  record into a pre-resolved INTO area.
+  REQID/SYSID, alternate key modes and lengths, SET, and UPDATE/TOKEN/RLS
+  semantics remain fail-closed.
+- Migrated the explicit-key `DELETE` and `WRITE FILE` compatibility subsets to
+  typed file-mutation plans. RIDFLD and WRITE FROM are resolved data-area
+  inputs, FILE/DATASET remains one exact resource alias, and both operations
+  carry typed mutation identity. DELETE may instead consume the latest record
+  held by `READ UPDATE`; TOKEN deletes, remote and length forms, generic and
+  alternate record identifiers, mass insert, and RLS wait controls remain
+  deferred.
+- Migrated the local `WRITEQ TD` compatibility subset to a typed queue-write
+  plan. QUEUE is a validated 1–4 character literal or field, FROM is a resolved
+  data area, and optional numeric LENGTH or `LENGTH OF` selects the persisted
+  prefix before idempotency comparison. Remote SYSID routing and unimplemented
+  TDQUEUE definition/open/disabled condition semantics remain fail-closed.
+- Migrated bounded local `RECEIVE MAP`, `SEND MAP`, and `SEND TEXT` subsets to
+  typed terminal plans. MAP and optional MAPSET are validated 1–7 character
+  selectors, with an eight-byte RECEIVE MAPSET field admitted for a valid name
+  plus trailing blank. MAPSET defaults to MAP, and FROM/INTO storage is
+  resolved before dispatch. RECEIVE uses the requested durable definition for
+  terminal-fit and field normalization. SET pointers, omitted-map AID-only
+  receive, implicit symbolic map storage, lengths, paging, device and other
+  terminal controls remain fail-closed.
+- Added a typed `PURGE MESSAGE` route for the runtime's reachable empty
+  full-BMS logical-message state. Local execution is an idempotent audited
+  mutation that preserves the displayed terminal image; DPL execution returns
+  the source-defined `INVREQ` 16/200. Accumulated pages and `TSIOERR` remain
+  fail-closed until a full-BMS ACCUM/page authority exists.
+- Migrated the 78 source-bounded `ASSIGN` context outputs from raw command-text
+  compatibility lowering to one typed task plan. Each output carries an
+  append-only semantic name and pre-resolved writable storage identity through
+  publication and defensive admission, while the existing 16-option, receiver,
+  partial-INVREQ, DPL, EIBFN, provider and retained-artifact behavior is
+  preserved.
+- Expanded the source-bounded CICS `ASSIGN` route with APPLID,
+  SYSID, USERID, TASKPRIORITY, and the exact absent application/channel context
+  defaults. It also reports absent CWA/TWA lengths, null OPERKEYS, and a normal
+  task start without inventing state. The compiler enforces the 16-option limit
+  and halfword/fullword/exact-width receivers, the provider rejects unknown or
+  wrongly typed arguments, and local OPSECURITY/TCTUALENG defaults become exact
+  DPL `INVREQ` 16/200 failures while unrelated requested outputs still populate.
+  With no configured initialization parameter, INITPARM remains unchanged and
+  INITPARMLEN returns halfword zero. PROGRAM is derived from the trusted current
+  execution frame and follows durable HANDLE ABEND program transfers. Compiled
+  local tasks with no pending next transaction receive four blanks from
+  NEXTTRANSID, while DPL use returns `INVREQ` 16/200. BRIDGE returns four
+  blanks because bridge-started tasks are outside the runtime. Compiled online
+  tasks also receive exact zero ABOFFSET, instruction-interrupt, PSW, and
+  register diagnostics because no recoverable ASRA-class machine-check handoff
+  exists. They observe these values, the durable terminal's
+  current/default/alternate screen geometry, and priority changes through the
+  selected route. With no transaction-abend-control-block message, ERRORMSG
+  and ERRORMSGLEN return 500 null bytes and halfword zero. Screen options fail
+  with
+  `INVREQ` 16/5 for nonterminal tasks and `INVREQ` 16/200 in DPL; FCI
+  distinguishes the supported terminal facility (`X'01'`) from no facility
+  (`X'00'`) and is also DPL-prohibited. LINKLEVEL returns one for a top-level
+  local program and two for a DPL target behind its level-one mirror; unmodeled
+  deeper local stacks fail closed. With no application partition set, PARTNSET
+  returns six blanks on a terminal task and follows the local/DPL `INVREQ`
+  matrix. MAPCOLUMN, MAPHEIGHT, MAPLINE, and MAPWIDTH resolve the `MECM6`
+  durable definition of the most recently sent map; historical `MECM1`–`MECM5`
+  definitions retain their prior top-left origin. Numeric DFHMDI LINE/COLUMN
+  now offset TN3270 fields, maps that exceed the terminal receive source-named
+  `INVMPSZ` 38, absent maps receive `INVREQ` 16/2, and DPL returns 16/200. The
+  fixed CP037 region encoding is exposed as fullword LOCALCCSID 37 in both
+  local and DPL execution. The same owned virtual terminal reports a
+  3270 data stream and no basic SCS data stream; its unsupported optional
+  device capabilities return false indicators, and its interactive session
+  profile returns the attended indicator. CMDSEC and RESSEC return `X` because
+  command admission and resource-owning operations use the platform's mandatory
+  authorization routes.
+  QNAME fails with exact `INVREQ` 16/4 because no task can be started by an ATI
+  trigger, and with 16/200 in DPL. ACTIVITY, ACTIVITYID, PROCESS, and
+  PROCESSTYPE fail with exact `INVREQ` 16/6 because no BTS activity path exists.
+  DESTID and DESTIDLENG similarly report 16/3 before any BDI command and
+  16/200 in DPL. PRINSYSID reports 16/5 because the runtime has no MRO, LU6.1,
+  or APPC principal facility, including in a DPL server program.
+- Added online continuation format `MEOM4`, which retains the current task
+  priority and an optional staged program-transfer handoff. Readers preserve
+  `MEOM3` priority rows and historical `MEOM2` rows without that field.
+- Added a zero-credit IBM source scope and typed CICS `SET ASSOCIATION
+  USERCORRDATA`. The task-owned value overwrites with IBM's silent 64-byte
+  truncation, enforces originating-task and command-security checks, and uses
+  replay-bound `MECS5` session rows with `MECS1`–`MECS4` read compatibility.
+- Added typed CICS `ADDRESS SET` for both documented COBOL directions. The
+  compiler distinguishes pointer references from `ADDRESS OF` data areas, the
+  provider validates only opaque storage identities, and the interpreter
+  applies checked virtual aliases after successful audited dispatch.
+- Added source-backed CICS `ABEND NODUMP` admission and explicit terminal dump
+  disposition. Valid nonreserved ABCODE values request a dump, omitted or
+  invalid codes and NODUMP suppress it, and retained older outcomes remain
+  distinguishable as having no recorded dump decision.
+- Added single-level CICS `HANDLE ABEND RESET` lifecycle semantics. Dispatching
+  an active label automatically deactivates it, RESET reactivates the canceled
+  label, bare HANDLE ABEND defaults to CANCEL, and conflicting action forms
+  fail before execution.
+- Added typed CICS `PUSH HANDLE` and `POP HANDLE` over a bounded 64-frame task
+  stack. Nested frames suspend and restore condition/ABEND specifications,
+  unmatched POP returns exact INVREQ behavior, and a compiled online route
+  proves inner-to-outer exit restoration.
+- Added typed CICS `IGNORE CONDITION` for 1–16 unique generated EIBRESP names.
+  Ignored failures continue with the EIB set, HANDLE CONDITION overrides the
+  matching ignore, PUSH/POP preserves it, and hostile lists fail before task
+  state changes.
+- Promoted CICS `HANDLE CONDITION` to typed execution for 1–16 generated
+  EIBRESP names. One command atomically installs or deactivates every selected
+  handler, specific actions precede generalized `ERROR`, and canonical or
+  legacy duplicates and malformed labels fail before task state changes.
+- Pinned a zero-credit CICS `HANDLE AID` source scope containing the exact
+  command page and its linked BMS/DFHAID constant authority, reproduced through
+  the existing Chrome session. This source receipt grants no execution or
+  licensed differential credit.
+- Added typed CICS `HANDLE AID` for the 34 source-named terminal AIDs, including
+  optional-label deactivation, exact-over-`ANYKEY` precedence, the complete
+  reached DFHAID byte set, PUSH/POP participation, and DPL `INVREQ` 16/200.
+- Added durable `MECS7` CICS HANDLE state. Condition, AID, IGNORE, typed
+  LABEL/PROGRAM ABEND exits, and nested PUSH/POP specifications now use session
+  CAS, roll back on failed persistence, survive a terminal-input handoff and
+  SQLite reopen, and clear when the task completes or recovery discards a
+  non-handoff terminal task. `MECS6` label-only state remains readable.
+- Extended the session state to `MECS9` with the first and latest explicit EXEC
+  CICS ABEND codes, dump request, and failing program. ASSIGN ABCODE, ORGABCODE,
+  ABDUMP, and ABPROGRAM now survive repeated-handler and program-transfer
+  handoffs and SQLite reopen; `MECS8` remains readable by treating its sole
+  code as both original and current, and `MECS7` retains no abend history.
+- Added current-level CICS `HANDLE ABEND PROGRAM(name)` with exact local-program
+  SAF and PGMIDERR checks, issuing-program COMMAREA transfer, CANCEL/RESET and
+  PUSH/POP participation, a compiled two-program selected route, and recoverable
+  artifact-bound execution handoff. Outward LINK-level search remains pending.
 - Added the frozen-with-bounded-ambiguities CIC-901 command contract and generated
   263-row compiler registry. The registry explicitly separates three typed runtime
   handlers, 20 legacy compatibility handlers, and 240 unready handlers; automatic
@@ -48,6 +238,19 @@ All notable changes to mainframe-env are documented here.
   discriminators, dependencies, alternatives, exclusions, and known source bounds.
   This seals only the non-release CIC-901 implementation boundary; it grants no new
   execution, coverage, or differential credit to unready commands.
+- Added the first CIC-902 recovery guard: an owned execution-context binding
+  rejects DPL `SYNCPOINT` without `SYNCONRETURN` or under `DPLSUBSET` with exact
+  `INVREQ` RESP/RESP2 before unit-of-work mutation.
+- Added a bounded remote-syncpoint outcome binding: a `SYNCONRETURN` DPL commit
+  that the remote system cannot commit now rolls back local recoverable work,
+  durably finalizes the rolled-back UOW, and returns exact `ROLLEDBACK` RESP 82
+  with replay-safe behavior. A zero-credit selected-route regression drives the
+  condition through typed COBOL, Conformance IR, the coordinator, and product
+  providers.
+- Implemented the source-defined `ABEND CANCEL` behavior on the existing task
+  path: it cancels the active HANDLE ABEND exit before abnormal termination,
+  persists no stale target, and is now admitted by the generated legacy option
+  catalog. Dump disposition and typed task-control migration remain pending.
 - Added a reviewed COBOL numeric `MOVE` pilot and corrected floating-insertion,
   capacity, sign, and overflow behavior found by that review.
 - Added cost-aware local Jenkins assurance, exact-candidate command receipts,
@@ -93,6 +296,20 @@ All notable changes to mainframe-env are documented here.
 - Updated the 0.9 CICS implementation plan to require the integrated 28-finding
   hardening baseline, bounded family slices, per-slice security/recovery,
   explicit backend validation, and early licensed-campaign planning.
+- Moved the 20 raw CICS compatibility routes' executable option subsets into a
+  versioned runtime-admission catalog and the generated application registry,
+  removing a handwritten compiler allowlist and rejecting catalog/runtime
+  drift during generation. The move also removed the unreachable `ASSIGN
+  TRANSID` entry, which is absent from the pinned application-command syntax.
+- Normalized the verified ENQ/DEQ syntax so direct `UOW` and `TASK` lifetime
+  forms remain distinct flags from `MAXLIFETIME(cvda)`. The generated registry
+  now requires `RESOURCE`, resolves RESOURCE/MAXLIFETIME as inputs, and enforces
+  the three lifetime spellings as mutually exclusive without advertising the
+  still-unimplemented commands.
+- CICS result handling now distinguishes a source-defined ignored condition
+  from normal completion, updates `EIBFN` from the generated application row,
+  and retains an ENQ suspension as the same durable online task until dequeue,
+  timeout, or cancellation cleanup.
 - Added a blocking `missing_docs` ratchet for every contract crate, reduced the
   initial execution/store debt, and added runnable lifecycle/store examples.
 - Split Db2, IMS, and MQ durable state into independently versioned object,
@@ -109,6 +326,22 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Fixed typed `RETURN` lowering and execution for `LENGTH(LENGTH OF
+  commarea)` (#202).
+- Fixed typed `SEND MAP`/`SEND TEXT` admission for the reached `ERASE`,
+  `CURSOR`, and `FREEKB` flags (#203).
+- Fixed typed `STARTBR` admission for its default-equivalent `GTEQ` option
+  (#204).
+- Fixed current-record `DELETE` after `READ UPDATE`, including `INVREQ` 16/31
+  when no record is held (#205).
+- Fixed typed plan validation accepting unrelated extension flags on READ, REWRITE,
+  and SYNCPOINT during the PR #179 merge (#212).
+- Fixed typed `WRITEQ TD` lowering for `LENGTH(LENGTH OF data-area)` (#206).
+- Fixed bare `DATESEP`/`TIMESEP` defaults and compact FORMATTIME output widths
+  (#207).
+- Fixed typed `RECEIVE MAP` lowering and runtime trimming for eight-byte
+  `MAPSET` data areas (#208).
+- Fixed the stale licensed COBOL oracle digest used by `spec --check` (#209).
 - Fixed `SystemClockProvider`'s request and result budgets being too small for
   the canonical encoding the host-call guard measures, so CardDemo bill
   payment's `EXEC CICS ASKTIME` failed with `ResourceExhausted`
@@ -432,6 +665,9 @@ All notable changes to mainframe-env are documented here.
   the parent's own work for a bounded retry on a transient admission failure instead of dead-lettering
   it immediately, and validated an already-admitted child's record against its frozen identity on
   reclaim instead of a fresh, possibly drifted capability recomputation.
+- Made legacy EXEC CICS compatibility routes reject source-valid options that
+  their pre-typed runtime handlers do not implement, preventing silent operand
+  drops while retaining the documented `DATASET` file-name compatibility alias.
 - Moved the authentication wall-clock fixture wholly behind the server test
   boundary and tightened the reviewed product-module production-line ceiling.
 - Anchored authentication-session expiry and rotation to the shared durable
@@ -562,6 +798,8 @@ All notable changes to mainframe-env are documented here.
 
 ### Known issues
 
+- Typed terminal plans forward `CURSOR` and `FREEKB`, but the terminal provider
+  does not yet model cursor placement or keyboard-lock state (#210).
 - These `0.8.3` development changes are not part of the published 0.8.2 tag. The
   [pre-0.9 deep review](docs/reviews/PRE-0.9.0-DEEP-REVIEW.md) records the
   release-truth, durability, security, CI, and documentation blockers that must

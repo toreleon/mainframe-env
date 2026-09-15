@@ -105,6 +105,10 @@ pub struct BmsField {
 pub struct BmsMap {
     pub mapset: String,
     pub name: String,
+    /// Numeric DFHMDI LINE when the source explicitly supplies it.
+    pub line: Option<usize>,
+    /// Numeric DFHMDI COLUMN when the source explicitly supplies it.
+    pub column: Option<usize>,
     pub size: Option<(usize, usize)>,
     pub fields: Vec<BmsField>,
 }
@@ -329,6 +333,8 @@ pub fn parse_bms(source: &str) -> Result<BmsMap, InstallProblem> {
     let statements = continued_statements(source);
     let mut mapset = None;
     let mut map = None;
+    let mut line = None;
+    let mut column = None;
     let mut size = None;
     let mut fields = Vec::new();
     for statement in statements {
@@ -346,6 +352,8 @@ pub fn parse_bms(source: &str) -> Result<BmsMap, InstallProblem> {
                 .checked_sub(1)
                 .and_then(|index| words.get(index))
                 .map(|v| (*v).into());
+            line = scalar_property(&upper, "LINE");
+            column = scalar_property(&upper, "COLUMN");
             size = pair_property(&upper, "SIZE");
         } else if let Some(index) = words.iter().position(|word| *word == "DFHMDF") {
             let name = index
@@ -367,6 +375,8 @@ pub fn parse_bms(source: &str) -> Result<BmsMap, InstallProblem> {
     Ok(BmsMap {
         mapset: mapset.ok_or(InstallProblem::InvalidIdentity)?,
         name: map.ok_or(InstallProblem::InvalidIdentity)?,
+        line,
+        column,
         size,
         fields,
     })
@@ -761,10 +771,11 @@ mod tests {
 
     #[test]
     fn bms_continuations_and_csd_properties_are_typed() {
-        let bms = "MAPSET DFHMSD TYPE=MAP,-\n MODE=INOUT\nMAPA DFHMDI SIZE=(24,80)\nFIELD DFHMDF POS=(2,3),-\n LENGTH=8,ATTRB=(UNPROT,FSET),INITIAL='VALUE'\n DFHMSD TYPE=FINAL";
+        let bms = "MAPSET DFHMSD TYPE=MAP,-\n MODE=INOUT\nMAPA DFHMDI SIZE=(24,80),LINE=3,COLUMN=4\nFIELD DFHMDF POS=(2,3),-\n LENGTH=8,ATTRB=(UNPROT,FSET),INITIAL='VALUE'\n DFHMSD TYPE=FINAL";
         let map = parse_bms(bms).unwrap();
         assert_eq!((map.mapset.as_str(), map.name.as_str()), ("MAPSET", "MAPA"));
         assert_eq!(map.size, Some((24, 80)));
+        assert_eq!((map.line, map.column), (Some(3), Some(4)));
         assert_eq!(map.fields[0].position, Some((2, 3)));
         assert_eq!(map.fields[0].attributes, ["UNPROT", "FSET"]);
         assert!(map.fields[0].justify.is_empty());

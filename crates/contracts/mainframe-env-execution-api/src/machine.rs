@@ -58,10 +58,23 @@ pub struct Condition {
     pub handled: bool,
 }
 
+/// Whether a terminal abend requested a transaction dump.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AbendDumpDisposition {
+    /// The originating runtime did not expose a dump decision.
+    Unspecified,
+    /// The runtime requested a transaction dump.
+    Requested,
+    /// The runtime explicitly suppressed a transaction dump.
+    Suppressed,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Abend {
     pub code: String,
     pub reason: Option<String>,
+    /// Transaction-dump disposition reported by the originating runtime.
+    pub dump: AbendDumpDisposition,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

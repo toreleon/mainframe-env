@@ -1,0 +1,137 @@
+use super::super::{
+    HirCicsNamedOperand, HirCicsOperandName, HirCicsOutputName, HirCicsValue, HirDataReference,
+    Resolution, ResolutionFailure, require_numeric,
+};
+use super::{Clauses, cics_value, complete_data_reference};
+use crate::{CobolUsage, DataCategory, SemanticModel};
+
+pub(super) fn operands(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    let absolute = complete_data_reference(&clauses["ABSTIME"], semantic)?;
+    require_absolute_time(&absolute)?;
+    let mut operands = vec![HirCicsNamedOperand {
+        name: HirCicsOperandName::Abstime,
+        value: HirCicsValue::Data(absolute),
+    }];
+    for (name, identity) in [
+        ("DATESEP", HirCicsOperandName::DateSep),
+        ("TIMESEP", HirCicsOperandName::TimeSep),
+    ] {
+        if let Some(tokens) = clauses.get(name) {
+            let value = cics_value(tokens, semantic)?;
+            require_separator(name, &value)?;
+            operands.push(HirCicsNamedOperand {
+                name: identity,
+                value,
+            });
+        }
+    }
+    Ok(operands)
+}
+
+fn require_absolute_time(reference: &HirDataReference) -> Resolution<()> {
+    require_numeric(reference)?;
+    if reference.usage == CobolUsage::PackedDecimal
+        && reference.length == 8
+        && reference.digits == 15
+        && reference.scale == 0
+        && reference.signed
+    {
+        Ok(())
+    } else {
+        Err(ResolutionFailure::Invalid(
+            "CICS absolute time requires PIC S9(15) COMP-3 storage".into(),
+        ))
+    }
+}
+
+fn require_separator(name: &str, value: &HirCicsValue) -> Resolution<()> {
+    let valid = match value {
+        HirCicsValue::Literal(value) => value.len() == 1,
+        HirCicsValue::Data(reference) => {
+            reference.length == 1
+                && matches!(
+                    reference.category,
+                    DataCategory::Alphabetic | DataCategory::Alphanumeric
+                )
+        }
+        HirCicsValue::Integer(_) | HirCicsValue::LengthOf(_) => false,
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(ResolutionFailure::Invalid(format!(
+            "CICS FORMATTIME {name} requires one character"
+        )))
+    }
+}
+
+pub(super) fn require_output_shape(
+    name: HirCicsOutputName,
+    target: &HirDataReference,
+    clauses: &Clauses,
+    options: &[String],
+) -> Resolution<()> {
+    match name {
+        HirCicsOutputName::Abstime => require_absolute_time(target),
+        HirCicsOutputName::Milliseconds => {
+            require_numeric(target)?;
+            if matches!(target.usage, CobolUsage::Binary | CobolUsage::NativeBinary)
+                && target.length == 4
+                && target.scale == 0
+            {
+                Ok(())
+            } else {
+                Err(ResolutionFailure::Invalid(
+                    "CICS FORMATTIME MILLISECONDS requires fullword binary storage".into(),
+                ))
+            }
+        }
+        HirCicsOutputName::Resp | HirCicsOutputName::Resp2 => require_numeric(target),
+        HirCicsOutputName::Mmddyy
+        | HirCicsOutputName::Mmddyyyy
+        | HirCicsOutputName::Time
+        | HirCicsOutputName::Yyddd
+        | HirCicsOutputName::Yymmdd
+        | HirCicsOutputName::Yyyymmdd => {
+            let separator = match name {
+                HirCicsOutputName::Time => "TIMESEP",
+                _ => "DATESEP",
+            };
+            let separated =
+                clauses.contains_key(separator) || options.iter().any(|option| option == separator);
+            let (plain, field) = match name {
+                HirCicsOutputName::Mmddyy | HirCicsOutputName::Time | HirCicsOutputName::Yymmdd => {
+                    (6, 8)
+                }
+                HirCicsOutputName::Mmddyyyy | HirCicsOutputName::Yyyymmdd => (8, 10),
+                HirCicsOutputName::Yyddd => (5, 6),
+                _ => unreachable!(),
+            };
+            let valid_length = if separated {
+                target.length == field
+            } else {
+                matches!(target.length, length if length == plain || length == field)
+            };
+            if valid_length
+                && matches!(
+                    target.category,
+                    DataCategory::Alphabetic | DataCategory::Alphanumeric
+                )
+            {
+                Ok(())
+            } else {
+                Err(ResolutionFailure::Invalid(format!(
+                    "CICS FORMATTIME output has an invalid field length for {name:?}"
+                )))
+            }
+        }
+        HirCicsOutputName::Commarea
+        | HirCicsOutputName::Into
+        | HirCicsOutputName::Ridfld
+        | HirCicsOutputName::Length
+        | HirCicsOutputName::Assign(_) => Ok(()),
+    }
+}

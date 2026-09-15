@@ -1,0 +1,27 @@
+{
+  "baseline_id": "ibm-cics-ts-6x-task-association-2026-09-13",
+  "book_href": "SSJL4D_6.x/reference-system-programming/commands-spi/set-association-usercorrdata.html",
+  "book_label": "CICS task association semantic slice",
+  "content_url_template": "https://www.ibm.com/docs/api/v1/content/{topic_path}?parsebody=true&lang=en",
+  "coverage_credit": 0,
+  "product": "SSJL4D_6.x",
+  "retained_in_repository": false,
+  "schema_version": "mainframe-env.topic-manifest@1",
+  "snapshot_date": "2026-09-13",
+  "subsystem": "cics",
+  "target_version": "0.9.0",
+  "toc_sha256": "f65c51e52facc390c05f084e1d249ff19e68bf2d7f8d3f32d4d745faf622681a",
+  "toc_url": "https://www.ibm.com/docs/api/v1/toc/cics-ts/6.x?lang=en",
+  "topic_count": 1,
+  "topic_manifest_digest": "68634fcac8020b463fb4ba9749e0276be63aa1c887fe954a81120a5296936135",
+  "topic_manifest_digest_definition": "sha256 over the concatenation, sorted by topic_path, of one \"<topic_path> <sha256>\\n\" line per topic, each <sha256> written as bare lowercase hex",
+  "topics": [
+    {
+      "bytes": 12232,
+      "last_modified": "2026-07-23",
+      "sha256": "c38ae42617d5dbbdf8e1dd8f1aa546d4c76ef960c1f2431b2ec1eb65e503c42a",
+      "topic_path": "SSJL4D_6.x/reference-system-programming/commands-spi/set-association-usercorrdata.html"
+    }
+  ],
+  "total_bytes": 12232
+}

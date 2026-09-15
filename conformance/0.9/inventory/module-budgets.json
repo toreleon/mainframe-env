@@ -42,7 +42,7 @@
     },
     {
       "path": "crates/apps/mainframe-env-server/src/product.rs",
-      "max_production_lines": 6446,
+      "max_production_lines": 6308,
       "responsibility": "Product construction, dependency assembly, application publication, JES control, and HTTP route behavior converge here.",
       "split_boundary": "Extract bootstrap/construction, publication, JES operations, and route-family adapters around the Product state owner."
     },
@@ -54,13 +54,13 @@
     },
     {
       "path": "crates/contracts/mainframe-env-host-api/src/canonical/generated.rs",
-      "max_production_lines": 3189,
+      "max_production_lines": 3046,
       "responsibility": "This frozen exhaustive host wire encoder keeps every request and result field explicit for protocol review.",
       "split_boundary": "Partition exhaustive encoders by dataset, CICS, security, Db2, IMS, and MQ families under one canonical codec facade."
     },
     {
       "path": "crates/contracts/mainframe-env-host-api/src/request.rs",
-      "max_production_lines": 2474,
+      "max_production_lines": 2333,
       "responsibility": "Owned host request and response records for all provider families are declared in one compatibility boundary.",
       "split_boundary": "Move family-owned request records into dataset, CICS, security, Db2, IMS, and MQ contract modules with stable re-exports."
     },
@@ -108,13 +108,13 @@
     },
     {
       "path": "crates/kernel/mainframe-env-interpreter/src/machine.rs",
-      "max_production_lines": 13061,
+      "max_production_lines": 12981,
       "responsibility": "The deterministic COBOL machine executes all operations, control flow, calls, host effects, and conditions.",
       "split_boundary": "Extract operation handlers by control, numeric/data, call, file/host-effect, and condition families around one machine state."
     },
     {
       "path": "crates/providers/mainframe-env-cics/src/service.rs",
-      "max_production_lines": 3921,
+      "max_production_lines": 3718,
       "responsibility": "The CICS pilot service owns session, BMS, file, queue, program, and unit-of-work semantics and persistence.",
       "split_boundary": "Freeze this pilot and route future catalog descriptors through generated modules and semantics through handler-family modules."
     },
@@ -198,7 +198,7 @@
     },
     {
       "path": "crates/tooling/mainframe-env-conformance/src/carddemo.rs",
-      "max_production_lines": 14151,
+      "max_production_lines": 13985,
       "responsibility": "CardDemo conformance provisions the full fixture, drives online and batch journeys, and checks persistence and failures.",
       "split_boundary": "Separate fixture provisioning, online transactions, batch jobs, authorization, and durability/failure scenario families."
     },
@@ -282,12 +282,20 @@
     "descriptor_directory": "crates/providers/mainframe-env-cics/src/generated",
     "handler_directory": "crates/providers/mainframe-env-cics/src/handlers",
     "handler_modules": [
+      "crates/providers/mainframe-env-cics/src/handlers/bms_map.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/condition.rs",
       "crates/providers/mainframe-env-cics/src/handlers/file_control.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/handle_state.rs",
       "crates/providers/mainframe-env-cics/src/handlers/program_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/queue_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/recovery.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/task_context.rs",
       "crates/providers/mainframe-env-cics/src/handlers/task_control.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/task_enqueue.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/task_enqueue/model.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/task_return.rs",
       "crates/providers/mainframe-env-cics/src/handlers/terminal_control.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/terminal_run.rs",
       "crates/providers/mainframe-env-cics/src/handlers/time.rs"
     ]
   }

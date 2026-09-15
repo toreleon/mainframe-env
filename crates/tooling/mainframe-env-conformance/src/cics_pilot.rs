@@ -1324,6 +1324,33 @@ mod tests {
     use super::*;
     use std::process::Command;
 
+    const REMOTE_ROLLBACK_SOURCE: &str = r#"IDENTIFICATION DIVISION.
+PROGRAM-ID. CICSREMOTE.
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 RESP-X PIC 9(3) VALUE 0.
+01 RESP2-X PIC 9(3) VALUE 0.
+PROCEDURE DIVISION.
+EXEC CICS SYNCPOINT RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
+DISPLAY 'REMOTE:' RESP-X ':' RESP2-X.
+STOP RUN.
+"#;
+
+    const TASK_ENQUEUE_SOURCE: &str = r#"IDENTIFICATION DIVISION.
+PROGRAM-ID. CICSENQ.
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 LOCK-NAME PIC X(4) VALUE 'LOCK'.
+01 RESP-X PIC 9(3) VALUE 0.
+01 RESP2-X PIC 9(3) VALUE 0.
+PROCEDURE DIVISION.
+EXEC CICS ENQ RESOURCE(LOCK-NAME) LENGTH(4) UOW RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
+DISPLAY EIBFN.
+EXEC CICS DEQ RESOURCE(LOCK-NAME) LENGTH(4) UOW RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
+DISPLAY EIBFN.
+STOP RUN.
+"#;
+
     #[test]
     fn cics_pilot_sources_use_only_the_typed_executable_dialects() {
         for source in [
@@ -1396,6 +1423,112 @@ mod tests {
             assert!(
                 matched,
                 "{obligation}: expected={expected:?} actual={actual:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn remote_rollback_uses_the_typed_selected_route_without_claiming_credit() {
+        let store = Arc::new(MemoryStore::new(StoreLimits::default()));
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let platform_store: Arc<dyn PlatformStore> = store;
+        let dataset =
+            DatasetService::open(provider_store.clone(), DatasetLimits::default()).unwrap();
+        seed_dataset(&dataset, "remote-rollback-selected-route").unwrap();
+        let inner = pilot_inner_host(dataset).unwrap();
+        let cics = CicsService::open(inner, provider_store, CicsLimits::default()).unwrap();
+        let outer = pilot_outer_host(cics).unwrap();
+        let execution = PilotExecution::new(outer, platform_store);
+        let artifact = crate::compile(REMOTE_ROLLBACK_SOURCE).unwrap();
+        let limits = InvocationLimits::default();
+        let mut invocation = pilot_invocation(
+            &artifact,
+            "IBMUSER",
+            "remote-rollback-selected-route",
+            "CICSREMOTE",
+        )
+        .unwrap();
+        invocation.bindings = BTreeMap::from([
+            (
+                "cics.execution-context".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.execution-context@1",
+                    b"dpl-synconreturn".to_vec(),
+                    limits,
+                )
+                .unwrap(),
+            ),
+            (
+                "cics.syncpoint.remote-outcome".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.syncpoint.remote-outcome@1",
+                    b"unable-to-commit".to_vec(),
+                    limits,
+                )
+                .unwrap(),
+            ),
+        ]);
+        let output = drive_artifact(&artifact, invocation, &execution).unwrap();
+        assert_eq!(parse_command(&output, "REMOTE", false).unwrap().resp, 82);
+        assert_eq!(parse_command(&output, "REMOTE", false).unwrap().resp2, 0);
+    }
+
+    #[test]
+    fn task_enqueue_uses_typed_selected_routes_in_local_and_dpl_contexts() {
+        for (identity, context) in [
+            ("task-enqueue-local", None),
+            (
+                "task-enqueue-dpl",
+                Some(b"dpl-without-synconreturn".as_slice()),
+            ),
+        ] {
+            let store = Arc::new(MemoryStore::new(StoreLimits::default()));
+            let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+            let platform_store: Arc<dyn PlatformStore> = store.clone();
+            let dataset =
+                DatasetService::open(provider_store.clone(), DatasetLimits::default()).unwrap();
+            let inner = pilot_inner_host(dataset).unwrap();
+            let cics = CicsService::open(inner, provider_store, CicsLimits::default()).unwrap();
+            let outer = pilot_outer_host(cics).unwrap();
+            let execution = PilotExecution::new(outer, platform_store);
+            let artifact = crate::compile(TASK_ENQUEUE_SOURCE).unwrap();
+            assert!(
+                artifact
+                    .manifest()
+                    .dialect_contracts
+                    .contains("cics.task@1")
+            );
+            let mut invocation =
+                pilot_invocation(&artifact, "IBMUSER", identity, "CICSENQ").unwrap();
+            if let Some(context) = context {
+                invocation.bindings.insert(
+                    "cics.execution-context".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.execution-context@1",
+                        context.to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                );
+            }
+            let output = drive_artifact(&artifact, invocation, &execution).unwrap();
+            assert!(
+                output
+                    .as_bytes()
+                    .windows(2)
+                    .any(|bytes| bytes == [0x12, 0x04])
+            );
+            assert!(
+                output
+                    .as_bytes()
+                    .windows(2)
+                    .any(|bytes| bytes == [0x12, 0x06])
+            );
+            assert!(
+                store
+                    .list_provider_state("cics-enqueue-v1", 2)
+                    .unwrap()
+                    .is_empty()
             );
         }
     }

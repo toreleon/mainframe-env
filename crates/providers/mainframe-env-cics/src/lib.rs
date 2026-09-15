@@ -18,9 +18,9 @@ pub use retention::{
     describe_cics_undo_row, describe_cics_uow_row,
 };
 pub use service::{
-    BmsFieldDefinition, BmsMapDefinition, CicsContinuation, CicsFileDefinition, CicsFileStatus,
-    CicsLimits, CicsReplayClock, CicsService, CicsTerminalExecution, CicsTerminalSnapshot,
-    CicsTraceEntry, cics_provider,
+    BmsFieldDefinition, BmsMapDefinition, CicsContinuation, CicsEnqueueModelDefinition,
+    CicsFileDefinition, CicsFileStatus, CicsLimits, CicsReplayClock, CicsService,
+    CicsTerminalExecution, CicsTerminalSnapshot, CicsTraceEntry, cics_provider,
 };
 
 #[cfg(feature = "fault-injection")]

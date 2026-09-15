@@ -19,6 +19,8 @@ class CicsDescriptorTests(unittest.TestCase):
     def fixture(self, root: Path) -> None:
         for relative in [
             cics_descriptors.CATALOG_PATH,
+            cics_descriptors.LEGACY_EXECUTION_CATALOG_PATH,
+            cics_descriptors.TYPED_EXECUTION_REGISTRATIONS_PATH,
             Path("conformance/0.2/catalogs/cics.json"),
         ]:
             target = root / relative
@@ -31,6 +33,10 @@ class CicsDescriptorTests(unittest.TestCase):
 
     def write_catalog(self, path: Path, catalog: dict) -> None:
         path.write_text(json.dumps(catalog, indent=2) + "\n")
+
+    def legacy_execution_catalog(self, root: Path) -> tuple[Path, dict]:
+        path = root / cics_descriptors.LEGACY_EXECUTION_CATALOG_PATH
+        return path, json.loads(path.read_text())
 
     def source_fixture(self, root: Path) -> tuple[Path, Path]:
         _, _, _, projection_relative, review_relative = cics_descriptors.CONTRACT_BATCHES[0]
@@ -116,11 +122,13 @@ class CicsDescriptorTests(unittest.TestCase):
         compiler_spi = cics_descriptors.render_compiler_spi_compatibility(ROOT)
         contracts = cics_descriptors.build_contracts(ROOT)
         ir_registry = cics_descriptors.render_ir_registry(ROOT, contracts)
-        self.assertEqual(provider.count("CicsOperation::"), 50)
+        self.assertEqual(provider.count("CicsOperation::"), 74)
+        self.assertIn("pub(crate) const CICS_CONDITION_NAMES", provider)
+        self.assertIn('"PGMIDERR"', provider)
         self.assertIn("CicsCommandFamily::TaskControl", provider)
         self.assertIn("CicsCommandFamily::Recovery", provider)
         self.assertEqual(len(catalog["_application_commands"]), 263)
-        self.assertEqual(len(catalog["_runtime_operations"]), 25)
+        self.assertEqual(len(catalog["_runtime_operations"]), 37)
         self.assertEqual(host.count("official_row:"), 263)
         self.assertIn(
             'official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0155"',
@@ -142,10 +150,10 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertFalse(contracts["execution_authority"])
         self.assertEqual(contracts["coverage_credit"], 0)
         self.assertEqual(contracts["semantic_credit"], 0)
-        self.assertEqual(contracts["counts"]["runtime_backed_commands"], 23)
-        self.assertEqual(contracts["counts"]["typed_runtime_commands"], 3)
-        self.assertEqual(contracts["counts"]["legacy_compatibility_commands"], 20)
-        self.assertEqual(contracts["counts"]["advertised_commands"], 23)
+        self.assertEqual(contracts["counts"]["runtime_backed_commands"], 35)
+        self.assertEqual(contracts["counts"]["typed_runtime_commands"], 34)
+        self.assertEqual(contracts["counts"]["legacy_compatibility_commands"], 1)
+        self.assertEqual(contracts["counts"]["advertised_commands"], 35)
         contract_rows = [
             command for batch in contracts["batches"] for command in batch["commands"]
         ]
@@ -164,30 +172,73 @@ class CicsDescriptorTests(unittest.TestCase):
             if row["implementation_status"] != "unimplemented"
         }
         self.assertEqual(observed_runtime, expected_runtime)
-        self.assertEqual(len(observed_runtime), 23)
+        self.assertEqual(len(observed_runtime), 35)
         self.assertEqual(
             sum(row["implementation_status"] == "unimplemented" for row in contract_rows),
-            240,
+            228,
         )
         rows_by_label = {row["label"]: row for row in contract_rows}
-        self.assertEqual(rows_by_label["ASKTIME"]["registration_status"], "unready")
+        self.assertEqual(rows_by_label["ABEND"]["registration_status"], "typed-runtime")
+        self.assertEqual(rows_by_label["ABEND"]["existing_runtime_operation"], "Abend")
+        self.assertEqual(
+            rows_by_label["HANDLE ABEND"]["registration_status"], "typed-runtime"
+        )
+        self.assertEqual(
+            rows_by_label["HANDLE ABEND"]["existing_runtime_operation"],
+            "HandleAbend",
+        )
+        self.assertEqual(rows_by_label["LINK"]["registration_status"], "typed-runtime")
+        self.assertEqual(rows_by_label["LINK"]["existing_runtime_operation"], "Link")
+        self.assertEqual(rows_by_label["XCTL"]["registration_status"], "typed-runtime")
+        self.assertEqual(rows_by_label["XCTL"]["existing_runtime_operation"], "Xctl")
+        self.assertEqual(rows_by_label["RETURN"]["registration_status"], "typed-runtime")
+        self.assertEqual(rows_by_label["RETURN"]["existing_runtime_operation"], "Return")
+        for label, operation in [
+            ("STARTBR", "StartBrowse"),
+            ("READNEXT", "ReadNext"),
+            ("READPREV", "ReadPrev"),
+            ("ENDBR", "EndBrowse"),
+            ("DELETE", "Delete"),
+            ("WRITE FILE", "Write"),
+            ("WRITEQ TD", "WriteTransientData"),
+            ("RECEIVE MAP", "ReceiveMap"),
+            ("SEND MAP", "SendMap"),
+            ("SEND TEXT", "SendText"),
+            ("ASSIGN", "Assign"),
+            ("PURGE MESSAGE", "PurgeMessage"),
+        ]:
+            self.assertEqual(rows_by_label[label]["registration_status"], "typed-runtime")
+            self.assertEqual(rows_by_label[label]["existing_runtime_operation"], operation)
+        self.assertEqual(
+            rows_by_label["ASKTIME"]["registration_status"],
+            "typed-runtime",
+        )
+        self.assertEqual(
+            rows_by_label["ASKTIME"]["existing_runtime_operation"],
+            "AsktimeEib",
+        )
         self.assertEqual(rows_by_label["ASKTIME"]["contract"]["registry"]["family"], "time")
         self.assertEqual(
             rows_by_label["ASKTIME ABSTIME"]["registration_status"],
-            "legacy-compatibility",
+            "typed-runtime",
         )
         self.assertEqual(
             rows_by_label["ASKTIME ABSTIME"]["existing_runtime_operation"],
             "Asktime",
         )
+        self.assertEqual(rows_by_label["FORMATTIME"]["registration_status"], "typed-runtime")
+        self.assertEqual(
+            rows_by_label["FORMATTIME"]["existing_runtime_operation"],
+            "FormatTime",
+        )
         self.assertEqual(ir_registry.count("CicsApplicationRegistryDescriptor {"), 263)
         self.assertIn("CICS_APPLICATION_REGISTRY_FROZEN", ir_registry)
         self.assertIn("CICS_APPLICATION_REGISTRY_SHA256", ir_registry)
         self.assertEqual(contracts["registry"]["shape_commands"], 263)
-        self.assertEqual(contracts["registry"]["typed_handlers"], 3)
-        self.assertEqual(contracts["registry"]["legacy_compatibility_handlers"], 20)
-        self.assertEqual(contracts["registry"]["advertised_commands"], 23)
-        self.assertEqual(contracts["registry"]["unready_handlers"], 240)
+        self.assertEqual(contracts["registry"]["typed_handlers"], 34)
+        self.assertEqual(contracts["registry"]["legacy_compatibility_handlers"], 1)
+        self.assertEqual(contracts["registry"]["advertised_commands"], 35)
+        self.assertEqual(contracts["registry"]["unready_handlers"], 228)
         self.assertIsNone(contracts["registry"]["default_handler"])
         self.assertEqual(contracts["participant_contract"]["status"], "bounded-ambiguity")
         self.assertEqual(contracts["participant_contract"]["execution_credit"], 0)
@@ -207,7 +258,7 @@ class CicsDescriptorTests(unittest.TestCase):
         )
         self.assertEqual(
             sum(row["contract"]["registry"]["advertised"] for row in contract_rows),
-            23,
+            35,
         )
         self.assertTrue(
             all(
@@ -530,12 +581,12 @@ class CicsDescriptorTests(unittest.TestCase):
                 ):
                     cics_descriptors.load_catalog(root)
 
-    def test_runtime_operations_remain_exactly_23_api_and_2_spi(self):
+    def test_runtime_operations_remain_exactly_35_api_and_2_spi(self):
         catalog = cics_descriptors.load_catalog(ROOT)
         counts = {"api": 0, "spi-compatibility": 0}
         for operation in catalog["_runtime_operations"]:
             counts[operation["interface"]] += 1
-        self.assertEqual(counts, {"api": 23, "spi-compatibility": 2})
+        self.assertEqual(counts, {"api": 35, "spi-compatibility": 2})
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -545,6 +596,79 @@ class CicsDescriptorTests(unittest.TestCase):
             self.write_catalog(path, changed)
             with self.assertRaises(cics_descriptors.DescriptorError):
                 cics_descriptors.load_catalog(root)
+
+    def test_legacy_execution_options_are_catalog_owned_and_source_reviewed(self):
+        catalog = cics_descriptors.load_catalog(ROOT)
+        legacy = [
+            operation
+            for operation in catalog["_runtime_operations"]
+            if operation["legacy_execution_options"]
+        ]
+        self.assertEqual(len(legacy), 1)
+        self.assertTrue(
+            all(
+                operation["interface"] == "api"
+                and operation["operation"]
+                not in cics_descriptors.TYPED_RUNTIME_OPERATIONS
+                and operation["legacy_execution_options"]
+                == sorted(set(operation["legacy_execution_options"]))
+                for operation in legacy
+            )
+        )
+
+        contracts = cics_descriptors.build_contracts(ROOT)
+        registry = {
+            command["official_row"]: command["contract"]["registry"]
+            for batch in contracts["batches"]
+            for command in batch["commands"]
+        }
+        for operation in legacy:
+            self.assertEqual(
+                registry[operation["official_row"]]["legacy_execution_options"],
+                operation["legacy_execution_options"],
+            )
+
+    def test_enqueue_lifetime_forms_are_normalized_from_the_verified_syntax(self):
+        contracts = cics_descriptors.build_contracts(ROOT)
+        rows = {
+            command["label"]: command
+            for batch in contracts["batches"]
+            for command in batch["commands"]
+        }
+        for label in ("DEQ", "ENQ"):
+            options = rows[label]["contract"]["options"]
+            entries = {entry["name"]: entry for entry in options["entries"]}
+            self.assertEqual(entries["MAXLIFETIME"]["value_shape"], "value")
+            self.assertEqual(entries["MAXLIFETIME"]["directions"], ["input"])
+            self.assertEqual(entries["RESOURCE"]["directions"], ["input"])
+            self.assertEqual(entries["TASK"]["value_shape"], "flag")
+            self.assertEqual(entries["UOW"]["value_shape"], "flag")
+            self.assertIsNone(entries["LENGTH"]["source_max_value_bytes"])
+            self.assertEqual(options["constraints"]["required"], ["RESOURCE"])
+            self.assertIn(
+                ["MAXLIFETIME", "TASK", "UOW"],
+                options["constraints"]["mutual_exclusions"],
+            )
+
+    def test_legacy_execution_options_reject_missing_nonlegacy_and_invalid_entries(self):
+        mutations = {
+            "missing": lambda routes: routes.pop(),
+            "nonlegacy": lambda routes: routes[0].__setitem__(
+                "runtime_operation", "Read"
+            ),
+            "invalid": lambda routes: routes[0].__setitem__(
+                "execution_options", ["not-an-option"]
+            ),
+        }
+        for name, mutate in mutations.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                self.fixture(root)
+                path, catalog = self.legacy_execution_catalog(root)
+                mutate(catalog["routes"])
+                self.write_catalog(path, catalog)
+                with self.assertRaises(cics_descriptors.DescriptorError):
+                    cics_descriptors.build_contracts(root)
 
     def test_runtime_rejects_fepi_leakage_and_unknown_family(self):
         cases = [("official_row", "ibm-cics-ts-6x-2026-08-31:fepi-commands:0001")]
@@ -569,20 +693,20 @@ class CicsDescriptorTests(unittest.TestCase):
         self.assertTrue(all(":api-commands:" in row["official_row"] for row in rows))
         self.assertFalse(any(":spi-" in row["official_row"] for row in rows))
         self.assertFalse(any(":fepi-" in row["official_row"] for row in rows))
-        self.assertEqual(sum(row["readiness"] == "typed-runtime" for row in registry), 3)
+        self.assertEqual(sum(row["readiness"] == "typed-runtime" for row in registry), 34)
         self.assertEqual(
-            sum(row["readiness"] == "legacy-compatibility" for row in registry), 20
+            sum(row["readiness"] == "legacy-compatibility" for row in registry), 1
         )
-        self.assertEqual(sum(row["advertised"] for row in registry), 23)
-        self.assertEqual(sum(row["readiness"] == "unready" for row in registry), 240)
+        self.assertEqual(sum(row["advertised"] for row in registry), 35)
+        self.assertEqual(sum(row["readiness"] == "unready" for row in registry), 228)
         self.assertFalse(contracts["automatic_registration"])
         self.assertIsNone(contracts["registry"]["default_handler"])
         self.assertEqual(
             contracts["participant_contract"]["mutating_rows"],
             sum(row["contract"]["effect"]["mutating"] is True for row in rows),
         )
-        self.assertEqual(contracts["participant_contract"]["mutating_rows"], 2)
-        self.assertEqual(contracts["participant_contract"]["bounded_effect_rows"], 260)
+        self.assertEqual(contracts["participant_contract"]["mutating_rows"], 16)
+        self.assertEqual(contracts["participant_contract"]["bounded_effect_rows"], 229)
         self.assertEqual(contracts["participant_contract"]["explicit_uow_boundary_rows"], 1)
         self.assertFalse(
             contracts["participant_contract"]["unknown_outcome"]["automatic_redispatch"]
@@ -695,6 +819,7 @@ class CicsDescriptorTests(unittest.TestCase):
             for row in batch["commands"]
         }
         expected_typed = {
+            "ADDRESS SET": {"memory-read", "memory-write", "condition"},
             "READ": {
                 "dataset-read",
                 "memory-read",
@@ -710,6 +835,93 @@ class CicsDescriptorTests(unittest.TestCase):
                 "transaction",
             },
             "SYNCPOINT": {"memory-write", "condition", "transaction"},
+            "SET ASSOCIATION USERCORRDATA": {
+                "memory-read",
+                "memory-write",
+                "condition",
+            },
+            "HANDLE CONDITION": {"memory-read", "memory-write", "condition"},
+            "HANDLE ABEND": {"memory-read", "memory-write", "condition"},
+            "HANDLE AID": {"memory-read", "memory-write", "condition"},
+            "LINK": {
+                "memory-read",
+                "memory-write",
+                "program-control",
+                "condition",
+                "transaction",
+            },
+            "STARTBR": {
+                "dataset-read",
+                "memory-read",
+                "memory-write",
+                "condition",
+                "transaction",
+            },
+            "READNEXT": {
+                "dataset-read",
+                "memory-read",
+                "memory-write",
+                "condition",
+                "transaction",
+            },
+            "READPREV": {
+                "dataset-read",
+                "memory-read",
+                "memory-write",
+                "condition",
+                "transaction",
+            },
+            "ENDBR": {
+                "dataset-read",
+                "memory-read",
+                "memory-write",
+                "condition",
+                "transaction",
+            },
+            "DELETE": {
+                "dataset-write",
+                "memory-read",
+                "memory-write",
+                "condition",
+                "transaction",
+            },
+            "WRITE FILE": {
+                "dataset-write",
+                "memory-read",
+                "memory-write",
+                "condition",
+                "transaction",
+            },
+            "WRITEQ TD": {
+                "memory-read",
+                "memory-write",
+                "condition",
+                "transaction",
+            },
+            "RECEIVE MAP": {
+                "memory-read",
+                "memory-write",
+                "terminal-read",
+                "suspension",
+                "condition",
+                "transaction",
+            },
+            "SEND MAP": {
+                "memory-read",
+                "memory-write",
+                "terminal-write",
+                "condition",
+                "transaction",
+            },
+            "SEND TEXT": {
+                "memory-read",
+                "memory-write",
+                "terminal-write",
+                "condition",
+                "transaction",
+            },
+            "ASSIGN": {"memory-write", "condition", "transaction"},
+            "PURGE MESSAGE": {"memory-write", "condition", "transaction"},
         }
         for label, typed_effects in expected_typed.items():
             effects = set(rows[label]["contract"]["effect"]["ir_effects"])
@@ -736,12 +948,12 @@ class CicsDescriptorTests(unittest.TestCase):
             ],
         )
 
-        for label in ("HANDLE ABEND", "HANDLE CONDITION", "ENDBR", "STARTBR"):
+        for label in ("STARTBR", "READNEXT", "READPREV", "ENDBR"):
             contract = rows[label]["contract"]
-            self.assertEqual(contract["effect"]["status"], "bounded-ambiguity")
-            self.assertIsNone(contract["effect"]["mutating"])
-            self.assertEqual(contract["resource"]["status"], "bounded-ambiguity")
-            self.assertEqual(contract["audit"]["status"], "bounded-ambiguity")
+            self.assertEqual(contract["effect"]["status"], "resolved")
+            self.assertFalse(contract["effect"]["mutating"])
+            self.assertEqual(contract["resource"]["status"], "resolved")
+            self.assertEqual(contract["audit"]["status"], "resolved")
 
         ready = [
             row
@@ -750,11 +962,11 @@ class CicsDescriptorTests(unittest.TestCase):
         ]
         self.assertEqual(
             sum("memory-read" in row["contract"]["effect"]["ir_effects"] for row in ready),
-            18,
+            26,
         )
         self.assertEqual(
             sum("memory-write" in row["contract"]["effect"]["ir_effects"] for row in ready),
-            23,
+            35,
         )
 
     def test_resource_selectors_are_family_scoped_and_input_only(self):
@@ -780,8 +992,8 @@ class CicsDescriptorTests(unittest.TestCase):
 
         self.assertEqual(exact("ASSIGN"), set())
         self.assertEqual(ambiguous("ASSIGN"), set())
-        self.assertEqual(ambiguous("DEQ"), {"RESOURCE"})
-        self.assertEqual(ambiguous("ENQ"), {"RESOURCE"})
+        self.assertEqual(exact("DEQ"), {"RESOURCE"})
+        self.assertEqual(exact("ENQ"), {"RESOURCE"})
         self.assertEqual(exact("GET COUNTER"), {"COUNTER", "POOL"})
         self.assertEqual(
             exact("TRANSFORM DATATOJSON"),
@@ -871,7 +1083,45 @@ class CicsDescriptorTests(unittest.TestCase):
             for row in rows.values()
             if row["contract"]["registry"]["readiness"] == "typed-runtime"
         }
-        self.assertEqual(typed, {"READ", "REWRITE", "SYNCPOINT"})
+        self.assertEqual(
+            typed,
+            {
+                "ABEND",
+                "ADDRESS SET",
+                "ASKTIME",
+                "ASKTIME ABSTIME",
+                "CHANGE TASK",
+                "DEQ",
+                "ENQ",
+                "FORMATTIME",
+                "HANDLE ABEND",
+                "HANDLE AID",
+                "HANDLE CONDITION",
+                "IGNORE CONDITION",
+                "LINK",
+                "POP HANDLE",
+                "PUSH HANDLE",
+                "READ",
+                "REWRITE",
+                "SET ASSOCIATION USERCORRDATA",
+                "SUSPEND",
+                "SYNCPOINT",
+                "XCTL",
+                "RETURN",
+                "STARTBR",
+                "READNEXT",
+                "READPREV",
+                "ENDBR",
+                "DELETE",
+                "WRITE FILE",
+                "WRITEQ TD",
+                "RECEIVE MAP",
+                "SEND MAP",
+                "SEND TEXT",
+                "ASSIGN",
+                "PURGE MESSAGE",
+            },
+        )
         self.assertEqual(
             rows["BIF DEEDIT"]["contract"]["registry"]["family"],
             "builtin-function-control",
@@ -970,6 +1220,12 @@ class CicsDescriptorTests(unittest.TestCase):
             self.assertEqual(
                 rows[label]["condition_clauses"]["maximum_occurrences"], 16
             )
+
+        self.assertEqual(rows["HANDLE AID"]["recognition_heads"], [["HANDLE", "AID"]])
+        self.assertIn(
+            'pub const CICS_APPLICATION_AID_NAMES: &[&str] =',
+            (ROOT / "crates/foundation/mainframe-env-ir/src/generated/cics_application_registry.rs").read_text(),
+        )
 
         activity_constraints = command_rows["ACQUIRE ACTIVITYID"]["contract"]["options"][
             "constraints"

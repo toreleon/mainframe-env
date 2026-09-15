@@ -1,27 +1,11 @@
 {
   "counts": {
-    "markdown_documents": 188,
+    "markdown_documents": 187,
     "navigation_groups": 5,
     "normative_documents": 39,
-    "xtask_commands": 168
+    "xtask_commands": 167
   },
   "documents": [
-    {
-      "normative": false,
-      "path": ".run-logs/pf185-03-summary.md",
-      "relative_links": 0,
-      "sha256": "sha256:38fd574ba93888d678052b090760fa224ef35db4cfd843ae34d1602ddd707933",
-      "title": "PF185 per-CALL summary (mainframe-env #185)",
-      "xtask_commands": 0
-    },
-    {
-      "normative": false,
-      "path": ".run-logs/sc194-03-summary.md",
-      "relative_links": 0,
-      "sha256": "sha256:4bfc6a023199da4652b6b1baec0b38b2f33897f8c69b9f66a5395472d6b78d0f",
-      "title": "SC194 step 1 measurement: per-row cost inside `invoke_checked` (real gate)",
-      "xtask_commands": 1
-    },
     {
       "normative": false,
       "path": "AGENTS.md",
@@ -34,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:b047f4945a19fe75ca669b5775e4c5db40d89990a02cb809924426eae6ee339d",
+      "sha256": "sha256:d19211f9567694b2866cb571d14badfc58620c95b4dfe8ff12ac538d7564d88a",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -359,9 +343,9 @@
       "normative": true,
       "owner": "CICS provider maintainers",
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
-      "relative_links": 20,
+      "relative_links": 22,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:8a65412680f08d9c783ffb331e44f2c94673881e0bf2511e6016c72e23419c44",
+      "sha256": "sha256:d952011b117bfbb0ffca92cb9edc3a5fd0695506ac17aa645f9c9d19f748a780",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -373,7 +357,7 @@
       "path": "docs/architecture/COBOL-RUNTIME-SEMANTICS.md",
       "relative_links": 0,
       "scope": "COBOL runtime semantic contracts",
-      "sha256": "sha256:3117cb0c7126de982c9bd28dd3e3adb24229abfafb574f9a69c107543c67aad5",
+      "sha256": "sha256:c7f0ab9e5b014aa776be79dadd04c29a1db734174eed05ffe5f7705f2606d328",
       "status": "Frozen for mainframe-env 0.4.0 implementation",
       "title": "COBOL runtime semantic contracts",
       "xtask_commands": 0
@@ -445,7 +429,7 @@
       "path": "docs/architecture/EXECUTION-AND-DURABILITY.md",
       "relative_links": 1,
       "scope": "execution lifecycle, effects, work, checkpoints, and durability",
-      "sha256": "sha256:b7e066a059128aa7e1c4e523fdc6b945ae5981025f43201385505f73194082fd",
+      "sha256": "sha256:dd2460e8eb88fc6fbfa9c7245a0af83158c95bd4617c5db3a0b01f729cbd4d8e",
       "status": "Accepted by repository owner",
       "title": "Execution and Durability Architecture",
       "xtask_commands": 0
@@ -505,7 +489,7 @@
       "path": "docs/architecture/PLUGIN-AND-SECURITY.md",
       "relative_links": 0,
       "scope": "capability, provider, plugin, secret, and transport boundaries",
-      "sha256": "sha256:4198a52a0304f12910e614592338594da446f8ed31b86b8987749ae61d1ae8d3",
+      "sha256": "sha256:2291c1f0120677dfe065a57bf8934a5020f77604205ee7cb6c6d47a3e352ffd0",
       "status": "Accepted by repository owner",
       "title": "0.1 Security and Capability Architecture",
       "xtask_commands": 0
@@ -538,7 +522,7 @@
       "normative": false,
       "path": "docs/compatibility/CARDDEMO-COPYBOOKS.md",
       "relative_links": 0,
-      "sha256": "sha256:b4898990f86ea395a34e74b133c3980817a1f2cb619d074a4e17cdfe0201e43f",
+      "sha256": "sha256:01075a1461bb211e26a1841e4cdb66bac5c588a4805da24925b17364137d8807",
       "title": "CardDemo reached compatibility copybooks",
       "xtask_commands": 2
     },
@@ -561,7 +545,7 @@
       "path": "docs/contracts/EFFECT-CANONICAL-V1.md",
       "relative_links": 0,
       "scope": "canonical persisted host request/result digest representation",
-      "sha256": "sha256:d4612141dff7044f4953a73003ffd10df4eb02433234c2bfd43c48806e1fcfca",
+      "sha256": "sha256:af4ddec70539b7ffd2d1e858fc3da5b9917bfa65bd60d207c979a39362bb280b",
       "status": "Frozen contract; implementation deviations tracked before 0.9.0",
       "title": "Canonical host effect representation, version 1",
       "xtask_commands": 0
@@ -1078,7 +1062,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:0b020834deff2af7f5f4574c17116df16b82925c657d5442c6c55b1aacc63d38",
+      "sha256": "sha256:6583f41b6e363c4c0d107d37b3742df653967f0435b31938318719e16256112d",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },
@@ -1414,8 +1398,16 @@
       "normative": false,
       "path": "docs/research/publication-source-probe.md",
       "relative_links": 0,
-      "sha256": "sha256:76e2111e5a597c4293c7d71cfbc9d68155c0932a1bbd8e42b73a6757fa0e1618",
+      "sha256": "sha256:1779bbdc68a10b01f70db5d9ea94a0d9255c5ab4521f635cf8f5a852b42cc0a4",
       "title": "Publication source probe",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "docs/reviews/PR-163-FOLLOWUP-BOUNDARIES.md",
+      "relative_links": 0,
+      "sha256": "sha256:c182cdc5d19cd91b643213b175760f208350e5fe552fb17758c2e084b5d739c5",
+      "title": "PR #163 follow-up boundaries",
       "xtask_commands": 0
     },
     {
@@ -1446,7 +1438,7 @@
       "normative": false,
       "path": "docs/runbooks/CAPACITY-AND-RECOVERY.md",
       "relative_links": 2,
-      "sha256": "sha256:eab3913a9514fa2323c37aa9090f0ffca5d3f8d71b6974244adcc9da882e85fc",
+      "sha256": "sha256:454a8d8c65faf3f1626a3f9c3861507b96124fd92acb56605b368734191c7993",
       "title": "Capacity and recovery",
       "xtask_commands": 0
     },

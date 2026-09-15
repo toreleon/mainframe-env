@@ -308,6 +308,7 @@ pub fn canonical_result_size(
     encode(value, RESULT_DIGEST_DOMAIN, limit, &mut |_| {})
 }
 
+mod cics;
 mod generated;
 
 #[cfg(test)]
