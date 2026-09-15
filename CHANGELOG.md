@@ -109,6 +109,25 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Fixed the CardDemo card list (`COCRDLIC` menu COMEN01 option 3) failing
+  `9000-READ-FORWARD-EXIT`'s unconditional `ENDBR` with an unhandled
+  `INVREQ`, a regression from `0204c9b` on this branch. `0204c9b` made
+  `file_control.rs`'s `decimal_argument` (`crates/providers/mainframe-env-cics/
+  src/handlers/file_control.rs`) require `LENGTH`/`KEYLENGTH` as
+  `mainframe-env.cics.decimal@1` for every file-control operation, but left
+  `STARTBR`/`READNEXT`/`READPREV`/`ENDBR` on the legacy-argument route
+  (`execute_legacy`, `crates/kernel/mainframe-env-interpreter/src/machine/
+  typed_cics.rs`), which never resolved a `KEYLENGTH(LENGTH OF x)` clause to
+  that schema. `STARTBR` therefore failed closed with a generic `ERROR`
+  condition instead of ever registering a browse, `READNEXT` failed the same
+  way, and the source program's `ENDBR` -- which correctly never suppresses
+  `INVREQ` -- then raised it against a browse that had never existed.
+  `execute_legacy` now lowers `LENGTH`/`KEYLENGTH` for file-control commands
+  the same way typed `READ`/`REWRITE` already do: a `LENGTH OF x` clause
+  resolves to `x`'s byte length and a halfword binary reference decodes as a
+  whole-number decimal, and a bare numeric `LENGTH`/`KEYLENGTH` literal (such
+  as `KEYLENGTH(16)`) now resolves the same way, with no data-name lookup.
+  `toreleon/mainframe-env#184`.
 - Fixed CardDemo's account-update `SYNCPOINT ROLLBACK` failing with a bare
   `Unauthorized` (surfaced as `host call failed: Unauthorized`) even though
   the compensating dataset rewrite it protects was itself authorized.

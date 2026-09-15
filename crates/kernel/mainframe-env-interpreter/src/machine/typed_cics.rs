@@ -235,8 +235,8 @@ pub(super) fn execute_legacy(
     let response2_target = legacy_destination(&arguments, "RESP2").map(CicsTarget::Legacy);
     let absolute_time = legacy_destination(&arguments, "ABSTIME");
     for key in [
-        "FROM", "COMMAREA", "RIDFLD", "LENGTH", "QUEUE", "MAP", "MAPSET", "TRANSID", "PROGRAM",
-        "DATASET", "FILE", "MEMBER", "VERSION",
+        "FROM", "COMMAREA", "RIDFLD", "QUEUE", "MAP", "MAPSET", "TRANSID", "PROGRAM", "DATASET",
+        "FILE", "MEMBER", "VERSION",
     ] {
         if outputs.contains_key(key) {
             continue;
@@ -258,6 +258,42 @@ pub(super) fn execute_legacy(
                 key.into(),
                 payload("mainframe-env.cics.storage-value@1", value)?,
             );
+        }
+    }
+    // `file_control.rs::decimal_argument` requires LENGTH/KEYLENGTH as
+    // `decimal@1`, like typed READ/REWRITE (`execute` above). STARTBR/
+    // READNEXT/READPREV/ENDBR stay LegacyCompatibility, so they need the
+    // same halfword-binary / `LENGTH OF` lowering done here instead.
+    if matches!(
+        operation,
+        CicsOperation::Read
+            | CicsOperation::Write
+            | CicsOperation::Rewrite
+            | CicsOperation::Delete
+            | CicsOperation::StartBrowse
+            | CicsOperation::ReadNext
+            | CicsOperation::ReadPrev
+            | CicsOperation::EndBrowse
+    ) {
+        for key in ["LENGTH", "KEYLENGTH"] {
+            let Some(argument) = arguments.get(key) else {
+                continue;
+            };
+            if argument.schema() == "mainframe-env.cics.literal@1" {
+                continue;
+            }
+            let token = String::from_utf8_lossy(argument.bytes()).into_owned();
+            let reference_tokens = token
+                .split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            let resolved = legacy_numeric_operand(machine, &reference_tokens);
+            if let Ok(decimal) = resolved {
+                arguments.insert(
+                    key.into(),
+                    payload("mainframe-env.cics.decimal@1", decimal)?,
+                );
+            }
         }
     }
     if operation == CicsOperation::FormatTime
@@ -807,6 +843,45 @@ fn legacy_destination(arguments: &BTreeMap<String, BoundedPayload>, key: &str) -
         .map(|value| String::from_utf8_lossy(value.bytes()).into_owned())
 }
 
+/// Resolve a legacy `LENGTH`/`KEYLENGTH` reference the way the typed
+/// `CicsOperandValue::Length`/`LengthOf` cases do in `execute` above: a bare
+/// `LENGTH OF x` yields `x`'s byte length, otherwise the reference must be a
+/// halfword binary data item decoded as a whole-number decimal.
+fn legacy_numeric_operand(
+    machine: &ReferenceMachine,
+    reference_tokens: &[String],
+) -> Result<Vec<u8>, MachineProblem> {
+    if let [literal] = reference_tokens
+        && !literal.is_empty()
+        && literal.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        // A bare numeric literal (`KEYLENGTH(16)`) is unquoted, so it arrives
+        // as `argument@1`, not `literal@1`; resolve it directly, with no
+        // data-name lookup. Out of `u32` range fails closed (caller leaves
+        // the argument unchanged, so the provider rejects it).
+        let value: u32 = literal.parse().map_err(|_| MachineProblem::DataException)?;
+        return Ok(value.to_string().into_bytes());
+    }
+    if let [head, of, rest @ ..] = reference_tokens
+        && head.eq_ignore_ascii_case("LENGTH")
+        && of.eq_ignore_ascii_case("OF")
+    {
+        let reference = machine.reference(rest)?;
+        return Ok(machine
+            .read_reference(&reference)?
+            .len()
+            .to_string()
+            .into_bytes());
+    }
+    let reference = machine.reference(reference_tokens)?;
+    let bytes = machine.read_reference(&reference)?;
+    let value = decode_decimal(&reference.layout, &bytes)?;
+    if value.scale != 0 {
+        return Err(MachineProblem::DataException);
+    }
+    Ok(value.coefficient.to_string().into_bytes())
+}
+
 fn invalid_plan(detail: &str) -> MachineProblem {
     MachineProblem::InvalidArtifact(format!("invalid typed CICS effect plan: {detail}"))
 }
@@ -1258,5 +1333,158 @@ mod tests {
             ),
             Err(MachineProblem::InvalidArtifact(_))
         ));
+    }
+
+    #[test]
+    fn legacy_startbr_keylength_length_of_resolves_to_decimal() {
+        // Issue #184: COCRDLIC.cbl:1129's legacy-routed STARTBR writes
+        // `KEYLENGTH(LENGTH OF WS-CARD-RID-CARDNUM)`; this pins that clause
+        // resolving to `mainframe-env.cics.decimal@1`, like typed READ/REWRITE.
+        let mut builder = ModuleBuilder::new(IrLimits::default());
+        builder.add_storage("KEY-X", 3, None).unwrap();
+        let region = builder.add_region().unwrap();
+        let block = builder.add_block(region).unwrap();
+        builder
+            .add_operation(
+                block,
+                OperationIdentity::new(super::super::NAMESPACE, "define", 1).unwrap(),
+                Vec::new(),
+                0,
+                BTreeMap::from([
+                    ("name".into(), Attribute::Text("KEY-X".into())),
+                    ("simple_name".into(), Attribute::Text("KEY-X".into())),
+                    ("category".into(), Attribute::Text("alphanumeric".into())),
+                    ("picture".into(), Attribute::Text("X(3)".into())),
+                    ("digits".into(), Attribute::Integer(0)),
+                    ("scale".into(), Attribute::Integer(0)),
+                    ("signed".into(), Attribute::Integer(0)),
+                    ("sign_separate".into(), Attribute::Integer(0)),
+                    ("section".into(), Attribute::Text("working".into())),
+                    ("offset".into(), Attribute::Integer(0)),
+                    ("length".into(), Attribute::Integer(3)),
+                    ("element_length".into(), Attribute::Integer(3)),
+                    ("occurs".into(), Attribute::Integer(1)),
+                    ("parent".into(), Attribute::Text(String::new())),
+                    ("condition_values".into(), Attribute::Text(String::new())),
+                ]),
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .unwrap();
+        builder
+            .add_operation(
+                block,
+                OperationIdentity::new(super::super::NAMESPACE, "halt", 1).unwrap(),
+                Vec::new(),
+                0,
+                BTreeMap::new(),
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .unwrap();
+        let bytes =
+            mainframe_env_ir::encode_binary(&builder.finish().unwrap(), CodecLimits::default())
+                .unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            &bytes,
+            super::super::tests::invocation(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let tokens = [
+            "EXEC",
+            "CICS",
+            "STARTBR",
+            "DATASET",
+            "(",
+            "'TRANSACT'",
+            ")",
+            "RIDFLD",
+            "(",
+            "KEY-X",
+            ")",
+            "KEYLENGTH",
+            "(",
+            "LENGTH",
+            "OF",
+            "KEY-X",
+            ")",
+            "END-EXEC",
+        ]
+        .map(str::to_string);
+        let step = execute_legacy(&mut machine, &tokens).expect("startbr lowers");
+        let Step::Effect(effect) = step else {
+            panic!("expected a host effect step");
+        };
+        let HostRequest::Cics(request) = effect.request else {
+            panic!("expected a CICS request");
+        };
+        let key_length = request
+            .arguments
+            .get("KEYLENGTH")
+            .expect("KEYLENGTH argument");
+        assert_eq!(key_length.schema(), "mainframe-env.cics.decimal@1");
+        assert_eq!(key_length.bytes(), b"3");
+    }
+
+    #[test]
+    fn legacy_startbr_keylength_numeric_literal_resolves_to_decimal() {
+        // A bare `KEYLENGTH(16)` isn't quoted, so `legacy_arguments` tags it
+        // `argument@1`; `legacy_numeric_operand` resolves an all-digit token
+        // directly to `decimal@1`, with no data-name lookup.
+        let mut builder = ModuleBuilder::new(IrLimits::default());
+        let region = builder.add_region().unwrap();
+        let block = builder.add_block(region).unwrap();
+        builder
+            .add_operation(
+                block,
+                OperationIdentity::new(super::super::NAMESPACE, "halt", 1).unwrap(),
+                Vec::new(),
+                0,
+                BTreeMap::new(),
+                Vec::new(),
+                Vec::new(),
+                None,
+            )
+            .unwrap();
+        let bytes =
+            mainframe_env_ir::encode_binary(&builder.finish().unwrap(), CodecLimits::default())
+                .unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            &bytes,
+            super::super::tests::invocation(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let tokens = [
+            "EXEC",
+            "CICS",
+            "STARTBR",
+            "DATASET",
+            "(",
+            "'TRANSACT'",
+            ")",
+            "KEYLENGTH",
+            "(",
+            "16",
+            ")",
+            "END-EXEC",
+        ]
+        .map(str::to_string);
+        let step = execute_legacy(&mut machine, &tokens).expect("startbr lowers");
+        let Step::Effect(effect) = step else {
+            panic!("expected a host effect step");
+        };
+        let HostRequest::Cics(request) = effect.request else {
+            panic!("expected a CICS request");
+        };
+        let key_length = request
+            .arguments
+            .get("KEYLENGTH")
+            .expect("KEYLENGTH argument");
+        assert_eq!(key_length.schema(), "mainframe-env.cics.decimal@1");
+        assert_eq!(key_length.bytes(), b"16");
     }
 }
