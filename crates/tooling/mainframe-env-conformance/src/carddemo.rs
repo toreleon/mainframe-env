@@ -1,6 +1,7 @@
 //! Fail-closed verification for the externally supplied CardDemo corpus.
 
 mod bms;
+mod control_library;
 
 use bms::{carddemo_base_maps, carddemo_maps};
 
@@ -5142,16 +5143,7 @@ async fn exercise_db2_routes(
         .map_err(terminal_problem)?;
 
     let mut sequence = 40_000u64;
-    utility_seed_dataset(
-        &server,
-        "AWS.M2.CARDDEMO.CNTL",
-        DatasetOrganization::Partitioned,
-        RecordFormat::Variable,
-        4_096,
-        None,
-        Vec::new(),
-        &mut sequence,
-    )?;
+    let mut control_members = Vec::new();
     for relative in collect_paths(corpus_dir, &["app/app-transaction-type-db2/ctl"], "ctl")? {
         let member = Path::new(&relative)
             .file_stem()
@@ -5166,17 +5158,20 @@ async fn exercise_db2_routes(
                     format!("{relative} is not UTF-8"),
                 )
             })?;
-        utility_write_dataset(
-            &server,
-            "AWS.M2.CARDDEMO.CNTL",
-            Some(member),
+        control_members.push((
+            member.to_string(),
             source
                 .lines()
                 .map(|line| line.as_bytes().to_vec())
                 .collect(),
-            &mut sequence,
-        )?;
+        ));
     }
+    control_library::seed_control_library(
+        &server,
+        "AWS.M2.CARDDEMO.CNTL",
+        control_members,
+        &mut sequence,
+    )?;
     utility_seed_dataset(
         &server,
         "INPFILE",

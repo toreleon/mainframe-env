@@ -336,6 +336,9 @@ All notable changes to mainframe-env are documented here.
   when no record is held (#205).
 - Fixed typed plan validation accepting unrelated extension flags on READ, REWRITE,
   and SYNCPOINT during the PR #179 merge (#212).
+- Fixed CardDemo DB2 control-library allocation to reserve directory space for all
+  members (#201). CNTL seeding from `3d1a55b` exceeded the directory capacity
+  enforced by `fe2c1ee`; seven control members now receive two directory blocks.
 - Fixed typed `WRITEQ TD` lowering for `LENGTH(LENGTH OF data-area)` (#206).
 - Fixed bare `DATESEP`/`TIMESEP` defaults and compact FORMATTIME output widths
   (#207).

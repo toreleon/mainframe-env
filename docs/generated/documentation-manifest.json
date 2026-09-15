@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:d19211f9567694b2866cb571d14badfc58620c95b4dfe8ff12ac538d7564d88a",
+      "sha256": "sha256:5c646edee6d389d9db4fdf81e68000b5671d5d214c976b45727bced358a8ed96",
       "title": "Changelog",
       "xtask_commands": 6
     },
