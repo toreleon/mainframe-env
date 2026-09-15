@@ -336,6 +336,8 @@ All notable changes to mainframe-env are documented here.
   when no record is held (#205).
 - Fixed typed plan validation accepting unrelated extension flags on READ, REWRITE,
   and SYNCPOINT during the PR #179 merge (#212).
+- Fixed online XCTL and program-exit transfers dropping prior CICS trace entries
+  when replacing the volatile run, introduced by `ad53b3f` (#213).
 - Fixed CardDemo DB2 control-library allocation to reserve directory space for all
   members (#201). CNTL seeding from `3d1a55b` exceeded the directory capacity
   enforced by `fe2c1ee`; seven control members now receive two directory blocks.

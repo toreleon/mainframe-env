@@ -10956,6 +10956,27 @@ mod tests {
 
     #[test]
     fn online_xctl_replaces_the_frame_and_passes_typed_commarea() {
+        run_online_xctl_fixture();
+    }
+
+    /// Issue #213: a program transfer keeps earlier task effects in trace order.
+    #[test]
+    fn online_xctl_preserves_prior_cics_trace_exactly_once() {
+        let trace = run_online_xctl_fixture();
+        assert_eq!(
+            trace
+                .iter()
+                .map(|entry| entry.operation)
+                .collect::<Vec<_>>(),
+            vec![
+                mainframe_env_host_api::CicsOperation::Xctl,
+                mainframe_env_host_api::CicsOperation::Retrieve,
+                mainframe_env_host_api::CicsOperation::Suspend,
+            ],
+        );
+    }
+
+    fn run_online_xctl_fixture() -> Vec<CicsTraceEntry> {
         let limits = SourceLimits::default();
         let compile = |name: &str, source: &[u8]| {
             let filename = format!("{name}.cbl");
@@ -11111,6 +11132,14 @@ mod tests {
                 .state,
             ExecutionState::Completed
         );
+        let mut trace = server.online_trace(session.as_str()).unwrap();
+        trace.extend(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 2)
+                .unwrap(),
+        );
+        trace
     }
 
     #[test]
