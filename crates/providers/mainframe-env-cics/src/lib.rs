@@ -4,10 +4,12 @@
 
 mod abi;
 mod generated;
+mod interval;
 mod retention;
 mod service;
 
 pub use abi::cics_abi_library;
+pub use interval::{CicsIntervalError, CicsIntervalMode, CicsIntervalTime};
 
 pub use retention::{
     CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
