@@ -2205,7 +2205,9 @@ mod tests {
 
     #[test]
     fn cics_outbound_operands_read_storage_bytes() {
-        use mainframe_env_host_api::{CicsOperation, HostRequest};
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsResponse, EffectResult, HostRequest, HostResult,
+        };
 
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSABI. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(3) VALUE 'ABC'. PROCEDURE DIVISION. EXEC CICS WRITEQ TD QUEUE('Q1') FROM(DATA-X) LENGTH(3) END-EXEC. STOP RUN.";
         let artifact = compile(source).unwrap();
@@ -2220,13 +2222,299 @@ mod tests {
         else {
             panic!("CICS operation did not call host");
         };
-        let HostRequest::Cics(request) = effect.request else {
+        let HostRequest::Cics(request) = &effect.request else {
             panic!("unexpected host request");
         };
         assert_eq!(request.operation, CicsOperation::WriteTransientData);
         assert_eq!(request.arguments["FROM"].bytes(), b"ABC");
         assert_eq!(request.arguments["QUEUE"].bytes(), b"Q1");
         assert_eq!(request.arguments["LENGTH"].bytes(), b"3");
+        assert!(request.mutation.is_some());
+        let response = CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                Vec::new(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            outputs: BTreeMap::new(),
+            unit_of_work: None,
+        };
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: effect.sequence,
+                    outcome: Ok(HostResult::Cics(response)),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x08, 0x02]);
+    }
+
+    #[test]
+    fn cics_bms_subset_uses_typed_map_text_and_receive_bindings() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBMS. DATA DIVISION. WORKING-STORAGE SECTION. 01 OUT-X PIC X(4) VALUE 'DATA'. 01 IN-X PIC X(5). PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') MAPSET('MAIN') FROM(OUT-X) END-EXEC. EXEC CICS RECEIVE MAP('MENU') MAPSET('MAIN') INTO(IN-X) END-EXEC. EXEC CICS SEND TEXT FROM(OUT-X) END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let response = |bytes: &[u8]| CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0x7d,
+            target: None,
+            next_transaction: None,
+            payload: mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                bytes.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            outputs: BTreeMap::new(),
+            unit_of_work: None,
+        };
+
+        let MachineDrive::HostCall(send_map) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("SEND MAP did not call host");
+        };
+        assert!(matches!(
+            &send_map.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::SendMap,
+                arguments,
+                mutation: Some(_),
+                ..
+            }) if arguments["MAP"].bytes() == b"MENU"
+                && arguments["MAPSET"].bytes() == b"MAIN"
+                && arguments["FROM"].bytes() == b"DATA"
+        ));
+
+        let MachineDrive::HostCall(receive_map) = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: send_map.sequence,
+                outcome: Ok(HostResult::Cics(response(b""))),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        ) else {
+            panic!("RECEIVE MAP did not call host");
+        };
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x18, 0x04]);
+        assert!(matches!(
+            &receive_map.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::ReceiveMap,
+                arguments,
+                mutation: Some(_),
+                ..
+            }) if arguments["MAP"].bytes() == b"MENU"
+                && arguments["MAPSET"].bytes() == b"MAIN"
+                && arguments["INTO"].bytes() == b"IN-X"
+        ));
+
+        let MachineDrive::HostCall(send_text) = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: receive_map.sequence,
+                outcome: Ok(HostResult::Cics(response(b"INPUT"))),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        ) else {
+            panic!("SEND TEXT did not call host");
+        };
+        assert_eq!(machine.variable("IN-X").unwrap().bytes(), b"INPUT");
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x18, 0x02]);
+        assert!(matches!(
+            &send_text.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::SendText,
+                arguments,
+                mutation: Some(_),
+                ..
+            }) if arguments["FROM"].bytes() == b"DATA"
+        ));
+
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: send_text.sequence,
+                    outcome: Ok(HostResult::Cics(response(b""))),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x18, 0x06]);
+    }
+
+    #[test]
+    fn cics_assign_uses_typed_bounded_output_bindings() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSASGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 APPL-X PIC X(8). 01 PRIORITY-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS ASSIGN APPLID(APPL-X) TASKPRIORITY(PRIORITY-X) END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+
+        let MachineDrive::HostCall(call) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("ASSIGN did not call host");
+        };
+        assert!(matches!(
+            &call.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::Assign,
+                arguments,
+                mutation: None,
+                ..
+            }) if arguments["APPLID"].bytes() == b"APPL-X"
+                && arguments["TASKPRIORITY"].bytes() == b"PRIORITY-X"
+        ));
+
+        let response = CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                Vec::new(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            outputs: BTreeMap::from([
+                (
+                    "APPLID".into(),
+                    mainframe_env_execution_api::BoundedPayload::new(
+                        "mainframe-env.cics.payload@1",
+                        b"REGION01".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                (
+                    "TASKPRIORITY".into(),
+                    mainframe_env_execution_api::BoundedPayload::new(
+                        "mainframe-env.cics.decimal@1",
+                        b"200".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+            ]),
+            unit_of_work: None,
+        };
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: call.sequence,
+                    outcome: Ok(HostResult::Cics(response)),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("APPL-X").unwrap().bytes(), b"REGION01");
+        assert_eq!(machine.variable("PRIORITY-X").unwrap().bytes(), &[0, 200]);
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x02, 0x08]);
+    }
+
+    #[test]
+    fn cics_purge_message_uses_a_typed_mutating_host_request() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsResponse, EffectResult, HostRequest, HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSPURG. PROCEDURE DIVISION. EXEC CICS PURGE MESSAGE END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(call) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("PURGE MESSAGE did not call host");
+        };
+        let HostRequest::Cics(request) = &call.request else {
+            panic!("unexpected host request");
+        };
+        assert_eq!(request.operation, CicsOperation::PurgeMessage);
+        assert!(request.arguments.is_empty());
+        assert!(request.mutation.is_some());
+
+        let response = CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                Vec::new(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            outputs: BTreeMap::new(),
+            unit_of_work: None,
+        };
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: call.sequence,
+                    outcome: Ok(HostResult::Cics(response)),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x18, 0x0a]);
     }
 
     #[test]
@@ -2450,9 +2738,12 @@ mod tests {
 
     #[test]
     fn cics_decimal_outputs_update_exact_cobol_destinations() {
-        use mainframe_env_host_api::{CicsDisposition, CicsResponse, EffectResult, HostResult};
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
 
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTIME. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-X PIC S9(15) COMP-3 VALUE 0. 01 ABS-DISPLAY PIC 9(15). PROCEDURE DIVISION. EXEC CICS ASKTIME ABSTIME(ABS-X) END-EXEC. MOVE ABS-X TO ABS-DISPLAY. DISPLAY ABS-DISPLAY. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTIME. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-X PIC S9(15) COMP-3 VALUE 0. 01 ABS-DISPLAY PIC 9(15). 01 EIBDATE PIC S9(7) COMP-3. 01 EIBTIME PIC S9(7) COMP-3. PROCEDURE DIVISION. EXEC CICS ASKTIME ABSTIME(ABS-X) END-EXEC. MOVE ABS-X TO ABS-DISPLAY. DISPLAY ABS-DISPLAY. STOP RUN.";
         let artifact = compile(source).unwrap();
         let mut machine = ReferenceMachine::from_binary(
             artifact.payload(),
@@ -2464,6 +2755,815 @@ mod tests {
             machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
         else {
             panic!("ASKTIME did not call host");
+        };
+        assert!(matches!(
+            &effect.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::Asktime,
+                arguments,
+                ..
+            }) if arguments.contains_key("ABSTIME")
+        ));
+        let response = CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                Vec::new(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            outputs: BTreeMap::from([
+                (
+                    "ABSTIME".into(),
+                    mainframe_env_execution_api::BoundedPayload::new(
+                        "mainframe-env.cics.decimal@1",
+                        b"3997082096789".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                (
+                    "EIBDATE".into(),
+                    mainframe_env_execution_api::BoundedPayload::new(
+                        "mainframe-env.cics.decimal@1",
+                        b"126242".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                (
+                    "EIBTIME".into(),
+                    mainframe_env_execution_api::BoundedPayload::new(
+                        "mainframe-env.cics.decimal@1",
+                        b"123456".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+            ]),
+            unit_of_work: None,
+        };
+        let mut malformed = response.clone();
+        malformed.outputs.insert(
+            "ABSTIME".into(),
+            mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.decimal@1",
+                b"not-a-number".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        let mut rejected = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(rejected_effect) =
+            rejected.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("ASKTIME did not call host");
+        };
+        assert!(matches!(
+            rejected.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: rejected_effect.sequence,
+                    outcome: Ok(HostResult::Cics(malformed)),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Failed(_)
+        ));
+        let result = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: effect.sequence,
+                outcome: Ok(HostResult::Cics(response)),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        );
+        assert!(
+            matches!(
+                result,
+                MachineDrive::Completed(ref done)
+                    if done.output.bytes() == b"003997082096789\n"
+            ),
+            "{result:?}"
+        );
+        assert_eq!(
+            machine.variable("EIBDATE").unwrap().bytes(),
+            &[0x01, 0x26, 0x24, 0x2c]
+        );
+        assert_eq!(
+            machine.variable("EIBTIME").unwrap().bytes(),
+            &[0x01, 0x23, 0x45, 0x6c]
+        );
+    }
+
+    #[test]
+    fn cics_formattime_writes_typed_character_and_binary_outputs() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFMT. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-X PIC S9(15) COMP-3 VALUE 3997082096789. 01 DATE-X PIC X(10). 01 TIME-X PIC X(8). 01 MS-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS FORMATTIME ABSTIME(ABS-X) DATESEP('-') YYYYMMDD(DATE-X) TIMESEP(':') TIME(TIME-X) MILLISECONDS(MS-X) END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let start = |machine: &mut ReferenceMachine| {
+            let MachineDrive::HostCall(effect) =
+                machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+            else {
+                panic!("FORMATTIME did not call host");
+            };
+            assert!(matches!(
+                &effect.request,
+                HostRequest::Cics(CicsRequest {
+                    operation: CicsOperation::FormatTime,
+                    arguments,
+                    ..
+                }) if arguments["ABSTIME"].bytes() == b"3997082096789"
+            ));
+            effect
+        };
+        let payload = |schema: &str, bytes: &[u8]| {
+            mainframe_env_execution_api::BoundedPayload::new(
+                schema,
+                bytes.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let response = CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: payload("mainframe-env.cics.payload@1", b""),
+            outputs: BTreeMap::from([
+                (
+                    "MILLISECONDS".into(),
+                    payload("mainframe-env.cics.decimal@1", b"789"),
+                ),
+                (
+                    "TIME".into(),
+                    payload("mainframe-env.cics.payload@1", b"12:34:56"),
+                ),
+                (
+                    "YYYYMMDD".into(),
+                    payload("mainframe-env.cics.payload@1", b"2026-08-30"),
+                ),
+            ]),
+            unit_of_work: None,
+        };
+        let mut malformed = response.clone();
+        malformed.outputs.insert(
+            "TIME".into(),
+            payload("mainframe-env.cics.decimal@1", b"123456"),
+        );
+        let mut rejected = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let rejected_effect = start(&mut rejected);
+        assert!(matches!(
+            rejected.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: rejected_effect.sequence,
+                    outcome: Ok(HostResult::Cics(malformed)),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Failed(_)
+        ));
+
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let effect = start(&mut machine);
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: effect.sequence,
+                    outcome: Ok(HostResult::Cics(response)),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(done) if done.output.bytes().is_empty()
+        ));
+        assert_eq!(machine.variable("DATE-X").unwrap().bytes(), b"2026-08-30");
+        assert_eq!(machine.variable("TIME-X").unwrap().bytes(), b"12:34:56");
+        assert_eq!(machine.variable("MS-X").unwrap().bytes(), &[0, 0, 3, 21]);
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x4a, 0x04]);
+    }
+
+    #[test]
+    fn cics_abend_uses_typed_code_flags_and_terminal_metadata() {
+        use mainframe_env_execution_api::AbendDumpDisposition;
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSABND. DATA DIVISION. WORKING-STORAGE SECTION. 01 AB-CODE PIC X(4) VALUE 'B001'. PROCEDURE DIVISION. EXEC CICS ABEND ABCODE(AB-CODE) CANCEL NODUMP END-EXEC.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("ABEND did not call host");
+        };
+        assert!(matches!(
+            &effect.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::Abend,
+                arguments,
+                ..
+            }) if arguments["ABCODE"].bytes() == b"B001"
+                && arguments.contains_key("OPTION.CANCEL")
+                && arguments.contains_key("OPTION.NODUMP")
+        ));
+        let payload = |schema: &str, bytes: &[u8]| {
+            mainframe_env_execution_api::BoundedPayload::new(
+                schema,
+                bytes.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let result = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: effect.sequence,
+                outcome: Ok(HostResult::Cics(CicsResponse {
+                    disposition: CicsDisposition::Abended,
+                    condition: "ERROR".into(),
+                    response: 27,
+                    response2: 0,
+                    applid: "APP".into(),
+                    sysid: "SYS".into(),
+                    transaction: "T001".into(),
+                    aid: 0,
+                    target: None,
+                    next_transaction: None,
+                    payload: payload("mainframe-env.cics.payload@1", b"B001"),
+                    outputs: BTreeMap::from([(
+                        "ABEND.DUMP".into(),
+                        payload("mainframe-env.cics.abend-dump@1", b"suppressed"),
+                    )]),
+                    unit_of_work: None,
+                })),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        );
+        assert!(matches!(
+            result,
+            MachineDrive::Abend(abend)
+                if abend.code == "B001"
+                    && abend.dump == AbendDumpDisposition::Suppressed
+        ));
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x0e, 0x0c]);
+    }
+
+    #[test]
+    fn cics_handle_abend_uses_typed_label_and_program_inputs() {
+        use mainframe_env_host_api::{CicsOperation, CicsRequest, HostRequest};
+
+        for (source, expected_name, expected_value) in [
+            (
+                "IDENTIFICATION DIVISION. PROGRAM-ID. HABLAB. PROCEDURE DIVISION. EXEC CICS HANDLE ABEND LABEL(EXIT-PARA) END-EXEC. STOP RUN. EXIT-PARA. STOP RUN.",
+                "LABEL",
+                b"EXIT-PARA".as_slice(),
+            ),
+            (
+                "IDENTIFICATION DIVISION. PROGRAM-ID. HABPGM. DATA DIVISION. WORKING-STORAGE SECTION. 01 PROGRAM-X PIC X(8) VALUE 'ABEXIT'. PROCEDURE DIVISION. EXEC CICS HANDLE ABEND PROGRAM(PROGRAM-X) END-EXEC. STOP RUN.",
+                "PROGRAM",
+                b"ABEXIT  ".as_slice(),
+            ),
+        ] {
+            let artifact = compile(source).unwrap();
+            let mut machine = ReferenceMachine::from_binary(
+                artifact.payload(),
+                invocation(&artifact, 1024),
+                CodecLimits::default(),
+            )
+            .unwrap();
+            let MachineDrive::HostCall(effect) =
+                machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+            else {
+                panic!("HANDLE ABEND did not call host");
+            };
+            assert!(matches!(
+                &effect.request,
+                HostRequest::Cics(CicsRequest {
+                    operation: CicsOperation::HandleAbend,
+                    arguments,
+                    ..
+                }) if arguments[expected_name].bytes() == expected_value
+            ));
+        }
+    }
+
+    #[test]
+    fn cics_link_uses_typed_input_output_commarea() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLINK. DATA DIVISION. WORKING-STORAGE SECTION. 01 AREA-X PIC X(8) VALUE 'REQUEST'. PROCEDURE DIVISION. EXEC CICS LINK PROGRAM('CHILD') COMMAREA(AREA-X) END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("LINK did not call host");
+        };
+        assert!(
+            matches!(
+                &effect.request,
+                HostRequest::Cics(CicsRequest {
+                    operation: CicsOperation::Link,
+                    arguments,
+                    mutation: Some(_),
+                    ..
+                }) if arguments["PROGRAM"].bytes() == b"CHILD"
+                    && arguments["COMMAREA"].bytes() == b"REQUEST "
+            ),
+            "{:#?}",
+            effect.request
+        );
+        let payload = |bytes: &[u8]| {
+            mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                bytes.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: effect.sequence,
+                    outcome: Ok(HostResult::Cics(CicsResponse {
+                        disposition: CicsDisposition::Complete,
+                        condition: "NORMAL".into(),
+                        response: 0,
+                        response2: 0,
+                        applid: "APP".into(),
+                        sysid: "SYS".into(),
+                        transaction: "T001".into(),
+                        aid: 0,
+                        target: Some("CHILD".into()),
+                        next_transaction: None,
+                        payload: payload(b"RESPONSE"),
+                        outputs: BTreeMap::from([("COMMAREA".into(), payload(b"RESPONSE"))]),
+                        unit_of_work: None,
+                    })),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("AREA-X").unwrap().bytes(), b"RESPONSE");
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x0e, 0x02]);
+    }
+
+    #[test]
+    fn cics_xctl_uses_typed_input_commarea_and_transfers() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSXCTL. DATA DIVISION. WORKING-STORAGE SECTION. 01 AREA-X PIC X(8) VALUE 'REQUEST'. PROCEDURE DIVISION. EXEC CICS XCTL PROGRAM('CHILD') COMMAREA(AREA-X) END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("XCTL did not call host");
+        };
+        assert!(
+            matches!(
+                &effect.request,
+                HostRequest::Cics(CicsRequest {
+                    operation: CicsOperation::Xctl,
+                    arguments,
+                    mutation: Some(_),
+                    ..
+                }) if arguments["PROGRAM"].bytes() == b"CHILD"
+                    && arguments["COMMAREA"].bytes() == b"REQUEST "
+                    && arguments["COMMAREA"].schema()
+                        == "mainframe-env.cics.storage-value@1"
+            ),
+            "{:#?}",
+            effect.request
+        );
+        let payload = mainframe_env_execution_api::BoundedPayload::new(
+            "mainframe-env.cics.payload@1",
+            b"REQUEST ".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: effect.sequence,
+                    outcome: Ok(HostResult::Cics(CicsResponse {
+                        disposition: CicsDisposition::Transfer,
+                        condition: "NORMAL".into(),
+                        response: 0,
+                        response2: 0,
+                        applid: "APP".into(),
+                        sysid: "SYS".into(),
+                        transaction: "T001".into(),
+                        aid: 0,
+                        target: Some("CHILD".into()),
+                        next_transaction: None,
+                        payload: payload.clone(),
+                        outputs: BTreeMap::new(),
+                        unit_of_work: None,
+                    })),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Transfer(transfer)
+                if transfer.selector.as_str() == "CHILD"
+                    && transfer.payload == payload
+                    && transfer.replace_frame
+        ));
+        assert_eq!(machine.variable("AREA-X").unwrap().bytes(), b"REQUEST ");
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x0e, 0x04]);
+    }
+
+    #[test]
+    fn cics_return_uses_typed_transaction_and_commarea_before_completion() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSRET. DATA DIVISION. WORKING-STORAGE SECTION. 01 STATE-X PIC X(8) VALUE 'STATE'. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS RETURN TRANSID('NEXT') COMMAREA(STATE-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("RETURN did not call host");
+        };
+        assert!(
+            matches!(
+                &effect.request,
+                HostRequest::Cics(CicsRequest {
+                    operation: CicsOperation::Return,
+                    arguments,
+                    mutation: Some(_),
+                    ..
+                }) if arguments["TRANSID"].bytes() == b"NEXT"
+                    && arguments["COMMAREA"].bytes() == b"STATE   "
+                    && arguments["RESP"].bytes() == b"RESP-X"
+                    && arguments["RESP2"].bytes() == b"RESP2-X"
+            ),
+            "{:#?}",
+            effect.request
+        );
+        let payload = mainframe_env_execution_api::BoundedPayload::new(
+            "mainframe-env.cics.payload@1",
+            b"STATE   ".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: effect.sequence,
+                    outcome: Ok(HostResult::Cics(CicsResponse {
+                        disposition: CicsDisposition::Returned,
+                        condition: "NORMAL".into(),
+                        response: 0,
+                        response2: 0,
+                        applid: "APP".into(),
+                        sysid: "SYS".into(),
+                        transaction: "T001".into(),
+                        aid: 0,
+                        target: None,
+                        next_transaction: Some("NEXT".into()),
+                        payload,
+                        outputs: BTreeMap::new(),
+                        unit_of_work: None,
+                    })),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("STATE-X").unwrap().bytes(), b"STATE   ");
+        assert_eq!(machine.variable("RESP-X").unwrap().bytes(), &[0; 4]);
+        assert_eq!(machine.variable("RESP2-X").unwrap().bytes(), &[0; 4]);
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x0e, 0x08]);
+    }
+
+    #[test]
+    fn cics_default_file_browse_preserves_cursor_key_across_typed_operations() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBROWSE. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2) VALUE 'AA'. 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) END-EXEC. EXEC CICS READNEXT FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS READPREV FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS ENDBR FILE('ACCTDAT') END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let payload = |bytes: &[u8]| {
+            mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                bytes.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let response = |record: &[u8], outputs: BTreeMap<String, _>| CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: payload(record),
+            outputs,
+            unit_of_work: None,
+        };
+
+        let MachineDrive::HostCall(start) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("STARTBR did not call host");
+        };
+        assert!(matches!(
+            &start.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::StartBrowse,
+                arguments,
+                mutation: None,
+                ..
+            }) if arguments["FILE"].bytes() == b"ACCTDAT"
+                && arguments["RIDFLD"].bytes() == b"AA"
+        ));
+
+        let MachineDrive::HostCall(next) = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: start.sequence,
+                outcome: Ok(HostResult::Cics(response(b"", BTreeMap::new()))),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        ) else {
+            panic!("READNEXT did not call host");
+        };
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x06, 0x0c]);
+        assert!(matches!(
+            &next.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::ReadNext,
+                arguments,
+                mutation: None,
+                ..
+            }) if arguments["FILE"].bytes() == b"ACCTDAT"
+                && arguments["INTO"].bytes() == b"RECORD-X"
+                && arguments["RIDFLD"].bytes() == b"AA"
+        ));
+
+        let MachineDrive::HostCall(previous) = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: next.sequence,
+                outcome: Ok(HostResult::Cics(response(
+                    b"AA11",
+                    BTreeMap::from([("RIDFLD".into(), payload(b"AA"))]),
+                ))),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        ) else {
+            panic!("READPREV did not call host");
+        };
+        assert_eq!(machine.variable("RECORD-X").unwrap().bytes(), b"AA11");
+        assert_eq!(machine.variable("KEY-X").unwrap().bytes(), b"AA");
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x06, 0x0e]);
+        assert!(matches!(
+            &previous.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::ReadPrev,
+                arguments,
+                mutation: None,
+                ..
+            }) if arguments["FILE"].bytes() == b"ACCTDAT"
+                && arguments["INTO"].bytes() == b"RECORD-X"
+                && arguments["RIDFLD"].bytes() == b"AA"
+        ));
+
+        let MachineDrive::HostCall(end) = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: previous.sequence,
+                outcome: Ok(HostResult::Cics(response(
+                    b"A011",
+                    BTreeMap::from([("RIDFLD".into(), payload(b"A0"))]),
+                ))),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        ) else {
+            panic!("ENDBR did not call host");
+        };
+        assert_eq!(machine.variable("RECORD-X").unwrap().bytes(), b"A011");
+        assert_eq!(machine.variable("KEY-X").unwrap().bytes(), b"A0");
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x06, 0x10]);
+        assert!(matches!(
+            &end.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::EndBrowse,
+                arguments,
+                mutation: None,
+                ..
+            }) if arguments["FILE"].bytes() == b"ACCTDAT"
+        ));
+
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: end.sequence,
+                    outcome: Ok(HostResult::Cics(response(b"", BTreeMap::new()))),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x06, 0x12]);
+    }
+
+    #[test]
+    fn cics_keyed_write_and_delete_use_typed_mutation_inputs() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSMUT. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3) VALUE '003'. 01 RECORD-X PIC X(4) VALUE 'DATA'. PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS DELETE DATASET('ACCTDAT') RIDFLD(KEY-X) END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let response = || CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                Vec::new(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            outputs: BTreeMap::new(),
+            unit_of_work: None,
+        };
+
+        let MachineDrive::HostCall(write) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("WRITE FILE did not call host");
+        };
+        assert!(matches!(
+            &write.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::Write,
+                arguments,
+                mutation: Some(_),
+                ..
+            }) if arguments["FILE"].bytes() == b"ACCTDAT"
+                && arguments["FROM"].bytes() == b"DATA"
+                && arguments["RIDFLD"].bytes() == b"003"
+        ));
+
+        let MachineDrive::HostCall(delete) = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: write.sequence,
+                outcome: Ok(HostResult::Cics(response())),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        ) else {
+            panic!("DELETE did not call host");
+        };
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x06, 0x04]);
+        assert!(matches!(
+            &delete.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::Delete,
+                arguments,
+                mutation: Some(_),
+                ..
+            }) if arguments["DATASET"].bytes() == b"ACCTDAT"
+                && arguments["RIDFLD"].bytes() == b"003"
+        ));
+
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: delete.sequence,
+                    outcome: Ok(HostResult::Cics(response())),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x06, 0x08]);
+    }
+
+    #[test]
+    fn bare_asktime_requires_and_updates_both_implicit_eib_fields() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSEIBTIME. DATA DIVISION. WORKING-STORAGE SECTION. 01 EIBDATE PIC S9(7) COMP-3. 01 EIBTIME PIC S9(7) COMP-3. PROCEDURE DIVISION. EXEC CICS ASKTIME END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("bare ASKTIME did not call host");
+        };
+        assert!(matches!(
+            effect.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::AsktimeEib,
+                ..
+            })
+        ));
+        let decimal = |bytes: &[u8]| {
+            mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.decimal@1",
+                bytes.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap()
         };
         let response = CicsResponse {
             disposition: CicsDisposition::Complete,
@@ -2482,17 +3582,47 @@ mod tests {
                 InvocationLimits::default(),
             )
             .unwrap(),
-            outputs: BTreeMap::from([(
-                "ABSTIME".into(),
-                mainframe_env_execution_api::BoundedPayload::new(
-                    "mainframe-env.cics.decimal@1",
-                    b"3997082096789".to_vec(),
-                    InvocationLimits::default(),
-                )
-                .unwrap(),
-            )]),
+            outputs: BTreeMap::from([
+                ("EIBDATE".into(), decimal(b"126242")),
+                ("EIBTIME".into(), decimal(b"123456")),
+            ]),
             unit_of_work: None,
         };
+        let mut incomplete = response.clone();
+        incomplete.outputs.remove("EIBTIME");
+        let mut malformed = response.clone();
+        malformed.outputs.insert(
+            "EIBTIME".into(),
+            mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                b"123456".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        for rejected in [incomplete, malformed] {
+            let mut rejected_machine = ReferenceMachine::from_binary(
+                artifact.payload(),
+                invocation(&artifact, 1024),
+                CodecLimits::default(),
+            )
+            .unwrap();
+            let MachineDrive::HostCall(rejected_effect) =
+                rejected_machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+            else {
+                panic!("bare ASKTIME did not call host");
+            };
+            assert!(matches!(
+                rejected_machine.drive(
+                    MachineResume::HostResult(EffectResult {
+                        sequence: rejected_effect.sequence,
+                        outcome: Ok(HostResult::Cics(rejected)),
+                    }),
+                    Quantum::new(64, 1024).unwrap(),
+                ),
+                MachineDrive::Failed(_)
+            ));
+        }
         assert!(matches!(
             machine.drive(
                 MachineResume::HostResult(EffectResult {
@@ -2501,8 +3631,16 @@ mod tests {
                 }),
                 Quantum::new(64, 1024).unwrap(),
             ),
-            MachineDrive::Completed(done) if done.output.bytes() == b"003997082096789\n"
+            MachineDrive::Completed(done) if done.output.bytes().is_empty()
         ));
+        assert_eq!(
+            machine.variable("EIBDATE").unwrap().bytes(),
+            &[0x01, 0x26, 0x24, 0x2c]
+        );
+        assert_eq!(
+            machine.variable("EIBTIME").unwrap().bytes(),
+            &[0x01, 0x23, 0x45, 0x6c]
+        );
     }
 
     #[test]

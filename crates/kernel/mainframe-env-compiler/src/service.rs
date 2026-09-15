@@ -1490,9 +1490,12 @@ mod tests {
 
     #[test]
     fn typed_cics_is_proof_bound_in_hir_and_the_published_executable() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSP. DATA DIVISION. WORKING-STORAGE SECTION. 01 RECORD-X PIC X(4). 01 KEY-X PIC X(3) VALUE '003'. 01 CODE-A PIC S9(9) COMP. 01 CODE-B PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') UPDATE INTO(RECORD-X) RIDFLD(KEY-X) RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS REWRITE DATASET('ACCTDAT') FROM(RECORD-X) END-EXEC. EXEC CICS SYNCPOINT ROLLBACK NOHANDLE END-EXEC. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSP. DATA DIVISION. WORKING-STORAGE SECTION. 01 AB-CODE PIC X(4) VALUE 'B001'. 01 ABS-X PIC S9(15) COMP-3. 01 DATE-X PIC X(10). 01 TIME-X PIC X(8). 01 MS-X PIC S9(9) COMP. 01 RECORD-X PIC X(4). 01 KEY-X PIC X(3) VALUE '003'. 01 LOCK-X PIC X(4) VALUE 'LOCK'. 01 PTR-X POINTER. 01 CORR-X PIC X(80) VALUE ALL 'A'. 01 PRIORITY-X PIC S9(4) COMP VALUE 200. 01 CODE-A PIC S9(9) COMP. 01 CODE-B PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS ASKTIME END-EXEC. EXEC CICS ASKTIME ABSTIME(ABS-X) END-EXEC. EXEC CICS FORMATTIME ABSTIME(ABS-X) DATESEP('-') YYYYMMDD(DATE-X) TIMESEP(':') TIME(TIME-X) MILLISECONDS(MS-X) END-EXEC. EXEC CICS LINK PROGRAM('CHILD') COMMAREA(RECORD-X) END-EXEC. EXEC CICS XCTL PROGRAM('NEXT') COMMAREA(RECORD-X) END-EXEC. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) END-EXEC. EXEC CICS READNEXT FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS READPREV DATASET('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS ENDBR FILE('ACCTDAT') END-EXEC. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS DELETE FILE('ACCTDAT') RIDFLD(KEY-X) END-EXEC. EXEC CICS READ FILE('ACCTDAT') UPDATE INTO(RECORD-X) RIDFLD(KEY-X) RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS REWRITE DATASET('ACCTDAT') FROM(RECORD-X) END-EXEC. EXEC CICS ENQ RESOURCE(LOCK-X) LENGTH(4) UOW NOSUSPEND END-EXEC. EXEC CICS DEQ RESOURCE(LOCK-X) LENGTH(4) UOW END-EXEC. EXEC CICS ADDRESS SET(PTR-X) USING(ADDRESS OF RECORD-X) END-EXEC. EXEC CICS CHANGE TASK PRIORITY(PRIORITY-X) RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS HANDLE AID ANYKEY(AID-HANDLER) ENTER END-EXEC. EXEC CICS HANDLE ABEND PROGRAM('ABEXIT') END-EXEC. EXEC CICS HANDLE CONDITION ERROR(ERROR-HANDLER) LENGERR END-EXEC. EXEC CICS IGNORE CONDITION PGMIDERR END-EXEC. EXEC CICS PUSH HANDLE END-EXEC. EXEC CICS POP HANDLE RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS SET ASSOCIATION USERCORRDATA(CORR-X) RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS SUSPEND END-EXEC. EXEC CICS SYNCPOINT ROLLBACK NOHANDLE END-EXEC. EXEC CICS ABEND ABCODE(AB-CODE) NODUMP END-EXEC. EXEC CICS RETURN TRANSID('NEXT') COMMAREA(RECORD-X) END-EXEC.";
+        let source = format!(
+            "{source} EXEC CICS WRITEQ TD QUEUE('OUTQ') FROM(RECORD-X) LENGTH(4) END-EXEC. EXEC CICS SEND MAP('MENU') MAPSET('MAIN') FROM(RECORD-X) END-EXEC. EXEC CICS RECEIVE MAP('MENU') MAPSET('MAIN') END-EXEC. EXEC CICS SEND TEXT FROM(RECORD-X) END-EXEC. EXEC CICS ASSIGN ABCODE(AB-CODE) END-EXEC. EXEC CICS PURGE MESSAGE END-EXEC."
+        );
         let compiler = CobolCompiler::default();
-        let analysis = compiler.analyze(&bundle(source));
+        let analysis = compiler.analyze(&bundle(&source));
         let hir = analysis.hir.as_ref().expect("typed CICS HIR");
         let encoded_hir = encode_binary(&hir.module, CodecLimits::default()).unwrap();
         let hir_module = decode_binary(&encoded_hir, CodecLimits::default()).unwrap();
@@ -1522,7 +1525,7 @@ mod tests {
                     && operation.identity.major() == 2
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed_hir.len(), 3);
+        assert_eq!(typed_hir.len(), 34);
         let mut hir_plans = Vec::new();
         for operation in typed_hir {
             assert!(!operation.attributes.contains_key("arguments"));
@@ -1567,9 +1570,44 @@ mod tests {
                 );
             }
             let source_operation = match plan.operation {
+                CicsPlanOperation::Abend => crate::HirCicsOperation::Abend,
+                CicsPlanOperation::AddressSet => crate::HirCicsOperation::AddressSet,
+                CicsPlanOperation::Asktime => crate::HirCicsOperation::Asktime,
+                CicsPlanOperation::AsktimeEib => crate::HirCicsOperation::AsktimeEib,
+                CicsPlanOperation::FormatTime => crate::HirCicsOperation::FormatTime,
+                CicsPlanOperation::ChangeTask => crate::HirCicsOperation::ChangeTask,
+                CicsPlanOperation::Deq => crate::HirCicsOperation::Deq,
+                CicsPlanOperation::Enq => crate::HirCicsOperation::Enq,
+                CicsPlanOperation::HandleAid => crate::HirCicsOperation::HandleAid,
+                CicsPlanOperation::HandleAbend => crate::HirCicsOperation::HandleAbend,
+                CicsPlanOperation::HandleCondition => crate::HirCicsOperation::HandleCondition,
+                CicsPlanOperation::IgnoreCondition => crate::HirCicsOperation::IgnoreCondition,
+                CicsPlanOperation::Link => crate::HirCicsOperation::Link,
+                CicsPlanOperation::Xctl => crate::HirCicsOperation::Xctl,
+                CicsPlanOperation::Return => crate::HirCicsOperation::Return,
+                CicsPlanOperation::StartBrowse => crate::HirCicsOperation::StartBrowse,
+                CicsPlanOperation::ReadNext => crate::HirCicsOperation::ReadNext,
+                CicsPlanOperation::ReadPrev => crate::HirCicsOperation::ReadPrev,
+                CicsPlanOperation::EndBrowse => crate::HirCicsOperation::EndBrowse,
+                CicsPlanOperation::Delete => crate::HirCicsOperation::Delete,
+                CicsPlanOperation::Write => crate::HirCicsOperation::Write,
+                CicsPlanOperation::WriteTransientData => {
+                    crate::HirCicsOperation::WriteTransientData
+                }
+                CicsPlanOperation::ReceiveMap => crate::HirCicsOperation::ReceiveMap,
+                CicsPlanOperation::SendMap => crate::HirCicsOperation::SendMap,
+                CicsPlanOperation::SendText => crate::HirCicsOperation::SendText,
+                CicsPlanOperation::Assign => crate::HirCicsOperation::Assign,
+                CicsPlanOperation::PurgeMessage => crate::HirCicsOperation::PurgeMessage,
+                CicsPlanOperation::PopHandle => crate::HirCicsOperation::PopHandle,
+                CicsPlanOperation::PushHandle => crate::HirCicsOperation::PushHandle,
                 CicsPlanOperation::Read => crate::HirCicsOperation::Read,
                 CicsPlanOperation::Rewrite => crate::HirCicsOperation::Rewrite,
+                CicsPlanOperation::SetAssociationUserCorrData => {
+                    crate::HirCicsOperation::SetAssociationUserCorrData
+                }
                 CicsPlanOperation::Syncpoint => crate::HirCicsOperation::Syncpoint,
+                CicsPlanOperation::Suspend => crate::HirCicsOperation::Suspend,
             };
             assert_eq!(
                 operation.effects,
@@ -1590,9 +1628,40 @@ mod tests {
                 .map(|plan| plan.operation)
                 .collect::<BTreeSet<_>>(),
             BTreeSet::from([
+                CicsPlanOperation::Abend,
+                CicsPlanOperation::AddressSet,
+                CicsPlanOperation::Asktime,
+                CicsPlanOperation::AsktimeEib,
+                CicsPlanOperation::FormatTime,
+                CicsPlanOperation::ChangeTask,
+                CicsPlanOperation::Deq,
+                CicsPlanOperation::Enq,
+                CicsPlanOperation::HandleAid,
+                CicsPlanOperation::HandleAbend,
+                CicsPlanOperation::HandleCondition,
+                CicsPlanOperation::IgnoreCondition,
+                CicsPlanOperation::Link,
+                CicsPlanOperation::Xctl,
+                CicsPlanOperation::Return,
+                CicsPlanOperation::StartBrowse,
+                CicsPlanOperation::ReadNext,
+                CicsPlanOperation::ReadPrev,
+                CicsPlanOperation::EndBrowse,
+                CicsPlanOperation::Delete,
+                CicsPlanOperation::Write,
+                CicsPlanOperation::WriteTransientData,
+                CicsPlanOperation::ReceiveMap,
+                CicsPlanOperation::SendMap,
+                CicsPlanOperation::SendText,
+                CicsPlanOperation::Assign,
+                CicsPlanOperation::PurgeMessage,
+                CicsPlanOperation::PopHandle,
+                CicsPlanOperation::PushHandle,
                 CicsPlanOperation::Read,
                 CicsPlanOperation::Rewrite,
+                CicsPlanOperation::SetAssociationUserCorrData,
                 CicsPlanOperation::Syncpoint,
+                CicsPlanOperation::Suspend,
             ])
         );
         let read = hir_plans
@@ -1666,7 +1735,7 @@ mod tests {
         assert_eq!(syncpoint.condition, CicsCondition::NoHandle);
 
         let CompilerResult::Published { artifact, .. } = compiler
-            .compile(request(source, CompilationMode::Executable))
+            .compile(request(&source, CompilationMode::Executable))
             .unwrap()
         else {
             panic!("published typed CICS")
@@ -1675,7 +1744,12 @@ mod tests {
             artifact.manifest().dialect_contracts,
             BTreeSet::from([
                 "cics.file@1".into(),
+                "cics.program@1".into(),
+                "cics.queue@1".into(),
                 "cics.recovery@1".into(),
+                "cics.task@1".into(),
+                "cics.terminal@1".into(),
+                "cics.time@1".into(),
                 "mainframe.core.cobol@1".into(),
             ])
         );
@@ -1688,11 +1762,17 @@ mod tests {
             .filter(|operation| {
                 matches!(
                     operation.identity.namespace(),
-                    "cics.file" | "cics.recovery"
+                    "cics.file"
+                        | "cics.program"
+                        | "cics.queue"
+                        | "cics.recovery"
+                        | "cics.task"
+                        | "cics.terminal"
+                        | "cics.time"
                 )
             })
             .collect::<Vec<_>>();
-        assert_eq!(operations.len(), 3);
+        assert_eq!(operations.len(), 34);
         assert_eq!(
             operations
                 .iter()
@@ -1773,8 +1853,10 @@ mod tests {
         }
     }
 
-    fn cics_grammar_tokens() -> [&'static [u8]; 13] {
+    fn cics_grammar_tokens() -> [&'static [u8]; 21] {
         [
+            b"DEQ",
+            b"ENQ",
             b"READ",
             b"REWRITE",
             b"SYNCPOINT",
@@ -1787,6 +1869,12 @@ mod tests {
             b"UPDATE",
             b"ROLLBACK",
             b"NOHANDLE",
+            b"RESOURCE",
+            b"LENGTH",
+            b"MAXLIFETIME",
+            b"TASK",
+            b"UOW",
+            b"NOSUSPEND",
             b"END-EXEC",
         ]
     }
@@ -1798,6 +1886,7 @@ mod tests {
             .filter_map(|operand| match &operand.value {
                 CicsOperandValue::Literal(_) => None,
                 CicsOperandValue::Storage(slot) => Some(slot.storage),
+                CicsOperandValue::Integer(_) => None,
             })
             .chain(plan.outputs.iter().map(|output| output.target.storage))
             .collect::<BTreeSet<_>>();
@@ -1814,7 +1903,7 @@ mod tests {
 
     #[test]
     fn unsupported_and_numeric_cics_forms_keep_the_version_one_route() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSL. DATA DIVISION. WORKING-STORAGE SECTION. 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS WRITEQ TD QUEUE('OUTQ') FROM(RECORD-X) END-EXEC. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(003) END-EXEC. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSL. DATA DIVISION. WORKING-STORAGE SECTION. 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS RETRIEVE INTO(RECORD-X) END-EXEC. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(003) END-EXEC. STOP RUN.";
         let compiler = CobolCompiler::default();
         let analysis = compiler.analyze(&bundle(source));
         let hir = analysis.hir.as_ref().expect("legacy-compatible CICS HIR");
@@ -1833,7 +1922,7 @@ mod tests {
             statements[0]
                 .arguments
                 .iter()
-                .any(|argument| argument == "WRITEQ")
+                .any(|argument| argument == "RETRIEVE")
         );
         assert!(
             statements[1]

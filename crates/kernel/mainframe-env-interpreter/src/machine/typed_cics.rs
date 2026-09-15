@@ -1,12 +1,17 @@
 use super::*;
+use mainframe_env_host_api::CicsResponse;
 use mainframe_env_ir::{
-    CICS_EXECUTABLE_DESCRIPTORS, CicsCondition, CicsEffectPlan, CicsExecutableDescriptor,
-    CicsOperandName, CicsOperandValue, CicsOperationContract, CicsOutputName, CicsPlanLimits,
-    CicsPlanOperation, CicsPlanOption, CicsStorageSlot, Effect, Module, OperationCatalog,
-    OperationSchema, OperationSemanticContract, cics_executable_descriptor,
+    CICS_ASSIGN_OUTPUT_NAMES, CICS_EXECUTABLE_DESCRIPTORS, CicsCondition, CicsEffectPlan,
+    CicsExecutableDescriptor, CicsOperandName, CicsOperandValue, CicsOperationContract,
+    CicsOutputName, CicsPlanLimits, CicsPlanOperation, CicsStorageSlot, Effect, Module,
+    OperationCatalog, OperationSchema, OperationSemanticContract, cics_executable_descriptor,
     cics_executable_descriptor_for_identity, cobol_layout_definition_identity,
     decode_cics_effect_plan, verify_semantic_contracts,
 };
+
+mod assign;
+mod names;
+use names::SlotUse;
 
 const PLAN_ATTRIBUTE: &str = "cics_plan";
 
@@ -14,6 +19,18 @@ const PLAN_ATTRIBUTE: &str = "cics_plan";
 pub(super) enum CicsTarget {
     Legacy(String),
     Resolved(CicsStorageSlot),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) enum CicsAddressSet {
+    PointerFromData {
+        target: CicsStorageSlot,
+        source: CicsStorageSlot,
+    },
+    DataFromPointer {
+        target: CicsStorageSlot,
+        source: CicsStorageSlot,
+    },
 }
 
 pub(super) fn operation_identities() -> Vec<OperationIdentity> {
@@ -25,6 +42,119 @@ pub(super) fn operation_identities() -> Vec<OperationIdentity> {
 
 pub(super) fn is_typed(operation: &Operation) -> bool {
     expected_operation(&operation.identity).is_some()
+}
+
+pub(super) fn write_response_state(
+    machine: &mut ReferenceMachine,
+    response_target: Option<&CicsTarget>,
+    response2_target: Option<&CicsTarget>,
+    address_set: Option<&CicsAddressSet>,
+    response: &CicsResponse,
+) -> Result<(), MachineProblem> {
+    for (target, value) in [
+        (response_target, response.response),
+        (response2_target, response.response2),
+    ] {
+        if let Some(target) = target {
+            write_target(
+                machine,
+                target,
+                &CobolValue::Decimal(Decimal {
+                    coefficient: i128::from(value),
+                    scale: 0,
+                }),
+            )?;
+        }
+    }
+    if response.disposition == CicsDisposition::Complete
+        && response.response == 0
+        && let Some(action) = address_set
+    {
+        apply_address_set(machine, action)?;
+    }
+    Ok(())
+}
+
+pub(super) fn write_runtime_output(
+    machine: &mut ReferenceMachine,
+    name: &str,
+    value: &BoundedPayload,
+) -> Result<bool, MachineProblem> {
+    if name != "TASK.PRIORITY" {
+        return Ok(false);
+    }
+    if value.schema() != "mainframe-env.cics.decimal@1" {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
+    machine.invocation.priority = String::from_utf8_lossy(value.bytes())
+        .parse::<u8>()
+        .map_err(|_| MachineProblem::UnexpectedHostResult)?;
+    Ok(true)
+}
+
+pub(super) fn abend_dump_disposition(
+    operation: CicsOperation,
+    response: &CicsResponse,
+) -> Result<AbendDumpDisposition, MachineProblem> {
+    if operation != CicsOperation::Abend {
+        return Ok(AbendDumpDisposition::Unspecified);
+    }
+    let Some(value) = response.outputs.get("ABEND.DUMP") else {
+        // Retained responses written before this metadata was introduced do
+        // not claim a dump decision.
+        return Ok(AbendDumpDisposition::Unspecified);
+    };
+    if value.schema() != "mainframe-env.cics.abend-dump@1" {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
+    match value.bytes() {
+        b"requested" => Ok(AbendDumpDisposition::Requested),
+        b"suppressed" => Ok(AbendDumpDisposition::Suppressed),
+        _ => Err(MachineProblem::UnexpectedHostResult),
+    }
+}
+
+pub(super) fn abend_outcome(
+    operation: CicsOperation,
+    response: &CicsResponse,
+) -> Result<Abend, MachineProblem> {
+    let code = if operation == CicsOperation::Abend && !response.payload.bytes().is_empty() {
+        String::from_utf8(response.payload.bytes().to_vec())
+            .map_err(|_| MachineProblem::UnexpectedHostResult)?
+    } else {
+        response.condition.clone()
+    };
+    Ok(Abend {
+        code,
+        reason: Some(format!(
+            "EIBRESP={} EIBRESP2={}",
+            response.response, response.response2
+        )),
+        dump: abend_dump_disposition(operation, response)?,
+    })
+}
+
+pub(super) fn suspension(
+    machine: &mut ReferenceMachine,
+    operation: CicsOperation,
+    state_bytes: usize,
+) -> MachineDrive<EffectRequest> {
+    let (kind, reissue) = match operation {
+        CicsOperation::Enq => ("cics-enqueue", true),
+        CicsOperation::ChangeTask | CicsOperation::Suspend => ("cics-scheduler", false),
+        _ => ("cics-terminal", true),
+    };
+    if reissue {
+        machine.pc = machine.pc.saturating_sub(1);
+    }
+    MachineDrive::Suspended(Suspension {
+        kind: kind.into(),
+        resume_token: format!(
+            "{}:{}",
+            machine.invocation.run_unit_id, machine.effect_sequence
+        ),
+        state_bytes: state_bytes as u64,
+    })
 }
 
 pub(super) fn validate_module_operations(module: &Module) -> Result<(), MachineProblem> {
@@ -62,11 +192,19 @@ pub(super) fn validate_machine(machine: &ReferenceMachine) -> Result<(), Machine
         for slot in plan_slots(&plan)? {
             validate_machine_slot(machine, operation, &slot, SlotUse::Input)?;
         }
+        for operand in &plan.operands {
+            if let CicsOperandValue::Storage(slot) = &operand.value {
+                validate_machine_slot(
+                    machine,
+                    operation,
+                    slot,
+                    names::input_slot_use(operand.name),
+                )?;
+            }
+        }
+        validate_address_set_slots(machine, operation, &plan)?;
         for output in &plan.outputs {
-            let slot_use = match output.name {
-                CicsOutputName::Into => SlotUse::Output,
-                CicsOutputName::Resp | CicsOutputName::Resp2 => SlotUse::NumericOutput,
-            };
+            let slot_use = names::output_slot_use(output.name);
             validate_machine_slot(machine, operation, &output.target, slot_use)?;
         }
     }
@@ -81,42 +219,134 @@ pub(super) fn execute(
     validate_declared_slots(operation, &plan)?;
     validate_runtime_plan(machine, operation, &plan)?;
 
-    let host_operation = host_operation(plan.operation);
+    let host_operation = names::host_operation(plan.operation);
+    let address_set = address_set_action(&plan)?;
     let mut arguments = BTreeMap::new();
     for operand in &plan.operands {
         let (schema, bytes) = match &operand.value {
+            CicsOperandValue::Literal(bytes) if operand.name == CicsOperandName::Conditions => (
+                if plan.operation == CicsPlanOperation::HandleCondition {
+                    "mainframe-env.cics.condition-handlers@1"
+                } else {
+                    "mainframe-env.cics.condition-list@1"
+                },
+                bytes.clone(),
+            ),
+            CicsOperandValue::Literal(bytes) if operand.name == CicsOperandName::Aids => {
+                ("mainframe-env.cics.aid-handlers@1", bytes.clone())
+            }
             CicsOperandValue::Literal(bytes) => ("mainframe-env.cics.literal@1", bytes.clone()),
+            CicsOperandValue::Storage(slot)
+                if matches!(
+                    operand.name,
+                    CicsOperandName::SetAddress | CicsOperandName::SetPointer
+                ) =>
+            {
+                (
+                    "mainframe-env.cics.storage-target@1",
+                    format!(
+                        "{}:{}:{}",
+                        machine.invocation.artifact.as_str(),
+                        slot.storage.get(),
+                        slot.qualified_layout_name
+                    )
+                    .into_bytes(),
+                )
+            }
+            CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::UsingAddress => (
+                "mainframe-env.cics.storage-identity@1",
+                format!(
+                    "{}:{}:{}",
+                    machine.invocation.artifact.as_str(),
+                    slot.storage.get(),
+                    slot.qualified_layout_name
+                )
+                .into_bytes(),
+            ),
+            CicsOperandValue::Storage(slot)
+                if matches!(
+                    operand.name,
+                    CicsOperandName::Length
+                        | CicsOperandName::MaxLifetime
+                        | CicsOperandName::Priority
+                        | CicsOperandName::Abstime
+                ) =>
+            {
+                (
+                    "mainframe-env.cics.decimal@1",
+                    read_integer_slot(machine, slot)?.to_string().into_bytes(),
+                )
+            }
+            CicsOperandValue::Storage(slot)
+                if operand.name == CicsOperandName::Resource
+                    && !plan
+                        .operands
+                        .iter()
+                        .any(|value| value.name == CicsOperandName::Length) =>
+            {
+                (
+                    "mainframe-env.cics.storage-identity@1",
+                    format!(
+                        "{}:{}:{}",
+                        machine.invocation.artifact.as_str(),
+                        slot.storage.get(),
+                        slot.qualified_layout_name
+                    )
+                    .into_bytes(),
+                )
+            }
             CicsOperandValue::Storage(slot) => (
                 "mainframe-env.cics.storage-value@1",
                 read_slot(machine, slot)?,
             ),
+            CicsOperandValue::Integer(value) => (
+                "mainframe-env.cics.decimal@1",
+                value.to_string().into_bytes(),
+            ),
         };
-        arguments.insert(operand_name(operand.name).into(), payload(schema, bytes)?);
+        arguments.insert(names::operand(operand.name).into(), payload(schema, bytes)?);
     }
 
     let mut into = None;
-    let outputs = BTreeMap::new();
+    let mut outputs = BTreeMap::new();
     let mut response = None;
     let mut response2 = None;
     for output in &plan.outputs {
-        let key = output_name(output.name);
-        arguments.insert(
-            key.into(),
-            payload(
-                "mainframe-env.cics.argument@1",
-                output.target.qualified_layout_name.as_bytes().to_vec(),
-            )?,
-        );
+        let key = names::output(output.name);
+        if !arguments.contains_key(key) {
+            arguments.insert(
+                key.into(),
+                payload(
+                    "mainframe-env.cics.argument@1",
+                    output.target.qualified_layout_name.as_bytes().to_vec(),
+                )?,
+            );
+        }
         let target = CicsTarget::Resolved(output.target.clone());
         match output.name {
+            CicsOutputName::Abstime
+            | CicsOutputName::Commarea
+            | CicsOutputName::Milliseconds
+            | CicsOutputName::Mmddyy
+            | CicsOutputName::Mmddyyyy
+            | CicsOutputName::Time
+            | CicsOutputName::Yyddd
+            | CicsOutputName::Yymmdd
+            | CicsOutputName::Yyyymmdd
+            | CicsOutputName::Assign(_) => {
+                outputs.insert(key.into(), target);
+            }
             CicsOutputName::Into => into = Some(target),
+            CicsOutputName::Ridfld => {
+                outputs.insert(key.into(), target);
+            }
             CicsOutputName::Resp => response = Some(target),
             CicsOutputName::Resp2 => response2 = Some(target),
         }
     }
     for option in &plan.options {
         arguments.insert(
-            format!("OPTION.{}", option_name(*option)),
+            format!("OPTION.{}", names::option(*option)),
             payload("mainframe-env.cics.option@1", Vec::new())?,
         );
     }
@@ -165,6 +395,7 @@ pub(super) fn execute(
             outputs,
             response,
             response2,
+            address_set,
             no_handle,
         },
     )
@@ -179,7 +410,8 @@ pub(super) fn execute_legacy(
     let into = legacy_destination(&arguments, "INTO").map(CicsTarget::Legacy);
     let output_names: &[&str] = match operation {
         CicsOperation::Asktime => &["ABSTIME"],
-        CicsOperation::Assign => &["APPLID", "SYSID", "TRANSID", "PRINCIPAL"],
+        CicsOperation::AsktimeEib => &[],
+        CicsOperation::Assign => CICS_ASSIGN_OUTPUT_NAMES,
         CicsOperation::FormatTime => &[
             "YYYYMMDD",
             "YYMMDD",
@@ -200,6 +432,9 @@ pub(super) fn execute_legacy(
                 .map(|target| ((*name).into(), CicsTarget::Legacy(target)))
         })
         .collect::<BTreeMap<_, _>>();
+    if operation == CicsOperation::Assign {
+        validate_legacy_assign_outputs(machine, &outputs)?;
+    }
     let response_target = legacy_destination(&arguments, "RESP").map(CicsTarget::Legacy);
     let response2_target = legacy_destination(&arguments, "RESP2").map(CicsTarget::Legacy);
     let absolute_time = legacy_destination(&arguments, "ABSTIME");
@@ -283,6 +518,7 @@ pub(super) fn execute_legacy(
             outputs,
             response: response_target,
             response2: response2_target,
+            address_set: None,
             no_handle: args.iter().any(|argument| argument == "NOHANDLE"),
         },
     )
@@ -330,26 +566,120 @@ pub(super) fn write_target(
     }
 }
 
+pub(super) fn write_output(
+    machine: &mut ReferenceMachine,
+    name: &str,
+    target: &CicsTarget,
+    value: &BoundedPayload,
+) -> Result<(), MachineProblem> {
+    if matches!(name, "ABSTIME" | "MILLISECONDS")
+        && value.schema() != "mainframe-env.cics.decimal@1"
+        || matches!(name, "COMMAREA" | "RIDFLD") && value.schema() != "mainframe-env.cics.payload@1"
+        || matches!(
+            name,
+            "MMDDYY" | "MMDDYYYY" | "TIME" | "YYDDD" | "YYMMDD" | "YYYYMMDD"
+        ) && value.schema() != "mainframe-env.cics.payload@1"
+    {
+        return Err(MachineProblem::UnexpectedHostResult);
+    }
+    if value.schema() == "mainframe-env.cics.decimal@1" {
+        let coefficient = String::from_utf8_lossy(value.bytes())
+            .parse::<i128>()
+            .map_err(|_| MachineProblem::UnexpectedHostResult)?;
+        write_target(
+            machine,
+            target,
+            &CobolValue::Decimal(Decimal {
+                coefficient,
+                scale: 0,
+            }),
+        )
+    } else {
+        write_target(machine, target, &CobolValue::Bytes(value.bytes().to_vec()))
+    }
+}
+
+fn address_set_action(plan: &CicsEffectPlan) -> Result<Option<CicsAddressSet>, MachineProblem> {
+    if plan.operation != CicsPlanOperation::AddressSet {
+        return Ok(None);
+    }
+    let slot = |name| {
+        plan.operands
+            .iter()
+            .find(|operand| operand.name == name)
+            .and_then(|operand| match &operand.value {
+                CicsOperandValue::Storage(slot) => Some(slot.clone()),
+                _ => None,
+            })
+            .ok_or_else(|| invalid_plan("ADDRESS SET storage role is missing"))
+    };
+    if plan
+        .operands
+        .iter()
+        .any(|operand| operand.name == CicsOperandName::SetPointer)
+    {
+        Ok(Some(CicsAddressSet::PointerFromData {
+            target: slot(CicsOperandName::SetPointer)?,
+            source: slot(CicsOperandName::UsingAddress)?,
+        }))
+    } else {
+        Ok(Some(CicsAddressSet::DataFromPointer {
+            target: slot(CicsOperandName::SetAddress)?,
+            source: slot(CicsOperandName::UsingPointer)?,
+        }))
+    }
+}
+
+pub(super) fn apply_address_set(
+    machine: &mut ReferenceMachine,
+    action: &CicsAddressSet,
+) -> Result<(), MachineProblem> {
+    match action {
+        CicsAddressSet::PointerFromData { target, source } => {
+            let target = resolved_slot(machine, target)?;
+            let source = resolved_slot(machine, source)?;
+            let address = machine.address_bytes(&source, target.length)?;
+            machine.write_reference(&target, &address)
+        }
+        CicsAddressSet::DataFromPointer { target, source } => {
+            let target = resolved_slot(machine, target)?;
+            let source = resolved_slot(machine, source)?;
+            let pointer = machine.read_reference(&source)?;
+            let address = if pointer.as_slice() == [0xff, 0, 0, 0] {
+                None
+            } else {
+                machine.decode_address(&pointer)?
+            };
+            machine.assign_linkage_address(&target.layout.name, address)
+        }
+    }
+}
+
+fn resolved_slot(
+    machine: &ReferenceMachine,
+    slot: &CicsStorageSlot,
+) -> Result<ResolvedReference, MachineProblem> {
+    Ok(ResolvedReference {
+        layout: machine
+            .layouts
+            .get(&slot.qualified_layout_name)
+            .cloned()
+            .ok_or(MachineProblem::UnknownStorage)?,
+        offset: 0,
+        length: machine
+            .views_by_id
+            .get(&slot.storage)
+            .ok_or(MachineProblem::UnknownStorage)?
+            .length,
+    })
+}
+
 fn write_resolved(
     machine: &mut ReferenceMachine,
     slot: &CicsStorageSlot,
     value: &CobolValue,
 ) -> Result<(), MachineProblem> {
-    let layout = machine
-        .layouts
-        .get(&slot.qualified_layout_name)
-        .cloned()
-        .ok_or(MachineProblem::UnknownStorage)?;
-    let length = machine
-        .views_by_id
-        .get(&slot.storage)
-        .ok_or(MachineProblem::UnknownStorage)?
-        .length;
-    let reference = ResolvedReference {
-        layout,
-        offset: 0,
-        length,
-    };
+    let reference = resolved_slot(machine, slot)?;
     if reference.layout.dynamic {
         let bytes = match value {
             CobolValue::Bytes(bytes) => bytes.clone(),
@@ -461,28 +791,45 @@ fn validate_runtime_plan(
 ) -> Result<(), MachineProblem> {
     for operand in &plan.operands {
         if let CicsOperandValue::Storage(slot) = &operand.value {
-            validate_machine_slot(machine, operation, slot, SlotUse::Input)?;
+            validate_machine_slot(
+                machine,
+                operation,
+                slot,
+                names::input_slot_use(operand.name),
+            )?;
         }
     }
+    validate_address_set_slots(machine, operation, plan)?;
     for output in &plan.outputs {
         validate_machine_slot(
             machine,
             operation,
             &output.target,
-            match output.name {
-                CicsOutputName::Into => SlotUse::Output,
-                CicsOutputName::Resp | CicsOutputName::Resp2 => SlotUse::NumericOutput,
-            },
+            names::output_slot_use(output.name),
         )?;
     }
     Ok(())
 }
 
-#[derive(Clone, Copy)]
-enum SlotUse {
-    Input,
-    Output,
-    NumericOutput,
+fn validate_address_set_slots(
+    machine: &ReferenceMachine,
+    operation: &Operation,
+    plan: &CicsEffectPlan,
+) -> Result<(), MachineProblem> {
+    for operand in &plan.operands {
+        let CicsOperandValue::Storage(slot) = &operand.value else {
+            continue;
+        };
+        let slot_use = match operand.name {
+            CicsOperandName::SetAddress => SlotUse::AddressOutput,
+            CicsOperandName::SetPointer => SlotUse::PointerOutput,
+            CicsOperandName::UsingAddress => SlotUse::AddressInput,
+            CicsOperandName::UsingPointer => SlotUse::PointerInput,
+            _ => continue,
+        };
+        validate_machine_slot(machine, operation, slot, slot_use)?;
+    }
+    Ok(())
 }
 
 fn validate_machine_slot(
@@ -511,16 +858,110 @@ fn validate_machine_slot(
             "plan storage slot does not match its qualified layout name",
         ));
     }
-    if matches!(slot_use, SlotUse::Output | SlotUse::NumericOutput)
+    if matches!(
+        slot_use,
+        SlotUse::Output
+            | SlotUse::AbstimeOutput
+            | SlotUse::FormatTextOutput(_)
+            | SlotUse::MillisecondsOutput
+            | SlotUse::NumericOutput
+            | SlotUse::PointerOutput
+            | SlotUse::AddressOutput
+            | SlotUse::AssignOutput(_)
+    ) && matches!(
+        layout.category,
+        LayoutCategory::Condition | LayoutCategory::Rename
+    ) {
+        return Err(invalid_plan("plan output is not writable storage"));
+    }
+    if matches!(slot_use, SlotUse::NumericOutput) && !is_numeric(layout.category) {
+        return Err(invalid_plan("RESP and RESP2 outputs must be numeric"));
+    }
+    if let SlotUse::AssignOutput(output) = slot_use {
+        assign::validate_output(layout, output)?;
+    }
+    if matches!(slot_use, SlotUse::AbcodeInput)
+        && (!matches!(layout.length, 1..=4)
+            || !matches!(
+                layout.category,
+                LayoutCategory::Alphabetic | LayoutCategory::Alphanumeric
+            ))
+    {
+        return Err(invalid_plan(
+            "ABEND ABCODE input must be a 1-4 character field",
+        ));
+    }
+    if matches!(slot_use, SlotUse::ProgramNameInput)
+        && (!matches!(layout.length, 1..=8)
+            || !matches!(
+                layout.category,
+                LayoutCategory::Alphabetic | LayoutCategory::Alphanumeric
+            ))
+    {
+        return Err(invalid_plan(
+            "HANDLE ABEND PROGRAM input must be a 1-8 character field",
+        ));
+    }
+    if matches!(slot_use, SlotUse::AbstimeInput | SlotUse::AbstimeOutput)
+        && (layout.category != LayoutCategory::PackedDecimal
+            || layout.length != 8
+            || layout.digits != 15
+            || layout.scale != 0
+            || !layout.signed)
+    {
+        return Err(invalid_plan("CICS absolute time must be PIC S9(15) COMP-3"));
+    }
+    if matches!(slot_use, SlotUse::SeparatorInput)
+        && (layout.length != 1
+            || !matches!(
+                layout.category,
+                LayoutCategory::Alphabetic | LayoutCategory::Alphanumeric
+            ))
+    {
+        return Err(invalid_plan(
+            "FORMATTIME separator input must be one character",
+        ));
+    }
+    if let SlotUse::FormatTextOutput(expected) = slot_use
+        && (layout.length != expected
+            || !matches!(
+                layout.category,
+                LayoutCategory::Alphabetic | LayoutCategory::Alphanumeric
+            ))
+    {
+        return Err(invalid_plan(
+            "FORMATTIME character output has the wrong layout",
+        ));
+    }
+    if matches!(slot_use, SlotUse::MillisecondsOutput)
+        && (layout.category != LayoutCategory::Binary || layout.length != 4 || layout.scale != 0)
+    {
+        return Err(invalid_plan(
+            "FORMATTIME MILLISECONDS output must be fullword binary",
+        ));
+    }
+    if matches!(slot_use, SlotUse::PointerInput | SlotUse::PointerOutput)
+        && !matches!(
+            layout.category,
+            LayoutCategory::Pointer | LayoutCategory::Pointer32
+        )
+    {
+        return Err(invalid_plan(
+            "ADDRESS SET pointer operands must use POINTER or POINTER-32",
+        ));
+    }
+    if matches!(slot_use, SlotUse::AddressInput | SlotUse::AddressOutput)
         && matches!(
             layout.category,
             LayoutCategory::Condition | LayoutCategory::Rename
         )
     {
-        return Err(invalid_plan("plan output is not writable storage"));
+        return Err(invalid_plan("ADDRESS SET data area is not addressable"));
     }
-    if matches!(slot_use, SlotUse::NumericOutput) && !is_numeric(layout.category) {
-        return Err(invalid_plan("RESP and RESP2 outputs must be numeric"));
+    if matches!(slot_use, SlotUse::AddressOutput) && !layout.linkage {
+        return Err(invalid_plan(
+            "ADDRESS SET ADDRESS OF target must be linkage storage",
+        ));
     }
     let exact_length = u64::try_from(id_view.length)
         .map_err(|_| invalid_plan("plan storage view length is invalid"))?;
@@ -594,45 +1035,30 @@ fn read_slot(
     machine.read(&slot.qualified_layout_name)
 }
 
+fn read_integer_slot(
+    machine: &ReferenceMachine,
+    slot: &CicsStorageSlot,
+) -> Result<i128, MachineProblem> {
+    let layout = machine
+        .layouts
+        .get(&slot.qualified_layout_name)
+        .ok_or(MachineProblem::UnknownStorage)?;
+    if !is_numeric(layout.category) {
+        return Err(MachineProblem::DataException);
+    }
+    let value = decode_decimal(layout, &read_slot(machine, slot)?)?;
+    if value.scale != 0 {
+        return Err(MachineProblem::DataException);
+    }
+    Ok(value.coefficient)
+}
+
 fn expected_operation(identity: &OperationIdentity) -> Option<CicsPlanOperation> {
     cics_executable_descriptor_for_identity(identity).map(|descriptor| descriptor.operation)
 }
 
 fn expected_effects(operation: CicsPlanOperation) -> &'static [Effect] {
     cics_executable_descriptor(operation).effects
-}
-
-const fn host_operation(operation: CicsPlanOperation) -> CicsOperation {
-    match operation {
-        CicsPlanOperation::Read => CicsOperation::Read,
-        CicsPlanOperation::Rewrite => CicsOperation::Rewrite,
-        CicsPlanOperation::Syncpoint => CicsOperation::Syncpoint,
-    }
-}
-
-const fn operand_name(name: CicsOperandName) -> &'static str {
-    match name {
-        CicsOperandName::File => "FILE",
-        CicsOperandName::Dataset => "DATASET",
-        CicsOperandName::From => "FROM",
-        CicsOperandName::Ridfld => "RIDFLD",
-    }
-}
-
-const fn output_name(name: CicsOutputName) -> &'static str {
-    match name {
-        CicsOutputName::Into => "INTO",
-        CicsOutputName::Resp => "RESP",
-        CicsOutputName::Resp2 => "RESP2",
-    }
-}
-
-const fn option_name(option: CicsPlanOption) -> &'static str {
-    match option {
-        CicsPlanOption::Update => "UPDATE",
-        CicsPlanOption::Rollback => "ROLLBACK",
-        CicsPlanOption::NoHandle => "NOHANDLE",
-    }
 }
 
 fn payload(schema: &str, bytes: Vec<u8>) -> Result<BoundedPayload, MachineProblem> {
@@ -739,6 +1165,30 @@ fn legacy_destination(arguments: &BTreeMap<String, BoundedPayload>, key: &str) -
         .map(|value| String::from_utf8_lossy(value.bytes()).into_owned())
 }
 
+fn validate_legacy_assign_outputs(
+    machine: &ReferenceMachine,
+    outputs: &BTreeMap<String, CicsTarget>,
+) -> Result<(), MachineProblem> {
+    for (name, target) in outputs {
+        let CicsTarget::Legacy(target) = target else {
+            return Err(MachineProblem::InvalidOperation);
+        };
+        let tokens = target
+            .split_whitespace()
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        let reference = machine.reference(&tokens)?;
+        if name == "TASKPRIORITY"
+            && (reference.layout.category != LayoutCategory::Binary
+                || reference.length != 2
+                || reference.layout.scale != 0)
+        {
+            return Err(MachineProblem::DataException);
+        }
+    }
+    Ok(())
+}
+
 fn invalid_plan(detail: &str) -> MachineProblem {
     MachineProblem::InvalidArtifact(format!("invalid typed CICS effect plan: {detail}"))
 }
@@ -825,6 +1275,66 @@ mod tests {
         );
     }
 
+    #[test]
+    fn cics_abend_dump_metadata_is_typed_and_backward_compatible() {
+        let response = |schema: &str, value: &[u8]| CicsResponse {
+            disposition: CicsDisposition::Abended,
+            condition: "ERROR".into(),
+            response: 27,
+            response2: 0,
+            applid: "MEAPPL".into(),
+            sysid: "MESYS".into(),
+            transaction: "MENU".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: payload("mainframe-env.cics.payload@1", b"B001".to_vec()).unwrap(),
+            outputs: BTreeMap::from([(
+                "ABEND.DUMP".into(),
+                payload(schema, value.to_vec()).unwrap(),
+            )]),
+            unit_of_work: None,
+        };
+        assert_eq!(
+            abend_dump_disposition(
+                CicsOperation::Abend,
+                &response("mainframe-env.cics.abend-dump@1", b"requested"),
+            ),
+            Ok(AbendDumpDisposition::Requested)
+        );
+        assert_eq!(
+            abend_outcome(
+                CicsOperation::Abend,
+                &response("mainframe-env.cics.abend-dump@1", b"requested"),
+            ),
+            Ok(Abend {
+                code: "B001".into(),
+                reason: Some("EIBRESP=27 EIBRESP2=0".into()),
+                dump: AbendDumpDisposition::Requested,
+            })
+        );
+        assert_eq!(
+            abend_dump_disposition(
+                CicsOperation::Abend,
+                &response("mainframe-env.cics.abend-dump@1", b"suppressed"),
+            ),
+            Ok(AbendDumpDisposition::Suppressed)
+        );
+        assert_eq!(
+            abend_dump_disposition(
+                CicsOperation::Abend,
+                &response("mainframe-env.cics.payload@1", b"requested"),
+            ),
+            Err(MachineProblem::UnexpectedHostResult)
+        );
+        let mut legacy = response("mainframe-env.cics.abend-dump@1", b"requested");
+        legacy.outputs.clear();
+        assert_eq!(
+            abend_dump_disposition(CicsOperation::Abend, &legacy),
+            Ok(AbendDumpDisposition::Unspecified)
+        );
+    }
+
     fn module(
         identity: OperationIdentity,
         plan: &CicsEffectPlan,
@@ -880,7 +1390,7 @@ mod tests {
     #[test]
     fn typed_cics_plan_identity_signature_and_storage_are_fail_closed() {
         let syncpoint = syncpoint_plan();
-        let identity = operation_identities()[2].clone();
+        let identity = operation_identities()[4].clone();
         assert!(
             super::super::validate_module(&module(
                 identity.clone(),
@@ -937,7 +1447,7 @@ mod tests {
     fn malformed_plan_and_unregistered_major_are_rejected() {
         let syncpoint = syncpoint_plan();
         let malformed = module(
-            operation_identities()[2].clone(),
+            operation_identities()[4].clone(),
             &syncpoint,
             expected_effects(CicsPlanOperation::Syncpoint).to_vec(),
             false,
@@ -1071,7 +1581,7 @@ mod tests {
         builder
             .add_operation(
                 block,
-                operation_identities()[0].clone(),
+                operation_identities()[2].clone(),
                 Vec::new(),
                 0,
                 BTreeMap::from([(

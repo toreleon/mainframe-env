@@ -14,9 +14,10 @@ JSON text, a COBOL data layout, or a licensed mainframe representation.
 The request preimage begins with the ASCII bytes `mainframe-env.effect-request@1`
 followed by a zero byte; the result preimage uses `mainframe-env.effect-result@1`
 and a zero byte. SHA-256 hashes that domain prefix and the canonical value.
-`canonical.rs` and its exhaustive `canonical/generated.rs` are the explicit
-schema. Public type and variant names appearing there are wire identifiers and
-must remain fixed within version 1, even if Rust types are renamed later.
+`canonical.rs` and its exhaustive `canonical/generated.rs` and
+`canonical/cics.rs` modules are the explicit schema. Public type and variant
+names appearing there are wire identifiers and must remain fixed within version
+1, even if Rust types are renamed later.
 
 All lengths/counts are unsigned 64-bit little-endian numbers. Integers are fixed
 width little-endian with distinct signed/unsigned type tags; `usize` uses u64,
@@ -48,6 +49,17 @@ explicit boundaries. There are no floating-point host values in this schema.
 Adding a field/variant requires updating an exhaustive implementation; it cannot
 silently disappear through a default serializer. A schema change requires
 review of the protocol version, golden vectors and persistence compatibility.
+The `AddressSet`, `ChangeTask`, `Deq`, `Enq`, `HandleAid`, `HandleCondition`,
+`IgnoreCondition`, `PopHandle`, `PushHandle`, `SetAssociationUserCorrData`, and
+`Suspend` CICS operation identities and `Ignored` CICS disposition are additive
+named variants: they do not alter the canonical bytes of any existing value,
+and their exact variant-name bytes are frozen by golden tests.
+
+A terminal CICS ABEND records `ABEND.DUMP` in the response output map with
+schema `mainframe-env.cics.abend-dump@1` and exact value `requested` or
+`suppressed`. The entry therefore participates in the ordinary canonical result
+digest without changing the `CicsResponse` object shape. Historical retained
+responses that lack the entry remain readable and make no dump claim.
 
 ## Typed size budgets
 

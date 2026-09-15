@@ -21,9 +21,9 @@ pub use catalog::{
     cobol_layout_definition_identity, cobol_layout_definition_schema,
 };
 pub use cics_descriptor::{
-    CICS_APPLICATION_CONDITION_AUTHORITY_SHA256, CICS_APPLICATION_CONDITION_NAMES,
-    CICS_APPLICATION_CONDITION_NAMES_SHA256, CICS_APPLICATION_REGISTRY,
-    CICS_APPLICATION_REGISTRY_FROZEN, CICS_APPLICATION_REGISTRY_SHA256,
+    CICS_APPLICATION_AID_NAMES, CICS_APPLICATION_CONDITION_AUTHORITY_SHA256,
+    CICS_APPLICATION_CONDITION_NAMES, CICS_APPLICATION_CONDITION_NAMES_SHA256,
+    CICS_APPLICATION_REGISTRY, CICS_APPLICATION_REGISTRY_FROZEN, CICS_APPLICATION_REGISTRY_SHA256,
     CICS_EXECUTABLE_DESCRIPTORS, CICS_RUNTIME_IMPORT, CicsApplicationCobolApplicability,
     CicsApplicationConditionClauseDescriptor, CicsApplicationConditionLabelOperand,
     CicsApplicationConstraintStatus, CicsApplicationHandlerReadiness,
@@ -31,14 +31,15 @@ pub use cics_descriptor::{
     CicsApplicationOptionDescriptor, CicsApplicationOptionDirection,
     CicsApplicationOptionValueShape, CicsApplicationRegistryDescriptor,
     CicsApplicationRegistryMatch, CicsExecutableDescriptor,
-    cics_application_registry_candidates_for_tokens, cics_application_registry_for_tokens,
+    cics_application_registry_candidates_for_tokens,
+    cics_application_registry_for_runtime_operation, cics_application_registry_for_tokens,
     cics_executable_descriptor, cics_executable_descriptor_for_identity,
 };
 pub use cics_plan::{
-    CICS_EFFECT_PLAN_CONTRACT, CicsCondition, CicsEffectPlan, CicsNamedOperand, CicsOperandName,
-    CicsOperandValue, CicsOutputBinding, CicsOutputName, CicsPlanCodecProblem, CicsPlanLimits,
-    CicsPlanOperation, CicsPlanOption, CicsStorageSlot, decode_cics_effect_plan,
-    encode_cics_effect_plan,
+    CICS_ASSIGN_OUTPUT_NAMES, CICS_EFFECT_PLAN_CONTRACT, CicsAssignOutput, CicsCondition,
+    CicsEffectPlan, CicsNamedOperand, CicsOperandName, CicsOperandValue, CicsOutputBinding,
+    CicsOutputName, CicsPlanCodecProblem, CicsPlanLimits, CicsPlanOperation, CicsPlanOption,
+    CicsStorageSlot, decode_cics_effect_plan, encode_cics_effect_plan,
 };
 pub use cobol_config::{
     COBOL_EFFECTIVE_ARITH_OPTION, COBOL_EFFECTIVE_DISPSIGN_OPTION, COBOL_EFFECTIVE_LP_OPTION,

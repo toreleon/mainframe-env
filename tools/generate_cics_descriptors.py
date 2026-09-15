@@ -13,6 +13,12 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG_PATH = Path("conformance/0.9/cics/command-descriptors.json")
+LEGACY_EXECUTION_CATALOG_PATH = Path(
+    "conformance/0.9/cics/legacy-execution-options.json"
+)
+TYPED_EXECUTION_REGISTRATIONS_PATH = Path(
+    "conformance/0.9/cics/typed-execution-registrations.json"
+)
 OUTPUT_PATH = Path("crates/providers/mainframe-env-cics/src/generated/command_descriptors.rs")
 HOST_OUTPUT_PATH = Path(
     "crates/contracts/mainframe-env-host-api/src/generated/cics_application_commands.rs"
@@ -42,8 +48,16 @@ HANDLER_DIGEST_DOMAIN = b"mainframe-env.cics-application-command-handler@1\0"
 SOURCE_REVIEW_DIGEST_DOMAIN = b"mainframe-env.cics-source-review@2\0"
 CONDITION_NAME_DOMAIN = b"mainframe-env.cics-condition-name-authority@1\0"
 CONDITION_NAME_PROFILE = "cics-eibresp-condition-name@1"
+AID_NAMES = tuple(
+    sorted(
+        ["ANYKEY", "CLEAR", "CLRPARTN", "ENTER", "LIGHTPEN", "OPERID", "TRIGGER"]
+        + [f"PA{number}" for number in range(1, 4)]
+        + [f"PF{number}" for number in range(1, 25)]
+    )
+)
 CONDITION_NAME_OPTION = "CONDITION-NAME"
 IDENTIFIER = re.compile(r"^[A-Z][A-Za-z0-9]*$")
+OPTION_IDENTIFIER = re.compile(r"^[A-Z][A-Z0-9-]*$")
 FAMILY_ID = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
 EIBFN = re.compile(r"^[0-9A-F]{4}$")
 EXPECTED_UNITS = {
@@ -74,13 +88,20 @@ EXPECTED_FAMILIES = {
 }
 EXPECTED_RUNTIME_OPERATIONS = [
     ("Abend", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0001"),
+    ("AddressSet", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0006"),
+    ("AsktimeEib", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0009"),
     ("Asktime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0010"),
     ("Assign", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0011"),
+    ("ChangeTask", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0022"),
     ("Delete", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0040"),
+    ("Deq", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0050"),
     ("EndBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0058"),
+    ("Enq", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0064"),
     ("FormatTime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0080"),
     ("HandleAbend", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0097"),
+    ("HandleAid", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0098"),
     ("HandleCondition", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0099"),
+    ("IgnoreCondition", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0100"),
     (
         "Inquire",
         "spi-compatibility",
@@ -89,6 +110,15 @@ EXPECTED_RUNTIME_OPERATIONS = [
         f"{OFFICIAL_BASELINE}:spi-commands-unique:0155",
     ),
     ("Link", "api", "program-control", True, f"{OFFICIAL_BASELINE}:api-commands:0138"),
+    ("PopHandle", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0146"),
+    (
+        "PurgeMessage",
+        "api",
+        "terminal-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0148",
+    ),
+    ("PushHandle", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0149"),
     ("Read", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0156"),
     ("ReadNext", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0157"),
     ("ReadPrev", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0158"),
@@ -99,6 +129,13 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("SendMap", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0189"),
     ("SendText", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0192"),
     (
+        "SetAssociationUserCorrData",
+        "api",
+        "task-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0193",
+    ),
+    (
         "SetFileStatus",
         "spi-compatibility",
         "file-control",
@@ -106,6 +143,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
         f"{OFFICIAL_BASELINE}:spi-commands-unique:0224",
     ),
     ("StartBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0208"),
+    ("Suspend", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0214"),
     ("Syncpoint", "api", "recovery", True, f"{OFFICIAL_BASELINE}:api-commands:0218"),
     ("Write", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0253"),
     (
@@ -318,7 +356,50 @@ POLICY_BINDINGS = {
     },
 }
 
-TYPED_RUNTIME_OPERATIONS = frozenset({"Read", "Rewrite", "Syncpoint"})
+TYPED_RUNTIME_OPERATIONS = frozenset(
+    {
+        "Abend",
+        "ChangeTask",
+        "AddressSet",
+        "Asktime",
+        "AsktimeEib",
+        "Deq",
+        "Enq",
+        "FormatTime",
+        "HandleAbend",
+        "HandleAid",
+        "HandleCondition",
+        "IgnoreCondition",
+        "Link",
+        "Xctl",
+        "Return",
+        "StartBrowse",
+        "ReadNext",
+        "ReadPrev",
+        "EndBrowse",
+        "Delete",
+        "Write",
+        "WriteTransientData",
+        "ReceiveMap",
+        "SendMap",
+        "SendText",
+        "Assign",
+        "PurgeMessage",
+        "PopHandle",
+        "PushHandle",
+        "Read",
+        "Rewrite",
+        "SetAssociationUserCorrData",
+        "Suspend",
+        "Syncpoint",
+    }
+)
+ENQUEUE_COMMAND_ROWS = frozenset(
+    {
+        f"{OFFICIAL_BASELINE}:api-commands:0050",
+        f"{OFFICIAL_BASELINE}:api-commands:0064",
+    }
+)
 COMPILER_SPI_COMPATIBILITY = {
     "operation": "Inquire",
     "official_row": f"{OFFICIAL_BASELINE}:spi-commands-unique:0155",
@@ -330,6 +411,98 @@ COMPILER_SPI_COMPATIBILITY = {
     "resp2_requires_resp": True,
 }
 TYPED_RUNTIME_IR_EFFECTS = {
+    "Abend": frozenset(
+        {
+            "memory-read",
+            "memory-write",
+            "program-control",
+            "condition",
+            "transaction",
+        }
+    ),
+    "AddressSet": frozenset({"memory-read", "memory-write", "condition"}),
+    "Asktime": frozenset({"memory-write", "clock", "condition"}),
+    "AsktimeEib": frozenset({"memory-write", "clock", "condition"}),
+    "ChangeTask": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition"}
+    ),
+    "Deq": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "Enq": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "FormatTime": frozenset({"memory-read", "memory-write", "condition"}),
+    "HandleAbend": frozenset({"memory-read", "memory-write", "condition"}),
+    "HandleAid": frozenset({"memory-read", "memory-write", "condition"}),
+    "HandleCondition": frozenset({"memory-read", "memory-write", "condition"}),
+    "IgnoreCondition": frozenset({"memory-read", "memory-write", "condition"}),
+    "Link": frozenset(
+        {
+            "memory-read",
+            "memory-write",
+            "program-control",
+            "condition",
+            "transaction",
+        }
+    ),
+    "Xctl": frozenset(
+        {
+            "memory-read",
+            "memory-write",
+            "program-control",
+            "condition",
+            "transaction",
+        }
+    ),
+    "Return": frozenset(
+        {
+            "memory-read",
+            "memory-write",
+            "program-control",
+            "condition",
+            "transaction",
+        }
+    ),
+    "StartBrowse": frozenset(
+        {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "ReadNext": frozenset(
+        {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "ReadPrev": frozenset(
+        {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "EndBrowse": frozenset(
+        {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "Delete": frozenset(
+        {"dataset-write", "memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "Write": frozenset(
+        {"dataset-write", "memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "WriteTransientData": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "ReceiveMap": frozenset(
+        {
+            "memory-read",
+            "memory-write",
+            "terminal-read",
+            "suspension",
+            "condition",
+            "transaction",
+        }
+    ),
+    "SendMap": frozenset(
+        {"memory-read", "memory-write", "terminal-write", "condition", "transaction"}
+    ),
+    "SendText": frozenset(
+        {"memory-read", "memory-write", "terminal-write", "condition", "transaction"}
+    ),
+    "Assign": frozenset({"memory-write", "condition", "transaction"}),
+    "PurgeMessage": frozenset({"memory-write", "condition", "transaction"}),
+    "PopHandle": frozenset({"memory-write", "condition"}),
+    "PushHandle": frozenset({"memory-write", "condition"}),
     "Read": frozenset(
         {"dataset-read", "memory-read", "memory-write", "condition", "transaction"}
     ),
@@ -337,6 +510,10 @@ TYPED_RUNTIME_IR_EFFECTS = {
         {"dataset-write", "memory-read", "memory-write", "condition", "transaction"}
     ),
     "Syncpoint": frozenset({"memory-write", "condition", "transaction"}),
+    "SetAssociationUserCorrData": frozenset(
+        {"memory-read", "memory-write", "condition"}
+    ),
+    "Suspend": frozenset({"memory-write", "suspension", "condition"}),
 }
 
 
@@ -373,6 +550,173 @@ def _read_json(path: Path) -> dict[str, Any]:
         return _object(json.loads(path.read_text()), str(path))
     except (OSError, json.JSONDecodeError) as error:
         raise DescriptorError(f"{path}: {error}") from error
+
+
+def _load_legacy_execution_options(
+    root: Path,
+    commands: list[dict[str, Any]],
+    operations: list[dict[str, Any]],
+) -> dict[str, list[str]]:
+    path = root / LEGACY_EXECUTION_CATALOG_PATH
+    catalog = _read_json(path)
+    expected_fields = {
+        "schema_version",
+        "target_version",
+        "source_baseline",
+        "application_identity_set_sha256",
+        "routes",
+    }
+    if set(catalog) != expected_fields:
+        raise DescriptorError(f"{path} fields differ")
+    if (
+        catalog["schema_version"] != "mainframe-env.cics-legacy-execution-options@1"
+        or catalog["target_version"] != "0.9.0"
+        or catalog["source_baseline"] != OFFICIAL_BASELINE
+        or catalog["application_identity_set_sha256"]
+        != application_identity_digest(commands)
+    ):
+        raise DescriptorError(f"{path} identity binding differs")
+
+    expected_routes = [
+        (operation["official_row"], operation["operation"])
+        for operation in operations
+        if operation["interface"] == "api"
+        and operation["operation"] not in TYPED_RUNTIME_OPERATIONS
+    ]
+    routes = _array(catalog["routes"], "legacy execution routes")
+    normalized = []
+    for index, raw_route in enumerate(routes):
+        route = _object(raw_route, f"legacy execution routes[{index}]")
+        if set(route) != {"official_row", "runtime_operation", "execution_options"}:
+            raise DescriptorError(f"legacy execution routes[{index}] fields differ")
+        official_row = _text(
+            route["official_row"], f"legacy execution routes[{index}].official_row"
+        )
+        operation = _text(
+            route["runtime_operation"],
+            f"legacy execution routes[{index}].runtime_operation",
+        )
+        execution_options = [
+            _text(value, f"legacy execution routes[{index}].execution_options")
+            for value in _array(
+                route["execution_options"],
+                f"legacy execution routes[{index}].execution_options",
+            )
+        ]
+        if (
+            not execution_options
+            or execution_options != sorted(set(execution_options))
+            or any(
+                OPTION_IDENTIFIER.fullmatch(value) is None for value in execution_options
+            )
+        ):
+            raise DescriptorError(f"legacy execution route {official_row} options differ")
+        normalized.append((official_row, operation, execution_options))
+    if [(row, operation) for row, operation, _ in normalized] != expected_routes:
+        raise DescriptorError(f"{path} route identities or order differ")
+    return {row: options for row, _, options in normalized}
+
+
+def _load_typed_execution_registrations(
+    root: Path,
+    commands: list[dict[str, Any]],
+    families: dict[str, str],
+    existing_operations: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    path = root / TYPED_EXECUTION_REGISTRATIONS_PATH
+    catalog = _read_json(path)
+    if set(catalog) != {
+        "schema_version",
+        "target_version",
+        "application_identity_set_sha256",
+        "registrations",
+    } or (
+        catalog["schema_version"]
+        != "mainframe-env.cics-typed-execution-registrations@1"
+        or catalog["target_version"] != "0.9.0"
+        or catalog["application_identity_set_sha256"]
+        != application_identity_digest(commands)
+    ):
+        raise DescriptorError(f"{path} identity or fields differ")
+    command_by_row = {command["official_row"]: command for command in commands}
+    existing_names = {operation["operation"] for operation in existing_operations}
+    existing_rows = {operation["official_row"] for operation in existing_operations}
+    expected_by_name = {
+        operation: (interface, family, mutating, official_row)
+        for operation, interface, family, mutating, official_row in EXPECTED_RUNTIME_OPERATIONS
+    }
+    normalized = []
+    for index, raw_registration in enumerate(
+        _array(catalog["registrations"], "typed execution registrations")
+    ):
+        registration = _object(
+            raw_registration, f"typed execution registrations[{index}]"
+        )
+        if set(registration) != {
+            "operation",
+            "interface",
+            "family",
+            "mutating",
+            "official_row",
+        }:
+            raise DescriptorError(f"typed execution registrations[{index}] fields differ")
+        name = _text(
+            registration["operation"],
+            f"typed execution registrations[{index}].operation",
+        )
+        family = _text(
+            registration["family"], f"typed execution registrations[{index}].family"
+        )
+        official_row = _text(
+            registration["official_row"],
+            f"typed execution registrations[{index}].official_row",
+        )
+        command = command_by_row.get(official_row)
+        expected = expected_by_name.get(name)
+        if (
+            expected is None
+            or (
+                registration["interface"],
+                family,
+                registration["mutating"],
+                official_row,
+            )
+            != expected
+            or IDENTIFIER.fullmatch(name) is None
+            or family not in families
+            or command is None
+            or name in existing_names
+            or official_row in existing_rows
+        ):
+            raise DescriptorError(f"invalid typed execution registration {name}")
+        existing_names.add(name)
+        existing_rows.add(official_row)
+        normalized.append(
+            {
+                "operation": name,
+                "interface": registration["interface"],
+                "family": family,
+                "mutating": registration["mutating"],
+                "official_row": official_row,
+                "label": command["label"],
+            }
+        )
+    if [row["operation"] for row in normalized] != [
+        "AddressSet",
+        "AsktimeEib",
+        "ChangeTask",
+        "Deq",
+        "Enq",
+        "HandleAid",
+        "IgnoreCondition",
+        "PopHandle",
+        "PurgeMessage",
+        "PushHandle",
+        "SetAssociationUserCorrData",
+        "Suspend",
+    ]:
+        raise DescriptorError(f"{path} registration identities or order differ")
+    return normalized
 
 
 def _official_units(
@@ -463,7 +807,9 @@ def _official_units(
     return units, rows_by_id
 
 
-def load_catalog(root: Path = ROOT) -> dict[str, Any]:
+def load_catalog(
+    root: Path = ROOT, *, include_runtime_admission: bool = True
+) -> dict[str, Any]:
     path = root / CATALOG_PATH
     catalog = _read_json(path)
     expected = {
@@ -622,6 +968,23 @@ def load_catalog(root: Path = ROOT) -> dict[str, Any]:
         )
     if interface_counts != {"api": 23, "spi-compatibility": 2}:
         raise DescriptorError(f"CICS runtime interface split drifted: {interface_counts}")
+    if include_runtime_admission:
+        normalized_operations.extend(
+            _load_typed_execution_registrations(
+                root, normalized_commands, families, normalized_operations
+            )
+        )
+    expected_order = {
+        (operation, official_row): index
+        for index, (operation, _, _, _, official_row) in enumerate(
+            EXPECTED_RUNTIME_OPERATIONS
+        )
+    }
+    normalized_operations.sort(
+        key=lambda row: expected_order.get(
+            (row["operation"], row["official_row"]), len(expected_order)
+        )
+    )
     observed_runtime = [
         (
             row["operation"],
@@ -632,8 +995,40 @@ def load_catalog(root: Path = ROOT) -> dict[str, Any]:
         )
         for row in normalized_operations
     ]
-    if observed_runtime != EXPECTED_RUNTIME_OPERATIONS:
+    expected_runtime = (
+        EXPECTED_RUNTIME_OPERATIONS
+        if include_runtime_admission
+        else [
+            row
+            for row in EXPECTED_RUNTIME_OPERATIONS
+            if row[0]
+            not in {
+                "ChangeTask",
+                "AddressSet",
+                "AsktimeEib",
+                "Deq",
+                "Enq",
+                "HandleAid",
+                "IgnoreCondition",
+                "PopHandle",
+                "PurgeMessage",
+                "PushHandle",
+                "SetAssociationUserCorrData",
+                "Suspend",
+            }
+        ]
+    )
+    if observed_runtime != expected_runtime:
         raise DescriptorError("CICS runtime operation compatibility set drifted")
+    legacy_execution_options = (
+        _load_legacy_execution_options(root, normalized_commands, normalized_operations)
+        if include_runtime_admission
+        else {}
+    )
+    for operation in normalized_operations:
+        operation["legacy_execution_options"] = legacy_execution_options.get(
+            operation["official_row"], []
+        )
 
     result = dict(catalog)
     result["_families"] = families
@@ -1041,6 +1436,7 @@ def _handler_digest(handler: dict[str, Any]) -> str:
             "readiness",
             "advertised",
             "runtime_operation",
+            "legacy_execution_options",
             "unready_result",
         )
     }
@@ -1100,7 +1496,9 @@ def _source_contract_status(dimension: dict[str, Any]) -> str:
     return "pending"
 
 
-def _top_level_source_option_names(dimensions: list[dict[str, Any]]) -> list[str]:
+def _top_level_source_option_names(
+    command: dict[str, Any], dimensions: list[dict[str, Any]]
+) -> list[str]:
     dimension = _source_dimension(dimensions, "option-legality")
     names = {
         _text(value.get("term"), "top-level option term")
@@ -1111,6 +1509,11 @@ def _top_level_source_option_names(dimensions: list[dict[str, Any]]) -> list[str
     }
     if dimension["source_projection_state"] != "source-backed-not-applicable":
         names.update(COMMON_COMMAND_OPTIONS)
+    if (
+        command["official_row"] in ENQUEUE_COMMAND_ROWS
+        and dimension["source_projection_state"] == "projected"
+    ):
+        names.update({"TASK", "UOW"})
     return sorted(names)
 
 
@@ -1316,12 +1719,18 @@ def _option_constraints(
     }
 
 
-def _option_contract(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
+def _option_contract(
+    command: dict[str, Any], dimensions: list[dict[str, Any]]
+) -> dict[str, Any]:
     option_dimension = _source_dimension(dimensions, "option-legality")
     direction_dimension = _source_dimension(dimensions, "operand-direction")
     applicable = (
         option_dimension["source_projection_state"]
         != "source-backed-not-applicable"
+    )
+    enqueue_source_projected = (
+        command["official_row"] in ENQUEUE_COMMAND_ROWS
+        and option_dimension["source_projection_state"] == "projected"
     )
     options: dict[str, dict[str, Any]] = {}
     condition_clause_values: list[dict[str, Any]] = []
@@ -1352,6 +1761,23 @@ def _option_contract(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
                 }
             )
             continue
+        stack = tuple(
+            _text(item, f"{name} option stack item")
+            for item in _array(value.get("stack"), f"{name} option stack")
+        )
+        markers = [
+            _text(marker, f"{name} argument marker")
+            for marker in _array(value.get("arguments"), f"{name} arguments")
+        ]
+        if (
+            enqueue_source_projected
+            and name == "MAXLIFETIME"
+            and len(stack) == 2
+            and stack[1] in {"TASK", "UOW"}
+        ):
+            name = stack[1]
+            stack = (name,)
+            markers = ["none"]
         entry = options.setdefault(
             name,
             {
@@ -1364,14 +1790,7 @@ def _option_contract(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
             },
         )
         entry["authorities"].add("command-source")
-        entry["markers"].update(
-            _text(marker, f"{name} argument marker")
-            for marker in _array(value.get("arguments"), f"{name} arguments")
-        )
-        stack = tuple(
-            _text(item, f"{name} option stack item")
-            for item in _array(value.get("stack"), f"{name} option stack")
-        )
+        entry["markers"].update(markers)
         if stack:
             entry["stacks"].add(stack)
         source_bound = _source_option_bound(value, name)
@@ -1386,6 +1805,13 @@ def _option_contract(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
         if value.get("type") != "operand-direction":
             continue
         name = _text(value.get("option"), "source operand option")
+        marker = _text(value.get("marker"), f"{name} direction marker")
+        direction = _text(value.get("direction"), f"{name} direction")
+        if enqueue_source_projected:
+            if name == "MAXLIFETIME" and marker == "none":
+                continue
+            if name in {"MAXLIFETIME", "RESOURCE"} and direction == "unknown":
+                direction = "input"
         entry = options.setdefault(
             name,
             {
@@ -1398,8 +1824,8 @@ def _option_contract(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
             },
         )
         entry["authorities"].add("command-source")
-        entry["markers"].add(_text(value.get("marker"), f"{name} direction marker"))
-        entry["directions"].add(_text(value.get("direction"), f"{name} direction"))
+        entry["markers"].add(marker)
+        entry["directions"].add(direction)
 
     if option_dimension["source_projection_state"] != "source-backed-not-applicable":
         for name, (markers, directions) in COMMON_COMMAND_OPTIONS.items():
@@ -1476,7 +1902,7 @@ def _option_contract(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
             else "resolved"
         )
     grammar = _grammar_contract(dimensions)
-    top_level_options = set(_top_level_source_option_names(dimensions))
+    top_level_options = set(_top_level_source_option_names(command, dimensions))
     option_status = _source_contract_status(option_dimension)
     source_entries = [
         entry for entry in options.values() if "command-source" in entry["authorities"]
@@ -1504,15 +1930,29 @@ def _option_contract(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
     if len(condition_clause_material) > 1:
         raise DescriptorError("dynamic condition clause facts conflict")
     condition_clauses = next(iter(condition_clause_material.values()), None)
+    constraints = _option_constraints(grammar, top_level_options, applicable, option_status)
+    if enqueue_source_projected:
+        constraints["required"] = ["RESOURCE"]
+        lifetime = {"members": ["MAXLIFETIME", "TASK", "UOW"], "required": False}
+        constraints["alternatives"] = [
+            *[group for group in constraints["alternatives"] if group != lifetime],
+            lifetime,
+        ]
+        constraints["mutual_exclusions"] = [
+            *[
+                group
+                for group in constraints["mutual_exclusions"]
+                if group != lifetime["members"]
+            ],
+            lifetime["members"],
+        ]
     return {
         "status": option_status,
         "direction_status": direction_status,
         "bounds_status": bounds_status,
         "entries": entries,
         "condition_clauses": condition_clauses,
-        "constraints": _option_constraints(
-            grammar, top_level_options, applicable, option_status
-        ),
+        "constraints": constraints,
         "unknown_option": "reject",
         "duplicate_option": "reject",
         "max_argument_count": HOST_LIMITS["max_argument_count"],
@@ -2070,7 +2510,7 @@ def _semantic_contract(
     family = _contract_family(command, runtime_operation)
     grammar = _grammar_contract(source_dimensions)
     source_not_applicable = grammar["status"] == "not-applicable"
-    options = _option_contract(source_dimensions)
+    options = _option_contract(command, source_dimensions)
     if options["condition_clauses"] is not None:
         if (
             condition_name_authority is None
@@ -2081,7 +2521,7 @@ def _semantic_contract(
             condition_name_authority["conditions_sha256"]
         )
     recognition = _recognition_contract(
-        command, grammar, set(_top_level_source_option_names(source_dimensions))
+        command, grammar, set(_top_level_source_option_names(command, source_dimensions))
     )
     # A catalog-qualified command form owns its qualifier even when IBM renders
     # the command and valued operand as one SVG keyword (for example, REQUEST
@@ -2113,6 +2553,11 @@ def _semantic_contract(
         "advertised": runtime_operation is not None,
         "runtime_operation": (
             runtime_operation["operation"] if runtime_operation is not None else None
+        ),
+        "legacy_execution_options": (
+            runtime_operation["legacy_execution_options"]
+            if runtime_operation is not None
+            else []
         ),
         "unready_result": None if runtime_operation is not None else "explicit-unsupported",
     }
@@ -2679,6 +3124,8 @@ def _recognition_contract(
     else:
         heads.add(tuple(catalog_head))
         discriminators.update(catalog_discriminators)
+    if command["label"] == "HANDLE AID":
+        heads = {("HANDLE", "AID")}
     if grammar["status"] == "pending":
         status = "pending"
     elif grammar["status"] == "not-applicable":
@@ -2701,7 +3148,7 @@ def _registry_row_material(
     source_dimensions: list[dict[str, Any]],
     semantic: dict[str, Any],
 ) -> dict[str, Any]:
-    top_level_names = set(_top_level_source_option_names(source_dimensions))
+    top_level_names = set(_top_level_source_option_names(command, source_dimensions))
     option_entries = {
         entry["name"]: entry for entry in semantic["options"]["entries"]
     }
@@ -2843,8 +3290,8 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
         for row in catalog["_runtime_operations"]
         if row["interface"] == "api"
     }
-    if len(existing_runtime) != 23:
-        raise DescriptorError("CICS application runtime baseline must remain exactly 23 rows")
+    if len(existing_runtime) != 35:
+        raise DescriptorError("CICS application runtime set must remain exactly 35 rows")
 
     loaded_batches = []
     for batch_id, start, end, projection_path, review_path in CONTRACT_BATCHES:
@@ -2894,6 +3341,7 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
         batch_commands = []
         for command in commands[start - 1 : end]:
             source_row = source_rows.get(command["official_row"])
+            source_accepted = False
             dimensions = []
             row_issue_ids: set[str] = set()
             scoped_ambiguity = review["ambiguity_scope"].get(
@@ -2992,6 +3440,17 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
                 condition_codes,
                 condition_name_authority,
             )
+            if source_accepted:
+                unknown_execution_options = set(
+                    semantic["registry"]["legacy_execution_options"]
+                ) - {
+                    option["name"] for option in semantic["options"]["entries"]
+                }
+                if unknown_execution_options:
+                    raise DescriptorError(
+                        f"{command['official_row']} legacy execution options are not "
+                        f"source-reviewed: {sorted(unknown_execution_options)}"
+                    )
             _validate_semantic_contract(command, semantic)
             dispositions = _dimension_dispositions(dimensions, semantic)
             if frozen:
@@ -3086,15 +3545,18 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
     if (
         len(registry_rows) != 263
         or len(set(handler_ids)) != 263
-        or len(typed_rows) != 3
-        or len(legacy_rows) != 20
+        or len(typed_rows) != 34
+        or len(legacy_rows) != 1
         or {row["runtime_operation"] for row in typed_rows}
         != TYPED_RUNTIME_OPERATIONS
-        or len(advertised_rows) != 23
-        or len(unready_rows) != 240
+        or len(advertised_rows) != 35
+        or len(unready_rows) != 228
         or any(row["unready_result"] != "explicit-unsupported" for row in unready_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in typed_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in legacy_rows)
+        or any(not row["legacy_execution_options"] for row in legacy_rows)
+        or any(row["legacy_execution_options"] for row in typed_rows)
+        or any(row["legacy_execution_options"] for row in unready_rows)
         or any(row["advertised"] or row["runtime_operation"] is not None for row in unready_rows)
         or any(
             row["handler_sha256"]
@@ -3193,8 +3655,13 @@ def _rust_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=True)
 
 
-def render_provider(root: Path = ROOT) -> str:
+def render_provider(
+    root: Path = ROOT, contracts: dict[str, Any] | None = None
+) -> str:
     catalog = load_catalog(root)
+    contracts = contracts or build_contracts(root)
+    condition_authority = contracts.get("condition_name_authority") or {}
+    condition_names = condition_authority.get("allowed_names", [])
     family_variants = catalog["_families"]
     families = catalog["runtime"]["families"]
     operations = catalog["_runtime_operations"]
@@ -3202,6 +3669,14 @@ def render_provider(root: Path = ROOT) -> str:
         "// @generated by `python3 -B tools/generate_cics_descriptors.py`; do not edit.",
         "",
         "use mainframe_env_host_api::CicsOperation;",
+        "",
+        "#[rustfmt::skip]",
+        "pub(crate) const CICS_CONDITION_NAMES: &[&str] =",
+        f"    {_rust_string_slice(condition_names)};",
+        "",
+        "#[rustfmt::skip]",
+        "pub(crate) const CICS_AID_NAMES: &[&str] =",
+        f"    {_rust_string_slice(list(AID_NAMES))};",
         "",
         "#[derive(Clone, Copy, Debug, Eq, PartialEq)]",
         "pub(crate) enum CicsCommandFamily {",
@@ -3278,7 +3753,7 @@ def render_host(root: Path = ROOT) -> str:
 
 
 def _top_level_option_names(command: dict[str, Any]) -> list[str]:
-    return _top_level_source_option_names(command["source_dimensions"])
+    return _top_level_source_option_names(command, command["source_dimensions"])
 
 
 def _rust_string_slice(values: list[str]) -> str:
@@ -3391,6 +3866,11 @@ def render_ir_registry(root: Path = ROOT, contracts: dict[str, Any] | None = Non
         "/// Condition names accepted by dynamic HANDLE/IGNORE CONDITION clauses.",
         "pub const CICS_APPLICATION_CONDITION_NAMES: &[&str] =",
         f"    {_rust_string_slice(condition_name_authority['allowed_names'])};",
+        "",
+        "#[rustfmt::skip]",
+        "/// AID names accepted by dynamic HANDLE AID clauses.",
+        "pub const CICS_APPLICATION_AID_NAMES: &[&str] =",
+        f"    {_rust_string_slice(list(AID_NAMES))};",
         "",
         "#[rustfmt::skip]",
         "/// Complete application-command registry shape in official-row order.",
@@ -3506,6 +3986,9 @@ def render_ir_registry(root: Path = ROOT, contracts: dict[str, Any] | None = Non
             if registry["runtime_operation"] is not None
             else "None"
         )
+        legacy_execution_options = _rust_string_slice(
+            registry["legacy_execution_options"]
+        )
         lines.append(
             "    CicsApplicationRegistryDescriptor { "
             f"official_row: {_rust_string(command['official_row'])}, "
@@ -3534,7 +4017,8 @@ def render_ir_registry(root: Path = ROOT, contracts: dict[str, Any] | None = Non
             f"handler_sha256: {_rust_string(registry['handler_sha256'])}, "
             f"readiness: {readiness}, "
             f"advertised: {str(registry['advertised']).lower()}, "
-            f"runtime_operation: {runtime_operation} "
+            f"runtime_operation: {runtime_operation}, "
+            f"legacy_execution_options: {legacy_execution_options} "
             "},"
         )
     lines.extend(["];"])
@@ -3549,7 +4033,7 @@ def render(root: Path = ROOT) -> str:
 def rendered_outputs(root: Path = ROOT) -> dict[Path, str]:
     contracts = build_contracts(root)
     return {
-        OUTPUT_PATH: render_provider(root),
+        OUTPUT_PATH: render_provider(root, contracts),
         HOST_OUTPUT_PATH: render_host(root),
         COMPILER_SPI_COMPAT_OUTPUT_PATH: render_compiler_spi_compatibility(root),
         IR_REGISTRY_OUTPUT_PATH: render_ir_registry(root, contracts),

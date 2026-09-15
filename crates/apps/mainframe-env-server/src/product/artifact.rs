@@ -195,10 +195,11 @@ impl ProductServer {
         let Some(saved) = continuation.as_ref() else {
             return Ok(continuation);
         };
-        if expected_program
-            .map(|program| normalize_online_name(program, 128))
-            .transpose()?
-            .is_some_and(|program| program != saved.program)
+        if saved.transfer.is_none()
+            && expected_program
+                .map(|program| normalize_online_name(program, 128))
+                .transpose()?
+                .is_some_and(|program| program != saved.program)
         {
             return Err(HostProblem::InfrastructureFailure);
         }

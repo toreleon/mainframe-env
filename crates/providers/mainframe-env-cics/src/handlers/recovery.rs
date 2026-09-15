@@ -12,6 +12,17 @@ use mainframe_env_host_api::{
 use mainframe_env_store_api::ProviderStateRecord;
 use std::collections::BTreeMap;
 
+const EXECUTION_CONTEXT_BINDING: &str = "cics.execution-context";
+const EXECUTION_CONTEXT_SCHEMA: &str = "mainframe-env.cics.execution-context@1";
+const REMOTE_OUTCOME_BINDING: &str = "cics.syncpoint.remote-outcome";
+const REMOTE_OUTCOME_SCHEMA: &str = "mainframe-env.cics.syncpoint.remote-outcome@1";
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SyncpointOwner {
+    Local,
+    DplSynconreturn,
+}
+
 pub(in crate::service) fn invoke(
     service: &CicsService,
     run: &mut Run,
@@ -30,14 +41,21 @@ fn syncpoint(
     request: &CicsRequest,
     retention_tick: u64,
 ) -> Result<CicsResponse, HostProblem> {
+    let owner = validate_syncpoint_owner(run)?;
     let mutation = request
         .mutation
         .as_ref()
         .ok_or(HostProblem::MissingIdempotency)?;
-    let outcome = if request.arguments.contains_key("OPTION.ROLLBACK") {
+    let requested_outcome = if request.arguments.contains_key("OPTION.ROLLBACK") {
         CicsUnitOfWorkOutcome::RolledBack
     } else {
         CicsUnitOfWorkOutcome::Committed
+    };
+    let remote_forced_rollback = remote_forced_rollback(run, owner, requested_outcome)?;
+    let outcome = if remote_forced_rollback {
+        CicsUnitOfWorkOutcome::RolledBack
+    } else {
+        requested_outcome
     };
     let key = mutation.idempotency_key.as_str();
     if retention_tick == 0 {
@@ -75,7 +93,7 @@ fn syncpoint(
                 )
             }
             (true, existing_outcome) if existing_outcome == outcome => {
-                return uow_response(service, run, outcome);
+                return syncpoint_response(service, run, outcome, remote_forced_rollback);
             }
             _ => return Err(HostProblem::IdempotencyConflict),
         }
@@ -109,6 +127,7 @@ fn syncpoint(
     syncpoint_db2(service, run, outcome)?;
     syncpoint_ims(service, run, outcome)?;
     syncpoint_mq(service, run, outcome)?;
+    super::release_uow_enqueues(service, run)?;
     if outcome == CicsUnitOfWorkOutcome::RolledBack {
         rollback_run(service, run)?;
     } else {
@@ -151,7 +170,47 @@ fn syncpoint(
     {
         return Err(HostProblem::UnknownOutcome);
     }
-    uow_response(service, run, outcome)
+    syncpoint_response(service, run, outcome, remote_forced_rollback)
+}
+
+fn validate_syncpoint_owner(run: &Run) -> Result<SyncpointOwner, HostProblem> {
+    let Some(context) = run.invocation.bindings.get(EXECUTION_CONTEXT_BINDING) else {
+        return Ok(SyncpointOwner::Local);
+    };
+    if context.schema() != EXECUTION_CONTEXT_SCHEMA {
+        return Err(HostProblem::Malformed);
+    }
+    match context.bytes() {
+        b"local" => Ok(SyncpointOwner::Local),
+        b"dpl-synconreturn" => Ok(SyncpointOwner::DplSynconreturn),
+        // IBM topic dfhp4_syncpoint.html assigns INVREQ RESP2 200 when a DPL
+        // server does not own the syncpoint or is constrained to DPLSUBSET.
+        b"dpl-without-synconreturn" | b"dpl-executionset-subset" => Err(HostProblem::Condition {
+            name: "INVREQ".into(),
+            response: 16,
+            response2: 200,
+        }),
+        _ => Err(HostProblem::Malformed),
+    }
+}
+
+fn remote_forced_rollback(
+    run: &Run,
+    owner: SyncpointOwner,
+    requested_outcome: CicsUnitOfWorkOutcome,
+) -> Result<bool, HostProblem> {
+    let Some(remote_outcome) = run.invocation.bindings.get(REMOTE_OUTCOME_BINDING) else {
+        return Ok(false);
+    };
+    if owner != SyncpointOwner::DplSynconreturn || remote_outcome.schema() != REMOTE_OUTCOME_SCHEMA
+    {
+        return Err(HostProblem::Malformed);
+    }
+    match remote_outcome.bytes() {
+        b"commit-capable" => Ok(false),
+        b"unable-to-commit" => Ok(requested_outcome == CicsUnitOfWorkOutcome::Committed),
+        _ => Err(HostProblem::Malformed),
+    }
 }
 
 fn syncpoint_db2(
@@ -402,4 +461,21 @@ fn uow_response(
     )?;
     response.unit_of_work = Some(outcome);
     Ok(response)
+}
+
+fn syncpoint_response(
+    service: &CicsService,
+    run: &Run,
+    outcome: CicsUnitOfWorkOutcome,
+    remote_forced_rollback: bool,
+) -> Result<CicsResponse, HostProblem> {
+    if remote_forced_rollback {
+        Err(HostProblem::Condition {
+            name: "ROLLEDBACK".into(),
+            response: 82,
+            response2: 0,
+        })
+    } else {
+        uow_response(service, run, outcome)
+    }
 }

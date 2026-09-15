@@ -44,14 +44,58 @@ Replay envelope `MECER002` records expose the owner execution and effect
 deadline needed by retention; `MECER001` rows lack that proof and must remain
 retention-ineligible.
 
+For a suspended `cics-enqueue` exchange, also leave `cics-enqueue-v1` and
+`cics-enqueue-catalog-v1` untouched. The resource row is the durable FIFO and
+ownership authority; its catalog count is checked when CICS opens. Resume the
+same online exchange after the resource owner dequeues. Timeout, cancellation,
+session disconnect, or abandoned-task recovery invokes bounded task cleanup,
+which removes the waiter or releases its owned locks and promotes the oldest
+surviving waiter. Manual deletion can orphan a grant or break the catalog count
+and will make the next provider open fail closed.
+
+Treat `cics-enqueue-model-v1` and `cics-enqueue-model-catalog-v1` as one
+configuration unit. Install the complete bounded model set before the first
+lock exists; later calls must be exact idempotent replays. Back up and restore
+the definition rows and singleton digest row together. Missing, extra,
+overlapping, noncanonical, or digest-mismatched definitions make CICS open fail
+closed. Do not delete the model catalog to force local routing: model-aware lock
+keys contain either APPLID/SYSID or ENQSCOPE and are not compatible with the
+single-region key profile.
+
+Back up `cics-session` rows containing task association or HANDLE state before
+enabling typed `SET ASSOCIATION USERCORRDATA` or durable handlers. Current
+`MECS7` rows carry at most 64 correlator bytes, the last mutation key and
+canonical request digest, and the complete bounded condition/AID/IGNORE/typed
+ABEND PUSH/POP state. Historical `MECS1`–`MECS4` rows decode with an empty
+correlator, `MECS5` and `MECS6` retain theirs, versions 1–5 have empty HANDLE
+state, and `MECS6` retains label-only exits. If the session write succeeds but
+the outer replay row does not, retain the session row and retry only the
+identical key and request. A different digest is an idempotency conflict, and
+manual deletion of the session row loses both authoritative values.
+
+A `cics-scheduler` suspension from `CHANGE TASK` or `SUSPEND` is a one-shot
+yield, not a terminal handoff and not a command retry. Preserve the execution
+checkpoint, online exchange, and `online-machine-continuation` row, then resume
+the same execution through normal bounded admission. Current `MEOM4` rows carry
+the changed priority and optional staged program transfer; `MEOM3` priority
+rows and historical `MEOM2` rows remain readable. For a nonempty transfer
+marker, retain both rows: recovery must observe the predecessor's exact
+`HandoffCompleted` event and CAS the recorded next exchange before clearing the
+marker. Deleting either continuation can lose the post-command program counter
+and must be treated as failed recovery, not permission to reissue the CICS
+command.
+
 If an exchange points at a terminal execution, first finish the abandoned
 COBOL/CICS run, remove its interpreter checkpoint, and delete the exchange.
 Preserve `online-machine-continuation` only when the final lifecycle event is
-`HandoffCompleted`; that record is the durable owner of the next
-pseudo-conversation task. Ordinary completion returns success. Cancellation
-and timeout retain their exact categories, while failed/dead-letter executions
-return a conservative provider failure when no exact condition payload was
-persisted. Never retry a terminal execution identity.
+`HandoffCompleted`; retain the session's HANDLE state in that case because it
+belongs to the same logical task. Clear HANDLE state for every other terminal
+outcome before admitting a fresh task. That continuation record is the durable
+owner of the next pseudo-conversation task. Ordinary completion returns
+success. Cancellation and timeout retain their exact categories, while
+failed/dead-letter executions return a conservative provider failure when no
+exact condition payload was persisted. Never retry a terminal execution
+identity.
 
 Local wakeups are reconstructible by scanning authoritative work rows.
 Dead-letter work requires an operator decision; it is never treated as

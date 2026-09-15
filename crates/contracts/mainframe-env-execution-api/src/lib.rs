@@ -44,9 +44,9 @@ pub use identity::{
     PrincipalId, RequestId, RunUnitId, Selector, TraceId,
 };
 pub use machine::{
-    Abend, ChildInvocation, Completion, Condition, ExecutionOutcome, Frame, FrameId,
-    LifecycleEvent, LifecycleEventKind, Machine, MachineDrive, MachineResume, Quantum, Suspension,
-    Transfer,
+    Abend, AbendDumpDisposition, ChildInvocation, Completion, Condition, ExecutionOutcome, Frame,
+    FrameId, LifecycleEvent, LifecycleEventKind, Machine, MachineDrive, MachineResume, Quantum,
+    Suspension, Transfer,
 };
 
 /// Stable identifier for this execution contract generation.

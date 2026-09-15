@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mainframe-env.invalid/schemas/cics-typed-execution-registrations-v1.json",
+  "title": "mainframe-env reviewed typed CICS execution registrations",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_version",
+    "application_identity_set_sha256",
+    "registrations"
+  ],
+  "properties": {
+    "schema_version": {"const": "mainframe-env.cics-typed-execution-registrations@1"},
+    "target_version": {"const": "0.9.0"},
+    "application_identity_set_sha256": {
+      "const": "sha256:a18057164564781563252d53586a8afbc401f2783950db456b3b98177fc60b94"
+    },
+    "registrations": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["operation", "interface", "family", "mutating", "official_row"],
+        "properties": {
+          "operation": {"enum": ["AddressSet", "ChangeTask", "Deq", "Enq", "HandleAid", "IgnoreCondition", "PopHandle", "PushHandle", "SetAssociationUserCorrData", "Suspend"]},
+          "interface": {"const": "api"},
+          "family": {"const": "task-control"},
+          "mutating": {"type": "boolean"},
+          "official_row": {
+            "enum": [
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0006",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0022",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0050",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0064",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0098",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0100",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0146",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0149",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0193",
+              "ibm-cics-ts-6x-2026-08-31:api-commands:0214"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

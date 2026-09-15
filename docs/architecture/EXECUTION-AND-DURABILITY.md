@@ -131,7 +131,7 @@ outer result, reconciliation changes the effect to `Completed` before machine
 execution resumes.
 
 CICS also retains the exact bounded outer response for every mutating file,
-transient-queue, program-link, and syncpoint request. The replay key is checked
+transient-queue, program-link, enqueue/dequeue, and syncpoint request. The replay key is checked
 against the canonical request digest. New replay envelopes also retain the
 owning execution and conservative effect deadline; legacy envelopes remain
 replayable but are not retention-eligible. A crash after the provider mutation
@@ -140,16 +140,86 @@ mutation twice. An unresolved result remains an explicit HTTP 409
 `unknown_outcome`; it is never translated to a normal CICS condition or the
 generic `conflict` code.
 
+Local CICS ENQ state is stored in `cics-enqueue-v1`, with one content-addressed
+resource row containing the exact owner, nested UOW/TASK counts, pending grant,
+and bounded FIFO waiter list. `cics-enqueue-catalog-v1` is the CAS-protected
+row-count authority. A first acquisition or final release changes the resource,
+catalog, and normal `cics-effect-replay-v1` receipt in one provider-state
+transaction; waiter registration is committed with its suspended response.
+Reopen validates every row and the catalog count before admission. Syncpoint
+releases UOW ownership, while task completion, abnormal termination,
+cancellation, timeout, discard, and disconnect remove both owned locks and
+waiter entries. Promotion reserves the lock for the oldest waiter, which must
+resume under the same execution and run-unit identity before continuing.
+
+Installed ENQMODEL definitions are immutable rows in
+`cics-enqueue-model-v1`, bound as one complete set by the
+`cics-enqueue-model-catalog-v1` count/digest row. The first installation is
+allowed only while the enqueue authority is empty; this makes the transition
+from the single-region compatibility profile to explicit scoped identities
+atomic and rollback-safe. Once installed, unmatched resources and blank-scope
+matches include APPLID/SYSID in their local lock identity. A nonblank
+four-character ENQSCOPE replaces that region identity and therefore coordinates
+all CICS services sharing the durable store. Address-based requests never use
+an ENQMODEL. Disabled matches abend ENQ, and corrupt or partially installed
+model/catalog state prevents provider open. The pinned source set does not
+establish precedence among overlapping generic models, so installation rejects
+overlap rather than choosing an undocumented winner.
+
+An ENQ wait is not a terminal-input handoff. Its execution remains
+`Suspended`, and both the coordinator checkpoint and product continuation stay
+attached to the same online exchange. Resume reissues the ENQ as a new bounded
+effect attempt; a promoted waiter completes without incrementing the nesting
+count. A crossed deadline or cancellation terminalizes the execution and runs
+the task cleanup path.
+
+Typed `CHANGE TASK PRIORITY` and `SUSPEND` use a distinct
+`cics-scheduler` suspension. The machine advances past the command before
+yielding, so resume cannot execute the same scheduling request twice. A valid
+priority change is returned as typed control metadata and updates both the CICS
+run and interpreter invocation; omission and `-1` do not yield. Product
+continuation format `MEOM4` stores the resulting priority beside the machine
+checkpoint and provider generations. It can also stage a program-transfer
+exchange before terminalizing the artifact-bound source execution. The reader
+retains `MEOM3` priority rows and `MEOM2` compatibility, using the enclosing
+exchange priority when the oldest row has no explicit field. Scheduler
+suspension keeps the execution and online exchange live until the next bounded
+redispatch, unlike terminal-input handoff.
+
+Typed `SET ASSOCIATION USERCORRDATA` mutates the durable session that owns the
+originating task. The provider verifies the issuing and originating run-unit
+identities, overwrites rather than appends, and silently truncates the supplied
+bytes to 64. Current `MECS7` session rows bind the result to both the mutation
+key and canonical request digest and also carry typed CICS HANDLE state.
+A replay-ledger crash gap can complete only the identical association request;
+a failed HANDLE-state CAS restores the prior volatile run. Readers retain
+`MECS1`–`MECS6`: versions 1–4 begin with no user correlator, versions 1–5 begin
+with empty HANDLE state, and version 6 preserves label-only ABEND exits. Session
+CAS is the single state authority across memory, SQLite, and PostgreSQL
+adapters.
+
+An online program transfer never changes an admitted execution's artifact
+identity. The product first stores an `MEOM4` start checkpoint and next-exchange
+identity, terminalizes the source execution with `HandoffCompleted`, CASes the
+exchange to a new execution over the same CICS run unit, and then clears the
+staging marker. Recovery accepts only the exact prior or next exchange version,
+finishes an observed suspended predecessor once, and verifies the terminal
+handoff event before advancing. Thus a crash between any two writes cannot run
+the source artifact under the target identity or strand its checkpoint.
+
 When a terminal RECEIVE suspends a machine, the product first commits its own
 session continuation and then atomically moves the interpreter execution from
 `Suspended` to terminal `Completed` with `HandoffCompleted`. Only after that
 handoff does it delete the redundant interpreter checkpoint and finish the
-volatile COBOL/CICS run. A restart in the cleanup gap recognizes the handoff
-event, preserves the product continuation, completes the remaining cleanup,
-and admits the next terminal task under a new execution identity. Other stale
-terminal exchanges discard both continuations and retain their conservative
-`Cancelled`, `TimedOut`, or provider-failure outcome; terminal journal rows are
-never passed back to resumable execution.
+volatile COBOL/CICS run while retaining its durable HANDLE state. The next task
+restores both the machine checkpoint and those specifications before consuming
+terminal input. A restart in the cleanup gap recognizes the handoff event,
+preserves the product continuation and HANDLE state, completes the remaining
+cleanup, and admits the next terminal task under a new execution identity.
+Other stale terminal exchanges discard both continuations and clear HANDLE
+state before retaining their conservative `Cancelled`, `TimedOut`, or
+provider-failure outcome; terminal journal rows are never passed back to
+resumable execution.
 
 Keyed dataset insert, rewrite, and delete commit the base cluster, every
 upgradable alternate-index generation, and the idempotency result as one atomic

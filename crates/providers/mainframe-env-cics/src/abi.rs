@@ -53,6 +53,16 @@ mod tests {
                 .source
                 .contains("DFHENTER PIC X VALUE X'7D'")
         );
+        for definition in [
+            "DFHCLRP PIC X VALUE X'6A'",
+            "DFHPA3 PIC X VALUE X'6B'",
+            "DFHPEN PIC X VALUE X'7E'",
+            "DFHTRIG PIC X VALUE X'7F'",
+            "DFHOPID PIC X VALUE X'E6'",
+            "DFHMSRE PIC X VALUE X'E7'",
+        ] {
+            assert!(library.members[0].source.contains(definition));
+        }
         assert!(
             library.members[1]
                 .source

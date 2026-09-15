@@ -9,6 +9,8 @@ const READ_EFFECTS: &[Effect] = &[
     Effect::DatasetRead,
     Effect::MemoryRead,
     Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
     Effect::Condition,
     Effect::Transaction,
 ];
@@ -16,10 +18,150 @@ const REWRITE_EFFECTS: &[Effect] = &[
     Effect::DatasetWrite,
     Effect::MemoryRead,
     Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
     Effect::Condition,
     Effect::Transaction,
 ];
-const SYNCPOINT_EFFECTS: &[Effect] = &[Effect::MemoryWrite, Effect::Condition, Effect::Transaction];
+const SYNCPOINT_EFFECTS: &[Effect] = &[
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+    Effect::Transaction,
+];
+const DEQ_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+    Effect::Transaction,
+];
+const ENQ_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Suspension,
+    Effect::Condition,
+    Effect::Transaction,
+];
+const CHANGE_TASK_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Suspension,
+    Effect::Condition,
+];
+const SUSPEND_EFFECTS: &[Effect] = &[
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Suspension,
+    Effect::Condition,
+];
+const SET_ASSOCIATION_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+];
+const ADDRESS_SET_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+];
+const ASKTIME_EFFECTS: &[Effect] = &[
+    Effect::MemoryWrite,
+    Effect::Clock,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+];
+const FORMAT_TIME_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+];
+const ABEND_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::ProgramControl,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+    Effect::Transaction,
+];
+const CONTROL_TRANSFER_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::ProgramControl,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+    Effect::Transaction,
+];
+const HANDLE_STACK_EFFECTS: &[Effect] = &[
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+];
+const IGNORE_CONDITION_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+];
+const QUEUE_WRITE_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+    Effect::Transaction,
+];
+const TERMINAL_RECEIVE_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::TerminalRead,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Suspension,
+    Effect::Condition,
+    Effect::Transaction,
+];
+const TERMINAL_SEND_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::TerminalWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+    Effect::Transaction,
+];
+const ASSIGN_EFFECTS: &[Effect] = &[
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+    Effect::Transaction,
+];
+const PURGE_MESSAGE_EFFECTS: &[Effect] = &[
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+    Effect::Transaction,
+];
 
 /// Static executable facts owned by the typed CICS dialect.
 ///
@@ -236,6 +378,11 @@ pub struct CicsApplicationRegistryDescriptor {
     pub advertised: bool,
     /// Existing host API operation name when the handler is ready.
     pub runtime_operation: Option<&'static str>,
+    /// Source-reviewed options fully implemented by the raw compatibility route.
+    ///
+    /// Typed and unready rows keep this empty; their option admission is owned by
+    /// typed lowering or the explicit unsupported path respectively.
+    pub legacy_execution_options: &'static [&'static str],
 }
 
 include!("generated/cics_application_registry.rs");
@@ -349,8 +496,39 @@ pub fn cics_application_registry_for_tokens(
     best.and_then(|(descriptor, _)| (!ambiguous).then_some(descriptor))
 }
 
+/// Resolves the unique advertised application row for a host runtime operation.
+///
+/// Internal-only operations and the separate SPI compatibility route have no
+/// application row and therefore return `None`.
+#[must_use]
+pub fn cics_application_registry_for_runtime_operation(
+    runtime_operation: &str,
+) -> Option<&'static CicsApplicationRegistryDescriptor> {
+    let mut matches = CICS_APPLICATION_REGISTRY.iter().filter(|descriptor| {
+        descriptor.advertised && descriptor.runtime_operation == Some(runtime_operation)
+    });
+    let descriptor = matches.next()?;
+    matches.next().is_none().then_some(descriptor)
+}
+
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 3] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 34] = [
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Deq,
+        namespace: "cics.task",
+        name: "deq",
+        major: 1,
+        effects: DEQ_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Enq,
+        namespace: "cics.task",
+        name: "enq",
+        major: 1,
+        effects: ENQ_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Read,
         namespace: "cics.file",
@@ -375,6 +553,238 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 3] = [
         effects: SYNCPOINT_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::ChangeTask,
+        namespace: "cics.task",
+        name: "change-task",
+        major: 1,
+        effects: CHANGE_TASK_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Suspend,
+        namespace: "cics.task",
+        name: "suspend",
+        major: 1,
+        effects: SUSPEND_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::SetAssociationUserCorrData,
+        namespace: "cics.task",
+        name: "set-association-usercorrdata",
+        major: 1,
+        effects: SET_ASSOCIATION_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::AddressSet,
+        namespace: "cics.task",
+        name: "address-set",
+        major: 1,
+        effects: ADDRESS_SET_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::PopHandle,
+        namespace: "cics.task",
+        name: "pop-handle",
+        major: 1,
+        effects: HANDLE_STACK_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::PushHandle,
+        namespace: "cics.task",
+        name: "push-handle",
+        major: 1,
+        effects: HANDLE_STACK_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::IgnoreCondition,
+        namespace: "cics.task",
+        name: "ignore-condition",
+        major: 1,
+        effects: IGNORE_CONDITION_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::HandleCondition,
+        namespace: "cics.task",
+        name: "handle-condition",
+        major: 1,
+        effects: IGNORE_CONDITION_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::HandleAid,
+        namespace: "cics.task",
+        name: "handle-aid",
+        major: 1,
+        effects: IGNORE_CONDITION_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::AsktimeEib,
+        namespace: "cics.time",
+        name: "asktime-eib",
+        major: 1,
+        effects: ASKTIME_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Asktime,
+        namespace: "cics.time",
+        name: "asktime",
+        major: 1,
+        effects: ASKTIME_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::FormatTime,
+        namespace: "cics.time",
+        name: "format-time",
+        major: 1,
+        effects: FORMAT_TIME_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Abend,
+        namespace: "cics.task",
+        name: "abend",
+        major: 1,
+        effects: ABEND_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::HandleAbend,
+        namespace: "cics.task",
+        name: "handle-abend",
+        major: 1,
+        effects: IGNORE_CONDITION_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Link,
+        namespace: "cics.program",
+        name: "link",
+        major: 1,
+        effects: CONTROL_TRANSFER_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Xctl,
+        namespace: "cics.program",
+        name: "xctl",
+        major: 1,
+        effects: CONTROL_TRANSFER_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Return,
+        namespace: "cics.task",
+        name: "return",
+        major: 1,
+        effects: CONTROL_TRANSFER_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::StartBrowse,
+        namespace: "cics.file",
+        name: "start-browse",
+        major: 1,
+        effects: READ_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::ReadNext,
+        namespace: "cics.file",
+        name: "read-next",
+        major: 1,
+        effects: READ_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::ReadPrev,
+        namespace: "cics.file",
+        name: "read-prev",
+        major: 1,
+        effects: READ_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::EndBrowse,
+        namespace: "cics.file",
+        name: "end-browse",
+        major: 1,
+        effects: READ_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Delete,
+        namespace: "cics.file",
+        name: "delete",
+        major: 1,
+        effects: REWRITE_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Write,
+        namespace: "cics.file",
+        name: "write",
+        major: 1,
+        effects: REWRITE_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::WriteTransientData,
+        namespace: "cics.queue",
+        name: "write-transient-data",
+        major: 1,
+        effects: QUEUE_WRITE_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::ReceiveMap,
+        namespace: "cics.terminal",
+        name: "receive-map",
+        major: 1,
+        effects: TERMINAL_RECEIVE_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::SendMap,
+        namespace: "cics.terminal",
+        name: "send-map",
+        major: 1,
+        effects: TERMINAL_SEND_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::SendText,
+        namespace: "cics.terminal",
+        name: "send-text",
+        major: 1,
+        effects: TERMINAL_SEND_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Assign,
+        namespace: "cics.task",
+        name: "assign",
+        major: 1,
+        effects: ASSIGN_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::PurgeMessage,
+        namespace: "cics.terminal",
+        name: "purge-message",
+        major: 1,
+        effects: PURGE_MESSAGE_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
 ];
 
 /// Resolves the executable descriptor for a decoded CICS plan operation.
@@ -383,9 +793,40 @@ pub const fn cics_executable_descriptor(
     operation: CicsPlanOperation,
 ) -> &'static CicsExecutableDescriptor {
     match operation {
-        CicsPlanOperation::Read => &CICS_EXECUTABLE_DESCRIPTORS[0],
-        CicsPlanOperation::Rewrite => &CICS_EXECUTABLE_DESCRIPTORS[1],
-        CicsPlanOperation::Syncpoint => &CICS_EXECUTABLE_DESCRIPTORS[2],
+        CicsPlanOperation::Deq => &CICS_EXECUTABLE_DESCRIPTORS[0],
+        CicsPlanOperation::Enq => &CICS_EXECUTABLE_DESCRIPTORS[1],
+        CicsPlanOperation::Read => &CICS_EXECUTABLE_DESCRIPTORS[2],
+        CicsPlanOperation::Rewrite => &CICS_EXECUTABLE_DESCRIPTORS[3],
+        CicsPlanOperation::Syncpoint => &CICS_EXECUTABLE_DESCRIPTORS[4],
+        CicsPlanOperation::ChangeTask => &CICS_EXECUTABLE_DESCRIPTORS[5],
+        CicsPlanOperation::Suspend => &CICS_EXECUTABLE_DESCRIPTORS[6],
+        CicsPlanOperation::SetAssociationUserCorrData => &CICS_EXECUTABLE_DESCRIPTORS[7],
+        CicsPlanOperation::AddressSet => &CICS_EXECUTABLE_DESCRIPTORS[8],
+        CicsPlanOperation::PopHandle => &CICS_EXECUTABLE_DESCRIPTORS[9],
+        CicsPlanOperation::PushHandle => &CICS_EXECUTABLE_DESCRIPTORS[10],
+        CicsPlanOperation::IgnoreCondition => &CICS_EXECUTABLE_DESCRIPTORS[11],
+        CicsPlanOperation::HandleCondition => &CICS_EXECUTABLE_DESCRIPTORS[12],
+        CicsPlanOperation::HandleAid => &CICS_EXECUTABLE_DESCRIPTORS[13],
+        CicsPlanOperation::AsktimeEib => &CICS_EXECUTABLE_DESCRIPTORS[14],
+        CicsPlanOperation::Asktime => &CICS_EXECUTABLE_DESCRIPTORS[15],
+        CicsPlanOperation::FormatTime => &CICS_EXECUTABLE_DESCRIPTORS[16],
+        CicsPlanOperation::Abend => &CICS_EXECUTABLE_DESCRIPTORS[17],
+        CicsPlanOperation::HandleAbend => &CICS_EXECUTABLE_DESCRIPTORS[18],
+        CicsPlanOperation::Link => &CICS_EXECUTABLE_DESCRIPTORS[19],
+        CicsPlanOperation::Xctl => &CICS_EXECUTABLE_DESCRIPTORS[20],
+        CicsPlanOperation::Return => &CICS_EXECUTABLE_DESCRIPTORS[21],
+        CicsPlanOperation::StartBrowse => &CICS_EXECUTABLE_DESCRIPTORS[22],
+        CicsPlanOperation::ReadNext => &CICS_EXECUTABLE_DESCRIPTORS[23],
+        CicsPlanOperation::ReadPrev => &CICS_EXECUTABLE_DESCRIPTORS[24],
+        CicsPlanOperation::EndBrowse => &CICS_EXECUTABLE_DESCRIPTORS[25],
+        CicsPlanOperation::Delete => &CICS_EXECUTABLE_DESCRIPTORS[26],
+        CicsPlanOperation::Write => &CICS_EXECUTABLE_DESCRIPTORS[27],
+        CicsPlanOperation::WriteTransientData => &CICS_EXECUTABLE_DESCRIPTORS[28],
+        CicsPlanOperation::ReceiveMap => &CICS_EXECUTABLE_DESCRIPTORS[29],
+        CicsPlanOperation::SendMap => &CICS_EXECUTABLE_DESCRIPTORS[30],
+        CicsPlanOperation::SendText => &CICS_EXECUTABLE_DESCRIPTORS[31],
+        CicsPlanOperation::Assign => &CICS_EXECUTABLE_DESCRIPTORS[32],
+        CicsPlanOperation::PurgeMessage => &CICS_EXECUTABLE_DESCRIPTORS[33],
     }
 }
 
@@ -446,33 +887,41 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 3);
-        assert!(
-            typed
-                .iter()
-                .all(|descriptor| descriptor.advertised && descriptor.runtime_operation.is_some())
-        );
+        assert_eq!(typed.len(), 34);
+        assert!(typed.iter().all(|descriptor| descriptor.advertised
+            && descriptor.runtime_operation.is_some()
+            && descriptor.legacy_execution_options.is_empty()));
         let legacy = CICS_APPLICATION_REGISTRY
             .iter()
             .filter(|descriptor| {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 20);
-        assert!(
-            legacy
-                .iter()
-                .all(|descriptor| descriptor.advertised && descriptor.runtime_operation.is_some())
-        );
+        assert_eq!(legacy.len(), 1);
+        assert!(legacy.iter().all(|descriptor| descriptor.advertised
+            && descriptor.runtime_operation.is_some()
+            && !descriptor.legacy_execution_options.is_empty()));
         let unready = CICS_APPLICATION_REGISTRY
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 240);
-        assert!(
-            unready
-                .iter()
-                .all(|descriptor| !descriptor.advertised && descriptor.runtime_operation.is_none())
+        assert_eq!(unready.len(), 228);
+        assert!(unready.iter().all(|descriptor| !descriptor.advertised
+            && descriptor.runtime_operation.is_none()
+            && descriptor.legacy_execution_options.is_empty()));
+        for descriptor in typed.into_iter().chain(legacy) {
+            assert_eq!(
+                cics_application_registry_for_runtime_operation(
+                    descriptor
+                        .runtime_operation
+                        .expect("ready runtime operation")
+                ),
+                Some(descriptor)
+            );
+        }
+        assert_eq!(
+            cics_application_registry_for_runtime_operation("Inquire"),
+            None
         );
     }
 
@@ -484,18 +933,23 @@ mod tests {
         let asktime = cics_application_registry_for_tokens(&["asktime"])
             .expect("ASKTIME must be catalog-known");
         assert_eq!(asktime.label_tokens, ["ASKTIME"]);
-        assert_eq!(asktime.readiness, CicsApplicationHandlerReadiness::Unready);
-        assert!(!asktime.advertised);
+        assert_eq!(
+            asktime.readiness,
+            CicsApplicationHandlerReadiness::TypedRuntime
+        );
+        assert!(asktime.advertised);
+        assert_eq!(asktime.runtime_operation, Some("AsktimeEib"));
 
         let absolute = cics_application_registry_for_tokens(&["asktime", "abstime", "target"])
             .expect("ASKTIME ABSTIME must be catalog-known");
         assert_eq!(absolute.label_tokens, ["ASKTIME", "ABSTIME"]);
         assert_eq!(
             absolute.readiness,
-            CicsApplicationHandlerReadiness::LegacyCompatibility
+            CicsApplicationHandlerReadiness::TypedRuntime
         );
         assert!(absolute.advertised);
         assert_eq!(absolute.runtime_operation, Some("Asktime"));
+        assert!(absolute.legacy_execution_options.is_empty());
     }
 
     #[test]
@@ -617,9 +1071,40 @@ mod tests {
                 .map(|descriptor| descriptor.operation)
                 .collect::<BTreeSet<_>>(),
             BTreeSet::from([
+                CicsPlanOperation::Abend,
+                CicsPlanOperation::AddressSet,
+                CicsPlanOperation::Asktime,
+                CicsPlanOperation::AsktimeEib,
+                CicsPlanOperation::FormatTime,
+                CicsPlanOperation::ChangeTask,
+                CicsPlanOperation::Deq,
+                CicsPlanOperation::Enq,
+                CicsPlanOperation::HandleAid,
+                CicsPlanOperation::HandleAbend,
+                CicsPlanOperation::HandleCondition,
+                CicsPlanOperation::IgnoreCondition,
+                CicsPlanOperation::Link,
+                CicsPlanOperation::Xctl,
+                CicsPlanOperation::Return,
+                CicsPlanOperation::StartBrowse,
+                CicsPlanOperation::ReadNext,
+                CicsPlanOperation::ReadPrev,
+                CicsPlanOperation::EndBrowse,
+                CicsPlanOperation::Delete,
+                CicsPlanOperation::Write,
+                CicsPlanOperation::WriteTransientData,
+                CicsPlanOperation::ReceiveMap,
+                CicsPlanOperation::SendMap,
+                CicsPlanOperation::SendText,
+                CicsPlanOperation::Assign,
+                CicsPlanOperation::PurgeMessage,
+                CicsPlanOperation::PopHandle,
+                CicsPlanOperation::PushHandle,
                 CicsPlanOperation::Read,
                 CicsPlanOperation::Rewrite,
                 CicsPlanOperation::Syncpoint,
+                CicsPlanOperation::SetAssociationUserCorrData,
+                CicsPlanOperation::Suspend,
             ])
         );
         assert_eq!(

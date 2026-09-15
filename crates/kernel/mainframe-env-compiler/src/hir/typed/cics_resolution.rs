@@ -1,16 +1,33 @@
 //! Catalog-bound recognition of top-level EXEC CICS command clauses.
-
-use super::{Resolution, ResolutionFailure};
-use crate::SemanticModel;
+use super::{
+    HirCicsConditionPolicy, HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation,
+    HirCicsOption, HirCicsOutputBinding, HirCicsOutputName, HirCicsStatement, HirCicsValue,
+    HirDataReference, Resolution, ResolutionFailure, data_reference_at, numeric_literal,
+    require_numeric, require_writable,
+};
+use crate::{CobolUsage, SemanticModel};
 use mainframe_env_ir::{
-    CICS_APPLICATION_CONDITION_NAMES, CicsApplicationCobolApplicability,
-    CicsApplicationConditionLabelOperand, CicsApplicationConstraintStatus,
+    CICS_APPLICATION_AID_NAMES, CICS_APPLICATION_CONDITION_NAMES,
+    CicsApplicationCobolApplicability, CicsApplicationConditionLabelOperand,
+    CicsApplicationConstraintStatus, CicsApplicationHandlerReadiness,
     CicsApplicationOptionValueShape, CicsApplicationRegistryDescriptor,
     cics_application_registry_candidates_for_tokens,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
 type Clauses = BTreeMap<String, Vec<String>>;
+mod abend;
+mod assign_validation;
+mod file_operands;
+mod format_time;
+mod handle_abend;
+mod operation;
+mod output_bindings;
+mod program_control;
+mod program_name;
+mod queue_control;
+mod terminal_control;
+mod transaction_name;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) struct CicsLegacySpiCompatibilityDescriptor {
@@ -201,6 +218,22 @@ pub(super) fn validated_command(
             );
             continue;
         }
+        if candidate.descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
+            && let Err(detail) = validate_legacy_execution_subset(candidate.descriptor, &present)
+        {
+            keep_best_failure(
+                &mut best_failure,
+                CandidateFailure {
+                    score: (
+                        candidate.head_tokens.len(),
+                        discriminator_matches,
+                        recognized_options,
+                    ),
+                    detail,
+                },
+            );
+            continue;
+        }
 
         let validated = ValidatedCandidate {
             descriptor: candidate.descriptor,
@@ -278,7 +311,19 @@ fn validate_candidate(
         ));
     }
 
+    let mut canonical_spellings = BTreeMap::<&str, &str>::new();
+    for name in present {
+        let canonical = compatibility_alias_target(descriptor, name).unwrap_or(name);
+        if let Some(existing) = canonical_spellings.insert(canonical, name) {
+            return Err(format!(
+                "CICS {} options {existing} and {name} are aliases and mutually exclusive",
+                command_label(descriptor)
+            ));
+        }
+    }
+
     let mut condition_clause_count = 0usize;
+    let mut aid_clause_count = 0usize;
     for name in present {
         let Some(shape) = option_value_shape(descriptor, name) else {
             if let Some(condition_clauses) = descriptor.condition_clauses
@@ -303,6 +348,18 @@ fn validate_candidate(
                         ));
                     }
                     (CicsApplicationConditionLabelOperand::Forbidden, None) => {}
+                }
+                continue;
+            }
+            if descriptor.label_tokens == ["HANDLE", "AID"] && is_aid_name(name) {
+                aid_clause_count += 1;
+                if clauses
+                    .get(*name)
+                    .is_some_and(|tokens| !is_single_condition_label(tokens))
+                {
+                    return Err(format!(
+                        "CICS HANDLE AID option {name} requires one label operand"
+                    ));
                 }
                 continue;
             }
@@ -345,11 +402,16 @@ fn validate_candidate(
             condition_clauses.maximum_occurrences,
         ));
     }
+    if descriptor.label_tokens == ["HANDLE", "AID"] && aid_clause_count > 16 {
+        return Err(format!(
+            "CICS HANDLE AID permits at most 16 AID clauses, found {aid_clause_count}"
+        ));
+    }
 
     if !descriptor
         .required_discriminator_options
         .iter()
-        .all(|name| present.contains(name))
+        .all(|name| option_is_present(descriptor, present, name))
     {
         return Err(format!(
             "CICS {} is missing a required command discriminator",
@@ -359,7 +421,7 @@ fn validate_candidate(
     if let Some(name) = descriptor
         .forbidden_discriminator_options
         .iter()
-        .find(|name| present.contains(**name))
+        .find(|name| option_is_present(descriptor, present, name))
     {
         return Err(format!(
             "CICS {} forbids discriminator {name}",
@@ -372,7 +434,7 @@ fn validate_candidate(
         && !descriptor
             .discriminator_options
             .iter()
-            .any(|name| present.contains(name))
+            .any(|name| option_is_present(descriptor, present, name))
     {
         return Err(format!(
             "CICS {} is missing a source-reviewed command discriminator",
@@ -397,10 +459,14 @@ fn validate_candidate(
         }
     }
 
+    if descriptor.runtime_operation == Some("Assign") {
+        assign_validation::validate(clauses, present, semantic)?;
+    }
+
     if let Some(name) = descriptor
         .required_options
         .iter()
-        .find(|name| !present.contains(**name))
+        .find(|name| !option_is_present(descriptor, present, name))
     {
         return Err(format!(
             "CICS {} requires option {name}",
@@ -411,7 +477,7 @@ fn validate_candidate(
         let count = alternative
             .members
             .iter()
-            .filter(|name| present.contains(**name))
+            .filter(|name| option_is_present(descriptor, present, name))
             .count();
         if alternative.required && count == 0 {
             return Err(format!(
@@ -422,11 +488,11 @@ fn validate_candidate(
         }
     }
     for dependency in descriptor.dependencies {
-        if present.contains(dependency.option)
+        if option_is_present(descriptor, present, dependency.option)
             && let Some(required) = dependency
                 .requires
                 .iter()
-                .find(|required| !present.contains(**required))
+                .find(|required| !option_is_present(descriptor, present, required))
         {
             return Err(format!(
                 "CICS {} option {} requires {required}",
@@ -438,7 +504,7 @@ fn validate_candidate(
     for group in descriptor.mutual_exclusion_groups {
         let selected = group
             .iter()
-            .filter(|name| present.contains(**name))
+            .filter(|name| option_is_present(descriptor, present, name))
             .copied()
             .collect::<Vec<_>>();
         if selected.len() > 1 {
@@ -478,12 +544,17 @@ fn validate_candidate(
 fn option_is_known(descriptor: &CicsApplicationRegistryDescriptor, name: &str) -> bool {
     option_value_shape(descriptor, name).is_some()
         || (descriptor.condition_clauses.is_some() && is_condition_name(name))
+        || (descriptor.label_tokens == ["HANDLE", "AID"] && is_aid_name(name))
 }
 
 fn is_condition_name(name: &str) -> bool {
     CICS_APPLICATION_CONDITION_NAMES
         .binary_search(&name)
         .is_ok()
+}
+
+fn is_aid_name(name: &str) -> bool {
+    CICS_APPLICATION_AID_NAMES.binary_search(&name).is_ok()
 }
 
 fn is_single_condition_label(tokens: &[String]) -> bool {
@@ -502,18 +573,78 @@ fn option_value_shape(
         .find(|option| option.name == name)
         .map(|option| option.value_shape)
         .or_else(|| {
-            is_typed_compatibility_option(descriptor, name)
-                .then_some(CicsApplicationOptionValueShape::Value)
+            compatibility_alias_target(descriptor, name).and_then(|canonical| {
+                descriptor
+                    .options
+                    .iter()
+                    .find(|option| option.name == canonical)
+                    .map(|option| option.value_shape)
+            })
         })
 }
 
-fn is_typed_compatibility_option(
+fn compatibility_alias_target(
     descriptor: &CicsApplicationRegistryDescriptor,
     name: &str,
+) -> Option<&'static str> {
+    // The pre-registry file provider accepts DATASET as FILE's spelling for
+    // every keyed and browse operation. Preserve that compiler ABI alias
+    // without widening the source-reviewed IBM option catalog.
+    (name == "DATASET"
+        && matches!(
+            descriptor.runtime_operation,
+            Some(
+                "Delete"
+                    | "EndBrowse"
+                    | "Read"
+                    | "ReadNext"
+                    | "ReadPrev"
+                    | "Rewrite"
+                    | "StartBrowse"
+                    | "Write"
+            )
+        ))
+    .then_some("FILE")
+}
+
+fn option_is_present(
+    descriptor: &CicsApplicationRegistryDescriptor,
+    present: &BTreeSet<&str>,
+    name: &str,
 ) -> bool {
-    // The shipped typed file plan already accepts DATASET as FILE's spelling.
-    // Keep that one compiler ABI alias without widening any catalog row.
-    name == "DATASET" && matches!(descriptor.label_tokens, ["READ"] | ["REWRITE"])
+    present.contains(name)
+        || present
+            .iter()
+            .any(|candidate| compatibility_alias_target(descriptor, candidate) == Some(name))
+}
+
+fn validate_legacy_execution_subset(
+    descriptor: &CicsApplicationRegistryDescriptor,
+    present: &BTreeSet<&str>,
+) -> Result<(), String> {
+    if descriptor.legacy_execution_options.is_empty() {
+        return Err(format!(
+            "CICS {} has no frozen legacy execution option subset",
+            command_label(descriptor)
+        ));
+    }
+    let unready = present
+        .iter()
+        .filter(|name| {
+            let canonical = compatibility_alias_target(descriptor, name).unwrap_or(name);
+            !descriptor.legacy_execution_options.contains(&canonical)
+                && !(descriptor.condition_clauses.is_some() && is_condition_name(name))
+        })
+        .copied()
+        .collect::<Vec<_>>();
+    if !unready.is_empty() {
+        return Err(format!(
+            "CICS {} is catalog-known but legacy execution is unready for {}",
+            command_label(descriptor),
+            unready.join(", ")
+        ));
+    }
+    Ok(())
 }
 
 fn command_label(descriptor: &CicsApplicationRegistryDescriptor) -> String {
@@ -594,4 +725,466 @@ fn matching_close(tokens: &[String], open: usize) -> Resolution<usize> {
     Err(ResolutionFailure::Invalid(
         "CICS clause parentheses are malformed".into(),
     ))
+}
+
+pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsStatement> {
+    let mut body = tokens;
+    if body
+        .first()
+        .is_some_and(|token| token.eq_ignore_ascii_case("CICS"))
+    {
+        body = &body[1..];
+    }
+    if body
+        .last()
+        .is_some_and(|token| token.eq_ignore_ascii_case("END-EXEC"))
+    {
+        body = &body[..body.len() - 1];
+    }
+    if validated_legacy_spi_compatibility(body)?.is_some() {
+        return Err(ResolutionFailure::Unsupported);
+    }
+    let (descriptor, clauses, raw_options) = validated_command(body, semantic)?;
+    match descriptor.readiness {
+        CicsApplicationHandlerReadiness::TypedRuntime => {}
+        CicsApplicationHandlerReadiness::LegacyCompatibility => {
+            return Err(ResolutionFailure::Unsupported);
+        }
+        CicsApplicationHandlerReadiness::Unready => {
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS application command {} is catalog-known but its handler is unready",
+                descriptor.label_tokens.join(" ")
+            )));
+        }
+    }
+    let operation = operation::resolve(descriptor)?;
+    let allowed_clauses: &[&str] = match operation {
+        HirCicsOperation::Abend => &["ABCODE", "RESP", "RESP2"],
+        HirCicsOperation::AddressSet => &["SET", "USING", "RESP", "RESP2"],
+        HirCicsOperation::Asktime => &["ABSTIME", "RESP", "RESP2"],
+        HirCicsOperation::AsktimeEib => &["RESP", "RESP2"],
+        HirCicsOperation::FormatTime => &[
+            "ABSTIME",
+            "DATESEP",
+            "MILLISECONDS",
+            "MMDDYY",
+            "MMDDYYYY",
+            "RESP",
+            "RESP2",
+            "TIME",
+            "TIMESEP",
+            "YYDDD",
+            "YYMMDD",
+            "YYYYMMDD",
+        ],
+        HirCicsOperation::ChangeTask => &["PRIORITY", "RESP", "RESP2"],
+        HirCicsOperation::Deq | HirCicsOperation::Enq => {
+            &["RESOURCE", "LENGTH", "MAXLIFETIME", "RESP", "RESP2"]
+        }
+        HirCicsOperation::HandleAbend => &["LABEL", "PROGRAM", "RESP", "RESP2"],
+        HirCicsOperation::HandleAid
+        | HirCicsOperation::HandleCondition
+        | HirCicsOperation::IgnoreCondition
+        | HirCicsOperation::PopHandle
+        | HirCicsOperation::PushHandle => &["RESP", "RESP2"],
+        HirCicsOperation::Link | HirCicsOperation::Xctl => {
+            &["PROGRAM", "COMMAREA", "RESP", "RESP2"]
+        }
+        HirCicsOperation::Return => &["TRANSID", "COMMAREA", "RESP", "RESP2"],
+        HirCicsOperation::StartBrowse => &["FILE", "DATASET", "RIDFLD", "RESP", "RESP2"],
+        HirCicsOperation::ReadNext | HirCicsOperation::ReadPrev => {
+            &["FILE", "DATASET", "INTO", "RIDFLD", "RESP", "RESP2"]
+        }
+        HirCicsOperation::EndBrowse => &["FILE", "DATASET", "RESP", "RESP2"],
+        HirCicsOperation::Delete => &["FILE", "DATASET", "RIDFLD", "RESP", "RESP2"],
+        HirCicsOperation::Write => &["FILE", "DATASET", "FROM", "RIDFLD", "RESP", "RESP2"],
+        HirCicsOperation::WriteTransientData => &["QUEUE", "FROM", "LENGTH", "RESP", "RESP2"],
+        HirCicsOperation::ReceiveMap => &["MAP", "MAPSET", "INTO", "RESP", "RESP2"],
+        HirCicsOperation::SendMap => &["MAP", "MAPSET", "FROM", "RESP", "RESP2"],
+        HirCicsOperation::SendText => &["FROM", "RESP", "RESP2"],
+        HirCicsOperation::Assign => &["RESP", "RESP2"],
+        HirCicsOperation::PurgeMessage => &["RESP", "RESP2"],
+        HirCicsOperation::Read => &["FILE", "DATASET", "RIDFLD", "INTO", "RESP", "RESP2"],
+        HirCicsOperation::Rewrite => &["FILE", "DATASET", "FROM", "RESP", "RESP2"],
+        HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA", "RESP", "RESP2"],
+        HirCicsOperation::Syncpoint => &["RESP", "RESP2"],
+        HirCicsOperation::Suspend => &["RESP", "RESP2"],
+    };
+    let allowed_options: &[&str] = match operation {
+        HirCicsOperation::Abend => &["CANCEL", "NODUMP", "NOHANDLE"],
+        HirCicsOperation::HandleAbend => &["CANCEL", "RESET", "NOHANDLE"],
+        HirCicsOperation::AddressSet
+        | HirCicsOperation::Asktime
+        | HirCicsOperation::AsktimeEib
+        | HirCicsOperation::FormatTime
+        | HirCicsOperation::ChangeTask
+        | HirCicsOperation::HandleAid
+        | HirCicsOperation::HandleCondition
+        | HirCicsOperation::IgnoreCondition
+        | HirCicsOperation::Link
+        | HirCicsOperation::Xctl
+        | HirCicsOperation::Return
+        | HirCicsOperation::StartBrowse
+        | HirCicsOperation::ReadNext
+        | HirCicsOperation::ReadPrev
+        | HirCicsOperation::EndBrowse
+        | HirCicsOperation::Delete
+        | HirCicsOperation::Write
+        | HirCicsOperation::WriteTransientData
+        | HirCicsOperation::ReceiveMap
+        | HirCicsOperation::SendMap
+        | HirCicsOperation::SendText
+        | HirCicsOperation::Assign
+        | HirCicsOperation::PurgeMessage
+        | HirCicsOperation::PopHandle
+        | HirCicsOperation::PushHandle
+        | HirCicsOperation::SetAssociationUserCorrData
+        | HirCicsOperation::Suspend => &["NOHANDLE"],
+        HirCicsOperation::Deq => &["UOW", "TASK", "NOHANDLE"],
+        HirCicsOperation::Enq => &["UOW", "TASK", "NOSUSPEND", "NOHANDLE"],
+        HirCicsOperation::Read => &["UPDATE", "NOHANDLE"],
+        HirCicsOperation::Rewrite => &["NOHANDLE"],
+        HirCicsOperation::Syncpoint => &["ROLLBACK", "NOHANDLE"],
+    };
+    let unready_clauses = clauses
+        .keys()
+        .filter(|name| {
+            !allowed_clauses.contains(&name.as_str())
+                && !(operation == HirCicsOperation::Assign
+                    && mainframe_env_ir::CicsAssignOutput::from_name(name).is_some())
+                && !(operation == HirCicsOperation::HandleCondition && is_condition_name(name))
+                && !(operation == HirCicsOperation::HandleAid && is_aid_name(name))
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    let unready_options = raw_options
+        .iter()
+        .filter(|name| {
+            !allowed_options.contains(&name.as_str())
+                && !(matches!(
+                    operation,
+                    HirCicsOperation::HandleCondition | HirCicsOperation::IgnoreCondition
+                ) && is_condition_name(name))
+                && !(operation == HirCicsOperation::HandleAid && is_aid_name(name))
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    if !unready_clauses.is_empty() || !unready_options.is_empty() {
+        let names = unready_clauses
+            .into_iter()
+            .chain(unready_options)
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(ResolutionFailure::Invalid(format!(
+            "CICS {} is catalog-known but typed lowering is unready for {names}",
+            descriptor.label_tokens.join(" ")
+        )));
+    }
+    program_control::validate_constraints(operation, &clauses)?;
+    file_operands::validate_constraints(&clauses, operation)?;
+    queue_control::validate_constraints(&clauses, operation)?;
+    terminal_control::validate_constraints(&clauses, operation)?;
+    for required in match operation {
+        HirCicsOperation::AddressSet => &["SET", "USING"][..],
+        HirCicsOperation::Asktime => &["ABSTIME"][..],
+        HirCicsOperation::FormatTime => &["ABSTIME"][..],
+        HirCicsOperation::Abend
+        | HirCicsOperation::AsktimeEib
+        | HirCicsOperation::ChangeTask
+        | HirCicsOperation::HandleAid
+        | HirCicsOperation::HandleAbend
+        | HirCicsOperation::HandleCondition
+        | HirCicsOperation::IgnoreCondition
+        | HirCicsOperation::PopHandle
+        | HirCicsOperation::PushHandle
+        | HirCicsOperation::Return
+        | HirCicsOperation::StartBrowse
+        | HirCicsOperation::ReadNext
+        | HirCicsOperation::ReadPrev
+        | HirCicsOperation::EndBrowse
+        | HirCicsOperation::Delete
+        | HirCicsOperation::Write
+        | HirCicsOperation::Read
+        | HirCicsOperation::Rewrite
+        | HirCicsOperation::WriteTransientData
+        | HirCicsOperation::ReceiveMap
+        | HirCicsOperation::SendMap
+        | HirCicsOperation::SendText
+        | HirCicsOperation::Assign
+        | HirCicsOperation::PurgeMessage
+        | HirCicsOperation::Suspend => &[][..],
+        HirCicsOperation::Deq | HirCicsOperation::Enq => &["RESOURCE"][..],
+        HirCicsOperation::Link | HirCicsOperation::Xctl => &["PROGRAM"][..],
+        HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA"][..],
+        HirCicsOperation::Syncpoint => &[][..],
+    } {
+        if !clauses.contains_key(*required) {
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS {operation:?} requires {required}"
+            )));
+        }
+    }
+    let mut operands = Vec::new();
+    if operation == HirCicsOperation::Abend
+        && let Some(operand) = abend::operand(&clauses, semantic)?
+    {
+        operands.push(operand);
+    }
+    if operation == HirCicsOperation::HandleAbend {
+        operands.extend(handle_abend::operands(&clauses, &raw_options, semantic)?);
+    }
+    operands.extend(program_control::operands(operation, &clauses, semantic)?);
+    if operation == HirCicsOperation::AddressSet {
+        let (set_is_address, set) = cics_address_value(&clauses["SET"], semantic)?;
+        let (using_is_address, using) = cics_address_value(&clauses["USING"], semantic)?;
+        if set_is_address == using_is_address {
+            return Err(ResolutionFailure::Invalid(
+                "CICS ADDRESS SET requires one pointer reference and one ADDRESS OF data area"
+                    .into(),
+            ));
+        }
+        require_writable(&set)?;
+        let pointer = if set_is_address { &using } else { &set };
+        if !matches!(pointer.usage, CobolUsage::Pointer | CobolUsage::Pointer32) {
+            return Err(ResolutionFailure::Invalid(
+                "CICS ADDRESS SET pointer operand must use POINTER or POINTER-32".into(),
+            ));
+        }
+        operands.extend([
+            HirCicsNamedOperand {
+                name: if set_is_address {
+                    HirCicsOperandName::SetAddress
+                } else {
+                    HirCicsOperandName::SetPointer
+                },
+                value: HirCicsValue::Data(set),
+            },
+            HirCicsNamedOperand {
+                name: if using_is_address {
+                    HirCicsOperandName::UsingAddress
+                } else {
+                    HirCicsOperandName::UsingPointer
+                },
+                value: HirCicsValue::Data(using),
+            },
+        ]);
+    }
+    if operation == HirCicsOperation::HandleAid {
+        let mut handlers = clauses
+            .iter()
+            .filter(|(name, _)| is_aid_name(name))
+            .map(|(name, value)| (name.clone(), value[0].clone()))
+            .collect::<BTreeMap<_, _>>();
+        handlers.extend(
+            raw_options
+                .iter()
+                .filter(|name| is_aid_name(name))
+                .map(|name| (name.clone(), String::new())),
+        );
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::Aids,
+            value: HirCicsValue::Literal(
+                handlers
+                    .iter()
+                    .map(|(name, label)| format!("{name}\t{label}"))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ),
+        });
+    } else if operation == HirCicsOperation::HandleCondition {
+        let mut handlers = clauses
+            .iter()
+            .filter(|(name, _)| is_condition_name(name))
+            .map(|(name, value)| (name.clone(), value[0].clone()))
+            .collect::<BTreeMap<_, _>>();
+        handlers.extend(
+            raw_options
+                .iter()
+                .filter(|name| is_condition_name(name))
+                .map(|name| (name.clone(), String::new())),
+        );
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::Conditions,
+            value: HirCicsValue::Literal(
+                handlers
+                    .iter()
+                    .map(|(name, label)| format!("{name}\t{label}"))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ),
+        });
+    } else if operation == HirCicsOperation::IgnoreCondition {
+        let names = raw_options
+            .iter()
+            .filter(|name| is_condition_name(name))
+            .cloned()
+            .collect::<Vec<_>>();
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::Conditions,
+            value: HirCicsValue::Literal(names.join("\n")),
+        });
+    }
+    operands.extend(file_operands::resolve(&clauses, operation, semantic)?);
+    operands.extend(queue_control::operands(&clauses, operation, semantic)?);
+    operands.extend(terminal_control::operands(&clauses, operation, semantic)?);
+    if matches!(operation, HirCicsOperation::Deq | HirCicsOperation::Enq) {
+        let resource = complete_data_reference(&clauses["RESOURCE"], semantic)?;
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::Resource,
+            value: HirCicsValue::Data(resource),
+        });
+        if let Some(value) = clauses.get("LENGTH") {
+            operands.push(HirCicsNamedOperand {
+                name: HirCicsOperandName::Length,
+                value: cics_integer_value(value, semantic)?,
+            });
+        }
+        if let Some(value) = clauses.get("MAXLIFETIME") {
+            operands.push(HirCicsNamedOperand {
+                name: HirCicsOperandName::MaxLifetime,
+                value: cics_cvda_value(value, semantic)?,
+            });
+        }
+    }
+    if operation == HirCicsOperation::ChangeTask
+        && let Some(value) = clauses.get("PRIORITY")
+    {
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::Priority,
+            value: cics_integer_value(value, semantic)?,
+        });
+    }
+    if operation == HirCicsOperation::SetAssociationUserCorrData {
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::UserCorrData,
+            value: cics_value(&clauses["USERCORRDATA"], semantic)?,
+        });
+    }
+    if operation == HirCicsOperation::FormatTime {
+        operands.extend(format_time::operands(&clauses, semantic)?);
+    }
+    let outputs = output_bindings::resolve(&clauses, operation, semantic)?;
+    let mut options = raw_options
+        .iter()
+        .filter(|option| {
+            !(matches!(
+                operation,
+                HirCicsOperation::HandleCondition | HirCicsOperation::IgnoreCondition
+            ) && is_condition_name(option))
+                && !(operation == HirCicsOperation::HandleAid && is_aid_name(option))
+        })
+        .map(|option| match option.as_str() {
+            "CANCEL" => HirCicsOption::Cancel,
+            "NODUMP" => HirCicsOption::NoDump,
+            "RESET" => HirCicsOption::Reset,
+            "UPDATE" => HirCicsOption::Update,
+            "ROLLBACK" => HirCicsOption::Rollback,
+            "NOHANDLE" => HirCicsOption::NoHandle,
+            "TASK" => HirCicsOption::Task,
+            "UOW" => HirCicsOption::Uow,
+            "NOSUSPEND" => HirCicsOption::NoSuspend,
+            _ => unreachable!("allowed CICS option"),
+        })
+        .collect::<BTreeSet<_>>();
+    let response = output(&outputs, HirCicsOutputName::Resp).cloned();
+    let response2 = output(&outputs, HirCicsOutputName::Resp2).cloned();
+    if response.is_none() && response2.is_some() {
+        return Err(ResolutionFailure::Invalid(
+            "CICS RESP2 requires RESP".into(),
+        ));
+    }
+    let no_handle = options.contains(&HirCicsOption::NoHandle);
+    let condition_policy = if let Some(response) = response {
+        // RESP implies NOHANDLE while retaining the response-area update.
+        options.remove(&HirCicsOption::NoHandle);
+        HirCicsConditionPolicy::Respond {
+            response,
+            response2,
+        }
+    } else if no_handle {
+        HirCicsConditionPolicy::NoHandle
+    } else {
+        HirCicsConditionPolicy::Default
+    };
+    Ok(HirCicsStatement {
+        operation,
+        operands,
+        options,
+        outputs,
+        condition_policy,
+    })
+}
+
+fn cics_value(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsValue> {
+    if let [value] = tokens
+        && value.len() >= 2
+        && value.starts_with(['\'', '"'])
+        && value.as_bytes().first() == value.as_bytes().last()
+    {
+        return Ok(HirCicsValue::Literal(value[1..value.len() - 1].into()));
+    }
+    if matches!(tokens, [value] if numeric_literal(value).is_some()) {
+        return Err(ResolutionFailure::Unsupported);
+    }
+    complete_data_reference(tokens, semantic).map(HirCicsValue::Data)
+}
+
+fn cics_address_value(
+    tokens: &[String],
+    semantic: &SemanticModel,
+) -> Resolution<(bool, HirDataReference)> {
+    if tokens.len() > 2
+        && tokens[0].eq_ignore_ascii_case("ADDRESS")
+        && tokens[1].eq_ignore_ascii_case("OF")
+    {
+        complete_data_reference(&tokens[2..], semantic).map(|reference| (true, reference))
+    } else {
+        complete_data_reference(tokens, semantic).map(|reference| (false, reference))
+    }
+}
+
+fn cics_integer_value(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsValue> {
+    if let [value] = tokens
+        && let Ok(value) = value.parse::<i64>()
+    {
+        return Ok(HirCicsValue::Integer(value));
+    }
+    let reference = complete_data_reference(tokens, semantic)?;
+    require_numeric(&reference)?;
+    Ok(HirCicsValue::Data(reference))
+}
+
+fn cics_cvda_value(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsValue> {
+    if let [function, open, value, close] = tokens
+        && function.eq_ignore_ascii_case("DFHVALUE")
+        && open == "("
+        && close == ")"
+        && matches!(value.as_str(), "TASK" | "UOW" | "LUW")
+    {
+        return Ok(HirCicsValue::Integer(match value.as_str() {
+            "TASK" => 233,
+            "UOW" | "LUW" => 246,
+            _ => unreachable!(),
+        }));
+    }
+    cics_integer_value(tokens, semantic)
+}
+
+fn complete_data_reference(
+    tokens: &[String],
+    semantic: &SemanticModel,
+) -> Resolution<HirDataReference> {
+    let (reference, end) = data_reference_at(tokens, 0, semantic)?;
+    if end == tokens.len() {
+        Ok(reference)
+    } else {
+        Err(ResolutionFailure::Unsupported)
+    }
+}
+
+fn output(outputs: &[HirCicsOutputBinding], name: HirCicsOutputName) -> Option<&HirDataReference> {
+    outputs
+        .iter()
+        .find(|output| output.name == name)
+        .map(|output| &output.target)
 }

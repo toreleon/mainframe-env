@@ -34,7 +34,19 @@ pub(in crate::service) fn invoke(
         AccessIntent::Update,
     )?;
     let mut state = service.lock()?;
-    let value = argument_bytes(request, "FROM").unwrap_or_default();
+    let mut value = argument_bytes(request, "FROM").ok_or(HostProblem::Malformed)?;
+    if let Some(length) = argument_bytes(request, "LENGTH") {
+        let length = std::str::from_utf8(&length)
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .filter(|length| *length <= value.len())
+            .ok_or_else(|| HostProblem::Condition {
+                name: "LENGERR".into(),
+                response: 22,
+                response2: 0,
+            })?;
+        value.truncate(length);
+    }
     let mutation = request
         .mutation
         .as_ref()
