@@ -109,6 +109,23 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Removed one cause of `CREASTMT` (STEP040, `CBSTM03A`) slowing down over its
+  run; the step still doesn't finish within the `carddemo-operator-submit`
+  gate. `MemoryStore`'s per-effect journal methods (`admit_execution`,
+  `commit_execution_step`, and `mutate_provider_states_atomic`, which backs
+  `put_provider_states_atomic`, in
+  `crates/stores/mainframe-env-store/src/memory.rs`) staged every write by
+  cloning the whole `State`, a cost proportional to store size. `c77006a` (#55)
+  made the installed-program child `CALL` path durable instead of going
+  through `ExecutionCoordinator::with_host`, so each nested `CALL 'CBSTM03B'`
+  journals its own execution and made about 9 of these clones instead of
+  about 2. These methods now mutate the locked `State` in place under an undo
+  log (`memory/journal.rs`) that records the prior value of only the entries a
+  call touches and restores them, in reverse order, on any `Err`; the six
+  cold-path clones (retention, archive, reconcile) are unchanged. Sequential
+  `TRNXFILE` calls now stay flat at about 108 ms each, but a nested `CALL`
+  still costs about 100 ms, and calls grow again once the keyed customer and
+  account lookups start. `toreleon/mainframe-env#185` stays open.
 - Fixed the CardDemo card-list selection (`COCRDLIC`, menu COMEN01 option 3)
   ignoring a row picked with `S`/`U`: choosing a card redisplayed the list
   (mapset `COCRDLI`) with `ERRMSG` `INVALID ACTION CODE` instead of `XCTL`ing

@@ -27,6 +27,8 @@ use mainframe_env_store_api::{
 use std::collections::BTreeMap;
 use std::sync::{Mutex, MutexGuard};
 
+mod journal;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct StoreLimits {
     pub max_executions: usize,
@@ -99,6 +101,11 @@ struct State {
 pub struct MemoryStore {
     limits: StoreLimits,
     state: Mutex<State>,
+    /// Counts calls to [`Self::snapshot`], the only route to a whole-state
+    /// clone in this file (see `memory/journal.rs`). Per-store so parallel
+    /// tests never see each other's clones.
+    #[cfg(test)]
+    clone_count: std::sync::atomic::AtomicUsize,
 }
 
 impl MemoryStore {
@@ -107,11 +114,30 @@ impl MemoryStore {
         Self {
             limits,
             state: Mutex::new(State::default()),
+            #[cfg(test)]
+            clone_count: std::sync::atomic::AtomicUsize::new(0),
         }
     }
 
     fn lock(&self) -> Result<MutexGuard<'_, State>, StoreError> {
         self.state.lock().map_err(|_| StoreError::Poisoned)
+    }
+
+    /// The only whole-state clone left in this file. The six retention,
+    /// archive and reconcile paths below still stage this way (out of
+    /// scope for #185); `admit_execution`, `commit_execution_step` and
+    /// `mutate_provider_states_atomic` no longer call it, and route their
+    /// hot-path mutations through `memory/journal.rs` instead.
+    fn snapshot(&self, state: &State) -> State {
+        #[cfg(test)]
+        self.clone_count
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        state.clone()
+    }
+
+    #[cfg(test)]
+    fn clone_count(&self) -> usize {
+        self.clone_count.load(std::sync::atomic::Ordering::Relaxed)
     }
 
     fn reserve_blob(
@@ -926,7 +952,7 @@ impl IdempotencyStore for MemoryStore {
         result_digest: [u8; 32],
     ) -> Result<EffectRecord, StoreError> {
         let mut state = self.lock()?;
-        let mut staged = state.clone();
+        let mut staged = self.snapshot(&state);
         let record = staged.effects.get_mut(key).ok_or(StoreError::NotFound)?;
         validation::stale_reconciliation(
             key,
@@ -1021,133 +1047,6 @@ impl OutboxStore for MemoryStore {
         Self::validate_encoded_size(encode_outbox(record)?, self.limits)?;
         let updated = record.clone();
         Self::bump_retention_epoch(&mut state)?;
-        Ok(updated)
-    }
-}
-
-impl JournalStore for MemoryStore {
-    fn admit_execution(
-        &self,
-        execution: ExecutionRecord,
-        event: LifecycleEvent,
-        notification: OutboxRecord,
-    ) -> Result<(), StoreError> {
-        validation::admission(&execution, &event, &notification)?;
-        Self::validate_encoded_size(encode_execution(&execution)?, self.limits)?;
-        let mut state = self.lock()?;
-        let mut staged = state.clone();
-        if staged.executions.contains_key(&execution.execution_id) {
-            return Err(StoreError::AlreadyExists);
-        }
-        if staged.executions.len() >= self.limits.max_executions {
-            return Err(StoreError::CapacityExceeded);
-        }
-        staged
-            .executions
-            .insert(execution.execution_id.clone(), execution);
-        Self::append_event_locked(&mut staged, event, self.limits)?;
-        Self::append_outbox_locked(&mut staged, notification, self.limits)?;
-        Self::bump_retention_epoch(&mut staged)?;
-        *state = staged;
-        Ok(())
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn commit_execution_step(
-        &self,
-        execution_id: &ExecutionId,
-        expected_version: u64,
-        next_state: Option<ExecutionState>,
-        event: LifecycleEvent,
-        effect: Option<EffectRecord>,
-        audit: Option<AuditRecord>,
-        checkpoint: Option<CheckpointRecord>,
-        notification: OutboxRecord,
-    ) -> Result<ExecutionRecord, StoreError> {
-        let mut state = self.lock()?;
-        let mut staged = state.clone();
-        let current = staged
-            .executions
-            .get(execution_id)
-            .cloned()
-            .ok_or(StoreError::NotFound)?;
-        validation::execution_step(execution_id, &current, &event, &notification)?;
-        if current.version != expected_version {
-            return Err(StoreError::Conflict);
-        }
-        if next_state.is_some_and(|next| !current.state.can_transition_to(next)) {
-            return Err(StoreError::InvalidTransition);
-        }
-        validation::audit_event(&current, &event, effect.as_ref(), audit.as_ref())?;
-        let mut updated = current.clone();
-        if let Some(next) = next_state {
-            updated.state = next;
-            updated.terminal_tick = next
-                .terminal()
-                .then_some(event.tick)
-                .filter(|tick| *tick != 0);
-        }
-        updated.version = updated.version.checked_add(1).ok_or(StoreError::Conflict)?;
-        Self::validate_encoded_size(encode_execution(&updated)?, self.limits)?;
-        staged
-            .executions
-            .insert(execution_id.clone(), updated.clone());
-        if let Some(mut effect) = effect {
-            if matches!(effect.state, EffectState::Completed | EffectState::Failed)
-                && effect.digest_format
-                    == mainframe_env_store_api::EffectDigestFormat::CanonicalHostV1
-                && effect.resolved_tick.is_none()
-                && event.tick != 0
-            {
-                effect.resolved_tick = Some(event.tick);
-            }
-            validation::effect(&effect)?;
-            Self::validate_encoded_size(encode_effect(&effect)?, self.limits)?;
-            validation::effect_execution(&current, &effect)?;
-            match effect.state {
-                EffectState::Intent => {
-                    validation::new_intent(&effect)?;
-                    validation::effect_event(&event, &effect)?;
-                    if staged.effects.contains_key(&effect.key) {
-                        return Err(StoreError::Conflict);
-                    }
-                    if staged.effects.len() >= self.limits.max_effects {
-                        return Err(StoreError::CapacityExceeded);
-                    }
-                    staged.effects.insert(effect.key.clone(), effect);
-                }
-                EffectState::Completed | EffectState::Failed | EffectState::UnknownOutcome => {
-                    let intent = staged
-                        .effects
-                        .get(&effect.key)
-                        .ok_or(StoreError::NotFound)?;
-                    validation::result(&effect.key, intent, &effect)?;
-                    validation::effect_event(&event, &effect)?;
-                    staged.effects.insert(effect.key.clone(), effect);
-                }
-            }
-        }
-        if let Some(audit) = audit {
-            Self::append_audit_locked(&mut staged, audit, self.limits)?;
-        }
-        if let Some(checkpoint) = checkpoint {
-            validation::checkpoint(&checkpoint)?;
-            Self::validate_encoded_size(encode_checkpoint(&checkpoint)?, self.limits)?;
-            validation::checkpoint_execution(&current, &checkpoint)?;
-            let old = staged
-                .checkpoints
-                .get(execution_id)
-                .map_or(0, |record| record.payload.len());
-            if old == 0 && staged.checkpoints.len() >= self.limits.max_checkpoints {
-                return Err(StoreError::CapacityExceeded);
-            }
-            Self::reserve_blob(&mut staged, old, checkpoint.payload.len(), self.limits)?;
-            staged.checkpoints.insert(execution_id.clone(), checkpoint);
-        }
-        Self::append_event_locked(&mut staged, event, self.limits)?;
-        Self::append_outbox_locked(&mut staged, notification, self.limits)?;
-        Self::bump_retention_epoch(&mut staged)?;
-        *state = staged;
         Ok(updated)
     }
 }
@@ -1321,84 +1220,93 @@ impl ProviderStateStore for MemoryStore {
             return Err(StoreError::InvalidTransition);
         }
         let mut state = self.lock()?;
-        let mut staged = state.clone();
+        let limits = self.limits;
         let staging_limits = StoreLimits {
             max_provider_state: usize::MAX,
             max_total_blob_bytes: usize::MAX,
-            ..self.limits
+            ..limits
         };
-        for mutation in mutations {
-            match mutation {
-                ProviderStateMutation::Put(write) => Self::put_provider_state_locked(
-                    &mut staged,
-                    write.record,
-                    write.expected_version,
-                    staging_limits,
-                )?,
-                ProviderStateMutation::Delete {
-                    namespace,
-                    key,
-                    expected_version,
-                } => {
-                    if namespace.is_empty() || key.is_empty() || expected_version == 0 {
-                        return Err(StoreError::Conflict);
+        journal::journaled(&mut state, |state, journal| {
+            for mutation in mutations {
+                match mutation {
+                    ProviderStateMutation::Put(write) => {
+                        let key = (write.record.namespace.clone(), write.record.key.clone());
+                        journal.touch_provider_state(state, &key);
+                        journal.touch_blob_bytes(state);
+                        journal.touch_provider_epoch(state);
+                        Self::put_provider_state_locked(
+                            state,
+                            write.record,
+                            write.expected_version,
+                            staging_limits,
+                        )?;
                     }
-                    let map_key = (namespace, key);
-                    let current = staged
-                        .provider_state
-                        .get(&map_key)
-                        .ok_or(StoreError::NotFound)?;
-                    if current.version != expected_version {
-                        return Err(StoreError::Conflict);
+                    ProviderStateMutation::Delete {
+                        namespace,
+                        key,
+                        expected_version,
+                    } => {
+                        if namespace.is_empty() || key.is_empty() || expected_version == 0 {
+                            return Err(StoreError::Conflict);
+                        }
+                        let map_key = (namespace, key);
+                        let current = state
+                            .provider_state
+                            .get(&map_key)
+                            .ok_or(StoreError::NotFound)?;
+                        if current.version != expected_version {
+                            return Err(StoreError::Conflict);
+                        }
+                        let bytes = current.payload.len();
+                        journal.touch_provider_state(state, &map_key);
+                        journal.touch_blob_bytes(state);
+                        journal.touch_provider_epoch(state);
+                        state.provider_state.remove(&map_key);
+                        state.blob_bytes = state.blob_bytes.saturating_sub(bytes);
+                        state.provider_epoch = state
+                            .provider_epoch
+                            .checked_add(1)
+                            .ok_or(StoreError::CapacityExceeded)?;
                     }
-                    let bytes = current.payload.len();
-                    staged.provider_state.remove(&map_key);
-                    staged.blob_bytes = staged.blob_bytes.saturating_sub(bytes);
-                    staged.provider_epoch = staged
-                        .provider_epoch
-                        .checked_add(1)
-                        .ok_or(StoreError::CapacityExceeded)?;
-                }
-                ProviderStateMutation::Move {
-                    record,
-                    old_key,
-                    expected_version,
-                } => {
-                    record.validate_move(&old_key, expected_version, self.limits.max_blob_bytes)?;
-                    let old_map_key = (record.namespace.clone(), old_key);
-                    let new_map_key = (record.namespace.clone(), record.key.clone());
-                    let old = staged
-                        .provider_state
-                        .get(&old_map_key)
-                        .ok_or(StoreError::Conflict)?;
-                    if old.version != expected_version
-                        || staged.provider_state.contains_key(&new_map_key)
-                    {
-                        return Err(StoreError::Conflict);
+                    ProviderStateMutation::Move {
+                        record,
+                        old_key,
+                        expected_version,
+                    } => {
+                        record.validate_move(&old_key, expected_version, limits.max_blob_bytes)?;
+                        let old_map_key = (record.namespace.clone(), old_key);
+                        let new_map_key = (record.namespace.clone(), record.key.clone());
+                        let old = state
+                            .provider_state
+                            .get(&old_map_key)
+                            .ok_or(StoreError::Conflict)?;
+                        if old.version != expected_version
+                            || state.provider_state.contains_key(&new_map_key)
+                        {
+                            return Err(StoreError::Conflict);
+                        }
+                        let old_bytes = old.payload.len();
+                        journal.touch_provider_state(state, &old_map_key);
+                        journal.touch_provider_state(state, &new_map_key);
+                        journal.touch_blob_bytes(state);
+                        Self::reserve_blob(state, old_bytes, record.payload.len(), staging_limits)?;
+                        journal.touch_provider_epoch(state);
+                        state.provider_state.remove(&old_map_key);
+                        state.provider_state.insert(new_map_key, record);
+                        state.provider_epoch = state
+                            .provider_epoch
+                            .checked_add(1)
+                            .ok_or(StoreError::CapacityExceeded)?;
                     }
-                    let old_bytes = old.payload.len();
-                    Self::reserve_blob(
-                        &mut staged,
-                        old_bytes,
-                        record.payload.len(),
-                        staging_limits,
-                    )?;
-                    staged.provider_state.remove(&old_map_key);
-                    staged.provider_state.insert(new_map_key, record);
-                    staged.provider_epoch = staged
-                        .provider_epoch
-                        .checked_add(1)
-                        .ok_or(StoreError::CapacityExceeded)?;
                 }
             }
-        }
-        if staged.provider_state.len() > self.limits.max_provider_state
-            || staged.blob_bytes > self.limits.max_total_blob_bytes
-        {
-            return Err(StoreError::CapacityExceeded);
-        }
-        *state = staged;
-        Ok(())
+            if state.provider_state.len() > limits.max_provider_state
+                || state.blob_bytes > limits.max_total_blob_bytes
+            {
+                return Err(StoreError::CapacityExceeded);
+            }
+            Ok(())
+        })
     }
 
     fn archive_provider_state_replacement(
@@ -1445,7 +1353,7 @@ impl ProviderStateStore for MemoryStore {
                 })
                 .collect(),
         )?;
-        let mut staged = state.clone();
+        let mut staged = self.snapshot(&state);
         Self::put_provider_state_locked(
             &mut staged,
             request.replacement.record,
@@ -1582,7 +1490,7 @@ impl ProviderStateStore for MemoryStore {
                 })
                 .collect(),
         )?;
-        let mut staged = state.clone();
+        let mut staged = self.snapshot(&state);
         for row in &archive.rows {
             remove_memory_row(&mut staged, row)?;
             remove_memory_observation(&mut staged, request.target, row)?;
@@ -2066,7 +1974,7 @@ impl RetentionStore for MemoryStore {
                 watermark,
                 rows.iter().take(batch).cloned().collect(),
             )?;
-            let mut staged = state.clone();
+            let mut staged = self.snapshot(&state);
             for row in &archive.rows {
                 remove_memory_row(&mut staged, row)?;
                 remove_memory_observation(&mut staged, request.target, row)?;
@@ -2144,7 +2052,7 @@ impl RetentionStore for MemoryStore {
                 watermark,
                 rows.iter().take(batch).cloned().collect(),
             )?;
-            let mut staged = state.clone();
+            let mut staged = self.snapshot(&state);
             for row in &archive.rows {
                 remove_memory_row(&mut staged, row)?;
                 remove_memory_observation(&mut staged, request.target, row)?;
@@ -2236,7 +2144,7 @@ impl RetentionStore for MemoryStore {
             };
         }
         let mut state = self.lock()?;
-        let mut staged = state.clone();
+        let mut staged = self.snapshot(&state);
         let mut selected_rows = 0usize;
         let mut keys = Vec::new();
         let mut eligible = staged
@@ -3763,6 +3671,89 @@ mod tests {
         }
     }
 
+    fn lifecycle_event(ids: &Ids, sequence: u64, kind: LifecycleEventKind) -> LifecycleEvent {
+        LifecycleEvent {
+            execution_id: ids.execution.clone(),
+            run_unit_id: ids.run.clone(),
+            sequence,
+            attempt: 1,
+            tick: sequence,
+            kind,
+        }
+    }
+
+    fn outbox_record(ids: &Ids, label: &str, sequence: u64) -> OutboxRecord {
+        OutboxRecord {
+            notification_id: format!("{label}-{sequence}"),
+            execution_id: ids.execution.clone(),
+            sequence,
+            topic: "execution.lifecycle".into(),
+            payload: vec![1],
+            attempt: 0,
+            delivered: false,
+            delivered_tick: None,
+            version: 1,
+        }
+    }
+
+    fn capability() -> mainframe_env_execution_api::CapabilityId {
+        mainframe_env_execution_api::CapabilityId::new(
+            "host.state.write",
+            InvocationLimits::default(),
+        )
+        .unwrap()
+    }
+
+    fn audit_resource() -> mainframe_env_execution_api::AuditResourceDigest {
+        mainframe_env_execution_api::AuditResourceDigest {
+            format: mainframe_env_execution_api::AuditResourceDigestFormat::CanonicalHostResourceV1,
+            value: [9; 32],
+        }
+    }
+
+    /// `event_sequence` must be the `EffectIntent` event's own sequence:
+    /// `effect_event` (validation.rs) matches the intent's epoch and created
+    /// tick against the event, and `lifecycle_event` sets `tick == sequence`.
+    fn intent_effect(ids: &Ids, event_sequence: u64) -> EffectRecord {
+        EffectRecord {
+            execution_id: ids.execution.clone(),
+            run_unit_id: ids.run.clone(),
+            sequence: 1,
+            key: ids.idem.clone(),
+            digest_format: mainframe_env_store_api::EffectDigestFormat::CanonicalHostV1,
+            request_digest: [1; 32],
+            intent: mainframe_env_store_api::EffectIntentMetadata {
+                owner: ids.execution.clone(),
+                attempt: 1,
+                capability: Some(capability()),
+                audit_resource: Some(audit_resource()),
+                audit_invocation_key: Some(ids.idem.clone()),
+                created_tick: event_sequence,
+                recovery_after_tick: event_sequence,
+                epoch: event_sequence,
+                recovery_lease: None,
+            },
+            state: EffectState::Intent,
+            result_digest: None,
+            resolved_tick: None,
+        }
+    }
+
+    fn audit_for(ids: &Ids, effect_sequence: u64, tick: u64) -> AuditRecord {
+        AuditRecord {
+            execution_id: ids.execution.clone(),
+            run_unit_id: ids.run.clone(),
+            attempt: 1,
+            effect_sequence,
+            observed_tick: tick,
+            principal: ids.principal.clone(),
+            invocation_key: ids.idem.clone(),
+            capability: capability(),
+            resource: audit_resource(),
+            decision: mainframe_env_execution_api::AuditDecision::Success,
+        }
+    }
+
     #[test]
     fn execution_transition_is_optimistic_and_monotonic() {
         let store = MemoryStore::new(StoreLimits::default());
@@ -4254,5 +4245,504 @@ mod tests {
             Err(StoreError::CapacityExceeded)
         );
         assert_eq!(store.get_execution(&ids.execution).unwrap(), None);
+    }
+
+    #[test]
+    /// #185: `admit_execution`, `commit_execution_step` and
+    /// `put_provider_states_atomic` must make zero whole-state clones.
+    fn hot_path_makes_no_whole_state_clones() {
+        let store = MemoryStore::new(StoreLimits::default());
+        let ids = ids();
+        store
+            .admit_execution(
+                execution(&ids),
+                lifecycle_event(&ids, 1, LifecycleEventKind::Admitted),
+                outbox_record(&ids, "clone-counter", 1),
+            )
+            .unwrap();
+        let intent = intent_effect(&ids, 2);
+        store
+            .commit_execution_step(
+                &ids.execution,
+                1,
+                None,
+                lifecycle_event(&ids, 2, LifecycleEventKind::EffectIntent { sequence: 1 }),
+                Some(intent.clone()),
+                None,
+                None,
+                outbox_record(&ids, "clone-counter", 2),
+            )
+            .unwrap();
+        let completed = EffectRecord {
+            state: EffectState::Completed,
+            result_digest: Some([3; 32]),
+            resolved_tick: Some(3),
+            ..intent
+        };
+        store
+            .commit_execution_step(
+                &ids.execution,
+                2,
+                None,
+                lifecycle_event(&ids, 3, LifecycleEventKind::EffectResult { sequence: 1 }),
+                Some(completed),
+                Some(audit_for(&ids, 1, 3)),
+                None,
+                outbox_record(&ids, "clone-counter", 3),
+            )
+            .unwrap();
+        store
+            .put_provider_states_atomic(vec![ProviderStateWrite {
+                record: ProviderStateRecord {
+                    namespace: "clone-counter".into(),
+                    key: "k".into(),
+                    version: 1,
+                    payload: vec![1],
+                },
+                expected_version: None,
+            }])
+            .unwrap();
+        assert_eq!(store.clone_count(), 0);
+    }
+
+    #[test]
+    /// #185: an outbox notification that hits capacity after the effect,
+    /// audit and event were already applied in-place must undo all three.
+    fn commit_execution_step_rolls_back_outbox_saturation_after_effect_audit_and_event() {
+        let store = MemoryStore::new(StoreLimits {
+            max_outbox: 2,
+            ..StoreLimits::default()
+        });
+        let ids = ids();
+        store
+            .admit_execution(
+                execution(&ids),
+                lifecycle_event(&ids, 1, LifecycleEventKind::Admitted),
+                outbox_record(&ids, "outbox-sat", 1),
+            )
+            .unwrap();
+        let intent = intent_effect(&ids, 2);
+        store
+            .commit_execution_step(
+                &ids.execution,
+                1,
+                None,
+                lifecycle_event(&ids, 2, LifecycleEventKind::EffectIntent { sequence: 1 }),
+                Some(intent.clone()),
+                None,
+                None,
+                outbox_record(&ids, "outbox-sat", 2),
+            )
+            .unwrap();
+        // The outbox now holds 2 notifications, exactly `max_outbox`. The
+        // effect result below stages a third; the append fails after the
+        // effect and audit were already written and the event appended.
+        let completed = EffectRecord {
+            state: EffectState::Completed,
+            result_digest: Some([3; 32]),
+            resolved_tick: Some(3),
+            ..intent.clone()
+        };
+        let before_epoch = store.provider_state_retention_epoch().unwrap();
+        let before_ordinal = store.lock().unwrap().next_audit_ordinal;
+        assert_eq!(
+            store.commit_execution_step(
+                &ids.execution,
+                2,
+                None,
+                lifecycle_event(&ids, 3, LifecycleEventKind::EffectResult { sequence: 1 }),
+                Some(completed),
+                Some(audit_for(&ids, 1, 3)),
+                None,
+                outbox_record(&ids, "outbox-sat", 3),
+            ),
+            Err(StoreError::CapacityExceeded)
+        );
+        let retained = store.get_execution(&ids.execution).unwrap().unwrap();
+        assert_eq!(retained.version, 2, "execution update must roll back");
+        assert_eq!(
+            store.effect(&ids.idem).unwrap(),
+            Some(intent),
+            "effect result must roll back to the prior intent"
+        );
+        assert!(
+            store
+                .audit_records(&ids.execution, 1, 8)
+                .unwrap()
+                .is_empty(),
+            "the staged audit must roll back"
+        );
+        assert_eq!(store.events(&ids.execution, 1, 8).unwrap().len(), 2);
+        assert_eq!(store.pending_notifications(2).unwrap().len(), 2);
+        assert_eq!(
+            store.provider_state_retention_epoch().unwrap(),
+            before_epoch
+        );
+        assert_eq!(store.lock().unwrap().next_audit_ordinal, before_ordinal);
+    }
+
+    #[test]
+    /// #185: a checkpoint that overruns the total blob budget after the
+    /// effect was already inserted in-place must undo that effect insert
+    /// too, not just the checkpoint.
+    fn commit_execution_step_rolls_back_checkpoint_blob_saturation_after_effect_insert() {
+        let store = MemoryStore::new(StoreLimits {
+            max_total_blob_bytes: 4,
+            ..StoreLimits::default()
+        });
+        let ids = ids();
+        store
+            .admit_execution(
+                execution(&ids),
+                lifecycle_event(&ids, 1, LifecycleEventKind::Admitted),
+                outbox_record(&ids, "checkpoint-sat", 1),
+            )
+            .unwrap();
+        let intent = intent_effect(&ids, 2);
+        let payload = b"checkpoint payload larger than the blob budget".to_vec();
+        let payload_digest = Sha256::digest(&payload).into();
+        let checkpoint = CheckpointRecord {
+            execution_id: ids.execution.clone(),
+            run_unit_id: ids.run.clone(),
+            session_id: None,
+            schema_version: 1,
+            machine_schema_version: 1,
+            artifact: ids.artifact.clone(),
+            provider_generation: "rollback-test@1".into(),
+            required_host_interfaces: BTreeMap::new(),
+            effect_sequence: 1,
+            transaction: None,
+            principal: ids.principal.clone(),
+            security_classification: "application-data".into(),
+            encryption_key_reference: None,
+            payload_size: payload.len() as u64,
+            payload_digest,
+            payload,
+        };
+        let before_blob_bytes = store.lock().unwrap().blob_bytes;
+        assert_eq!(
+            store.commit_execution_step(
+                &ids.execution,
+                1,
+                None,
+                lifecycle_event(&ids, 2, LifecycleEventKind::EffectIntent { sequence: 1 }),
+                Some(intent.clone()),
+                None,
+                Some(checkpoint),
+                outbox_record(&ids, "checkpoint-sat", 2),
+            ),
+            Err(StoreError::CapacityExceeded)
+        );
+        let retained = store.get_execution(&ids.execution).unwrap().unwrap();
+        assert_eq!(retained.version, 1, "execution update must roll back");
+        assert_eq!(
+            store.effect(&ids.idem).unwrap(),
+            None,
+            "the effect insert made before the checkpoint failure must roll back"
+        );
+        assert_eq!(store.get_checkpoint(&ids.execution).unwrap(), None);
+        assert_eq!(store.events(&ids.execution, 1, 8).unwrap().len(), 1);
+        assert_eq!(store.pending_notifications(8).unwrap().len(), 1);
+        assert_eq!(store.lock().unwrap().blob_bytes, before_blob_bytes);
+    }
+
+    #[test]
+    /// #185: a batch that applies one provider-state write and then hits a
+    /// version conflict on a second key must undo the first write too.
+    fn mutate_provider_states_atomic_rolls_back_on_version_conflict_after_partial_apply() {
+        let store = MemoryStore::new(StoreLimits::default());
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "conflict-rollback".into(),
+                    key: "x".into(),
+                    version: 1,
+                    payload: b"x1".to_vec(),
+                },
+                None,
+            )
+            .unwrap();
+        let before_epoch = store.provider_state_retention_epoch().unwrap();
+        assert_eq!(
+            store.mutate_provider_states_atomic(vec![
+                ProviderStateMutation::Put(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: "conflict-rollback".into(),
+                        key: "y".into(),
+                        version: 1,
+                        payload: b"y1".to_vec(),
+                    },
+                    expected_version: None,
+                }),
+                ProviderStateMutation::Put(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: "conflict-rollback".into(),
+                        key: "x".into(),
+                        version: 5,
+                        payload: b"x5".to_vec(),
+                    },
+                    expected_version: Some(99),
+                }),
+            ]),
+            Err(StoreError::Conflict)
+        );
+        assert_eq!(
+            store.get_provider_state("conflict-rollback", "y").unwrap(),
+            None,
+            "the first write in the batch must roll back too"
+        );
+        assert_eq!(
+            store
+                .get_provider_state("conflict-rollback", "x")
+                .unwrap()
+                .unwrap()
+                .version,
+            1
+        );
+        assert_eq!(
+            store.provider_state_retention_epoch().unwrap(),
+            before_epoch
+        );
+    }
+
+    #[test]
+    /// #185: a Delete that applies, followed by a later mutation in the
+    /// same batch that fails, must restore the deleted row exactly.
+    fn mutate_provider_states_atomic_rolls_back_delete_after_later_conflict() {
+        let store = MemoryStore::new(StoreLimits::default());
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "delete-rollback".into(),
+                    key: "x".into(),
+                    version: 1,
+                    payload: b"x-payload".to_vec(),
+                },
+                None,
+            )
+            .unwrap();
+        let before_epoch = store.provider_state_retention_epoch().unwrap();
+        let before_blob_bytes = store.lock().unwrap().blob_bytes;
+        assert_eq!(
+            store.mutate_provider_states_atomic(vec![
+                ProviderStateMutation::Delete {
+                    namespace: "delete-rollback".into(),
+                    key: "x".into(),
+                    expected_version: 1,
+                },
+                // Stale: "y" does not exist, so an `expected_version` of
+                // `Some(_)` can never match (only `(None, None)` succeeds
+                // for a fresh key).
+                ProviderStateMutation::Put(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: "delete-rollback".into(),
+                        key: "y".into(),
+                        version: 1,
+                        payload: b"y-payload".to_vec(),
+                    },
+                    expected_version: Some(1),
+                }),
+            ]),
+            Err(StoreError::Conflict)
+        );
+        assert_eq!(
+            store.get_provider_state("delete-rollback", "x").unwrap(),
+            Some(ProviderStateRecord {
+                namespace: "delete-rollback".into(),
+                key: "x".into(),
+                version: 1,
+                payload: b"x-payload".to_vec(),
+            }),
+            "the deleted row must come back with identical version and payload"
+        );
+        assert_eq!(
+            store.get_provider_state("delete-rollback", "y").unwrap(),
+            None
+        );
+        assert_eq!(
+            store.provider_state_retention_epoch().unwrap(),
+            before_epoch
+        );
+        assert_eq!(store.lock().unwrap().blob_bytes, before_blob_bytes);
+    }
+
+    #[test]
+    /// #185: a Move that applies and grows `blob_bytes`, then a Move with a
+    /// stale version, must restore the rows, epoch and blob bytes; the move
+    /// contract test checks only the rows.
+    fn mutate_provider_states_atomic_rolls_back_move_epoch_and_blob_bytes() {
+        let store = MemoryStore::new(StoreLimits::default());
+        // Seeded outside the batch under test, so the batch's own journal
+        // contains the Move arm's touches and nothing else for this key -
+        // a broken Move-arm touch has nowhere else to be masked from.
+        let seeded = ProviderStateRecord {
+            namespace: "move-rollback".into(),
+            key: "a".into(),
+            version: 1,
+            payload: b"a1".to_vec(),
+        };
+        store.put_provider_state(seeded.clone(), None).unwrap();
+        let before_epoch = store.provider_state_retention_epoch().unwrap();
+        let before_blob_bytes = store.lock().unwrap().blob_bytes;
+        assert_eq!(
+            store.mutate_provider_states_atomic(vec![
+                // Grows the payload from 2 bytes to 4, so a skipped
+                // blob-bytes touch here is observable after rollback.
+                ProviderStateMutation::Move {
+                    record: ProviderStateRecord {
+                        namespace: "move-rollback".into(),
+                        key: "b".into(),
+                        version: 2,
+                        payload: b"bbbb".to_vec(),
+                    },
+                    old_key: "a".into(),
+                    expected_version: 1,
+                },
+                // Stale: "b" is at version 2 after the move above, not 99.
+                ProviderStateMutation::Move {
+                    record: ProviderStateRecord {
+                        namespace: "move-rollback".into(),
+                        key: "c".into(),
+                        version: 100,
+                        payload: b"c1".to_vec(),
+                    },
+                    old_key: "b".into(),
+                    expected_version: 99,
+                },
+            ]),
+            Err(StoreError::Conflict)
+        );
+        assert_eq!(
+            store.get_provider_state("move-rollback", "a").unwrap(),
+            Some(seeded),
+            "the moved-from row must come back"
+        );
+        assert_eq!(
+            store.get_provider_state("move-rollback", "b").unwrap(),
+            None
+        );
+        assert_eq!(
+            store.get_provider_state("move-rollback", "c").unwrap(),
+            None
+        );
+        assert_eq!(
+            store.provider_state_retention_epoch().unwrap(),
+            before_epoch
+        );
+        assert_eq!(store.lock().unwrap().blob_bytes, before_blob_bytes);
+    }
+
+    #[test]
+    /// #185: Puts that each pass their per-op checks but exceed the real
+    /// `max_provider_state` at the post-loop aggregate check must all roll
+    /// back.
+    fn mutate_provider_states_atomic_rolls_back_when_final_capacity_is_exceeded() {
+        let store = MemoryStore::new(StoreLimits {
+            max_provider_state: 1,
+            ..StoreLimits::default()
+        });
+        let before_epoch = store.provider_state_retention_epoch().unwrap();
+        let before_blob_bytes = store.lock().unwrap().blob_bytes;
+        assert_eq!(
+            store.mutate_provider_states_atomic(vec![
+                ProviderStateMutation::Put(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: "final-cap".into(),
+                        key: "a".into(),
+                        version: 1,
+                        payload: b"a1".to_vec(),
+                    },
+                    expected_version: None,
+                }),
+                ProviderStateMutation::Put(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: "final-cap".into(),
+                        key: "b".into(),
+                        version: 1,
+                        payload: b"b1".to_vec(),
+                    },
+                    expected_version: None,
+                }),
+            ]),
+            Err(StoreError::CapacityExceeded)
+        );
+        assert_eq!(store.get_provider_state("final-cap", "a").unwrap(), None);
+        assert_eq!(store.get_provider_state("final-cap", "b").unwrap(), None);
+        assert_eq!(
+            store.provider_state_retention_epoch().unwrap(),
+            before_epoch
+        );
+        assert_eq!(store.lock().unwrap().blob_bytes, before_blob_bytes);
+    }
+
+    #[test]
+    /// #185: the same post-loop aggregate check also covers total blob
+    /// bytes: two Puts each within the per-payload cap, but over the real
+    /// `max_total_blob_bytes` once summed, must roll back both.
+    fn mutate_provider_states_atomic_rolls_back_when_final_blob_bytes_are_exceeded() {
+        let store = MemoryStore::new(StoreLimits {
+            max_total_blob_bytes: 3,
+            ..StoreLimits::default()
+        });
+        let before_epoch = store.provider_state_retention_epoch().unwrap();
+        let before_blob_bytes = store.lock().unwrap().blob_bytes;
+        assert_eq!(
+            store.mutate_provider_states_atomic(vec![
+                ProviderStateMutation::Put(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: "final-blob".into(),
+                        key: "a".into(),
+                        version: 1,
+                        payload: b"a1".to_vec(),
+                    },
+                    expected_version: None,
+                }),
+                ProviderStateMutation::Put(ProviderStateWrite {
+                    record: ProviderStateRecord {
+                        namespace: "final-blob".into(),
+                        key: "b".into(),
+                        version: 1,
+                        payload: b"b1".to_vec(),
+                    },
+                    expected_version: None,
+                }),
+            ]),
+            Err(StoreError::CapacityExceeded)
+        );
+        assert_eq!(store.get_provider_state("final-blob", "a").unwrap(), None);
+        assert_eq!(store.get_provider_state("final-blob", "b").unwrap(), None);
+        assert_eq!(
+            store.provider_state_retention_epoch().unwrap(),
+            before_epoch
+        );
+        assert_eq!(store.lock().unwrap().blob_bytes, before_blob_bytes);
+    }
+
+    #[test]
+    /// #185: admission that fails on the epoch overflow at the end of
+    /// `append_outbox_locked` must roll back the event, the outbox row, the
+    /// blob reservation and the event's epoch bump.
+    fn admit_execution_rolls_back_blob_bytes_and_epoch_when_outbox_fails() {
+        let store = MemoryStore::new(StoreLimits::default());
+        let ids = ids();
+        // Seed the epoch one bump away from overflow: the event append
+        // below consumes that last bump, so the trailing bump inside
+        // `append_outbox_locked` (memory.rs `append_outbox_locked`, after
+        // its own successful `reserve_blob`) is the one that overflows.
+        store.lock().unwrap().provider_epoch = u64::MAX - 1;
+        let event = lifecycle_event(&ids, 1, LifecycleEventKind::Admitted);
+        assert_eq!(
+            store.admit_execution(
+                execution(&ids),
+                event,
+                outbox_record(&ids, "outbox-epoch-overflow", 1),
+            ),
+            Err(StoreError::CapacityExceeded)
+        );
+        assert_eq!(store.get_execution(&ids.execution).unwrap(), None);
+        assert!(store.events(&ids.execution, 1, 8).unwrap().is_empty());
+        assert!(store.pending_notifications(8).unwrap().is_empty());
+        assert_eq!(store.lock().unwrap().blob_bytes, 0);
+        assert_eq!(store.lock().unwrap().provider_epoch, u64::MAX - 1);
     }
 }
