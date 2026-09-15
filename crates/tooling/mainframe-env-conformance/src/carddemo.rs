@@ -2,6 +2,9 @@
 
 mod bms;
 mod control_library;
+mod online_authorities;
+
+use online_authorities::install_base_online_authorities;
 
 use bms::{carddemo_base_maps, carddemo_maps};
 
@@ -5124,6 +5127,7 @@ async fn exercise_db2_routes(
         .bootstrap_user("IBMUSER", b"TESTPASS")
         .map_err(terminal_problem)?;
     install_base_online_authorities(&server, corpus_dir, &online)?;
+    online_authorities::install_db2_authorities(&server)?;
     server
         .install_online_application(online)
         .map_err(terminal_problem)?;
@@ -12564,166 +12568,6 @@ fn carddemo_dataset_text_records(
                 })
         })
         .collect()
-}
-
-fn install_base_online_authorities(
-    server: &ProductServer,
-    corpus_dir: &Path,
-    definition: &OnlineApplicationDefinition,
-) -> Result<(), CorpusProblem> {
-    let dataset = server.dataset_service();
-    let objects = carddemo_base_seed_objects(corpus_dir)?;
-    dataset
-        .install_seed_generation("CARDDEMO", "g1", objects.clone())
-        .map_err(terminal_problem)?;
-    let mutation = |sequence| Mutation {
-        sequence,
-        idempotency_key: IdempotencyKey::new(
-            format!("carddemo-online-index-{sequence}"),
-            InvocationLimits::default(),
-        )
-        .expect("static mutation key"),
-        transaction: Some("CARDDEMO-INSTALL".into()),
-    };
-    for (sequence, (index, base, offset, length)) in [
-        (
-            "AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.PATH",
-            "AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS",
-            16,
-            11,
-        ),
-        (
-            "AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH",
-            "AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS",
-            25,
-            11,
-        ),
-        (
-            "AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH",
-            "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
-            304,
-            26,
-        ),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        dataset
-            .invoke(DatasetRequest::DefineAlternateIndex {
-                base: DatasetName::new(base, 128).expect("static base"),
-                index: DatasetName::new(index, 128).expect("static index"),
-                key_offset: offset,
-                key_length: length,
-                allow_duplicates: true,
-                upgrade: true,
-                mutation: mutation(sequence as u64 + 1),
-            })
-            .map_err(terminal_problem)?;
-    }
-    let csd = String::from_utf8(read_corpus_file(
-        corpus_dir,
-        &corpus_dir.join("app/csd/CARDDEMO.CSD"),
-    )?)
-    .map_err(|_| CorpusProblem::new("carddemo.online.csd_invalid", "base CSD is not UTF-8"))?;
-    let resources = parse_csd(&csd).map_err(package_problem)?;
-    let aliases = resources
-        .iter()
-        .filter(|resource| resource.kind == "FILE")
-        .map(|resource| {
-            Ok((
-                resource.name.clone(),
-                DatasetName::new(
-                    resource.properties.get("DSNAME").ok_or_else(|| {
-                        CorpusProblem::new(
-                            "carddemo.online.csd_invalid",
-                            format!("{} DSNAME is missing", resource.name),
-                        )
-                    })?,
-                    128,
-                )
-                .map_err(|_| {
-                    CorpusProblem::new(
-                        "carddemo.online.csd_invalid",
-                        format!("{} DSNAME is invalid", resource.name),
-                    )
-                })?,
-            ))
-        })
-        .collect::<Result<BTreeMap<_, _>, CorpusProblem>>()?;
-    server
-        .cics_service()
-        .register_file_definitions(
-            &aliases
-                .iter()
-                .map(|(name, dataset)| {
-                    (
-                        name.clone(),
-                        CicsFileDefinition {
-                            dataset: dataset.clone(),
-                            ccsid: Some(37),
-                        },
-                    )
-                })
-                .collect(),
-        )
-        .map_err(terminal_problem)?;
-
-    server
-        .bootstrap_identity("WEBUSER", b"transport-password")
-        .map_err(terminal_problem)?;
-    server
-        .bootstrap_identity("WEBADM", b"admin-transport-password")
-        .map_err(terminal_problem)?;
-    let racf = server.racf_service();
-    for transaction in definition.transactions.keys() {
-        let resource = format!("CICS.{transaction}");
-        racf.define_profile("TCICSTRN", &resource, "WEBADM", None)
-            .map_err(terminal_problem)?;
-        racf.permit("TCICSTRN", &resource, "WEBADM", AccessIntent::Execute)
-            .map_err(terminal_problem)?;
-        if transaction != "CA00"
-            && !transaction.starts_with("CU")
-            && (!transaction.starts_with("CT")
-                || matches!(transaction.as_str(), "CT00" | "CT01" | "CT02"))
-        {
-            racf.permit("TCICSTRN", &resource, "WEBUSER", AccessIntent::Execute)
-                .map_err(terminal_problem)?;
-        }
-    }
-    for program in definition.programs.iter().map(|program| &program.name) {
-        let resource = format!("CICS.PROGRAM.{program}");
-        racf.define_profile("FACILITY", &resource, "WEBADM", None)
-            .map_err(terminal_problem)?;
-        racf.permit("FACILITY", &resource, "WEBADM", AccessIntent::Execute)
-            .map_err(terminal_problem)?;
-        if !program.starts_with("COADM")
-            && !program.starts_with("COUSR")
-            && !program.starts_with("COTRT")
-        {
-            racf.permit("FACILITY", &resource, "WEBUSER", AccessIntent::Execute)
-                .map_err(terminal_problem)?;
-        }
-    }
-    for name in objects
-        .iter()
-        .map(|object| object.dataset.as_str())
-        .chain(aliases.values().map(DatasetName::as_str))
-        .collect::<BTreeSet<_>>()
-    {
-        racf.define_profile("DATASET", name, "WEBADM", None)
-            .map_err(terminal_problem)?;
-        racf.permit("DATASET", name, "WEBADM", AccessIntent::Update)
-            .map_err(terminal_problem)?;
-        racf.permit("DATASET", name, "WEBUSER", AccessIntent::Update)
-            .map_err(terminal_problem)?;
-    }
-    racf.define_profile("QUEUE", "CICS.TD.JOBS", "WEBADM", None)
-        .map_err(terminal_problem)?;
-    for principal in ["WEBADM", "WEBUSER"] {
-        racf.permit("QUEUE", "CICS.TD.JOBS", principal, AccessIntent::Update)
-            .map_err(terminal_problem)?;
-    }
-    Ok(())
 }
 
 struct TerminalExercise {

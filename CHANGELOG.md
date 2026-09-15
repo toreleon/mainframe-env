@@ -326,6 +326,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Accept underscores in RACF service resource profiles, consistent with the
+  existing security model and command interface (#216).
+
+- Provision CardDemo DB2 maintenance table permissions for WEBADM while retaining
+  IBMUSER installation access and denying WEBUSER (#215).
+
 - Fixed typed `RETURN` lowering and execution for `LENGTH(LENGTH OF
   commarea)` (#202).
 - Fixed typed `SEND MAP`/`SEND TEXT` admission for the reached `ERASE`,
