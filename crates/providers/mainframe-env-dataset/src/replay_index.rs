@@ -2,22 +2,33 @@
 //!
 //! `DatasetService` used to reload and fully decode every `dataset-replay`
 //! row on each request (`fix(#194)`). `ReplayIndex` instead keeps one
-//! `(version, payload digest)` fingerprint per key and only re-decodes a row
-//! whose fingerprint changed since the last sync, matching `a5fbc43` in
-//! every observable outcome.
+//! `(version, payload)` fingerprint per key and only re-decodes a row whose
+//! fingerprint changed since the last sync, matching `a5fbc43` in every
+//! observable outcome.
+//!
+//! `sync` also leaves every unchanged row untouched: no clone, no map
+//! rebuild. A profile of the `carddemo-operator-submit` gate found the
+//! per-row cost of the first incremental-sync change was dominated by
+//! recomputing a SHA-256 digest for every row on every sync, including
+//! unchanged ones (~10 of ~13.4 us/row); cloning unchanged entries into a
+//! freshly rebuilt map cost another ~2.8 us/row. Comparing the committed
+//! `version`, then payload length, then payload bytes is cheaper than a
+//! digest for these small payloads and needs no extra dependency; keeping
+//! `self.entries` in place instead of rebuilding it removes the clone.
 
 use crate::service::{
     DatasetLimits, Replay, decode_replay, describe_dataset_replay_row_with_limits, store_error,
 };
 use mainframe_env_host_api::HostProblem;
 use mainframe_env_store_api::ProviderStateStore;
-use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
-#[derive(Clone)]
 struct Entry {
     replay: Replay,
-    seen: Option<(u64, [u8; 32])>,
+    /// The row `version` and payload committed the last time this entry was
+    /// validated. Every current producer knows those bytes; `None` would
+    /// force the next sync to re-decode the row once.
+    seen: Option<(u64, Vec<u8>)>,
 }
 
 /// The live, incrementally synced view of the `dataset-replay` namespace.
@@ -28,6 +39,11 @@ pub(crate) struct ReplayIndex {
     /// parallel tests never see each other's decodes.
     #[cfg(test)]
     decode_count: usize,
+    /// Counts entries actually inserted or replaced by [`Self::sync`]
+    /// (new or changed keys only). Zero on an unchanged sync proves it
+    /// touches, clones or rebuilds nothing for rows that didn't change.
+    #[cfg(test)]
+    applied_count: usize,
 }
 
 impl ReplayIndex {
@@ -53,12 +69,11 @@ impl ReplayIndex {
         payload: &[u8],
         replay: Replay,
     ) {
-        let digest: [u8; 32] = Sha256::digest(payload).into();
         self.entries.insert(
             key.into(),
             Entry {
                 replay,
-                seen: Some((version, digest)),
+                seen: Some((version, payload.to_vec())),
             },
         );
     }
@@ -75,10 +90,12 @@ impl ReplayIndex {
     }
 
     /// Sync the index against `store` with exactly one `list_provider_state`
-    /// call. A listed row is re-decoded only when its `(version, payload
-    /// digest)` fingerprint differs from what was last seen; every other
-    /// row is kept from the current index. Keys no longer listed are
-    /// dropped. On any error the index is left unchanged.
+    /// call. A listed row is re-decoded only when its version, payload
+    /// length or payload bytes differ from what was last committed for that
+    /// key; every other row is left untouched in the index (no clone, no
+    /// digest, no map rebuild). Keys no longer listed are dropped. Every row
+    /// is checked, and every changed or new one decoded, before any change
+    /// is applied, so an error leaves the index exactly as it was.
     pub(crate) fn sync(
         &mut self,
         store: &dyn ProviderStateStore,
@@ -87,27 +104,54 @@ impl ReplayIndex {
         let rows = store
             .list_provider_state("dataset-replay", limits.max_idempotency)
             .map_err(store_error)?;
-        let mut staged = BTreeMap::new();
-        for row in rows {
-            if staged.contains_key(&row.key) {
-                return Err(HostProblem::InfrastructureFailure);
-            }
-            let digest: [u8; 32] = Sha256::digest(&row.payload).into();
-            let fingerprint = Some((row.version, digest));
-            let entry = match self.entries.get(&row.key) {
-                Some(existing) if existing.seen == fingerprint => existing.clone(),
-                _ => self.decode_row(&row, digest, limits)?,
-            };
-            staged.insert(row.key, entry);
+
+        // Duplicate-key check over borrowed keys: a sort with no per-row
+        // clone or map insertion, instead of probing a map being built.
+        let mut keys: Vec<&str> = rows.iter().map(|row| row.key.as_str()).collect();
+        keys.sort_unstable();
+        if keys.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(HostProblem::InfrastructureFailure);
         }
-        self.entries = staged;
+
+        let mut updates: Vec<(String, Entry)> = Vec::new();
+        for row in &rows {
+            let unchanged = self.entries.get(row.key.as_str()).is_some_and(|existing| {
+                existing.seen.as_ref().is_some_and(|(version, payload)| {
+                    *version == row.version
+                        && payload.len() == row.payload.len()
+                        && *payload == row.payload
+                })
+            });
+            if !unchanged {
+                let entry = self.decode_row(row, limits)?;
+                updates.push((row.key.clone(), entry));
+            }
+        }
+
+        // Every row validated: apply the staged changes. `updates` holds
+        // only new or changed keys, so unchanged entries are never touched.
+        #[cfg(test)]
+        {
+            self.applied_count += updates.len();
+        }
+        for (key, entry) in updates {
+            self.entries.insert(key, entry);
+        }
+        // `self.entries` can only hold extra (now-unlisted) keys at this
+        // point; it can never be short one, since every listed row was
+        // either already present or just inserted. So an exact length match
+        // against the duplicate-free `keys` proves nothing was pruned,
+        // without a scan.
+        if self.entries.len() != keys.len() {
+            self.entries
+                .retain(|key, _| keys.binary_search(&key.as_str()).is_ok());
+        }
         Ok(())
     }
 
     fn decode_row(
         &mut self,
         row: &mainframe_env_store_api::ProviderStateRecord,
-        digest: [u8; 32],
         limits: DatasetLimits,
     ) -> Result<Entry, HostProblem> {
         describe_dataset_replay_row_with_limits(row, limits)
@@ -120,13 +164,18 @@ impl ReplayIndex {
         }
         Ok(Entry {
             replay: decoded,
-            seen: Some((row.version, digest)),
+            seen: Some((row.version, row.payload.clone())),
         })
     }
 
     #[cfg(test)]
     pub(crate) fn decode_count(&self) -> usize {
         self.decode_count
+    }
+
+    #[cfg(test)]
+    pub(crate) fn applied_count(&self) -> usize {
+        self.applied_count
     }
 
     /// A copy of the currently synced `Replay` values, for equivalence
@@ -178,13 +227,56 @@ mod tests {
         let mut index = ReplayIndex::default();
         index.sync(&store, limits()).unwrap();
         assert_eq!(index.decode_count(), 3);
+        assert_eq!(index.applied_count(), 3);
         index.sync(&store, limits()).unwrap();
         assert_eq!(
             index.decode_count(),
             3,
             "a second sync with no external change must decode 0 additional rows"
         );
+        assert_eq!(
+            index.applied_count(),
+            3,
+            "a second sync with no external change must clone or rebuild 0 entries"
+        );
         assert_eq!(index.len(), 3);
+    }
+
+    #[test]
+    fn resynced_row_at_same_version_and_length_with_different_bytes_is_detected() {
+        let store = MemoryStore::new(Default::default());
+        put_pending_row(&store, "id-1");
+        let mut index = ReplayIndex::default();
+        index.sync(&store, limits()).unwrap();
+        assert_eq!(index.decode_count(), 1);
+
+        // Delete and re-put at the same version (1), same payload length,
+        // but different bytes. The identity check must not mistake this for
+        // "unchanged" just because version and length match.
+        store
+            .delete_provider_state("dataset-replay", "id-1", 1)
+            .unwrap();
+        let mut payload = b"MEDR1".to_vec();
+        payload.extend_from_slice(&[7u8; 32]);
+        payload.push(0);
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "dataset-replay".into(),
+                    key: "id-1".into(),
+                    version: 1,
+                    payload,
+                },
+                None,
+            )
+            .unwrap();
+
+        index.sync(&store, limits()).unwrap();
+        assert_eq!(
+            index.decode_count(),
+            2,
+            "a same-version, same-length, different-bytes re-put must still be re-decoded"
+        );
     }
 
     #[test]

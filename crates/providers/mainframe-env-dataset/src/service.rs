@@ -9557,6 +9557,10 @@ mod tests {
         fail_next: AtomicBool,
         fail_next_tvs_put: AtomicBool,
         fail_replay_metadata_put: AtomicBool,
+        /// Unlike `fail_next` (which fails *before* the underlying write),
+        /// this commits the write for real and then reports failure anyway,
+        /// simulating a lost commit acknowledgement.
+        fail_next_after_commit: AtomicBool,
     }
 
     impl FailAtomicOnceStore {
@@ -9566,11 +9570,16 @@ mod tests {
                 fail_next: AtomicBool::new(false),
                 fail_next_tvs_put: AtomicBool::new(false),
                 fail_replay_metadata_put: AtomicBool::new(false),
+                fail_next_after_commit: AtomicBool::new(false),
             }
         }
 
         fn arm(&self) {
             self.fail_next.store(true, Ordering::SeqCst);
+        }
+
+        fn arm_after_commit(&self) {
+            self.fail_next_after_commit.store(true, Ordering::SeqCst);
         }
 
         fn arm_reconciliation_failure(&self) {
@@ -9683,6 +9692,9 @@ mod tests {
         ) -> Result<(), StoreError> {
             if self.fail_now() {
                 Err(StoreError::Infrastructure("injected-before-commit".into()))
+            } else if self.fail_next_after_commit.swap(false, Ordering::SeqCst) {
+                self.inner.mutate_provider_states_atomic(mutations)?;
+                Err(StoreError::Infrastructure("injected-after-commit".into()))
             } else {
                 self.inner.mutate_provider_states_atomic(mutations)
             }
@@ -15982,8 +15994,9 @@ mod tests {
         let limits = DatasetLimits::default();
         let service = DatasetService::open(store.clone(), limits).unwrap();
 
-        // An own write through invoke_checked's direct (non-catalog-commit)
-        // write shape.
+        // An own write that resolves through `commit_catalog_writes` (like
+        // every request below): `Create` is not invoke_checked's direct
+        // reserve/final-put shape.
         let create = DatasetRequest::Create {
             dataset: DatasetName::new("USER.REPLAY.SYNC.E1", 128).unwrap(),
             attributes: attrs(DatasetOrganization::Sequential),
@@ -16047,5 +16060,51 @@ mod tests {
     #[test]
     fn synced_index_matches_a_full_reload_after_a_scripted_sequence_sqlite() {
         synced_index_matches_a_full_reload_after_a_scripted_sequence(sqlite_store("e"));
+    }
+
+    /// The existing `FailAtomicOnceStore` tests only cover the mismatch
+    /// side of `commit_catalog_mutations`'s retry read-back (the atomic
+    /// batch never actually wrote). This drives the successful side: the
+    /// write really commits, but the store still reports failure (a lost
+    /// ack). The read-back must find the persisted row decodes to the same
+    /// replay and return the real result, and the fingerprint it records
+    /// must match the store exactly, so the next sync decodes 0 rows.
+    #[test]
+    fn commit_ack_lost_after_a_successful_write_reads_back_the_same_replay() {
+        let store = Arc::new(FailAtomicOnceStore::new());
+        let dataset = service(store.clone());
+        let name = DatasetName::new("USER.ACKLOST", 44).unwrap();
+        dataset
+            .invoke(DatasetRequest::Create {
+                dataset: name.clone(),
+                attributes: attrs(DatasetOrganization::Sequential),
+                mutation: mutation(9500),
+            })
+            .unwrap();
+        store.arm_after_commit();
+        let request = DatasetRequest::Write {
+            dataset: name.clone(),
+            member: None,
+            records: vec![b"AA11".to_vec()],
+            expected_version: Some(1),
+            mutation: mutation(9501),
+        };
+        assert_eq!(
+            dataset.invoke(request),
+            Ok(DatasetResult::Mutated { version: 2 })
+        );
+        let persisted = store
+            .get_provider_state("dataset-replay", "id-9501")
+            .unwrap()
+            .unwrap();
+        assert_eq!(persisted.version, 2);
+        let before = dataset.state.lock().unwrap().replay.decode_count();
+        assert_eq!(dataset.refresh_replay_index().unwrap(), 2);
+        let after = dataset.state.lock().unwrap().replay.decode_count();
+        assert_eq!(
+            after, before,
+            "the fingerprint recorded from the read-back must already match \
+             the store, so an explicit resync decodes 0 rows"
+        );
     }
 }

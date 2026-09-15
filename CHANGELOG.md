@@ -118,22 +118,33 @@ All notable changes to mainframe-env are documented here.
   index a second time; both reloads decoded and validated every listed row,
   about 43 µs per row, so cost grew with every replay row ever persisted. A
   new `ReplayIndex` (`crates/providers/mainframe-env-dataset/src/replay_index.rs`)
-  keeps a `(version, payload SHA-256)` fingerprint per key from every
-  request's own writes and syncs the index with one `list_provider_state`
-  call per request, re-decoding a row only when its fingerprint changed and
-  dropping keys no longer listed; a corrupt or duplicate row still fails the
-  request closed without partially applying the sync. `invoke_checked` now
-  syncs once, under the state lock, before `HostRequest::validate`, so store
-  and corruption errors still precede `Malformed`. `refresh_replay_index` is
-  now sync-plus-`len`. This removes the largest measured cost in the
-  CREASTMT (STEP040, `CBSTM03A`) slowdown from `toreleon/mainframe-env#185`:
-  at CALL 200 of an instrumented run, the two reloads took 102 ms of a
-  106 ms request over 1,192 rows. It doesn't remove all of the slowdown. In
-  the `carddemo-operator-submit` gate, the wall time between dataset
-  requests still rises with the replay row count, by about 11-14 µs per row
-  (25 ms at 1,148 rows, 99 ms at 7,569), so CREASTMT still doesn't finish
-  within `timeout --signal=KILL 590`. Where that per-row cost comes from is
-  being measured; `#185` and `#194` stay open.
+  syncs the index with one `list_provider_state` call per request,
+  re-decoding a row only when it changed and dropping keys no longer listed;
+  a corrupt or duplicate row still fails the request closed without
+  partially applying the sync. `invoke_checked` now syncs once, under the
+  state lock, before `HostRequest::validate`, so store and corruption
+  errors still precede `Malformed`. `refresh_replay_index` is now
+  sync-plus-`len`.
+
+  The first cut of this fix kept a `(version, payload SHA-256)` fingerprint
+  per key and rebuilt the index map on every sync, which removed the
+  repeated decode but still cost about 13.4 µs per replay row on every
+  request, even when nothing had changed: an instrumented
+  `carddemo-operator-submit` gate run (logging every 25th
+  `invoke_checked`'s phase timings) found about 10 of those 13.4 µs/row
+  recomputing the SHA-256 digest and about 2.8 µs/row cloning unchanged
+  entries into a freshly rebuilt `BTreeMap`; request application itself grew
+  only about 0.4 µs/row. `ReplayIndex` now keeps the committed payload bytes
+  in each entry and detects a changed row by comparing `version`, then
+  payload length, then payload bytes — no digest — and updates
+  `self.entries` in place instead of rebuilding it, so an unchanged sync
+  touches, clones, or decodes nothing. A request still lists the namespace
+  and compares each row's bytes, so some per-row work remains, but it is
+  small enough that the CREASTMT (STEP040, `CBSTM03A`) slowdown in
+  `toreleon/mainframe-env#185` is gone: `timeout --signal=KILL 590 cargo
+  xtask carddemo-operator-submit --check` now completes and passes, in about
+  3 minutes 21 seconds, where it was previously killed at 590 s without
+  finishing.
 - Fixed `STARTBR` rejecting a full-length all-`X'FF'` `RIDFLD` under the
   default `GTEQ` relation with `NOTFND` instead of positioning the browse at
   the end of the data set for `READPREV` (IBM topic
@@ -151,9 +162,10 @@ All notable changes to mainframe-env are documented here.
   registers the cursor at `identities.len()`, ready for `READPREV`; a
   shorter `GENERIC` all-`X'FF'` key, a non-`X'FF'` out-of-range key, and any
   key on an empty data set keep returning `NOTFND`.
-- Removed one cause of `CREASTMT` (STEP040, `CBSTM03A`) slowing down over its
-  run; the step still doesn't finish within the `carddemo-operator-submit`
-  gate. `MemoryStore`'s per-effect journal methods (`admit_execution`,
+- Removed one of two causes of `CREASTMT` (STEP040, `CBSTM03A`) slowing down
+  over its run and never finishing in the `carddemo-operator-submit` gate;
+  the other, the dataset replay index, is the `#194` entry above.
+  `MemoryStore`'s per-effect journal methods (`admit_execution`,
   `commit_execution_step`, and `mutate_provider_states_atomic`, which backs
   `put_provider_states_atomic`, in
   `crates/stores/mainframe-env-store/src/memory.rs`) staged every write by
@@ -164,10 +176,11 @@ All notable changes to mainframe-env are documented here.
   about 2. These methods now mutate the locked `State` in place under an undo
   log (`memory/journal.rs`) that records the prior value of only the entries a
   call touches and restores them, in reverse order, on any `Err`; the six
-  cold-path clones (retention, archive, reconcile) are unchanged. Sequential
-  `TRNXFILE` calls now stay flat at about 108 ms each, but a nested `CALL`
-  still costs about 100 ms, and calls grow again once the keyed customer and
-  account lookups start. `toreleon/mainframe-env#185` stays open.
+  cold-path clones (retention, archive, reconcile) are unchanged. After this
+  change sequential `TRNXFILE` calls stayed flat at about 108 ms each; a
+  profile then showed that remaining time was the dataset replay index
+  being decoded on every request (`toreleon/mainframe-env#194`), which is
+  fixed separately.
 - Fixed the CardDemo card-list selection (`COCRDLIC`, menu COMEN01 option 3)
   ignoring a row picked with `S`/`U`: choosing a card redisplayed the list
   (mapset `COCRDLI`) with `ERRMSG` `INVALID ACTION CODE` instead of `XCTL`ing

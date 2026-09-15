@@ -1,9 +1,9 @@
 {
   "counts": {
-    "markdown_documents": 187,
+    "markdown_documents": 188,
     "navigation_groups": 5,
     "normative_documents": 39,
-    "xtask_commands": 166
+    "xtask_commands": 167
   },
   "documents": [
     {
@@ -13,6 +13,14 @@
       "sha256": "sha256:38fd574ba93888d678052b090760fa224ef35db4cfd843ae34d1602ddd707933",
       "title": "PF185 per-CALL summary (mainframe-env #185)",
       "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": ".run-logs/sc194-03-summary.md",
+      "relative_links": 0,
+      "sha256": "sha256:4bfc6a023199da4652b6b1baec0b38b2f33897f8c69b9f66a5395472d6b78d0f",
+      "title": "SC194 step 1 measurement: per-row cost inside `invoke_checked` (real gate)",
+      "xtask_commands": 1
     },
     {
       "normative": false,
@@ -26,7 +34,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:6250040d4d4abb8ffef3e781c6e67fda7d08841959a6030d7566cecd05ef78b0",
+      "sha256": "sha256:cbe0a17845d78164817a8b1dc111c18ecce01d788c79da2252d3da683ca6b403",
       "title": "Changelog",
       "xtask_commands": 5
     },
