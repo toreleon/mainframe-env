@@ -10,7 +10,7 @@ use std::fs;
 const RECEIPT_ENV: &str = "MAINFRAME_ENV_COBOL65_LICENSED_ORACLE_RECEIPT";
 const MAX_RECEIPT_BYTES: u64 = 4 * 1024 * 1024;
 const COMPILER_OPTIONS: &[&str] = &[
-    "ARCH(8)",
+    "ARCH(11)",
     "ARITH(EXTEND)",
     "CODEPAGE(037)",
     "LP(32)",
@@ -263,5 +263,11 @@ mod tests {
     fn licensed_denominator_and_fixture_digest_are_stable_without_an_oracle() {
         assert_eq!(crate::cobol_assurance::assurance_rows().unwrap().len(), 153);
         assert!(digest(&licensed_fixture_digest()));
+    }
+
+    #[test]
+    fn licensed_compiler_profile_uses_enterprise_cobol_65_supported_arch_level() {
+        assert_eq!(COMPILER_OPTIONS.first().copied(), Some("ARCH(11)"));
+        assert!(!COMPILER_OPTIONS.contains(&"ARCH(8)"));
     }
 }
