@@ -109,6 +109,23 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Fixed `STARTBR` rejecting a full-length all-`X'FF'` `RIDFLD` under the
+  default `GTEQ` relation with `NOTFND` instead of positioning the browse at
+  the end of the data set for `READPREV` (IBM topic
+  `SSJL4D_6.x/reference-applications/commands-api/dfhp4_startbr.html`, RIDFLD
+  option). COTRN02C's add-transaction browse
+  (`MOVE HIGH-VALUES TO TRAN-ID` then `STARTBR ... KEYLENGTH(LENGTH OF
+  TRAN-ID)`) relies on this VSAM behavior to find the last transaction ID, so
+  the online add journey (`toreleon/mainframe-env#191`,
+  `carddemo.online.transaction_add_drift`) wrote no record. `0df4cdb` added
+  the `relation` field and a bounds check to `DatasetRequest::StartBrowse`
+  (`crates/providers/mainframe-env-dataset/src/service.rs`) that rejected any
+  out-of-range key without registering a cursor. The CardDemo journey only
+  reached it once #181, #183, #184 and #187 were fixed. A full-length
+  all-`X'FF'` key under `GreaterOrEqual` on a non-empty data set now
+  registers the cursor at `identities.len()`, ready for `READPREV`; a
+  shorter `GENERIC` all-`X'FF'` key, a non-`X'FF'` out-of-range key, and any
+  key on an empty data set keep returning `NOTFND`.
 - Removed one cause of `CREASTMT` (STEP040, `CBSTM03A`) slowing down over its
   run; the step still doesn't finish within the `carddemo-operator-submit`
   gate. `MemoryStore`'s per-effect journal methods (`admit_execution`,

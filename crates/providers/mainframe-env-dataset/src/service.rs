@@ -648,12 +648,12 @@ struct Cursor {
     index: isize,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct AlternateIndex {
+pub(crate) struct AlternateIndex {
     base: String,
     parent: String,
     is_path: bool,
     key_offset: u32,
-    key_length: u32,
+    pub(crate) key_length: u32,
     allow_duplicates: bool,
     upgrade: bool,
     identities: Vec<BrowseIdentity>,
@@ -703,7 +703,7 @@ struct SeedSelection {
 }
 pub(crate) struct State {
     entries: BTreeMap<String, Entry>,
-    alternate_indexes: BTreeMap<String, AlternateIndex>,
+    pub(crate) alternate_indexes: BTreeMap<String, AlternateIndex>,
     generation_groups: BTreeMap<String, GenerationGroup>,
     catalogs: BTreeMap<String, CatalogRecord>,
     catalog_aliases: BTreeMap<String, CatalogAlias>,
@@ -4561,7 +4561,7 @@ impl DatasetService {
                     }
                 };
                 if index >= identities.len() {
-                    return Err(condition("NOTFND", 13));
+                    state.require_eof_browse(dataset, key, *relation, !identities.is_empty())?;
                 }
                 let active_identities = state
                     .cursors
@@ -4903,7 +4903,7 @@ impl DatasetService {
         Ok((members, more))
     }
 }
-fn entry<'a>(state: &'a State, name: &DatasetName) -> Result<&'a Entry, HostProblem> {
+pub(crate) fn entry<'a>(state: &'a State, name: &DatasetName) -> Result<&'a Entry, HostProblem> {
     state
         .entries
         .get(name.as_str())
@@ -7737,7 +7737,7 @@ fn dependency_limits(limits: DatasetLimits) -> DependencyLimits {
         max_depth: 128.min(limits.max_datasets.max(1)),
     }
 }
-fn condition(name: &str, response: i32) -> HostProblem {
+pub(crate) fn condition(name: &str, response: i32) -> HostProblem {
     HostProblem::Condition {
         name: name.into(),
         response,
@@ -15100,6 +15100,140 @@ mod tests {
                 dataset,
                 key: b"BD".to_vec(),
                 relation: KeyRelation::Equal,
+            }),
+            Err(HostProblem::Condition { ref name, response: 13, .. }) if name == "NOTFND"
+        ));
+    }
+
+    #[test]
+    fn startbr_full_length_high_values_key_positions_browse_at_end_for_readprev() {
+        // #191: a full-length all-X'FF' key under GTEQ must succeed
+        // positioned past the last record, and READPREV/READNEXT must
+        // then walk that position correctly.
+        use mainframe_env_host_api::KeyRelation;
+
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let dataset = DatasetName::new("USER.HIVALS", 44).unwrap();
+        service
+            .invoke(DatasetRequest::Create {
+                dataset: dataset.clone(),
+                attributes: attrs(DatasetOrganization::KeySequenced),
+                mutation: mutation(1),
+            })
+            .unwrap();
+        service
+            .invoke(DatasetRequest::Write {
+                dataset: dataset.clone(),
+                member: None,
+                records: vec![b"AA01".to_vec(), b"BB02".to_vec(), b"CC03".to_vec()],
+                expected_version: Some(1),
+                mutation: mutation(2),
+            })
+            .unwrap();
+        let start_browse = || match service
+            .invoke(DatasetRequest::StartBrowse {
+                dataset: dataset.clone(),
+                key: vec![0xFF, 0xFF],
+                relation: KeyRelation::GreaterOrEqual,
+            })
+            .unwrap()
+        {
+            DatasetResult::Browse { cursor, .. } => cursor,
+            other => panic!("unexpected browse result: {other:?}"),
+        };
+
+        let reverse_cursor = start_browse();
+        assert!(matches!(
+            service.invoke(DatasetRequest::ReadNext {
+                dataset: dataset.clone(),
+                cursor: reverse_cursor.clone(),
+                reverse: true,
+                control: Default::default(),
+            }),
+            Ok(DatasetResult::Browse { record: Some(record), .. }) if record == b"CC03"
+        ));
+        assert!(matches!(
+            service.invoke(DatasetRequest::ReadNext {
+                dataset: dataset.clone(),
+                cursor: reverse_cursor,
+                reverse: true,
+                control: Default::default(),
+            }),
+            Ok(DatasetResult::Browse { record: Some(record), .. }) if record == b"BB02"
+        ));
+
+        let forward_cursor = start_browse();
+        assert!(matches!(
+            service.invoke(DatasetRequest::ReadNext {
+                dataset,
+                cursor: forward_cursor,
+                reverse: false,
+                control: Default::default(),
+            }),
+            Ok(DatasetResult::Browse { record: None, .. })
+        ));
+    }
+
+    #[test]
+    fn startbr_out_of_range_key_without_full_length_high_values_stays_notfnd() {
+        // #191: only a full-length all-X'FF' key gets end-of-data-set
+        // treatment; an ordinary out-of-range key, or a shorter GENERIC
+        // all-X'FF' key, still fails STARTBR as before.
+        use mainframe_env_host_api::KeyRelation;
+
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let dataset = DatasetName::new("USER.OUTRANGE", 44).unwrap();
+        service
+            .invoke(DatasetRequest::Create {
+                dataset: dataset.clone(),
+                attributes: attrs(DatasetOrganization::KeySequenced),
+                mutation: mutation(1),
+            })
+            .unwrap();
+        service
+            .invoke(DatasetRequest::Write {
+                dataset: dataset.clone(),
+                member: None,
+                records: vec![b"AA01".to_vec(), b"BB02".to_vec(), b"CC03".to_vec()],
+                expected_version: Some(1),
+                mutation: mutation(2),
+            })
+            .unwrap();
+
+        for key in [b"ZZ".to_vec(), vec![0xFF]] {
+            assert!(matches!(
+                service.invoke(DatasetRequest::StartBrowse {
+                    dataset: dataset.clone(),
+                    key,
+                    relation: KeyRelation::GreaterOrEqual,
+                }),
+                Err(HostProblem::Condition { ref name, response: 13, .. }) if name == "NOTFND"
+            ));
+        }
+    }
+
+    #[test]
+    fn startbr_full_length_high_values_key_on_empty_ksds_stays_notfnd() {
+        // #191: dfhp4_startbr.html's RIDFLD note describes positioning past
+        // the last record for READPREV; it does not settle an empty data
+        // set, so STARTBR keeps returning NOTFND there, unchanged.
+        use mainframe_env_host_api::KeyRelation;
+
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let dataset = DatasetName::new("USER.EMPTYHV", 44).unwrap();
+        service
+            .invoke(DatasetRequest::Create {
+                dataset: dataset.clone(),
+                attributes: attrs(DatasetOrganization::KeySequenced),
+                mutation: mutation(1),
+            })
+            .unwrap();
+
+        assert!(matches!(
+            service.invoke(DatasetRequest::StartBrowse {
+                dataset,
+                key: vec![0xFF, 0xFF],
+                relation: KeyRelation::GreaterOrEqual,
             }),
             Err(HostProblem::Condition { ref name, response: 13, .. }) if name == "NOTFND"
         ));

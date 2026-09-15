@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+mod browse;
 mod codec;
 mod dataset_locks;
 mod dependency;
