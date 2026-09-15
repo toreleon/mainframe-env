@@ -5473,8 +5473,8 @@ impl SystemClockProvider {
                 generation: "1".into(),
                 request_schema: "mainframe-env.clock.request@1".into(),
                 result_schema: "mainframe-env.clock.response@1".into(),
-                max_request_bytes: 64,
-                max_result_bytes: 64,
+                max_request_bytes: 256, // #195: canonical req sizes are 135/127/127 bytes; was 64.
+                max_result_bytes: 256,  // #195: canonical result sizes 109/100/101 bytes; was 64.
                 ready: true,
             },
         }
@@ -6493,6 +6493,112 @@ mod tests {
         assert!(timestamp.bytes().all(|byte| byte.is_ascii_digit()));
         assert!(date.bytes().all(|byte| byte.is_ascii_digit()));
         assert!(time.bytes().all(|byte| byte.is_ascii_digit()));
+    }
+
+    /// Regression tests for #195. Measured canonical sizes (bf749b2's
+    /// encoding): requests are 135/127/127 bytes and results are 109/100/101
+    /// bytes for UtcTimestamp/Date/Time, all over the old 64-byte budget.
+    #[test]
+    fn system_clock_budgets_fit_every_canonical_clock_request_and_result() {
+        let limits = InvocationLimits::default();
+        let descriptor = &SystemClockProvider::new(limits).descriptor;
+        for (request, result) in [
+            (ClockRequest::UtcTimestamp, "0".repeat(17)),
+            (ClockRequest::Date, "0".repeat(8)),
+            (ClockRequest::Time, "0".repeat(9)),
+        ] {
+            let host_request = HostRequest::Clock(request);
+            let request_size = mainframe_env_host_api::canonical_request_size(
+                &host_request,
+                descriptor
+                    .max_request_bytes
+                    .min(mainframe_env_host_api::MAX_CANONICAL_EFFECT_BYTES),
+            );
+            assert!(
+                request_size.is_ok(),
+                "clock request {request:?} canonical size exceeds max_request_bytes={}",
+                descriptor.max_request_bytes
+            );
+            let host_result: Result<HostResult, HostProblem> = Ok(HostResult::Clock(result));
+            let result_size = mainframe_env_host_api::canonical_result_size(
+                &host_result,
+                descriptor
+                    .max_result_bytes
+                    .min(mainframe_env_host_api::MAX_CANONICAL_EFFECT_BYTES),
+            );
+            assert!(
+                result_size.is_ok(),
+                "clock result for {request:?} canonical size exceeds max_result_bytes={}",
+                descriptor.max_result_bytes
+            );
+        }
+    }
+
+    /// Regression test for #195. Every `ClockRequest` variant must round-trip
+    /// through `ScopedHostService::invoke` with the real `SystemClockProvider`.
+    #[test]
+    fn system_clock_request_round_trips_through_the_scoped_host_service() {
+        let l = InvocationLimits::default();
+        let capability = CapabilityId::new("host.clock", l).unwrap();
+        let host = ScopedHostService::new(
+            Arc::new(
+                RegistrySnapshot::new(
+                    1,
+                    vec![Arc::new(SystemClockProvider::new(l)) as Arc<dyn HostProvider>],
+                    l,
+                )
+                .unwrap(),
+            ),
+            HostLimits::default(),
+        );
+        let invocation = Invocation::new(
+            RequestId::new("request", l).unwrap(),
+            ExecutionId::new("execution", l).unwrap(),
+            RunUnitId::new("run", l).unwrap(),
+            None,
+            Selector::new("test", l).unwrap(),
+            ArtifactRef::new("artifact", l).unwrap(),
+            Principal::new(
+                PrincipalId::new("IBMUSER", l).unwrap(),
+                std::collections::BTreeSet::from([capability]),
+                l,
+            )
+            .unwrap(),
+            ServiceClass::System,
+            0,
+            100,
+            TraceId::new("trace", l).unwrap(),
+            IdempotencyKey::new("idem", l).unwrap(),
+            1,
+            ResourceLimits::default(),
+            std::collections::BTreeMap::new(),
+            l,
+        )
+        .unwrap();
+        for (sequence, request, expected_width) in [
+            (1u64, ClockRequest::UtcTimestamp, 17usize),
+            (2, ClockRequest::Date, 8),
+            (3, ClockRequest::Time, 9),
+        ] {
+            let effect = EffectRequest {
+                run_unit: invocation.run_unit_id.clone(),
+                sequence,
+                deadline_tick: 100,
+                idempotency_key: None,
+                request: HostRequest::Clock(request),
+            };
+            let (result, _audit) = host
+                .invoke(&invocation, 0, false, effect)
+                .into_transaction_parts();
+            match result.outcome {
+                Ok(HostResult::Clock(value)) => assert_eq!(
+                    value.len(),
+                    expected_width,
+                    "clock request {request:?} returned an unexpected width"
+                ),
+                other => panic!("clock request {request:?} must succeed, got {other:?}"),
+            }
+        }
     }
 
     #[test]

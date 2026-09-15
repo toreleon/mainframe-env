@@ -109,6 +109,19 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Fixed `SystemClockProvider`'s request and result budgets being too small for
+  the canonical encoding the host-call guard measures, so CardDemo bill
+  payment's `EXEC CICS ASKTIME` failed with `ResourceExhausted`
+  (`toreleon/mainframe-env#195`). `bf749b2` switched
+  `ScopedHostService::invoke` to measure `canonical_request_size` and
+  `canonical_result_size` instead of `Debug`-formatted length, but didn't
+  re-budget the clock provider's `4309a0a`-era 64-byte `max_request_bytes`
+  and `max_result_bytes` (`crates/apps/mainframe-env-server/src/product.rs`,
+  `SystemClockProvider::new`), so every nested `Clock` request (135/127/127
+  canonical bytes for `UtcTimestamp`/`Date`/`Time`) was rejected before the
+  provider ever dispatched. Both budgets are now 256 bytes, sized to the
+  measured canonical request and result sizes of every `ClockRequest`
+  variant. `cargo xtask carddemo-base-online --check` now passes.
 - Fixed `DatasetService` reloading and fully decoding the whole `dataset-replay`
   provider-state index twice on every dataset request, regardless of whether
   any row had changed (`toreleon/mainframe-env#194`, introduced by `a5fbc43`).
