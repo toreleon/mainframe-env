@@ -67,6 +67,10 @@ fn inquire(
     }
 }
 
+fn valid_program_character(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || matches!(byte, b'$' | b'@' | b'#')
+}
+
 fn transfer(
     service: &CicsService,
     run: &mut Run,
@@ -76,7 +80,7 @@ fn transfer(
     let target = argument_text(request, "PROGRAM")?
         .trim()
         .to_ascii_uppercase();
-    if !matches!(target.len(), 1..=8) || !target.bytes().all(|byte| byte.is_ascii_alphanumeric()) {
+    if !matches!(target.len(), 1..=8) || !target.bytes().all(valid_program_character) {
         return Err(HostProblem::Malformed);
     }
     service.authorize(
