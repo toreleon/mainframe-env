@@ -126,7 +126,7 @@
     },
     {
       "path": "crates/providers/mainframe-env-db2/src/service.rs",
-      "max_production_lines": 3333,
+      "max_production_lines": 3279,
       "responsibility": "Db2 catalog resolution, SQL interpretation, DDL/DML effects, transaction state, and replay are co-located.",
       "split_boundary": "Separate catalog/name resolution, DDL, DML/query, and unit-of-work/replay handlers behind the service."
     },

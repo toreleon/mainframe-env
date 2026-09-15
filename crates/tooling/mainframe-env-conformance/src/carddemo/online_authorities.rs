@@ -162,15 +162,16 @@ pub(super) fn install_base_online_authorities(
 
 pub(super) fn install_db2_authorities(server: &ProductServer) -> Result<(), CorpusProblem> {
     let racf = server.racf_service();
-    for table in [
-        "CARDDEMO.TRANSACTION_TYPE",
-        "CARDDEMO.TRANSACTION_TYPE_CATEGORY",
+    for (table, access) in [
+        ("CARDDEMO.TRANSACTION_TYPE", AccessIntent::Update),
+        ("CARDDEMO.TRANSACTION_TYPE_CATEGORY", AccessIntent::Update),
+        ("SYSIBM.SYSDUMMY1", AccessIntent::Read),
     ] {
         racf.define_profile("DB2TABLE", table, "IBMUSER", None)
             .map_err(terminal_problem)?;
         racf.permit("DB2TABLE", table, "IBMUSER", AccessIntent::Alter)
             .map_err(terminal_problem)?;
-        racf.permit("DB2TABLE", table, "WEBADM", AccessIntent::Update)
+        racf.permit("DB2TABLE", table, "WEBADM", access)
             .map_err(terminal_problem)?;
     }
     Ok(())
@@ -241,6 +242,32 @@ mod tests {
                         "batch installation must retain table access"
                     );
                 }
+            }
+            for (user, intent, expected) in [
+                ("WEBADM", AccessIntent::Read, Ok(())),
+                (
+                    "WEBADM",
+                    AccessIntent::Update,
+                    Err(HostProblem::Unauthorized),
+                ),
+                (
+                    "WEBUSER",
+                    AccessIntent::Read,
+                    Err(HostProblem::Unauthorized),
+                ),
+                ("IBMUSER", AccessIntent::Read, Ok(())),
+            ] {
+                let resource = EnterpriseResource::new(
+                    EnterpriseResourceClass::Db2Table,
+                    "SYSIBM.SYSDUMMY1",
+                    intent,
+                )
+                .unwrap();
+                assert_eq!(
+                    EnterpriseAuthorizer::authorize(&*racf, &principal(user), &resource),
+                    expected,
+                    "{user} {intent:?} SYSIBM.SYSDUMMY1"
+                );
             }
             let unrelated = EnterpriseResource::new(
                 EnterpriseResourceClass::Db2Table,

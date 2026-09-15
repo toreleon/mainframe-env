@@ -1,3 +1,7 @@
+mod cursor;
+
+use cursor::open_cursor;
+
 use crate::catalog::{
     Db2CatalogGeneration, Db2ColumnDefinition, Db2ResultEncoding, Db2TableDefinition,
     input_for_column, normalize_identifier, value_for_column,
@@ -1854,64 +1858,6 @@ fn declare_cursor(
     Ok(success(0, "CURSOR DECLARED", Vec::new()))
 }
 
-fn open_cursor(
-    state: &mut State,
-    run: &str,
-    request: &Db2Request,
-    limits: Db2Limits,
-) -> Result<Db2Result, HostProblem> {
-    if state.cursors.len() >= limits.max_cursors {
-        return Err(HostProblem::ResourceExhausted);
-    }
-    let cursor_name = request.cursor.as_deref().ok_or(HostProblem::Malformed)?;
-    let statement = if request.statement.to_ascii_uppercase().contains(" FROM ") {
-        request.statement.clone()
-    } else {
-        state
-            .cursor_declarations
-            .get(&cursor_key(run, cursor_name))
-            .cloned()
-            .ok_or(HostProblem::NotFound)?
-    };
-    let (_, definition, table) = read_relation(state, run, &statement)?;
-    let backward = statement.to_ascii_uppercase().contains(" DESC");
-    let columns = selected_column_indices(&statement, definition)?;
-    let key_index = *definition
-        .primary_key_indices()?
-        .first()
-        .ok_or(HostProblem::Malformed)?;
-    let start = request
-        .inputs
-        .values()
-        .next()
-        .map(|value| predicate_operand(&definition.columns[key_index], &value.value))
-        .transpose()?;
-    let mut ordered = table.rows.values().collect::<Vec<_>>();
-    ordered.sort_by(|left, right| compare_primary_key_rows(definition, left, right));
-    let mut rows = ordered
-        .into_iter()
-        .filter(|row| {
-            start.as_ref().is_none_or(|start| {
-                start.bytes().is_empty()
-                    || if backward {
-                        row[key_index].as_slice() <= start.bytes()
-                    } else {
-                        row[key_index].as_slice() >= start.bytes()
-                    }
-            })
-        })
-        .map(|row| result_row(definition, row, &columns).map(|row| row.columns))
-        .collect::<Result<Vec<_>, _>>()?;
-    if backward {
-        rows.reverse();
-    }
-    state.cursors.insert(
-        cursor_key(run, cursor_name),
-        Arc::new(Cursor { rows, index: 0 }),
-    );
-    Ok(success(0, "CURSOR OPEN", Vec::new()))
-}
-
 fn fetch_cursor(
     state: &mut State,
     run: &str,
@@ -3508,6 +3454,78 @@ mod tests {
             max_rows: 64,
             mutation,
         }
+    }
+
+    /// Issue #217: inline OPEN retains its table identity for later authorization.
+    #[test]
+    fn inline_open_preserves_fetch_and_close_authorization_after_restart() {
+        struct Policy {
+            allow: std::sync::atomic::AtomicBool,
+            seen: Mutex<Vec<EnterpriseResource>>,
+        }
+        impl EnterpriseAuthorizer for Policy {
+            fn authorize(
+                &self,
+                _: &PrincipalId,
+                resource: &EnterpriseResource,
+            ) -> Result<(), HostProblem> {
+                self.seen.lock().unwrap().push(resource.clone());
+                if self.allow.load(AtomicOrdering::SeqCst) {
+                    Ok(())
+                } else {
+                    Err(HostProblem::Unauthorized)
+                }
+            }
+        }
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let policy = Arc::new(Policy {
+            allow: std::sync::atomic::AtomicBool::new(true),
+            seen: Mutex::new(Vec::new()),
+        });
+        let service =
+            Db2Service::open_authorized(store.clone(), Db2Limits::default(), policy.clone())
+                .unwrap();
+        service.install_catalog(installed_catalog(1)).unwrap();
+        let run = invocation("inline-cursor");
+        let cursor_request = |operation, sequence, statement| {
+            let mut req = request(operation, sequence, statement, BTreeMap::new());
+            req.cursor = Some("C1".into());
+            req
+        };
+        service
+            .execute(
+                &run,
+                &cursor_request(
+                    Db2Operation::OpenCursor,
+                    901,
+                    "DECLARE C1 CURSOR FOR SELECT CODE, DESCRIPTION FROM APP.CODE",
+                ),
+            )
+            .unwrap();
+        drop(service);
+        let service =
+            Db2Service::open_authorized(store, Db2Limits::default(), policy.clone()).unwrap();
+        let fetched = service
+            .execute(
+                &run,
+                &cursor_request(Db2Operation::FetchCursor, 902, "FETCH C1"),
+            )
+            .expect("inline OPEN must retain the table for FETCH authorization");
+        assert_eq!(fetched.rows.len(), 1);
+        policy.allow.store(false, AtomicOrdering::SeqCst);
+        let close = cursor_request(Db2Operation::CloseCursor, 903, "CLOSE C1");
+        assert_eq!(
+            service.execute(&run, &close),
+            Err(HostProblem::Unauthorized)
+        );
+        policy.allow.store(true, AtomicOrdering::SeqCst);
+        service.execute(&run, &close).unwrap();
+        let seen = policy.seen.lock().unwrap();
+        assert_eq!(seen.len(), 4);
+        assert!(seen.iter().all(
+            |resource| resource.class == EnterpriseResourceClass::Db2Table
+                && resource.name.as_str() == "APP.CODE"
+        ));
     }
 
     #[test]

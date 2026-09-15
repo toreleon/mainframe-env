@@ -326,11 +326,18 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Refresh CD-024's derived spool digests for the existing JES-803 step-scoped
+  output layout, preserving record bytes and workload checks (#218).
+
+- Retain inline Db2 cursor declarations on OPEN so FETCH and CLOSE can authorize
+  the original table, including after restart (#217).
+
 - Accept underscores in RACF service resource profiles, consistent with the
   existing security model and command interface (#216).
 
 - Provision CardDemo DB2 maintenance table permissions for WEBADM while retaining
-  IBMUSER installation access and denying WEBUSER (#215).
+  IBMUSER installation access and denying WEBUSER; permit the readiness probe
+  to read SYSIBM.SYSDUMMY1 without granting writes (#215).
 
 - Fixed typed `RETURN` lowering and execution for `LENGTH(LENGTH OF
   commarea)` (#202).
