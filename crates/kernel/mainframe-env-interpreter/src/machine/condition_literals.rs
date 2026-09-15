@@ -104,13 +104,29 @@ pub(super) fn condition_matches(
             }
             index += 3;
         } else {
-            if actual_text == start {
+            if alphanumeric_condition_equal(actual, &start) {
                 return Ok(true);
             }
             index += 1;
         }
     }
     Ok(false)
+}
+
+/// Byte-for-byte COBOL alphanumeric comparison: the shorter operand is
+/// conceptually extended with spaces to the longer operand's length before
+/// the comparison (IBM Enterprise COBOL 6.5, `SS6SG3_6.5/lr/ref/rlpdcmp.html`).
+/// Unlike a trimmed-text comparison, this keeps a condition value made only
+/// of spaces (`VALUE ' '`) distinct from an empty one.
+fn alphanumeric_condition_equal(actual: &[u8], literal_text: &str) -> bool {
+    let literal = literal_text.as_bytes();
+    let length = actual.len().max(literal.len());
+    let pad = |bytes: &[u8]| -> Vec<u8> {
+        let mut padded = bytes.to_vec();
+        padded.resize(length, b' ');
+        padded
+    };
+    pad(actual) == pad(literal)
 }
 
 /// The bytes a `SET condition-name TO TRUE` statement stores for `literal`:

@@ -213,6 +213,20 @@ fn id(r: &FixtureRef) -> Result<&str, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    /// Issue #187 root cause: a subscripted level-88 on an `OCCURS` item
+    /// (COCRDLIC's `SELECT-BLANK`) must match a quoted-space `VALUE`
+    /// literal, not compare it against a trimmed (thus emptied) field.
+    #[test]
+    fn level88_subscripted_condition_matches_a_space_literal_value() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SL187. DATA DIVISION. WORKING-STORAGE SECTION. 01 WS-EDIT-SELECT-FLAGS PIC X(7) VALUE LOW-VALUES. 01 WS-EDIT-SELECT-ARRAY REDEFINES WS-EDIT-SELECT-FLAGS. 05 WS-EDIT-SELECT PIC X(1) OCCURS 7 TIMES. 88 SELECT-OK VALUES 'S', 'U'. 88 UPDATE-REQUESTED-ON VALUE 'U'. 88 SELECT-BLANK VALUES ' ', LOW-VALUES. 01 I PIC 9(1) VALUE 0. PROCEDURE DIVISION. MOVE 'U' TO WS-EDIT-SELECT(1). MOVE ' ' TO WS-EDIT-SELECT(2). PERFORM VARYING I FROM 1 BY 1 UNTIL I > 2 EVALUATE TRUE WHEN SELECT-OK(I) AND UPDATE-REQUESTED-ON(I) DISPLAY 'SELECTED' I WHEN SELECT-BLANK(I) DISPLAY 'BLANK' I WHEN OTHER DISPLAY 'INVALID' I END-EVALUATE END-PERFORM. STOP RUN.";
+        let artifact = crate::compile(source).unwrap();
+        match crate::execute(&artifact, 1024) {
+            mainframe_env_execution_api::MachineDrive::Completed(done) => {
+                assert_eq!(done.output.bytes(), b"SELECTED1\nBLANK2\n");
+            }
+            other => panic!("{other:?}"),
+        }
+    }
     #[test]
     fn all_condition_fixtures_are_exact() {
         verify_cobol_condition_fixtures().unwrap();

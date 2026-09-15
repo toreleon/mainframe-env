@@ -109,6 +109,25 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Fixed the CardDemo card-list selection (`COCRDLIC`, menu COMEN01 option 3)
+  ignoring a row picked with `S`/`U`: choosing a card redisplayed the list
+  (mapset `COCRDLI`) with `ERRMSG` `INVALID ACTION CODE` instead of `XCTL`ing
+  to `COCRDUPC`. `2250-EDIT-ARRAY`'s subscripted level-88 `SELECT-BLANK`
+  (`WS-EDIT-SELECT(n)`, `88 SELECT-BLANK VALUES ' ', LOW-VALUES`) never
+  matched a blank row's single space byte: `condition_matches`
+  (`crates/kernel/mainframe-env-interpreter/src/machine/
+  condition_literals.rs`) compared the field's `.trim()`-med text against the
+  `' '` literal's quote-trimmed (but not space-trimmed) text, so a field
+  holding exactly one space compared `""` against `" "` and never matched.
+  Every blank row then fell into `EVALUATE TRUE`'s `WHEN OTHER`, which set
+  `INPUT-ERROR`/`WS-INVALID-ACTION-CODE` and masked the correctly selected
+  row's `I-SELECTED`. The trimmed comparison dates from `da74f19`, before
+  0.1.1; the change that made the `' '` value reach it with its space intact
+  after 0.1.1 is not pinned. `condition_matches` now compares the field's raw
+  bytes against the literal's raw bytes after space-padding the shorter
+  operand to the longer's length, matching IBM Enterprise COBOL 6.5
+  alphanumeric comparison rules, so a space-only literal is no longer
+  indistinguishable from an empty one. `toreleon/mainframe-env#187`.
 - Fixed the CardDemo card list (`COCRDLIC` menu COMEN01 option 3) failing
   `9000-READ-FORWARD-EXIT`'s unconditional `ENDBR` with an unhandled
   `INVREQ`, a regression from `0204c9b` on this branch. `0204c9b` made
