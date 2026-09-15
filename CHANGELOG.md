@@ -109,6 +109,31 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Fixed `DatasetService` reloading and fully decoding the whole `dataset-replay`
+  provider-state index twice on every dataset request, regardless of whether
+  any row had changed (`toreleon/mainframe-env#194`, introduced by `a5fbc43`).
+  `DatasetService::invoke_checked`
+  (`crates/providers/mainframe-env-dataset/src/service.rs`) called
+  `refresh_replay_index()` and then, after taking the state lock, reloaded the
+  index a second time; both reloads decoded and validated every listed row,
+  about 43 µs per row, so cost grew with every replay row ever persisted. A
+  new `ReplayIndex` (`crates/providers/mainframe-env-dataset/src/replay_index.rs`)
+  keeps a `(version, payload SHA-256)` fingerprint per key from every
+  request's own writes and syncs the index with one `list_provider_state`
+  call per request, re-decoding a row only when its fingerprint changed and
+  dropping keys no longer listed; a corrupt or duplicate row still fails the
+  request closed without partially applying the sync. `invoke_checked` now
+  syncs once, under the state lock, before `HostRequest::validate`, so store
+  and corruption errors still precede `Malformed`. `refresh_replay_index` is
+  now sync-plus-`len`. This removes the largest measured cost in the
+  CREASTMT (STEP040, `CBSTM03A`) slowdown from `toreleon/mainframe-env#185`:
+  at CALL 200 of an instrumented run, the two reloads took 102 ms of a
+  106 ms request over 1,192 rows. It doesn't remove all of the slowdown. In
+  the `carddemo-operator-submit` gate, the wall time between dataset
+  requests still rises with the replay row count, by about 11-14 µs per row
+  (25 ms at 1,148 rows, 99 ms at 7,569), so CREASTMT still doesn't finish
+  within `timeout --signal=KILL 590`. Where that per-row cost comes from is
+  being measured; `#185` and `#194` stay open.
 - Fixed `STARTBR` rejecting a full-length all-`X'FF'` `RIDFLD` under the
   default `GTEQ` relation with `NOTFND` instead of positioning the browse at
   the end of the data set for `READPREV` (IBM topic

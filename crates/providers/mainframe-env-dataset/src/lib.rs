@@ -6,6 +6,7 @@ mod browse;
 mod codec;
 mod dataset_locks;
 mod dependency;
+mod replay_index;
 mod retention;
 mod service;
 
