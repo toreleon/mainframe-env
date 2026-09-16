@@ -6,9 +6,10 @@
   "transition_justification": [
     "JES-803 retains step and DD ownership instead of aggregating same-name spool files at job scope",
     "JES-802 models NEW allocation before program output and therefore retains the allocation transition in dataset versions",
-    "typed JCL DCB projection preserves blocked record formats from the accepted plan"
+    "typed JCL DCB projection preserves blocked record formats from the accepted plan",
+    "PR #179 / #219: c6b487d corrects Cp037 fixed-record padding (USRSEC PS/KSDS) and retains every digit when adding a negative sign in SORT editing (TCATBALF.REPT). These are the only dataset digest differences from the previous 0.8 receipt; spool hashes and workload counts are unchanged. CD-023 remains byte-identical to its historical completion commit."
   ],
-  "evidence_digest": "sha256:f1416d04cadf4103dfbc47c6f2bacaee31351496aff16442bb6e0f784046eaf7",
+  "evidence_digest": "sha256:9516f51ff809d6c21ea70d21c1c751b4a6fedc760629c10adb40f8d824c721f1",
   "receipt": {
     "schema_version": "mainframe-env.carddemo-base-batch-receipt@1",
     "status": "pass",
@@ -52,7 +53,7 @@
       "AWS.M2.CARDDEMO.SYSTRAN.G0001V00": "c3d8268abed3dc0a925b52d0b8d39b79228a984fac9446968df26f3d77e79027",
       "AWS.M2.CARDDEMO.TCATBALF.BKUP.G0001V00": "2692a03d440129fa14723b33d5b62f23d8b6f4a09c9bba520241b3ded363d791",
       "AWS.M2.CARDDEMO.TCATBALF.PS": "6d89451b8b46349bbc5bbbb5ddfe32a8a73bf8d834b2b10db065226f1f41240e",
-      "AWS.M2.CARDDEMO.TCATBALF.REPT": "cac22009628b8708c9133c83934f7a595c54c2686dbe9d46124b11d36b25122a",
+      "AWS.M2.CARDDEMO.TCATBALF.REPT": "b59e145ae008500151003b229fb39a7291dbf2a5c6f1843ee5db24d56b1babd3",
       "AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS": "ffac4bd1dc8f3503e9aa42ad11e5b81c35fe863f2937759b2b7aaf643f6c45fb",
       "AWS.M2.CARDDEMO.TRANCATG.PS": "69101981f70d9d11ab80015eba27817424613b0e806e00d28a369ea4a69b2052",
       "AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS": "0351ebae75a4ddd4fb923d186a12f37af1222efc5b46c0f5e572cfb5c446c7b1",
@@ -68,8 +69,8 @@
       "AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS": "2a6c7ba88748e4068dc0c5bf9cb97f87531f62e3abe891cbd840a3aaf0d7717f",
       "AWS.M2.CARDDEMO.TRXFL.SEQ": "fc50e584fa0015f47ff070d2c2d81ce8d2458dd03c78b673ebd74e0dc6c6d205",
       "AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS": "23973e2603a8eca02c231a5c728a4254f3e35bde2194cdcbe91291053838ccfd",
-      "AWS.M2.CARDDEMO.USRSEC.PS": "ee55894026b6667f243a6ae86858c70b488418797225871145ce71a3ef735f9c",
-      "AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS": "7b1ccee7e3672cce740f2963f3cb7217b6e65865af2fa9a9d2c3ec04d834014a",
+      "AWS.M2.CARDDEMO.USRSEC.PS": "d9161cc69bac7f93acfbb389389f98237a32f4730c27cbf79703e3dbf1d9c249",
+      "AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS": "9024a0fc54ea9b89bb86aa090e5b190fe77cb59e88df484b103182219fde5bd1",
       "AWS.M2.CARDEMO.FTP.TEST": "f8a1aa1f82f78f6884994fe3c62233d04dfd4d8b6e2d1af5c4264982ce3ffcf2",
       "AWS.M2.CARDEMO.FTP.TEST.BKUP": "f8a1aa1f82f78f6884994fe3c62233d04dfd4d8b6e2d1af5c4264982ce3ffcf2",
       "AWS.M2.CARDEMO.FTP.TEST.BKUP.INTRDR": "f8a1aa1f82f78f6884994fe3c62233d04dfd4d8b6e2d1af5c4264982ce3ffcf2"
@@ -102,6 +103,6 @@
       "TRANTYPE": "03ebeb9f7b0abe1d24cd392ac3b0d7943b3d6d16823fccbc192ec527e88759d2",
       "XREFFILE": "e9ec102ea373bbc5816628b21dc069b6a520c33ce6831308df461f003d769845"
     },
-    "journey_shape_sha256": "863465f11c4bed015f70d66e1c68918f46729685499a613871d43344cde1a14d"
+    "journey_shape_sha256": "0cd4f5d879d384d5286a1cb2698d0c0687503802163f29b04060e04550b51d85"
   }
 }

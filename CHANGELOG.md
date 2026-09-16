@@ -326,6 +326,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Refresh CardDemo resource, base-batch, IMS and full derived receipts for existing
+  main behavior after reproducing release 0.1.1 and comparing record bytes; retain
+  historical CD-023 bytes through the existing 0.8 receipt, and keep all workload
+  and source-contract assertions (#219).
+
 - Refresh CD-024's derived spool digests for the existing JES-803 step-scoped
   output layout, preserving record bytes and workload checks (#218).
 
