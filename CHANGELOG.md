@@ -89,32 +89,36 @@ All notable changes to mainframe-env are documented here.
   pseudo-conversation subset to a typed task-control plan. TRANSID is a
   prevalidated 1–4 character literal or field, COMMAREA is captured as an
   input-only copy, and the durable selected route completes the old execution
-  before the next terminal task. Length, channel, input-message, immediate,
-  BTS, higher-level, and DPL ownership remain deferred.
+  before the next terminal task. `LENGTH(LENGTH OF commarea)` selects the
+  captured prefix; other lengths, channel, input-message, immediate, BTS,
+  higher-level, and DPL ownership remain deferred.
 - Migrated the default-cursor `STARTBR`/`READNEXT`/`READPREV`/`ENDBR` file
   browse subset to typed plans. The compiler binds exactly one FILE/DATASET
-  resource and a writable RIDFLD, models RIDFLD as the same input/output slot
-  on reads, and writes the returned record into a pre-resolved INTO area.
+  resource and a writable RIDFLD, admits STARTBR's default-equivalent `GTEQ`,
+  models RIDFLD as the same input/output slot on reads, and writes the returned
+  record into a pre-resolved INTO area.
   REQID/SYSID, alternate key modes and lengths, SET, and UPDATE/TOKEN/RLS
   semantics remain fail-closed.
 - Migrated the explicit-key `DELETE` and `WRITE FILE` compatibility subsets to
   typed file-mutation plans. RIDFLD and WRITE FROM are resolved data-area
   inputs, FILE/DATASET remains one exact resource alias, and both operations
-  carry typed mutation identity. Prior-update/TOKEN deletes, remote and length
-  forms, generic and alternate record identifiers, mass insert, and RLS wait
-  controls remain deferred.
+  carry typed mutation identity. DELETE may instead consume the latest record
+  held by `READ UPDATE`; TOKEN deletes, remote and length forms, generic and
+  alternate record identifiers, mass insert, and RLS wait controls remain
+  deferred.
 - Migrated the local `WRITEQ TD` compatibility subset to a typed queue-write
   plan. QUEUE is a validated 1–4 character literal or field, FROM is a resolved
-  data area, and optional numeric LENGTH truncates the persisted record before
-  idempotency comparison. Remote SYSID routing and unimplemented TDQUEUE
-  definition/open/disabled condition semantics remain fail-closed.
+  data area, and optional numeric LENGTH or `LENGTH OF` selects the persisted
+  prefix before idempotency comparison. Remote SYSID routing and unimplemented
+  TDQUEUE definition/open/disabled condition semantics remain fail-closed.
 - Migrated bounded local `RECEIVE MAP`, `SEND MAP`, and `SEND TEXT` subsets to
   typed terminal plans. MAP and optional MAPSET are validated 1–7 character
-  selectors, MAPSET defaults to MAP, and FROM/INTO storage is resolved before
-  dispatch. RECEIVE uses the requested durable definition for terminal-fit and
-  field normalization. SET pointers, omitted-map AID-only receive, implicit
-  symbolic map storage, lengths, paging, device and other terminal controls
-  remain fail-closed.
+  selectors, with an eight-byte RECEIVE MAPSET field admitted for a valid name
+  plus trailing blank. MAPSET defaults to MAP, and FROM/INTO storage is
+  resolved before dispatch. RECEIVE uses the requested durable definition for
+  terminal-fit and field normalization. SET pointers, omitted-map AID-only
+  receive, implicit symbolic map storage, lengths, paging, device and other
+  terminal controls remain fail-closed.
 - Added a typed `PURGE MESSAGE` route for the runtime's reachable empty
   full-BMS logical-message state. Local execution is an idempotent audited
   mutation that preserves the displayed terminal image; DPL execution returns
@@ -254,6 +258,15 @@ All notable changes to mainframe-env are documented here.
 
 ### Changed
 
+- Extended typed CICS file control with lossless `READ LENGTH`/`KEYLENGTH` and
+  `REWRITE LENGTH` operands, including `LENGTH OF`, actual-length reporting,
+  full-key validation, truncation, and sourced `LENGERR`/`INVREQ` responses.
+  The behavior is bound to baseline
+  `ibm-cics-ts-6x-file-uow-pilot-2026-09-08`, catalog rows
+  `ibm-cics-ts-6x-2026-08-31:api-commands:0156` and `:0181`, and the Options
+  and Conditions sections of
+  `SSJL4D_6.x/reference-applications/commands-api/dfhp4_read.html` and
+  `SSJL4D_6.x/reference-applications/commands-api/dfhp4_rewrite.html`.
 - Scoped local CI to the last successful ancestor, preserving policy/docs
   checks while skipping runtime rebuild/deployment for prose-only changes. Added
   per-command timings, bounded stage timeouts, and focused agent verification rules.
@@ -313,6 +326,376 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Apply typed CICS `WRITE LENGTH`/`KEYLENGTH` through persisted records, resolve
+  dynamic legacy `SEND LENGTH` operands, preserve typed `SEND MAP` ownership
+  during compatibility probing, and keep FORMATTIME admission aligned with its
+  documented output-field widths. Level-88 hexadecimal values now use the same
+  alphanumeric space-padding comparison as quoted values, and exhausted
+  internal-reader child admission cancels the unadmitted child instead of
+  stranding it queued without work.
+
+- Refresh CardDemo resource, base-batch, IMS and full derived receipts for existing
+  main behavior after reproducing release 0.1.1 and comparing record bytes; retain
+  historical CD-023 bytes through the existing 0.8 receipt, and keep all workload
+  and source-contract assertions (#219).
+
+- Refresh CD-024's derived spool digests for the existing JES-803 step-scoped
+  output layout, preserving record bytes and workload checks (#218).
+
+- Retain inline Db2 cursor declarations on OPEN so FETCH and CLOSE can authorize
+  the original table, including after restart (#217).
+
+- Accept underscores in RACF service resource profiles, consistent with the
+  existing security model and command interface (#216).
+
+- Provision CardDemo DB2 maintenance table permissions for WEBADM while retaining
+  IBMUSER installation access and denying WEBUSER; permit the readiness probe
+  to read SYSIBM.SYSDUMMY1 without granting writes (#215).
+
+- Fixed typed `RETURN` lowering and execution for `LENGTH(LENGTH OF
+  commarea)` (#202).
+- Fixed typed `SEND MAP`/`SEND TEXT` admission for the reached `ERASE`,
+  `CURSOR`, and `FREEKB` flags (#203).
+- Fixed typed `STARTBR` admission for its default-equivalent `GTEQ` option
+  (#204).
+- Fixed current-record `DELETE` after `READ UPDATE`, including `INVREQ` 16/31
+  when no record is held (#205).
+- Fixed typed plan validation accepting unrelated extension flags on READ, REWRITE,
+  and SYNCPOINT during the PR #179 merge (#212).
+- Fixed online XCTL and program-exit transfers dropping prior CICS trace entries
+  when replacing the volatile run, introduced by `ad53b3f` (#213).
+- Fixed CardDemo DB2 control-library allocation to reserve directory space for all
+  members (#201). CNTL seeding from `3d1a55b` exceeded the directory capacity
+  enforced by `fe2c1ee`; seven control members now receive two directory blocks.
+- Fixed typed `WRITEQ TD` lowering for `LENGTH(LENGTH OF data-area)` (#206).
+- Fixed bare `DATESEP`/`TIMESEP` defaults and compact FORMATTIME output widths
+  (#207).
+- Fixed typed `RECEIVE MAP` lowering and runtime trimming for eight-byte
+  `MAPSET` data areas (#208).
+- Fixed the stale licensed COBOL oracle digest used by `spec --check` (#209).
+- Fixed `SystemClockProvider`'s request and result budgets being too small for
+  the canonical encoding the host-call guard measures, so CardDemo bill
+  payment's `EXEC CICS ASKTIME` failed with `ResourceExhausted`
+  (`toreleon/mainframe-env#195`). `bf749b2` switched
+  `ScopedHostService::invoke` to measure `canonical_request_size` and
+  `canonical_result_size` instead of `Debug`-formatted length, but didn't
+  re-budget the clock provider's `4309a0a`-era 64-byte `max_request_bytes`
+  and `max_result_bytes` (`crates/apps/mainframe-env-server/src/product.rs`,
+  `SystemClockProvider::new`), so every nested `Clock` request (135/127/127
+  canonical bytes for `UtcTimestamp`/`Date`/`Time`) was rejected before the
+  provider ever dispatched. Both budgets are now 256 bytes, sized to the
+  measured canonical request and result sizes of every `ClockRequest`
+  variant. `cargo xtask carddemo-base-online --check` now passes.
+- Fixed `DatasetService` reloading and fully decoding the whole `dataset-replay`
+  provider-state index twice on every dataset request, regardless of whether
+  any row had changed (`toreleon/mainframe-env#194`, introduced by `a5fbc43`).
+  `DatasetService::invoke_checked`
+  (`crates/providers/mainframe-env-dataset/src/service.rs`) called
+  `refresh_replay_index()` and then, after taking the state lock, reloaded the
+  index a second time; both reloads decoded and validated every listed row,
+  about 43 µs per row, so cost grew with every replay row ever persisted. A
+  new `ReplayIndex` (`crates/providers/mainframe-env-dataset/src/replay_index.rs`)
+  syncs the index with one `list_provider_state` call per request,
+  re-decoding a row only when it changed and dropping keys no longer listed;
+  a corrupt or duplicate row still fails the request closed without
+  partially applying the sync. `invoke_checked` now syncs once, under the
+  state lock, before `HostRequest::validate`, so store and corruption
+  errors still precede `Malformed`. `refresh_replay_index` is now
+  sync-plus-`len`.
+
+  The first cut of this fix kept a `(version, payload SHA-256)` fingerprint
+  per key and rebuilt the index map on every sync, which removed the
+  repeated decode but still cost about 13.4 µs per replay row on every
+  request, even when nothing had changed: an instrumented
+  `carddemo-operator-submit` gate run (logging every 25th
+  `invoke_checked`'s phase timings) found about 10 of those 13.4 µs/row
+  recomputing the SHA-256 digest and about 2.8 µs/row cloning unchanged
+  entries into a freshly rebuilt `BTreeMap`; request application itself grew
+  only about 0.4 µs/row. `ReplayIndex` now keeps the committed payload bytes
+  in each entry and detects a changed row by comparing `version`, then
+  payload length, then payload bytes — no digest — and updates
+  `self.entries` in place instead of rebuilding it, so an unchanged sync
+  touches, clones, or decodes nothing. A request still lists the namespace
+  and compares each row's bytes, so some per-row work remains, but it is
+  small enough that the CREASTMT (STEP040, `CBSTM03A`) slowdown in
+  `toreleon/mainframe-env#185` is gone: `timeout --signal=KILL 590 cargo
+  xtask carddemo-operator-submit --check` now completes and passes, in about
+  3 minutes 21 seconds, where it was previously killed at 590 s without
+  finishing.
+- Fixed `STARTBR` rejecting a full-length all-`X'FF'` `RIDFLD` under the
+  default `GTEQ` relation with `NOTFND` instead of positioning the browse at
+  the end of the data set for `READPREV` (IBM topic
+  `SSJL4D_6.x/reference-applications/commands-api/dfhp4_startbr.html`, RIDFLD
+  option). COTRN02C's add-transaction browse
+  (`MOVE HIGH-VALUES TO TRAN-ID` then `STARTBR ... KEYLENGTH(LENGTH OF
+  TRAN-ID)`) relies on this VSAM behavior to find the last transaction ID, so
+  the online add journey (`toreleon/mainframe-env#191`,
+  `carddemo.online.transaction_add_drift`) wrote no record. `0df4cdb` added
+  the `relation` field and a bounds check to `DatasetRequest::StartBrowse`
+  (`crates/providers/mainframe-env-dataset/src/service.rs`) that rejected any
+  out-of-range key without registering a cursor. The CardDemo journey only
+  reached it once #181, #183, #184 and #187 were fixed. A full-length
+  all-`X'FF'` key under `GreaterOrEqual` on a non-empty data set now
+  registers the cursor at `identities.len()`, ready for `READPREV`; a
+  shorter `GENERIC` all-`X'FF'` key, a non-`X'FF'` out-of-range key, and any
+  key on an empty data set keep returning `NOTFND`.
+- Removed one of two causes of `CREASTMT` (STEP040, `CBSTM03A`) slowing down
+  over its run and never finishing in the `carddemo-operator-submit` gate;
+  the other, the dataset replay index, is the `#194` entry above.
+  `MemoryStore`'s per-effect journal methods (`admit_execution`,
+  `commit_execution_step`, and `mutate_provider_states_atomic`, which backs
+  `put_provider_states_atomic`, in
+  `crates/stores/mainframe-env-store/src/memory.rs`) staged every write by
+  cloning the whole `State`, a cost proportional to store size. `c77006a` (#55)
+  made the installed-program child `CALL` path durable instead of going
+  through `ExecutionCoordinator::with_host`, so each nested `CALL 'CBSTM03B'`
+  journals its own execution and made about 9 of these clones instead of
+  about 2. These methods now mutate the locked `State` in place under an undo
+  log (`memory/journal.rs`) that records the prior value of only the entries a
+  call touches and restores them, in reverse order, on any `Err`; the six
+  cold-path clones (retention, archive, reconcile) are unchanged. After this
+  change sequential `TRNXFILE` calls stayed flat at about 108 ms each; a
+  profile then showed that remaining time was the dataset replay index
+  being decoded on every request (`toreleon/mainframe-env#194`), which is
+  fixed separately.
+- Fixed the CardDemo card-list selection (`COCRDLIC`, menu COMEN01 option 3)
+  ignoring a row picked with `S`/`U`: choosing a card redisplayed the list
+  (mapset `COCRDLI`) with `ERRMSG` `INVALID ACTION CODE` instead of `XCTL`ing
+  to `COCRDUPC`. `2250-EDIT-ARRAY`'s subscripted level-88 `SELECT-BLANK`
+  (`WS-EDIT-SELECT(n)`, `88 SELECT-BLANK VALUES ' ', LOW-VALUES`) never
+  matched a blank row's single space byte: `condition_matches`
+  (`crates/kernel/mainframe-env-interpreter/src/machine/
+  condition_literals.rs`) compared the field's `.trim()`-med text against the
+  `' '` literal's quote-trimmed (but not space-trimmed) text, so a field
+  holding exactly one space compared `""` against `" "` and never matched.
+  Every blank row then fell into `EVALUATE TRUE`'s `WHEN OTHER`, which set
+  `INPUT-ERROR`/`WS-INVALID-ACTION-CODE` and masked the correctly selected
+  row's `I-SELECTED`. The trimmed comparison dates from `da74f19`, before
+  0.1.1; the change that made the `' '` value reach it with its space intact
+  after 0.1.1 is not pinned. `condition_matches` now compares the field's raw
+  bytes against the literal's raw bytes after space-padding the shorter
+  operand to the longer's length, matching IBM Enterprise COBOL 6.5
+  alphanumeric comparison rules, so a space-only literal is no longer
+  indistinguishable from an empty one. `toreleon/mainframe-env#187`.
+- Fixed the CardDemo card list (`COCRDLIC` menu COMEN01 option 3) failing
+  `9000-READ-FORWARD-EXIT`'s unconditional `ENDBR` with an unhandled
+  `INVREQ`, a regression from `0204c9b` on this branch. `0204c9b` made
+  `file_control.rs`'s `decimal_argument` (`crates/providers/mainframe-env-cics/
+  src/handlers/file_control.rs`) require `LENGTH`/`KEYLENGTH` as
+  `mainframe-env.cics.decimal@1` for every file-control operation, but left
+  `STARTBR`/`READNEXT`/`READPREV`/`ENDBR` on the legacy-argument route
+  (`execute_legacy`, `crates/kernel/mainframe-env-interpreter/src/machine/
+  typed_cics.rs`), which never resolved a `KEYLENGTH(LENGTH OF x)` clause to
+  that schema. `STARTBR` therefore failed closed with a generic `ERROR`
+  condition instead of ever registering a browse, `READNEXT` failed the same
+  way, and the source program's `ENDBR` -- which correctly never suppresses
+  `INVREQ` -- then raised it against a browse that had never existed.
+  `execute_legacy` now lowers `LENGTH`/`KEYLENGTH` for file-control commands
+  the same way typed `READ`/`REWRITE` already do: a `LENGTH OF x` clause
+  resolves to `x`'s byte length and a halfword binary reference decodes as a
+  whole-number decimal, and a bare numeric `LENGTH`/`KEYLENGTH` literal (such
+  as `KEYLENGTH(16)`) now resolves the same way, with no data-name lookup.
+  `toreleon/mainframe-env#184`.
+- Fixed CardDemo's account-update `SYNCPOINT ROLLBACK` failing with a bare
+  `Unauthorized` (surfaced as `host call failed: Unauthorized`) even though
+  the compensating dataset rewrite it protects was itself authorized.
+  `db2_resources`, `ims_resources`, and `mq_resources`
+  (`crates/providers/mainframe-env-{db2,ims,mq}/src/service.rs`) manufactured
+  a synthetic "CURRENT" unit-of-work resource and asked the enterprise
+  authorizer to approve it for every `Commit`/`Rollback`, even when the run
+  unit never opened a Db2, IMS, or MQ unit of work -- a regression from
+  `a51f274`'s enterprise-resource authorization, which 0.1.1
+  (`44f3081`) predates. `CicsService`'s `syncpoint_db2`/`syncpoint_ims`/
+  `syncpoint_mq` call all three unconditionally on every `SYNCPOINT`, so a
+  CardDemo transaction that never touches Db2/IMS/MQ was denied trying to
+  roll back work it never did. Each `*_resources` function now returns no
+  resources (nothing to authorize) when the run has no pending unit of work
+  for that provider. Fixing the authorization also exposed a second,
+  independent bug in `mainframe-env-ims`/`mainframe-env-mq`'s
+  `execute_at`: an untouched Commit/Rollback still persisted a durable
+  replay row, which `validate_state`'s `f87eaaa` invariant (state must be
+  empty absent an installed definition) then rejected as
+  `InfrastructureFailure` in an environment where IMS/MQ have no installed
+  definitions. Both now skip replay persistence for a Commit/Rollback only
+  when the provider has no installed definitions *and* the run has nothing
+  pending -- an installed-but-untouched Commit/Rollback still persists its
+  replay row, so a redelivered idempotency key still replays the recorded
+  no-op instead of acting on whatever real unit of work the run has since
+  opened. `toreleon/mainframe-env#183`.
+- Fixed `CicsResume` rejecting the ordinary pseudo-conversational hand-off
+  between two different online transactions as a 503
+  `infrastructure_failure`. `crates/apps/mainframe-env-server/src/product.rs`
+  compared `resume_terminal`'s admitted transaction against the terminal's
+  stale pre-resume snapshot instead of re-resolving the online program for
+  whichever transaction `resume_terminal` actually admitted -- a regression
+  from `00f25a9`'s online transfer-loop rewrite, which dropped the
+  `mainframe-env-v0.1.1` (`44f3081`) behavior of always deriving the resumed
+  program from `resume_terminal`'s own result. This broke every CardDemo
+  online transaction transfer via `EXEC CICS RETURN TRANSID(...)`, including
+  `COMEN01C`'s hand-off to `COACTVWC` for the account view.
+  `toreleon/mainframe-env#181`.
+- Admitted pinned AWS CardDemo (`59cc6c2f`)'s bare 3270-logical
+  `EXEC CICS SEND FROM(...) LENGTH(...) NOHANDLE ERASE END-EXEC` -- issued in
+  five ABEND-ROUTINE paragraphs, `app/cbl/COACTUPC.cbl:4211`,
+  `COACTVWC.cbl:924`, `COCRDSLC.cbl:865`, `COCRDUPC.cbl:1539`, and
+  `app/app-transaction-type-db2/cbl/COTRTUPC.cbl:1684` -- through a second
+  generated, compiler-only compatibility descriptor bound to the
+  pre-existing raw `SendText` route the legacy runtime has executed since
+  0.1.1 (`44f3081`). Only the compile gate added in `f8d44ec`/`f1fe39e`
+  rejected it: registry row `ibm-cics-ts-6x-2026-08-31:api-commands:0187`
+  stays `Unready` and `advertised: false`, per the Syntax section of
+  `SSJL4D_6.x/reference-applications/commands-api/dfhp4_send3270logical.html`.
+  `toreleon/mainframe-env#177`. The reviewed runtime-operations table is left
+  unchanged, because editing it moves source-map, extraction, and review
+  receipt digests that cannot be re-verified while `toreleon/mainframe-env#173`
+  blocks the source review. Folding row 0187 into that table and deleting this
+  descriptor is tracked in `toreleon/mainframe-env#180`.
+- Gave every CardDemo conformance-harness check (`toreleon/mainframe-env#175`)
+  that compiles an `app/app-transaction-type-db2/cbl` program the same Db2 DCL library
+  (`app/app-transaction-type-db2/dcl`, as library `db2-dcl`) and
+  `cobol.sql-precompile=true` option that `carddemo_db2_bundles` already gave
+  its own callers. Previously only `carddemo_db2_bundles` did this;
+  `explicit_carddemo_bundles` -- used by `verify_carddemo_data_layouts_from_env`,
+  `verify_carddemo_control_flow_from_env`, `verify_carddemo_core_semantics_from_env`,
+  `verify_carddemo_file_call_semantics_from_env`, `verify_carddemo_host_operands_from_env`,
+  `verify_carddemo_cics_abi_from_env`, `verify_carddemo_cics_runtime_from_env`,
+  `verify_carddemo_vsam_from_env`, `verify_carddemo_batch_programs_from_env`,
+  `verify_carddemo_base_batch_from_env`, `verify_carddemo_ims_from_env`,
+  `verify_carddemo_mq_authorization_from_env`, and `carddemo_base_online_definition`
+  -- built Db2-program bundles without it, so `EXEC SQL INCLUDE DCLTRTYP
+  END-EXEC` was never expanded and the DCLGEN group was absent. Since typed
+  receiver resolution landed (`229077a`, `00f25a9`), `cargo xtask
+  carddemo-operator-install --check` and `cargo xtask carddemo-cics --check`
+  failed closed with `carddemo.cics.hir_failed: app/app-transaction-type-db2
+  /cbl/COTRTLIC.cbl missing HIR` because `COMPUTE DCL-TR-DESCRIPTION-LEN`
+  could not resolve its typed receiver. `explicit_carddemo_bundles` now
+  builds every Db2-program bundle with the DCL library and precompile option
+  itself, and `carddemo_db2_bundles` is a plain filter over it with no
+  duplicated construction; non-Db2 program bundles are unchanged.
+  COTRTLIC now compiles; both checks still fail closed, now on
+  `app/app-transaction-type-db2/cbl/COTRTUPC.cbl`, on a pre-existing, unrelated
+  gap (`InvalidResolvedStatement(ExecCics, 1459, "CICS application command
+  SEND is catalog-known but its handler is unready")`) that already
+  reproduces on this base commit via `cargo xtask carddemo-db2 --check`,
+  which already built COTRTUPC's bundle correctly through
+  `carddemo_db2_bundles`; tracked in `toreleon/mainframe-env#177`.
+- Accepted `DATASET(...)` as `FILE`'s compatibility spelling on every CICS
+  file-control command whose registry row declares a `FILE` option and does
+  not itself declare `DATASET`: READ, READNEXT, READPREV, REWRITE, WRITE,
+  DELETE, STARTBR, RESETBR, ENDBR, and UNLOCK. Pinned AWS CardDemo `59cc6c2f`
+  writes `DATASET(...)` at `app/cbl/COBIL00C.cbl:443` (STARTBR),
+  `app/cbl/COCRDLIC.cbl:1129` (STARTBR, plus three more masked sites in the
+  same program), `app/cbl/COUSR01C.cbl:240` (WRITE), and
+  `app/cbl/COUSR03C.cbl:306` (DELETE); `COTRN00C`, `COTRN02C`, and `COUSR00C`
+  were masked by an earlier comment-line failure. Since `f1fe39e` ("enforce
+  generated compiler routing") these failed to compile with `CICS <cmd> has
+  unknown or unreviewed top-level option DATASET`, because the only existing
+  alias -- the shipped typed file plan -- covered just READ and REWRITE. The
+  alias is now derived from the registry descriptor (`family: "file-control"`
+  plus a declared `FILE` option and no declared `DATASET`) instead of a
+  hand-listed command name, following the same compiler-side compatibility
+  precedent as `49ae7c9` ("preserve reviewed compatibility routes"); it never
+  widens any catalog row, the generator, or the conformance JSON. `FILE(...)`
+  and `DATASET(...)` together on one command, and a repeated `DATASET`, are
+  still rejected. No cached pinned IBM topic confirms `DATASET` as a
+  documented synonym for `FILE`; this is a bounded compatibility alias with
+  the same standing as the pre-existing READ/REWRITE one, not a confirmed IBM
+  rule. The legacy-compatibility execution route already carried `DATASET`
+  through unchanged --
+  `crates/providers/mainframe-env-cics/src/handlers/file_control.rs:125-126`
+  resolves `DATASET` before falling back to `FILE` for every one of these
+  commands -- so no runtime change was needed.
+- Stopped a standard fixed-format comment line (`*` in column 7, IBM
+  Enterprise COBOL 6.5 Language Reference `rlfmtcom.html`) from reaching
+  statement operand/argument text when it sits inside a multi-line
+  statement. Pinned AWS CardDemo `59cc6c2f` writes such a comment inside
+  an `EXEC CICS ... END-EXEC` option list at seven sites across four
+  programs: `app/cbl/CORPT00C.cbl:575,590`, `app/cbl/COTRN00C.cbl:546,597`,
+  `app/cbl/COTRN02C.cbl:533`, and `app/cbl/COUSR00C.cbl:541,592`. Statement,
+  option, and branch text is sliced from the source by byte span
+  (`token_range` in `crates/kernel/mainframe-env-compiler/src/hir/statement_grammar.rs:960`,
+  14 call sites); the span slicing dates from `5c09dfa` ("Repair COBOL
+  statement grammar and token boundaries"), and comment lines between the
+  first and last token of a span were never excluded, so the comment's
+  text became part of the resolved text. `f1fe39e` ("enforce generated
+  compiler routing") then made the strict CICS top-level clause check
+  reject that leaked text with `CICS top-level clause is malformed`,
+  failing all four programs (`toreleon/mainframe-env#176`), and masked the
+  `DATASET(...)` compatibility gap this file's previous entry fixes for
+  `COTRN00C`, `COTRN02C`, and `COUSR00C`. Comment-line bytes (a fixed-format
+  column-7 comment normalizes to a floating `*>` comment in
+  `normalize_source`, `crates/kernel/mainframe-env-compiler/src/syntax.rs`)
+  are now blanked once, before the procedure grammar lexes the source
+  (`crates/kernel/mainframe-env-compiler/src/hir/source_text.rs`), so
+  every `token_range` call site is fixed at the shared layer with no
+  per-call-site change; quoted literals containing `*` or `*>`, and
+  comment-free statements, are unaffected. `*` is never stripped inside
+  CICS clause resolution itself.
+- Restored CICS application-command options whose pinned syntax diagram draws
+  the parenthesized operand as an independently optional nested group: bare
+  `CURSOR` on `SEND MAP`/`SEND CONTROL`, bare `DATESEP`/`TIMESEP` on
+  `FORMATTIME`, and bare `ERRTERM` on `ROUTE` and `FORMFIELD`/`QUERYPARM` on
+  `WEB STARTBROWSE` once again compile, matching each option's IBM default
+  when its operand is omitted (`dfhp4_sendmap.html`, `dfhp4_formattime.html`,
+  `dfhp4_route.html`, `dfhp4_webstartbrowseformfield.html`,
+  `dfhp4_webstartbrowsequeryparm.html`, all under
+  `SSJL4D_6.x/reference-applications/commands-api/`). `tools/generate_cics_descriptors.py`
+  now derives a new `CicsApplicationOptionValueShape::OptionalValue` shape
+  directly from that nested-group structure in the pinned syntax projection
+  (`conformance/0.9/generated/cics-application-command-contracts.json`)
+  instead of any hand-listed option name, so the fix generalizes to every
+  option the pinned diagrams mark this way. This unblocks
+  `app/cbl/COSGN00C.cbl` and 16 other CardDemo programs that regressed to
+  `MECOB0102: "... requires a parenthesized operand"` at `f8d44ec`
+  ("freeze 263-command contract and registry") and `f1fe39e` ("enforce
+  generated compiler routing"). `app/app-authorization-ims-db2-mq/cbl/COPAUS2C.cbl`'s
+  repeated top-level `NOHANDLE` on one `ASKTIME` command (also regressed by
+  the same two commits) now compiles too (`toreleon/mainframe-env#171`): an
+  exact bare repeat of an option whose registry shape is
+  `CicsApplicationOptionValueShape::Flag` is accepted as idempotent, and the
+  resolved CICS HIR is identical to the single-occurrence form, because a
+  repeated bare flag adds no operand and there is nothing to reconcile.
+  Every other repeat — a non-`Flag`-shape option, or any occurrence that
+  carries a parenthesized operand — is still rejected exactly as before.
+  This is a bounded-ambiguity acceptance the owner can veto in review, not a
+  confirmed IBM rule: the pinned sources cached for this contract
+  (`dfhp4_apiformat.html`, `dfhp4_asktime.html`) describe NOHANDLE's effect
+  but do not state whether repeating it is legal. It would be reversed by a
+  pinned CICS translator-message topic that calls a duplicated option an
+  error.
+- Accepted, evaluated, and executed level-88 condition-names on an alphanumeric
+  group item (including a group declared with a mixed-usage subordinate, such as
+  a BINARY subgroup), whose entries may precede the group's subordinate items,
+  per IBM Enterprise COBOL 6.5 "Format 2" (`SS6SG3_6.5/lr/ref/rlddeva2.html`),
+  "Group comparisons" (`SS6SG3_6.5/lr/ref/rlpdsgrp.html`), "Alphanumeric
+  comparisons" (`SS6SG3_6.5/lr/ref/rlpdsalp.html`), figurative constants
+  (`SS6SG3_6.5/lr/ref/rllancon.html`), "SET for condition-names"
+  (`SS6SG3_6.5/lr/ref/rlpssetd.html`), and hexadecimal-notation alphanumeric
+  literals (`SS6SG3_6.5/lr/ref/rllitahx.html`); national and UTF-8 groups
+  remain outside the executable subset. This unblocks
+  `app/cbl/COACTUPC.cbl`'s `WS-EDIT-US-PHONE-NUM-FLGS`,
+  `app/cbl/CSUTLDTC.cbl`'s `FEEDBACK-TOKEN-VALUE`, and the corresponding
+  group in `app/cpy/CSUTLDWY.cpy` used by `app/cbl/COTRTUPC.cbl`, which
+  previously failed `MECOB0101: InvalidDeclaration` at commit `5de3ce4`.
+- Moved CICS READ/REWRITE `LENGTH`/`KEYLENGTH` clause lowering, dataset-name lock-conflict
+  and delete-lock retention checks, and the CardDemo job-wait/spool-failure helpers into
+  sibling modules, and tightened the reviewed module-review production-line ceilings for
+  `mainframe-env-dataset/src/service.rs` and `mainframe-env-conformance/src/carddemo.rs`.
+- Allowed dataset deletion by the transaction that owns an active allocation lock while
+  preserving lock rejection for unrelated transactions.
+- Kept a job's exclusive dataset-name lock through its own IDCAMS `DELETE` until step end, so
+  the step-end release finds it, while `DISP` terminal deletes still drop the lock with the
+  dataset and other transactions still receive `LOCKED` on the reserved name.
+- Repaired CardDemo conformance harnesses to run submitted jobs on JES background workers,
+  observe terminal state through authenticated z/OSMF routes, and stop workers at gate shutdown.
+- Admitted one durable JES work record for each internal-reader child after its worker-run parent
+  returns, using the child's own validated-plan capabilities and crash-safe duplicate checks.
+- Made CardDemo gates wait for internal-reader child jobs to appear and reach terminal state before
+  checking their completion and output.
+- Attempted admission for every internal-reader child even after an earlier sibling fails, released
+  the parent's own work for a bounded retry on a transient admission failure instead of dead-lettering
+  it immediately, and validated an already-admitted child's record against its frozen identity on
+  reclaim instead of a fresh, possibly drifted capability recomputation.
 - Made legacy EXEC CICS compatibility routes reject source-valid options that
   their pre-typed runtime handlers do not implement, preventing silent operand
   drops while retaining the documented `DATASET` file-name compatibility alias.
@@ -428,9 +811,26 @@ All notable changes to mainframe-env are documented here.
   through a generated compiler descriptor without exposing other SPI commands.
 - Corrected Jenkins checkout/temp storage, tool selection, parameter handling,
   shell portability, and release-target selection.
+- Fixed CREASTMT `STEP040` (`PGM=CBSTM03A`) failing `cargo xtask
+  carddemo-operator-submit --check` with `ResourceExhausted` before the program
+  ran (#182). `hydrate_dds` (`crates/apps/mainframe-env-batch/src/service.rs`)
+  embedded each dataset-backed DD's hydrated records twice -- flattened into
+  `DdPlan::inline_data` and exactly in `ProgramInput::dd_records` (added by
+  `c6b487d`, after `mainframe-env-v0.1.1`'s single flattened copy) -- and
+  `execute_program_controller`'s JSON-encoded `BoundedPayload`
+  (`mainframe-env.program.input@1`, 1 MiB cap) inflated STEP040's 151,700 raw
+  SHR-input bytes to 1,051,400 encoded bytes. `hydrate_dds` now flattens a
+  dataset-backed DD's records into `inline_data` only for `SYSIN` and
+  `SYSLIB*` -- the only DD names whose flattened bytes are still read after
+  hydration (COBOL terminal input and compile-on-run source/copybooks in
+  `mainframe-env-server/src/cobol.rs`, and the IDCAMS builtin's control
+  statements in `program.rs`); every other dataset-backed DD now carries its
+  records exactly once, in `dd_records`.
 
 ### Known issues
 
+- Typed terminal plans forward `CURSOR` and `FREEKB`, but the terminal provider
+  does not yet model cursor placement or keyboard-lock state (#210).
 - These `0.8.3` development changes are not part of the published 0.8.2 tag. The
   [pre-0.9 deep review](docs/reviews/PRE-0.9.0-DEEP-REVIEW.md) records the
   release-truth, durability, security, CI, and documentation blockers that must

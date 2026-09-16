@@ -12,6 +12,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
 pub(crate) mod cics;
 pub(crate) mod decimal;
+mod source_text;
 mod statement_grammar;
 mod typed;
 pub use typed::*;
@@ -605,7 +606,7 @@ fn statement_options(kind: StatementKind, text: &str) -> Vec<StatementOption> {
         return Vec::new();
     }
     let upper = text.to_ascii_uppercase();
-    let tokens = semantic_tokens(text, 1);
+    let tokens = source_text::semantic_tokens(text, 1);
     let mut options = Vec::new();
     for (phrase, kind) in [
         ("NOT AT END", StatementOptionKind::NotAtEnd),
@@ -936,7 +937,7 @@ impl ProcedureParser {
             }
             _ => 1,
         };
-        let arguments = semantic_tokens(header_text, keyword_words);
+        let arguments = source_text::semantic_tokens(header_text, keyword_words);
         if kind == StatementKind::ExecSql
             && arguments
                 .iter()
@@ -972,7 +973,7 @@ impl ProcedureParser {
         match kind {
             StatementKind::GoTo => {
                 let (targets, computed) =
-                    go_to_targets(header_text).ok_or(HirProblem::UnsupportedForm)?;
+                    source_text::go_to_targets(header_text).ok_or(HirProblem::UnsupportedForm)?;
                 self.transfers
                     .extend(targets.into_iter().map(|target| InternalTransfer {
                         node,
@@ -984,7 +985,7 @@ impl ProcedureParser {
             }
             StatementKind::Perform if scope.is_none() => {
                 let (target, through) =
-                    perform_targets(header_text).ok_or(HirProblem::UnsupportedForm)?;
+                    source_text::perform_targets(header_text).ok_or(HirProblem::UnsupportedForm)?;
                 self.transfers.push(InternalTransfer {
                     node,
                     target,
@@ -1230,7 +1231,10 @@ fn paragraph_end(start: usize, labels: &[(String, usize)], node_count: usize) ->
 fn parse_procedure(source: &str, max_statements: usize) -> Result<ParsedProcedure, HirProblem> {
     use statement_grammar::ProcedureEvent;
 
-    let syntax = statement_grammar::parse(source, max_statements)?;
+    // toreleon/mainframe-env#176: blank comment-line bytes before lexing so
+    // they never reach the statement text `token_range` slices below.
+    let source = source_text::blank(source);
+    let syntax = statement_grammar::parse(&source, max_statements)?;
     let mut parser = ProcedureParser::new(max_statements, syntax.sentence_count);
     let mut event_nodes = BTreeMap::new();
     for (event_index, (event, sentence)) in syntax
@@ -1317,86 +1321,6 @@ fn statement_role(kind: StatementKind, scope: Option<ControlScope>) -> ControlRo
     } else {
         ControlRole::Statement
     }
-}
-
-fn perform_targets(text: &str) -> Option<(String, Option<String>)> {
-    let words: Vec<String> = text
-        .split_whitespace()
-        .map(|word| word.trim_matches([',', '.']).to_ascii_uppercase())
-        .collect();
-    let target = words.get(1)?.clone();
-    let through = words
-        .windows(2)
-        .find(|pair| matches!(pair[0].as_str(), "THRU" | "THROUGH"))
-        .map(|pair| pair[1].clone());
-    Some((target, through))
-}
-
-fn go_to_targets(text: &str) -> Option<(Vec<String>, bool)> {
-    let words: Vec<String> = text
-        .split_whitespace()
-        .map(|word| word.trim_matches([',', '.']).to_ascii_uppercase())
-        .collect();
-    let to = words.iter().position(|word| word == "TO")?;
-    let depending = words.iter().position(|word| word == "DEPENDING");
-    let end = depending.unwrap_or(words.len());
-    let targets = words[to + 1..end]
-        .iter()
-        .filter(|word| word.as_str() != ",")
-        .cloned()
-        .collect::<Vec<_>>();
-    (!targets.is_empty()).then_some((targets, depending.is_some()))
-}
-
-fn semantic_tokens(sentence: &str, keyword_words: usize) -> Vec<String> {
-    let mut tokens = Vec::new();
-    let mut current = String::new();
-    let mut quote = None;
-    for ch in sentence.chars() {
-        if matches!(ch, '\'' | '"') {
-            if quote == Some(ch) {
-                current.push(ch);
-                tokens.push(current.clone());
-                current.clear();
-                quote = None;
-            } else if quote.is_none() {
-                if !current.is_empty() {
-                    tokens.push(current.clone());
-                    current.clear();
-                }
-                current.push(ch);
-                quote = Some(ch);
-            } else {
-                current.push(ch);
-            }
-        } else if quote.is_some() {
-            current.push(ch);
-        } else if ch.is_whitespace() || matches!(ch, ',' | '(' | ')' | '=') {
-            if !current.is_empty() {
-                tokens.push(current.clone());
-                current.clear();
-            }
-            if matches!(ch, '=' | '(' | ')') {
-                tokens.push(ch.to_string());
-            }
-        } else {
-            current.push(ch);
-        }
-    }
-    if !current.is_empty() {
-        tokens.push(current);
-    }
-    tokens
-        .into_iter()
-        .skip(keyword_words)
-        .map(|token| {
-            if token.starts_with(['\'', '"']) {
-                token
-            } else {
-                token.to_ascii_uppercase()
-            }
-        })
-        .collect()
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1868,5 +1792,75 @@ mod lifecycle_tests {
             installed_lifecycle(source, &SemanticModel::analyze(source, 4096, 32).unwrap()),
             "unsupported@1"
         );
+    }
+
+    #[test]
+    fn exec_sql_ignores_a_comment_line_between_clauses() {
+        // toreleon/mainframe-env#176: EXEC SQL is built through the same
+        // `token_range` span slicing as EXEC CICS, so a fixed-format
+        // comment line between clauses (here represented in its
+        // post-normalization `*>` form, see `normalize_source` in
+        // syntax.rs) must not leak into the resolved argument tokens.
+        let source = "MAIN.\nEXEC SQL\n    SELECT ACCT-ID\n*>  INTO :WS-BAIT\n    INTO :WS-ACCT-ID\n    FROM ACCOUNT\nEND-EXEC.\nGOBACK.";
+        let parsed = parse_procedure(source, 16).unwrap();
+        let sql = parsed
+            .statements
+            .iter()
+            .find(|statement| statement.kind == StatementKind::ExecSql)
+            .expect("EXEC SQL statement");
+        assert!(
+            !sql.arguments
+                .iter()
+                .any(|argument| argument.contains("BAIT")),
+            "commented clause leaked into arguments: {:?}",
+            sql.arguments
+        );
+    }
+
+    #[test]
+    fn call_using_ignores_a_comment_line_between_arguments() {
+        // toreleon/mainframe-env#176: a non-EXEC multi-line statement
+        // (CALL ... USING) must resolve the same arguments with or
+        // without an interior comment line.
+        let without_comment = parse_procedure(
+            "MAIN.\nCALL 'SUBPGM' USING WS-FIRST, WS-SECOND.\nGOBACK.",
+            16,
+        )
+        .unwrap();
+        let with_comment = parse_procedure(
+            "MAIN.\nCALL 'SUBPGM' USING WS-FIRST,\n*>  WS-BAIT\n WS-SECOND.\nGOBACK.",
+            16,
+        )
+        .unwrap();
+        let arguments = |parsed: &ParsedProcedure| {
+            parsed
+                .statements
+                .iter()
+                .find(|statement| statement.kind == StatementKind::Call)
+                .expect("CALL statement")
+                .arguments
+                .clone()
+        };
+        assert_eq!(arguments(&without_comment), arguments(&with_comment));
+        assert!(
+            !arguments(&with_comment)
+                .iter()
+                .any(|argument| argument.contains("BAIT"))
+        );
+    }
+
+    #[test]
+    fn move_literal_containing_asterisk_marker_is_unaffected() {
+        // Requirement: quoted literals that happen to contain `*` (or the
+        // floating comment marker `*>`) keep their current behavior; only
+        // real comment-line ranges are ever blanked.
+        let parsed =
+            parse_procedure("MAIN.\nMOVE '*>NOT-A-COMMENT' TO WS-FIELD.\nGOBACK.", 16).unwrap();
+        let mv = parsed
+            .statements
+            .iter()
+            .find(|statement| statement.kind == StatementKind::Move)
+            .expect("MOVE statement");
+        assert_eq!(mv.arguments, ["'*>NOT-A-COMMENT'", "TO", "WS-FIELD"]);
     }
 }

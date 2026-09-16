@@ -57,7 +57,7 @@ fn require_separator(name: &str, value: &HirCicsValue) -> Resolution<()> {
                     DataCategory::Alphabetic | DataCategory::Alphanumeric
                 )
         }
-        HirCicsValue::Integer(_) => false,
+        HirCicsValue::Integer(_) | HirCicsValue::LengthOf(_) => false,
     };
     if valid {
         Ok(())
@@ -71,6 +71,8 @@ fn require_separator(name: &str, value: &HirCicsValue) -> Resolution<()> {
 pub(super) fn require_output_shape(
     name: HirCicsOutputName,
     target: &HirDataReference,
+    _clauses: &Clauses,
+    _options: &[String],
 ) -> Resolution<()> {
     match name {
         HirCicsOutputName::Abstime => require_absolute_time(target),
@@ -94,7 +96,7 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::Yyddd
         | HirCicsOutputName::Yymmdd
         | HirCicsOutputName::Yyyymmdd => {
-            let expected = match name {
+            let field = match name {
                 HirCicsOutputName::Mmddyy | HirCicsOutputName::Time | HirCicsOutputName::Yymmdd => {
                     8
                 }
@@ -102,7 +104,7 @@ pub(super) fn require_output_shape(
                 HirCicsOutputName::Yyddd => 6,
                 _ => unreachable!(),
             };
-            if target.length == expected
+            if target.length == field
                 && matches!(
                     target.category,
                     DataCategory::Alphabetic | DataCategory::Alphanumeric
@@ -111,13 +113,14 @@ pub(super) fn require_output_shape(
                 Ok(())
             } else {
                 Err(ResolutionFailure::Invalid(format!(
-                    "CICS FORMATTIME output requires a {expected}-character field"
+                    "CICS FORMATTIME output has an invalid field length for {name:?}"
                 )))
             }
         }
         HirCicsOutputName::Commarea
         | HirCicsOutputName::Into
         | HirCicsOutputName::Ridfld
+        | HirCicsOutputName::Length
         | HirCicsOutputName::Assign(_) => Ok(()),
     }
 }

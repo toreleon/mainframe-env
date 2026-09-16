@@ -18,7 +18,7 @@ pub(super) fn value(tokens: &[String], semantic: &SemanticModel) -> Resolution<H
                     DataCategory::Alphabetic | DataCategory::Alphanumeric
                 )
         }
-        HirCicsValue::Integer(_) => false,
+        HirCicsValue::Integer(_) | HirCicsValue::LengthOf(_) => false,
     };
     if valid {
         Ok(value)

@@ -114,37 +114,44 @@ program. Channel, explicit length, and input-message forms remain compiler
 rejections until their separate contracts are implemented.
 The typed local RETURN subset admits bare completion and an optional TRANSID;
 COMMAREA is admitted only with TRANSID so the copied bytes have an owned durable
-continuation identity. RETURN carries no COMMAREA output. Explicit length,
-channel, input-message, IMMEDIATE, ENDACTIVITY, higher-level, and DPL forms
-remain fail-closed.
+continuation identity. RETURN carries no COMMAREA output. `LENGTH(LENGTH OF
+commarea)` selects the captured prefix; other explicit lengths, channel,
+input-message, IMMEDIATE, ENDACTIVITY, higher-level, and DPL forms remain
+fail-closed.
 The typed default-cursor file-browse subset binds STARTBR, READNEXT, READPREV,
 and ENDBR to exactly one FILE/DATASET alias. STARTBR captures a writable
-RIDFLD without returning a record; READNEXT and READPREV require INTO and
+RIDFLD without returning a record and admits the default-equivalent `GTEQ`
+relation; READNEXT and READPREV require INTO and
 model RIDFLD as the same input/output storage identity so the host-updated key
 feeds the next browse request; ENDBR closes the resource browse. REQID/SYSID,
-KEYLENGTH/LENGTH, SET, alternate RBA/RRN/XRBA and generic key modes, and
+KEYLENGTH/LENGTH, SET, alternate RBA/RRN/XRBA and other generic key modes, and
 UPDATE/TOKEN/RLS locking remain explicit compiler rejections.
-The typed keyed-mutation subset admits DELETE only with an explicit RIDFLD and
-WRITE FILE only with explicit FROM and RIDFLD data areas. Both use the same
-single FILE/DATASET resource binding and typed mutation envelope. DELETE after
-a prior READ UPDATE without RIDFLD, TOKEN correlation, SYSID/length handling,
-generic and alternate record identities, WRITE MASSINSERT, and RLS NOSUSPEND
-remain fail-closed until their update-context and data-definition contracts are
-owned.
+The typed keyed-mutation subset admits DELETE with either an explicit RIDFLD or
+the record held by the task's latest `READ UPDATE` on that file. WRITE FILE
+requires explicit FROM and RIDFLD data areas. Both use the same single
+FILE/DATASET resource binding and typed mutation envelope. TOKEN correlation,
+SYSID/length handling, generic and alternate record identities, WRITE
+MASSINSERT, and RLS NOSUSPEND remain fail-closed.
 The typed local WRITEQ TD subset requires a bounded QUEUE selector and FROM
-storage input, with optional numeric LENGTH. The provider writes exactly the
-selected prefix under the request's mutation identity, so retries compare the
-semantic record rather than ignored trailing bytes. Remote SYSID routing and
-TDQUEUE definition-state conditions remain deferred.
+storage input, with optional numeric LENGTH or `LENGTH OF` that input. The
+provider writes exactly the selected prefix under the request's mutation
+identity, so retries compare the semantic record rather than ignored trailing
+bytes. Remote SYSID routing and TDQUEUE definition-state conditions remain
+deferred.
 The typed local BMS subset binds `RECEIVE MAP`, `SEND MAP`, and `SEND TEXT` to
 the terminal family. Map names are prevalidated 1–7 character literals or
-alpha/alphanumeric fields. `SEND MAP` requires MAP, defaults MAPSET to MAP, and
-optionally captures FROM; `RECEIVE MAP` requires MAP, applies the same MAPSET
-default, and optionally writes INTO; `SEND TEXT` requires FROM. The provider
-uses the requested durable map definition for terminal-fit validation and
-input-field normalization. SET pointers, omitted-map AID-only receive,
-implicit symbolic map storage, explicit length, paging, device and other
-terminal controls remain explicit compiler rejections.
+alpha/alphanumeric fields; a `RECEIVE MAP` MAPSET field may be eight bytes so
+its runtime value can contain a valid name plus a trailing blank. `SEND MAP`
+requires MAP, defaults MAPSET to MAP, and optionally captures FROM; `RECEIVE
+MAP` requires MAP, applies the same MAPSET default, and optionally writes INTO;
+`SEND TEXT` requires FROM. The provider uses the requested durable map
+definition for terminal-fit validation and input-field normalization. SET
+pointers, omitted-map AID-only receive, implicit symbolic map storage, explicit
+length, paging, device and other terminal controls remain explicit compiler
+rejections.
+`CURSOR` and `FREEKB` are admitted and forwarded but are not yet modeled by the
+terminal provider (`#210`). `ERASE` coincides with the provider's existing
+full-screen replacement behavior (`#203`).
 `PURGE MESSAGE` is a separate typed terminal mutation. Because this runtime has
 no ACCUM or page-building route, its reachable full-BMS logical-message state
 is empty: local purge succeeds idempotently without changing the already
@@ -173,11 +180,33 @@ the 263-row registry and its digest, and does not admit `SET FILE`, other
 operations otherwise remain confined to the separate legacy runtime
 collection; SPI/FEPI completion belongs to 0.10.
 
+A second generated, compiler-only compatibility descriptor
+(`toreleon/mainframe-env#177`) admits exactly a bare, non-MAP 3270-logical
+`SEND FROM(...)` -- with optional `LENGTH`, `RESP`, `RESP2` and flags `ERASE`,
+`NOHANDLE`, and no other options -- to the pre-existing raw `SendText` route
+the legacy runtime has executed since 0.1.1. It is bound to application row
+`0187`, whose own reviewed runtime operation (row `0192`, `SEND TEXT`) is
+`SendText`; every sibling `SEND *` form (`MAP`, `TEXT`, `CONTROL`, `PAGE`,
+`PARTNSET`) is an application discriminator and is excluded. Unlike the
+`INQUIRE PROGRAM` route, an option outside this bounded shape does not fail
+closed from the compatibility descriptor itself: it falls through to the
+pre-existing 263-row registry route, so a real, catalog-known SEND option
+(`CTLCHAR`, `WAIT`, `STRFIELD`, `CONVID`, ...) keeps failing with the
+existing "handler is unready" diagnosis for row `0187` instead of a
+fabricated "unknown option" from the compatibility route. This route changes
+no readiness, advertising, count or credit: row `0187` stays `Unready` and
+`advertised: false` in the 263-row registry, and the runtime is unchanged --
+the legacy route already passes `LENGTH` into the `SendText` request exactly
+the way `SEND TEXT` does, since both surface forms share
+`CicsOperation::SendText` and `typed_cics::execute_legacy`. Folding row
+`0187` into the reviewed runtime table itself is deferred until
+`toreleon/mainframe-env#173` lets the source review re-run.
+
 [`tools/generate_cics_descriptors.py`](../../tools/generate_cics_descriptors.py)
 deterministically writes the provider descriptors, host-API identity table,
 263-row contract, compact IR registry, and the isolated compiler-only
-`INQUIRE PROGRAM` SPI compatibility descriptor. `--check` compares all
-generated outputs without writing. Schema, freshness, digest and
+`INQUIRE PROGRAM` and bare-`SEND` legacy compatibility descriptors. `--check`
+compares all generated outputs without writing. Schema, freshness, digest and
 module-boundary checks run under `cargo xtask architecture-fast --check`;
 hand-editing a generated artifact or changing an authority without
 regeneration fails the gate.

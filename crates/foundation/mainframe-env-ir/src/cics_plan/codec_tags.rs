@@ -112,6 +112,7 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::Queue => 23,
         CicsOperandName::Map => 24,
         CicsOperandName::Mapset => 25,
+        CicsOperandName::KeyLength => 26,
     }
 }
 
@@ -143,6 +144,7 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         23 => Ok(CicsOperandName::Queue),
         24 => Ok(CicsOperandName::Map),
         25 => Ok(CicsOperandName::Mapset),
+        26 => Ok(CicsOperandName::KeyLength),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -158,6 +160,12 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u8 {
         CicsPlanOption::Cancel => 6,
         CicsPlanOption::NoDump => 7,
         CicsPlanOption::Reset => 8,
+        CicsPlanOption::Erase => 9,
+        CicsPlanOption::Cursor => 10,
+        CicsPlanOption::DateSep => 11,
+        CicsPlanOption::TimeSep => 12,
+        CicsPlanOption::FreeKb => 13,
+        CicsPlanOption::Gteq => 14,
     }
 }
 
@@ -172,6 +180,12 @@ pub(super) fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodec
         6 => Ok(CicsPlanOption::Cancel),
         7 => Ok(CicsPlanOption::NoDump),
         8 => Ok(CicsPlanOption::Reset),
+        9 => Ok(CicsPlanOption::Erase),
+        10 => Ok(CicsPlanOption::Cursor),
+        11 => Ok(CicsPlanOption::DateSep),
+        12 => Ok(CicsPlanOption::TimeSep),
+        13 => Ok(CicsPlanOption::FreeKb),
+        14 => Ok(CicsPlanOption::Gteq),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -192,6 +206,7 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u8 {
         CicsOutputName::Commarea => 11,
         CicsOutputName::Ridfld => 12,
         CicsOutputName::Assign(output) => ASSIGN_OUTPUT_TAG_BASE + output.tag(),
+        CicsOutputName::Length => 91,
     }
 }
 
@@ -210,6 +225,7 @@ pub(super) fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodec
         10 => Ok(CicsOutputName::Yyyymmdd),
         11 => Ok(CicsOutputName::Commarea),
         12 => Ok(CicsOutputName::Ridfld),
+        91 => Ok(CicsOutputName::Length),
         value => CicsAssignOutput::from_tag(
             value
                 .checked_sub(ASSIGN_OUTPUT_TAG_BASE)

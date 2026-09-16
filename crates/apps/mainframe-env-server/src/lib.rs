@@ -7,6 +7,7 @@ mod config;
 #[allow(dead_code, reason = "R-11 product integration seam")]
 mod console_retention;
 mod environment_secrets;
+mod jes_admission;
 mod jes_worker;
 mod product;
 #[cfg(test)]

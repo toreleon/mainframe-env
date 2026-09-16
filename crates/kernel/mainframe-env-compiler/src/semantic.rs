@@ -3221,6 +3221,144 @@ mod tests {
         }
     }
 
+    /// Per IBM Enterprise COBOL 6.5, VALUE clause format 2
+    /// (`SS6SG3_6.5/lr/ref/rlddeva2.html`), condition-names may be attached
+    /// to an alphanumeric group, their entries follow the conditional
+    /// variable's entry directly, and each value must be an alphanumeric
+    /// literal or figurative constant no longer than the group's total
+    /// elementary size. This mirrors
+    /// `app/cbl/COACTUPC.cbl:101-112`'s `WS-EDIT-US-PHONE-NUM-FLGS`, whose
+    /// level-88 entries precede its subordinate PIC X(01) items.
+    #[test]
+    fn level88_condition_names_on_an_alphanumeric_group_declared_before_its_children() {
+        let model = SemanticModel::analyze(
+            &program(
+                "01 WS-GROUP. 88 WS-GROUP-INVALID VALUE '000'. 88 WS-GROUP-VALID VALUE LOW-VALUES. 05 WS-FLAG-A PIC X(01). 05 WS-FLAG-B PIC X(01). 05 WS-FLAG-C PIC X(01)",
+            ),
+            4096,
+            128,
+        )
+        .unwrap();
+        assert_eq!(
+            model.layout("WS-GROUP").unwrap().category,
+            DataCategory::Group
+        );
+        assert_eq!(model.layout("WS-GROUP").unwrap().element_length, 3);
+        assert_eq!(
+            model.layout("WS-GROUP.WS-GROUP-INVALID").unwrap().category,
+            DataCategory::Condition
+        );
+        assert_eq!(
+            model
+                .layout("WS-GROUP.WS-GROUP-INVALID")
+                .unwrap()
+                .condition_values,
+            ["'000'"]
+        );
+        assert_eq!(
+            model
+                .layout("WS-GROUP.WS-GROUP-VALID")
+                .unwrap()
+                .condition_values,
+            ["LOW-VALUES"]
+        );
+
+        // Negative: a literal longer than the group's total byte length
+        // (3 bytes here) is rejected instead of silently truncated.
+        assert!(
+            SemanticModel::analyze(
+                &program(
+                    "01 WS-GROUP. 88 WS-GROUP-TOO-LONG VALUE '0000'. 05 WS-FLAG-A PIC X(01). 05 WS-FLAG-B PIC X(01). 05 WS-FLAG-C PIC X(01)",
+                ),
+                4096,
+                128,
+            )
+            .is_err()
+        );
+
+        // Negative: an unquoted numeric literal is not an alphanumeric
+        // literal or figurative constant for an alphanumeric group.
+        assert!(
+            SemanticModel::analyze(
+                &program(
+                    "01 WS-GROUP. 88 WS-GROUP-NUMERIC VALUE 000. 05 WS-FLAG-A PIC X(01). 05 WS-FLAG-B PIC X(01). 05 WS-FLAG-C PIC X(01)",
+                ),
+                4096,
+                128,
+            )
+            .is_err()
+        );
+
+        // Scope guard: national and UTF-8 groups stay outside the
+        // executable subset until the topics and matching runtime byte
+        // semantics are in place.
+        assert!(
+            SemanticModel::analyze(
+                &program(
+                    "01 WS-NGROUP GROUP-USAGE NATIONAL. 88 WS-NGROUP-INVALID VALUE '000'. 05 WS-NFLAG-A PIC N(01). 05 WS-NFLAG-B PIC N(01). 05 WS-NFLAG-C PIC N(01)",
+                ),
+                4096,
+                128,
+            )
+            .is_err()
+        );
+    }
+
+    /// `app/cbl/CSUTLDTC.cbl:60-62`: `FEEDBACK-TOKEN-VALUE` puts
+    /// hexadecimal-notation level-88 values (`X'0000000000000000'`) on a
+    /// mixed-usage 8-byte group (a BINARY subgroup plus two PIC X items).
+    /// Per IBM Enterprise COBOL 6.5 (`SS6SG3_6.5/lr/ref/rllitahx.html`), a
+    /// hexadecimal-notation literal is an alphanumeric literal and is valid
+    /// wherever one is.
+    #[test]
+    fn level88_hexadecimal_notation_on_a_mixed_usage_group() {
+        let model = SemanticModel::analyze(
+            &program(
+                "01 FEEDBACK-CODE. 02 FEEDBACK-TOKEN-VALUE. 88 FC-INVALID-DATE VALUE X'0000000000000000'. 88 FC-INSUFFICIENT-DATA VALUE X'000309CB59C3C5C5'. 03 CASE-1-CONDITION-ID. 04 SEVERITY PIC S9(4) BINARY. 04 MSG-NO PIC S9(4) BINARY. 03 CASE-SEV-CTL PIC X. 03 FACILITY-ID PIC XXX",
+            ),
+            4096,
+            128,
+        )
+        .unwrap();
+        assert_eq!(
+            model.layout("FEEDBACK-TOKEN-VALUE").unwrap().category,
+            DataCategory::Group
+        );
+        assert_eq!(
+            model.layout("FEEDBACK-TOKEN-VALUE").unwrap().element_length,
+            8
+        );
+        assert_eq!(
+            model.layout("FC-INVALID-DATE").unwrap().condition_values,
+            ["X'0000000000000000'"]
+        );
+
+        // Negative: the decoded byte length (10), not the 20-hex-digit
+        // character count, must fit the 8-byte group.
+        assert!(
+            SemanticModel::analyze(
+                &program(
+                    "01 FEEDBACK-CODE. 02 FEEDBACK-TOKEN-VALUE. 88 FC-TOO-LONG VALUE X'00000000000000000000'. 03 CASE-1-CONDITION-ID. 04 SEVERITY PIC S9(4) BINARY. 04 MSG-NO PIC S9(4) BINARY. 03 CASE-SEV-CTL PIC X. 03 FACILITY-ID PIC XXX",
+                ),
+                4096,
+                128,
+            )
+            .is_err()
+        );
+
+        // Negative: an odd hex-digit count is malformed hexadecimal notation.
+        assert!(
+            SemanticModel::analyze(
+                &program(
+                    "01 FEEDBACK-CODE. 02 FEEDBACK-TOKEN-VALUE. 88 FC-BAD-HEX VALUE X'000'. 03 CASE-1-CONDITION-ID. 04 SEVERITY PIC S9(4) BINARY. 04 MSG-NO PIC S9(4) BINARY. 03 CASE-SEV-CTL PIC X. 03 FACILITY-ID PIC XXX",
+                ),
+                4096,
+                128,
+            )
+            .is_err()
+        );
+    }
+
     #[test]
     fn synchronized_groups_group_usage_and_types_preserve_layout_contracts() {
         let source = program(

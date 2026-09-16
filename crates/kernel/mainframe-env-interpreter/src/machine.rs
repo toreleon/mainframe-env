@@ -26,6 +26,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::OnceLock;
 
 use typed_decimal::{decimal_add, decimal_divide, decimal_multiply, decimal_subtract};
+mod condition_literals;
 mod corresponding;
 mod decimal_commit;
 mod eib;
@@ -33,6 +34,7 @@ mod layout_admission;
 mod layout_resolution;
 mod typed_cics;
 mod typed_decimal;
+use condition_literals::{condition_matches, condition_true_value_bytes};
 
 const NAMESPACE: &str = "mainframe.core.cobol";
 pub const SUPPORTED_LAYOUT_CATEGORIES: &[&str] = &[
@@ -4859,7 +4861,7 @@ impl ReferenceMachine {
                     _ if is_numeric(parent_layout.category) => CobolValue::Decimal(
                         decimal_text(literal).ok_or(MachineProblem::DataException)?,
                     ),
-                    _ => CobolValue::Bytes(literal.trim_matches(['\'', '"']).as_bytes().to_vec()),
+                    _ => CobolValue::Bytes(condition_true_value_bytes(literal)),
                 };
                 self.write_reference_value(&[parent], &value)?;
             }
@@ -11114,96 +11116,6 @@ fn expanded_picture(picture: &str, limit: usize) -> Result<Vec<u8>, MachineProbl
         output.extend(std::iter::repeat_n(symbol, repeat));
     }
     Ok(output)
-}
-
-fn condition_matches(
-    actual: &[u8],
-    values: &[String],
-    layout: &LayoutMetadata,
-) -> Result<bool, MachineProblem> {
-    if is_numeric(layout.category) && actual.len() == layout.length {
-        let actual = decode_decimal(layout, actual)?;
-        let mut index = 0usize;
-        while index < values.len() {
-            let start = values[index].trim_matches(['\'', '"']);
-            let Some(start) = decimal_text(start) else {
-                break;
-            };
-            if values
-                .get(index + 1)
-                .is_some_and(|value| value == "THRU" || value == "THROUGH")
-            {
-                let end = values
-                    .get(index + 2)
-                    .and_then(|value| decimal_text(value.trim_matches(['\'', '"'])))
-                    .ok_or(MachineProblem::InvalidOperation)?;
-                let (actual_start, start) = decimal_aligned(actual, start)?;
-                let (actual_end, end) = decimal_aligned(actual, end)?;
-                if actual_start.coefficient >= start.coefficient
-                    && actual_end.coefficient <= end.coefficient
-                {
-                    return Ok(true);
-                }
-                index += 3;
-            } else {
-                let (actual, expected) = decimal_aligned(actual, start)?;
-                if actual.coefficient == expected.coefficient {
-                    return Ok(true);
-                }
-                index += 1;
-            }
-        }
-        if index == values.len() {
-            return Ok(false);
-        }
-    }
-    let actual_text = String::from_utf8_lossy(actual).trim().to_string();
-    let mut index = 0usize;
-    while index < values.len() {
-        let normalized = normalize(&values[index]);
-        let figurative = match normalized.as_str() {
-            "SPACE" | "SPACES" => Some(b' '),
-            "ZERO" | "ZEROS" | "ZEROES" => Some(b'0'),
-            "LOW-VALUE" | "LOW-VALUES" => Some(0),
-            "HIGH-VALUE" | "HIGH-VALUES" => Some(0xff),
-            _ => None,
-        };
-        if figurative.is_some_and(|byte| actual.iter().all(|actual| *actual == byte)) {
-            return Ok(true);
-        }
-        let start = values[index].trim_matches(['\'', '"']).to_string();
-        if values
-            .get(index + 1)
-            .is_some_and(|value| value == "THRU" || value == "THROUGH")
-        {
-            let end = values
-                .get(index + 2)
-                .ok_or(MachineProblem::InvalidOperation)?
-                .trim_matches(['\'', '"']);
-            let matched = match (
-                decimal_text(&actual_text),
-                decimal_text(&start),
-                decimal_text(end),
-            ) {
-                (Some(actual), Some(start), Some(end)) => {
-                    let (actual, start) = decimal_aligned(actual, start)?;
-                    let (actual, end) = decimal_aligned(actual, end)?;
-                    actual.coefficient >= start.coefficient && actual.coefficient <= end.coefficient
-                }
-                _ => actual_text.as_str() >= start.as_str() && actual_text.as_str() <= end,
-            };
-            if matched {
-                return Ok(true);
-            }
-            index += 3;
-        } else {
-            if actual_text == start {
-                return Ok(true);
-            }
-            index += 1;
-        }
-    }
-    Ok(false)
 }
 
 fn encode_dataset_record(ccsid: Option<u16>, record: &[u8]) -> Result<Vec<u8>, MachineProblem> {

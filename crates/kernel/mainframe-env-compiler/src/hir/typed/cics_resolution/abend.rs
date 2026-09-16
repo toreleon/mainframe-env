@@ -21,7 +21,7 @@ pub(super) fn operand(
                     DataCategory::Alphabetic | DataCategory::Alphanumeric
                 )
         }
-        HirCicsValue::Integer(_) => false,
+        HirCicsValue::Integer(_) | HirCicsValue::LengthOf(_) => false,
     };
     if !valid {
         return Err(ResolutionFailure::Invalid(

@@ -23,13 +23,13 @@ pub(super) fn value(
                     DataCategory::Alphabetic | DataCategory::Alphanumeric
                 )
         }
-        HirCicsValue::Integer(_) => false,
+        HirCicsValue::Integer(_) | HirCicsValue::LengthOf(_) => false,
     };
     if valid {
         Ok(value)
     } else {
         Err(ResolutionFailure::Invalid(format!(
-            "CICS {command} PROGRAM requires a 1-8 character literal name or an 8-byte alphanumeric data area; names use A-Z, 0-9, $, @, or #"
+            "CICS {command} PROGRAM requires a 1-8 character name literal or an 8-byte alphanumeric data area; names use A-Z, 0-9, $, @, or #"
         )))
     }
 }

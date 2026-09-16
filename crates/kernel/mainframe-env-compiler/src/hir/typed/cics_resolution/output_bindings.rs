@@ -7,6 +7,7 @@ use mainframe_env_ir::CicsAssignOutput;
 
 pub(super) fn resolve(
     clauses: &Clauses,
+    options: &[String],
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsOutputBinding>> {
@@ -39,7 +40,7 @@ pub(super) fn resolve(
         if let Some(value) = clauses.get(name) {
             let target = complete_data_reference(value, semantic)?;
             require_writable(&target)?;
-            format_time::require_output_shape(identity, &target)?;
+            format_time::require_output_shape(identity, &target, clauses, options)?;
             outputs.push(HirCicsOutputBinding {
                 name: identity,
                 target,

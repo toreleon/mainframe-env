@@ -1,6 +1,10 @@
 //! Fail-closed verification for the externally supplied CardDemo corpus.
 
 mod bms;
+mod control_library;
+mod online_authorities;
+
+use online_authorities::install_base_online_authorities;
 
 use bms::{carddemo_base_maps, carddemo_maps};
 
@@ -83,6 +87,11 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 use tower::ServiceExt;
+
+mod carddemo_jobs;
+use carddemo_jobs::{
+    submit_expected_abend, utility_job_failure, wait_for_listed_job, wait_for_submitted_job,
+};
 
 const CORPUS_ENV: &str = "CARDDEMO_CORPUS_DIR";
 
@@ -5118,6 +5127,7 @@ async fn exercise_db2_routes(
         .bootstrap_user("IBMUSER", b"TESTPASS")
         .map_err(terminal_problem)?;
     install_base_online_authorities(&server, corpus_dir, &online)?;
+    online_authorities::install_db2_authorities(&server)?;
     server
         .install_online_application(online)
         .map_err(terminal_problem)?;
@@ -5137,16 +5147,7 @@ async fn exercise_db2_routes(
         .map_err(terminal_problem)?;
 
     let mut sequence = 40_000u64;
-    utility_seed_dataset(
-        &server,
-        "AWS.M2.CARDDEMO.CNTL",
-        DatasetOrganization::Partitioned,
-        RecordFormat::Variable,
-        4_096,
-        None,
-        Vec::new(),
-        &mut sequence,
-    )?;
+    let mut control_members = Vec::new();
     for relative in collect_paths(corpus_dir, &["app/app-transaction-type-db2/ctl"], "ctl")? {
         let member = Path::new(&relative)
             .file_stem()
@@ -5161,17 +5162,20 @@ async fn exercise_db2_routes(
                     format!("{relative} is not UTF-8"),
                 )
             })?;
-        utility_write_dataset(
-            &server,
-            "AWS.M2.CARDDEMO.CNTL",
-            Some(member),
+        control_members.push((
+            member.to_string(),
             source
                 .lines()
                 .map(|line| line.as_bytes().to_vec())
                 .collect(),
-            &mut sequence,
-        )?;
+        ));
     }
+    control_library::seed_control_library(
+        &server,
+        "AWS.M2.CARDDEMO.CNTL",
+        control_members,
+        &mut sequence,
+    )?;
     utility_seed_dataset(
         &server,
         "INPFILE",
@@ -6599,6 +6603,9 @@ async fn exercise_full_certification() -> Result<FullCertificationExercise, Corp
     memory
         .racf_service()
         .permit("JESJOBS", "JOB.**", "APPUSER", AccessIntent::Alter)
+        .map_err(terminal_problem)?;
+    memory
+        .start_background_workers()
         .map_err(terminal_problem)?;
     let app = memory.router();
     let basic = format!(
@@ -9237,7 +9244,7 @@ async fn exercise_base_batch_routes(
     job_ids.insert("INTRDRJ1".into(), internal_id);
     let principal =
         PrincipalId::new("IBMUSER", InvocationLimits::default()).expect("static batch principal");
-    let (jobs, more) = server
+    let (_, more) = server
         .batch_service()
         .list(Some(&principal), None, 128)
         .map_err(terminal_problem)?;
@@ -9247,22 +9254,22 @@ async fn exercise_base_batch_routes(
             "job list exceeded the base-cycle observation bound",
         ));
     }
-    let child = jobs
-        .iter()
-        .find(|job| job.name == "INTRDRJ2")
-        .ok_or_else(|| {
-            CorpusProblem::new(
-                "carddemo.base_batch.internal_missing",
-                "INTRDRJ2 was not submitted",
-            )
-        })?;
+    let child = wait_for_listed_job(
+        &server,
+        &principal,
+        "INTRDRJ2",
+        128,
+        "carddemo.base_batch.internal_missing",
+        "carddemo.base_batch.internal_incomplete",
+    )
+    .await?;
     if child.state != JobState::Completed || child.return_code != Some(0) {
         return Err(CorpusProblem::new(
             "carddemo.base_batch.internal_incomplete",
             format!("INTRDRJ2 did not complete: {child:?}"),
         ));
     }
-    job_ids.insert("INTRDRJ2".into(), child.id.clone());
+    job_ids.insert("INTRDRJ2".into(), child.id);
     if utility_records(&server, "AWS.M2.CARDEMO.FTP.TEST.BKUP.INTRDR", None)?
         != utility_records(&server, "AWS.M2.CARDEMO.FTP.TEST.BKUP", None)?
     {
@@ -9318,16 +9325,25 @@ async fn exercise_base_batch_routes(
     }
 
     let rollback_jcl = "//CD23ROLL JOB CLASS=A\n//FAIL EXEC PGM=NOTREAL\n//WORK DD DSN=AWS.M2.CARDDEMO.CD23.ROLLBACK,DISP=(NEW,KEEP,DELETE),\n// UNIT=SYSDA,DCB=(LRECL=80,RECFM=FB)\n";
+    server
+        .start_background_workers()
+        .map_err(terminal_problem)?;
+    let rollback_headers = base_batch_job_headers();
     let (rollback_status, rollback_body) = terminal_http(
         &app,
         Method::PUT,
         "/zosmf/restjobs/jobs",
-        base_batch_job_headers(),
+        rollback_headers.clone(),
         rollback_jcl.as_bytes().to_vec(),
     )
     .await?;
     let rollback_job: serde_json::Value = serde_json::from_slice(&rollback_body)
         .map_err(|error| CorpusProblem::new("carddemo.base_batch.rollback", error.to_string()))?;
+    let rollback_job = if rollback_status == StatusCode::CREATED {
+        wait_for_submitted_job(&server, &app, &rollback_headers, rollback_job).await?
+    } else {
+        rollback_job
+    };
     if rollback_status != StatusCode::CREATED
         || rollback_job["status"] != "OUTPUT"
         || !rollback_job["retcode"].is_null()
@@ -9778,10 +9794,7 @@ fn base_batch_spool_digests(
     let mut observations = BTreeMap::new();
     for (label, id) in job_ids {
         let job = server.batch_service().get(id).map_err(terminal_problem)?;
-        if !matches!(
-            job.state,
-            JobState::Completed | JobState::Failed | JobState::Cancelled
-        ) {
+        if !job.state.terminal() {
             return Err(CorpusProblem::new(
                 "carddemo.base_batch.job_incomplete",
                 format!("{label}/{id} is not terminal"),
@@ -10328,6 +10341,7 @@ async fn exercise_batch_program_routes(
         ));
     }
     submit_expected_abend(
+        &server,
         &server.router(),
         "//ABENDJOB JOB CLASS=A\n//FAIL EXEC PGM=ABENDCHK\n",
         "ABEND U0999",
@@ -10610,18 +10624,29 @@ async fn exercise_utility_routes() -> Result<UtilityExercise, CorpusProblem> {
     .await?;
     let principal =
         PrincipalId::new("IBMUSER", InvocationLimits::default()).expect("static principal");
-    let (jobs, _) = server
-        .batch_service()
-        .list(Some(&principal), None, 64)
-        .map_err(terminal_problem)?;
-    if !jobs.iter().any(|job| {
-        job.name == "CHILD" && job.state == JobState::Completed && job.return_code == Some(0)
-    }) {
+    let child = wait_for_listed_job(
+        &server,
+        &principal,
+        "CHILD",
+        64,
+        "carddemo.utility.internal_reader_drift",
+        "carddemo.utility.internal_reader_drift",
+    )
+    .await?;
+    if child.state != JobState::Completed || child.return_code != Some(0) {
         return Err(CorpusProblem::new(
             "carddemo.utility.internal_reader_drift",
             "internal reader child job did not complete",
         ));
     }
+    drop(app);
+    if !server.graceful_shutdown().await {
+        return Err(CorpusProblem::new(
+            "carddemo.utility.shutdown_failed",
+            "utility server did not shut down",
+        ));
+    }
+    drop(server);
     let _ = fs::remove_dir_all(&artifact_root);
     Ok(UtilityExercise {
         selected_job_routes: 7,
@@ -10799,7 +10824,7 @@ fn utility_records(
 }
 
 async fn submit_utility_job(
-    server: &ProductServer,
+    server: &Arc<ProductServer>,
     app: &axum::Router,
     jcl: &str,
 ) -> Result<(), CorpusProblem> {
@@ -10809,11 +10834,14 @@ async fn submit_utility_job(
 }
 
 async fn submit_job_with_retcode(
-    server: &ProductServer,
+    server: &Arc<ProductServer>,
     app: &axum::Router,
     jcl: &str,
     expected_retcode: &str,
 ) -> Result<String, CorpusProblem> {
+    server
+        .start_background_workers()
+        .map_err(terminal_problem)?;
     let headers = BTreeMap::from([
         (
             "authorization".into(),
@@ -10828,7 +10856,7 @@ async fn submit_job_with_retcode(
         app,
         Method::PUT,
         "/zosmf/restjobs/jobs",
-        headers,
+        headers.clone(),
         jcl.as_bytes().to_vec(),
     )
     .await?;
@@ -10843,73 +10871,14 @@ async fn submit_job_with_retcode(
     }
     let job: serde_json::Value = serde_json::from_slice(&body)
         .map_err(|error| CorpusProblem::new("carddemo.utility.job_failed", error.to_string()))?;
-    let spool_invocation = base_batch_control_invocation()?;
+    let job = wait_for_submitted_job(server, app, &headers, job).await?;
     if job["status"] != "OUTPUT" || job["retcode"] != expected_retcode {
-        let detail = job["jobid"].as_str().map_or_else(BTreeMap::new, |id| {
-            [
-                "JESMSGLG", "JOBLOG", "SYSPRINT", "SYSOUT", "CMDOUT", "ISFOUT",
-            ]
-            .into_iter()
-            .filter_map(|name| {
-                server
-                    .batch_service()
-                    .spool(&spool_invocation, id, name, 0, 4096)
-                    .ok()
-                    .map(|(records, _)| {
-                        (
-                            name.to_string(),
-                            records
-                                .into_iter()
-                                .map(|record| String::from_utf8_lossy(&record).into_owned())
-                                .collect::<Vec<_>>(),
-                        )
-                    })
-            })
-            .collect()
-        });
-        return Err(CorpusProblem::new(
-            "carddemo.utility.job_failed",
-            format!("utility job did not complete: {job}; spool={detail:?}"),
-        ));
+        return Err(utility_job_failure(server, &job)?);
     }
     job["jobid"]
         .as_str()
         .map(str::to_string)
         .ok_or_else(|| CorpusProblem::new("carddemo.utility.job_failed", "job ID is missing"))
-}
-
-async fn submit_expected_abend(
-    app: &axum::Router,
-    jcl: &str,
-    expected: &str,
-) -> Result<(), CorpusProblem> {
-    let headers = BTreeMap::from([
-        (
-            "authorization".into(),
-            format!(
-                "Basic {}",
-                base64::engine::general_purpose::STANDARD.encode("IBMUSER:TESTPASS")
-            ),
-        ),
-        ("x-csrf-zosmf-header".into(), "true".into()),
-    ]);
-    let (status, body) = terminal_http(
-        app,
-        Method::PUT,
-        "/zosmf/restjobs/jobs",
-        headers,
-        jcl.as_bytes().to_vec(),
-    )
-    .await?;
-    let job: serde_json::Value = serde_json::from_slice(&body)
-        .map_err(|error| CorpusProblem::new("carddemo.batch_program.abend", error.to_string()))?;
-    if status != StatusCode::CREATED || job["status"] != "OUTPUT" || job["retcode"] != expected {
-        return Err(CorpusProblem::new(
-            "carddemo.batch_program.abend",
-            format!("ABEND job returned {status}: {job}"),
-        ));
-    }
-    Ok(())
 }
 
 async fn exercise_base_online_smoke(
@@ -12601,166 +12570,6 @@ fn carddemo_dataset_text_records(
         .collect()
 }
 
-fn install_base_online_authorities(
-    server: &ProductServer,
-    corpus_dir: &Path,
-    definition: &OnlineApplicationDefinition,
-) -> Result<(), CorpusProblem> {
-    let dataset = server.dataset_service();
-    let objects = carddemo_base_seed_objects(corpus_dir)?;
-    dataset
-        .install_seed_generation("CARDDEMO", "g1", objects.clone())
-        .map_err(terminal_problem)?;
-    let mutation = |sequence| Mutation {
-        sequence,
-        idempotency_key: IdempotencyKey::new(
-            format!("carddemo-online-index-{sequence}"),
-            InvocationLimits::default(),
-        )
-        .expect("static mutation key"),
-        transaction: Some("CARDDEMO-INSTALL".into()),
-    };
-    for (sequence, (index, base, offset, length)) in [
-        (
-            "AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.PATH",
-            "AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS",
-            16,
-            11,
-        ),
-        (
-            "AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH",
-            "AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS",
-            25,
-            11,
-        ),
-        (
-            "AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH",
-            "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
-            304,
-            26,
-        ),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        dataset
-            .invoke(DatasetRequest::DefineAlternateIndex {
-                base: DatasetName::new(base, 128).expect("static base"),
-                index: DatasetName::new(index, 128).expect("static index"),
-                key_offset: offset,
-                key_length: length,
-                allow_duplicates: true,
-                upgrade: true,
-                mutation: mutation(sequence as u64 + 1),
-            })
-            .map_err(terminal_problem)?;
-    }
-    let csd = String::from_utf8(read_corpus_file(
-        corpus_dir,
-        &corpus_dir.join("app/csd/CARDDEMO.CSD"),
-    )?)
-    .map_err(|_| CorpusProblem::new("carddemo.online.csd_invalid", "base CSD is not UTF-8"))?;
-    let resources = parse_csd(&csd).map_err(package_problem)?;
-    let aliases = resources
-        .iter()
-        .filter(|resource| resource.kind == "FILE")
-        .map(|resource| {
-            Ok((
-                resource.name.clone(),
-                DatasetName::new(
-                    resource.properties.get("DSNAME").ok_or_else(|| {
-                        CorpusProblem::new(
-                            "carddemo.online.csd_invalid",
-                            format!("{} DSNAME is missing", resource.name),
-                        )
-                    })?,
-                    128,
-                )
-                .map_err(|_| {
-                    CorpusProblem::new(
-                        "carddemo.online.csd_invalid",
-                        format!("{} DSNAME is invalid", resource.name),
-                    )
-                })?,
-            ))
-        })
-        .collect::<Result<BTreeMap<_, _>, CorpusProblem>>()?;
-    server
-        .cics_service()
-        .register_file_definitions(
-            &aliases
-                .iter()
-                .map(|(name, dataset)| {
-                    (
-                        name.clone(),
-                        CicsFileDefinition {
-                            dataset: dataset.clone(),
-                            ccsid: Some(37),
-                        },
-                    )
-                })
-                .collect(),
-        )
-        .map_err(terminal_problem)?;
-
-    server
-        .bootstrap_identity("WEBUSER", b"transport-password")
-        .map_err(terminal_problem)?;
-    server
-        .bootstrap_identity("WEBADM", b"admin-transport-password")
-        .map_err(terminal_problem)?;
-    let racf = server.racf_service();
-    for transaction in definition.transactions.keys() {
-        let resource = format!("CICS.{transaction}");
-        racf.define_profile("TCICSTRN", &resource, "WEBADM", None)
-            .map_err(terminal_problem)?;
-        racf.permit("TCICSTRN", &resource, "WEBADM", AccessIntent::Execute)
-            .map_err(terminal_problem)?;
-        if transaction != "CA00"
-            && !transaction.starts_with("CU")
-            && (!transaction.starts_with("CT")
-                || matches!(transaction.as_str(), "CT00" | "CT01" | "CT02"))
-        {
-            racf.permit("TCICSTRN", &resource, "WEBUSER", AccessIntent::Execute)
-                .map_err(terminal_problem)?;
-        }
-    }
-    for program in definition.programs.iter().map(|program| &program.name) {
-        let resource = format!("CICS.PROGRAM.{program}");
-        racf.define_profile("FACILITY", &resource, "WEBADM", None)
-            .map_err(terminal_problem)?;
-        racf.permit("FACILITY", &resource, "WEBADM", AccessIntent::Execute)
-            .map_err(terminal_problem)?;
-        if !program.starts_with("COADM")
-            && !program.starts_with("COUSR")
-            && !program.starts_with("COTRT")
-        {
-            racf.permit("FACILITY", &resource, "WEBUSER", AccessIntent::Execute)
-                .map_err(terminal_problem)?;
-        }
-    }
-    for name in objects
-        .iter()
-        .map(|object| object.dataset.as_str())
-        .chain(aliases.values().map(DatasetName::as_str))
-        .collect::<BTreeSet<_>>()
-    {
-        racf.define_profile("DATASET", name, "WEBADM", None)
-            .map_err(terminal_problem)?;
-        racf.permit("DATASET", name, "WEBADM", AccessIntent::Update)
-            .map_err(terminal_problem)?;
-        racf.permit("DATASET", name, "WEBUSER", AccessIntent::Update)
-            .map_err(terminal_problem)?;
-    }
-    racf.define_profile("QUEUE", "CICS.TD.JOBS", "WEBADM", None)
-        .map_err(terminal_problem)?;
-    for principal in ["WEBADM", "WEBUSER"] {
-        racf.permit("QUEUE", "CICS.TD.JOBS", principal, AccessIntent::Update)
-            .map_err(terminal_problem)?;
-    }
-    Ok(())
-}
-
 struct TerminalExercise {
     public_routes: usize,
     protocol_fetches: usize,
@@ -13583,13 +13392,25 @@ fn explicit_carddemo_bundles(
         );
     }
     libraries.extend(compatibility_libraries);
+    let (dcl_files, dcl_library) = carddemo_db2_dcl_library(corpus_dir, limits)?;
     let mut bundles = Vec::new();
     for primary_path in source_paths {
+        let is_db2 = primary_path.starts_with("app/app-transaction-type-db2/cbl/");
         let primary = source_file(corpus_dir, &primary_path, limits)?;
         let mut files = Vec::with_capacity(1 + copybooks.len() + compatibility.len());
         files.push(primary);
         files.extend(copybooks.iter().cloned());
         files.extend(compatibility.iter().cloned());
+        let mut bundle_libraries = libraries.clone();
+        let mut options = BTreeMap::new();
+        if is_db2 {
+            files.extend(dcl_files.iter().cloned());
+            bundle_libraries.insert(
+                bundle_libraries.len().saturating_sub(1),
+                dcl_library.clone(),
+            );
+            options.insert("cobol.sql-precompile".into(), "true".into());
+        }
         let logical = LogicalPath::new(&primary_path, limits.max_path_bytes).map_err(|error| {
             CorpusProblem::new(
                 "carddemo.layout.closure_invalid",
@@ -13599,8 +13420,8 @@ fn explicit_carddemo_bundles(
         let bundle = SourceBundle::with_libraries(
             &logical,
             files,
-            libraries.clone(),
-            BTreeMap::new(),
+            bundle_libraries,
+            options,
             Vec::new(),
             limits,
         )
@@ -13615,8 +13436,11 @@ fn explicit_carddemo_bundles(
     Ok(bundles)
 }
 
-fn carddemo_db2_bundles(corpus_dir: &Path) -> Result<Vec<(String, SourceBundle)>, CorpusProblem> {
-    let limits = SourceLimits::default();
+/// Loads the Db2 DCLGEN library shared by every Db2-program bundle.
+fn carddemo_db2_dcl_library(
+    corpus_dir: &Path,
+    limits: SourceLimits,
+) -> Result<(Vec<SourceFile>, SourceLibrary), CorpusProblem> {
     let dcl_paths = collect_paths(corpus_dir, &["app/app-transaction-type-db2/dcl"], "dcl")?;
     let dcl_files = dcl_paths
         .iter()
@@ -13638,33 +13462,16 @@ fn carddemo_db2_bundles(corpus_dir: &Path) -> Result<Vec<(String, SourceBundle)>
             format!("Db2 DCL library is invalid: {problem}"),
         )
     })?;
-    explicit_carddemo_bundles(corpus_dir)?
+    Ok((dcl_files, dcl_library))
+}
+
+/// Db2-program bundles, built by `explicit_carddemo_bundles` itself; this is
+/// only a filter, so no bundle construction is duplicated.
+fn carddemo_db2_bundles(corpus_dir: &Path) -> Result<Vec<(String, SourceBundle)>, CorpusProblem> {
+    Ok(explicit_carddemo_bundles(corpus_dir)?
         .into_iter()
         .filter(|(relative, _)| relative.starts_with("app/app-transaction-type-db2/cbl/"))
-        .map(|(relative, bundle)| {
-            let mut files = bundle.files().to_vec();
-            files.extend(dcl_files.iter().cloned());
-            let mut libraries = bundle.libraries().to_vec();
-            libraries.insert(libraries.len().saturating_sub(1), dcl_library.clone());
-            let mut options = bundle.options().clone();
-            options.insert("cobol.sql-precompile".into(), "true".into());
-            let primary =
-                LogicalPath::new(&relative, limits.max_path_bytes).map_err(|problem| {
-                    CorpusProblem::new(
-                        "carddemo.db2.closure_invalid",
-                        format!("Db2 primary path is invalid: {problem}"),
-                    )
-                })?;
-            SourceBundle::with_libraries(&primary, files, libraries, options, Vec::new(), limits)
-                .map(|bundle| (relative, bundle))
-                .map_err(|problem| {
-                    CorpusProblem::new(
-                        "carddemo.db2.closure_invalid",
-                        format!("Db2 source closure is invalid: {problem}"),
-                    )
-                })
-        })
-        .collect()
+        .collect())
 }
 
 fn collect_paths(
@@ -14221,6 +14028,120 @@ mod tests {
     }
 
     #[test]
+    fn submitted_job_reaches_terminal_state_through_public_route() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let artifact_root = env::temp_dir().join(format!(
+            "mainframe-env-carddemo-job-poll-{}-{nonce}",
+            std::process::id()
+        ));
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let server = ProductServer::open(
+                ServerConfig {
+                    store_profile: StoreProfile::Memory,
+                    artifact_root: artifact_root.clone(),
+                    tls: TlsConfig {
+                        enabled: false,
+                        certificate_path: None,
+                        private_key_reference: None,
+                    },
+                    ..ServerConfig::default()
+                },
+                Arc::new(MemoryStore::new(Default::default())),
+                Arc::new(MemorySecretResolver::default()),
+                default_program_router(),
+            )
+            .unwrap();
+            server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+            let app = server.router();
+            let id = submit_job_with_retcode(
+                &server,
+                &app,
+                "//POLLJOB JOB CLASS=A\n//STEP EXEC PGM=IEFBR14\n",
+                "CC 0000",
+            )
+            .await
+            .unwrap();
+            assert_eq!(
+                server.batch_service().get(&id).unwrap().state,
+                JobState::Completed
+            );
+            drop(app);
+            assert!(server.graceful_shutdown().await);
+            drop(server);
+        });
+        let _ = fs::remove_dir_all(artifact_root);
+    }
+
+    #[test]
+    fn internal_reader_child_reaches_terminal_state_on_background_worker() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let artifact_root = env::temp_dir().join(format!(
+            "mainframe-env-carddemo-intrdr-poll-{}-{nonce}",
+            std::process::id()
+        ));
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let server = ProductServer::open(
+                ServerConfig {
+                    store_profile: StoreProfile::Memory,
+                    artifact_root: artifact_root.clone(),
+                    tls: TlsConfig {
+                        enabled: false,
+                        certificate_path: None,
+                        private_key_reference: None,
+                    },
+                    ..ServerConfig::default()
+                },
+                Arc::new(MemoryStore::new(Default::default())),
+                Arc::new(MemorySecretResolver::default()),
+                default_program_router(),
+            )
+            .unwrap();
+            server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+            let app = server.router();
+            submit_job_with_retcode(
+                &server,
+                &app,
+                "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IEFBR14\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n",
+                "CC 0000",
+            )
+            .await
+            .unwrap();
+            let principal =
+                PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+            let child = wait_for_listed_job(
+                &server,
+                &principal,
+                "CHILD",
+                16,
+                "test.internal_reader.missing",
+                "test.internal_reader.incomplete",
+            )
+            .await
+            .unwrap();
+            assert_eq!(child.state, JobState::Completed);
+            assert_eq!(child.return_code, Some(0));
+            drop(app);
+            assert!(server.graceful_shutdown().await);
+            drop(server);
+        });
+        let _ = fs::remove_dir_all(artifact_root);
+    }
+
+    #[test]
     fn accepted_cdv1_correction_compiles_and_runs_public_route() {
         let inventory = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../../conformance/0.1.1/inventory/carddemo-corpus.json");
@@ -14261,6 +14182,7 @@ mod tests {
             })
             .unwrap();
             server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+            server.start_background_workers().unwrap();
             server
                 .racf_service()
                 .define_profile("DATASET", "AWS.M2.CARDDEMO.**", "IBMUSER", None)
@@ -14282,6 +14204,7 @@ mod tests {
                 })
                 .await
                 .unwrap();
+            assert!(server.graceful_shutdown().await);
         });
     }
 
@@ -14298,5 +14221,128 @@ mod tests {
         assert_eq!(exercise.sqlite_backup_restore_controls, 1);
         assert_eq!(exercise.postgres_restart_controls, 1);
         assert_eq!(exercise.cross_principal_controls, 2);
+    }
+
+    struct BundleCorpus {
+        root: PathBuf,
+    }
+
+    impl BundleCorpus {
+        fn create() -> Self {
+            let nonce = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let root = env::temp_dir().join(format!(
+                "mainframe-env-carddemo-bundle-corpus-{}-{nonce}-{}",
+                std::process::id(),
+                NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed)
+            ));
+            for directory in [
+                "app/cbl",
+                "app/cpy",
+                "app/cpy-bms",
+                "app/app-authorization-ims-db2-mq/cbl",
+                "app/app-authorization-ims-db2-mq/cpy",
+                "app/app-authorization-ims-db2-mq/cpy-bms",
+                "app/app-transaction-type-db2/cbl",
+                "app/app-transaction-type-db2/cpy",
+                "app/app-transaction-type-db2/cpy-bms",
+                "app/app-transaction-type-db2/dcl",
+                "app/app-vsam-mq/cbl",
+            ] {
+                fs::create_dir_all(root.join(directory)).unwrap();
+            }
+            fs::write(
+                root.join("app/cbl/CORTL01.cbl"),
+                b"       IDENTIFICATION DIVISION.\n       PROGRAM-ID. CORTL01.\n",
+            )
+            .unwrap();
+            fs::write(
+                root.join("app/app-transaction-type-db2/cbl/COTRTLIC.cbl"),
+                b"       IDENTIFICATION DIVISION.\n       PROGRAM-ID. COTRTLIC.\n",
+            )
+            .unwrap();
+            fs::write(
+                root.join("app/app-transaction-type-db2/dcl/DCLTRTYP.dcl"),
+                b"       01  DCL-TRAN-TYPE.\n           05  DCL-TR-TYPE PIC X(02).\n",
+            )
+            .unwrap();
+            for (directory, name) in [
+                ("app/cpy", "CVACT01Y.cpy"),
+                ("app/cpy-bms", "CVACT02Y.cpy"),
+                ("app/app-authorization-ims-db2-mq/cpy", "CVACT03Y.cpy"),
+                ("app/app-authorization-ims-db2-mq/cpy-bms", "CVACT04Y.cpy"),
+                ("app/app-transaction-type-db2/cpy", "CVACT05Y.cpy"),
+                ("app/app-transaction-type-db2/cpy-bms", "CVACT06Y.cpy"),
+            ] {
+                fs::write(
+                    root.join(directory).join(name),
+                    b"       01  DUMMY-COPYBOOK-FIELD PIC X(01).\n",
+                )
+                .unwrap();
+            }
+            Self { root }
+        }
+    }
+
+    impl Drop for BundleCorpus {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
+
+    #[test]
+    fn explicit_bundles_apply_db2_dcl_library_and_precompile_option_only_to_db2_programs() {
+        let corpus = BundleCorpus::create();
+        let bundles = explicit_carddemo_bundles(&corpus.root).unwrap();
+        let db2_bundle = bundles
+            .iter()
+            .find(|(relative, _)| relative == "app/app-transaction-type-db2/cbl/COTRTLIC.cbl")
+            .map(|(_, bundle)| bundle)
+            .expect("db2 program bundle is present");
+        assert_eq!(
+            db2_bundle.options().get("cobol.sql-precompile"),
+            Some(&"true".to_string()),
+            "db2 program bundle must enable SQL precompilation"
+        );
+        assert!(
+            db2_bundle
+                .libraries()
+                .iter()
+                .any(|library| library.name() == "db2-dcl"),
+            "db2 program bundle must carry the db2-dcl library"
+        );
+
+        let non_db2_bundle = bundles
+            .iter()
+            .find(|(relative, _)| relative == "app/cbl/CORTL01.cbl")
+            .map(|(_, bundle)| bundle)
+            .expect("non-db2 program bundle is present");
+        assert!(
+            !non_db2_bundle
+                .options()
+                .contains_key("cobol.sql-precompile"),
+            "non-db2 program bundle must not enable SQL precompilation"
+        );
+        assert!(
+            !non_db2_bundle
+                .libraries()
+                .iter()
+                .any(|library| library.name() == "db2-dcl"),
+            "non-db2 program bundle must not carry the db2-dcl library"
+        );
+    }
+
+    #[test]
+    fn db2_bundles_are_a_filter_over_explicit_bundles_with_no_duplicated_construction() {
+        let corpus = BundleCorpus::create();
+        let explicit = explicit_carddemo_bundles(&corpus.root).unwrap();
+        let db2 = carddemo_db2_bundles(&corpus.root).unwrap();
+        let expected: Vec<_> = explicit
+            .into_iter()
+            .filter(|(relative, _)| relative.starts_with("app/app-transaction-type-db2/cbl/"))
+            .collect();
+        assert_eq!(db2, expected);
     }
 }

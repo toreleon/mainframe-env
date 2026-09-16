@@ -6,6 +6,7 @@ use mainframe_env_ir::{
 #[derive(Clone, Copy)]
 pub(super) enum SlotUse {
     Input,
+    HalfwordInput,
     AbcodeInput,
     ProgramNameInput,
     AbstimeInput,
@@ -28,6 +29,7 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::Program => SlotUse::ProgramNameInput,
         CicsOperandName::Abstime => SlotUse::AbstimeInput,
         CicsOperandName::DateSep | CicsOperandName::TimeSep => SlotUse::SeparatorInput,
+        CicsOperandName::KeyLength => SlotUse::Input,
         _ => SlotUse::Input,
     }
 }
@@ -44,7 +46,9 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         }
         CicsOutputName::Mmddyyyy | CicsOutputName::Yyyymmdd => SlotUse::FormatTextOutput(10),
         CicsOutputName::Yyddd => SlotUse::FormatTextOutput(6),
-        CicsOutputName::Resp | CicsOutputName::Resp2 => SlotUse::NumericOutput,
+        CicsOutputName::Resp | CicsOutputName::Resp2 | CicsOutputName::Length => {
+            SlotUse::NumericOutput
+        }
         CicsOutputName::Assign(output) => SlotUse::AssignOutput(output),
     }
 }
@@ -116,6 +120,7 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::Abstime => "ABSTIME",
         CicsOperandName::DateSep => "DATESEP",
         CicsOperandName::TimeSep => "TIMESEP",
+        CicsOperandName::KeyLength => "KEYLENGTH",
     }
 }
 
@@ -135,6 +140,7 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::Yymmdd => "YYMMDD",
         CicsOutputName::Yyyymmdd => "YYYYMMDD",
         CicsOutputName::Assign(output) => output.name(),
+        CicsOutputName::Length => "LENGTH",
     }
 }
 
@@ -149,5 +155,11 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::Task => "TASK",
         CicsPlanOption::Uow => "UOW",
         CicsPlanOption::NoSuspend => "NOSUSPEND",
+        CicsPlanOption::Erase => "ERASE",
+        CicsPlanOption::Cursor => "CURSOR",
+        CicsPlanOption::DateSep => "DATESEP",
+        CicsPlanOption::TimeSep => "TIMESEP",
+        CicsPlanOption::FreeKb => "FREEKB",
+        CicsPlanOption::Gteq => "GTEQ",
     }
 }

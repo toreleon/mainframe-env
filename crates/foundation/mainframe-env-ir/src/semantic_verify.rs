@@ -845,11 +845,19 @@ fn expression_slots<'a>(expression: &'a DecimalExpression, slots: &mut Vec<PlanS
 fn cics_slots(plan: &CicsEffectPlan) -> Vec<PlanSlot<'_>> {
     let mut slots = Vec::new();
     for operand in &plan.operands {
-        if let CicsOperandValue::Storage(slot) = &operand.value {
+        if let CicsOperandValue::Storage(slot) | CicsOperandValue::LengthOf(slot) = &operand.value {
             slots.push(PlanSlot {
                 storage: slot.storage,
                 name: slot.qualified_layout_name.as_str(),
-                usage: SlotUse::READ,
+                usage: if matches!(operand.value, CicsOperandValue::Storage(_))
+                    && matches!(
+                        operand.name,
+                        crate::CicsOperandName::Length | crate::CicsOperandName::KeyLength
+                    ) {
+                    SlotUse::NUMERIC_READ
+                } else {
+                    SlotUse::READ
+                },
             });
         }
     }
@@ -870,7 +878,8 @@ fn cics_slots(plan: &CicsEffectPlan) -> Vec<PlanSlot<'_>> {
             CicsOutputName::Abstime
             | CicsOutputName::Milliseconds
             | CicsOutputName::Resp
-            | CicsOutputName::Resp2 => SlotUse::NUMERIC_WRITE,
+            | CicsOutputName::Resp2
+            | CicsOutputName::Length => SlotUse::NUMERIC_WRITE,
         },
     }));
     if let CicsCondition::Respond {

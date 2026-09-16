@@ -88,5 +88,22 @@ fn return_operands(
             value: HirCicsValue::Data(reference),
         });
     }
+    if let Some(tokens) = clauses.get("LENGTH") {
+        if !tokens
+            .first()
+            .is_some_and(|token| token.eq_ignore_ascii_case("LENGTH"))
+            || !tokens
+                .get(1)
+                .is_some_and(|token| token.eq_ignore_ascii_case("OF"))
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS RETURN LENGTH requires LENGTH OF a data area".into(),
+            ));
+        }
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::Length,
+            value: HirCicsValue::LengthOf(complete_data_reference(&tokens[2..], semantic)?),
+        });
+    }
     Ok(operands)
 }

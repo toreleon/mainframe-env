@@ -67294,7 +67294,7 @@
     ],
     "oracles": [
       {
-        "digest": "sha256:9a9f9d318fe8ceeb5b121daa341c128520243b5dedf28f87fba5721073bd3b0a",
+        "digest": "sha256:064f9f01e808f2db8373dd5c816d0089d55df7c7bd8f514c5793be980073cad2",
         "id": "cobol.enterprise-6.5.licensed"
       }
     ],

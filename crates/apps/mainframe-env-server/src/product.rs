@@ -1,10 +1,10 @@
 use crate::cobol::artifact::admit_executable_artifact;
 use crate::cobol::bind_compatible_runtime_services;
 use crate::console_retention::{decode_console_log_rows, encode_console_log};
+use crate::jes_admission::ChildAdmissionResult;
 use crate::jes_worker::{
-    DurableJesClock, JES_HEARTBEAT_MILLIS, JES_IDLE_MILLIS, JES_LEASE_TICKS,
-    JES_WORK_DEADLINE_TICKS, JES_WORK_GENERATION, JES_WORKER_COUNT, JES_WORKER_FRESHNESS_MILLIS,
-    JesClock, JesWorkPayload,
+    DurableJesClock, JES_HEARTBEAT_MILLIS, JES_IDLE_MILLIS, JES_LEASE_TICKS, JES_WORK_GENERATION,
+    JES_WORKER_COUNT, JES_WORKER_FRESHNESS_MILLIS, JesClock, JesWorkPayload,
 };
 use crate::retention_maintenance::provider::RetentionPlanner;
 use crate::{
@@ -361,7 +361,7 @@ impl SpoolRetentionClock for EnterpriseReplayClock {
 
 pub struct ProductServer {
     config: ServerConfig,
-    store: Arc<dyn PlatformStore>,
+    pub(crate) store: Arc<dyn PlatformStore>,
     secrets: Arc<MemorySecretResolver>,
     racf: Arc<RacfService>,
     cics: Arc<CicsService>,
@@ -370,7 +370,7 @@ pub struct ProductServer {
     ims: Arc<ImsService>,
     mq: Arc<MqService>,
     spool: Arc<SpoolService>,
-    batch: Arc<BatchService>,
+    pub(crate) batch: Arc<BatchService>,
     artifacts: Arc<ProductArtifactStore>,
     host: Arc<ScopedHostService>,
     program: Arc<DefaultProgramRouter>,
@@ -387,7 +387,7 @@ pub struct ProductServer {
     jes_clock: Arc<dyn JesClock>,
     jes_workers_started: AtomicBool,
     jes_workers_stopping: AtomicBool,
-    jes_worker_notify: tokio::sync::Notify,
+    pub(crate) jes_worker_notify: tokio::sync::Notify,
     jes_worker_handles: Mutex<Vec<tokio::task::JoinHandle<()>>>,
     jes_worker_active: AtomicUsize,
     jes_worker_last_progress: Mutex<Vec<Option<Instant>>>,
@@ -459,7 +459,7 @@ const MAX_AUTH_SESSIONS_PER_USER: usize = 8;
 const AUTH_SESSION_ABSOLUTE_TTL_MILLIS: u64 = 8 * 60 * 60 * 1000;
 const AUTH_SESSION_IDLE_TTL_MILLIS: u64 = 30 * 60 * 1000;
 static NEXT_JES_WORKER_POOL: AtomicU64 = AtomicU64::new(1);
-const JES_ALLOWED_WORK_CAPABILITIES: [&str; 15] = [
+pub(crate) const JES_ALLOWED_WORK_CAPABILITIES: [&str; 15] = [
     "host.cics.execute",
     "host.clock",
     "host.dataset.read",
@@ -2822,6 +2822,7 @@ impl ProductServer {
         {
             return Err(HostProblem::Malformed);
         }
+        let child_admission_retry_allowed = work.attempt < work.max_attempts;
         loop {
             let job = self.batch.get(&payload.job_id)?;
             if job.owner != payload.owner {
@@ -2832,9 +2833,23 @@ impl ProductServer {
             }
             match job.state {
                 mainframe_env_batch::JobState::Completed
-                | mainframe_env_batch::JobState::Failed => return Ok(JesWorkOutcome::Completed),
+                | mainframe_env_batch::JobState::Failed => {
+                    return match self.admit_internal_reader_children(
+                        &payload.job_id,
+                        child_admission_retry_allowed,
+                    )? {
+                        ChildAdmissionResult::Ok => Ok(JesWorkOutcome::Completed),
+                        ChildAdmissionResult::Retry => Ok(JesWorkOutcome::Deferred),
+                    };
+                }
                 mainframe_env_batch::JobState::Cancelled => {
-                    return Ok(JesWorkOutcome::Cancelled);
+                    return match self.admit_internal_reader_children(
+                        &payload.job_id,
+                        child_admission_retry_allowed,
+                    )? {
+                        ChildAdmissionResult::Ok => Ok(JesWorkOutcome::Cancelled),
+                        ChildAdmissionResult::Retry => Ok(JesWorkOutcome::Deferred),
+                    };
                 }
                 mainframe_env_batch::JobState::Held => return Ok(JesWorkOutcome::Deferred),
                 mainframe_env_batch::JobState::Submitted
@@ -2872,9 +2887,23 @@ impl ProductServer {
                 .run_claimed(&invocation, &payload.job_id, "INIT0001", false)?
             {
                 Some(job) if job.state == mainframe_env_batch::JobState::Cancelled => {
-                    return Ok(JesWorkOutcome::Cancelled);
+                    return match self.admit_internal_reader_children(
+                        &payload.job_id,
+                        child_admission_retry_allowed,
+                    )? {
+                        ChildAdmissionResult::Ok => Ok(JesWorkOutcome::Cancelled),
+                        ChildAdmissionResult::Retry => Ok(JesWorkOutcome::Deferred),
+                    };
                 }
-                Some(_) => return Ok(JesWorkOutcome::Completed),
+                Some(_) => {
+                    return match self.admit_internal_reader_children(
+                        &payload.job_id,
+                        child_admission_retry_allowed,
+                    )? {
+                        ChildAdmissionResult::Ok => Ok(JesWorkOutcome::Completed),
+                        ChildAdmissionResult::Retry => Ok(JesWorkOutcome::Deferred),
+                    };
+                }
                 None if self.jes_workers_stopping.load(Ordering::SeqCst) => {
                     return Ok(JesWorkOutcome::Deferred);
                 }
@@ -3004,7 +3033,7 @@ impl ProductServer {
         Ok(invocation)
     }
 
-    fn jes_tick(&self) -> Result<u64, HostProblem> {
+    pub(crate) fn jes_tick(&self) -> Result<u64, HostProblem> {
         self.jes_clock.now_tick().map_err(store_error)
     }
 
@@ -3715,9 +3744,6 @@ impl ProductServer {
                     )
                     .map_err(gateway_problem)?;
                 let now_tick = self.jes_tick().map_err(gateway_problem)?;
-                let deadline_tick = now_tick
-                    .checked_add(JES_WORK_DEADLINE_TICKS)
-                    .ok_or_else(|| gateway_problem(HostProblem::ResourceExhausted))?;
                 let snapshot = self
                     .batch
                     .submit(
@@ -3727,39 +3753,12 @@ impl ProductServer {
                         false,
                     )
                     .map_err(gateway_problem)?;
-                let work_id = format!("jes:{}", snapshot.id);
-                let payload =
-                    JesWorkPayload::new(&snapshot.id, &principal, capabilities.iter().copied())
-                        .and_then(|payload| payload.encode())
-                        .map_err(store_error)
-                        .map_err(gateway_problem)?;
-                if let Err(error) = self.store.enqueue(WorkRecord {
-                    work_id: work_id.clone(),
-                    execution_id: invocation.execution_id.clone(),
-                    required_selector: invocation.selector.clone(),
-                    required_generation: JES_WORK_GENERATION.into(),
-                    artifact: invocation.artifact.clone(),
-                    state: WorkState::Queued,
-                    priority: snapshot.priority,
-                    attempt: 0,
-                    max_attempts: 3,
-                    available_tick: now_tick,
-                    deadline_tick,
-                    cancellation_requested: false,
-                    worker_id: None,
-                    lease_id: None,
-                    lease_epoch: 0,
-                    lease_expiry_tick: None,
-                    heartbeat_tick: None,
-                    terminal_tick: None,
-                    checkpoint_id: None,
-                    effect_sequence: 0,
-                    payload,
-                }) {
+                if let Err(error) =
+                    self.enqueue_jes_work(&invocation, &snapshot, &capabilities, now_tick)
+                {
                     let _ = self.batch.cancel(&invocation, &snapshot.id);
-                    return Err(gateway_problem(store_error(error)));
+                    return Err(gateway_problem(error));
                 }
-                self.jes_worker_notify.notify_one();
                 Ok(GatewayResponse::json(
                     StatusCode::CREATED,
                     job_json(snapshot),
@@ -4075,36 +4074,12 @@ impl ProductServer {
                     }
                 }
                 if start_fresh_task {
-                    let snapshot = self
-                        .cics
-                        .terminal_snapshot(&session, &principal_id, current_tick()?)
-                        .map_err(gateway_problem)?;
-                    let online = self.online_transaction(&snapshot.transaction)?;
-                    if let Some((_, artifact)) = online.as_ref() {
-                        artifact::preflight_one(self.artifacts.as_ref(), artifact)
-                            .map_err(gateway_problem)?;
-                    }
-                    let invocation = self.cics_invocation(
+                    self.resume_fresh_online_task(
+                        &session,
                         &principal,
-                        &snapshot.transaction,
-                        online.as_ref().map(|(_, artifact)| artifact.clone()),
+                        &principal_id,
+                        &csrf_token,
                     )?;
-                    let resumed = self
-                        .cics
-                        .resume_terminal(invocation, &session, &csrf_token, current_tick()?)
-                        .map_err(gateway_problem)?;
-                    if resumed.transaction != snapshot.transaction {
-                        return Err(gateway_problem(HostProblem::InfrastructureFailure));
-                    }
-                    if let Some((program, _)) = online {
-                        self.run_online_exchange(
-                            &session,
-                            &principal_id,
-                            &program,
-                            current_tick()?,
-                        )
-                        .map_err(gateway_problem)?;
-                    }
                 }
                 let snapshot = self
                     .cics
@@ -4897,7 +4872,7 @@ impl ProductServer {
         Ok(current)
     }
 
-    fn invocation(
+    pub(crate) fn invocation(
         &self,
         principal: &str,
         selector: &str,
@@ -6106,7 +6081,7 @@ fn wildcard(pattern: &str, value: &str) -> bool {
             .is_some_and(|prefix| value.starts_with(prefix))
 }
 
-fn job_capabilities(
+pub(crate) fn job_capabilities(
     store: &dyn ProviderStateStore,
     plan: &mainframe_env_batch::JobPlan,
 ) -> Result<Vec<&'static str>, HostProblem> {
@@ -6271,7 +6246,7 @@ fn gateway_problem(problem: HostProblem) -> GatewayProblem {
     GatewayProblem::new(status, code, &problem.to_string())
 }
 
-fn store_error(error: StoreError) -> HostProblem {
+pub(crate) fn store_error(error: StoreError) -> HostProblem {
     match error {
         StoreError::Conflict => HostProblem::IdempotencyConflict,
         StoreError::CapacityExceeded | StoreError::PayloadTooLarge => {
@@ -6429,6 +6404,112 @@ mod tests {
             selected.outcome,
             Ok(HostResult::Clock(value)) if value.len() == 17
         ));
+    }
+
+    /// Regression tests for #195. Measured canonical sizes (bf749b2's
+    /// encoding): requests are 135/127/127 bytes and results are 109/100/101
+    /// bytes for UtcTimestamp/Date/Time, all over the old 64-byte budget.
+    #[test]
+    fn system_clock_budgets_fit_every_canonical_clock_request_and_result() {
+        let limits = InvocationLimits::default();
+        let descriptor = &SystemClockProvider::new(limits).descriptor;
+        for (request, result) in [
+            (ClockRequest::UtcTimestamp, "0".repeat(17)),
+            (ClockRequest::Date, "0".repeat(8)),
+            (ClockRequest::Time, "0".repeat(9)),
+        ] {
+            let host_request = HostRequest::Clock(request);
+            let request_size = mainframe_env_host_api::canonical_request_size(
+                &host_request,
+                descriptor
+                    .max_request_bytes
+                    .min(mainframe_env_host_api::MAX_CANONICAL_EFFECT_BYTES),
+            );
+            assert!(
+                request_size.is_ok(),
+                "clock request {request:?} canonical size exceeds max_request_bytes={}",
+                descriptor.max_request_bytes
+            );
+            let host_result: Result<HostResult, HostProblem> = Ok(HostResult::Clock(result));
+            let result_size = mainframe_env_host_api::canonical_result_size(
+                &host_result,
+                descriptor
+                    .max_result_bytes
+                    .min(mainframe_env_host_api::MAX_CANONICAL_EFFECT_BYTES),
+            );
+            assert!(
+                result_size.is_ok(),
+                "clock result for {request:?} canonical size exceeds max_result_bytes={}",
+                descriptor.max_result_bytes
+            );
+        }
+    }
+
+    /// Regression test for #195. Every `ClockRequest` variant must round-trip
+    /// through `ScopedHostService::invoke` with the real `SystemClockProvider`.
+    #[test]
+    fn system_clock_request_round_trips_through_the_scoped_host_service() {
+        let l = InvocationLimits::default();
+        let capability = CapabilityId::new("host.clock", l).unwrap();
+        let host = ScopedHostService::new(
+            Arc::new(
+                RegistrySnapshot::new(
+                    1,
+                    vec![Arc::new(SystemClockProvider::new(l)) as Arc<dyn HostProvider>],
+                    l,
+                )
+                .unwrap(),
+            ),
+            HostLimits::default(),
+        );
+        let invocation = Invocation::new(
+            RequestId::new("request", l).unwrap(),
+            ExecutionId::new("execution", l).unwrap(),
+            RunUnitId::new("run", l).unwrap(),
+            None,
+            Selector::new("test", l).unwrap(),
+            ArtifactRef::new("artifact", l).unwrap(),
+            Principal::new(
+                PrincipalId::new("IBMUSER", l).unwrap(),
+                std::collections::BTreeSet::from([capability]),
+                l,
+            )
+            .unwrap(),
+            ServiceClass::System,
+            0,
+            100,
+            TraceId::new("trace", l).unwrap(),
+            IdempotencyKey::new("idem", l).unwrap(),
+            1,
+            ResourceLimits::default(),
+            std::collections::BTreeMap::new(),
+            l,
+        )
+        .unwrap();
+        for (sequence, request, expected_width) in [
+            (1u64, ClockRequest::UtcTimestamp, 17usize),
+            (2, ClockRequest::Date, 8),
+            (3, ClockRequest::Time, 9),
+        ] {
+            let effect = EffectRequest {
+                run_unit: invocation.run_unit_id.clone(),
+                sequence,
+                deadline_tick: 100,
+                idempotency_key: None,
+                request: HostRequest::Clock(request),
+            };
+            let (result, _audit) = host
+                .invoke(&invocation, 0, false, effect)
+                .into_transaction_parts();
+            match result.outcome {
+                Ok(HostResult::Clock(value)) => assert_eq!(
+                    value.len(),
+                    expected_width,
+                    "clock request {request:?} returned an unexpected width"
+                ),
+                other => panic!("clock request {request:?} must succeed, got {other:?}"),
+            }
+        }
     }
 
     #[test]
@@ -7938,6 +8019,15 @@ mod tests {
     }
 
     fn submit_direct(server: &ProductServer, user: &str, secret: &[u8], name: &str) -> Value {
+        submit_jcl_direct(
+            server,
+            user,
+            secret,
+            format!("//{name} JOB CLASS=A\n//STEP1 EXEC PGM=IEFBR14\n"),
+        )
+    }
+
+    fn submit_jcl_direct(server: &ProductServer, user: &str, secret: &[u8], jcl: String) -> Value {
         let response = server
             .handle(
                 Authentication::Basic {
@@ -7945,7 +8035,7 @@ mod tests {
                     secret: secret.to_vec(),
                 },
                 GatewayRequest::JobSubmit {
-                    jcl: format!("//{name} JOB CLASS=A\n//STEP1 EXEC PGM=IEFBR14\n").into_bytes(),
+                    jcl: jcl.into_bytes(),
                 },
             )
             .unwrap();
@@ -7955,6 +8045,21 @@ mod tests {
         };
         assert_eq!(job["status"], "ACTIVE");
         job
+    }
+
+    fn only_internal_reader_child(
+        server: &ProductServer,
+        parent_job_id: &str,
+    ) -> (
+        mainframe_env_batch::JobSnapshot,
+        mainframe_env_batch::JobPlan,
+    ) {
+        let children = server
+            .batch
+            .internal_reader_children(parent_job_id)
+            .unwrap();
+        assert_eq!(children.len(), 1);
+        children.into_iter().next().unwrap()
     }
 
     async fn wait_for_terminal_job(
@@ -8053,6 +8158,374 @@ mod tests {
     }
 
     #[test]
+    fn reclaimed_terminal_parent_admits_internal_reader_child_once() {
+        let (server, store, clock) = worker_test_server(250);
+        server.bootstrap_user("ALICE", b"ALICEPASS").unwrap();
+        let parent = submit_jcl_direct(
+            &server,
+            "ALICE",
+            b"ALICEPASS",
+            "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IEFBR14\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n"
+                .into(),
+        );
+        let parent_id = parent["jobid"].as_str().unwrap();
+        let parent_work = store
+            .claim("crashed-worker", Some(JES_WORK_GENERATION), 250, 10)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            server.process_claimed_jes_work(&parent_work),
+            Ok(JesWorkOutcome::Completed)
+        );
+        let (child, _) = only_internal_reader_child(&server, parent_id);
+        let child_work_id = format!("jes:{}", child.id);
+        let admitted = store.get_work(&child_work_id).unwrap().unwrap();
+        assert_eq!((admitted.state, admitted.attempt), (WorkState::Queued, 0));
+
+        clock.advance(10);
+        assert_eq!(
+            server.run_jes_worker_once("recovery-worker").unwrap(),
+            Some(format!("jes:{parent_id}"))
+        );
+        let after_reclaim = store.get_work(&child_work_id).unwrap().unwrap();
+        assert_eq!(
+            (after_reclaim.state, after_reclaim.attempt),
+            (WorkState::Queued, 0)
+        );
+        assert_eq!(
+            server.run_jes_worker_once("child-worker").unwrap(),
+            Some(child_work_id.clone())
+        );
+        assert_eq!(store.get_work(&child_work_id).unwrap().unwrap().attempt, 1);
+        assert_eq!(
+            server.batch.get(&child.id).unwrap().state,
+            mainframe_env_batch::JobState::Completed
+        );
+    }
+
+    #[test]
+    fn internal_reader_child_work_uses_the_child_plan_capabilities() {
+        let (server, store, _) = worker_test_server(275);
+        server.bootstrap_user("ALICE", b"ALICEPASS").unwrap();
+        let parent = submit_jcl_direct(
+            &server,
+            "ALICE",
+            b"ALICEPASS",
+            "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IKJEFT01\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n//WORK DD DSN=&&WORK,DISP=(NEW,DELETE,DELETE)\n"
+                .into(),
+        );
+        let parent_id = parent["jobid"].as_str().unwrap();
+        assert_eq!(
+            server.run_jes_worker_once("parent-worker").unwrap(),
+            Some(format!("jes:{parent_id}"))
+        );
+        let (child, child_plan) = only_internal_reader_child(&server, parent_id);
+        let capabilities = job_capabilities(server.store.as_ref(), &child_plan).unwrap();
+        let payload = JesWorkPayload::decode(
+            &store
+                .get_work(&format!("jes:{}", child.id))
+                .unwrap()
+                .unwrap()
+                .payload,
+        )
+        .unwrap();
+        assert_eq!(
+            payload.capabilities,
+            capabilities
+                .into_iter()
+                .map(str::to_string)
+                .collect::<BTreeSet<_>>()
+        );
+        assert!(payload.capabilities.contains("host.db2.read"));
+        assert!(payload.capabilities.contains("host.db2.write"));
+        assert!(!payload.capabilities.contains("host.dataset.read"));
+        assert!(!payload.capabilities.contains("host.dataset.write"));
+    }
+
+    #[test]
+    fn denied_internal_reader_creates_neither_child_nor_work() {
+        let (server, store, _) = worker_test_server(290);
+        server.bootstrap_user("ALICE", b"ALICEPASS").unwrap();
+        server.bootstrap_identity("OTHER", b"OTHERPASS1").unwrap();
+        let parent = submit_jcl_direct(
+            &server,
+            "ALICE",
+            b"ALICEPASS",
+            "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IEFBR14\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n"
+                .into(),
+        );
+        let parent_id = parent["jobid"].as_str().unwrap();
+        server
+            .racf
+            .define_profile("JESJOBS", &format!("JOB.{parent_id}.INTRDR"), "OTHER", None)
+            .unwrap();
+        assert_eq!(
+            server.run_jes_worker_once("denied-worker").unwrap(),
+            Some(format!("jes:{parent_id}"))
+        );
+        assert_eq!(
+            server.batch.get(parent_id).unwrap().state,
+            mainframe_env_batch::JobState::Failed
+        );
+        assert!(
+            server
+                .batch
+                .internal_reader_children(parent_id)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(store.get_work("jes:JOB00002").unwrap().is_none());
+    }
+
+    #[test]
+    fn admit_internal_reader_children_retries_every_child_after_one_is_blocked() {
+        // A worker-run parent writes two children to INTRDR from two separate
+        // steps (idempotency is keyed by job+step, so one step can only ever
+        // admit one child). "JOB00002" is the first child's predictable ID in
+        // a fresh test server (see `denied_internal_reader_creates_neither_child_nor_work`
+        // above). Pre-seed a work record at that exact work ID with a
+        // mismatched `required_generation`, so the first child's own
+        // admission collides on `AlreadyExists` against a record that does
+        // not match its frozen identity: an infrastructure-classified,
+        // retryable failure that must not stop the second child from being
+        // attempted and admitted.
+        let (server, store, _) = worker_test_server(600);
+        server.bootstrap_user("ALICE", b"ALICEPASS").unwrap();
+        store
+            .enqueue(WorkRecord {
+                work_id: "jes:JOB00002".into(),
+                execution_id: ExecutionId::new("blocker-execution", InvocationLimits::default())
+                    .unwrap(),
+                required_selector: Selector::new("zosmf:job-submit", InvocationLimits::default())
+                    .unwrap(),
+                required_generation: "blocked-generation".into(),
+                artifact: ArtifactRef::new("artifact:none", InvocationLimits::default()).unwrap(),
+                state: WorkState::Queued,
+                priority: 5,
+                attempt: 0,
+                max_attempts: 3,
+                available_tick: 0,
+                deadline_tick: 1_000_000,
+                cancellation_requested: false,
+                worker_id: None,
+                lease_id: None,
+                lease_epoch: 0,
+                lease_expiry_tick: None,
+                heartbeat_tick: None,
+                terminal_tick: None,
+                checkpoint_id: None,
+                effect_sequence: 0,
+                payload: JesWorkPayload::new("JOB00002", "ALICE", ["host.security.authorize"])
+                    .unwrap()
+                    .encode()
+                    .unwrap(),
+            })
+            .unwrap();
+        let parent = submit_jcl_direct(
+            &server,
+            "ALICE",
+            b"ALICEPASS",
+            "//PARENT JOB CLASS=A\n//STEPA EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILDA JOB CLASS=A\n//RUN EXEC PGM=IEFBR14\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n//STEPB EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILDB JOB CLASS=A\n//RUN EXEC PGM=IEFBR14\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n"
+                .into(),
+        );
+        let parent_id = parent["jobid"].as_str().unwrap().to_string();
+        let parent_work = store
+            .claim("worker", Some(JES_WORK_GENERATION), 600, 10)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            server.process_claimed_jes_work(&parent_work),
+            Ok(JesWorkOutcome::Deferred)
+        );
+        let children = server.batch.internal_reader_children(&parent_id).unwrap();
+        assert_eq!(children.len(), 2);
+        let blocked = children
+            .iter()
+            .find(|(job, _)| job.id == "JOB00002")
+            .expect("the first internal-reader child in a fresh test server is JOB00002");
+        let free = children
+            .iter()
+            .find(|(job, _)| job.id != "JOB00002")
+            .unwrap();
+
+        // The blocked child's own admission failed on a mismatched
+        // `AlreadyExists`: the placeholder record is untouched, and the
+        // child job itself was neither cancelled nor given a real work
+        // record.
+        let still_blocked = store.get_work("jes:JOB00002").unwrap().unwrap();
+        assert_eq!(still_blocked.required_generation, "blocked-generation");
+        assert_eq!(
+            server.batch.get(&blocked.0.id).unwrap().state,
+            mainframe_env_batch::JobState::Queued
+        );
+
+        // The second child still gets its own work record even though the
+        // first child's admission failed first.
+        let free_work = store
+            .get_work(&format!("jes:{}", free.0.id))
+            .unwrap()
+            .expect("the second child must not be starved by the first child's failure");
+        assert_eq!(free_work.state, WorkState::Queued);
+        assert_eq!(free_work.attempt, 0);
+        assert_eq!(free_work.required_generation, JES_WORK_GENERATION);
+
+        // Calling admission again directly is idempotent: the blocked child
+        // is retried (still fails against the placeholder) and the already
+        // admitted sibling is a no-op.
+        assert!(matches!(
+            server.admit_internal_reader_children(&parent_id, true),
+            Ok(ChildAdmissionResult::Retry)
+        ));
+    }
+
+    #[test]
+    fn exhausted_internal_reader_child_admission_cancels_the_unadmitted_child() {
+        // A child whose admission fails for a persistently transient reason
+        // (here, the durable store is already at capacity) must not dead-
+        // letter the parent's own work on the first attempt: the parent's
+        // work is released for a bounded retry instead. On the parent's last
+        // attempt, the still-unadmitted child is cancelled and verified so
+        // neither lifecycle is stranded without recoverable work.
+        let limits = mainframe_env_store::StoreLimits {
+            max_work_items: 1,
+            ..Default::default()
+        };
+        let store = Arc::new(MemoryStore::new(limits));
+        let clock = Arc::new(ManualJesClock::new(700));
+        let platform: Arc<dyn PlatformStore> = store.clone();
+        let server = ProductServer::open_with_clock(config(), platform, clock.clone()).unwrap();
+        server.bootstrap_user("ALICE", b"ALICEPASS").unwrap();
+        let parent = submit_jcl_direct(
+            &server,
+            "ALICE",
+            b"ALICEPASS",
+            "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IEFBR14\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n"
+                .into(),
+        );
+        let parent_id = parent["jobid"].as_str().unwrap().to_string();
+        let parent_work_id = format!("jes:{parent_id}");
+
+        for attempt in 1..=3u32 {
+            clock.advance(JES_IDLE_MILLIS + 10);
+            assert_eq!(
+                server.run_jes_worker_once("retry-worker").unwrap(),
+                Some(parent_work_id.clone()),
+                "attempt {attempt} should still claim the parent's own work"
+            );
+            let work = store.get_work(&parent_work_id).unwrap().unwrap();
+            assert_eq!(work.attempt, attempt);
+            if attempt < 3 {
+                assert_eq!(work.state, WorkState::Queued);
+            } else {
+                assert_eq!(work.state, WorkState::Completed);
+            }
+        }
+        // No further claim is possible: the parent's work is terminal.
+        assert_eq!(
+            store
+                .claim("retry-worker", Some(JES_WORK_GENERATION), 10_000, 10)
+                .unwrap(),
+            None
+        );
+        let (child, _) = only_internal_reader_child(&server, &parent_id);
+        assert_eq!(child.state, mainframe_env_batch::JobState::Cancelled);
+        assert!(
+            store
+                .get_work(&format!("jes:{}", child.id))
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn reclaimed_parent_reuses_frozen_child_capabilities_despite_registry_change() {
+        let (server, store, clock) = worker_test_server(400);
+        server.bootstrap_user("ALICE", b"ALICEPASS").unwrap();
+        let parent = submit_jcl_direct(
+            &server,
+            "ALICE",
+            b"ALICEPASS",
+            "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=MYPROG\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n"
+                .into(),
+        );
+        let parent_id = parent["jobid"].as_str().unwrap().to_string();
+        let parent_work = store
+            .claim("crashed-worker", Some(JES_WORK_GENERATION), 400, 10)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            server.process_claimed_jes_work(&parent_work),
+            Ok(JesWorkOutcome::Completed)
+        );
+        let (child, _) = only_internal_reader_child(&server, &parent_id);
+        let child_work_id = format!("jes:{}", child.id);
+        let admitted = store.get_work(&child_work_id).unwrap().unwrap();
+        let admitted_payload = JesWorkPayload::decode(&admitted.payload).unwrap();
+        assert!(!admitted_payload.capabilities.contains("host.db2.read"));
+
+        // The mutable `batch-program` registry gains a binding for "MYPROG"
+        // only after the child was already admitted with the narrower,
+        // pre-registration capability set.
+        server
+            .store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "batch-program".into(),
+                    key: "MYPROG".into(),
+                    version: 1,
+                    payload: b"1".to_vec(),
+                },
+                None,
+            )
+            .unwrap();
+
+        clock.advance(10);
+        assert_eq!(
+            server.run_jes_worker_once("recovery-worker").unwrap(),
+            Some(format!("jes:{parent_id}"))
+        );
+
+        let after_reclaim = store.get_work(&child_work_id).unwrap().unwrap();
+        assert_eq!(
+            (after_reclaim.state, after_reclaim.attempt),
+            (WorkState::Queued, 0)
+        );
+        let after_payload = JesWorkPayload::decode(&after_reclaim.payload).unwrap();
+        assert_eq!(
+            after_payload.capabilities, admitted_payload.capabilities,
+            "reclaim must validate the existing record, not overwrite it with a fresh recomputation"
+        );
+        assert_eq!(
+            server.batch.get(&child.id).unwrap().state,
+            mainframe_env_batch::JobState::Queued
+        );
+    }
+
+    #[test]
+    fn cancel_internal_reader_child_verifies_the_job_reaches_cancelled() {
+        let (server, _store, _clock) = worker_test_server(50);
+        server.bootstrap_user("ALICE", b"ALICEPASS").unwrap();
+        let parent = submit_jcl_direct(
+            &server,
+            "ALICE",
+            b"ALICEPASS",
+            "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IEFBR14\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n"
+                .into(),
+        );
+        let parent_id = parent["jobid"].as_str().unwrap();
+        assert_eq!(
+            server.run_jes_worker_once("worker").unwrap(),
+            Some(format!("jes:{parent_id}"))
+        );
+        let (child, _) = only_internal_reader_child(&server, parent_id);
+        assert!(server.cancel_internal_reader_child(&child));
+        assert_eq!(
+            server.batch.get(&child.id).unwrap().state,
+            mainframe_env_batch::JobState::Cancelled
+        );
+    }
+
+    #[test]
     fn sqlite_restart_reclaims_crashed_jes_work_with_a_new_epoch() {
         let directory = std::env::temp_dir().join(format!(
             "mainframe-env-jes-worker-restart-{}-{:?}",
@@ -8076,13 +8549,29 @@ mod tests {
         )
         .unwrap();
         first.bootstrap_user("ALICE", b"ALICEPASS").unwrap();
-        let job = submit_direct(&first, "ALICE", b"ALICEPASS", "RESTART");
+        let job = submit_jcl_direct(
+            &first,
+            "ALICE",
+            b"ALICEPASS",
+            "//RESTART JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IEFBR14\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n"
+                .into(),
+        );
         let id = job["jobid"].as_str().unwrap().to_string();
         let work_id = format!("jes:{id}");
         let stale = first_store
             .claim("crashed-process", Some(JES_WORK_GENERATION), 500, 10)
             .unwrap()
             .unwrap();
+        assert_eq!(
+            first.process_claimed_jes_work(&stale),
+            Ok(JesWorkOutcome::Completed)
+        );
+        let (child, _) = only_internal_reader_child(&first, &id);
+        let child_work_id = format!("jes:{}", child.id);
+        assert_eq!(
+            first_store.get_work(&child_work_id).unwrap().unwrap().state,
+            WorkState::Queued
+        );
         drop((first, first_store));
 
         let second_store =
@@ -8102,6 +8591,22 @@ mod tests {
         assert_eq!((work.state, work.lease_epoch), (WorkState::Completed, 2));
         assert_eq!(
             second.batch.get(&id).unwrap().state,
+            mainframe_env_batch::JobState::Completed
+        );
+        assert_eq!(
+            second_store
+                .get_work(&child_work_id)
+                .unwrap()
+                .unwrap()
+                .attempt,
+            0
+        );
+        assert_eq!(
+            second.run_jes_worker_once("restarted-child").unwrap(),
+            Some(child_work_id.clone())
+        );
+        assert_eq!(
+            second.batch.get(&child.id).unwrap().state,
             mainframe_env_batch::JobState::Completed
         );
         assert_eq!(
@@ -8233,6 +8738,53 @@ mod tests {
                 WorkState::Completed
             );
         }
+        assert!(server.graceful_shutdown().await);
+    }
+
+    #[tokio::test]
+    async fn background_workers_complete_internal_reader_children() {
+        let (server, store, _) = worker_test_server(750);
+        server.bootstrap_user("ALICE", b"ALICEPASS").unwrap();
+        server.start_background_workers().unwrap();
+        let parent = submit_jcl_direct(
+            &server,
+            "ALICE",
+            b"ALICEPASS",
+            "//PARENT JOB CLASS=A\n//SUBMIT EXEC PGM=IEBGENER\n//SYSUT1 DD DATA,DLM=@@\n//CHILD JOB CLASS=A\n//RUN EXEC PGM=IEFBR14\n@@\n//SYSUT2 DD SYSOUT=(A,INTRDR)\n//WORK DD DSN=&&WORK,DISP=(NEW,DELETE,DELETE)\n"
+                .into(),
+        );
+        let parent_id = parent["jobid"].as_str().unwrap();
+        let mut child = None;
+        for _ in 0..2_000 {
+            let children = server.batch.internal_reader_children(parent_id).unwrap();
+            if let Some(found) = children.into_iter().next() {
+                child = Some(found);
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        let (child, child_plan) = child.expect("internal-reader child did not appear");
+        let completed = wait_for_terminal_job(&server, &child.id).await;
+        assert_eq!(completed.state, mainframe_env_batch::JobState::Completed);
+        assert_eq!(completed.return_code, Some(0));
+        let payload = JesWorkPayload::decode(
+            &store
+                .get_work(&format!("jes:{}", child.id))
+                .unwrap()
+                .unwrap()
+                .payload,
+        )
+        .unwrap();
+        assert_eq!(
+            payload.capabilities,
+            job_capabilities(server.store.as_ref(), &child_plan)
+                .unwrap()
+                .into_iter()
+                .map(str::to_string)
+                .collect::<BTreeSet<_>>()
+        );
+        assert!(!payload.capabilities.contains("host.dataset.read"));
+        assert!(!payload.capabilities.contains("host.dataset.write"));
         assert!(server.graceful_shutdown().await);
     }
 
@@ -10415,6 +10967,27 @@ mod tests {
 
     #[test]
     fn online_xctl_replaces_the_frame_and_passes_typed_commarea() {
+        run_online_xctl_fixture();
+    }
+
+    /// Issue #213: a program transfer keeps earlier task effects in trace order.
+    #[test]
+    fn online_xctl_preserves_prior_cics_trace_exactly_once() {
+        let trace = run_online_xctl_fixture();
+        assert_eq!(
+            trace
+                .iter()
+                .map(|entry| entry.operation)
+                .collect::<Vec<_>>(),
+            vec![
+                mainframe_env_host_api::CicsOperation::Xctl,
+                mainframe_env_host_api::CicsOperation::Retrieve,
+                mainframe_env_host_api::CicsOperation::Suspend,
+            ],
+        );
+    }
+
+    fn run_online_xctl_fixture() -> Vec<CicsTraceEntry> {
         let limits = SourceLimits::default();
         let compile = |name: &str, source: &[u8]| {
             let filename = format!("{name}.cbl");
@@ -10570,6 +11143,14 @@ mod tests {
                 .state,
             ExecutionState::Completed
         );
+        let mut trace = server.online_trace(session.as_str()).unwrap();
+        trace.extend(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 2)
+                .unwrap(),
+        );
+        trace
     }
 
     #[test]
@@ -13336,5 +13917,150 @@ mod tests {
         }
         let _ = std::fs::remove_file(path);
         let _ = std::fs::remove_dir(directory);
+    }
+
+    // Regression for #181: CicsResume rejected the ordinary pseudo-conversational
+    // hand-off between two different online transactions (EXEC CICS RETURN
+    // TRANSID(x) followed by the terminal resuming into transaction x) as a 503
+    // infrastructure_failure. The handler compared resume_terminal's admitted
+    // transaction against the terminal's stale pre-resume snapshot instead of
+    // re-resolving the online program for the transaction actually resumed.
+    #[test]
+    fn cics_resume_follows_return_transid_to_a_different_transaction() {
+        fn compile(name: &str, source: &[u8]) -> PublishedArtifact {
+            let limits = SourceLimits::default();
+            let file_name = format!("{name}.cbl");
+            let path = LogicalPath::new(file_name.clone(), limits.max_path_bytes).unwrap();
+            let bundle = SourceBundle::new(
+                &path,
+                vec![
+                    SourceFile::input(
+                        file_name,
+                        source.to_vec(),
+                        SourceFormat::Free,
+                        SourceEncoding::Utf8,
+                        limits,
+                    )
+                    .unwrap(),
+                ],
+                BTreeMap::new(),
+                Vec::new(),
+                limits,
+            )
+            .unwrap();
+            let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+                .compile(CompilerRequest {
+                    source: bundle,
+                    mode: CompilationMode::Executable,
+                    target: CompileTarget::new("reference").unwrap(),
+                    options: CompileOptions::new(BTreeMap::new()).unwrap(),
+                })
+                .unwrap()
+            else {
+                panic!("{name} fixture did not publish");
+            };
+            artifact
+        }
+
+        let from_artifact = compile(
+            "XFERFROM",
+            b"IDENTIFICATION DIVISION.\nPROGRAM-ID. XFERFROM.\nPROCEDURE DIVISION.\nEXEC CICS RETURN TRANSID('XFTO') END-EXEC.\n",
+        );
+        let to_artifact = compile(
+            "XFERTO",
+            b"IDENTIFICATION DIVISION.\nPROGRAM-ID. XFERTO.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 MSG PIC X(5) VALUE 'HELLO'.\nPROCEDURE DIVISION.\nEXEC CICS SEND TEXT FROM(MSG) END-EXEC.\nEXEC CICS RETURN END-EXEC.\n",
+        );
+
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let from_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(from_artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let to_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(to_artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![
+                    OnlineProgramDefinition {
+                        name: "XFERFROM".into(),
+                        artifact: from_ref.clone(),
+                        payload: from_artifact.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(from_artifact.manifest().clone()),
+                        semantic_identity: from_artifact.semantic_id().to_reference(),
+                    },
+                    OnlineProgramDefinition {
+                        name: "XFERTO".into(),
+                        artifact: to_ref.clone(),
+                        payload: to_artifact.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(to_artifact.manifest().clone()),
+                        semantic_identity: to_artifact.semantic_id().to_reference(),
+                    },
+                ],
+                transactions: BTreeMap::from([
+                    ("XFFR".into(), "XFERFROM".into()),
+                    ("XFTO".into(), "XFERTO".into()),
+                ]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "XFERTO".into(),
+                    map: "XFERTO".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+
+        let launch = server
+            .handle(
+                Authentication::Basic {
+                    user: "IBMUSER".into(),
+                    secret: b"TESTPASS".to_vec(),
+                },
+                GatewayRequest::CicsLaunch {
+                    transaction: "XFFR".into(),
+                    rows: 24,
+                    columns: 80,
+                },
+            )
+            .unwrap();
+        let mainframe_env_zosmf::GatewayBody::Json(launched) = launch.body else {
+            panic!("launch response was not JSON")
+        };
+        let session = launched["session"].as_str().unwrap().to_string();
+        let csrf_token = launched["csrf_token"].as_str().unwrap().to_string();
+
+        // XFERFROM's own RETURN TRANSID('XFTO') already ran during launch, so
+        // the pending continuation now targets transaction XFTO while the
+        // terminal's own snapshot still reports the launch transaction XFFR.
+        let sends_before = server
+            .online_operation_count(CicsOperation::SendText)
+            .unwrap();
+        let response = server
+            .handle(
+                Authentication::Basic {
+                    user: "IBMUSER".into(),
+                    secret: b"TESTPASS".to_vec(),
+                },
+                GatewayRequest::CicsResume { session, csrf_token },
+            )
+            .expect(
+                "resume must follow resume_terminal's admitted transaction (XFTO) instead of \
+                 rejecting the terminal's stale pre-resume snapshot (XFFR) as an infrastructure failure",
+            );
+        assert_eq!(response.status, StatusCode::OK);
+        assert_eq!(
+            server
+                .online_operation_count(CicsOperation::SendText)
+                .unwrap(),
+            sends_before + 1,
+            "XFERTO did not run after the XFFR -> XFTO transaction hand-off"
+        );
     }
 }

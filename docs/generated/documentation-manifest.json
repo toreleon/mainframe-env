@@ -1,16 +1,16 @@
 {
   "counts": {
-    "markdown_documents": 186,
+    "markdown_documents": 187,
     "navigation_groups": 5,
     "normative_documents": 39,
-    "xtask_commands": 162
+    "xtask_commands": 167
   },
   "documents": [
     {
       "normative": false,
       "path": "AGENTS.md",
       "relative_links": 5,
-      "sha256": "sha256:71842bd07f1ffbe61aebdf5ff0e2ee6ab34366b31de55fdffb839fbcd4072933",
+      "sha256": "sha256:bc5c128b7d7d94e55da0e2fefa61bd93ad8b877266109f0216856cfd4cffeaa4",
       "title": "Repository Guidelines",
       "xtask_commands": 1
     },
@@ -18,9 +18,9 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:a69725c2f6553103df0f3ec92a890edd22388f542146df1d0846965f5cfaf1bc",
+      "sha256": "sha256:19df4a08e0a42b96c8b02c4aac27cea26b244580de83d969e0bb5a873c335061",
       "title": "Changelog",
-      "xtask_commands": 1
+      "xtask_commands": 6
     },
     {
       "normative": false,
@@ -345,7 +345,7 @@
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
       "relative_links": 22,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:3b5e8031eda755476637fd3f572c155733929ffe28156d6a398489397dc13763",
+      "sha256": "sha256:d952011b117bfbb0ffca92cb9edc3a5fd0695506ac17aa645f9c9d19f748a780",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -453,7 +453,7 @@
       "path": "docs/architecture/JES-EXECUTION.md",
       "relative_links": 1,
       "scope": "JES execution, scheduling, spool, and utility behavior",
-      "sha256": "sha256:9a8c85684ed9ae9ca8badeece315b33780029f84e37d56e33f5c476d4af7083b",
+      "sha256": "sha256:25a8e0e4a1e1dea820e3d2adf3743e57c44bba262483aad2a5b6c00f85d1b408",
       "status": "Normative from mainframe-env 0.8.0",
       "title": "JES execution, scheduling, spool, and utilities",
       "xtask_commands": 1
@@ -1398,8 +1398,16 @@
       "normative": false,
       "path": "docs/research/publication-source-probe.md",
       "relative_links": 0,
-      "sha256": "sha256:76e2111e5a597c4293c7d71cfbc9d68155c0932a1bbd8e42b73a6757fa0e1618",
+      "sha256": "sha256:1779bbdc68a10b01f70db5d9ea94a0d9255c5ab4521f635cf8f5a852b42cc0a4",
       "title": "Publication source probe",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "docs/reviews/PR-163-FOLLOWUP-BOUNDARIES.md",
+      "relative_links": 0,
+      "sha256": "sha256:c182cdc5d19cd91b643213b175760f208350e5fe552fb17758c2e084b5d739c5",
+      "title": "PR #163 follow-up boundaries",
       "xtask_commands": 0
     },
     {
@@ -1653,7 +1661,6 @@
   ],
   "navigation": [
     {
-      "heading": "Architecture and contracts",
       "entries": [
         {
           "label": "Project charter",
@@ -1747,10 +1754,10 @@
           "label": "Release builder security model",
           "path": "docs/architecture/RELEASE-BUILDER.md"
         }
-      ]
+      ],
+      "heading": "Architecture and contracts"
     },
     {
-      "heading": "Architecture decisions",
       "entries": [
         {
           "label": "ADR-0001: Technology stack",
@@ -1801,10 +1808,10 @@
           "path": "docs/decisions/README.md"
         }
       ],
+      "heading": "Architecture decisions",
       "note": "ADR-0009 supersedes ADR-0005 for current topology. Historical ADRs remain immutable records of the decisions they originally authorized."
     },
     {
-      "heading": "Delivery and development",
       "entries": [
         {
           "label": "Implementation roadmap",
@@ -1843,10 +1850,10 @@
           "path": "docs/prompts/coverage-versions/README.md"
         }
       ],
+      "heading": "Delivery and development",
       "note": "Version-specific status files and review reports describe candidates at a point in time. They are not automatically current product documentation."
     },
     {
-      "heading": "Operations",
       "entries": [
         {
           "label": "Core-server operations",
@@ -1876,10 +1883,10 @@
           "label": "Conformance family rollout",
           "path": "docs/runbooks/conformance-family-rollout.md"
         }
-      ]
+      ],
+      "heading": "Operations"
     },
     {
-      "heading": "Releases, reviews, and research",
       "entries": [
         {
           "label": "0.8 release notes",
@@ -1905,7 +1912,8 @@
           "label": "CICS behavioral pilot",
           "path": "docs/research/cics-behavioral-conformance-pilot.md"
         }
-      ]
+      ],
+      "heading": "Releases, reviews, and research"
     }
   ],
   "package_topology": {

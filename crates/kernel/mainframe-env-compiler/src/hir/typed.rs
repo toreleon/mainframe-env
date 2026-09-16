@@ -213,6 +213,7 @@ pub enum HirCicsOperandName {
     Abstime,
     DateSep,
     TimeSep,
+    KeyLength,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -220,6 +221,7 @@ pub enum HirCicsValue {
     Literal(String),
     Data(HirDataReference),
     Integer(i64),
+    LengthOf(HirDataReference),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -239,6 +241,12 @@ pub enum HirCicsOption {
     Task,
     Uow,
     NoSuspend,
+    Erase,
+    Cursor,
+    DateSep,
+    TimeSep,
+    FreeKb,
+    Gteq,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -257,6 +265,7 @@ pub enum HirCicsOutputName {
     Yymmdd,
     Yyyymmdd,
     Assign(CicsAssignOutput),
+    Length,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1092,6 +1101,22 @@ mod tests {
             "typed.cbl",
             source.as_bytes().to_vec(),
             SourceFormat::Free,
+            SourceEncoding::Utf8,
+            limits,
+        )
+        .unwrap();
+        let bundle =
+            SourceBundle::new(&path, vec![file], BTreeMap::new(), Vec::new(), limits).unwrap();
+        CobolCompiler::default().analyze(&bundle)
+    }
+
+    fn analyze_fixed(source: &str) -> crate::CobolAnalysis {
+        let limits = SourceLimits::default();
+        let path = LogicalPath::new("typed.cbl", limits.max_path_bytes).unwrap();
+        let file = SourceFile::input(
+            "typed.cbl",
+            source.as_bytes().to_vec(),
+            SourceFormat::Fixed,
             SourceEncoding::Utf8,
             limits,
         )
@@ -2042,6 +2067,16 @@ mod tests {
                 HirCicsOperandName::TimeSep,
             ])
         );
+
+        let compact = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFMTC. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-X PIC S9(15) COMP-3. 01 DATE-X PIC X(6). 01 TIME-X PIC X(6). PROCEDURE DIVISION. EXEC CICS FORMATTIME ABSTIME(ABS-X) YYMMDD(DATE-X) TIME(TIME-X) END-EXEC. STOP RUN.",
+        );
+        assert!(compact.hir.is_none());
+        assert!(compact.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("FORMATTIME output has an invalid field length")
+        }));
         assert_eq!(
             command
                 .outputs
@@ -2074,6 +2109,32 @@ mod tests {
             let message = diagnostic.public_message();
             message.contains("FORMATTIME") && message.contains("DAYCOUNT")
         }));
+    }
+
+    /// Issue #207: bare DATESEP and TIMESEP select the documented defaults.
+    #[test]
+    fn cics_formattime_bare_separators_lower_as_default_options() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. FMTSEP. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-X PIC S9(15) COMP-3. 01 DATE-X PIC X(8). 01 TIME-X PIC X(8). PROCEDURE DIVISION. EXEC CICS FORMATTIME ABSTIME(ABS-X) MMDDYY(DATE-X) DATESEP TIME(TIME-X) TIMESEP NOHANDLE END-EXEC.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("bare separators: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed FORMATTIME");
+        assert_eq!(command.operation, HirCicsOperation::FormatTime);
+        assert!(command.options.contains(&HirCicsOption::DateSep));
+        assert!(command.options.contains(&HirCicsOption::TimeSep));
+        assert!(matches!(
+            command.condition_policy,
+            HirCicsConditionPolicy::NoHandle
+        ));
     }
 
     #[test]
@@ -2336,6 +2397,39 @@ mod tests {
         }
     }
 
+    /// Issue #202: RETURN accepts LENGTH(LENGTH OF) for its COMMAREA.
+    #[test]
+    fn cics_return_length_of_commarea_resolves_typed_length() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. RETLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 AREA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS RETURN TRANSID('NEXT') COMMAREA(AREA-X) LENGTH(LENGTH OF AREA-X) END-EXEC.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("RETURN LENGTH OF: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed RETURN");
+        let commarea = command
+            .operands
+            .iter()
+            .find(|operand| operand.name == HirCicsOperandName::Commarea)
+            .expect("COMMAREA");
+        let length = command
+            .operands
+            .iter()
+            .find(|operand| operand.name == HirCicsOperandName::Length)
+            .expect("LENGTH");
+        assert!(matches!(
+            (&commarea.value, &length.value),
+            (HirCicsValue::Data(area), HirCicsValue::LengthOf(length)) if area == length
+        ));
+    }
+
     #[test]
     fn cics_default_file_browse_resolves_shared_key_input_output_roles() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBROW. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2) VALUE 'AA'. 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) END-EXEC. EXEC CICS READNEXT FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS READPREV DATASET('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS ENDBR FILE('ACCTDAT') END-EXEC. STOP RUN.";
@@ -2417,6 +2511,33 @@ mod tests {
         }
     }
 
+    /// Issue #204: GTEQ is scoped to typed STARTBR and preserves its typed route.
+    #[test]
+    fn cics_startbr_gteq_is_typed_and_operation_scoped() {
+        let valid = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BRGTEQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). PROCEDURE DIVISION. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) GTEQ END-EXEC.",
+        );
+        let hir = valid
+            .hir
+            .unwrap_or_else(|| panic!("STARTBR GTEQ: {:?}", valid.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed STARTBR");
+        assert_eq!(command.operation, HirCicsOperation::StartBrowse);
+        assert_eq!(command.options, BTreeSet::from([HirCicsOption::Gteq]));
+
+        let invalid = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. RDGTEQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 REC-X PIC X(8). PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) GTEQ END-EXEC.",
+        );
+        assert!(invalid.hir.is_none());
+    }
+
+    /// Issue #205: DELETE may select the record held by READ UPDATE.
     #[test]
     fn cics_keyed_file_mutations_require_resolved_record_and_key_inputs() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSMUT. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3) VALUE '003'. 01 RECORD-X PIC X(4) VALUE 'DATA'. PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS DELETE DATASET('ACCTDAT') RIDFLD(KEY-X) END-EXEC. STOP RUN.";
@@ -2459,8 +2580,32 @@ mod tests {
             assert!(command.outputs.is_empty());
         }
 
+        let current_record_delete = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CURDEL. PROCEDURE DIVISION. EXEC CICS DELETE FILE('ACCTDAT') END-EXEC.",
+        );
+        let hir = current_record_delete.hir.unwrap_or_else(|| {
+            panic!(
+                "current-record DELETE: {:?}",
+                current_record_delete.diagnostics
+            )
+        });
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed current-record DELETE");
+        assert_eq!(command.operation, HirCicsOperation::Delete);
+        assert!(
+            !command
+                .operands
+                .iter()
+                .any(|operand| operand.name == HirCicsOperandName::Ridfld)
+        );
+
         for (command, expected) in [
-            ("DELETE FILE('ACCTDAT')", "requires RIDFLD"),
             ("WRITE FILE('ACCTDAT') FROM(RECORD-X)", "requires RIDFLD"),
             ("WRITE FILE('ACCTDAT') RIDFLD(KEY-X)", "requires FROM"),
             (
@@ -2497,6 +2642,7 @@ mod tests {
         }
     }
 
+    /// Issue #206: WRITEQ TD accepts the runtime length of its FROM area.
     #[test]
     fn cics_transient_data_write_resolves_queue_record_and_optional_length() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTDQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(6) VALUE 'ABCDEF'. PROCEDURE DIVISION. EXEC CICS WRITEQ TD QUEUE('OUTQ') FROM(DATA-X) LENGTH(3) END-EXEC. STOP RUN.";
@@ -2526,6 +2672,25 @@ mod tests {
         }));
         assert!(command.operands.iter().any(|operand| {
             operand.name == HirCicsOperandName::Length && operand.value == HirCicsValue::Integer(3)
+        }));
+
+        let length_of = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTDQL. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(6). PROCEDURE DIVISION. EXEC CICS WRITEQ TD QUEUE('OUTQ') FROM(DATA-X) LENGTH(LENGTH OF DATA-X) END-EXEC. STOP RUN.",
+        );
+        let hir = length_of
+            .hir
+            .unwrap_or_else(|| panic!("WRITEQ TD LENGTH OF: {:?}", length_of.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed WRITEQ TD LENGTH OF");
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(operand.value, HirCicsValue::LengthOf(_))
         }));
 
         for (command, expected) in [
@@ -2633,7 +2798,6 @@ mod tests {
                 "MAP requires a 1-7 character name",
             ),
             ("SEND TEXT FROM('DATA')", "FROM requires a data area"),
-            ("SEND MAP('MENU') ERASE", "unready for ERASE"),
             ("RECEIVE MAP('MENU') SET(PTR-X)", "unready for SET"),
         ] {
             let analysis = analyze(&format!(
@@ -2649,6 +2813,68 @@ mod tests {
                 analysis.diagnostics
             );
         }
+    }
+
+    /// Issues #203 and #206: CardDemo SEND display controls and LENGTH OF stay typed.
+    #[test]
+    fn cics_send_map_admits_erase_cursor_and_freekb() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. SENDOPT. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') ERASE CURSOR FREEKB END-EXEC. EXEC CICS SEND TEXT FROM(DATA-X) LENGTH(LENGTH OF DATA-X) ERASE FREEKB END-EXEC.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("SEND MAP options: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            commands[0].options,
+            BTreeSet::from([
+                HirCicsOption::Erase,
+                HirCicsOption::Cursor,
+                HirCicsOption::FreeKb,
+            ])
+        );
+        assert_eq!(
+            commands[1].options,
+            BTreeSet::from([HirCicsOption::Erase, HirCicsOption::FreeKb])
+        );
+        assert!(commands[1].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(operand.value, HirCicsValue::LengthOf(ref reference) if reference.qualified_name == "DATA-X")
+        }));
+    }
+
+    /// Issue #208: an eight-byte MAPSET data area is resolved at run time.
+    #[test]
+    fn cics_receive_map_accepts_eight_byte_mapset_data_area() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. RECVMSET. DATA DIVISION. WORKING-STORAGE SECTION. 01 MAPSET-X PIC X(8). 01 INPUT-X PIC X(16). PROCEDURE DIVISION. EXEC CICS RECEIVE MAP('MENU') MAPSET(MAPSET-X) INTO(INPUT-X) END-EXEC.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("RECEIVE MAPSET area: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed RECEIVE MAP");
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Mapset
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference)
+                        if reference.qualified_name == "MAPSET-X" && reference.length == 8
+                )
+        }));
     }
 
     #[test]
@@ -3569,6 +3795,445 @@ mod tests {
             diagnostic
                 .public_message()
                 .contains("CICS Read requires INTO")
+        }));
+    }
+
+    #[test]
+    fn cics_return_tolerates_a_column_seven_comment_between_options() {
+        // toreleon/mainframe-env#176: a standard fixed-format comment line
+        // (`*` in column 7) between EXEC CICS options must not reach the
+        // resolved clause text. Modeled on the AWS CardDemo (`59cc6c2f`)
+        // RETURN pattern in CORPT00C.cbl/COTRN02C.cbl, not copied verbatim.
+        // IBM Enterprise COBOL 6.5 Language Reference (`rlfmtcom.html`):
+        // a column-7 comment line carries no syntax and may appear
+        // anywhere in fixed-format source.
+        let source = concat!(
+            "       IDENTIFICATION DIVISION.\n",
+            "       PROGRAM-ID. CICSRTN.\n",
+            "       DATA DIVISION.\n",
+            "       WORKING-STORAGE SECTION.\n",
+            "       01 WS-TRAN-ID PIC X(4).\n",
+            "       01 WS-COMM-AREA PIC X(10).\n",
+            "       PROCEDURE DIVISION.\n",
+            "           EXEC CICS RETURN\n",
+            "               TRANSID (WS-TRAN-ID)\n",
+            "               COMMAREA (WS-COMM-AREA)\n",
+            "      *        LENGTH(LENGTH OF WS-COMM-AREA)\n",
+            "           END-EXEC.\n",
+            "           STOP RUN.\n",
+        );
+        let analysis = analyze_fixed(source);
+        let hir = analysis
+            .hir
+            .expect("EXEC CICS RETURN should compile with a column-7 comment between options");
+        assert!(
+            hir.statements
+                .iter()
+                .any(|statement| statement.kind == StatementKind::ExecCics)
+        );
+    }
+
+    #[test]
+    fn cics_file_lengths_lower_as_typed_values_and_read_output() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(3). 01 LEN-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) LENGTH(LEN-X) KEYLENGTH(LENGTH OF KEY-X) END-EXEC. EXEC CICS REWRITE FILE('ACCTDAT') FROM(REC-X) LENGTH(LENGTH OF REC-X) END-EXEC. STOP RUN.";
+        let hir = analyze(source).hir.expect("typed CICS length HIR");
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 2);
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(operand.value, HirCicsValue::Data(_))
+        }));
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::KeyLength
+                && matches!(operand.value, HirCicsValue::LengthOf(_))
+        }));
+        assert!(
+            commands[0]
+                .outputs
+                .iter()
+                .any(|output| output.name == HirCicsOutputName::Length)
+        );
+        assert!(commands[1].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(operand.value, HirCicsValue::LengthOf(_))
+        }));
+        assert!(
+            !commands[1]
+                .outputs
+                .iter()
+                .any(|output| output.name == HirCicsOutputName::Length)
+        );
+    }
+
+    #[test]
+    fn cics_dataset_alias_covers_the_browse_family() {
+        // CardDemo (`59cc6c2f`) writes DATASET(...) on STARTBR/READNEXT/ENDBR;
+        // COBIL00C.cbl:443 and COCRDLIC.cbl:1129 are pinned STARTBR sites.
+        // Main routes these commands through typed HIR; the alias must reach
+        // that route with the file-control operands intact.
+        for command in [
+            "STARTBR DATASET('TRANSACT') RIDFLD(KEY-X) KEYLENGTH(LENGTH OF KEY-X) RESP(RESP-X) RESP2(RESP2-X)",
+            "READNEXT DATASET('TRANSACT') INTO(REC-X) RIDFLD(KEY-X) RESP(RESP-X) RESP2(RESP2-X)",
+            "ENDBR DATASET('TRANSACT') RESP(RESP-X) RESP2(RESP2-X)",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBR. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(3). 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{command}: {:?}", analysis.diagnostics));
+            let statement = hir
+                .statements
+                .iter()
+                .find(|statement| statement.kind == StatementKind::ExecCics)
+                .unwrap_or_else(|| panic!("{command}: no EXEC CICS statement"));
+            assert!(
+                matches!(
+                    statement.resolved.as_ref(),
+                    Some(HirResolvedStatement::Cics(_))
+                ),
+                "{command}"
+            );
+        }
+
+        // RESETBR is a `family: "file-control"` row that declares `FILE` and
+        // not `DATASET`, so the alias still applies and the command no
+        // longer fails with "unknown or unreviewed top-level option
+        // DATASET". It is a pre-existing `Unready` handler even for
+        // `FILE(...)`, so it still fails to compile -- for that unrelated,
+        // pre-existing reason, which this asserts by name so the DATASET
+        // option-acceptance regression cannot hide behind it.
+        let resetbr = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBR. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS RESETBR DATASET('TRANSACT') RIDFLD(KEY-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.",
+        );
+        assert!(resetbr.hir.is_none());
+        assert!(resetbr.diagnostics.iter().any(|diagnostic| {
+            let message = diagnostic.public_message();
+            message.contains("RESETBR") && message.contains("handler is unready")
+        }));
+        assert!(!resetbr.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("unknown or unreviewed top-level option")
+        }));
+    }
+
+    #[test]
+    fn cics_dataset_alias_resolves_write_and_delete() {
+        // COUSR01C.cbl:240 (WRITE) and COUSR03C.cbl:306 (DELETE) both write
+        // DATASET(...). WRITE shares its head with WRITE JOURNALNAME/
+        // JOURNALNUM/OPERATOR and picks the file-control row by which option
+        // is present, so this also proves the DATASET alias satisfies that
+        // discriminator the same way FILE(...) does.
+        let write = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSWR. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(3). 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS WRITE DATASET('USRSEC') FROM(REC-X) LENGTH(LENGTH OF REC-X) RIDFLD(KEY-X) KEYLENGTH(LENGTH OF KEY-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.",
+        );
+        let hir = write
+            .hir
+            .unwrap_or_else(|| panic!("WRITE DATASET: {:?}", write.diagnostics));
+        let statement = hir
+            .statements
+            .iter()
+            .find(|statement| statement.kind == StatementKind::ExecCics)
+            .expect("WRITE EXEC CICS statement");
+        assert!(matches!(
+            statement.resolved.as_ref(),
+            Some(HirResolvedStatement::Cics(_))
+        ));
+
+        let delete = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSDL. DATA DIVISION. WORKING-STORAGE SECTION. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS DELETE DATASET('USRSEC') RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.",
+        );
+        let hir = delete
+            .hir
+            .unwrap_or_else(|| panic!("DELETE DATASET: {:?}", delete.diagnostics));
+        let statement = hir
+            .statements
+            .iter()
+            .find(|statement| statement.kind == StatementKind::ExecCics)
+            .expect("DELETE EXEC CICS statement");
+        assert!(matches!(
+            statement.resolved.as_ref(),
+            Some(HirResolvedStatement::Cics(_))
+        ));
+    }
+
+    #[test]
+    fn cics_dataset_and_file_together_are_rejected() {
+        let both = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBOTH. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS STARTBR FILE('TRANSACT') DATASET('TRANSACT') RIDFLD(KEY-X) RESP(RESP-X) END-EXEC. STOP RUN.",
+        );
+        assert!(both.hir.is_none());
+        assert!(both.diagnostics.iter().any(|diagnostic| {
+            let message = diagnostic.public_message();
+            message.contains("STARTBR")
+                && message.contains("FILE")
+                && message.contains("DATASET")
+                && message.contains("mutually exclusive")
+        }));
+
+        let repeated = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSDUP. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS STARTBR DATASET('TRANSACT') DATASET('TRANSACT') RIDFLD(KEY-X) RESP(RESP-X) END-EXEC. STOP RUN.",
+        );
+        assert!(repeated.hir.is_none());
+        assert!(repeated.diagnostics.iter().any(|diagnostic| {
+            let message = diagnostic.public_message();
+            message.contains("DATASET") && message.contains("is duplicated")
+        }));
+    }
+
+    #[test]
+    fn cics_file_length_data_items_require_halfword_binary_storage() {
+        for command in [
+            "READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) LENGTH(TEXT-X)",
+            "READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) KEYLENGTH(FULL-X)",
+            "REWRITE FILE('ACCTDAT') FROM(REC-X) LENGTH(FULL-X)",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLBAD. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(3). 01 TEXT-X PIC X(2). 01 FULL-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(analysis.diagnostics.iter().any(|diagnostic| {
+                diagnostic
+                    .public_message()
+                    .contains("is not a halfword binary data item")
+            }));
+        }
+    }
+
+    #[test]
+    fn cics_registry_accepts_bare_and_valued_optional_operand_options() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSOPT. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-TIME-X PIC S9(15) COMP-3. PROCEDURE DIVISION. STOP RUN.",
+        );
+        let semantic = analysis.semantic.as_ref().expect("semantic model");
+        for command in [
+            vec![
+                "SEND", "MAP", "(", "'MENU'", ")", "MAPSET", "(", "'MAIN'", ")", "CURSOR",
+            ],
+            vec![
+                "SEND", "MAP", "(", "'MENU'", ")", "MAPSET", "(", "'MAIN'", ")", "CURSOR", "(",
+                "5", ")",
+            ],
+            vec![
+                "FORMATTIME",
+                "ABSTIME",
+                "(",
+                "ABS-TIME-X",
+                ")",
+                "DATESEP",
+                "TIMESEP",
+            ],
+            vec![
+                "FORMATTIME",
+                "ABSTIME",
+                "(",
+                "ABS-TIME-X",
+                ")",
+                "DATESEP",
+                "(",
+                "'-'",
+                ")",
+                "TIMESEP",
+                "(",
+                "'.'",
+                ")",
+            ],
+        ] {
+            let body = command
+                .iter()
+                .map(|token| (*token).to_string())
+                .collect::<Vec<_>>();
+            assert!(
+                cics_resolution::validated_command(&body, semantic).is_ok(),
+                "{command:?}"
+            );
+        }
+
+        // A bare Value-shape option (its parenthesized operand is fused into
+        // the keyword in the pinned diagram, so it is not independently
+        // optional) must still be rejected exactly as before.
+        let body = ["SEND", "MAP", "(", "'MENU'", ")", "MAPSET"]
+            .into_iter()
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        let Err(ResolutionFailure::Invalid(detail)) =
+            cics_resolution::validated_command(&body, semantic)
+        else {
+            panic!("bare MAPSET must be rejected");
+        };
+        assert!(detail.contains("MAPSET requires a parenthesized operand"));
+    }
+
+    #[test]
+    fn cics_registry_accepts_an_exact_repeated_bare_flag_option() {
+        let repeated = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSDUPN. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-TIME-X PIC S9(15) COMP-3. PROCEDURE DIVISION. EXEC CICS ASKTIME NOHANDLE ABSTIME(ABS-TIME-X) NOHANDLE END-EXEC. STOP RUN.",
+        );
+        let repeated_hir = repeated.hir.unwrap_or_else(|| {
+            panic!(
+                "ASKTIME NOHANDLE ABSTIME NOHANDLE: {:?}",
+                repeated.diagnostics
+            )
+        });
+        let repeated_statement = repeated_hir
+            .statements
+            .iter()
+            .find(|statement| statement.kind == StatementKind::ExecCics)
+            .expect("EXEC CICS statement");
+
+        let once = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSDUPN. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-TIME-X PIC S9(15) COMP-3. PROCEDURE DIVISION. EXEC CICS ASKTIME NOHANDLE ABSTIME(ABS-TIME-X) END-EXEC. STOP RUN.",
+        );
+        let once_hir = once
+            .hir
+            .unwrap_or_else(|| panic!("ASKTIME NOHANDLE ABSTIME: {:?}", once.diagnostics));
+        let once_statement = once_hir
+            .statements
+            .iter()
+            .find(|statement| statement.kind == StatementKind::ExecCics)
+            .expect("EXEC CICS statement");
+
+        assert_eq!(repeated_statement.resolved, once_statement.resolved);
+    }
+
+    #[test]
+    fn cics_registry_still_rejects_other_repeated_options() {
+        let cases = [
+            // A Value-shape option repeated: still rejected exactly as
+            // today (`cics_registry_rejects_unknown_duplicate_and_malformed_top_level_forms`
+            // already covers the RETURN TRANSID case; this repeats it here
+            // for full-command context).
+            (
+                "RETURN TRANSID('NEXT') TRANSID('OTHER')",
+                "option TRANSID is duplicated",
+            ),
+            (
+                "ASKTIME ABSTIME(ABS-TIME-X) ABSTIME(ABS-TIME-X)",
+                "option ABSTIME is duplicated",
+            ),
+            // Mixed OptionalValue forms: the bare flag and the valued form
+            // are different clause shapes, so an exact-repeat carve-out
+            // does not apply.
+            (
+                "SEND MAP('MENU') MAPSET('MAIN') CURSOR CURSOR(5)",
+                "option CURSOR is duplicated",
+            ),
+            // OptionalValue repeated bare: not a `Flag`-shape option, so
+            // still rejected.
+            (
+                "SEND MAP('MENU') MAPSET('MAIN') CURSOR CURSOR",
+                "option CURSOR is duplicated",
+            ),
+        ];
+        for (command, expected) in cases {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSDUPO. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-TIME-X PIC S9(15) COMP-3. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| { diagnostic.public_message().contains(expected) }),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
+    #[test]
+    fn legacy_send_compatibility_is_exactly_bare_send() {
+        // toreleon/mainframe-env#177: pinned AWS CardDemo (`59cc6c2f`) issues
+        // a bare 3270-logical `SEND FROM(...) LENGTH(...) NOHANDLE ERASE` in
+        // its ABEND-ROUTINE paragraphs (e.g. COACTUPC.cbl:4211). Row 0187 is
+        // `Unready`; this second compiler-only compatibility descriptor
+        // admits exactly that bounded shape to the pre-existing raw
+        // `SendText` route the same way `INQUIRE PROGRAM` reaches `Inquire`.
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBSND. DATA DIVISION. WORKING-STORAGE SECTION. 01 WS-DATA PIC X(10). PROCEDURE DIVISION. EXEC CICS SEND FROM(WS-DATA) LENGTH(10) NOHANDLE ERASE END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("bare SEND: {:?}", analysis.diagnostics));
+        let statement = hir
+            .statements
+            .iter()
+            .find(|statement| statement.kind == StatementKind::ExecCics)
+            .expect("EXEC CICS statement");
+        assert!(statement.resolved.is_none());
+
+        // A real IBM SEND option outside the bounded compatibility shape, and
+        // a bare SEND missing FROM, both fall through to today's behavior:
+        // row 0187 is still recognized by the 263-row registry and still
+        // `Unready`, so both fail with the pre-existing diagnosis rather than
+        // a fabricated "unknown option" from the new compatibility route.
+        for command in [
+            "SEND CTLCHAR(WS-DATA) FROM(WS-DATA)",
+            "SEND LENGTH(10) ERASE",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBSNE. DATA DIVISION. WORKING-STORAGE SECTION. 01 WS-DATA PIC X(10). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis.diagnostics.iter().any(|diagnostic| {
+                    let message = diagnostic.public_message();
+                    message.contains("SEND") && message.contains("handler is unready")
+                }),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+
+        // Main's typed SEND TEXT and SEND MAP routes keep ownership of their
+        // catalog labels, so the bare compatibility form never claims them.
+        for command in [
+            "SEND TEXT FROM(WS-DATA)",
+            "SEND MAP('MENU') MAPSET('MAIN')",
+            "SEND MAP('MENU') MAPSET('MAIN') NOHANDLE NOHANDLE",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBSNU. DATA DIVISION. WORKING-STORAGE SECTION. 01 WS-DATA PIC X(10). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            );
+            let analysis = analyze(&source);
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{command}: {:?}", analysis.diagnostics));
+            let statement = hir
+                .statements
+                .iter()
+                .find(|statement| statement.kind == StatementKind::ExecCics)
+                .unwrap_or_else(|| panic!("{command}: no EXEC CICS statement"));
+            assert!(
+                matches!(
+                    statement.resolved.as_ref(),
+                    Some(HirResolvedStatement::Cics(_))
+                ),
+                "{command}"
+            );
+        }
+    }
+
+    #[test]
+    fn cics_registry_still_rejects_a_repeated_nohandle_pending_source_review() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSDUPN. PROCEDURE DIVISION. EXEC CICS INQUIRE PROGRAM('P001') NOHANDLE NOHANDLE END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        assert!(analysis.hir.is_none());
+        assert!(analysis.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("option NOHANDLE is duplicated")
         }));
     }
 }

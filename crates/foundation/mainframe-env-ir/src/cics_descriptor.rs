@@ -223,6 +223,10 @@ pub enum CicsApplicationOptionValueShape {
     Flag,
     /// The option requires a parenthesized operand.
     Value,
+    /// The pinned syntax diagram draws the parenthesized operand as an
+    /// independently optional nested group: both the bare keyword and the
+    /// keyword with its parenthesized operand are well-formed.
+    OptionalValue,
     /// Pinned source facts do not establish one safe shape.
     BoundedAmbiguity,
 }
@@ -879,6 +883,7 @@ mod tests {
                 && descriptor.options.iter().all(|option| {
                     option.source_max_value_bytes.is_none()
                         || option.value_shape == CicsApplicationOptionValueShape::Value
+                        || option.value_shape == CicsApplicationOptionValueShape::OptionalValue
                 })
         }));
         let typed = CICS_APPLICATION_REGISTRY
@@ -975,6 +980,41 @@ mod tests {
                 dependency.option == "RESP2" && dependency.requires == ["RESP"]
             })
         );
+
+        // SEND MAP CURSOR: the pinned syntax diagram draws the
+        // parenthesized data-value as an independently optional nested
+        // group, and the IBM option prose confirms bare CURSOR means
+        // symbolic cursor positioning. See dfhp4_sendmap.html, Options,
+        // CURSOR(data-value).
+        let send_map = CICS_APPLICATION_REGISTRY
+            .iter()
+            .find(|descriptor| descriptor.label_tokens == ["SEND", "MAP"])
+            .expect("SEND MAP registry row");
+        let cursor = send_map
+            .options
+            .iter()
+            .find(|option| option.name == "CURSOR")
+            .expect("SEND MAP CURSOR option");
+        assert_eq!(
+            cursor.value_shape,
+            CicsApplicationOptionValueShape::OptionalValue
+        );
+
+        let formattime = CICS_APPLICATION_REGISTRY
+            .iter()
+            .find(|descriptor| descriptor.label_tokens == ["FORMATTIME"])
+            .expect("FORMATTIME registry row");
+        for name in ["DATESEP", "TIMESEP"] {
+            let option = formattime
+                .options
+                .iter()
+                .find(|option| option.name == name)
+                .unwrap_or_else(|| panic!("FORMATTIME {name} option"));
+            assert_eq!(
+                option.value_shape,
+                CicsApplicationOptionValueShape::OptionalValue
+            );
+        }
 
         let wait = CICS_APPLICATION_REGISTRY
             .iter()

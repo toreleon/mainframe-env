@@ -13,7 +13,17 @@ pub(in crate::service) fn invoke(
     let mut state = service.lock()?;
     let next_transaction =
         argument_optional(request, "TRANSID").map(|value| value.trim().to_ascii_uppercase());
-    let commarea = argument_bytes(request, "COMMAREA").unwrap_or_default();
+    let mut commarea = argument_bytes(request, "COMMAREA").unwrap_or_default();
+    if let Some(length) = argument_optional(request, "LENGTH") {
+        let length = length
+            .trim()
+            .parse::<usize>()
+            .map_err(|_| invalid_commarea_length())?;
+        if length > 32_763 || length > commarea.len() {
+            return Err(invalid_commarea_length());
+        }
+        commarea.truncate(length);
+    }
     if commarea.len() > service.limits.max_screen_bytes {
         return Err(HostProblem::ResourceExhausted);
     }
@@ -100,6 +110,7 @@ fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
                 value.schema(),
                 "mainframe-env.cics.storage-value@1" | "mainframe-env.cics.argument@1"
             ),
+            "LENGTH" => value.schema() != "mainframe-env.cics.decimal@1",
             "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
             "OPTION.NOHANDLE" => {
                 value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
@@ -114,6 +125,14 @@ fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
         Err(HostProblem::Malformed)
     } else {
         Ok(())
+    }
+}
+
+fn invalid_commarea_length() -> HostProblem {
+    HostProblem::Condition {
+        name: "LENGERR".into(),
+        response: 22,
+        response2: 11,
     }
 }
 

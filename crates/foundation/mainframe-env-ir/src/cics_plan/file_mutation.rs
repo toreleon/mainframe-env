@@ -17,10 +17,12 @@ pub(super) fn invalid_shape(
         CicsOperandName::Dataset,
         CicsOperandName::From,
         CicsOperandName::Ridfld,
+        CicsOperandName::Length,
+        CicsOperandName::KeyLength,
     ]);
     resources != 1
         || !inputs.is_subset(&allowed_inputs)
-        || !inputs.contains(&CicsOperandName::Ridfld)
+        || (writing && !inputs.contains(&CicsOperandName::Ridfld))
         || writing != inputs.contains(&CicsOperandName::From)
         || plan.operands.iter().any(|operand| {
             matches!(

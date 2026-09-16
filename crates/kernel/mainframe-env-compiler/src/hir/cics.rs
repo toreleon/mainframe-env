@@ -193,6 +193,7 @@ impl PlanContext<'_> {
                 HirCicsOperandName::Abstime => CicsOperandName::Abstime,
                 HirCicsOperandName::DateSep => CicsOperandName::DateSep,
                 HirCicsOperandName::TimeSep => CicsOperandName::TimeSep,
+                HirCicsOperandName::KeyLength => CicsOperandName::KeyLength,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -200,6 +201,9 @@ impl PlanContext<'_> {
                 }
                 HirCicsValue::Data(reference) => CicsOperandValue::Storage(self.slot(reference)?),
                 HirCicsValue::Integer(value) => CicsOperandValue::Integer(*value),
+                HirCicsValue::LengthOf(reference) => {
+                    CicsOperandValue::LengthOf(self.slot(reference)?)
+                }
             },
         })
     }
@@ -224,6 +228,7 @@ impl PlanContext<'_> {
                 HirCicsOutputName::Yymmdd => CicsOutputName::Yymmdd,
                 HirCicsOutputName::Yyyymmdd => CicsOutputName::Yyyymmdd,
                 HirCicsOutputName::Assign(output) => CicsOutputName::Assign(output),
+                HirCicsOutputName::Length => CicsOutputName::Length,
             },
             target: self.slot(&output.target)?,
         })
@@ -317,5 +322,11 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::Task => CicsPlanOption::Task,
         HirCicsOption::Uow => CicsPlanOption::Uow,
         HirCicsOption::NoSuspend => CicsPlanOption::NoSuspend,
+        HirCicsOption::Erase => CicsPlanOption::Erase,
+        HirCicsOption::Cursor => CicsPlanOption::Cursor,
+        HirCicsOption::DateSep => CicsPlanOption::DateSep,
+        HirCicsOption::TimeSep => CicsPlanOption::TimeSep,
+        HirCicsOption::FreeKb => CicsPlanOption::FreeKb,
+        HirCicsOption::Gteq => CicsPlanOption::Gteq,
     }
 }

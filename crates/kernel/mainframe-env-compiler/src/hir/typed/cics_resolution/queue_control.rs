@@ -2,7 +2,7 @@ use super::super::{
     HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsValue, Resolution,
     ResolutionFailure,
 };
-use super::{Clauses, cics_integer_value, cics_value};
+use super::{Clauses, cics_integer_value, cics_value, complete_data_reference};
 use crate::{DataCategory, SemanticModel};
 
 pub(super) fn validate_constraints(
@@ -42,7 +42,7 @@ pub(super) fn operands(
                     DataCategory::Alphabetic | DataCategory::Alphanumeric
                 )
         }
-        HirCicsValue::Integer(_) => false,
+        HirCicsValue::Integer(_) | HirCicsValue::LengthOf(_) => false,
     };
     if !valid_queue {
         return Err(ResolutionFailure::Invalid(
@@ -65,9 +65,20 @@ pub(super) fn operands(
         },
     ];
     if let Some(length) = clauses.get("LENGTH") {
+        let value = if length
+            .first()
+            .is_some_and(|token| token.eq_ignore_ascii_case("LENGTH"))
+            && length
+                .get(1)
+                .is_some_and(|token| token.eq_ignore_ascii_case("OF"))
+        {
+            HirCicsValue::LengthOf(complete_data_reference(&length[2..], semantic)?)
+        } else {
+            cics_integer_value(length, semantic)?
+        };
         operands.push(HirCicsNamedOperand {
             name: HirCicsOperandName::Length,
-            value: cics_integer_value(length, semantic)?,
+            value,
         });
     }
     Ok(operands)

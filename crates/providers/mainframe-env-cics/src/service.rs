@@ -3904,6 +3904,11 @@ mod tests {
         trace: Arc<DatasetTrace>,
     }
 
+    struct PersistedDataset {
+        descriptor: CapabilityDescriptor,
+        record: Arc<Mutex<Option<Vec<u8>>>>,
+    }
+
     struct SyncpointOriginProvider {
         descriptor: CapabilityDescriptor,
         seen: Arc<Mutex<Vec<(String, String, String)>>>,
@@ -4073,6 +4078,57 @@ mod tests {
         }
     }
 
+    impl HostProvider for PersistedDataset {
+        fn descriptor(&self) -> &CapabilityDescriptor {
+            &self.descriptor
+        }
+
+        fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
+            let outcome = match effect.request {
+                HostRequest::Dataset(DatasetRequest::Attributes { .. }) => {
+                    Ok(HostResult::Dataset(DatasetResult::Attributes {
+                        attributes: DatasetAttributes {
+                            organization: DatasetOrganization::KeySequenced,
+                            record_format: RecordFormat::Variable,
+                            logical_record_length: 8,
+                            key_offset: Some(0),
+                            key_length: Some(3),
+                            ccsid: None,
+                        },
+                        version: 1,
+                    }))
+                }
+                HostRequest::Dataset(DatasetRequest::Write { records, .. }) => {
+                    if records.len() != 1 {
+                        Err(HostProblem::Malformed)
+                    } else {
+                        *self.record.lock().unwrap() = records.first().cloned();
+                        Ok(HostResult::Dataset(DatasetResult::Mutated { version: 2 }))
+                    }
+                }
+                HostRequest::Dataset(DatasetRequest::Read { key, .. }) => {
+                    let Some(record) = self.record.lock().unwrap().clone() else {
+                        return EffectResult {
+                            sequence: effect.sequence,
+                            outcome: Err(HostProblem::NotFound),
+                        };
+                    };
+                    Ok(HostResult::Dataset(DatasetResult::Records {
+                        records: vec![record],
+                        identities: vec![key.unwrap_or_else(|| b"KEY".to_vec())],
+                        version: 2,
+                    }))
+                }
+                HostRequest::Dataset(_) => Err(HostProblem::Unsupported),
+                _ => Err(HostProblem::Malformed),
+            };
+            EffectResult {
+                sequence: effect.sequence,
+                outcome,
+            }
+        }
+    }
+
     impl HostProvider for CountedMutationProvider {
         fn descriptor(&self) -> &CapabilityDescriptor {
             &self.descriptor
@@ -4227,6 +4283,33 @@ mod tests {
         ))
     }
 
+    fn persisted_dataset_authorities(
+        record: Arc<Mutex<Option<Vec<u8>>>>,
+    ) -> Arc<ScopedHostService> {
+        let mut providers = [
+            "host.security.authorize",
+            "host.program.invoke",
+            "host.clock",
+        ]
+        .into_iter()
+        .map(|capability| {
+            Arc::new(Authority {
+                descriptor: descriptor(capability),
+            }) as Arc<dyn HostProvider>
+        })
+        .collect::<Vec<_>>();
+        for capability in ["host.dataset.read", "host.dataset.write"] {
+            providers.push(Arc::new(PersistedDataset {
+                descriptor: descriptor(capability),
+                record: record.clone(),
+            }));
+        }
+        Arc::new(ScopedHostService::new(
+            Arc::new(RegistrySnapshot::new(1, providers, InvocationLimits::default()).unwrap()),
+            HostLimits::default(),
+        ))
+    }
+
     fn syncpoint_origin_authorities(
         seen: Arc<Mutex<Vec<(String, String, String)>>>,
     ) -> Arc<ScopedHostService> {
@@ -4342,6 +4425,15 @@ mod tests {
         BoundedPayload::new(
             "mainframe-env.cics.argument@1",
             value.to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap()
+    }
+
+    fn cics_option() -> BoundedPayload {
+        BoundedPayload::new(
+            "mainframe-env.cics.option@1",
+            Vec::new(),
             InvocationLimits::default(),
         )
         .unwrap()
@@ -5788,6 +5880,7 @@ mod tests {
         );
     }
 
+    /// Issue #206: WRITEQ TD persists exactly the requested FROM-area prefix.
     #[test]
     fn transient_data_length_selects_prefix_and_rejects_excess() {
         let service = service(Arc::new(MemoryStore::new(Default::default())));
@@ -5833,6 +5926,50 @@ mod tests {
             service.transient_records("OUTQ").unwrap(),
             [b"ABC".to_vec()]
         );
+    }
+
+    /// Issue #207: bare separators use slash/colon and compact forms keep compact widths.
+    #[test]
+    fn formattime_bare_and_absent_separators_return_documented_widths() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+        let separated = request(
+            CicsOperation::FormatTime,
+            BTreeMap::from([
+                ("ABSTIME".into(), argument(b"3997082096789")),
+                ("MMDDYY".into(), argument(b"DATE-OUT")),
+                ("TIME".into(), argument(b"TIME-OUT")),
+                ("OPTION.DATESEP".into(), cics_option()),
+                ("OPTION.TIMESEP".into(), cics_option()),
+            ]),
+            1,
+        );
+        let separated = service
+            .invoke(
+                &effect(&invocation.run_unit_id, separated.clone(), 1),
+                separated,
+            )
+            .unwrap();
+        assert_eq!(separated.outputs["MMDDYY"].bytes(), b"08/30/26");
+        assert_eq!(separated.outputs["TIME"].bytes(), b"12:34:56");
+
+        let compact = request(
+            CicsOperation::FormatTime,
+            BTreeMap::from([
+                ("ABSTIME".into(), argument(b"3997082096789")),
+                ("MMDDYY".into(), argument(b"DATE-OUT")),
+                ("TIME".into(), argument(b"TIME-OUT")),
+            ]),
+            2,
+        );
+        let compact = service
+            .invoke(
+                &effect(&invocation.run_unit_id, compact.clone(), 2),
+                compact,
+            )
+            .unwrap();
+        assert_eq!(compact.outputs["MMDDYY"].bytes(), b"083026");
+        assert_eq!(compact.outputs["TIME"].bytes(), b"123456");
     }
 
     #[test]
@@ -6005,6 +6142,67 @@ mod tests {
                 .unwrap()
                 .unit_of_work,
             Some(CicsUnitOfWorkOutcome::Committed)
+        );
+    }
+
+    /// Issue #202: RETURN truncates to LENGTH and reports out-of-range as 22/11.
+    #[test]
+    fn return_length_selects_commarea_prefix_and_reports_lengerr_22_11() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, session) = registered(&service);
+        let excessive = request(
+            CicsOperation::Return,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"NEXT")),
+                ("COMMAREA".into(), argument(b"STATE")),
+                ("LENGTH".into(), cics_decimal(6)),
+            ]),
+            1,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, excessive.clone(), 1),
+                excessive,
+            ),
+            Err(HostProblem::Condition {
+                name: "LENGERR".into(),
+                response: 22,
+                response2: 11,
+            })
+        );
+        assert!(
+            !service
+                .lock()
+                .unwrap()
+                .continuations
+                .contains_key(session.as_str())
+        );
+
+        let bounded = request(
+            CicsOperation::Return,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"NEXT")),
+                ("COMMAREA".into(), argument(b"STATE")),
+                ("LENGTH".into(), cics_decimal(3)),
+            ]),
+            2,
+        );
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, bounded.clone(), 2),
+                bounded,
+            )
+            .unwrap();
+        assert_eq!(response.payload.bytes(), b"STA");
+        assert_eq!(
+            service
+                .lock()
+                .unwrap()
+                .continuations
+                .get(session.as_str())
+                .unwrap()
+                .commarea,
+            b"STA"
         );
     }
 
@@ -9988,6 +10186,55 @@ mod tests {
             .unwrap();
     }
 
+    /// Issue #208: runtime MAPSET values trim trailing blanks, then enforce 1-7 bytes.
+    #[test]
+    fn receive_map_runtime_mapset_trims_trailing_blanks_and_rejects_long_names() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+        service
+            .register_map(BmsMapDefinition {
+                mapset: "MENUMS".into(),
+                map: "MENU".into(),
+                line: 1,
+                column: 1,
+                rows: 1,
+                columns: 1,
+                fields: Vec::new(),
+            })
+            .unwrap();
+        let padded = request(
+            CicsOperation::ReceiveMap,
+            BTreeMap::from([
+                ("MAPSET".into(), argument(b"MENUMS  ")),
+                ("MAP".into(), argument(b"MENU")),
+            ]),
+            1,
+        );
+        assert_eq!(
+            service
+                .invoke(&effect(&invocation.run_unit_id, padded.clone(), 1), padded)
+                .unwrap()
+                .disposition,
+            CicsDisposition::Suspended
+        );
+
+        let too_long = request(
+            CicsOperation::ReceiveMap,
+            BTreeMap::from([
+                ("MAPSET".into(), argument(b"TOOLONG8")),
+                ("MAP".into(), argument(b"MENU")),
+            ]),
+            2,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, too_long.clone(), 2),
+                too_long,
+            ),
+            Err(HostProblem::Malformed)
+        );
+    }
+
     #[test]
     fn bms_send_file_read_and_program_transfer_are_typed() {
         let service = service(Arc::new(MemoryStore::new(Default::default())));
@@ -10143,6 +10390,77 @@ mod tests {
     }
 
     #[test]
+    fn send_text_length_selects_the_requested_prefix() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, session) = registered(&service);
+        let send = request(
+            CicsOperation::SendText,
+            BTreeMap::from([
+                ("FROM".into(), argument(b"HELLOWORLD")),
+                ("LENGTH".into(), cics_decimal(5)),
+            ]),
+            1,
+        );
+        let response = service
+            .invoke(&effect(&invocation.run_unit_id, send.clone(), 1), send)
+            .unwrap();
+        assert_eq!(response.payload.bytes(), b"HELLO");
+        assert_eq!(
+            service.lock().unwrap().sessions[session.as_str()].screen,
+            b"HELLO"
+        );
+    }
+
+    #[test]
+    fn write_length_persists_only_the_selected_record_prefix() {
+        let persisted = Arc::new(Mutex::new(None));
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open(
+            persisted_dataset_authorities(persisted.clone()),
+            store,
+            CicsLimits::default(),
+        )
+        .unwrap();
+        service
+            .register_file_aliases(&BTreeMap::from([(
+                "TESTFILE".into(),
+                DatasetName::new("IBMUSER.TESTFILE", 128).unwrap(),
+            )]))
+            .unwrap();
+        let (invocation, _) = registered(&service);
+        let write = request(
+            CicsOperation::Write,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"TESTFILE")),
+                ("FROM".into(), argument(b"ABC12345")),
+                ("RIDFLD".into(), argument(b"ABC")),
+                ("LENGTH".into(), cics_decimal(5)),
+                ("KEYLENGTH".into(), cics_decimal(3)),
+            ]),
+            1,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, write.clone(), 1), write)
+            .unwrap();
+        assert_eq!(*persisted.lock().unwrap(), Some(b"ABC12".to_vec()));
+
+        let read = request(
+            CicsOperation::Read,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"TESTFILE")),
+                ("RIDFLD".into(), argument(b"ABC")),
+                ("LENGTH".into(), cics_decimal(8)),
+                ("KEYLENGTH".into(), cics_decimal(3)),
+            ]),
+            2,
+        );
+        let response = service
+            .invoke(&effect(&invocation.run_unit_id, read.clone(), 2), read)
+            .unwrap();
+        assert_eq!(response.payload.bytes(), b"ABC12");
+    }
+
+    #[test]
     fn file_control_is_atomic_durable_and_enforced_by_online_io() {
         let memory = Arc::new(MemoryStore::new(Default::default()));
         let store: Arc<dyn ProviderStateStore> = memory.clone();
@@ -10287,6 +10605,7 @@ mod tests {
         );
     }
 
+    /// Issue #204: typed GTEQ retains STARTBR's greater-or-equal positioning.
     #[test]
     fn carddemo_cics_browse_rewrite_and_delete_reuse_base_record_identity() {
         let trace = Arc::new(DatasetTrace::default());
@@ -10306,6 +10625,7 @@ mod tests {
             BTreeMap::from([
                 ("DATASET".into(), argument(b"CARDDAT")),
                 ("RIDFLD".into(), argument(b"AA")),
+                ("OPTION.GTEQ".into(), argument(b"")),
             ]),
             1,
         );
@@ -10362,8 +10682,11 @@ mod tests {
         let requests = trace.requests.lock().unwrap();
         assert!(matches!(
             &requests[0],
-            DatasetRequest::StartBrowse { dataset, .. }
-                if dataset.as_str() == "CARDDEMO.CARDDAT"
+            DatasetRequest::StartBrowse {
+                dataset,
+                relation: mainframe_env_host_api::KeyRelation::GreaterOrEqual,
+                ..
+            } if dataset.as_str() == "CARDDEMO.CARDDAT"
         ));
         assert!(matches!(
             &requests[1],
@@ -10387,6 +10710,64 @@ mod tests {
         assert_eq!(origins.len(), 2);
         assert_eq!(origins[0].1, "outer-3");
         assert_eq!(origins[1].1, "outer-4");
+    }
+
+    /// Issue #205: current-record DELETE consumes exactly one READ UPDATE hold.
+    #[test]
+    fn delete_without_ridfld_uses_and_releases_latest_read_update_hold() {
+        let trace = Arc::new(DatasetTrace::default());
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service =
+            CicsService::open(traced_authorities(trace.clone()), store, Default::default())
+                .unwrap();
+        let (invocation, _) = registered(&service);
+        service
+            .register_file_aliases(&BTreeMap::from([(
+                "ACCTDAT".into(),
+                DatasetName::new("CARDDEMO.ACCTDAT", 128).unwrap(),
+            )]))
+            .unwrap();
+        let read = request(
+            CicsOperation::Read,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"ACCTDAT")),
+                ("RIDFLD".into(), argument(b"AA")),
+                ("OPTION.UPDATE".into(), argument(b"")),
+            ]),
+            1,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, read.clone(), 1), read)
+            .unwrap();
+        let delete = request(
+            CicsOperation::Delete,
+            BTreeMap::from([("FILE".into(), argument(b"ACCTDAT"))]),
+            2,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, delete.clone(), 2), delete)
+            .unwrap();
+
+        let second = request(
+            CicsOperation::Delete,
+            BTreeMap::from([("FILE".into(), argument(b"ACCTDAT"))]),
+            3,
+        );
+        assert_eq!(
+            service.invoke(&effect(&invocation.run_unit_id, second.clone(), 3), second),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 31,
+            })
+        );
+        assert!(matches!(
+            trace.requests.lock().unwrap().as_slice(),
+            [
+                DatasetRequest::Read { .. },
+                DatasetRequest::DeleteRecord { key, .. }
+            ] if key == b"AA"
+        ));
     }
 
     #[test]

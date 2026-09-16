@@ -301,6 +301,19 @@ pub(crate) fn validate_definition(
 
 /// Validate the canonical true-value list for the currently executable subset
 /// of a level-88 condition association.
+///
+/// Per IBM Enterprise COBOL 6.5, VALUE clause format 2
+/// (`SS6SG3_6.5/lr/ref/rlddeva2.html`), condition-names may be attached to an
+/// alphanumeric group as well as to its subordinate items. Each group value
+/// must be an alphanumeric literal or figurative constant no longer than the
+/// group's total elementary size, and the condition test follows the group
+/// comparison rules (`SS6SG3_6.5/lr/ref/rlpdsgrp.html`), which compare the
+/// group as an alphanumeric item of the same byte length.
+/// This executable subset therefore accepts "group" alongside "alphanumeric"
+/// and reuses the same alphanumeric literal/figurative-constant/length
+/// validation; "national_group" and "utf8_group" stay outside the subset
+/// because their DBCS/national/UTF-8 byte semantics are not implemented
+/// here.
 pub fn validate_cobol_condition_values(
     category: &str,
     digits: u64,
@@ -313,7 +326,7 @@ pub fn validate_cobol_condition_values(
         return Err("COBOL condition values are empty or noncanonical");
     }
     let numeric = matches!(category, "numeric_display" | "packed_decimal" | "binary");
-    let alphanumeric = category == "alphanumeric";
+    let alphanumeric = matches!(category, "alphanumeric" | "group");
     if !numeric && !alphanumeric {
         return Err("COBOL condition variable category is outside the executable subset");
     }
@@ -508,6 +521,19 @@ fn validate_alphanumeric_condition_value(
     if is_condition_figurative(value) {
         return Ok(());
     }
+    // Per IBM Enterprise COBOL 6.5 (`SS6SG3_6.5/lr/ref/rllitahx.html`), a
+    // hexadecimal-notation literal (`X'..'`) is an alphanumeric literal and
+    // is valid wherever one is. Its decoded byte length, not its hex-digit
+    // character count, is what must fit the conditional variable.
+    if let Some(hex) = hexadecimal_condition_bytes(value) {
+        return if !hex.is_empty()
+            && u64::try_from(hex.len()).is_ok_and(|length| length <= element_length)
+        {
+            Ok(())
+        } else {
+            Err("COBOL alphanumeric condition value exceeds its storage")
+        };
+    }
     let text = quoted_condition_text(value)
         .ok_or("COBOL alphanumeric condition value is not a quoted literal")?;
     if !text.is_empty() && u64::try_from(text.len()).is_ok_and(|length| length <= element_length) {
@@ -524,6 +550,35 @@ fn quoted_condition_text(value: &str) -> Option<&str> {
     }
     let text = value.get(1..value.len().checked_sub(1)?)?;
     (!text.as_bytes().contains(&delimiter)).then_some(text)
+}
+
+/// Decode an `X'hexadecimal-digits'` (or `X"..."`) alphanumeric literal, per
+/// `SS6SG3_6.5/lr/ref/rllitahx.html`. Returns `None` when `value` is not
+/// hexadecimal notation.
+fn hexadecimal_condition_bytes(value: &str) -> Option<Vec<u8>> {
+    let bytes = value.as_bytes();
+    if bytes.len() < 3 || !matches!(bytes[0], b'X' | b'x') || !matches!(bytes[1], b'\'' | b'"') {
+        return None;
+    }
+    let quote = bytes[1];
+    if bytes.last().copied() != Some(quote) {
+        return None;
+    }
+    let digits = &bytes[2..bytes.len() - 1];
+    if digits.is_empty()
+        || !digits.len().is_multiple_of(2)
+        || !digits.iter().all(u8::is_ascii_hexdigit)
+    {
+        return None;
+    }
+    digits
+        .chunks(2)
+        .map(|pair| {
+            let high = (pair[0] as char).to_digit(16)?;
+            let low = (pair[1] as char).to_digit(16)?;
+            u8::try_from((high << 4) | low).ok()
+        })
+        .collect()
 }
 
 fn is_condition_figurative(value: &str) -> bool {

@@ -2976,6 +2976,99 @@ mod tests {
     }
 
     #[test]
+    fn legacy_bare_send_resolves_dynamic_length_to_decimal() {
+        use mainframe_env_host_api::{CicsOperation, CicsRequest, HostRequest};
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. SENDLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 MESSAGE-TEXT PIC X(10) VALUE 'HELLOWORLD'. 01 MESSAGE-LENGTH PIC S9(4) COMP VALUE 5. PROCEDURE DIVISION. EXEC CICS SEND FROM(MESSAGE-TEXT) LENGTH(MESSAGE-LENGTH) NOHANDLE ERASE END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("bare SEND did not call host");
+        };
+        assert!(matches!(
+            effect.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::SendText,
+                arguments,
+                ..
+            }) if arguments["FROM"].bytes() == b"HELLOWORLD"
+                && arguments["LENGTH"].schema() == "mainframe-env.cics.decimal@1"
+                && arguments["LENGTH"].bytes() == b"5"
+        ));
+    }
+
+    #[test]
+    fn compact_formattime_bytes_execute_in_the_documented_wide_field() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. FMTCMP. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-X PIC S9(15) COMP-3 VALUE 3997082096789. 01 DATE-X PIC X(8) VALUE 'XXXXXXXX'. PROCEDURE DIVISION. EXEC CICS FORMATTIME ABSTIME(ABS-X) MMDDYY(DATE-X) END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(effect) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("compact FORMATTIME did not call host");
+        };
+        assert!(matches!(
+            effect.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::FormatTime,
+                ..
+            })
+        ));
+        let payload = |schema: &str, bytes: &[u8]| {
+            mainframe_env_execution_api::BoundedPayload::new(
+                schema,
+                bytes.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let response = CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: payload("mainframe-env.cics.payload@1", b""),
+            outputs: BTreeMap::from([(
+                "MMDDYY".into(),
+                payload("mainframe-env.cics.payload@1", b"083026"),
+            )]),
+            unit_of_work: None,
+        };
+        let result = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: effect.sequence,
+                outcome: Ok(HostResult::Cics(response)),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        );
+        assert!(matches!(result, MachineDrive::Completed(_)), "{result:?}");
+        assert_eq!(machine.variable("DATE-X").unwrap().bytes(), b"083026XX");
+    }
+
+    #[test]
     fn cics_abend_uses_typed_code_flags_and_terminal_metadata() {
         use mainframe_env_execution_api::AbendDumpDisposition;
         use mainframe_env_host_api::{

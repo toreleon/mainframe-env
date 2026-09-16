@@ -7,7 +7,7 @@
   "target_product": "0.1.1",
   "current_product": "0.1.0-alpha.0",
   "digest_scope": "Recursively lexicographically key-sorted compact UTF-8 JSON serialization of db2_receipt, with no trailing newline, followed by SHA-256",
-  "evidence_digest": "sha256:f3462e5617f2b0a625058af59069bdbb8685d0b5ea4edc23baa95c51013f5b1d",
+  "evidence_digest": "sha256:cf2aabadbde515abee0d9882dc374d323f7bd1f32cc312eb7173d486ea87a430",
   "db2_receipt": {
     "schema_version": "mainframe-env.carddemo-db2-receipt@1",
     "status": "pass",
@@ -42,18 +42,19 @@
       "AWS.M2.CARDDEMO.TRANTYPE.PS": "af32b11c82cf76ebc96f9ca48dbcb037eaf370d3468a3c069fadbd3eedf03f8e"
     },
     "spool_sha256": {
-      "CREADB2": "763fc45d904f098f6e25e4d0ba6c0bf65ebeee95d834716dbf45a0ac5b45fde0",
-      "MNTTRDB2": "b330e4ad444d2d00cd173e9e2f711dfa2f3e8a8d0d82e2a30a620e1862154c82",
-      "TRANEXTR": "4b61edf2fbb3eb093665f6e0466ad46b40b29f5a5a4001c4f97932d0ebcf1d42"
+      "CREADB2": "5f573f4a23d97a1eef328f72e5a7086d18929b6c331441d68243a0cbaa768f76",
+      "MNTTRDB2": "4bcc79b76fb7a2f0350f14a68eb44f6529de276a63b8c249d08b3cd2a4c71201",
+      "TRANEXTR": "5dbe578257c750a2a069041184cd4002340297e01bf0a471bfd4e16c474110e5"
     },
-    "db2_shape_sha256": "3a67d0aeba977ba039afd3a227ea97891976a2cafbd8c5d184823601ce955857"
+    "db2_shape_sha256": "0f9c88450bbb053f9c67040d029fd16eaa9e1f11ccf3b09a8fa4e390956e2f94"
   },
   "acceptance_observations": [
     "The SQL precompiler expands nine ordered SQLCA, DCL, and procedure members across the three pinned Db2 COBOL programs. Typed lowering covers the reached SELECT, COUNT, INSERT, UPDATE, DELETE, DECLARE, OPEN, FETCH, CLOSE, COMMIT, and ROLLBACK surface without a generic SQL fallback.",
     "CD.J13 enters the administrator menu through the public CICS session route, denies CTLI to the regular transport principal, executes forward cursor listing, and performs the application-defined lookup/create/insert, lookup/update/confirm, and lookup/delete/confirm CTTU screen sequences. SQLCA, packed numeric results, floating edited SQLCODE display, CICS syncpoint commit, rollback, duplicate -803, referential -532, and concurrent -911 observations are exact.",
     "CD.J14 submits the exact pinned CREADB21, MNTTRDB2, and TRANEXTR JCL through the public z/OSMF route. CREADB21 installs four DDL inputs and loads seven type plus eighteen category rows; COBTUPDT consumes all three A98, U02, and D98 records; DSNTIAUL exports seven plus eighteen exact 60-byte records after online CRUD restores the table.",
     "Zowe CLI 8.36.0 independently submitted all three exact jobs to the ephemeral local ProductServer and observed OUTPUT CC 0000. MNTTRDB2 SYSPRINT reports successful add, update, and delete; TRANEXTR JOBLOG reports all five steps RC 0000 and SYSPRINT reports DSNTIAUL ROWS=7 and ROWS=18.",
-    "The durable Db2 tables, CICS continuation, extracted datasets, and three job spools remain byte-identical across graceful shutdown and warm restart; PF8 resumes the suspended list cursor through the public terminal route. No absolute corpus path or native/runtime-archive fallback enters the receipt."
+    "The durable Db2 tables, CICS continuation, extracted datasets, and three job spools remain byte-identical across graceful shutdown and warm restart; PF8 resumes the suspended list cursor through the public terminal route. No absolute corpus path or native/runtime-archive fallback enters the receipt.",
+    "PR #179 follow-up #218 refreshes only spool and aggregate digests for JES-803 step-scoped spool files (042339a). Recombining the same current records into the former job-wide JOBLOG/SYSPRINT layout reproduces all three historical spool hashes exactly. Table and dataset bytes, route counts, and authorization/restart/rollback/conflict/failure controls remain unchanged. Existing execution rows are historical; the refreshed receipt is checked by cargo xtask carddemo-db2 --check."
   ],
   "commands": [
     {

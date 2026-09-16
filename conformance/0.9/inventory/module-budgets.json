@@ -24,7 +24,7 @@
     },
     {
       "path": "crates/apps/mainframe-env-batch/src/service.rs",
-      "max_production_lines": 7432,
+      "max_production_lines": 7425,
       "responsibility": "The batch service coordinates submission, DD allocation, program execution, spool state, and recovery transitions.",
       "split_boundary": "Split submission and routing, DD allocation, step execution, and completion/recovery into state-machine command families."
     },
@@ -42,7 +42,7 @@
     },
     {
       "path": "crates/apps/mainframe-env-server/src/product.rs",
-      "max_production_lines": 6346,
+      "max_production_lines": 6308,
       "responsibility": "Product construction, dependency assembly, application publication, JES control, and HTTP route behavior converge here.",
       "split_boundary": "Extract bootstrap/construction, publication, JES operations, and route-family adapters around the Product state owner."
     },
@@ -78,7 +78,7 @@
     },
     {
       "path": "crates/kernel/mainframe-env-compiler/src/hir.rs",
-      "max_production_lines": 1849,
+      "max_production_lines": 1773,
       "responsibility": "HIR declarations, builder state, and source-to-HIR integration remain combined at the compiler stage boundary.",
       "split_boundary": "Separate HIR records and invariants from builder orchestration while keeping the stage-private public surface unchanged."
     },
@@ -108,7 +108,7 @@
     },
     {
       "path": "crates/kernel/mainframe-env-interpreter/src/machine.rs",
-      "max_production_lines": 13069,
+      "max_production_lines": 12981,
       "responsibility": "The deterministic COBOL machine executes all operations, control flow, calls, host effects, and conditions.",
       "split_boundary": "Extract operation handlers by control, numeric/data, call, file/host-effect, and condition families around one machine state."
     },
@@ -120,13 +120,13 @@
     },
     {
       "path": "crates/providers/mainframe-env-dataset/src/service.rs",
-      "max_production_lines": 9412,
+      "max_production_lines": 9411,
       "responsibility": "Dataset allocation, catalog state, sequential and VSAM I/O, AMS behavior, transactions, and replay meet here.",
       "split_boundary": "Split catalog/allocation, record I/O, VSAM access, AMS commands, and persistence/recovery command families."
     },
     {
       "path": "crates/providers/mainframe-env-db2/src/service.rs",
-      "max_production_lines": 3333,
+      "max_production_lines": 3279,
       "responsibility": "Db2 catalog resolution, SQL interpretation, DDL/DML effects, transaction state, and replay are co-located.",
       "split_boundary": "Separate catalog/name resolution, DDL, DML/query, and unit-of-work/replay handlers behind the service."
     },
@@ -180,7 +180,7 @@
     },
     {
       "path": "crates/stores/mainframe-env-store/src/memory.rs",
-      "max_production_lines": 3722,
+      "max_production_lines": 3630,
       "responsibility": "The deterministic in-memory adapter implements execution, work, session, replay, and provider-state contracts in one state owner.",
       "split_boundary": "Separate domain-specific store trait implementations while retaining one bounded in-memory state and atomic lock authority."
     },
@@ -198,7 +198,7 @@
     },
     {
       "path": "crates/tooling/mainframe-env-conformance/src/carddemo.rs",
-      "max_production_lines": 14017,
+      "max_production_lines": 13824,
       "responsibility": "CardDemo conformance provisions the full fixture, drives online and batch journeys, and checks persistence and failures.",
       "split_boundary": "Separate fixture provisioning, online transactions, batch jobs, authorization, and durability/failure scenario families."
     },

@@ -325,6 +325,9 @@ impl ProductServer {
             &checkpoint,
             Some(staged_version),
         )?;
+        let trace = self
+            .cics
+            .terminal_run_trace(session, previous.principal.id(), now_tick)?;
         self.cics.restore_terminal_run(
             next.clone(),
             session,
@@ -332,6 +335,12 @@ impl ProductServer {
             payload.bytes().to_vec(),
             now_tick,
         )?;
+        self.online_traces
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .entry(session.as_str().into())
+            .or_default()
+            .extend(trace);
         Ok((next, checkpoint, settled_version))
     }
 

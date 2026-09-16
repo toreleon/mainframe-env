@@ -1885,7 +1885,9 @@ mod tests {
             .iter()
             .filter_map(|operand| match &operand.value {
                 CicsOperandValue::Literal(_) => None,
-                CicsOperandValue::Storage(slot) => Some(slot.storage),
+                CicsOperandValue::Storage(slot) | CicsOperandValue::LengthOf(slot) => {
+                    Some(slot.storage)
+                }
                 CicsOperandValue::Integer(_) => None,
             })
             .chain(plan.outputs.iter().map(|output| output.target.storage))

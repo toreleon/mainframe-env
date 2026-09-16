@@ -25,7 +25,11 @@ pub(super) fn invalid_return_shape(
     inputs: &BTreeSet<CicsOperandName>,
     outputs: &BTreeSet<CicsOutputName>,
 ) -> bool {
-    let allowed_inputs = BTreeSet::from([CicsOperandName::TransId, CicsOperandName::Commarea]);
+    let allowed_inputs = BTreeSet::from([
+        CicsOperandName::TransId,
+        CicsOperandName::Commarea,
+        CicsOperandName::Length,
+    ]);
     let transid = plan
         .operands
         .iter()
@@ -43,6 +47,27 @@ pub(super) fn invalid_return_shape(
             operand.name == CicsOperandName::Commarea
                 && !matches!(operand.value, CicsOperandValue::Storage(_))
         })
+        || match (
+            plan.operands
+                .iter()
+                .find(|operand| operand.name == CicsOperandName::Commarea),
+            plan.operands
+                .iter()
+                .find(|operand| operand.name == CicsOperandName::Length),
+        ) {
+            (
+                Some(super::CicsNamedOperand {
+                    value: CicsOperandValue::Storage(commarea),
+                    ..
+                }),
+                Some(super::CicsNamedOperand {
+                    value: CicsOperandValue::LengthOf(length),
+                    ..
+                }),
+            ) => commarea != length,
+            (_, None) => false,
+            _ => true,
+        }
         || plan
             .options
             .iter()

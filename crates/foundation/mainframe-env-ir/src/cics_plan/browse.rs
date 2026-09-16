@@ -15,6 +15,8 @@ pub(super) fn invalid_shape(
         CicsOperandName::File,
         CicsOperandName::Dataset,
         CicsOperandName::Ridfld,
+        CicsOperandName::Length,
+        CicsOperandName::KeyLength,
     ]);
     let ridfld = plan
         .operands
@@ -37,8 +39,9 @@ pub(super) fn invalid_shape(
             None => ridfld_output.is_some(),
         }
         || reading != outputs.contains(&CicsOutputName::Into)
-        || plan
-            .options
-            .iter()
-            .any(|option| !matches!(option, CicsPlanOption::NoHandle))
+        || plan.options.iter().any(|option| match option {
+            CicsPlanOption::NoHandle => false,
+            CicsPlanOption::Gteq => plan.operation != CicsPlanOperation::StartBrowse,
+            _ => true,
+        })
 }

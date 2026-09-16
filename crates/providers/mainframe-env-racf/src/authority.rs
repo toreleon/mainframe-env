@@ -1442,9 +1442,9 @@ fn normalize_pattern(value: &str, max: usize) -> Result<String, HostProblem> {
     let value = value.to_ascii_uppercase();
     if value.is_empty()
         || value.len() > max
-        || !value.bytes().all(|byte| {
-            byte.is_ascii_alphanumeric() || matches!(byte, b'@' | b'#' | b'$' | b'.' | b'*' | b'%')
-        })
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"@#$.*%_".contains(&byte))
     {
         Err(HostProblem::Malformed)
     } else {
@@ -1494,6 +1494,49 @@ mod tests {
         let resolver = Arc::new(MemorySecretResolver::default());
         let service = RacfService::open(store, resolver.clone(), Default::default()).unwrap();
         (service, resolver)
+    }
+
+    /// Issue #216: exact DB2 table profiles accept SQL identifier underscores.
+    #[test]
+    fn db2_table_profile_with_underscore_defines_permits_and_authorizes() {
+        let (service, resolver) = setup();
+        resolver.insert("secret:user", b"PASSWORD".to_vec());
+        let reference = SecretRef::new("secret:user", Default::default()).unwrap();
+        service.add_user("IBMUSER", &reference).unwrap();
+        let table = "CARDDEMO.TRANSACTION_TYPE";
+        service
+            .define_profile("DB2TABLE", table, "IBMUSER", None)
+            .unwrap();
+        service
+            .permit("DB2TABLE", table, "IBMUSER", AccessIntent::Update)
+            .unwrap();
+        let user = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        assert_eq!(
+            service
+                .authorize(
+                    &user,
+                    "DB2TABLE",
+                    &ResourceName::new(table, 246).unwrap(),
+                    AccessIntent::Update
+                )
+                .unwrap(),
+            SecurityDecision::Allow
+        );
+        assert_eq!(
+            service
+                .authorize(
+                    &user,
+                    "DB2TABLE",
+                    &ResourceName::new("CARDDEMO.OTHER", 246).unwrap(),
+                    AccessIntent::Read
+                )
+                .unwrap(),
+            SecurityDecision::Deny
+        );
+        assert_eq!(
+            service.define_profile("DB2TABLE", "CARDDEMO.BAD NAME", "IBMUSER", None),
+            Err(HostProblem::Malformed)
+        );
     }
 
     #[test]

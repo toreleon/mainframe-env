@@ -1,11 +1,12 @@
 use super::continuation::{self, OnlineMachineContinuation};
-use super::{OnlineExchangeState, ProductServer, normalize_online_name};
+use super::{OnlineExchangeState, ProductServer, gateway_problem, normalize_online_name};
 use crate::cobol::artifact::{admit_executable_artifact, executable_artifact_metadata};
 use mainframe_env_compiler_api::{PublishedArtifact, VersionedArtifactManifest};
-use mainframe_env_execution_api::{ArtifactRef, InvocationLimits};
+use mainframe_env_execution_api::{ArtifactRef, InvocationLimits, PrincipalId};
 use mainframe_env_host_api::HostProblem;
 use mainframe_env_host_api::SessionId;
 use mainframe_env_store_api::{ArtifactRecord, ArtifactStore, PlatformStore};
+use mainframe_env_zosmf::GatewayProblem;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
@@ -241,5 +242,51 @@ impl ProductServer {
             self.host.as_ref(),
             &invocation.provider_generations,
         )
+    }
+
+    /// Admit and run a fresh pseudo-conversational task on `CicsResume`. A
+    /// pending continuation (`EXEC CICS RETURN TRANSID(x)` from the prior
+    /// turn) can legitimately resume a different transaction than the
+    /// terminal's pre-resume snapshot; that hand-off is normal, not a fault,
+    /// so the online program is re-resolved for whichever transaction
+    /// `resume_terminal` actually admitted instead of the stale snapshot.
+    pub(super) fn resume_fresh_online_task(
+        &self,
+        session: &SessionId,
+        principal: &str,
+        principal_id: &PrincipalId,
+        csrf_token: &str,
+    ) -> Result<(), GatewayProblem> {
+        let snapshot = self
+            .cics
+            .terminal_snapshot(session, principal_id, super::current_tick()?)
+            .map_err(gateway_problem)?;
+        let online = self.online_transaction(&snapshot.transaction)?;
+        if let Some((_, artifact)) = online.as_ref() {
+            preflight_one(self.artifacts.as_ref(), artifact).map_err(gateway_problem)?;
+        }
+        let invocation = self.cics_invocation(
+            principal,
+            &snapshot.transaction,
+            online.as_ref().map(|(_, artifact)| artifact.clone()),
+        )?;
+        let resumed = self
+            .cics
+            .resume_terminal(invocation, session, csrf_token, super::current_tick()?)
+            .map_err(gateway_problem)?;
+        let online = if resumed.transaction == snapshot.transaction {
+            online
+        } else {
+            let resumed_online = self.online_transaction(&resumed.transaction)?;
+            if let Some((_, artifact)) = resumed_online.as_ref() {
+                preflight_one(self.artifacts.as_ref(), artifact).map_err(gateway_problem)?;
+            }
+            resumed_online
+        };
+        if let Some((program, _)) = online {
+            self.run_online_exchange(session, principal_id, &program, super::current_tick()?)
+                .map_err(gateway_problem)?;
+        }
+        Ok(())
     }
 }

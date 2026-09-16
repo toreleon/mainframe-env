@@ -21,6 +21,7 @@ mod assign_validation;
 mod file_operands;
 mod format_time;
 mod handle_abend;
+mod legacy_compatibility;
 mod operation;
 mod output_bindings;
 mod program_control;
@@ -28,21 +29,6 @@ mod program_name;
 mod queue_control;
 mod terminal_control;
 mod transaction_name;
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) struct CicsLegacySpiCompatibilityDescriptor {
-    pub(super) official_row: &'static str,
-    pub(super) label_tokens: &'static [&'static str],
-    pub(super) recognition_head: &'static [&'static str],
-    pub(super) runtime_operation: &'static str,
-    pub(super) required_value_options: &'static [&'static str],
-    pub(super) optional_value_options: &'static [&'static str],
-    pub(super) optional_flag_options: &'static [&'static str],
-    pub(super) application_discriminator_options: &'static [&'static str],
-    pub(super) resp2_requires_resp: bool,
-}
-
-include!("generated_cics_spi_compatibility.rs");
 
 struct ValidatedCandidate {
     descriptor: &'static CicsApplicationRegistryDescriptor,
@@ -54,103 +40,6 @@ struct ValidatedCandidate {
 struct CandidateFailure {
     score: (usize, usize, usize),
     detail: String,
-}
-
-pub(super) fn validated_legacy_spi_compatibility(
-    body: &[String],
-) -> Resolution<Option<&'static CicsLegacySpiCompatibilityDescriptor>> {
-    let descriptor = &CICS_LEGACY_SPI_COMPATIBILITY;
-    if descriptor.recognition_head.len() > body.len()
-        || !descriptor
-            .recognition_head
-            .iter()
-            .zip(body)
-            .all(|(expected, actual)| expected.eq_ignore_ascii_case(actual))
-    {
-        return Ok(None);
-    }
-    let remainder = &body[descriptor.recognition_head.len()..];
-    let Some(selector) = descriptor.required_value_options.first() else {
-        return Err(ResolutionFailure::Invalid(
-            "compiler SPI compatibility descriptor has no selector".into(),
-        ));
-    };
-    let (clauses, options) = clauses(remainder)?;
-    if descriptor
-        .application_discriminator_options
-        .iter()
-        .any(|name| {
-            clauses.contains_key(*name) || options.iter().any(|option| option.as_str() == *name)
-        })
-    {
-        return Ok(None);
-    }
-    if !clauses.contains_key(*selector)
-        && !options.iter().any(|option| option.as_str() == *selector)
-    {
-        return Ok(None);
-    }
-    let value_options = descriptor
-        .required_value_options
-        .iter()
-        .chain(descriptor.optional_value_options)
-        .copied()
-        .collect::<BTreeSet<_>>();
-    let flag_options = descriptor
-        .optional_flag_options
-        .iter()
-        .copied()
-        .collect::<BTreeSet<_>>();
-    for name in clauses.keys() {
-        if flag_options.contains(name.as_str()) {
-            return Err(ResolutionFailure::Invalid(format!(
-                "CICS {} option {name} is a flag and rejects a parenthesized operand",
-                descriptor.label_tokens.join(" ")
-            )));
-        }
-        if !value_options.contains(name.as_str()) {
-            return Err(ResolutionFailure::Invalid(format!(
-                "CICS {} has unknown legacy SPI option {name}",
-                descriptor.label_tokens.join(" ")
-            )));
-        }
-    }
-    for name in &options {
-        if value_options.contains(name.as_str()) {
-            return Err(ResolutionFailure::Invalid(format!(
-                "CICS {} option {name} requires a parenthesized operand",
-                descriptor.label_tokens.join(" ")
-            )));
-        }
-        if !flag_options.contains(name.as_str()) {
-            return Err(ResolutionFailure::Invalid(format!(
-                "CICS {} has unknown legacy SPI option {name}",
-                descriptor.label_tokens.join(" ")
-            )));
-        }
-    }
-    if let Some(required) = descriptor
-        .required_value_options
-        .iter()
-        .find(|required| !clauses.contains_key(**required))
-    {
-        return Err(ResolutionFailure::Invalid(format!(
-            "CICS {} requires option {required}",
-            descriptor.label_tokens.join(" ")
-        )));
-    }
-    if descriptor.resp2_requires_resp
-        && clauses.contains_key("RESP2")
-        && !clauses.contains_key("RESP")
-    {
-        return Err(ResolutionFailure::Invalid(format!(
-            "CICS {} option RESP2 requires RESP",
-            descriptor.label_tokens.join(" ")
-        )));
-    }
-    debug_assert_eq!(descriptor.runtime_operation, "Inquire");
-    debug_assert!(descriptor.official_row.contains(":spi-commands-unique:"));
-    Ok(Some(descriptor))
 }
 
 pub(super) fn validated_command(
@@ -173,7 +62,7 @@ pub(super) fn validated_command(
     let mut best_failure: Option<CandidateFailure> = None;
     for candidate in candidates {
         let tokens = clause_tokens(body, candidate.head_tokens, candidate.descriptor);
-        let (clauses, options) = match clauses(&tokens) {
+        let (clauses, options) = match clauses(&tokens, Some(candidate.descriptor)) {
             Ok(parsed) => parsed,
             Err(ResolutionFailure::Invalid(detail)) => {
                 keep_best_failure(
@@ -587,23 +476,16 @@ fn compatibility_alias_target(
     descriptor: &CicsApplicationRegistryDescriptor,
     name: &str,
 ) -> Option<&'static str> {
-    // The pre-registry file provider accepts DATASET as FILE's spelling for
-    // every keyed and browse operation. Preserve that compiler ABI alias
-    // without widening the source-reviewed IBM option catalog.
     (name == "DATASET"
-        && matches!(
-            descriptor.runtime_operation,
-            Some(
-                "Delete"
-                    | "EndBrowse"
-                    | "Read"
-                    | "ReadNext"
-                    | "ReadPrev"
-                    | "Rewrite"
-                    | "StartBrowse"
-                    | "Write"
-            )
-        ))
+        && descriptor.family == "file-control"
+        && descriptor
+            .options
+            .iter()
+            .any(|option| option.name == "FILE")
+        && descriptor
+            .options
+            .iter()
+            .all(|option| option.name != "DATASET"))
     .then_some("FILE")
 }
 
@@ -668,7 +550,10 @@ fn statically_known_value_bytes(tokens: &[String], semantic: &SemanticModel) -> 
         .map(|layout| layout.length)
 }
 
-fn clauses(tokens: &[String]) -> Resolution<(Clauses, Vec<String>)> {
+fn clauses(
+    tokens: &[String],
+    descriptor: Option<&CicsApplicationRegistryDescriptor>,
+) -> Resolution<(Clauses, Vec<String>)> {
     let mut clauses = BTreeMap::new();
     let mut options = Vec::new();
     let mut seen = BTreeSet::new();
@@ -684,12 +569,25 @@ fn clauses(tokens: &[String]) -> Resolution<(Clauses, Vec<String>)> {
                 "CICS top-level clause is malformed".into(),
             ));
         }
+        let has_operand = tokens.get(position + 1).is_some_and(|token| token == "(");
         if !seen.insert(name.clone()) {
+            let exact_bare_flag_repeat = !has_operand
+                && !clauses.contains_key(&name)
+                && descriptor.is_some_and(|descriptor| {
+                    matches!(
+                        option_value_shape(descriptor, &name),
+                        Some(CicsApplicationOptionValueShape::Flag)
+                    )
+                });
+            if exact_bare_flag_repeat {
+                position += 1;
+                continue;
+            }
             return Err(ResolutionFailure::Invalid(format!(
                 "CICS top-level option {name} is duplicated"
             )));
         }
-        if tokens.get(position + 1).is_some_and(|token| token == "(") {
+        if has_operand {
             let close = matching_close(tokens, position + 1)?;
             if close == position + 2 {
                 return Err(ResolutionFailure::Invalid(
@@ -741,7 +639,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     {
         body = &body[..body.len() - 1];
     }
-    if validated_legacy_spi_compatibility(body)?.is_some() {
+    if legacy_compatibility::validated(body)?.is_some() {
         return Err(ResolutionFailure::Unsupported);
     }
     let (descriptor, clauses, raw_options) = validated_command(body, semantic)?;
@@ -790,22 +688,55 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Link | HirCicsOperation::Xctl => {
             &["PROGRAM", "COMMAREA", "RESP", "RESP2"]
         }
-        HirCicsOperation::Return => &["TRANSID", "COMMAREA", "RESP", "RESP2"],
-        HirCicsOperation::StartBrowse => &["FILE", "DATASET", "RIDFLD", "RESP", "RESP2"],
-        HirCicsOperation::ReadNext | HirCicsOperation::ReadPrev => {
-            &["FILE", "DATASET", "INTO", "RIDFLD", "RESP", "RESP2"]
-        }
+        HirCicsOperation::Return => &["TRANSID", "COMMAREA", "LENGTH", "RESP", "RESP2"],
+        HirCicsOperation::StartBrowse => &[
+            "FILE",
+            "DATASET",
+            "RIDFLD",
+            "LENGTH",
+            "KEYLENGTH",
+            "RESP",
+            "RESP2",
+        ],
+        HirCicsOperation::ReadNext | HirCicsOperation::ReadPrev => &[
+            "FILE",
+            "DATASET",
+            "INTO",
+            "RIDFLD",
+            "LENGTH",
+            "KEYLENGTH",
+            "RESP",
+            "RESP2",
+        ],
         HirCicsOperation::EndBrowse => &["FILE", "DATASET", "RESP", "RESP2"],
         HirCicsOperation::Delete => &["FILE", "DATASET", "RIDFLD", "RESP", "RESP2"],
-        HirCicsOperation::Write => &["FILE", "DATASET", "FROM", "RIDFLD", "RESP", "RESP2"],
+        HirCicsOperation::Write => &[
+            "FILE",
+            "DATASET",
+            "FROM",
+            "RIDFLD",
+            "LENGTH",
+            "KEYLENGTH",
+            "RESP",
+            "RESP2",
+        ],
         HirCicsOperation::WriteTransientData => &["QUEUE", "FROM", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::ReceiveMap => &["MAP", "MAPSET", "INTO", "RESP", "RESP2"],
         HirCicsOperation::SendMap => &["MAP", "MAPSET", "FROM", "RESP", "RESP2"],
-        HirCicsOperation::SendText => &["FROM", "RESP", "RESP2"],
+        HirCicsOperation::SendText => &["FROM", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::Assign => &["RESP", "RESP2"],
         HirCicsOperation::PurgeMessage => &["RESP", "RESP2"],
-        HirCicsOperation::Read => &["FILE", "DATASET", "RIDFLD", "INTO", "RESP", "RESP2"],
-        HirCicsOperation::Rewrite => &["FILE", "DATASET", "FROM", "RESP", "RESP2"],
+        HirCicsOperation::Read => &[
+            "FILE",
+            "DATASET",
+            "RIDFLD",
+            "INTO",
+            "LENGTH",
+            "KEYLENGTH",
+            "RESP",
+            "RESP2",
+        ],
+        HirCicsOperation::Rewrite => &["FILE", "DATASET", "FROM", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA", "RESP", "RESP2"],
         HirCicsOperation::Syncpoint => &["RESP", "RESP2"],
         HirCicsOperation::Suspend => &["RESP", "RESP2"],
@@ -816,7 +747,6 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::AddressSet
         | HirCicsOperation::Asktime
         | HirCicsOperation::AsktimeEib
-        | HirCicsOperation::FormatTime
         | HirCicsOperation::ChangeTask
         | HirCicsOperation::HandleAid
         | HirCicsOperation::HandleCondition
@@ -824,7 +754,6 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::Link
         | HirCicsOperation::Xctl
         | HirCicsOperation::Return
-        | HirCicsOperation::StartBrowse
         | HirCicsOperation::ReadNext
         | HirCicsOperation::ReadPrev
         | HirCicsOperation::EndBrowse
@@ -832,14 +761,16 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::Write
         | HirCicsOperation::WriteTransientData
         | HirCicsOperation::ReceiveMap
-        | HirCicsOperation::SendMap
-        | HirCicsOperation::SendText
         | HirCicsOperation::Assign
         | HirCicsOperation::PurgeMessage
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle
         | HirCicsOperation::SetAssociationUserCorrData
         | HirCicsOperation::Suspend => &["NOHANDLE"],
+        HirCicsOperation::FormatTime => &["DATESEP", "TIMESEP", "NOHANDLE"],
+        HirCicsOperation::SendMap => &["ERASE", "CURSOR", "FREEKB", "NOHANDLE"],
+        HirCicsOperation::SendText => &["ERASE", "FREEKB", "NOHANDLE"],
+        HirCicsOperation::StartBrowse => &["GTEQ", "NOHANDLE"],
         HirCicsOperation::Deq => &["UOW", "TASK", "NOHANDLE"],
         HirCicsOperation::Enq => &["UOW", "TASK", "NOSUSPEND", "NOHANDLE"],
         HirCicsOperation::Read => &["UPDATE", "NOHANDLE"],
@@ -1063,7 +994,21 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     if operation == HirCicsOperation::FormatTime {
         operands.extend(format_time::operands(&clauses, semantic)?);
     }
-    let outputs = output_bindings::resolve(&clauses, operation, semantic)?;
+    let mut outputs = output_bindings::resolve(&clauses, &raw_options, operation, semantic)?;
+    if operation == HirCicsOperation::Read
+        && let Some(HirCicsNamedOperand {
+            value: HirCicsValue::Data(target),
+            ..
+        }) = operands
+            .iter()
+            .find(|operand| operand.name == HirCicsOperandName::Length)
+    {
+        require_writable(target)?;
+        outputs.push(HirCicsOutputBinding {
+            name: HirCicsOutputName::Length,
+            target: target.clone(),
+        });
+    }
     let mut options = raw_options
         .iter()
         .filter(|option| {
@@ -1083,6 +1028,12 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "TASK" => HirCicsOption::Task,
             "UOW" => HirCicsOption::Uow,
             "NOSUSPEND" => HirCicsOption::NoSuspend,
+            "ERASE" => HirCicsOption::Erase,
+            "CURSOR" => HirCicsOption::Cursor,
+            "DATESEP" => HirCicsOption::DateSep,
+            "TIMESEP" => HirCicsOption::TimeSep,
+            "FREEKB" => HirCicsOption::FreeKb,
+            "GTEQ" => HirCicsOption::Gteq,
             _ => unreachable!("allowed CICS option"),
         })
         .collect::<BTreeSet<_>>();

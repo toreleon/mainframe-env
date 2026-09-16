@@ -107,6 +107,16 @@ fn send(
     let mut payload = argument_bytes(request, "FROM")
         .or_else(|| argument_bytes(request, "DATA"))
         .unwrap_or_default();
+    if let Some(length) = argument_optional(request, "LENGTH") {
+        let length = length
+            .trim()
+            .parse::<usize>()
+            .map_err(|_| HostProblem::Malformed)?;
+        if length > payload.len() {
+            return Err(HostProblem::Malformed);
+        }
+        payload.truncate(length);
+    }
     let mut field_protection = None;
     let mut field_modified = None;
     let mut field_values = None;
@@ -272,10 +282,12 @@ fn receive(
 }
 
 fn map_names(request: &CicsRequest) -> Result<(String, String), HostProblem> {
-    let map = argument_text(request, "MAP")?.trim().to_ascii_uppercase();
+    let map = argument_text(request, "MAP")?
+        .trim_end()
+        .to_ascii_uppercase();
     let mapset = argument_optional(request, "MAPSET")
         .unwrap_or_else(|| map.clone())
-        .trim()
+        .trim_end()
         .to_ascii_uppercase();
     if [&map, &mapset].iter().any(|name| {
         name.is_empty() || name.len() > 7 || !name.bytes().all(|byte| byte.is_ascii_alphanumeric())

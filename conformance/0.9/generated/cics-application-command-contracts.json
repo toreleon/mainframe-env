@@ -791,7 +791,7 @@
       "web-control": 14,
       "web-service-control": 8
     },
-    "registry_sha256": "sha256:07f4e7f4b1fb8a400be555eb1ea2060bfc14115c09814fdd86e3b880d91a235f"
+    "registry_sha256": "sha256:d1f56ec07ccbc6eb85634ef60ca916d889fabd5627755e3436e5e5faa830ed4b"
   },
   "counts": {
     "batches": 3,
@@ -132546,7 +132546,7 @@
                   "argument_markers": [
                     "data-value"
                   ],
-                  "value_shape": "value",
+                  "value_shape": "optional-value",
                   "directions": [
                     "input"
                   ],
@@ -132963,7 +132963,7 @@
                   "argument_markers": [
                     "data-value"
                   ],
-                  "value_shape": "value",
+                  "value_shape": "optional-value",
                   "directions": [
                     "input"
                   ],
@@ -133336,7 +133336,7 @@
               "handler_sha256": "sha256:cf9b848b973f6400afb4a0ed150f81687cfb2eb78807c1fa5f787aa5fc8a6a18"
             }
           },
-          "row_contract_sha256": "sha256:aee51038abbacf348bdabb4b7be4b2bb4c51201ce893187d6f2efc21f3e85fd6"
+          "row_contract_sha256": "sha256:d43a4f046e26e8477436e8913250a553927f62a8f8242066c9f3cf81ee5ff13d"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0081",
@@ -283890,7 +283890,7 @@
                   "argument_markers": [
                     "name"
                   ],
-                  "value_shape": "value",
+                  "value_shape": "optional-value",
                   "directions": [
                     "input"
                   ],
@@ -284534,7 +284534,7 @@
               "handler_sha256": "sha256:298db15b88bc9035a249a7a7c4b9a710fc3eec35f58ac925eff491f3b78496e1"
             }
           },
-          "row_contract_sha256": "sha256:dee111372b9186614d285a886d7ddfe0a42203e86ab487868b84613786b05309"
+          "row_contract_sha256": "sha256:c4d2a011bc3533554d8ecfb3ff09010c301878b300cae63d38a9658d51533187"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0183",
@@ -301323,7 +301323,7 @@
                   "argument_markers": [
                     "data-value"
                   ],
-                  "value_shape": "value",
+                  "value_shape": "optional-value",
                   "directions": [
                     "input"
                   ],
@@ -302103,7 +302103,7 @@
               "handler_sha256": "sha256:4da72d40bfff36f38b5726e9dd2c3728bf416c980e3f846f12cc9208cc86baf1"
             }
           },
-          "row_contract_sha256": "sha256:0d7f08a48557ba5efc5aac96a23e03063f10c7a103e7c66bf864a6ee6b689a91"
+          "row_contract_sha256": "sha256:9feae48bc894e5ce553308b66ee0c512e4dbf3337512a8909133eb2cf89f341e"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0189",
@@ -305615,7 +305615,7 @@
                   "argument_markers": [
                     "data-value"
                   ],
-                  "value_shape": "value",
+                  "value_shape": "optional-value",
                   "directions": [
                     "input"
                   ],
@@ -306718,7 +306718,7 @@
               "handler_sha256": "sha256:da8638b9f8a9c78ad1bcf6f46520e7cc1f033b6dd5c94022c8a2345c39648e97"
             }
           },
-          "row_contract_sha256": "sha256:32154d85915306fd1c82b2f300e1912363dd85251a0f429ecd39761027aac4ba"
+          "row_contract_sha256": "sha256:acfdaeb4a5fff4c7b7f64f1a77f2370e3f8ca21fa118db0dac814f4494c4c1ce"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0190",
@@ -422916,7 +422916,7 @@
                   "argument_markers": [
                     "data-area"
                   ],
-                  "value_shape": "value",
+                  "value_shape": "optional-value",
                   "directions": [
                     "unknown"
                   ],
@@ -423001,7 +423001,7 @@
                   "argument_markers": [
                     "data-area"
                   ],
-                  "value_shape": "value",
+                  "value_shape": "optional-value",
                   "directions": [
                     "unknown"
                   ],
@@ -423740,7 +423740,7 @@
               "handler_sha256": "sha256:3c1e9a0c16ea3aa6308aed3762b7e3809fbb4c156fc71375e4e9d6229bc49864"
             }
           },
-          "row_contract_sha256": "sha256:362603d5b3f4377961cb7fffba0235b4eed42b14e754d8b88f9d029ef5590d0b"
+          "row_contract_sha256": "sha256:1339da478c32d2eaf23275234e18966e8053aa4da7fc325c859e7a5f7e778a2d"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0252",
@@ -446573,5 +446573,5 @@
       ]
     }
   ],
-  "contract_sha256": "sha256:86349d7ffddd945f1366bf978cd3317bfdde5fe7a69ea852bd649d2ae9cea979"
+  "contract_sha256": "sha256:8794fd10a2f64f580a15cd25e7dff4c50e78a6680bf0877fc3e1f0c7f83f5c51"
 }

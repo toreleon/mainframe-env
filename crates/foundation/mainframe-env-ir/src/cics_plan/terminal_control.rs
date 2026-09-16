@@ -13,6 +13,7 @@ pub(super) fn invalid_shape(
         CicsOperandName::Map,
         CicsOperandName::Mapset,
         CicsOperandName::From,
+        CicsOperandName::Length,
     ]);
     let required = match plan.operation {
         CicsPlanOperation::ReceiveMap => BTreeSet::from([CicsOperandName::Map]),
@@ -25,19 +26,52 @@ pub(super) fn invalid_shape(
         || (plan.operation == CicsPlanOperation::ReceiveMap
             && inputs.contains(&CicsOperandName::From))
         || (plan.operation == CicsPlanOperation::SendText
-            && inputs.iter().any(|name| *name != CicsOperandName::From))
+            && inputs
+                .iter()
+                .any(|name| !matches!(name, CicsOperandName::From | CicsOperandName::Length)))
         || plan.operands.iter().any(|operand| match operand.name {
             CicsOperandName::Map | CicsOperandName::Mapset => !matches!(
                 operand.value,
                 CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
             ),
             CicsOperandName::From => !matches!(operand.value, CicsOperandValue::Storage(_)),
+            CicsOperandName::Length => !matches!(operand.value, CicsOperandValue::LengthOf(_)),
             _ => true,
         })
+        || match (
+            plan.operands
+                .iter()
+                .find(|operand| operand.name == CicsOperandName::From),
+            plan.operands
+                .iter()
+                .find(|operand| operand.name == CicsOperandName::Length),
+        ) {
+            (
+                Some(super::CicsNamedOperand {
+                    value: CicsOperandValue::Storage(from),
+                    ..
+                }),
+                Some(super::CicsNamedOperand {
+                    value: CicsOperandValue::LengthOf(length),
+                    ..
+                }),
+            ) => from != length,
+            (_, None) => false,
+            _ => true,
+        }
         || (plan.operation != CicsPlanOperation::ReceiveMap
             && outputs.contains(&CicsOutputName::Into))
-        || plan
-            .options
-            .iter()
-            .any(|option| !matches!(option, CicsPlanOption::NoHandle))
+        || plan.options.iter().any(|option| match option {
+            CicsPlanOption::NoHandle => false,
+            CicsPlanOption::Erase => !matches!(
+                plan.operation,
+                CicsPlanOperation::SendMap | CicsPlanOperation::SendText
+            ),
+            CicsPlanOption::Cursor => plan.operation != CicsPlanOperation::SendMap,
+            CicsPlanOption::FreeKb => !matches!(
+                plan.operation,
+                CicsPlanOperation::SendMap | CicsPlanOperation::SendText
+            ),
+            _ => true,
+        })
 }

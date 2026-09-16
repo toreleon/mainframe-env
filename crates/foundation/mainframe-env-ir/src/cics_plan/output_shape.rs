@@ -8,7 +8,10 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
         ),
         CicsPlanOperation::Read => matches!(
             output,
-            CicsOutputName::Into | CicsOutputName::Resp | CicsOutputName::Resp2
+            CicsOutputName::Into
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+                | CicsOutputName::Length
         ),
         CicsPlanOperation::FormatTime => matches!(
             output,

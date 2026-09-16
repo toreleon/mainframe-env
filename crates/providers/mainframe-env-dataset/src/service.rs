@@ -1,5 +1,7 @@
 use crate::codec::{Entry, MemberGeneration, decode, encode, encode_definition_digest_v3};
+use crate::dataset_locks;
 use crate::dependency::{DependencyGraph, DependencyLimits};
+use crate::replay_index::ReplayIndex;
 use crate::retention::{
     CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,
     CICS_OUTER_EFFECT_ORIGIN_BINDING, CICS_OUTER_EFFECT_ORIGIN_SCHEMA, DatasetReplayCodecVersion,
@@ -176,12 +178,13 @@ impl DatasetService {
                     expected_version: None,
                 }));
                 mutations.push(replay_mutation(mutation, &replay)?);
-                self.commit_catalog_mutations(mutations, mutation, &replay)?;
+                let (replay_version, replay_payload) =
+                    self.commit_catalog_mutations(mutations, mutation, &replay)?;
                 state.locks.retain(|_, lock| lock.expires_at > *now_tick);
                 state.locks.insert(lock_id, receipt);
                 state
                     .replay
-                    .insert(mutation.idempotency_key.as_str().into(), replay);
+                    .record_mutation(mutation, replay_version, &replay_payload, replay);
                 Ok(result)
             }
             DatasetRequest::ReleaseLock {
@@ -209,7 +212,7 @@ impl DatasetService {
                 };
                 let replay =
                     resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
-                self.commit_catalog_mutations(
+                let (replay_version, replay_payload) = self.commit_catalog_mutations(
                     vec![
                         ProviderStateMutation::Delete {
                             namespace: "dataset-lock".into(),
@@ -224,7 +227,7 @@ impl DatasetService {
                 state.locks.remove(lock_id);
                 state
                     .replay
-                    .insert(mutation.idempotency_key.as_str().into(), replay);
+                    .record_mutation(mutation, replay_version, &replay_payload, replay);
                 Ok(result)
             }
             DatasetRequest::BeginTvs {
@@ -246,7 +249,7 @@ impl DatasetService {
                 let result = DatasetResult::Tvs(tvs_receipt(transaction, &unit)?);
                 let replay =
                     resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
-                self.commit_catalog_mutations(
+                let (replay_version, replay_payload) = self.commit_catalog_mutations(
                     vec![
                         ProviderStateMutation::Put(ProviderStateWrite {
                             record: ProviderStateRecord {
@@ -265,7 +268,7 @@ impl DatasetService {
                 state.tvs_units.insert(transaction.clone(), unit);
                 state
                     .replay
-                    .insert(mutation.idempotency_key.as_str().into(), replay);
+                    .record_mutation(mutation, replay_version, &replay_payload, replay);
                 Ok(result)
             }
             DatasetRequest::StageTvs {
@@ -367,14 +370,15 @@ impl DatasetService {
                     }));
                 }
                 mutations.push(replay_mutation(mutation, &replay)?);
-                self.commit_catalog_mutations(mutations, mutation, &replay)?;
+                let (replay_version, replay_payload) =
+                    self.commit_catalog_mutations(mutations, mutation, &replay)?;
                 state.tvs_units.insert(transaction.clone(), next);
                 if let Some(lock) = new_lock {
                     state.locks.insert(lock_id, lock);
                 }
                 state
                     .replay
-                    .insert(mutation.idempotency_key.as_str().into(), replay);
+                    .record_mutation(mutation, replay_version, &replay_payload, replay);
                 Ok(result)
             }
             DatasetRequest::CompleteTvs {
@@ -530,29 +534,33 @@ impl DatasetService {
             });
         }
         mutations.push(replay_mutation(mutation, &replay)?);
-        if let Err(problem) = self.commit_catalog_mutations(mutations, mutation, &replay) {
-            if problem == HostProblem::UnknownOutcome {
-                let mut unknown = current.clone();
-                unknown.state = mainframe_env_host_api::TvsUnitOfWorkState::Unknown;
-                unknown.version = next.version;
-                if self
-                    .store
-                    .put_provider_state(
-                        ProviderStateRecord {
-                            namespace: "dataset-tvs".into(),
-                            key: transaction.into(),
-                            version: unknown.version,
-                            payload: encode_tvs(&unknown)?,
-                        },
-                        Some(current.version),
-                    )
-                    .is_ok()
-                {
-                    state.tvs_units.insert(transaction.into(), unknown);
+        let (replay_version, replay_payload) =
+            match self.commit_catalog_mutations(mutations, mutation, &replay) {
+                Ok(committed) => committed,
+                Err(problem) => {
+                    if problem == HostProblem::UnknownOutcome {
+                        let mut unknown = current.clone();
+                        unknown.state = mainframe_env_host_api::TvsUnitOfWorkState::Unknown;
+                        unknown.version = next.version;
+                        if self
+                            .store
+                            .put_provider_state(
+                                ProviderStateRecord {
+                                    namespace: "dataset-tvs".into(),
+                                    key: transaction.into(),
+                                    version: unknown.version,
+                                    payload: encode_tvs(&unknown)?,
+                                },
+                                Some(current.version),
+                            )
+                            .is_ok()
+                        {
+                            state.tvs_units.insert(transaction.into(), unknown);
+                        }
+                    }
+                    return Err(problem);
                 }
-            }
-            return Err(problem);
-        }
+            };
         for (name, entry) in updated_entries {
             state.entries.insert(name, entry);
         }
@@ -565,7 +573,7 @@ impl DatasetService {
             .retain(|_, lock| lock.transaction.as_deref() != Some(transaction));
         state
             .replay
-            .insert(mutation.idempotency_key.as_str().into(), replay);
+            .record_mutation(mutation, replay_version, &replay_payload, replay);
         Ok(result)
     }
 
@@ -601,19 +609,20 @@ impl DatasetService {
             });
         }
         mutations.push(replay_mutation(mutation, &replay)?);
-        self.commit_catalog_mutations(mutations, mutation, &replay)?;
+        let (replay_version, replay_payload) =
+            self.commit_catalog_mutations(mutations, mutation, &replay)?;
         state.tvs_units.insert(transaction.into(), next);
         state
             .locks
             .retain(|_, lock| lock.transaction.as_deref() != Some(transaction));
         state
             .replay
-            .insert(mutation.idempotency_key.as_str().into(), replay);
+            .record_mutation(mutation, replay_version, &replay_payload, replay);
         Ok(result)
     }
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct Replay {
+pub(crate) struct Replay {
     request_digest: [u8; 32],
     result: Option<DatasetResult>,
     metadata: Option<ReplayRetentionMetadata>,
@@ -647,12 +656,12 @@ struct Cursor {
     index: isize,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct AlternateIndex {
+pub(crate) struct AlternateIndex {
     base: String,
     parent: String,
     is_path: bool,
     key_offset: u32,
-    key_length: u32,
+    pub(crate) key_length: u32,
     allow_duplicates: bool,
     upgrade: bool,
     identities: Vec<BrowseIdentity>,
@@ -700,40 +709,20 @@ struct SeedSelection {
     generation: String,
     version: u64,
 }
-struct State {
+pub(crate) struct State {
     entries: BTreeMap<String, Entry>,
-    alternate_indexes: BTreeMap<String, AlternateIndex>,
+    pub(crate) alternate_indexes: BTreeMap<String, AlternateIndex>,
     generation_groups: BTreeMap<String, GenerationGroup>,
     catalogs: BTreeMap<String, CatalogRecord>,
     catalog_aliases: BTreeMap<String, CatalogAlias>,
-    locks: BTreeMap<String, mainframe_env_host_api::DatasetLockReceipt>,
+    pub(crate) locks: BTreeMap<String, mainframe_env_host_api::DatasetLockReceipt>,
     tvs_units: BTreeMap<String, TvsUnitOfWork>,
     seed_generations: BTreeMap<(String, String), SeedGeneration>,
     seed_selections: BTreeMap<String, SeedSelection>,
     cursors: BTreeMap<String, Cursor>,
     next_cursor: u64,
-    replay: BTreeMap<String, Replay>,
+    replay: ReplayIndex,
     dependencies: DependencyGraph,
-}
-
-fn load_replay_index(
-    store: &dyn ProviderStateStore,
-    limits: DatasetLimits,
-) -> Result<BTreeMap<String, Replay>, HostProblem> {
-    let rows = store
-        .list_provider_state("dataset-replay", limits.max_idempotency)
-        .map_err(store_error)?;
-    let mut replay = BTreeMap::new();
-    for row in rows {
-        describe_dataset_replay_row_with_limits(&row, limits)
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let decoded =
-            decode_replay(&row.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
-        if replay.insert(row.key, decoded).is_some() {
-            return Err(HostProblem::InfrastructureFailure);
-        }
-    }
-    Ok(replay)
 }
 
 pub struct DatasetService {
@@ -797,7 +786,8 @@ impl DatasetService {
             }
             entries.insert(row.key, entry);
         }
-        let replay = load_replay_index(&*store, limits)?;
+        let mut replay = ReplayIndex::default();
+        replay.sync(&*store, limits)?;
         let mut alternate_indexes = BTreeMap::new();
         for row in store
             .list_provider_state("dataset-aix", limits.max_datasets)
@@ -1323,21 +1313,20 @@ impl DatasetService {
         self.invoke_checked(None, None, request)
     }
 
-    /// Reload the live replay index after an external atomic retention prune.
+    /// Sync the live replay index against the store, e.g. after an external
+    /// atomic retention prune.
     ///
     /// The service mutex is held across the provider-state scan, so a local
-    /// mutation cannot be lost while the in-memory map is replaced. Every row
-    /// is fully validated before publication; corruption leaves the old map
-    /// unchanged and fails closed.
+    /// mutation cannot be lost while the in-memory index is synced. Every new
+    /// or changed row is fully validated before publication; corruption
+    /// leaves the old index unchanged and fails closed.
     pub fn refresh_replay_index(&self) -> Result<usize, HostProblem> {
         let mut state = self
             .state
             .lock()
             .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let replay = load_replay_index(&*self.store, self.limits)?;
-        let count = replay.len();
-        state.replay = replay;
-        Ok(count)
+        state.replay.sync(&*self.store, self.limits)?;
+        Ok(state.replay.len())
     }
 
     fn invoke_checked(
@@ -1346,7 +1335,11 @@ impl DatasetService {
         mut trusted_metadata: Option<ReplayRetentionMetadata>,
         request: DatasetRequest,
     ) -> Result<DatasetResult, HostProblem> {
-        self.refresh_replay_index()?;
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        state.replay.sync(&*self.store, self.limits)?;
         HostRequest::Dataset(request.clone()).validate(mainframe_env_host_api::HostLimits {
             max_record_bytes: self.limits.max_record_bytes,
             max_records: self.limits.max_records,
@@ -1358,11 +1351,6 @@ impl DatasetService {
         }) {
             return Err(HostProblem::IdempotencyConflict);
         }
-        let mut state = self
-            .state
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?;
-        state.replay = load_replay_index(&*self.store, self.limits)?;
         if let Some(principal) = principal {
             authorize_principal(&state, principal, &request)?;
         }
@@ -1430,20 +1418,19 @@ impl DatasetService {
                 result: None,
                 metadata: trusted_metadata.take(),
             };
+            let payload = encode_replay(&replay)?;
             self.store
                 .put_provider_state(
                     ProviderStateRecord {
                         namespace: "dataset-replay".into(),
                         key: meta.idempotency_key.as_str().into(),
                         version: 1,
-                        payload: encode_replay(&replay)?,
+                        payload: payload.clone(),
                     },
                     None,
                 )
                 .map_err(store_error)?;
-            state
-                .replay
-                .insert(meta.idempotency_key.as_str().into(), replay);
+            state.replay.record_mutation(meta, 1, &payload, replay);
         }
         let result = match self.apply(&mut state, &request) {
             Ok(result) => result,
@@ -1470,20 +1457,21 @@ impl DatasetService {
                 return Ok(result);
             }
             let replay = resolved_replay(&state, meta, digest, result.clone())?;
+            let payload = encode_replay(&replay)?;
             self.store
                 .put_provider_state(
                     ProviderStateRecord {
                         namespace: "dataset-replay".into(),
                         key: meta.idempotency_key.as_str().into(),
                         version: 2,
-                        payload: encode_replay(&replay)?,
+                        payload: payload.clone(),
                     },
                     Some(1),
                 )
                 .map_err(|_| HostProblem::UnknownOutcome)?;
             state
                 .replay
-                .insert(meta.idempotency_key.as_str().into(), replay.clone());
+                .record_mutation(meta, 2, &payload, replay.clone());
             if let Some(metadata) = &replay.metadata {
                 self.finalize_replay_metadata(
                     &mut state,
@@ -1548,18 +1536,21 @@ impl DatasetService {
             .checked_add(1)
             .filter(|version| *version <= i64::MAX as u64)
             .ok_or(HostProblem::ResourceExhausted)?;
+        let payload = encode_replay(&next)?;
         self.store
             .put_provider_state(
                 ProviderStateRecord {
                     namespace: "dataset-replay".into(),
                     key: key.into(),
                     version: next_version,
-                    payload: encode_replay(&next)?,
+                    payload: payload.clone(),
                 },
                 Some(record.version),
             )
             .map_err(store_error)?;
-        state.replay.insert(key.into(), next);
+        state
+            .replay
+            .record_committed(key, next_version, &payload, next);
         Ok(())
     }
 
@@ -2323,8 +2314,11 @@ impl DatasetService {
             DatasetRequest::Create {
                 dataset,
                 attributes,
-                ..
+                mutation,
             } => {
+                if dataset_locks::dataset_name_lock_conflicts(state, dataset, mutation) {
+                    return Err(condition("LOCKED", 16));
+                }
                 let definition = validated_compatibility_definition(attributes, self.limits)?;
                 if state
                     .entries
@@ -2355,15 +2349,7 @@ impl DatasetService {
                 mutation,
             } => {
                 validate_dataset_definition(definition, self.limits)?;
-                if state.locks.values().any(|lock| {
-                    lock.dataset == *dataset
-                        && matches!(
-                            lock.target,
-                            mainframe_env_host_api::DatasetLockTarget::Dataset
-                        )
-                        && lock.expires_at > mutation.sequence
-                        && lock.transaction.as_deref() != mutation.transaction.as_deref()
-                }) {
+                if dataset_locks::dataset_name_lock_conflicts(state, dataset, mutation) {
                     return Err(condition("LOCKED", 16));
                 }
                 if definition.lifecycle.migration_level != 0
@@ -2420,7 +2406,7 @@ impl DatasetService {
                 let result = DatasetResult::Created { version: 1 };
                 let replay =
                     resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
-                self.commit_catalog_writes(
+                let (replay_version, replay_payload) = self.commit_catalog_writes(
                     vec![
                         ProviderStateWrite {
                             record: ProviderStateRecord {
@@ -2449,7 +2435,7 @@ impl DatasetService {
                 state.dependencies = dependencies;
                 state
                     .replay
-                    .insert(mutation.idempotency_key.as_str().into(), replay);
+                    .record_mutation(mutation, replay_version, &replay_payload, replay);
                 Ok(result)
             }
             DatasetRequest::Alter {
@@ -2597,7 +2583,7 @@ impl DatasetService {
                 };
                 let replay =
                     resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
-                self.commit_catalog_writes(
+                let (replay_version, replay_payload) = self.commit_catalog_writes(
                     vec![
                         ProviderStateWrite {
                             record: ProviderStateRecord {
@@ -2625,7 +2611,7 @@ impl DatasetService {
                 state.entries.insert(dataset.as_str().into(), next);
                 state
                     .replay
-                    .insert(mutation.idempotency_key.as_str().into(), replay);
+                    .record_mutation(mutation, replay_version, &replay_payload, replay);
                 Ok(result)
             }
             DatasetRequest::Restore {
@@ -2754,7 +2740,7 @@ impl DatasetService {
                 } else {
                     let replay =
                         resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
-                    self.commit_catalog_writes(
+                    let (replay_version, replay_payload) = self.commit_catalog_writes(
                         vec![
                             ProviderStateWrite {
                                 record: ProviderStateRecord {
@@ -2782,7 +2768,7 @@ impl DatasetService {
                     state.entries.insert(dataset.as_str().into(), next);
                     state
                         .replay
-                        .insert(mutation.idempotency_key.as_str().into(), replay);
+                        .record_mutation(mutation, replay_version, &replay_payload, replay);
                 }
                 state.dependencies = dependencies;
                 Ok(result)
@@ -2838,7 +2824,7 @@ impl DatasetService {
                         )?;
                     }
                 }
-                self.commit_catalog_writes(
+                let (replay_version, replay_payload) = self.commit_catalog_writes(
                     vec![
                         ProviderStateWrite {
                             record: ProviderStateRecord {
@@ -2866,7 +2852,7 @@ impl DatasetService {
                 state.dependencies = dependencies;
                 state
                     .replay
-                    .insert(mutation.idempotency_key.as_str().into(), replay);
+                    .record_mutation(mutation, replay_version, &replay_payload, replay);
                 Ok(result)
             }
             DatasetRequest::SetCatalogConnection {
@@ -2897,7 +2883,7 @@ impl DatasetService {
                 };
                 let replay =
                     resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
-                self.commit_catalog_writes(
+                let (replay_version, replay_payload) = self.commit_catalog_writes(
                     vec![
                         ProviderStateWrite {
                             record: ProviderStateRecord {
@@ -2924,7 +2910,7 @@ impl DatasetService {
                 state.catalogs.insert(catalog.as_str().into(), next);
                 state
                     .replay
-                    .insert(mutation.idempotency_key.as_str().into(), replay);
+                    .record_mutation(mutation, replay_version, &replay_payload, replay);
                 Ok(result)
             }
             DatasetRequest::DefineAlias {
@@ -2953,7 +2939,7 @@ impl DatasetService {
                 let result = DatasetResult::Created { version: 1 };
                 let replay =
                     resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
-                self.commit_catalog_writes(
+                let (replay_version, replay_payload) = self.commit_catalog_writes(
                     vec![
                         ProviderStateWrite {
                             record: ProviderStateRecord {
@@ -2981,7 +2967,7 @@ impl DatasetService {
                 state.dependencies = dependencies;
                 state
                     .replay
-                    .insert(mutation.idempotency_key.as_str().into(), replay);
+                    .record_mutation(mutation, replay_version, &replay_payload, replay);
                 Ok(result)
             }
             DatasetRequest::DefineMemberAlias {
@@ -3670,6 +3656,7 @@ impl DatasetService {
                 let result = DatasetResult::Created { version: 1 };
                 let replay =
                     resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
+                let replay_payload = encode_replay(&replay)?;
                 let writes = vec![
                     ProviderStateWrite {
                         record: ProviderStateRecord {
@@ -3685,7 +3672,7 @@ impl DatasetService {
                             namespace: "dataset-replay".into(),
                             key: mutation.idempotency_key.as_str().into(),
                             version: 2,
-                            payload: encode_replay(&replay)?,
+                            payload: replay_payload.clone(),
                         },
                         expected_version: Some(1),
                     },
@@ -3702,14 +3689,21 @@ impl DatasetService {
                     {
                         return Err(HostProblem::UnknownOutcome);
                     }
+                    state.replay.record_mutation(
+                        mutation,
+                        persisted.version,
+                        &persisted.payload,
+                        replay,
+                    );
+                } else {
+                    state
+                        .replay
+                        .record_mutation(mutation, 2, &replay_payload, replay);
                 }
                 state
                     .alternate_indexes
                     .insert(index.as_str().into(), definition);
                 state.dependencies = dependencies;
-                state
-                    .replay
-                    .insert(mutation.idempotency_key.as_str().into(), replay);
                 Ok(result)
             }
             DatasetRequest::BuildAlternateIndex {
@@ -3771,13 +3765,14 @@ impl DatasetService {
                     })
                     .collect::<Result<Vec<_>, HostProblem>>()?;
                 mutations.push(replay_mutation(mutation, &replay)?);
-                self.commit_catalog_mutations(mutations, mutation, &replay)?;
+                let (replay_version, replay_payload) =
+                    self.commit_catalog_mutations(mutations, mutation, &replay)?;
                 for (name, _, next) in updates {
                     state.alternate_indexes.insert(name, next);
                 }
                 state
                     .replay
-                    .insert(mutation.idempotency_key.as_str().into(), replay);
+                    .record_mutation(mutation, replay_version, &replay_payload, replay);
                 Ok(result)
             }
             DatasetRequest::DefinePath {
@@ -3810,7 +3805,7 @@ impl DatasetService {
                 let result = DatasetResult::Created { version: 1 };
                 let replay =
                     resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
-                self.commit_catalog_writes(
+                let (replay_version, replay_payload) = self.commit_catalog_writes(
                     vec![
                         ProviderStateWrite {
                             record: ProviderStateRecord {
@@ -3840,7 +3835,7 @@ impl DatasetService {
                 state.dependencies = dependencies;
                 state
                     .replay
-                    .insert(mutation.idempotency_key.as_str().into(), replay);
+                    .record_mutation(mutation, replay_version, &replay_payload, replay);
                 Ok(result)
             }
             DatasetRequest::DefineGenerationGroup {
@@ -3899,12 +3894,13 @@ impl DatasetService {
                         expected_version: Some(1),
                     },
                 ];
-                self.commit_catalog_writes(writes, mutation, &replay)?;
+                let (replay_version, replay_payload) =
+                    self.commit_catalog_writes(writes, mutation, &replay)?;
                 state.generation_groups.insert(base.as_str().into(), group);
                 state.dependencies = dependencies;
                 state
                     .replay
-                    .insert(mutation.idempotency_key.as_str().into(), replay);
+                    .record_mutation(mutation, replay_version, &replay_payload, replay);
                 Ok(result)
             }
             DatasetRequest::CreateGeneration {
@@ -4043,7 +4039,8 @@ impl DatasetService {
                         });
                     }
                 }
-                self.commit_catalog_mutations(mutations, mutation, &replay)?;
+                let (replay_version, replay_payload) =
+                    self.commit_catalog_mutations(mutations, mutation, &replay)?;
                 state.entries.insert(name.as_str().into(), entry);
                 if next.scratch {
                     for retired in rolled {
@@ -4054,7 +4051,7 @@ impl DatasetService {
                 state.dependencies = dependencies;
                 state
                     .replay
-                    .insert(mutation.idempotency_key.as_str().into(), replay);
+                    .record_mutation(mutation, replay_version, &replay_payload, replay);
                 Ok(result)
             }
             DatasetRequest::ResolveGeneration { base, relative } => {
@@ -4230,7 +4227,8 @@ impl DatasetService {
                         .collect::<Result<Vec<_>, HostProblem>>()?,
                 );
                 mutations.push(replay_mutation(mutation, &replay)?);
-                self.commit_catalog_mutations(mutations, mutation, &replay)?;
+                let (replay_version, replay_payload) =
+                    self.commit_catalog_mutations(mutations, mutation, &replay)?;
                 state.entries.remove(from.as_str());
                 state.entries.insert(to.as_str().into(), moved.clone());
                 for (name, _, index) in updated_indexes {
@@ -4242,7 +4240,7 @@ impl DatasetService {
                 state.dependencies = dependencies;
                 state
                     .replay
-                    .insert(mutation.idempotency_key.as_str().into(), replay);
+                    .record_mutation(mutation, replay_version, &replay_payload, replay);
                 Ok(result)
             }
             DatasetRequest::Delete {
@@ -4273,7 +4271,7 @@ impl DatasetService {
                     let mutation = mutation(request).ok_or(HostProblem::MissingIdempotency)?;
                     let replay =
                         resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
-                    self.commit_catalog_mutations(
+                    let (replay_version, replay_payload) = self.commit_catalog_mutations(
                         vec![
                             ProviderStateMutation::Delete {
                                 namespace: "dataset-catalog-alias".into(),
@@ -4289,7 +4287,7 @@ impl DatasetService {
                     state.dependencies.remove_node(dataset.as_str());
                     state
                         .replay
-                        .insert(mutation.idempotency_key.as_str().into(), replay);
+                        .record_mutation(mutation, replay_version, &replay_payload, replay);
                     return Ok(result);
                 }
                 if member.is_none()
@@ -4312,7 +4310,7 @@ impl DatasetService {
                     let mutation = mutation(request).ok_or(HostProblem::MissingIdempotency)?;
                     let replay =
                         resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
-                    self.commit_catalog_mutations(
+                    let (replay_version, replay_payload) = self.commit_catalog_mutations(
                         vec![
                             ProviderStateMutation::Delete {
                                 namespace: "dataset-catalog".into(),
@@ -4328,7 +4326,7 @@ impl DatasetService {
                     state.dependencies.remove_node(dataset.as_str());
                     state
                         .replay
-                        .insert(mutation.idempotency_key.as_str().into(), replay);
+                        .record_mutation(mutation, replay_version, &replay_payload, replay);
                     return Ok(result);
                 }
                 if member.is_none()
@@ -4346,7 +4344,7 @@ impl DatasetService {
                     let mutation = mutation(request).ok_or(HostProblem::MissingIdempotency)?;
                     let replay =
                         resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
-                    self.commit_catalog_mutations(
+                    let (replay_version, replay_payload) = self.commit_catalog_mutations(
                         vec![
                             ProviderStateMutation::Delete {
                                 namespace: "dataset-gdg".into(),
@@ -4362,7 +4360,7 @@ impl DatasetService {
                     state.dependencies.remove_node(dataset.as_str());
                     state
                         .replay
-                        .insert(mutation.idempotency_key.as_str().into(), replay);
+                        .record_mutation(mutation, replay_version, &replay_payload, replay);
                     return Ok(result);
                 }
                 if member.is_none()
@@ -4385,7 +4383,7 @@ impl DatasetService {
                     let mutation = mutation(request).ok_or(HostProblem::MissingIdempotency)?;
                     let replay =
                         resolved_replay(state, mutation, request_digest(request)?, result.clone())?;
-                    self.commit_catalog_mutations(
+                    let (replay_version, replay_payload) = self.commit_catalog_mutations(
                         vec![
                             ProviderStateMutation::Delete {
                                 namespace: "dataset-aix".into(),
@@ -4401,8 +4399,13 @@ impl DatasetService {
                     state.dependencies.remove_node(dataset.as_str());
                     state
                         .replay
-                        .insert(mutation.idempotency_key.as_str().into(), replay);
+                        .record_mutation(mutation, replay_version, &replay_payload, replay);
                     return Ok(result);
+                }
+                if member.is_none()
+                    && dataset_locks::dataset_delete_lock_conflicts(state, dataset, delete_mutation)
+                {
+                    return Err(condition("LOCKED", 16));
                 }
                 let current = entry(state, dataset)?.clone();
                 if expected_version.is_some_and(|expected| expected != current.version) {
@@ -4467,12 +4470,8 @@ impl DatasetService {
                         .filter(|lock| lock.dataset == *dataset)
                         .cloned()
                         .collect::<Vec<_>>();
-                    if locks.iter().any(|lock| {
-                        lock.transaction.is_some()
-                            && delete_mutation.transaction.as_deref() != Some(lock.lock_id.as_str())
-                    }) {
-                        return Err(condition("LOCKED", 16));
-                    }
+                    let removed_locks =
+                        dataset_locks::dataset_delete_lock_retention(&locks, delete_mutation);
                     let invalidation = state
                         .dependencies
                         .invalidation_order(dataset.as_str(), dependency_limits(self.limits))?;
@@ -4512,19 +4511,22 @@ impl DatasetService {
                         key: dataset.as_str().into(),
                         expected_version: current.version,
                     });
-                    mutations.extend(locks.iter().map(|lock| ProviderStateMutation::Delete {
-                        namespace: "dataset-lock".into(),
-                        key: lock.lock_id.clone(),
-                        expected_version: lock.version,
+                    mutations.extend(removed_locks.iter().map(|lock| {
+                        ProviderStateMutation::Delete {
+                            namespace: "dataset-lock".into(),
+                            key: lock.lock_id.clone(),
+                            expected_version: lock.version,
+                        }
                     }));
                     mutations.push(replay_mutation(mutation, &replay)?);
-                    self.commit_catalog_mutations(mutations, mutation, &replay)?;
+                    let (replay_version, replay_payload) =
+                        self.commit_catalog_mutations(mutations, mutation, &replay)?;
                     for (name, _) in indexes {
                         state.alternate_indexes.remove(&name);
                         state.dependencies.remove_node(&name);
                     }
                     state.entries.remove(dataset.as_str());
-                    for lock in locks {
+                    for lock in removed_locks {
                         state.locks.remove(&lock.lock_id);
                     }
                     state
@@ -4535,7 +4537,7 @@ impl DatasetService {
                     }
                     state
                         .replay
-                        .insert(mutation.idempotency_key.as_str().into(), replay);
+                        .record_mutation(mutation, replay_version, &replay_payload, replay);
                     Ok(result)
                 }
             }
@@ -4562,7 +4564,7 @@ impl DatasetService {
                     }
                 };
                 if index >= identities.len() {
-                    return Err(condition("NOTFND", 13));
+                    state.require_eof_browse(dataset, key, *relation, !identities.is_empty())?;
                 }
                 let active_identities = state
                     .cursors
@@ -4790,34 +4792,28 @@ impl DatasetService {
                     expected_version: lock.version,
                 }),
         );
-        if self.store.mutate_provider_states_atomic(mutations).is_err() {
-            let persisted = self
-                .store
-                .get_provider_state("dataset-replay", mutation.idempotency_key.as_str())
-                .map_err(store_error)?
-                .ok_or(HostProblem::UnknownOutcome)?;
-            if decode_replay(&persisted.payload).map_err(|_| HostProblem::InfrastructureFailure)?
-                != replay
-            {
-                return Err(HostProblem::UnknownOutcome);
-            }
-        }
+        let (replay_version, replay_payload) =
+            self.commit_catalog_mutations(mutations, mutation, &replay)?;
         state.entries.insert(dataset.into(), next.clone());
         for (name, _, index) in updated_indexes {
             state.alternate_indexes.insert(name, index);
         }
         state
             .replay
-            .insert(mutation.idempotency_key.as_str().into(), replay);
+            .record_mutation(mutation, replay_version, &replay_payload, replay);
         Ok(())
     }
 
+    /// Commits `writes`, one of which must be the `dataset-replay` row for
+    /// `mutation`'s key at version 2. Returns the version and payload the
+    /// store now holds for that row, known exactly whether this call wrote
+    /// it or found it already committed by a matching retry.
     fn commit_catalog_writes(
         &self,
         writes: Vec<ProviderStateWrite>,
         mutation: &mainframe_env_host_api::Mutation,
         replay: &Replay,
-    ) -> Result<(), HostProblem> {
+    ) -> Result<(u64, Vec<u8>), HostProblem> {
         self.commit_catalog_mutations(
             writes.into_iter().map(ProviderStateMutation::Put).collect(),
             mutation,
@@ -4825,12 +4821,13 @@ impl DatasetService {
         )
     }
 
+    /// See [`Self::commit_catalog_writes`]; takes arbitrary mutations.
     fn commit_catalog_mutations(
         &self,
         mutations: Vec<ProviderStateMutation>,
         mutation: &mainframe_env_host_api::Mutation,
         replay: &Replay,
-    ) -> Result<(), HostProblem> {
+    ) -> Result<(u64, Vec<u8>), HostProblem> {
         if self.store.mutate_provider_states_atomic(mutations).is_err() {
             let persisted = self
                 .store
@@ -4842,8 +4839,10 @@ impl DatasetService {
             {
                 return Err(HostProblem::UnknownOutcome);
             }
+            Ok((persisted.version, persisted.payload))
+        } else {
+            Ok((2, encode_replay(replay)?))
         }
-        Ok(())
     }
 
     fn persist(&self, key: &str, entry: &Entry, expected: Option<u64>) -> Result<(), HostProblem> {
@@ -4904,7 +4903,7 @@ impl DatasetService {
         Ok((members, more))
     }
 }
-fn entry<'a>(state: &'a State, name: &DatasetName) -> Result<&'a Entry, HostProblem> {
+pub(crate) fn entry<'a>(state: &'a State, name: &DatasetName) -> Result<&'a Entry, HostProblem> {
     state
         .entries
         .get(name.as_str())
@@ -7738,7 +7737,7 @@ fn dependency_limits(limits: DatasetLimits) -> DependencyLimits {
         max_depth: 128.min(limits.max_datasets.max(1)),
     }
 }
-fn condition(name: &str, response: i32) -> HostProblem {
+pub(crate) fn condition(name: &str, response: i32) -> HostProblem {
     HostProblem::Condition {
         name: name.into(),
         response,
@@ -7856,7 +7855,7 @@ fn validated_compatibility_definition(
     Ok(definition)
 }
 
-fn store_error(error: StoreError) -> HostProblem {
+pub(crate) fn store_error(error: StoreError) -> HostProblem {
     match error {
         StoreError::Conflict => HostProblem::IdempotencyConflict,
         StoreError::CapacityExceeded | StoreError::PayloadTooLarge => {
@@ -8822,7 +8821,7 @@ fn replay_mutation(
     }))
 }
 
-fn decode_replay(payload: &[u8]) -> Result<Replay, ()> {
+pub(crate) fn decode_replay(payload: &[u8]) -> Result<Replay, ()> {
     let envelope = decode_replay_envelope(payload).map_err(|_| ())?;
     let payload = envelope.core;
     if payload.len() < 38 || payload.get(..5) != Some(b"MEDR1") {
@@ -9424,6 +9423,29 @@ mod tests {
     use std::sync::Barrier;
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
+    /// Test oracle: an unconditional full reload and decode of every
+    /// `dataset-replay` row, the whole-index behavior `ReplayIndex::sync`
+    /// replaces. Kept only to check the incremental sync against it (#194).
+    fn load_replay_index(
+        store: &dyn ProviderStateStore,
+        limits: DatasetLimits,
+    ) -> Result<BTreeMap<String, Replay>, HostProblem> {
+        let rows = store
+            .list_provider_state("dataset-replay", limits.max_idempotency)
+            .map_err(store_error)?;
+        let mut replay = BTreeMap::new();
+        for row in rows {
+            describe_dataset_replay_row_with_limits(&row, limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?;
+            let decoded =
+                decode_replay(&row.payload).map_err(|_| HostProblem::InfrastructureFailure)?;
+            if replay.insert(row.key, decoded).is_some() {
+                return Err(HostProblem::InfrastructureFailure);
+            }
+        }
+        Ok(replay)
+    }
+
     struct TestReplayClock {
         tick: AtomicU64,
         fail_next: AtomicBool,
@@ -9535,6 +9557,10 @@ mod tests {
         fail_next: AtomicBool,
         fail_next_tvs_put: AtomicBool,
         fail_replay_metadata_put: AtomicBool,
+        /// Unlike `fail_next` (which fails *before* the underlying write),
+        /// this commits the write for real and then reports failure anyway,
+        /// simulating a lost commit acknowledgement.
+        fail_next_after_commit: AtomicBool,
     }
 
     impl FailAtomicOnceStore {
@@ -9544,11 +9570,16 @@ mod tests {
                 fail_next: AtomicBool::new(false),
                 fail_next_tvs_put: AtomicBool::new(false),
                 fail_replay_metadata_put: AtomicBool::new(false),
+                fail_next_after_commit: AtomicBool::new(false),
             }
         }
 
         fn arm(&self) {
             self.fail_next.store(true, Ordering::SeqCst);
+        }
+
+        fn arm_after_commit(&self) {
+            self.fail_next_after_commit.store(true, Ordering::SeqCst);
         }
 
         fn arm_reconciliation_failure(&self) {
@@ -9661,6 +9692,9 @@ mod tests {
         ) -> Result<(), StoreError> {
             if self.fail_now() {
                 Err(StoreError::Infrastructure("injected-before-commit".into()))
+            } else if self.fail_next_after_commit.swap(false, Ordering::SeqCst) {
+                self.inner.mutate_provider_states_atomic(mutations)?;
+                Err(StoreError::Infrastructure("injected-after-commit".into()))
             } else {
                 self.inner.mutate_provider_states_atomic(mutations)
             }
@@ -11785,6 +11819,204 @@ mod tests {
                 mutation: mutation(5, "release-a", "JOB-A"),
             })
             .unwrap();
+    }
+
+    #[test]
+    fn delete_accepts_transaction_or_lock_id_owner_and_rejects_other_transactions() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let dataset = service(store.clone());
+        let owner = principal("OWNER1");
+        let transaction_owned = DatasetName::new("USER.DELETE.JOB", 44).unwrap();
+        let mut definition = mainframe_env_host_api::DatasetDefinition::compatibility(attrs(
+            DatasetOrganization::KeySequenced,
+        ));
+        definition.vsam.access_mode = mainframe_env_host_api::VsamAccessMode::Rls;
+        dataset
+            .invoke(DatasetRequest::Define {
+                dataset: transaction_owned.clone(),
+                definition: Box::new(definition.clone()),
+                mutation: mutation(420),
+            })
+            .unwrap();
+        let DatasetResult::Locks { locks } = dataset
+            .invoke(DatasetRequest::AcquireLock {
+                dataset: transaction_owned.clone(),
+                target: mainframe_env_host_api::DatasetLockTarget::Dataset,
+                owner: owner.clone(),
+                mode: mainframe_env_host_api::DatasetLockMode::Exclusive,
+                now_tick: 421,
+                lease_ticks: 100,
+                transaction: Some("JOBX".into()),
+                mutation: transaction_mutation(421, "JOBX"),
+            })
+            .unwrap()
+        else {
+            panic!("expected dataset lock receipt");
+        };
+        let dataset_lock_id = locks[0].lock_id.clone();
+        dataset
+            .invoke(DatasetRequest::Write {
+                dataset: transaction_owned.clone(),
+                member: None,
+                records: vec![b"ABCD".to_vec()],
+                expected_version: Some(1),
+                mutation: transaction_mutation(422, &dataset_lock_id),
+            })
+            .unwrap();
+        dataset
+            .invoke(DatasetRequest::AcquireLock {
+                dataset: transaction_owned.clone(),
+                target: mainframe_env_host_api::DatasetLockTarget::Record(b"AB".to_vec()),
+                owner: owner.clone(),
+                mode: mainframe_env_host_api::DatasetLockMode::Exclusive,
+                now_tick: 423,
+                lease_ticks: 100,
+                transaction: Some("JOBX".into()),
+                mutation: transaction_mutation(423, "JOBX"),
+            })
+            .unwrap();
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Delete {
+                dataset: transaction_owned.clone(),
+                member: None,
+                expected_version: Some(2),
+                purge: false,
+                current_date: None,
+                mutation: transaction_mutation(424, "JOBY"),
+            }),
+            Err(HostProblem::Condition {
+                ref name,
+                response: 16,
+                ..
+            }) if name == "LOCKED"
+        ));
+        let owner_delete = DatasetRequest::Delete {
+            dataset: transaction_owned.clone(),
+            member: None,
+            expected_version: Some(2),
+            purge: false,
+            current_date: None,
+            mutation: transaction_mutation(425, "JOBX"),
+        };
+        assert_eq!(
+            dataset.invoke(owner_delete.clone()),
+            Ok(DatasetResult::Mutated { version: 3 })
+        );
+        drop(dataset);
+
+        let dataset = service(store.clone());
+        assert_eq!(
+            dataset.invoke(owner_delete),
+            Ok(DatasetResult::Mutated { version: 3 })
+        );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::ListLocks {
+                dataset: transaction_owned.clone(),
+                now_tick: 426,
+                max_items: 8,
+            }),
+            Ok(DatasetResult::Locks { locks })
+                if locks.len() == 1 && locks[0].lock_id == dataset_lock_id
+        ));
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Create {
+                dataset: transaction_owned.clone(),
+                attributes: attrs(DatasetOrganization::Sequential),
+                mutation: transaction_mutation(426, "JOBY"),
+            }),
+            Err(HostProblem::Condition { ref name, .. }) if name == "LOCKED"
+        ));
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Define {
+                dataset: transaction_owned.clone(),
+                definition: Box::new(definition.clone()),
+                mutation: transaction_mutation(427, "JOBY"),
+            }),
+            Err(HostProblem::Condition { ref name, .. }) if name == "LOCKED"
+        ));
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::Delete {
+                dataset: transaction_owned.clone(),
+                member: None,
+                expected_version: None,
+                purge: false,
+                current_date: None,
+                mutation: transaction_mutation(428, "JOBY"),
+            }),
+            Err(HostProblem::Condition { ref name, .. }) if name == "LOCKED"
+        ));
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::AcquireLock {
+                dataset: transaction_owned.clone(),
+                target: mainframe_env_host_api::DatasetLockTarget::Dataset,
+                owner: principal("OWNER2"),
+                mode: mainframe_env_host_api::DatasetLockMode::Exclusive,
+                now_tick: 429,
+                lease_ticks: 100,
+                transaction: Some("JOBY".into()),
+                mutation: transaction_mutation(429, "JOBY"),
+            }),
+            Err(HostProblem::Condition { ref name, .. }) if name == "LOCKED"
+        ));
+        assert_eq!(
+            dataset.invoke(DatasetRequest::Define {
+                dataset: transaction_owned.clone(),
+                definition: Box::new(definition),
+                mutation: transaction_mutation(430, "JOBX"),
+            }),
+            Ok(DatasetResult::Created { version: 1 })
+        );
+        dataset
+            .invoke(DatasetRequest::ReleaseLock {
+                dataset: transaction_owned,
+                lock_id: dataset_lock_id,
+                owner: owner.clone(),
+                mutation: transaction_mutation(431, "JOBX"),
+            })
+            .unwrap();
+
+        let lock_owned = DatasetName::new("USER.DELETE.LOCK", 44).unwrap();
+        dataset
+            .invoke(DatasetRequest::Create {
+                dataset: lock_owned.clone(),
+                attributes: attrs(DatasetOrganization::Sequential),
+                mutation: mutation(432),
+            })
+            .unwrap();
+        let DatasetResult::Locks { locks } = dataset
+            .invoke(DatasetRequest::AcquireLock {
+                dataset: lock_owned.clone(),
+                target: mainframe_env_host_api::DatasetLockTarget::Dataset,
+                owner,
+                mode: mainframe_env_host_api::DatasetLockMode::Exclusive,
+                now_tick: 433,
+                lease_ticks: 100,
+                transaction: Some("JOBX".into()),
+                mutation: transaction_mutation(433, "JOBX"),
+            })
+            .unwrap()
+        else {
+            panic!("expected lock receipt");
+        };
+        assert_eq!(
+            dataset.invoke(DatasetRequest::Delete {
+                dataset: lock_owned.clone(),
+                member: None,
+                expected_version: Some(1),
+                purge: false,
+                current_date: None,
+                mutation: transaction_mutation(434, &locks[0].lock_id),
+            }),
+            Ok(DatasetResult::Mutated { version: 2 })
+        );
+        assert!(matches!(
+            dataset.invoke(DatasetRequest::ListLocks {
+                dataset: lock_owned,
+                now_tick: 435,
+                max_items: 8,
+            }),
+            Ok(DatasetResult::Locks { locks }) if locks.is_empty()
+        ));
     }
 
     #[test]
@@ -14909,6 +15141,140 @@ mod tests {
     }
 
     #[test]
+    fn startbr_full_length_high_values_key_positions_browse_at_end_for_readprev() {
+        // #191: a full-length all-X'FF' key under GTEQ must succeed
+        // positioned past the last record, and READPREV/READNEXT must
+        // then walk that position correctly.
+        use mainframe_env_host_api::KeyRelation;
+
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let dataset = DatasetName::new("USER.HIVALS", 44).unwrap();
+        service
+            .invoke(DatasetRequest::Create {
+                dataset: dataset.clone(),
+                attributes: attrs(DatasetOrganization::KeySequenced),
+                mutation: mutation(1),
+            })
+            .unwrap();
+        service
+            .invoke(DatasetRequest::Write {
+                dataset: dataset.clone(),
+                member: None,
+                records: vec![b"AA01".to_vec(), b"BB02".to_vec(), b"CC03".to_vec()],
+                expected_version: Some(1),
+                mutation: mutation(2),
+            })
+            .unwrap();
+        let start_browse = || match service
+            .invoke(DatasetRequest::StartBrowse {
+                dataset: dataset.clone(),
+                key: vec![0xFF, 0xFF],
+                relation: KeyRelation::GreaterOrEqual,
+            })
+            .unwrap()
+        {
+            DatasetResult::Browse { cursor, .. } => cursor,
+            other => panic!("unexpected browse result: {other:?}"),
+        };
+
+        let reverse_cursor = start_browse();
+        assert!(matches!(
+            service.invoke(DatasetRequest::ReadNext {
+                dataset: dataset.clone(),
+                cursor: reverse_cursor.clone(),
+                reverse: true,
+                control: Default::default(),
+            }),
+            Ok(DatasetResult::Browse { record: Some(record), .. }) if record == b"CC03"
+        ));
+        assert!(matches!(
+            service.invoke(DatasetRequest::ReadNext {
+                dataset: dataset.clone(),
+                cursor: reverse_cursor,
+                reverse: true,
+                control: Default::default(),
+            }),
+            Ok(DatasetResult::Browse { record: Some(record), .. }) if record == b"BB02"
+        ));
+
+        let forward_cursor = start_browse();
+        assert!(matches!(
+            service.invoke(DatasetRequest::ReadNext {
+                dataset,
+                cursor: forward_cursor,
+                reverse: false,
+                control: Default::default(),
+            }),
+            Ok(DatasetResult::Browse { record: None, .. })
+        ));
+    }
+
+    #[test]
+    fn startbr_out_of_range_key_without_full_length_high_values_stays_notfnd() {
+        // #191: only a full-length all-X'FF' key gets end-of-data-set
+        // treatment; an ordinary out-of-range key, or a shorter GENERIC
+        // all-X'FF' key, still fails STARTBR as before.
+        use mainframe_env_host_api::KeyRelation;
+
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let dataset = DatasetName::new("USER.OUTRANGE", 44).unwrap();
+        service
+            .invoke(DatasetRequest::Create {
+                dataset: dataset.clone(),
+                attributes: attrs(DatasetOrganization::KeySequenced),
+                mutation: mutation(1),
+            })
+            .unwrap();
+        service
+            .invoke(DatasetRequest::Write {
+                dataset: dataset.clone(),
+                member: None,
+                records: vec![b"AA01".to_vec(), b"BB02".to_vec(), b"CC03".to_vec()],
+                expected_version: Some(1),
+                mutation: mutation(2),
+            })
+            .unwrap();
+
+        for key in [b"ZZ".to_vec(), vec![0xFF]] {
+            assert!(matches!(
+                service.invoke(DatasetRequest::StartBrowse {
+                    dataset: dataset.clone(),
+                    key,
+                    relation: KeyRelation::GreaterOrEqual,
+                }),
+                Err(HostProblem::Condition { ref name, response: 13, .. }) if name == "NOTFND"
+            ));
+        }
+    }
+
+    #[test]
+    fn startbr_full_length_high_values_key_on_empty_ksds_stays_notfnd() {
+        // #191: dfhp4_startbr.html's RIDFLD note describes positioning past
+        // the last record for READPREV; it does not settle an empty data
+        // set, so STARTBR keeps returning NOTFND there, unchanged.
+        use mainframe_env_host_api::KeyRelation;
+
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let dataset = DatasetName::new("USER.EMPTYHV", 44).unwrap();
+        service
+            .invoke(DatasetRequest::Create {
+                dataset: dataset.clone(),
+                attributes: attrs(DatasetOrganization::KeySequenced),
+                mutation: mutation(1),
+            })
+            .unwrap();
+
+        assert!(matches!(
+            service.invoke(DatasetRequest::StartBrowse {
+                dataset,
+                key: vec![0xFF, 0xFF],
+                relation: KeyRelation::GreaterOrEqual,
+            }),
+            Err(HostProblem::Condition { ref name, response: 13, .. }) if name == "NOTFND"
+        ));
+    }
+
+    #[test]
     fn attributed_replay_is_atomic_restart_safe_and_keeps_its_original_owner() {
         let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
         let initial = service(store.clone());
@@ -15463,5 +15829,282 @@ mod tests {
             Ok(DatasetResult::Created { version: 1 })
         );
         assert_eq!(dataset.refresh_replay_index(), Ok(1));
+    }
+
+    /// A unique temp-file SQLite store, so a #194 sync test can also run
+    /// against the real backing store, not only `MemoryStore`.
+    fn sqlite_store(name: &str) -> Arc<dyn ProviderStateStore> {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-dataset-sy194-{name}-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("dataset.db");
+        let url = format!("sqlite://{}?mode=rwc", path.display());
+        Arc::new(SqliteStateStore::open(&url, 2 * 1024 * 1024, 65536).unwrap())
+    }
+
+    /// A replay row re-put at version 1 after an out-of-band conflict is not
+    /// identified by version alone: retrying the original request must see
+    /// the new content and fail closed, exactly as a full reload would (#194).
+    fn retry_after_external_conflicting_rewrite_returns_idempotency_conflict(
+        store: Arc<dyn ProviderStateStore>,
+    ) {
+        let service = DatasetService::open(store.clone(), DatasetLimits::default()).unwrap();
+        let request = DatasetRequest::Create {
+            dataset: DatasetName::new("USER.REPLAY.SYNC.C", 128).unwrap(),
+            attributes: attrs(DatasetOrganization::Sequential),
+            mutation: mutation(30_900),
+        };
+        assert_eq!(
+            service.invoke(request.clone()),
+            Ok(DatasetResult::Created { version: 1 })
+        );
+        // Out-of-band: delete the resolved row and re-put a differently
+        // digested, still validly decodable pending row at version 1.
+        store
+            .delete_provider_state("dataset-replay", "id-30900", 2)
+            .unwrap();
+        let mut foreign_payload = b"MEDR1".to_vec();
+        foreign_payload.extend_from_slice(&[0u8; 32]);
+        foreign_payload.push(0);
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "dataset-replay".into(),
+                    key: "id-30900".into(),
+                    version: 1,
+                    payload: foreign_payload,
+                },
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            service.invoke(request),
+            Err(HostProblem::IdempotencyConflict)
+        );
+    }
+
+    #[test]
+    fn retry_after_external_conflicting_rewrite_returns_idempotency_conflict_memory() {
+        retry_after_external_conflicting_rewrite_returns_idempotency_conflict(Arc::new(
+            MemoryStore::new(Default::default()),
+        ));
+    }
+
+    #[test]
+    fn retry_after_external_conflicting_rewrite_returns_idempotency_conflict_sqlite() {
+        retry_after_external_conflicting_rewrite_returns_idempotency_conflict(sqlite_store("c"));
+    }
+
+    /// An out-of-band corrupt payload at a new version fails the whole sync
+    /// closed without half-applying it, and a later invoke recovers once the
+    /// row is repaired (#194).
+    fn corrupt_row_out_of_band_fails_closed_then_recovers(store: Arc<dyn ProviderStateStore>) {
+        let service = DatasetService::open(store.clone(), DatasetLimits::default()).unwrap();
+        let first = DatasetRequest::Create {
+            dataset: DatasetName::new("USER.REPLAY.SYNC.D1", 128).unwrap(),
+            attributes: attrs(DatasetOrganization::Sequential),
+            mutation: mutation(30_910),
+        };
+        let second = DatasetRequest::Create {
+            dataset: DatasetName::new("USER.REPLAY.SYNC.D2", 128).unwrap(),
+            attributes: attrs(DatasetOrganization::Sequential),
+            mutation: mutation(30_911),
+        };
+        assert_eq!(
+            service.invoke(first.clone()),
+            Ok(DatasetResult::Created { version: 1 })
+        );
+        assert_eq!(
+            service.invoke(second.clone()),
+            Ok(DatasetResult::Created { version: 1 })
+        );
+        let healthy = store
+            .get_provider_state("dataset-replay", "id-30911")
+            .unwrap()
+            .unwrap();
+        let mut corrupt = healthy.clone();
+        corrupt.version = healthy.version + 1;
+        corrupt.payload.push(0);
+        store
+            .put_provider_state(corrupt, Some(healthy.version))
+            .unwrap();
+        let third = DatasetRequest::Create {
+            dataset: DatasetName::new("USER.REPLAY.SYNC.D3", 128).unwrap(),
+            attributes: attrs(DatasetOrganization::Sequential),
+            mutation: mutation(30_912),
+        };
+        assert_eq!(
+            service.invoke(third.clone()),
+            Err(HostProblem::InfrastructureFailure)
+        );
+        // A corrupt row anywhere in the namespace fails every request until
+        // it is repaired, by design (a corrupt row fails closed).
+        assert_eq!(
+            service.invoke(first.clone()),
+            Err(HostProblem::InfrastructureFailure)
+        );
+        // Repair the row (a higher version, the original healthy payload).
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "dataset-replay".into(),
+                    key: "id-30911".into(),
+                    version: healthy.version + 2,
+                    payload: healthy.payload.clone(),
+                },
+                Some(healthy.version + 1),
+            )
+            .unwrap();
+        assert_eq!(
+            service.invoke(third),
+            Ok(DatasetResult::Created { version: 1 })
+        );
+        assert_eq!(
+            service.invoke(second),
+            Ok(DatasetResult::Created { version: 1 })
+        );
+        assert_eq!(
+            service.invoke(first),
+            Ok(DatasetResult::Created { version: 1 })
+        );
+    }
+
+    #[test]
+    fn corrupt_row_out_of_band_fails_closed_then_recovers_memory() {
+        corrupt_row_out_of_band_fails_closed_then_recovers(Arc::new(MemoryStore::new(
+            Default::default(),
+        )));
+    }
+
+    #[test]
+    fn corrupt_row_out_of_band_fails_closed_then_recovers_sqlite() {
+        corrupt_row_out_of_band_fails_closed_then_recovers(sqlite_store("d"));
+    }
+
+    /// Equivalence oracle: after own writes through both the direct and the
+    /// catalog-commit-path write shapes, an external prune, and an external
+    /// re-put, the incrementally synced index equals a from-scratch full
+    /// reload of the same store (#194).
+    fn synced_index_matches_a_full_reload_after_a_scripted_sequence(
+        store: Arc<dyn ProviderStateStore>,
+    ) {
+        let limits = DatasetLimits::default();
+        let service = DatasetService::open(store.clone(), limits).unwrap();
+
+        // An own write that resolves through `commit_catalog_writes` (like
+        // every request below): `Create` is not invoke_checked's direct
+        // reserve/final-put shape.
+        let create = DatasetRequest::Create {
+            dataset: DatasetName::new("USER.REPLAY.SYNC.E1", 128).unwrap(),
+            attributes: attrs(DatasetOrganization::Sequential),
+            mutation: mutation(30_920),
+        };
+        assert_eq!(
+            service.invoke(create),
+            Ok(DatasetResult::Created { version: 1 })
+        );
+
+        // An own write through a catalog-commit-path request.
+        let reserve = DatasetRequest::AcquireLock {
+            dataset: DatasetName::new("USER.REPLAY.SYNC.E2", 128).unwrap(),
+            target: mainframe_env_host_api::DatasetLockTarget::Dataset,
+            owner: principal("owner-e"),
+            mode: mainframe_env_host_api::DatasetLockMode::Exclusive,
+            now_tick: 1,
+            lease_ticks: 100,
+            transaction: Some("JOB-E".into()),
+            mutation: mutation(30_921),
+        };
+        assert!(service.invoke(reserve).is_ok());
+
+        // External prune: delete a resolved row, as retention maintenance
+        // would.
+        store
+            .delete_provider_state("dataset-replay", "id-30920", 2)
+            .unwrap();
+
+        // External re-put: a reconciled row at a fresh key, still validly
+        // decodable, as an operator reconciliation would apply.
+        let mut reconciled_payload = b"MEDR1".to_vec();
+        reconciled_payload.extend_from_slice(&[7u8; 32]);
+        reconciled_payload.push(0);
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "dataset-replay".into(),
+                    key: "id-reconciled".into(),
+                    version: 1,
+                    payload: reconciled_payload,
+                },
+                None,
+            )
+            .unwrap();
+
+        let synced_count = service.refresh_replay_index().unwrap();
+        let oracle = load_replay_index(&*store, limits).unwrap();
+        assert_eq!(synced_count, oracle.len());
+        let synced = service.state.lock().unwrap().replay.snapshot();
+        assert_eq!(synced, oracle);
+    }
+
+    #[test]
+    fn synced_index_matches_a_full_reload_after_a_scripted_sequence_memory() {
+        synced_index_matches_a_full_reload_after_a_scripted_sequence(Arc::new(MemoryStore::new(
+            Default::default(),
+        )));
+    }
+
+    #[test]
+    fn synced_index_matches_a_full_reload_after_a_scripted_sequence_sqlite() {
+        synced_index_matches_a_full_reload_after_a_scripted_sequence(sqlite_store("e"));
+    }
+
+    /// The existing `FailAtomicOnceStore` tests only cover the mismatch
+    /// side of `commit_catalog_mutations`'s retry read-back (the atomic
+    /// batch never actually wrote). This drives the successful side: the
+    /// write really commits, but the store still reports failure (a lost
+    /// ack). The read-back must find the persisted row decodes to the same
+    /// replay and return the real result, and the fingerprint it records
+    /// must match the store exactly, so the next sync decodes 0 rows.
+    #[test]
+    fn commit_ack_lost_after_a_successful_write_reads_back_the_same_replay() {
+        let store = Arc::new(FailAtomicOnceStore::new());
+        let dataset = service(store.clone());
+        let name = DatasetName::new("USER.ACKLOST", 44).unwrap();
+        dataset
+            .invoke(DatasetRequest::Create {
+                dataset: name.clone(),
+                attributes: attrs(DatasetOrganization::Sequential),
+                mutation: mutation(9500),
+            })
+            .unwrap();
+        store.arm_after_commit();
+        let request = DatasetRequest::Write {
+            dataset: name.clone(),
+            member: None,
+            records: vec![b"AA11".to_vec()],
+            expected_version: Some(1),
+            mutation: mutation(9501),
+        };
+        assert_eq!(
+            dataset.invoke(request),
+            Ok(DatasetResult::Mutated { version: 2 })
+        );
+        let persisted = store
+            .get_provider_state("dataset-replay", "id-9501")
+            .unwrap()
+            .unwrap();
+        assert_eq!(persisted.version, 2);
+        let before = dataset.state.lock().unwrap().replay.decode_count();
+        assert_eq!(dataset.refresh_replay_index().unwrap(), 2);
+        let after = dataset.state.lock().unwrap().replay.decode_count();
+        assert_eq!(
+            after, before,
+            "the fingerprint recorded from the read-back must already match \
+             the store, so an explicit resync decodes 0 rows"
+        );
     }
 }

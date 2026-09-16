@@ -7,7 +7,7 @@
   "target_product": "0.1.1",
   "current_product": "0.1.0-alpha.0",
   "digest_scope": "Recursively lexicographically key-sorted compact UTF-8 JSON serialization of ims_receipt, with no trailing newline, followed by SHA-256",
-  "evidence_digest": "sha256:9e66695c659f41ca04fff8bff2bad74bf7baf582a20c72191ef2c3bc17ad61e3",
+  "evidence_digest": "sha256:9c2e60127fded721b0836eedb24755179b65d071d449a7448eb2856ed4217be3",
   "ims_receipt": {
     "schema_version": "mainframe-env.carddemo-ims-receipt@1",
     "status": "pass",
@@ -42,17 +42,18 @@
     "provider_failure_controls": 1,
     "hierarchy_sha256": "1a5c4c24147d854b56d69d644cce1226ba74afcf0db31637098ce23a9322aff4",
     "spool_sha256": {
-      "LOADPADB": "b9d0d83a391958fff7df659345f1580d37087038a3b1a4b2ead53596a936ccf7",
-      "UNLDPADB": "7494f14f7d992627bf4f29fa99e898c4ba079a1d98ce99fec43686ce836557d7"
+      "LOADPADB": "b63fe0c73be71d0b76c2b69ae03f4638378b0c273c085b1f9ad80e2839647083",
+      "UNLDPADB": "822c4718f3a872a46f7c40bb4ff2ebe25ae84656c9c66dba7b303251a19564b3"
     },
-    "ims_shape_sha256": "5ad364a311a41f574012e2635aa6af3791cd5fdf01598ce55ab1b7bb58fe7236"
+    "ims_shape_sha256": "34e36360e18bb4ad4529c772432a81bbcb6d0da8badd7dd6eb512338ca98c839"
   },
   "acceptance_observations": [
     "All eight pinned IMS definition sources are checked. The reached DBPAUTP0 HIDAM primary and DBPAUTX0 secondary-index definitions plus PSBPAUTB, PSBPAUTL, and PAUTBUNL install atomically as two DBDs, three PSBs, and three PCBs with idempotent replay.",
     "Four pinned authorization programs containing DLI compile to legal artifacts. Their exact static surface contains SCHD, TERM, GU, GN, GNP, ISRT, REPL, DLET, and CHKP, and interpreter lowering now emits typed IMS requests rather than MAINFRAME-DLI program-call payloads.",
     "The durable provider executes qualified root GU, ordered root GN, parent-scoped child GNP, root/child insert, replace, delete, checkpoint, load, unload, schedule, and terminate operations. Two roots, two children, and two secondary-index entries are byte-digested and remain identical with the checkpoint after warm restart.",
     "The actual pinned LOADPADB and UNLDPADB jobs execute through the public z/OSMF route. Zowe CLI 8.36.0 independently observes both at OUTPUT CC 0000; LOADPADB SYSPRINT reports four loaded segments and UNLDPADB reports four unloaded segments after IEFBR14 cleanup.",
-    "A compiled typed-DLI program schedules PSBPAUTB, performs an SSA-qualified GU, receives exact root bytes and terminates through the scoped host. Missing capability, generation mismatch, malformed segment length, root limit, and missing-environment controls fail closed without changing the durable hierarchy."
+    "A compiled typed-DLI program schedules PSBPAUTB, performs an SSA-qualified GU, receives exact root bytes and terminates through the scoped host. Missing capability, generation mismatch, malformed segment length, root limit, and missing-environment controls fail closed without changing the durable hierarchy.",
+    "PR #179 / #219 derived-evidence refresh: JES-803 step-scoped output; regrouping the same records into job-wide files exactly reproduces both historical spool hashes. Historical command rows remain historical; the unchanged current gate verifies the refreshed receipt."
   ],
   "commands": [
     {
