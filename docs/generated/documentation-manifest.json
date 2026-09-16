@@ -10,7 +10,7 @@
       "normative": false,
       "path": "AGENTS.md",
       "relative_links": 5,
-      "sha256": "sha256:71842bd07f1ffbe61aebdf5ff0e2ee6ab34366b31de55fdffb839fbcd4072933",
+      "sha256": "sha256:bc5c128b7d7d94e55da0e2fefa61bd93ad8b877266109f0216856cfd4cffeaa4",
       "title": "Repository Guidelines",
       "xtask_commands": 1
     },
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:299ee743bdeb35119ad2972b6b2d3ca9b6e34e7212ffd2e98768a213364a4bd6",
+      "sha256": "sha256:19df4a08e0a42b96c8b02c4aac27cea26b244580de83d969e0bb5a873c335061",
       "title": "Changelog",
       "xtask_commands": 6
     },

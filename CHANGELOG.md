@@ -326,6 +326,14 @@ All notable changes to mainframe-env are documented here.
 
 ### Fixed
 
+- Apply typed CICS `WRITE LENGTH`/`KEYLENGTH` through persisted records, resolve
+  dynamic legacy `SEND LENGTH` operands, preserve typed `SEND MAP` ownership
+  during compatibility probing, and keep FORMATTIME admission aligned with its
+  documented output-field widths. Level-88 hexadecimal values now use the same
+  alphanumeric space-padding comparison as quoted values, and exhausted
+  internal-reader child admission cancels the unadmitted child instead of
+  stranding it queued without work.
+
 - Refresh CardDemo resource, base-batch, IMS and full derived receipts for existing
   main behavior after reproducing release 0.1.1 and comparing record bytes; retain
   historical CD-023 bytes through the existing 0.8 receipt, and keep all workload

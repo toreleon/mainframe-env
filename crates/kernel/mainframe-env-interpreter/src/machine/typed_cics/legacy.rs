@@ -73,6 +73,7 @@ pub(crate) fn execute_legacy(
             | CicsOperation::ReadNext
             | CicsOperation::ReadPrev
             | CicsOperation::EndBrowse
+            | CicsOperation::SendText
     ) {
         for key in ["LENGTH", "KEYLENGTH"] {
             let Some(argument) = arguments.get(key) else {

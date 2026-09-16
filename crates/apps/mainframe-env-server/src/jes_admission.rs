@@ -33,11 +33,9 @@ enum ChildAdmissionFailure {
     /// no work record and nothing to retry it.
     Permanent,
     /// Retryable: store capacity or another infrastructure problem. The
-    /// child keeps no work record for now; the caller must release the
-    /// parent's own work for a later retry (bounded by that work's
-    /// `max_attempts`) instead of completing or dead-lettering it, so the
-    /// next attempt retries exactly the children still missing a record — an
-    /// already-admitted sibling matches on `AlreadyExists` and is a no-op.
+    /// child keeps no work record while the parent still has a retry. On the
+    /// parent's last attempt, the child is cancelled and verified instead of
+    /// being stranded in `Queued` after the parent becomes terminal.
     Transient,
 }
 
@@ -156,6 +154,7 @@ impl ProductServer {
     pub(crate) fn admit_internal_reader_children(
         &self,
         parent_job_id: &str,
+        retry_allowed: bool,
     ) -> Result<ChildAdmissionResult, HostProblem> {
         let mut needs_retry = false;
         let mut unresolved_children: Vec<String> = Vec::new();
@@ -175,7 +174,12 @@ impl ProductServer {
                 continue;
             };
             match classify(&problem) {
-                ChildAdmissionFailure::Transient => needs_retry = true,
+                ChildAdmissionFailure::Transient if retry_allowed => needs_retry = true,
+                ChildAdmissionFailure::Transient => {
+                    if !self.cancel_internal_reader_child(&child) {
+                        unresolved_children.push(child.id.clone());
+                    }
+                }
                 ChildAdmissionFailure::Permanent => {
                     if !self.cancel_internal_reader_child(&child) {
                         unresolved_children.push(child.id.clone());

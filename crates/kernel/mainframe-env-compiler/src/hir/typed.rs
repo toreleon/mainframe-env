@@ -2071,7 +2071,12 @@ mod tests {
         let compact = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFMTC. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABS-X PIC S9(15) COMP-3. 01 DATE-X PIC X(6). 01 TIME-X PIC X(6). PROCEDURE DIVISION. EXEC CICS FORMATTIME ABSTIME(ABS-X) YYMMDD(DATE-X) TIME(TIME-X) END-EXEC. STOP RUN.",
         );
-        assert!(compact.hir.is_some(), "{:?}", compact.diagnostics);
+        assert!(compact.hir.is_none());
+        assert!(compact.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("FORMATTIME output has an invalid field length")
+        }));
         assert_eq!(
             command
                 .outputs
@@ -4193,7 +4198,11 @@ mod tests {
 
         // Main's typed SEND TEXT and SEND MAP routes keep ownership of their
         // catalog labels, so the bare compatibility form never claims them.
-        for command in ["SEND TEXT FROM(WS-DATA)", "SEND MAP('MENU') MAPSET('MAIN')"] {
+        for command in [
+            "SEND TEXT FROM(WS-DATA)",
+            "SEND MAP('MENU') MAPSET('MAIN')",
+            "SEND MAP('MENU') MAPSET('MAIN') NOHANDLE NOHANDLE",
+        ] {
             let source = format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBSNU. DATA DIVISION. WORKING-STORAGE SECTION. 01 WS-DATA PIC X(10). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
             );

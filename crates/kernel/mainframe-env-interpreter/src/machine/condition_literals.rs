@@ -104,7 +104,7 @@ pub(super) fn condition_matches(
             }
             index += 3;
         } else {
-            if alphanumeric_condition_equal(actual, &start) {
+            if alphanumeric_condition_equal(actual, start.as_bytes()) {
                 return Ok(true);
             }
             index += 1;
@@ -118,8 +118,7 @@ pub(super) fn condition_matches(
 /// the comparison (IBM Enterprise COBOL 6.5, `SS6SG3_6.5/lr/ref/rlpdcmp.html`).
 /// Unlike a trimmed-text comparison, this keeps a condition value made only
 /// of spaces (`VALUE ' '`) distinct from an empty one.
-fn alphanumeric_condition_equal(actual: &[u8], literal_text: &str) -> bool {
-    let literal = literal_text.as_bytes();
+fn alphanumeric_condition_equal(actual: &[u8], literal: &[u8]) -> bool {
     let length = actual.len().max(literal.len());
     let pad = |bytes: &[u8]| -> Vec<u8> {
         let mut padded = bytes.to_vec();
@@ -137,11 +136,14 @@ pub(super) fn condition_true_value_bytes(literal: &str) -> Vec<u8> {
         .unwrap_or_else(|| literal.trim_matches(['\'', '"']).as_bytes().to_vec())
 }
 
-/// `Some(bytes == actual)` when `value` is `X'..'`/`X".."` hexadecimal
+/// `Some(padded-bytes == actual)` when `value` is `X'..'`/`X".."` hexadecimal
 /// notation; `None` when it is not, so the caller falls back to its other
 /// condition-value forms.
 fn hex_literal_matches(value: &str, actual: &[u8]) -> Option<bool> {
-    Some(hex_literal_condition_bytes(value)? == actual)
+    Some(alphanumeric_condition_equal(
+        actual,
+        &hex_literal_condition_bytes(value)?,
+    ))
 }
 
 fn hex_literal_condition_bytes(value: &str) -> Option<Vec<u8>> {

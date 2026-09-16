@@ -245,7 +245,7 @@ fn file(
     let attributes = if (length.is_some() || key_length.is_some())
         && matches!(
             request.operation,
-            CicsOperation::Read | CicsOperation::Rewrite
+            CicsOperation::Read | CicsOperation::Write | CicsOperation::Rewrite
         ) {
         match service.nested(
             run,
@@ -262,7 +262,10 @@ fn file(
     validate_key_length(request.operation, key_length, attributes.as_ref())?;
     let mut length_condition =
         validate_record_length(request.operation, length, attributes.as_ref())?;
-    let transfer_length = if request.operation == CicsOperation::Rewrite {
+    let transfer_length = if matches!(
+        request.operation,
+        CicsOperation::Write | CicsOperation::Rewrite
+    ) {
         length.map(|length| {
             attributes.as_ref().map_or(length, |attributes| {
                 length.min(attributes.logical_record_length)
@@ -302,10 +305,15 @@ fn file(
     )
     .then(|| {
         let mut record = argument_bytes(request, "FROM").unwrap_or_default();
-        if request.operation == CicsOperation::Rewrite
-            && let Some(length) = transfer_length
-        {
+        if let Some(length) = transfer_length {
             record.truncate(length as usize);
+        }
+        if request.operation == CicsOperation::Write
+            && length.is_some()
+            && let Some(attributes) = attributes.as_ref()
+            && !variable_record_format(attributes.record_format)
+        {
+            record.resize(attributes.logical_record_length as usize, 0);
         }
         encode_dataset_bytes(ccsid, &record)
     })
@@ -334,10 +342,7 @@ fn file(
             DatasetRequest::Write {
                 dataset: dataset.clone(),
                 member,
-                records: vec![encode_dataset_bytes(
-                    ccsid,
-                    &argument_bytes(request, "FROM").unwrap_or_default(),
-                )?],
+                records: vec![mutated_record.clone().ok_or(HostProblem::ProviderFailure)?],
                 expected_version: argument_optional(request, "VERSION")
                     .map(|value| value.parse().map_err(|_| HostProblem::Malformed))
                     .transpose()?,
@@ -359,14 +364,10 @@ fn file(
                     response: 16,
                     response2: 30,
                 })?;
-            let mut record = argument_bytes(request, "FROM").unwrap_or_default();
-            if let Some(length) = transfer_length {
-                record.truncate(length as usize);
-            }
             DatasetRequest::RewriteRecord {
                 dataset: dataset.clone(),
                 key,
-                record: encode_dataset_bytes(ccsid, &record)?,
+                record: mutated_record.clone().ok_or(HostProblem::ProviderFailure)?,
                 expected_version: argument_optional(request, "VERSION")
                     .map(|value| value.parse().map_err(|_| HostProblem::Malformed))
                     .transpose()?,
@@ -577,7 +578,7 @@ fn validate_key_length(
     key_length: Option<u32>,
     attributes: Option<&mainframe_env_host_api::DatasetAttributes>,
 ) -> Result<(), HostProblem> {
-    if operation == CicsOperation::Read
+    if matches!(operation, CicsOperation::Read | CicsOperation::Write)
         && let Some(key_length) = key_length
         && attributes.and_then(|attributes| attributes.key_length) != Some(key_length)
     {
@@ -598,15 +599,7 @@ fn validate_record_length(
     let Some(attributes) = attributes else {
         return Ok(None);
     };
-    let variable = matches!(
-        attributes.record_format,
-        RecordFormat::Variable
-            | RecordFormat::VariableBlocked
-            | RecordFormat::VariableSpanned
-            | RecordFormat::VariableBlockedSpanned
-            | RecordFormat::Undefined
-            | RecordFormat::Line
-    );
+    let variable = variable_record_format(attributes.record_format);
     if variable && length.is_none() {
         return Err(HostProblem::Condition {
             name: "LENGERR".into(),
@@ -618,7 +611,7 @@ fn validate_record_length(
         return Ok(None);
     };
     if variable && length > attributes.logical_record_length {
-        return if operation == CicsOperation::Rewrite {
+        return if matches!(operation, CicsOperation::Write | CicsOperation::Rewrite) {
             Ok(Some(("LENGERR", 22, 12)))
         } else {
             Ok(None)
@@ -640,6 +633,18 @@ fn validate_record_length(
         return Ok(Some(("LENGERR", 22, response2)));
     }
     Ok(None)
+}
+
+fn variable_record_format(record_format: RecordFormat) -> bool {
+    matches!(
+        record_format,
+        RecordFormat::Variable
+            | RecordFormat::VariableBlocked
+            | RecordFormat::VariableSpanned
+            | RecordFormat::VariableBlockedSpanned
+            | RecordFormat::Undefined
+            | RecordFormat::Line
+    )
 }
 
 fn apply_read_length(
@@ -705,7 +710,7 @@ mod tests {
     }
 
     #[test]
-    fn rewrite_length_and_full_key_mismatch_use_ibm_resp2_values() {
+    fn write_rewrite_length_and_full_key_mismatch_use_ibm_resp2_values() {
         let variable = attributes(RecordFormat::Variable, 8);
         assert!(matches!(
             validate_record_length(CicsOperation::Rewrite, None, Some(&variable)),
@@ -717,6 +722,10 @@ mod tests {
         ));
         assert_eq!(
             validate_record_length(CicsOperation::Rewrite, Some(9), Some(&variable)),
+            Ok(Some(("LENGERR", 22, 12)))
+        );
+        assert_eq!(
+            validate_record_length(CicsOperation::Write, Some(9), Some(&variable)),
             Ok(Some(("LENGERR", 22, 12)))
         );
         let fixed = attributes(RecordFormat::Fixed, 8);
@@ -739,6 +748,18 @@ mod tests {
         assert_eq!(
             validate_key_length(CicsOperation::Read, Some(3), Some(&fixed)),
             Ok(())
+        );
+        assert!(matches!(
+            validate_key_length(CicsOperation::Write, Some(2), Some(&fixed)),
+            Err(HostProblem::Condition {
+                response: 16,
+                response2: 26,
+                ..
+            })
+        ));
+        assert_eq!(
+            validate_record_length(CicsOperation::Write, Some(5), Some(&fixed)),
+            Ok(Some(("LENGERR", 22, 14)))
         );
     }
 }

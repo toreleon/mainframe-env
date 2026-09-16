@@ -71,8 +71,8 @@ fn require_separator(name: &str, value: &HirCicsValue) -> Resolution<()> {
 pub(super) fn require_output_shape(
     name: HirCicsOutputName,
     target: &HirDataReference,
-    clauses: &Clauses,
-    options: &[String],
+    _clauses: &Clauses,
+    _options: &[String],
 ) -> Resolution<()> {
     match name {
         HirCicsOutputName::Abstime => require_absolute_time(target),
@@ -96,26 +96,15 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::Yyddd
         | HirCicsOutputName::Yymmdd
         | HirCicsOutputName::Yyyymmdd => {
-            let separator = match name {
-                HirCicsOutputName::Time => "TIMESEP",
-                _ => "DATESEP",
-            };
-            let separated =
-                clauses.contains_key(separator) || options.iter().any(|option| option == separator);
-            let (plain, field) = match name {
+            let field = match name {
                 HirCicsOutputName::Mmddyy | HirCicsOutputName::Time | HirCicsOutputName::Yymmdd => {
-                    (6, 8)
+                    8
                 }
-                HirCicsOutputName::Mmddyyyy | HirCicsOutputName::Yyyymmdd => (8, 10),
-                HirCicsOutputName::Yyddd => (5, 6),
+                HirCicsOutputName::Mmddyyyy | HirCicsOutputName::Yyyymmdd => 10,
+                HirCicsOutputName::Yyddd => 6,
                 _ => unreachable!(),
             };
-            let valid_length = if separated {
-                target.length == field
-            } else {
-                matches!(target.length, length if length == plain || length == field)
-            };
-            if valid_length
+            if target.length == field
                 && matches!(
                     target.category,
                     DataCategory::Alphabetic | DataCategory::Alphanumeric

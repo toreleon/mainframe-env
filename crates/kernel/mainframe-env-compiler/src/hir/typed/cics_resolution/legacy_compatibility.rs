@@ -1,4 +1,4 @@
-use super::{Resolution, ResolutionFailure, clauses};
+use super::{Resolution, ResolutionFailure, clauses, matching_close};
 use std::collections::BTreeSet;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -59,16 +59,10 @@ fn validated_against_legacy_descriptor(
             "compiler SPI compatibility descriptor has no selector".into(),
         ));
     };
-    let (clauses, options) = clauses(remainder, None)?;
-    if descriptor
-        .application_discriminator_options
-        .iter()
-        .any(|name| {
-            clauses.contains_key(*name) || options.iter().any(|option| option.as_str() == *name)
-        })
-    {
+    if has_application_discriminator(descriptor, remainder)? {
         return Ok(None);
     }
+    let (clauses, options) = clauses(remainder, None)?;
     if !clauses.contains_key(*selector)
         && !options.iter().any(|option| option.as_str() == *selector)
     {
@@ -157,4 +151,27 @@ fn validated_against_legacy_descriptor(
             || descriptor.official_row.contains(":api-commands:")
     );
     Ok(Some(descriptor))
+}
+
+fn has_application_discriminator(
+    descriptor: &CicsLegacyCompatibilityDescriptor,
+    tokens: &[String],
+) -> Resolution<bool> {
+    let mut position = 0usize;
+    while position < tokens.len() {
+        let name = tokens[position].to_ascii_uppercase();
+        if descriptor
+            .application_discriminator_options
+            .iter()
+            .any(|discriminator| *discriminator == name)
+        {
+            return Ok(true);
+        }
+        if tokens.get(position + 1).is_some_and(|token| token == "(") {
+            position = matching_close(tokens, position + 1)? + 1;
+        } else {
+            position += 1;
+        }
+    }
+    Ok(false)
 }

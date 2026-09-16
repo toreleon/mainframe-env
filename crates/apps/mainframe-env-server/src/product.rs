@@ -2822,6 +2822,7 @@ impl ProductServer {
         {
             return Err(HostProblem::Malformed);
         }
+        let child_admission_retry_allowed = work.attempt < work.max_attempts;
         loop {
             let job = self.batch.get(&payload.job_id)?;
             if job.owner != payload.owner {
@@ -2833,13 +2834,19 @@ impl ProductServer {
             match job.state {
                 mainframe_env_batch::JobState::Completed
                 | mainframe_env_batch::JobState::Failed => {
-                    return match self.admit_internal_reader_children(&payload.job_id)? {
+                    return match self.admit_internal_reader_children(
+                        &payload.job_id,
+                        child_admission_retry_allowed,
+                    )? {
                         ChildAdmissionResult::Ok => Ok(JesWorkOutcome::Completed),
                         ChildAdmissionResult::Retry => Ok(JesWorkOutcome::Deferred),
                     };
                 }
                 mainframe_env_batch::JobState::Cancelled => {
-                    return match self.admit_internal_reader_children(&payload.job_id)? {
+                    return match self.admit_internal_reader_children(
+                        &payload.job_id,
+                        child_admission_retry_allowed,
+                    )? {
                         ChildAdmissionResult::Ok => Ok(JesWorkOutcome::Cancelled),
                         ChildAdmissionResult::Retry => Ok(JesWorkOutcome::Deferred),
                     };
@@ -2880,13 +2887,19 @@ impl ProductServer {
                 .run_claimed(&invocation, &payload.job_id, "INIT0001", false)?
             {
                 Some(job) if job.state == mainframe_env_batch::JobState::Cancelled => {
-                    return match self.admit_internal_reader_children(&payload.job_id)? {
+                    return match self.admit_internal_reader_children(
+                        &payload.job_id,
+                        child_admission_retry_allowed,
+                    )? {
                         ChildAdmissionResult::Ok => Ok(JesWorkOutcome::Cancelled),
                         ChildAdmissionResult::Retry => Ok(JesWorkOutcome::Deferred),
                     };
                 }
                 Some(_) => {
-                    return match self.admit_internal_reader_children(&payload.job_id)? {
+                    return match self.admit_internal_reader_children(
+                        &payload.job_id,
+                        child_admission_retry_allowed,
+                    )? {
                         ChildAdmissionResult::Ok => Ok(JesWorkOutcome::Completed),
                         ChildAdmissionResult::Retry => Ok(JesWorkOutcome::Deferred),
                     };
@@ -8360,21 +8373,19 @@ mod tests {
         // is retried (still fails against the placeholder) and the already
         // admitted sibling is a no-op.
         assert!(matches!(
-            server.admit_internal_reader_children(&parent_id),
+            server.admit_internal_reader_children(&parent_id, true),
             Ok(ChildAdmissionResult::Retry)
         ));
     }
 
     #[test]
-    fn internal_reader_child_admission_dead_letters_the_parent_after_max_attempts() {
+    fn exhausted_internal_reader_child_admission_cancels_the_unadmitted_child() {
         // A child whose admission fails for a persistently transient reason
         // (here, the durable store is already at capacity) must not dead-
         // letter the parent's own work on the first attempt: the parent's
-        // work is released for a bounded retry instead. Once the parent
-        // work's `max_attempts` (3) is exhausted, the store's own retry
-        // bookkeeping dead-letters it like any other exhausted work item;
-        // the child is left `Queued` with no work record, since nothing
-        // retries admission for a dead-lettered parent.
+        // work is released for a bounded retry instead. On the parent's last
+        // attempt, the still-unadmitted child is cancelled and verified so
+        // neither lifecycle is stranded without recoverable work.
         let limits = mainframe_env_store::StoreLimits {
             max_work_items: 1,
             ..Default::default()
@@ -8406,7 +8417,7 @@ mod tests {
             if attempt < 3 {
                 assert_eq!(work.state, WorkState::Queued);
             } else {
-                assert_eq!(work.state, WorkState::DeadLetter);
+                assert_eq!(work.state, WorkState::Completed);
             }
         }
         // No further claim is possible: the parent's work is terminal.
@@ -8417,7 +8428,7 @@ mod tests {
             None
         );
         let (child, _) = only_internal_reader_child(&server, &parent_id);
-        assert_eq!(child.state, mainframe_env_batch::JobState::Queued);
+        assert_eq!(child.state, mainframe_env_batch::JobState::Cancelled);
         assert!(
             store
                 .get_work(&format!("jes:{}", child.id))

@@ -466,6 +466,45 @@ mod tests {
     }
 
     #[test]
+    fn short_level88_hexadecimal_literal_uses_alphanumeric_space_padding() {
+        let fixture = Fixture::new();
+        let source = fixture.0.join("LEVEL88S.cbl");
+        fs::write(
+            &source,
+            b"IDENTIFICATION DIVISION.\nPROGRAM-ID. LEVEL88S.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 WS-TEXT PIC X(3) VALUE 'A  '.\n 88 MATCH-QUOTED VALUE 'A'.\n 88 MATCH-HEX VALUE X'41'.\nPROCEDURE DIVISION.\nIF MATCH-QUOTED DISPLAY 'QUOTED-TRUE' END-IF.\nIF MATCH-HEX DISPLAY 'HEX-TRUE' END-IF.\nMOVE 'ZZZ' TO WS-TEXT.\nSET MATCH-HEX TO TRUE.\nDISPLAY WS-TEXT.\nIF MATCH-HEX DISPLAY 'SET-TRUE' END-IF.\nSTOP RUN.\n",
+        )
+        .unwrap();
+        let result = compile(&source, Format::Free, &[], CompilationMode::Executable).unwrap();
+        let CompilerResult::Published { artifact, .. } = result else {
+            panic!("short hexadecimal condition program did not publish: {result:?}");
+        };
+        let limits = InvocationLimits::default();
+        let request_invocation =
+            invocation(ArtifactRef::new(artifact.content_id().to_reference(), limits).unwrap())
+                .unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            request_invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        match ExecutionCoordinator::local(CoordinatorLimits::default()).execute(
+            &mut machine,
+            &request_invocation,
+            ExecutionControl::default(),
+        ) {
+            ExecutionOutcome::Completed(completion) => {
+                assert_eq!(completion.return_code, 0);
+                assert_eq!(
+                    completion.output.bytes(),
+                    b"QUOTED-TRUE\nHEX-TRUE\nA  \nSET-TRUE\n"
+                );
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
     fn cli_builds_ordered_fixed_libraries_with_subsystem_abi_sources() {
         let fixture = Fixture::new();
         let source = fixture.0.join("MAIN.cbl");
