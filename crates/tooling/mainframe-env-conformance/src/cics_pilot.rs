@@ -109,6 +109,30 @@ DISPLAY 'INVALID:' RESP-X ':' RESP2-X.
 STOP RUN.
 "#;
 
+const WRITE_LENGTH_SOURCE: &str = r#"IDENTIFICATION DIVISION.
+PROGRAM-ID. CICSWRL.
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 RECORD-BUFFER PIC X(8) VALUE 'ABC12345'.
+01 RECORD-KEY PIC X(3) VALUE 'ABC'.
+01 WRITE-LENGTH PIC S9(4) COMP VALUE 5.
+01 READ-LENGTH PIC S9(4) COMP VALUE 8.
+01 KEY-LENGTH PIC S9(4) COMP VALUE 3.
+01 READ-BUFFER PIC X(8) VALUE ALL 'X'.
+01 RESP-X PIC 9(3) VALUE 0.
+01 RESP2-X PIC 9(3) VALUE 0.
+PROCEDURE DIVISION.
+EXEC CICS WRITE FILE('WRITELEN') FROM(RECORD-BUFFER) RIDFLD(RECORD-KEY)
+    LENGTH(WRITE-LENGTH) KEYLENGTH(KEY-LENGTH)
+    RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
+DISPLAY 'WRITE:' RESP-X ':' RESP2-X.
+EXEC CICS READ FILE('WRITELEN') INTO(READ-BUFFER) RIDFLD(RECORD-KEY)
+    LENGTH(READ-LENGTH) KEYLENGTH(KEY-LENGTH)
+    RESP(RESP-X) RESP2(RESP2-X) END-EXEC.
+DISPLAY 'READ:' RESP-X ':' RESP2-X ':' READ-BUFFER.
+STOP RUN.
+"#;
+
 const READ_SOURCE_PREFIX: &str = r#"IDENTIFICATION DIVISION.
 PROGRAM-ID. CICSNEG.
 DATA DIVISION.
@@ -1425,6 +1449,67 @@ STOP RUN.
                 "{obligation}: expected={expected:?} actual={actual:?}"
             );
         }
+    }
+
+    /// PR #179 review remediation: prove WRITE LENGTH across compiler lowering,
+    /// typed interpreter execution, CICS file control, and persisted dataset
+    /// read-back rather than checking any one layer in isolation.
+    #[test]
+    fn write_length_compiles_executes_and_persists_only_the_selected_prefix() {
+        let store = Arc::new(MemoryStore::new(StoreLimits::default()));
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let platform_store: Arc<dyn PlatformStore> = store;
+        let dataset =
+            DatasetService::open(provider_store.clone(), DatasetLimits::default()).unwrap();
+        let dataset_name = DatasetName::new("PILOT.WRITELEN", 128).unwrap();
+        dataset
+            .invoke(DatasetRequest::Create {
+                dataset: dataset_name.clone(),
+                attributes: DatasetAttributes {
+                    organization: DatasetOrganization::KeySequenced,
+                    record_format: RecordFormat::Variable,
+                    logical_record_length: 8,
+                    key_offset: Some(0),
+                    key_length: Some(3),
+                    ccsid: None,
+                },
+                mutation: mutation(1, "write-length-create").unwrap(),
+            })
+            .unwrap();
+        let inner = pilot_inner_host(dataset.clone()).unwrap();
+        let cics = CicsService::open(inner, provider_store, CicsLimits::default()).unwrap();
+        cics.register_file_definitions(&BTreeMap::from([(
+            "WRITELEN".into(),
+            CicsFileDefinition {
+                dataset: dataset_name.clone(),
+                ccsid: None,
+            },
+        )]))
+        .unwrap();
+        let execution = PilotExecution::new(pilot_outer_host(cics).unwrap(), platform_store);
+        let output = execute_source(
+            WRITE_LENGTH_SOURCE,
+            "CICSWRL",
+            "IBMUSER",
+            "write-length-selected-route",
+            &execution,
+        )
+        .unwrap();
+        assert_eq!(output, "WRITE:000:000\nREAD:000:000:ABC12   \n");
+
+        let readback = dataset
+            .invoke(DatasetRequest::Read {
+                dataset: dataset_name,
+                member: None,
+                key: Some(b"ABC".to_vec()),
+                max_records: 1,
+                control: Default::default(),
+            })
+            .unwrap();
+        assert!(matches!(
+            readback,
+            DatasetResult::Records { records, .. } if records == [b"ABC12".to_vec()]
+        ));
     }
 
     #[test]
