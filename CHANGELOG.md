@@ -6,6 +6,10 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added local CICS START `NOCHECK` on the typed route. An omitted REQID still
+  receives a replay-stable internal row/work identity, while EIBREQID remains
+  null as required; remote shipping and its reduced checking remain deferred.
+
 - Added SQLite process-restart proof for automatic CICS DELAY wakeup. A due
   DELAY survives product/store teardown, reopens its installed program,
   terminal session, exchange, checkpoint, provider timer, and work item, then

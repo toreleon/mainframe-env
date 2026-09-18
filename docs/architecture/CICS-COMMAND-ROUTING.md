@@ -175,7 +175,10 @@ handoff retains its already-applied RETURN finalization and is discarded without
 committing twice.
 When local START omits REQID, the provider derives one replay-stable
 eight-character identifier and the interpreter writes it to implicit EIBREQID;
-that value owns the same record and work identities as an explicit REQID.
+that value owns the same record and work identities as an explicit REQID. With
+local NOCHECK, the same internal identity is generated for replay and worker
+ownership but is deliberately not returned, leaving EIBREQID null. Remote
+NOCHECK shipping remains deferred.
 Local START USERID performs a `SURROGAT <userid>.DFHSTART` READ check under the
 issuing principal before writing an interval or work row, but only after the
 typed RACF principal-status route validates the requested non-login execution

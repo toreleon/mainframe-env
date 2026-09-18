@@ -190,5 +190,6 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::At => "AT",
         CicsPlanOption::For => "FOR",
         CicsPlanOption::Until => "UNTIL",
+        CicsPlanOption::NoCheck => "NOCHECK",
     }
 }

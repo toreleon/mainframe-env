@@ -181,8 +181,11 @@ Typed RETRIEVE then consumes the oldest ready record for the target transaction
 through explicit INTO and in/out LENGTH bindings, or through SET with an
 output-only LENGTH. START admission, the work row, interval state, and replay
 receipts share the durable store, so a SQLite reopen preserves the
-producer-to-consumer cycle. Remote routing, terminal starts, generated request
-identifiers, WAIT, and automatic target-task launch remain outside this slice.
+producer-to-consumer cycle. Omitted REQID uses a deterministic internal
+identifier for the same row and work ownership; ordinary START returns it in
+EIBREQID, while local NOCHECK intentionally leaves EIBREQID null. Remote
+routing, terminal starts, remote NOCHECK behavior, WAIT, and automatic
+target-task launch remain outside this slice.
 START `AFTER`/`AT` uses the same durable deadline authority as packed
 INTERVAL/TIME. Append-only plan operand tags retain each explicit component and
 append-only option tags retain relative versus absolute mode; literal and

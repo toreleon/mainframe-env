@@ -244,7 +244,6 @@ pub struct CicsNamedOperand {
     /// Resolved literal or storage value.
     pub value: CicsOperandValue,
 }
-
 /// Flag option accepted by the typed CICS pilot.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsPlanOption {
@@ -288,8 +287,9 @@ pub enum CicsPlanOption {
     At,
     For,
     Until,
+    /// Suppress the generated START request identifier in EIBREQID.
+    NoCheck,
 }
-
 /// Named result binding written after the host result arrives.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CicsOutputName {
@@ -1351,6 +1351,8 @@ mod tests {
         assert_eq!(option_from_tag(20), Ok(CicsPlanOption::For));
         assert_eq!(option_tag(CicsPlanOption::Until), 21);
         assert_eq!(option_from_tag(21), Ok(CicsPlanOption::Until));
+        assert_eq!(option_tag(CicsPlanOption::NoCheck), 22);
+        assert_eq!(option_from_tag(22), Ok(CicsPlanOption::NoCheck));
 
         let plan = read_plan();
         let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();

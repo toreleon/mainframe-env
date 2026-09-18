@@ -787,7 +787,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::PushHandle
         | HirCicsOperation::SetAssociationUserCorrData
         | HirCicsOperation::Suspend => &["NOHANDLE"],
-        HirCicsOperation::Start => &["AFTER", "AT", "FMH", "PROTECT", "NOHANDLE"],
+        HirCicsOperation::Start => &["AFTER", "AT", "FMH", "PROTECT", "NOCHECK", "NOHANDLE"],
         HirCicsOperation::Cancel => &["NOHANDLE"],
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
         HirCicsOperation::Retrieve => &["WAIT", "NOHANDLE"],
@@ -1078,6 +1078,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "AT" => HirCicsOption::At,
             "FOR" => HirCicsOption::For,
             "UNTIL" => HirCicsOption::Until,
+            "NOCHECK" => HirCicsOption::NoCheck,
             _ => unreachable!("allowed CICS option"),
         })
         .collect::<BTreeSet<_>>();

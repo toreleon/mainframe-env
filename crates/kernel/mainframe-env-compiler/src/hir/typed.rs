@@ -268,6 +268,7 @@ pub enum HirCicsOption {
     At,
     For,
     Until,
+    NoCheck,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -3365,7 +3366,7 @@ mod tests {
 
     #[test]
     fn cics_start_may_defer_request_identity_generation_to_runtime() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. GENREQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8) VALUE 'PAYLOAD'. PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') FROM(DATA-X) PROTECT END-EXEC. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. GENREQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8) VALUE 'PAYLOAD'. PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') FROM(DATA-X) PROTECT NOCHECK END-EXEC. STOP RUN.";
         let analysis = analyze(source);
         let hir = analysis
             .hir
@@ -3380,6 +3381,7 @@ mod tests {
             .expect("typed START");
         assert_eq!(command.operation, HirCicsOperation::Start);
         assert!(command.options.contains(&HirCicsOption::Protect));
+        assert!(command.options.contains(&HirCicsOption::NoCheck));
         assert!(
             command
                 .operands

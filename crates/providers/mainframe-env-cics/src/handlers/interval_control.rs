@@ -349,7 +349,7 @@ fn start(
         None,
         Vec::new(),
     )?;
-    if request_id_was_generated {
+    if request_id_was_generated && !request.arguments.contains_key("OPTION.NOCHECK") {
         response.outputs.insert(
             "EIBREQID".into(),
             BoundedPayload::new(
@@ -425,6 +425,7 @@ fn validate_start_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "OPTION.AFTER",
         "OPTION.AT",
         "OPTION.FMH",
+        "OPTION.NOCHECK",
         "OPTION.NOHANDLE",
         "OPTION.PROTECT",
         "QUEUE",
@@ -464,6 +465,7 @@ fn validate_start_request(request: &CicsRequest) -> Result<(), HostProblem> {
                     "OPTION.AFTER"
                         | "OPTION.AT"
                         | "OPTION.FMH"
+                        | "OPTION.NOCHECK"
                         | "OPTION.NOHANDLE"
                         | "OPTION.PROTECT"
                 ) {

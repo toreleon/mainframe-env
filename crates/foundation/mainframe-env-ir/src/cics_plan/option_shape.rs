@@ -13,6 +13,7 @@ pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
                 | CicsPlanOption::Protect
                 | CicsPlanOption::After
                 | CicsPlanOption::At
+                | CicsPlanOption::NoCheck
         ),
         CicsPlanOperation::Delay => !matches!(
             option,
