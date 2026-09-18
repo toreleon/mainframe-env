@@ -167,6 +167,7 @@ fn transfer(
 fn validate_transfer_request(request: &CicsRequest) -> Result<(), HostProblem> {
     let allowed = [
         "COMMAREA",
+        "DATALENGTH",
         "LENGTH",
         "OPTION.NOHANDLE",
         "PROGRAM",
@@ -190,7 +191,11 @@ fn validate_transfer_request(request: &CicsRequest) -> Result<(), HostProblem> {
                         "mainframe-env.cics.storage-value@1" | "mainframe-env.cics.argument@1"
                     )
                 || name == "LENGTH" && value.schema() != "mainframe-env.cics.decimal@1"
+                || name == "DATALENGTH" && value.schema() != "mainframe-env.cics.decimal@1"
         })
+        || request.arguments.contains_key("DATALENGTH")
+            && (!request.arguments.contains_key("COMMAREA")
+                || !request.arguments.contains_key("LENGTH"))
     {
         Err(HostProblem::Malformed)
     } else {

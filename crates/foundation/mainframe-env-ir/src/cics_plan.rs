@@ -9,6 +9,7 @@ mod browse;
 mod codec_tags;
 mod file_mutation;
 mod handle_abend;
+mod identities;
 mod interval_control;
 mod option_shape;
 mod output_shape;
@@ -17,6 +18,7 @@ mod queue_control;
 mod terminal_control;
 
 pub use assign::{CICS_ASSIGN_OUTPUT_NAMES, CicsAssignOutput};
+pub use identities::{CicsOperandName, CicsOutputName, CicsPlanOperation, CicsPlanOption};
 
 use codec_tags::{
     operand_from_tag, operand_tag, operation_from_tag, operation_tag, option_from_tag, option_tag,
@@ -59,87 +61,6 @@ impl Default for CicsPlanLimits {
     }
 }
 
-/// CICS operation selected by the frontend.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum CicsPlanOperation {
-    /// Terminate the issuing task abnormally or transfer to its active exit.
-    Abend,
-    /// Copy one checked virtual pointer/address relationship.
-    AddressSet,
-    /// Refresh the EIB clock fields and return one absolute-time value.
-    Asktime,
-    /// Refresh the implicit EIB date and time fields.
-    AsktimeEib,
-    /// Transform one absolute-time value into selected display/binary fields.
-    FormatTime,
-    /// Change the issuing task's dispatch priority and optionally yield.
-    ChangeTask,
-    /// Cancel one unhonored local interval-control START request.
-    Cancel,
-    /// Complete a source-defined zero-delay request without suspension.
-    Delay,
-    /// Release one task-owned enqueue.
-    Deq,
-    /// Acquire one task-owned enqueue.
-    Enq,
-    /// Install or deactivate one bounded set of terminal AID handlers.
-    HandleAid,
-    /// Activate, cancel, or reactivate one abnormal-termination exit.
-    HandleAbend,
-    /// Install or deactivate one bounded set of reviewed condition handlers.
-    HandleCondition,
-    /// Ignore one bounded set of reviewed EIBRESP conditions.
-    IgnoreCondition,
-    /// Invoke one installed program at the next logical level and return.
-    Link,
-    /// Transfer to one installed program at the same logical level without returning.
-    Xctl,
-    /// Return from the current top-level task and optionally schedule its next transaction.
-    Return,
-    /// Position one default-key file browse without reading a record.
-    StartBrowse,
-    /// Read the next record in one default-key file browse.
-    ReadNext,
-    /// Read the previous record in one default-key file browse.
-    ReadPrev,
-    /// End one default-key file browse.
-    EndBrowse,
-    /// Restore one suspended HANDLE/IGNORE specification snapshot.
-    PopHandle,
-    /// Suspend the current HANDLE/IGNORE specifications in one nested snapshot.
-    PushHandle,
-    /// Read one file record.
-    Read,
-    /// Delete an explicitly identified or currently held file record.
-    Delete,
-    /// Write one explicitly keyed file record.
-    Write,
-    /// Write one bounded record to a transient data queue.
-    WriteTransientData,
-    /// Receive one mapped terminal input message.
-    ReceiveMap,
-    /// Send one mapped terminal output message.
-    SendMap,
-    /// Send one unmapped terminal text message.
-    SendText,
-    /// Rewrite the record held by the current update context.
-    Rewrite,
-    /// Commit or roll back the current unit of work.
-    Syncpoint,
-    /// Overwrite the originating task's bounded user correlator data.
-    SetAssociationUserCorrData,
-    /// Yield the issuing task once for redispatch.
-    Suspend,
-    /// Return one bounded set of task, terminal, and invocation context values.
-    Assign,
-    /// Discard the current full-BMS logical message, if one is being built.
-    PurgeMessage,
-    /// Schedule one local interval-control START data record.
-    Start,
-    /// Consume one expired interval-control START data record.
-    Retrieve,
-}
-
 /// A resolved storage slot in the containing IR module.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct CicsStorageSlot {
@@ -147,80 +68,6 @@ pub struct CicsStorageSlot {
     pub storage: StorageId,
     /// Canonical qualified COBOL layout name used for cross-checking.
     pub qualified_layout_name: String,
-}
-
-/// Named input accepted by the typed CICS pilot.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum CicsOperandName {
-    /// Optional application transaction abend code.
-    Abcode,
-    /// Source label used by a task-local control transfer.
-    Label,
-    /// Program name selected for a program-control transfer.
-    Program,
-    /// `COMMAREA(...)` input-output data area.
-    Commarea,
-    /// `TRANSID(...)` next-transaction name.
-    TransId,
-    /// `RTRANSID(...)` metadata passed to a started task.
-    ReturnTransId,
-    /// `RTERMID(...)` metadata passed to a started task.
-    ReturnTermId,
-    /// `FILE(...)` resource binding.
-    File,
-    /// `DATASET(...)` resource alias.
-    Dataset,
-    /// `FROM(...)` record bytes.
-    From,
-    /// `RIDFLD(...)` record identifier.
-    Ridfld,
-    /// `QUEUE(...)` transient-data destination.
-    Queue,
-    /// `MAP(...)` BMS map name.
-    Map,
-    /// `MAPSET(...)` BMS mapset name.
-    Mapset,
-    /// `RESOURCE(...)` enqueue identity.
-    Resource,
-    /// `LENGTH(...)` file-record or enqueue content-identity length.
-    Length,
-    /// `MAXLIFETIME(...)` dynamic CVDA value.
-    MaxLifetime,
-    /// `PRIORITY(...)` task dispatch value.
-    Priority,
-    /// `USERCORRDATA(...)` task association value.
-    UserCorrData,
-    /// `SET(ADDRESS OF data-area)` target.
-    SetAddress,
-    /// `SET(pointer-reference)` target.
-    SetPointer,
-    /// `USING(ADDRESS OF data-area)` source.
-    UsingAddress,
-    /// `USING(pointer-reference)` source.
-    UsingPointer,
-    /// Canonical EIBRESP condition specifications for HANDLE or IGNORE.
-    Conditions,
-    /// Canonical terminal AID handler specifications.
-    Aids,
-    /// `ABSTIME(...)` packed-decimal input.
-    Abstime,
-    /// Optional one-byte date separator.
-    DateSep,
-    /// Optional one-byte time separator.
-    TimeSep,
-    /// `KEYLENGTH(...)` file key length.
-    KeyLength,
-    /// `REQID(...)` interval-control request identity.
-    ReqId,
-    /// Packed `INTERVAL(...)` relative expiration.
-    Interval,
-    /// Packed `TIME(...)` absolute expiration.
-    StartTime,
-    UserId,
-    Hours,
-    Minutes,
-    Seconds,
-    Milliseconds,
 }
 
 /// Literal bytes or a runtime read from resolved storage.
@@ -244,95 +91,6 @@ pub struct CicsNamedOperand {
     /// Resolved literal or storage value.
     pub value: CicsOperandValue,
 }
-/// Flag option accepted by the typed CICS pilot.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum CicsPlanOption {
-    /// Ignore and clear active abnormal-termination exits.
-    Cancel,
-    /// Suppress transaction-dump creation.
-    NoDump,
-    /// Reactivate the most recently canceled abnormal-termination exit.
-    Reset,
-    /// Establish a read-for-update context.
-    Update,
-    /// Roll back rather than commit at syncpoint.
-    Rollback,
-    /// Suppress default condition handling.
-    NoHandle,
-    /// Keep an enqueue until task termination.
-    Task,
-    /// Keep an enqueue until the current unit of work ends.
-    Uow,
-    /// Return `ENQBUSY` rather than suspending for a contended resource.
-    NoSuspend,
-    /// Erase the terminal buffer before mapped output is displayed.
-    Erase,
-    /// Use symbolic map cursor positioning.
-    Cursor,
-    /// Use the default date separator.
-    DateSep,
-    /// Use the default time separator.
-    TimeSep,
-    /// Unlock the terminal keyboard after output.
-    FreeKb,
-    /// Start a file browse at the first key greater than or equal to RIDFLD.
-    Gteq,
-    /// Mark START data as containing function management headers.
-    Fmh,
-    /// Defer START work admission until a successful syncpoint.
-    Protect,
-    /// Wait for an expired START record rather than returning ENDDATA immediately.
-    Wait,
-    After,
-    At,
-    For,
-    Until,
-    /// Suppress the generated START request identifier in EIBREQID.
-    NoCheck,
-}
-/// Named result binding written after the host result arrives.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum CicsOutputName {
-    /// Record payload destination.
-    Into,
-    /// Pointer receiving interpreter-owned retrieved storage.
-    SetPointer,
-    /// Returned browse record identifier.
-    Ridfld,
-    /// Returned communication-area destination.
-    Commarea,
-    /// Primary response code destination.
-    Resp,
-    /// Secondary response code destination.
-    Resp2,
-    /// `ABSTIME(...)` packed-decimal destination.
-    Abstime,
-    /// `MILLISECONDS(...)` fullword-binary destination.
-    Milliseconds,
-    /// `MMDDYY(...)` character destination.
-    Mmddyy,
-    /// `MMDDYYYY(...)` character destination.
-    Mmddyyyy,
-    /// `TIME(...)` character destination.
-    Time,
-    /// `YYDDD(...)` character destination.
-    Yyddd,
-    /// `YYMMDD(...)` character destination.
-    Yymmdd,
-    /// `YYYYMMDD(...)` character destination.
-    Yyyymmdd,
-    /// One source-reviewed `ASSIGN` output destination.
-    Assign(CicsAssignOutput),
-    /// Actual record length destination for `READ`.
-    Length,
-    /// Retrieved `RTRANSID(...)` metadata destination.
-    ReturnTransId,
-    /// Retrieved `RTERMID(...)` metadata destination.
-    ReturnTermId,
-    /// Retrieved `QUEUE(...)` metadata destination.
-    Queue,
-}
-
 /// One pre-resolved result binding.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CicsOutputBinding {
@@ -1335,6 +1093,8 @@ mod tests {
         assert_eq!(operand_from_tag(35), Ok(CicsOperandName::Seconds));
         assert_eq!(operand_tag(CicsOperandName::Milliseconds), 36);
         assert_eq!(operand_from_tag(36), Ok(CicsOperandName::Milliseconds));
+        assert_eq!(operand_tag(CicsOperandName::DataLength), 37);
+        assert_eq!(operand_from_tag(37), Ok(CicsOperandName::DataLength));
         assert_eq!(output_tag(CicsOutputName::Length), 91);
         assert_eq!(output_from_tag(91), Ok(CicsOutputName::Length));
         assert_eq!(output_tag(CicsOutputName::SetPointer), 95);
@@ -1524,6 +1284,10 @@ mod tests {
                     name: CicsOperandName::Length,
                     value: CicsOperandValue::LengthOf(commarea.clone()),
                 },
+                CicsNamedOperand {
+                    name: CicsOperandName::DataLength,
+                    value: CicsOperandValue::Integer(1),
+                },
             ],
             options: BTreeSet::new(),
             outputs: vec![CicsOutputBinding {
@@ -1545,11 +1309,13 @@ mod tests {
             encode_cics_effect_plan(&mismatched_link_length, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
-        let xctl = CicsEffectPlan {
+        let mut xctl = CicsEffectPlan {
             operation: CicsPlanOperation::Xctl,
             outputs: Vec::new(),
             ..link.clone()
         };
+        xctl.operands
+            .retain(|operand| operand.name != CicsOperandName::DataLength);
         let mut returning_xctl = xctl.clone();
         returning_xctl.outputs = link.outputs.clone();
         assert_eq!(

@@ -23,6 +23,7 @@ mod format_time;
 mod handle_abend;
 mod interval_control;
 mod legacy_compatibility;
+mod numeric_value;
 mod operation;
 mod output_bindings;
 mod program_control;
@@ -30,6 +31,8 @@ mod program_name;
 mod queue_control;
 mod terminal_control;
 mod transaction_name;
+
+use numeric_value::{cics_cvda_value, cics_integer_value};
 
 struct ValidatedCandidate {
     descriptor: &'static CicsApplicationRegistryDescriptor,
@@ -686,9 +689,14 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::IgnoreCondition
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle => &["RESP", "RESP2"],
-        HirCicsOperation::Link | HirCicsOperation::Xctl => {
-            &["PROGRAM", "COMMAREA", "LENGTH", "RESP", "RESP2"]
-        }
+        HirCicsOperation::Link | HirCicsOperation::Xctl => &[
+            "PROGRAM",
+            "COMMAREA",
+            "LENGTH",
+            "DATALENGTH",
+            "RESP",
+            "RESP2",
+        ],
         HirCicsOperation::Return => &["TRANSID", "COMMAREA", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::StartBrowse => &[
             "FILE",
@@ -1137,44 +1145,6 @@ fn cics_address_value(
     } else {
         complete_data_reference(tokens, semantic).map(|reference| (false, reference))
     }
-}
-
-fn cics_integer_value(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsValue> {
-    if let [value] = tokens
-        && let Some(literal) = numeric_literal(value)
-        && literal.scale == 0
-    {
-        let magnitude = literal.digits.parse::<i64>().map_err(|_| {
-            ResolutionFailure::Invalid("CICS integer operand is out of range".into())
-        })?;
-        let value = if literal.negative {
-            magnitude.checked_neg().ok_or_else(|| {
-                ResolutionFailure::Invalid("CICS integer operand is out of range".into())
-            })?
-        } else {
-            magnitude
-        };
-        return Ok(HirCicsValue::Integer(value));
-    }
-    let reference = complete_data_reference(tokens, semantic)?;
-    require_numeric(&reference)?;
-    Ok(HirCicsValue::Data(reference))
-}
-
-fn cics_cvda_value(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsValue> {
-    if let [function, open, value, close] = tokens
-        && function.eq_ignore_ascii_case("DFHVALUE")
-        && open == "("
-        && close == ")"
-        && matches!(value.as_str(), "TASK" | "UOW" | "LUW")
-    {
-        return Ok(HirCicsValue::Integer(match value.as_str() {
-            "TASK" => 233,
-            "UOW" | "LUW" => 246,
-            _ => unreachable!(),
-        }));
-    }
-    cics_integer_value(tokens, semantic)
 }
 
 fn complete_data_reference(

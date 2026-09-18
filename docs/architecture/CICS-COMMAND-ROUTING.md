@@ -120,9 +120,12 @@ The typed local LINK subset binds PROGRAM and an optional COMMAREA before
 dispatch. COMMAREA is one input/output storage identity, so registering its
 return destination cannot replace the captured request bytes. Optional LENGTH
 accepts a literal, numeric storage, or matching LENGTH OF identity and truncates
-the copied request before dispatch. Channel, DATALENGTH, input-message,
-remote-system, transaction, and SYNCONRETURN forms remain compiler rejections
-until their separate contracts are implemented.
+the copied request before dispatch. Local DATALENGTH is retained as a distinct
+numeric operand but deliberately does not shorten or validate that payload;
+the source assigns it only to remote/dynamic transfer optimization. Channel,
+remote DATALENGTH checking, input-message, remote-system, transaction, and
+SYNCONRETURN forms remain compiler rejections until their separate contracts
+are implemented.
 The typed local XCTL subset binds the same PROGRAM and optional COMMAREA inputs,
 but declares no COMMAREA output because control does not return to the caller.
 Its complete provider result becomes a frame-replacing transfer to the selected

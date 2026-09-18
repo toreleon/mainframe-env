@@ -18,6 +18,13 @@ pub(super) fn validate_constraints(
         Err(ResolutionFailure::Invalid(format!(
             "CICS {operation:?} LENGTH requires COMMAREA"
         )))
+    } else if operation == HirCicsOperation::Link
+        && clauses.contains_key("DATALENGTH")
+        && (!clauses.contains_key("COMMAREA") || !clauses.contains_key("LENGTH"))
+    {
+        Err(ResolutionFailure::Invalid(
+            "CICS LINK DATALENGTH requires COMMAREA and LENGTH".into(),
+        ))
     } else if operation == HirCicsOperation::Return
         && clauses.contains_key("COMMAREA")
         && !clauses.contains_key("TRANSID")
@@ -64,6 +71,12 @@ fn transfer_operands(
         operands.push(HirCicsNamedOperand {
             name: HirCicsOperandName::Length,
             value: commarea_length(tokens, semantic)?,
+        });
+    }
+    if let Some(tokens) = clauses.get("DATALENGTH") {
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::DataLength,
+            value: cics_integer_value(tokens, semantic)?,
         });
     }
     Ok(operands)

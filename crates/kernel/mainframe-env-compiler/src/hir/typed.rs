@@ -228,6 +228,7 @@ pub enum HirCicsOperandName {
     Minutes,
     Seconds,
     Milliseconds,
+    DataLength,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2458,7 +2459,7 @@ mod tests {
     #[test]
     fn cics_program_transfers_resolve_literal_dynamic_and_length_of_commareas() {
         let analysis = analyze(
-            "IDENTIFICATION DIVISION. PROGRAM-ID. XLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 AREA-X PIC X(8). 01 LENGTH-X PIC S9(4) COMP VALUE 4. PROCEDURE DIVISION. EXEC CICS LINK PROGRAM('CHILD') COMMAREA(AREA-X) LENGTH(3) END-EXEC. EXEC CICS XCTL PROGRAM('CHILD') COMMAREA(AREA-X) LENGTH(LENGTH-X) END-EXEC. EXEC CICS RETURN TRANSID('NEXT') COMMAREA(AREA-X) LENGTH(LENGTH OF AREA-X) END-EXEC.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. XLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 AREA-X PIC X(8). 01 LENGTH-X PIC S9(4) COMP VALUE 4. PROCEDURE DIVISION. EXEC CICS LINK PROGRAM('CHILD') COMMAREA(AREA-X) LENGTH(3) DATALENGTH(2) END-EXEC. EXEC CICS XCTL PROGRAM('CHILD') COMMAREA(AREA-X) LENGTH(LENGTH-X) END-EXEC. EXEC CICS RETURN TRANSID('NEXT') COMMAREA(AREA-X) LENGTH(LENGTH OF AREA-X) END-EXEC.",
         );
         let hir = analysis
             .hir
@@ -2474,6 +2475,10 @@ mod tests {
         assert_eq!(commands.len(), 3);
         assert!(commands[0].operands.iter().any(|operand| {
             operand.name == HirCicsOperandName::Length && operand.value == HirCicsValue::Integer(3)
+        }));
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::DataLength
+                && operand.value == HirCicsValue::Integer(2)
         }));
         assert!(commands[1].operands.iter().any(|operand| {
             matches!(
@@ -2499,6 +2504,15 @@ mod tests {
                 "IDENTIFICATION DIVISION. PROGRAM-ID. BADLEN. PROCEDURE DIVISION. EXEC CICS {command} LENGTH(1) END-EXEC."
             ));
             assert!(invalid.hir.is_none(), "{command}");
+        }
+        for clauses in [
+            "PROGRAM('CHILD') DATALENGTH(1)",
+            "PROGRAM('CHILD') COMMAREA(AREA-X) DATALENGTH(1)",
+        ] {
+            let invalid = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADDATA. DATA DIVISION. WORKING-STORAGE SECTION. 01 AREA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS LINK {clauses} END-EXEC."
+            ));
+            assert!(invalid.hir.is_none(), "{clauses}");
         }
     }
 

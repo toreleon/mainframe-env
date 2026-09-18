@@ -119,6 +119,7 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::Mapset => "MAPSET",
         CicsOperandName::Resource => "RESOURCE",
         CicsOperandName::Length => "LENGTH",
+        CicsOperandName::DataLength => "DATALENGTH",
         CicsOperandName::MaxLifetime => "MAXLIFETIME",
         CicsOperandName::Priority => "PRIORITY",
         CicsOperandName::UserCorrData => "USERCORRDATA",

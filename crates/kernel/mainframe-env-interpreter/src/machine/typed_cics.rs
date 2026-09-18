@@ -278,6 +278,7 @@ pub(super) fn execute(
                 if matches!(
                     operand.name,
                     CicsOperandName::Length
+                        | CicsOperandName::DataLength
                         | CicsOperandName::KeyLength
                         | CicsOperandName::MaxLifetime
                         | CicsOperandName::Priority

@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed local CICS LINK `DATALENGTH`. The value is preserved in the
+  canonical request but, as IBM defines for a static local link, is not checked
+  and does not shorten the LENGTH-selected COMMAREA; remote optimization and
+  validation remain deferred.
+
 - Added typed COMMAREA `LENGTH` for local CICS LINK, XCTL, and RETURN. Literal,
   numeric-storage, and matching `LENGTH OF` forms select the dispatched prefix;
   target EIBCALEN follows that prefix and unsafe ranges return bounded LENGERR.

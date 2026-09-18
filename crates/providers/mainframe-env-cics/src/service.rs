@@ -8854,6 +8854,42 @@ mod tests {
         assert_eq!(response.disposition, CicsDisposition::Transfer);
         assert_eq!(response.payload.bytes(), b"REQU");
 
+        let local_data_length = request(
+            CicsOperation::Link,
+            BTreeMap::from([
+                ("PROGRAM".into(), argument(b"CHILD")),
+                ("COMMAREA".into(), argument(b"REQUEST")),
+                ("LENGTH".into(), cics_decimal(4)),
+                ("DATALENGTH".into(), cics_decimal(-1)),
+            ]),
+            6,
+        );
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, local_data_length.clone(), 6),
+                local_data_length,
+            )
+            .unwrap();
+        assert_eq!(response.disposition, CicsDisposition::Complete);
+        assert_eq!(response.outputs["COMMAREA"].bytes(), b"CHILD");
+
+        let missing_length = request(
+            CicsOperation::Link,
+            BTreeMap::from([
+                ("PROGRAM".into(), argument(b"CHILD")),
+                ("COMMAREA".into(), argument(b"REQUEST")),
+                ("DATALENGTH".into(), cics_decimal(1)),
+            ]),
+            7,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, missing_length.clone(), 7),
+                missing_length,
+            ),
+            Err(HostProblem::Malformed)
+        );
+
         for (sequence, operation, arguments, response2) in [
             (
                 2,

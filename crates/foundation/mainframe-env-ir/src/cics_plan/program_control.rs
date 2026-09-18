@@ -65,6 +65,7 @@ fn invalid_transfer_shape(
         CicsOperandName::Program,
         CicsOperandName::Commarea,
         CicsOperandName::Length,
+        CicsOperandName::DataLength,
     ]);
     let program = plan
         .operands
@@ -93,11 +94,36 @@ fn invalid_transfer_shape(
             None => commarea_output.is_some(),
         }
         || invalid_commarea_length(plan)
+        || invalid_data_length(plan)
         || plan
             .options
             .iter()
             .any(|option| !matches!(option, CicsPlanOption::NoHandle))
         || outputs.contains(&CicsOutputName::Into)
+}
+
+fn invalid_data_length(plan: &CicsEffectPlan) -> bool {
+    let Some(value) = plan
+        .operands
+        .iter()
+        .find(|operand| operand.name == CicsOperandName::DataLength)
+        .map(|operand| &operand.value)
+    else {
+        return false;
+    };
+    plan.operation != super::CicsPlanOperation::Link
+        || !plan
+            .operands
+            .iter()
+            .any(|operand| operand.name == CicsOperandName::Commarea)
+        || !plan
+            .operands
+            .iter()
+            .any(|operand| operand.name == CicsOperandName::Length)
+        || !matches!(
+            value,
+            CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
+        )
 }
 
 fn invalid_commarea_length(plan: &CicsEffectPlan) -> bool {
