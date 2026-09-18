@@ -1520,6 +1520,10 @@ mod tests {
                     name: CicsOperandName::Commarea,
                     value: CicsOperandValue::Storage(commarea.clone()),
                 },
+                CicsNamedOperand {
+                    name: CicsOperandName::Length,
+                    value: CicsOperandValue::LengthOf(commarea.clone()),
+                },
             ],
             options: BTreeSet::new(),
             outputs: vec![CicsOutputBinding {
@@ -1532,6 +1536,13 @@ mod tests {
         missing_link_output.outputs.clear();
         assert_eq!(
             encode_cics_effect_plan(&missing_link_output, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut mismatched_link_length = link.clone();
+        mismatched_link_length.operands[2].value =
+            CicsOperandValue::LengthOf(slot(9, "REQUEST.OTHER"));
+        assert_eq!(
+            encode_cics_effect_plan(&mismatched_link_length, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
         let xctl = CicsEffectPlan {

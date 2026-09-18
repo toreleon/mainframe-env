@@ -8830,6 +8830,87 @@ mod tests {
     }
 
     #[test]
+    fn program_transfer_length_selects_prefix_and_reports_bounded_conditions() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+        service
+            .register_programs(&BTreeSet::from(["NEXT".into()]))
+            .unwrap();
+        let bounded = request(
+            CicsOperation::Xctl,
+            BTreeMap::from([
+                ("PROGRAM".into(), argument(b"NEXT")),
+                ("COMMAREA".into(), argument(b"REQUEST")),
+                ("LENGTH".into(), cics_decimal(4)),
+            ]),
+            1,
+        );
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, bounded.clone(), 1),
+                bounded,
+            )
+            .unwrap();
+        assert_eq!(response.disposition, CicsDisposition::Transfer);
+        assert_eq!(response.payload.bytes(), b"REQU");
+
+        for (sequence, operation, arguments, response2) in [
+            (
+                2,
+                CicsOperation::Link,
+                BTreeMap::from([
+                    ("PROGRAM".into(), argument(b"CHILD")),
+                    ("COMMAREA".into(), argument(b"REQUEST")),
+                    ("LENGTH".into(), cics_decimal(32_764)),
+                ]),
+                11,
+            ),
+            (
+                3,
+                CicsOperation::Link,
+                BTreeMap::from([
+                    ("PROGRAM".into(), argument(b"CHILD")),
+                    ("LENGTH".into(), cics_decimal(1)),
+                ]),
+                26,
+            ),
+            (
+                4,
+                CicsOperation::Xctl,
+                BTreeMap::from([
+                    ("PROGRAM".into(), argument(b"NEXT")),
+                    ("COMMAREA".into(), argument(b"REQUEST")),
+                    ("LENGTH".into(), cics_decimal(8)),
+                ]),
+                28,
+            ),
+            (
+                5,
+                CicsOperation::Link,
+                BTreeMap::from([
+                    ("PROGRAM".into(), argument(b"CHILD")),
+                    ("COMMAREA".into(), argument(b"REQUEST")),
+                    ("LENGTH".into(), cics_decimal(0)),
+                ]),
+                11,
+            ),
+        ] {
+            let invalid = request(operation, arguments, sequence);
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, invalid.clone(), sequence),
+                    invalid,
+                ),
+                Err(HostProblem::Condition {
+                    name: "LENGERR".into(),
+                    response: 22,
+                    response2,
+                })
+            );
+        }
+    }
+
+    #[test]
     fn return_request_is_bounded_typed_and_local_only() {
         let service = service(Arc::new(MemoryStore::new(Default::default())));
         let (invocation, session) = registered(&service);

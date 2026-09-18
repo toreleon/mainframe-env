@@ -2326,7 +2326,7 @@ mod tests {
                 .any(|output| output.name == HirCicsOutputName::Commarea)
         );
 
-        for clause in ["CHANNEL('DATA')", "LENGTH(16)", "INPUTMSG(AREA-X)"] {
+        for clause in ["CHANNEL('DATA')", "INPUTMSG(AREA-X)"] {
             let deferred = analyze(&format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. LATERXCT. DATA DIVISION. WORKING-STORAGE SECTION. 01 AREA-X PIC X(16). PROCEDURE DIVISION. EXEC CICS XCTL PROGRAM('CHILD') {clause} END-EXEC. STOP RUN."
             ));
@@ -2406,7 +2406,6 @@ mod tests {
                 .contains("TRANSID requires a 1-4 character name")
         }));
         for option in [
-            "LENGTH(8)",
             "CHANNEL('DATA')",
             "INPUTMSG(AREA-X)",
             "IMMEDIATE",
@@ -2454,6 +2453,53 @@ mod tests {
             (&commarea.value, &length.value),
             (HirCicsValue::Data(area), HirCicsValue::LengthOf(length)) if area == length
         ));
+    }
+
+    #[test]
+    fn cics_program_transfers_resolve_literal_dynamic_and_length_of_commareas() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. XLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 AREA-X PIC X(8). 01 LENGTH-X PIC S9(4) COMP VALUE 4. PROCEDURE DIVISION. EXEC CICS LINK PROGRAM('CHILD') COMMAREA(AREA-X) LENGTH(3) END-EXEC. EXEC CICS XCTL PROGRAM('CHILD') COMMAREA(AREA-X) LENGTH(LENGTH-X) END-EXEC. EXEC CICS RETURN TRANSID('NEXT') COMMAREA(AREA-X) LENGTH(LENGTH OF AREA-X) END-EXEC.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("program LENGTH: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 3);
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length && operand.value == HirCicsValue::Integer(3)
+        }));
+        assert!(commands[1].operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::Length,
+                    value: HirCicsValue::Data(reference),
+                } if reference.qualified_name == "LENGTH-X"
+            )
+        }));
+        assert!(commands[2].operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::Length,
+                    value: HirCicsValue::LengthOf(reference),
+                } if reference.qualified_name == "AREA-X"
+            )
+        }));
+
+        for command in ["LINK PROGRAM('CHILD')", "XCTL PROGRAM('CHILD')"] {
+            let invalid = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADLEN. PROCEDURE DIVISION. EXEC CICS {command} LENGTH(1) END-EXEC."
+            ));
+            assert!(invalid.hir.is_none(), "{command}");
+        }
     }
 
     #[test]

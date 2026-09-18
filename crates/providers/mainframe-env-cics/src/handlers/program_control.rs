@@ -90,7 +90,37 @@ fn transfer(
         AccessIntent::Execute,
     )?;
     let program = ProgramName::new(target.clone(), 128).map_err(|_| HostProblem::Malformed)?;
-    let payload = bounded(argument_bytes(request, "COMMAREA").unwrap_or_default())?;
+    let mut payload = argument_bytes(request, "COMMAREA").unwrap_or_default();
+    if let Some(length) = request.arguments.get("LENGTH") {
+        let length = std::str::from_utf8(length.bytes())
+            .ok()
+            .and_then(|value| value.trim().parse::<i64>().ok())
+            .and_then(|value| usize::try_from(value).ok())
+            .filter(|value| {
+                *value <= 32_763 && (request.operation != CicsOperation::Link || *value != 0)
+            })
+            .ok_or_else(invalid_commarea_length)?;
+        if !request.arguments.contains_key("COMMAREA") && length != 0 {
+            return Err(HostProblem::Condition {
+                name: "LENGERR".into(),
+                response: 22,
+                response2: 26,
+            });
+        }
+        if length > payload.len() {
+            return Err(HostProblem::Condition {
+                name: "LENGERR".into(),
+                response: 22,
+                response2: if request.operation == CicsOperation::Xctl {
+                    28
+                } else {
+                    0
+                },
+            });
+        }
+        payload.truncate(length);
+    }
+    let payload = bounded(payload)?;
     if request.operation == CicsOperation::Xctl && service.lock()?.programs.contains(&target) {
         return service.response(
             run,
@@ -135,7 +165,14 @@ fn transfer(
 }
 
 fn validate_transfer_request(request: &CicsRequest) -> Result<(), HostProblem> {
-    let allowed = ["COMMAREA", "OPTION.NOHANDLE", "PROGRAM", "RESP", "RESP2"];
+    let allowed = [
+        "COMMAREA",
+        "LENGTH",
+        "OPTION.NOHANDLE",
+        "PROGRAM",
+        "RESP",
+        "RESP2",
+    ];
     if !request.arguments.contains_key("PROGRAM")
         || request.arguments.iter().any(|(name, value)| {
             !allowed.contains(&name.as_str())
@@ -152,10 +189,19 @@ fn validate_transfer_request(request: &CicsRequest) -> Result<(), HostProblem> {
                         value.schema(),
                         "mainframe-env.cics.storage-value@1" | "mainframe-env.cics.argument@1"
                     )
+                || name == "LENGTH" && value.schema() != "mainframe-env.cics.decimal@1"
         })
     {
         Err(HostProblem::Malformed)
     } else {
         Ok(())
+    }
+}
+
+fn invalid_commarea_length() -> HostProblem {
+    HostProblem::Condition {
+        name: "LENGERR".into(),
+        response: 22,
+        response2: 11,
     }
 }

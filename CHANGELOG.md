@@ -6,6 +6,10 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed COMMAREA `LENGTH` for local CICS LINK, XCTL, and RETURN. Literal,
+  numeric-storage, and matching `LENGTH OF` forms select the dispatched prefix;
+  target EIBCALEN follows that prefix and unsafe ranges return bounded LENGERR.
+
 - Added local CICS START `NOCHECK` on the typed route. An omitted REQID still
   receives a replay-stable internal row/work identity, while EIBREQID remains
   null as required; remote shipping and its reduced checking remain deferred.

@@ -687,7 +687,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle => &["RESP", "RESP2"],
         HirCicsOperation::Link | HirCicsOperation::Xctl => {
-            &["PROGRAM", "COMMAREA", "RESP", "RESP2"]
+            &["PROGRAM", "COMMAREA", "LENGTH", "RESP", "RESP2"]
         }
         HirCicsOperation::Return => &["TRANSID", "COMMAREA", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::StartBrowse => &[

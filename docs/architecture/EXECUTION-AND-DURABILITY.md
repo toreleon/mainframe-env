@@ -128,7 +128,10 @@ through the original provider idempotency identity and only when the returned
 canonical digest matches the journaled result. `Intent` and `UnknownOutcome`
 records stop before provider dispatch. When the CICS replay ledger proves an
 outer result, reconciliation changes the effect to `Completed` before machine
-execution resumes.
+execution resumes. Local LINK, XCTL, and RETURN resolve any explicit COMMAREA
+length before this boundary, so the copied prefix—not adjacent task storage—is
+the payload journaled for dispatch, replacement, or continuation. XCTL target
+EIBCALEN is derived from that exact copied prefix.
 
 CICS also retains the exact bounded outer response for every mutating file,
 transient-queue, program-link, enqueue/dequeue, and syncpoint request. The replay key is checked

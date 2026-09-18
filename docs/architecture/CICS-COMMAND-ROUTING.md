@@ -118,20 +118,25 @@ program-name input and mutually exclusive CANCEL/RESET actions; its provider
 continues to own authorization and durable active/canceled exit state.
 The typed local LINK subset binds PROGRAM and an optional COMMAREA before
 dispatch. COMMAREA is one input/output storage identity, so registering its
-return destination cannot replace the captured request bytes. Channel, explicit
-length, input-message, remote-system, transaction, and SYNCONRETURN forms remain
-compiler rejections until their separate contracts are implemented.
+return destination cannot replace the captured request bytes. Optional LENGTH
+accepts a literal, numeric storage, or matching LENGTH OF identity and truncates
+the copied request before dispatch. Channel, DATALENGTH, input-message,
+remote-system, transaction, and SYNCONRETURN forms remain compiler rejections
+until their separate contracts are implemented.
 The typed local XCTL subset binds the same PROGRAM and optional COMMAREA inputs,
 but declares no COMMAREA output because control does not return to the caller.
 Its complete provider result becomes a frame-replacing transfer to the selected
-program. Channel, explicit length, and input-message forms remain compiler
+program. The same LENGTH forms select the replacement frame's copied COMMAREA
+and therefore its EIBCALEN. Channel and input-message forms remain compiler
 rejections until their separate contracts are implemented.
 The typed local RETURN subset admits bare completion and an optional TRANSID;
 COMMAREA is admitted only with TRANSID so the copied bytes have an owned durable
-continuation identity. RETURN carries no COMMAREA output. `LENGTH(LENGTH OF
-commarea)` selects the captured prefix; other explicit lengths, channel,
+continuation identity. RETURN carries no COMMAREA output. Literal, numeric
+storage, and matching `LENGTH OF` values select the captured prefix. Channel,
 input-message, IMMEDIATE, ENDACTIVITY, higher-level, and DPL forms remain
-fail-closed.
+fail-closed. All three commands bound explicit lengths before dispatch and map
+invalid ranges or missing storage to LENGERR rather than reading beyond the
+resolved data area.
 Typed local START scheduling accepts packed INTERVAL/TIME and explicit
 `AFTER`/`AT` unit forms from literals or numeric storage. Append-only plan tags
 retain the mode and each present HOURS, MINUTES, or SECONDS component through
