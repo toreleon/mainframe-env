@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added local START without passed data. FROM is now optional, while LENGTH and
+  FMH still require it. A no-data request schedules ordinary durable work; if
+  RETRIEVE is issued for that start identity it consumes once and returns
+  replay-safe ENDDATA 29/0 instead of manufacturing a zero-length success.
+
 - Added dynamic compiled START `AFTER`/`AT` units. Append-only CICS plan tags
   retain mode and HOURS/MINUTES/SECONDS storage identities through checkpoint,
   codec, and interpreter request construction so provider-side bounds and

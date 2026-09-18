@@ -2248,6 +2248,22 @@ mod tests {
         let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
         assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
 
+        let mut no_data = plan.clone();
+        no_data
+            .operands
+            .retain(|operand| operand.name != CicsOperandName::From);
+        let bytes = encode_cics_effect_plan(&no_data, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), no_data);
+        let mut invalid_length = no_data;
+        invalid_length.operands.push(CicsNamedOperand {
+            name: CicsOperandName::Length,
+            value: CicsOperandValue::Integer(1),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&invalid_length, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+
         let mut invalid_user = plan;
         invalid_user
             .operands

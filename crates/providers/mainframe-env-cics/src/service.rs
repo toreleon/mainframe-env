@@ -4735,6 +4735,141 @@ mod tests {
     }
 
     #[test]
+    fn start_without_data_schedules_and_retrieve_returns_source_defined_enddata() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (issuer, _) = registered(&service);
+        let start = request(
+            CicsOperation::Start,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"NEXT")),
+                ("REQID".into(), argument(b"NODATA01")),
+                ("INTERVAL".into(), cics_decimal(0)),
+            ]),
+            1,
+        );
+        service
+            .invoke(&effect(&issuer.run_unit_id, start.clone(), 1), start)
+            .unwrap();
+        let work = store
+            .claim("cics-worker", Some(CICS_START_WORK_GENERATION), 1_000, 100)
+            .unwrap()
+            .unwrap();
+        service.promote_start_work(&work, 1_000).unwrap();
+        store
+            .complete(
+                &work.work_id,
+                work.lease_id.as_deref().unwrap(),
+                work.lease_epoch,
+                1_000,
+            )
+            .unwrap();
+
+        let target = invocation_for("run-no-data", BTreeMap::new());
+        let session = SessionId::new("no-data-session", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(target.clone(), &session, "NEXT", "MEAPPL", "MESYS")
+            .unwrap();
+        let mut retrieve = request(
+            CicsOperation::Retrieve,
+            BTreeMap::from([
+                ("INTO".into(), argument(b"DATA-X")),
+                ("LENGTH".into(), cics_decimal(8)),
+            ]),
+            2,
+        );
+        retrieve.mutation.as_mut().unwrap().transaction = Some("NEXT".into());
+        retrieve.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let ended = service
+            .invoke(
+                &effect(&target.run_unit_id, retrieve.clone(), 2),
+                retrieve.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            (ended.condition.as_str(), ended.response, ended.response2),
+            ("ENDDATA", 29, 0)
+        );
+        assert_eq!(
+            service
+                .invoke(&effect(&target.run_unit_id, retrieve.clone(), 2), retrieve)
+                .unwrap(),
+            ended
+        );
+
+        let metadata = request(
+            CicsOperation::Start,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"NEXT")),
+                ("REQID".into(), argument(b"METADTA1")),
+                ("INTERVAL".into(), cics_decimal(0)),
+                ("RTRANSID".into(), argument(b"BACK")),
+            ]),
+            3,
+        );
+        service
+            .invoke(&effect(&issuer.run_unit_id, metadata.clone(), 3), metadata)
+            .unwrap();
+        let work = store
+            .claim("cics-worker", Some(CICS_START_WORK_GENERATION), 1_000, 100)
+            .unwrap()
+            .unwrap();
+        service.promote_start_work(&work, 1_000).unwrap();
+        let mut retrieve = request(
+            CicsOperation::Retrieve,
+            BTreeMap::from([
+                ("INTO".into(), argument(b"DATA-X")),
+                ("LENGTH".into(), cics_decimal(8)),
+                ("RTRANSID".into(), argument(b"RTRANS-X")),
+            ]),
+            4,
+        );
+        retrieve.mutation.as_mut().unwrap().transaction = Some("NEXT".into());
+        let retrieved = service
+            .invoke(&effect(&target.run_unit_id, retrieve.clone(), 4), retrieve)
+            .unwrap();
+        assert_eq!(retrieved.outputs["INTO"].bytes(), b"");
+        assert_eq!(retrieved.outputs["LENGTH"].bytes(), b"0");
+        assert_eq!(retrieved.outputs["RTRANSID"].bytes(), b"BACK");
+
+        for (request_id, extra) in [
+            ("BADLEN01", ("LENGTH", cics_decimal(1))),
+            ("BADFMH01", ("OPTION.FMH", cics_option())),
+        ] {
+            let invalid = request(
+                CicsOperation::Start,
+                BTreeMap::from([
+                    ("TRANSID".into(), argument(b"NEXT")),
+                    ("REQID".into(), argument(request_id.as_bytes())),
+                    (extra.0.into(), extra.1),
+                ]),
+                5,
+            );
+            assert_eq!(
+                service.invoke(&effect(&issuer.run_unit_id, invalid.clone(), 5), invalid),
+                Err(HostProblem::Malformed)
+            );
+            assert!(
+                store
+                    .get_provider_state("cics-interval-start-v1", request_id)
+                    .unwrap()
+                    .is_none()
+            );
+        }
+    }
+
+    #[test]
     fn start_after_and_at_units_drive_deadlines_and_exact_component_conditions() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = CicsService::open_with_runtime(

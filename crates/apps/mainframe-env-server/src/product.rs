@@ -10603,6 +10603,92 @@ mod tests {
     }
 
     #[test]
+    fn compiled_start_without_data_queues_the_target_without_a_false_payload() {
+        let artifact = published_source_fixture(
+            "NODATA",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. NODATA.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('NX00') REQID('NODATA01') AFTER SECONDS(0) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "NODATA".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([
+                    ("ND00".into(), "NODATA".into()),
+                    ("NX00".into(), "NODATA".into()),
+                ]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "NODATA".into(),
+                    map: "NODATA".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("start-no-data", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "ND00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation,
+                &session,
+                "ND00",
+                24,
+                80,
+                "start-no-data-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "NODATA", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "NODATA", 2)
+            .unwrap();
+        assert_eq!(
+            server
+                .store
+                .get_work("cics-start:NODATA01")
+                .unwrap()
+                .unwrap()
+                .state,
+            WorkState::Queued
+        );
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 2)
+                .unwrap()
+                .into_iter()
+                .find(|entry| entry.operation == CicsOperation::Start)
+                .map(|entry| (entry.outcome, entry.response, entry.response2)),
+            Some(("NORMAL".into(), 0, 0))
+        );
+    }
+
+    #[test]
     fn compiled_start_userid_rejects_unknown_and_revoked_principals_before_surrogate() {
         let artifact = published_source_fixture(
             "USERSTAT",

@@ -132,6 +132,14 @@ semantics therefore survive runtime evaluation: a lone MINUTES may reach 5999
 and lone SECONDS 359999, while any combined form narrows minutes and seconds to
 59. The provider returns INVREQ 16 with response2 4, 5, or 6 for the respective
 out-of-range component.
+Typed local START no longer requires FROM. A request with no FROM,
+RTRANSID, RTERMID, or QUEUE still creates its ordinary durable schedule/work
+identity but carries no retrievable data. RETRIEVE consumes that exact ready
+identity once and returns ENDDATA 29/0; the identical consumer request replays
+the same result. Metadata-only START is data-bearing for this rule and returns
+its requested metadata with length zero. LENGTH and FMH remain invalid without
+FROM, so omission cannot manufacture a payload or function-management-header
+state.
 The typed local START/RETRIEVE data cycle also carries the bounded metadata
 subset: START may supply RTRANSID, RTERMID, and QUEUE names, and RETRIEVE may
 request exact-width writable destinations for any corresponding value.

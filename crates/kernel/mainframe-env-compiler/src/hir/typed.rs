@@ -3386,6 +3386,38 @@ mod tests {
     }
 
     #[test]
+    fn cics_start_without_data_keeps_from_optional_and_rejects_dependent_options() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. NODATA. PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') REQID('NODATA01') AFTER SECONDS(0) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("no-data START: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed START");
+        assert_eq!(command.operation, HirCicsOperation::Start);
+        assert!(command.options.contains(&HirCicsOption::After));
+        assert!(command.operands.iter().all(|operand| {
+            !matches!(
+                operand.name,
+                HirCicsOperandName::From | HirCicsOperandName::Length
+            )
+        }));
+
+        for invalid in ["LENGTH(1)", "FMH"] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADNODAT. PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') {invalid} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{invalid}");
+        }
+    }
+
+    #[test]
     fn cics_cancel_lowers_only_the_bounded_local_start_form() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CANCELL. DATA DIVISION. WORKING-STORAGE SECTION. 01 REQ-X PIC X(8) VALUE 'REQ0001'. 01 TRANS-X PIC X(4) VALUE 'NEXT'. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS CANCEL REQID(REQ-X) TRANSID(TRANS-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);

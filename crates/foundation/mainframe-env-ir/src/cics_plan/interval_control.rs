@@ -72,7 +72,10 @@ pub(super) fn invalid_shape(
                 + explicit_modes;
             !inputs.is_subset(&allowed)
                 || !inputs.contains(&CicsOperandName::TransId)
-                || !inputs.contains(&CicsOperandName::From)
+                || inputs.contains(&CicsOperandName::Length)
+                    && !inputs.contains(&CicsOperandName::From)
+                || plan.options.contains(&CicsPlanOption::Fmh)
+                    && !inputs.contains(&CicsOperandName::From)
                 || schedules > 1
                 || (components > 0) != (explicit_modes == 1)
                 || plan.operands.iter().any(|operand| {

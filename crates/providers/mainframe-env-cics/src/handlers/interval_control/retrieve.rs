@@ -76,6 +76,22 @@ pub(super) fn invoke(
             },
         );
     };
+    if record.data.is_empty()
+        && record.return_transaction.is_none()
+        && record.return_terminal.is_none()
+        && record.queue.is_none()
+    {
+        return super::super::condition::respond(
+            service,
+            run,
+            &request.condition_policy,
+            HostProblem::Condition {
+                name: "ENDDATA".into(),
+                response: 29,
+                response2: 0,
+            },
+        );
+    }
     let actual = record.data.len();
     let maximum = if request.arguments.contains_key("INTO") {
         optional_decimal(request, "LENGTH")?

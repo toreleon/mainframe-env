@@ -224,8 +224,8 @@ fn start(
     let source = request
         .arguments
         .get("FROM")
-        .ok_or(HostProblem::Malformed)?
-        .bytes();
+        .map(BoundedPayload::bytes)
+        .unwrap_or_default();
     let length = optional_decimal(request, "LENGTH")?
         .unwrap_or(i64::try_from(source.len()).map_err(|_| HostProblem::ResourceExhausted)?);
     let length = usize::try_from(length).map_err(|_| HostProblem::Condition {
@@ -233,7 +233,7 @@ fn start(
         response: 22,
         response2: 0,
     })?;
-    if length == 0 || length > source.len() {
+    if (request.arguments.contains_key("FROM") && length == 0) || length > source.len() {
         return Err(HostProblem::Condition {
             name: "LENGERR".into(),
             response: 22,
@@ -447,10 +447,11 @@ fn validate_start_request(request: &CicsRequest) -> Result<(), HostProblem> {
     let explicit_components = ["HOURS", "MINUTES", "SECONDS"]
         .into_iter()
         .any(|name| request.arguments.contains_key(name));
-    if !request.arguments.contains_key("FROM")
-        || !request.arguments.contains_key("TRANSID")
+    if !request.arguments.contains_key("TRANSID")
         || schedule_selectors > 1
         || explicit_mode != explicit_components
+        || request.arguments.contains_key("LENGTH") && !request.arguments.contains_key("FROM")
+        || request.arguments.contains_key("OPTION.FMH") && !request.arguments.contains_key("FROM")
         || request.arguments.iter().any(|(name, value)| {
             !ALLOWED.contains(&name.as_str())
                 || if matches!(

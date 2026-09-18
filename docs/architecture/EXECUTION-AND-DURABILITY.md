@@ -191,6 +191,13 @@ component request. The provider applies source-defined single-unit versus
 combined-unit bounds and exact per-component INVREQ response2 values. Every
 valid path persists one resolved expiration tick, so replay and restart never
 recalculate against a later wall-clock observation.
+FROM is optional on the local START schedule. A no-data record still owns the
+same request/work/replay identities so a later worker can honor it, but it has
+no retrievable payload. If RETRIEVE reaches that exact ready record, the consume
+CAS occurs once and the canonical consumer receives ENDDATA 29/0; replay by the
+same consumer remains ENDDATA. RTRANSID, RTERMID, or QUEUE make the record
+metadata-bearing and therefore retrievable with actual length zero. LENGTH and
+FMH cannot appear without FROM.
 The bounded metadata extension
 also accepts local START RTRANSID, RTERMID, and QUEUE names and returns only the
 requested values through exact-width RETRIEVE outputs. A requested value absent

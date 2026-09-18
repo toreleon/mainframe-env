@@ -62,6 +62,11 @@ pub(super) fn validate_constraints(
                     "CICS START LENGTH requires FROM".into(),
                 ));
             }
+            if options.iter().any(|option| option == "FMH") && !clauses.contains_key("FROM") {
+                return Err(ResolutionFailure::Invalid(
+                    "CICS START FMH requires FROM".into(),
+                ));
+            }
         }
         HirCicsOperation::Retrieve
             if clauses.contains_key("INTO") == clauses.contains_key("SET")
@@ -138,21 +143,21 @@ fn start_operands(
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
     let transaction = bounded_name(&clauses["TRANSID"], semantic, 4, "START", "TRANSID")?;
-    let HirCicsValue::Data(from) = cics_value(&clauses["FROM"], semantic)? else {
-        return Err(ResolutionFailure::Invalid(
-            "CICS START FROM requires a data area".into(),
-        ));
-    };
-    let mut operands = vec![
-        HirCicsNamedOperand {
-            name: HirCicsOperandName::TransId,
-            value: transaction,
-        },
-        HirCicsNamedOperand {
+    let mut operands = vec![HirCicsNamedOperand {
+        name: HirCicsOperandName::TransId,
+        value: transaction,
+    }];
+    if let Some(source) = clauses.get("FROM") {
+        let HirCicsValue::Data(from) = cics_value(source, semantic)? else {
+            return Err(ResolutionFailure::Invalid(
+                "CICS START FROM requires a data area".into(),
+            ));
+        };
+        operands.push(HirCicsNamedOperand {
             name: HirCicsOperandName::From,
             value: HirCicsValue::Data(from),
-        },
-    ];
+        });
+    }
     if let Some(request_id) = clauses.get("REQID") {
         operands.push(HirCicsNamedOperand {
             name: HirCicsOperandName::ReqId,
