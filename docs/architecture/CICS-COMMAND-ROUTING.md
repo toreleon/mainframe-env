@@ -141,6 +141,11 @@ uses the ordinary pending-work cancellation fence after committing SYNCPOINT.
 When local START omits REQID, the provider derives one replay-stable
 eight-character identifier and the interpreter writes it to implicit EIBREQID;
 that value owns the same record and work identities as an explicit REQID.
+Local START USERID performs a `SURROGAT <userid>.DFHSTART` READ check under the
+issuing principal before writing an interval or work row. An accepted explicit
+identity is stored as the future task principal; omission keeps the issuer.
+Denial returns NOTAUTH 70/9 without mutation. Unknown/revoked-user USERIDERR,
+terminal combinations, and actual target-task creation remain deferred.
 RETRIEVE WAIT durably checkpoints and reissues the same statement when no
 eligible record exists; explicit execution re-entry after worker promotion
 consumes through the ordinary one-time fence. Deadlock timeout, shutdown/AICB,

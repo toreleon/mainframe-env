@@ -216,6 +216,8 @@ pub enum CicsOperandName {
     Interval,
     /// Packed `TIME(...)` absolute expiration.
     StartTime,
+    /// `USERID(...)` authority selected for a started task.
+    UserId,
 }
 
 /// Literal bytes or a runtime read from resolved storage.
@@ -1316,6 +1318,8 @@ mod tests {
         }
         assert_eq!(operand_tag(CicsOperandName::KeyLength), 26);
         assert_eq!(operand_from_tag(26), Ok(CicsOperandName::KeyLength));
+        assert_eq!(operand_tag(CicsOperandName::UserId), 32);
+        assert_eq!(operand_from_tag(32), Ok(CicsOperandName::UserId));
         assert_eq!(output_tag(CicsOutputName::Length), 91);
         assert_eq!(output_from_tag(91), Ok(CicsOutputName::Length));
         assert_eq!(output_tag(CicsOutputName::SetPointer), 95);
@@ -2211,6 +2215,10 @@ mod tests {
                     name: CicsOperandName::From,
                     value: CicsOperandValue::Storage(slot(1, "REQUEST.DATA")),
                 },
+                CicsNamedOperand {
+                    name: CicsOperandName::UserId,
+                    value: CicsOperandValue::Literal(b"TARGET".to_vec()),
+                },
             ],
             options: BTreeSet::from([CicsPlanOption::Protect]),
             outputs: Vec::new(),
@@ -2219,6 +2227,18 @@ mod tests {
         let limits = CicsPlanLimits::default();
         let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
         assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
+
+        let mut invalid_user = plan;
+        invalid_user
+            .operands
+            .iter_mut()
+            .find(|operand| operand.name == CicsOperandName::UserId)
+            .unwrap()
+            .value = CicsOperandValue::Integer(1);
+        assert_eq!(
+            encode_cics_effect_plan(&invalid_user, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
     }
 
     proptest! {

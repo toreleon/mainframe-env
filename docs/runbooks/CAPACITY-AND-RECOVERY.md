@@ -126,6 +126,13 @@ consume a record on behalf of the task, or close the exchange. Resume is
 currently explicit; automatic wake and shutdown/deadlock completion are not
 part of this bounded child.
 
+For START USERID, recover the selected execution principal from the interval
+row; do not substitute the issuer after a successful surrogate check. A denied
+check is pre-mutation and must leave no interval or work row. Replaying an
+accepted producer must preserve both its canonical USERID operand and stored
+principal, while a conflicting identity under the same REQID remains an IOERR
+duplicate rather than an identity rewrite.
+
 A typed local CANCEL leaves the interval row as a cancelled replay tombstone
 and calls the work store's cancellation transition. Queued work becomes
 cancelled immediately; claimed work retains its lease with

@@ -3884,6 +3884,7 @@ mod tests {
     struct CommandSecurityAuthority {
         descriptor: CapabilityDescriptor,
         deny_command: bool,
+        deny_surrogate: bool,
         seen: CommandSecurityTrace,
     }
 
@@ -3987,7 +3988,9 @@ mod tests {
                         intent,
                     ));
                     Ok(HostResult::Security(
-                        if self.deny_command && class == "FACILITY" {
+                        if self.deny_command && class == "FACILITY"
+                            || self.deny_surrogate && class == "SURROGAT"
+                        {
                             SecurityDecision::Deny
                         } else {
                             SecurityDecision::Allow
@@ -4239,6 +4242,7 @@ mod tests {
         let provider = Arc::new(CommandSecurityAuthority {
             descriptor: descriptor("host.security.authorize"),
             deny_command,
+            deny_surrogate: false,
             seen: seen.clone(),
         }) as Arc<dyn HostProvider>;
         (
@@ -4246,6 +4250,28 @@ mod tests {
                 Arc::new(
                     RegistrySnapshot::new(1, vec![provider], InvocationLimits::default()).unwrap(),
                 ),
+                HostLimits::default(),
+            )),
+            seen,
+        )
+    }
+
+    fn start_authorities(deny_surrogate: bool) -> (Arc<ScopedHostService>, CommandSecurityTrace) {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let providers = vec![
+            Arc::new(CommandSecurityAuthority {
+                descriptor: descriptor("host.security.authorize"),
+                deny_command: false,
+                deny_surrogate,
+                seen: seen.clone(),
+            }) as Arc<dyn HostProvider>,
+            Arc::new(Authority {
+                descriptor: descriptor("host.clock"),
+            }) as Arc<dyn HostProvider>,
+        ];
+        (
+            Arc::new(ScopedHostService::new(
+                Arc::new(RegistrySnapshot::new(1, providers, InvocationLimits::default()).unwrap()),
                 HostLimits::default(),
             )),
             seen,
@@ -5190,6 +5216,143 @@ mod tests {
             .invoke(&effect(&issuer.run_unit_id, start.clone(), 1), start)
             .unwrap();
         assert_eq!(replayed, response);
+    }
+
+    #[test]
+    fn start_userid_requires_surrogate_read_and_binds_target_principal() {
+        let start = |request_id: &[u8], sequence| {
+            let mut request = request(
+                CicsOperation::Start,
+                BTreeMap::from([
+                    ("TRANSID".into(), argument(b"NEXT")),
+                    ("REQID".into(), argument(request_id)),
+                    ("FROM".into(), argument(b"ASUSER")),
+                    ("INTERVAL".into(), cics_decimal(0)),
+                    ("USERID".into(), argument(b"TARGET")),
+                ]),
+                sequence,
+            );
+            request.condition_policy = CicsConditionPolicy::Respond {
+                response_field: "RESP-X".into(),
+                response2_field: Some("RESP2-X".into()),
+            };
+            request
+        };
+
+        let (denied_host, denied_trace) = start_authorities(true);
+        let denied_store = Arc::new(MemoryStore::new(Default::default()));
+        let denied = CicsService::open_with_runtime(
+            denied_host,
+            denied_store.clone(),
+            denied_store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (denied_issuer, _) = registered(&denied);
+        let denied_request = start(b"DENYUSR1", 1);
+        let response = denied
+            .invoke(
+                &effect(&denied_issuer.run_unit_id, denied_request.clone(), 1),
+                denied_request,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                response.condition.as_str(),
+                response.response,
+                response.response2
+            ),
+            ("NOTAUTH", 70, 9)
+        );
+        assert!(
+            denied_store
+                .get_provider_state("cics-interval-start-v1", "DENYUSR1")
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            denied_store
+                .get_work("cics-start:DENYUSR1")
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            denied_trace.lock().unwrap().last(),
+            Some(&(
+                "SURROGAT".into(),
+                "TARGET.DFHSTART".into(),
+                AccessIntent::Read,
+            ))
+        );
+
+        let (allowed_host, allowed_trace) = start_authorities(false);
+        let allowed_store = Arc::new(MemoryStore::new(Default::default()));
+        let allowed = CicsService::open_with_runtime(
+            allowed_host,
+            allowed_store.clone(),
+            allowed_store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (allowed_issuer, _) = registered(&allowed);
+        let allowed_request = start(b"ALLOWUSR", 2);
+        let response = allowed
+            .invoke(
+                &effect(&allowed_issuer.run_unit_id, allowed_request.clone(), 2),
+                allowed_request,
+            )
+            .unwrap();
+        assert_eq!((response.response, response.response2), (0, 0));
+        assert_eq!(
+            allowed.lock().unwrap().interval_records["ALLOWUSR"].principal,
+            "TARGET"
+        );
+        assert_eq!(
+            allowed_trace.lock().unwrap().last(),
+            Some(&(
+                "SURROGAT".into(),
+                "TARGET.DFHSTART".into(),
+                AccessIntent::Read,
+            ))
+        );
+        assert!(
+            allowed_store
+                .get_work("cics-start:ALLOWUSR")
+                .unwrap()
+                .is_some()
+        );
+
+        let inherited = request(
+            CicsOperation::Start,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"NEXT")),
+                ("REQID".into(), argument(b"INHERUSR")),
+                ("FROM".into(), argument(b"ISSUER")),
+                ("INTERVAL".into(), cics_decimal(0)),
+            ]),
+            3,
+        );
+        allowed
+            .invoke(
+                &effect(&allowed_issuer.run_unit_id, inherited.clone(), 3),
+                inherited,
+            )
+            .unwrap();
+        assert_eq!(
+            allowed.lock().unwrap().interval_records["INHERUSR"].principal,
+            "IBMUSER"
+        );
+        assert_eq!(
+            allowed_trace
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|(class, _, _)| class == "SURROGAT")
+                .count(),
+            1
+        );
     }
 
     #[test]

@@ -10304,9 +10304,11 @@ mod tests {
 
     #[test]
     fn compiled_start_and_retrieve_cross_shared_worker_and_durable_coordinator() {
+        use mainframe_env_racf::CommandContext;
+
         let starter = published_source_fixture(
             "STARTER",
-            "IDENTIFICATION DIVISION.\nPROGRAM-ID. STARTER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE 'PAYLOAD'.\n01 DATA-Y PIC X(8) VALUE 'SETDATA'.\n01 LENGTH-X PIC S9(4) COMP VALUE 7.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('NX00') REQID('REQ0001') FROM(DATA-X) LENGTH(LENGTH-X) INTERVAL(0) RTRANSID('BACK') RTERMID('T001') QUEUE('WORKQ') FMH RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS START TRANSID('NX00') FROM(DATA-Y) LENGTH(LENGTH-X) INTERVAL(0) FMH PROTECT RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SYNCPOINT RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. STARTER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE 'PAYLOAD'.\n01 DATA-Y PIC X(8) VALUE 'SETDATA'.\n01 LENGTH-X PIC S9(4) COMP VALUE 7.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('NX00') REQID('00000000') FROM(DATA-X) LENGTH(LENGTH-X) INTERVAL(0) RTRANSID('BACK') RTERMID('T001') QUEUE('WORKQ') USERID('TARGET') FMH RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS START TRANSID('NX00') FROM(DATA-Y) LENGTH(LENGTH-X) INTERVAL(0) FMH PROTECT RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SYNCPOINT RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
         );
         let receiver = published_source_fixture(
             "RECEIVER",
@@ -10331,7 +10333,30 @@ mod tests {
             }
         };
         let server = ProductServer::memory(config()).unwrap();
-        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .racf
+            .execute_command(
+                &CommandContext::new(
+                    PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap(),
+                    "interval-surrogate-class",
+                    "interval-surrogate-class",
+                    1,
+                )
+                .unwrap(),
+                "SETROPTS CLASSACT(SURROGAT)",
+            )
+            .unwrap();
+        server
+            .racf
+            .define_profile("SURROGAT", "TARGET.DFHSTART", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit("SURROGAT", "TARGET.DFHSTART", "IBMUSER", AccessIntent::Read)
+            .unwrap();
         server
             .install_online_application(OnlineApplicationDefinition {
                 programs: vec![
@@ -10448,7 +10473,7 @@ mod tests {
         assert_eq!(generated_request_id.len(), 8);
         assert!(generated_request_id.iter().all(u8::is_ascii_hexdigit));
 
-        for request_id in [b"REQ0001".as_slice(), generated_request_id.as_slice()] {
+        for request_id in [b"00000000".as_slice(), generated_request_id.as_slice()] {
             let work = server
                 .claim_jes_work("interval-worker")
                 .unwrap()

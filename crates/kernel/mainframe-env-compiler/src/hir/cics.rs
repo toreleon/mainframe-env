@@ -174,6 +174,7 @@ impl PlanContext<'_> {
                 HirCicsOperandName::TransId => CicsOperandName::TransId,
                 HirCicsOperandName::ReturnTransId => CicsOperandName::ReturnTransId,
                 HirCicsOperandName::ReturnTermId => CicsOperandName::ReturnTermId,
+                HirCicsOperandName::UserId => CicsOperandName::UserId,
                 HirCicsOperandName::File => CicsOperandName::File,
                 HirCicsOperandName::Dataset => CicsOperandName::Dataset,
                 HirCicsOperandName::From => CicsOperandName::From,

@@ -745,7 +745,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Suspend => &["RESP", "RESP2"],
         HirCicsOperation::Start => &[
             "TRANSID", "REQID", "FROM", "LENGTH", "INTERVAL", "TIME", "RTRANSID", "RTERMID",
-            "QUEUE", "RESP", "RESP2",
+            "QUEUE", "USERID", "RESP", "RESP2",
         ],
         HirCicsOperation::Retrieve => &[
             "INTO", "SET", "LENGTH", "RTRANSID", "RTERMID", "QUEUE", "RESP", "RESP2",

@@ -210,6 +210,7 @@ fn start(
     let return_transaction = optional_name_argument(request, "RTRANSID", 4)?;
     let return_terminal = optional_name_argument(request, "RTERMID", 4)?;
     let queue = optional_name_argument(request, "QUEUE", 8)?;
+    let execution_user = optional_name_argument(request, "USERID", 8)?;
     if queue.as_deref() == Some(request_id.as_str()) {
         return Err(HostProblem::Condition {
             name: "INVREQ".into(),
@@ -251,6 +252,23 @@ fn start(
             },
             other => other,
         })?;
+    if let Some(user) = execution_user.as_deref() {
+        service
+            .authorize(
+                run,
+                "SURROGAT",
+                &format!("{user}.DFHSTART"),
+                AccessIntent::Read,
+            )
+            .map_err(|problem| match problem {
+                HostProblem::Unauthorized => HostProblem::Condition {
+                    name: "NOTAUTH".into(),
+                    response: 70,
+                    response2: 9,
+                },
+                other => other,
+            })?;
+    }
     let time = if let Some(value) = optional_decimal(request, "INTERVAL")? {
         CicsIntervalTime::from_hhmmss(CicsIntervalMode::Relative, value)
     } else if let Some(value) = optional_decimal(request, "TIME")? {
@@ -274,7 +292,7 @@ fn start(
     let record = IntervalStartRecord {
         request_id,
         transaction,
-        principal: run.invocation.principal.id().as_str().into(),
+        principal: execution_user.unwrap_or_else(|| run.invocation.principal.id().as_str().into()),
         originating_run_unit: run.invocation.run_unit_id.as_str().into(),
         expiration_tick,
         terminal: None,
@@ -353,6 +371,7 @@ fn validate_start_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "RTRANSID",
         "TIME",
         "TRANSID",
+        "USERID",
     ];
     if !request.arguments.contains_key("FROM")
         || !request.arguments.contains_key("TRANSID")

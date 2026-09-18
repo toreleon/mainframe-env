@@ -176,6 +176,7 @@ fn start_operands(
         ("RTRANSID", HirCicsOperandName::ReturnTransId, 4),
         ("RTERMID", HirCicsOperandName::ReturnTermId, 4),
         ("QUEUE", HirCicsOperandName::Queue, 8),
+        ("USERID", HirCicsOperandName::UserId, 8),
     ] {
         if let Some(value) = clauses.get(clause) {
             operands.push(HirCicsNamedOperand {

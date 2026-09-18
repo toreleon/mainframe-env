@@ -52,6 +52,7 @@ pub(super) fn invalid_shape(
                 CicsOperandName::ReturnTransId,
                 CicsOperandName::ReturnTermId,
                 CicsOperandName::Queue,
+                CicsOperandName::UserId,
             ]);
             !inputs.is_subset(&allowed)
                 || !inputs.contains(&CicsOperandName::TransId)
@@ -65,6 +66,11 @@ pub(super) fn invalid_shape(
                             | CicsOperandName::Interval
                             | CicsOperandName::StartTime
                     ) && matches!(operand.value, CicsOperandValue::Literal(_))
+                        || operand.name == CicsOperandName::UserId
+                            && !matches!(
+                                operand.value,
+                                CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+                            )
                 })
                 || scheduling_options
                 || outputs.contains(&CicsOutputName::Into)

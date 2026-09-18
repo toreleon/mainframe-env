@@ -229,6 +229,15 @@ interval row and work payload identity, and is returned as a strict EIBREQID
 output. The interpreter validates and checkpoints the eight-byte implicit EIB
 field. Explicit names never receive this synthetic output.
 
+An optional local START USERID is part of the canonical producer request and
+the duplicate-REQID fence. Before schedule persistence, the provider authorizes
+the issuing principal for READ against `SURROGAT <userid>.DFHSTART`; denial is a
+known NOTAUTH 70/9 result and creates neither interval nor work state. Success
+stores the selected identity in the versioned interval row for future task
+creation. Without USERID, the existing issuer principal remains bound. User
+existence/revocation conditions and worker-driven target launch are not yet
+implemented by this child.
+
 Typed RETRIEVE WAIT uses the ordinary resumable execution boundary. A no-data
 attempt returns no condition and mutates no interval row; the interpreter moves
 the program counter back to the RETRIEVE statement and records a

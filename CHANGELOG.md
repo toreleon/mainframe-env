@@ -6,6 +6,13 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added bounded START USERID surrogate admission. Typed local START accepts a
+  one-to-eight-character execution identity, requires the issuing principal to
+  have READ access to `SURROGAT <userid>.DFHSTART`, returns exact NOTAUTH 70/9
+  before interval/work mutation on denial, and durably binds an accepted target
+  principal. Omitted USERID continues to inherit the issuer; unknown/revoked
+  USERID conditions and automatic target launch remain pending.
+
 - Added the bounded RETRIEVE WAIT data-arrival path. Typed WAIT now checkpoints
   and reissues the RETRIEVE statement without ENDDATA or record consumption
   when no expired START data is available, then consumes normally after worker

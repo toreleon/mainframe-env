@@ -126,6 +126,7 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::StartTime => 29,
         CicsOperandName::ReturnTransId => 30,
         CicsOperandName::ReturnTermId => 31,
+        CicsOperandName::UserId => 32,
     }
 }
 
@@ -163,6 +164,7 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         29 => Ok(CicsOperandName::StartTime),
         30 => Ok(CicsOperandName::ReturnTransId),
         31 => Ok(CicsOperandName::ReturnTermId),
+        32 => Ok(CicsOperandName::UserId),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
