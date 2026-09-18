@@ -1576,7 +1576,7 @@ mod tests {
             decoded.operands[1].value,
             CicsOperandValue::Literal(ref bytes) if bytes == b"003"
         ));
-        assert_eq!(CICS_ASSIGN_OUTPUT_NAMES.len(), 89);
+        assert_eq!(CICS_ASSIGN_OUTPUT_NAMES.len(), 91);
         assert!(
             CICS_ASSIGN_OUTPUT_NAMES[..78]
                 .windows(2)
@@ -1608,7 +1608,12 @@ mod tests {
                 .all(|pair| pair[0] < pair[1])
         );
         assert!(
-            CICS_ASSIGN_OUTPUT_NAMES[88..]
+            CICS_ASSIGN_OUTPUT_NAMES[88..89]
+                .windows(2)
+                .all(|pair| pair[0] < pair[1])
+        );
+        assert!(
+            CICS_ASSIGN_OUTPUT_NAMES[89..]
                 .windows(2)
                 .all(|pair| pair[0] < pair[1])
         );
@@ -1632,6 +1637,8 @@ mod tests {
             ("INPUTMSGLEN", 104),
             ("INVOKINGPROG", 105),
             ("INPARTN", 106),
+            ("FACILITY", 107),
+            ("NETNAME", 108),
         ] {
             let output = CicsAssignOutput::from_name(name).unwrap();
             assert_eq!(output_tag(CicsOutputName::Assign(output)), tag);

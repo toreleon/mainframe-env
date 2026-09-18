@@ -13,9 +13,17 @@ use std::collections::BTreeMap;
 pub(in crate::service) struct TerminalInput {
     pub(in crate::service) payload: Option<Vec<u8>>,
     pub(in crate::service) message_length: u32,
+    pub(in crate::service) terminal_id: Option<String>,
 }
 
 impl TerminalInput {
+    pub(in crate::service) fn identified(terminal_id: String) -> Self {
+        Self {
+            terminal_id: Some(terminal_id),
+            ..Self::default()
+        }
+    }
+
     pub(in crate::service) fn replace(&mut self, payload: Vec<u8>) -> Result<(), HostProblem> {
         self.message_length = u32::try_from(payload.len())
             .ok()

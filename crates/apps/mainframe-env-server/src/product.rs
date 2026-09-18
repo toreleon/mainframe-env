@@ -11784,11 +11784,11 @@ mod tests {
             )
             .replace(
                 "01 INITPARM-X PIC X(60) VALUE ALL 'Z'.",
-                "01 INVOKING-PROGRAM-X PIC X(8) VALUE ALL 'Z'.\n01 RETURN-PROGRAM-X PIC X(8) VALUE ALL 'Z'.\n01 INPUT-PARTITION-X PIC X(2) VALUE 'ZZ'.\n01 INPUT-PARTITION-RESP-X PIC S9(9) COMP.\n01 INPUT-PARTITION-RESP2-X PIC S9(9) COMP.\n01 INITPARM-X PIC X(60) VALUE ALL 'Z'.",
+                "01 FACILITY-X PIC X(4) VALUE 'ZZZZ'.\n01 NETWORK-NAME-X PIC X(8) VALUE ALL 'Z'.\n01 INVOKING-PROGRAM-X PIC X(8) VALUE ALL 'Z'.\n01 RETURN-PROGRAM-X PIC X(8) VALUE ALL 'Z'.\n01 INPUT-PARTITION-X PIC X(2) VALUE 'ZZ'.\n01 INPUT-PARTITION-RESP-X PIC S9(9) COMP.\n01 INPUT-PARTITION-RESP2-X PIC S9(9) COMP.\n01 INITPARM-X PIC X(60) VALUE ALL 'Z'.",
             )
             .replace(
                 "EXEC CICS ASSIGN INITPARM(INITPARM-X)",
-                "EXEC CICS ASSIGN INVOKINGPROG(INVOKING-PROGRAM-X) RETURNPROG(RETURN-PROGRAM-X) INITPARM(INITPARM-X)",
+                "EXEC CICS ASSIGN FACILITY(FACILITY-X) NETNAME(NETWORK-NAME-X) INVOKINGPROG(INVOKING-PROGRAM-X) RETURNPROG(RETURN-PROGRAM-X) INITPARM(INITPARM-X)",
             )
             .replace(
                 "01 PRIORITY-X PIC S9(4) COMP VALUE 200.",
@@ -12047,6 +12047,7 @@ mod tests {
             &[0; 2]
         );
         assert_eq!(restored.variable("FCI-X").unwrap().bytes(), &[1]);
+        assert_eq!(restored.variable("FACILITY-X").unwrap().bytes(), b"T000");
         assert_eq!(
             restored.variable("INITPARM-X").unwrap().bytes(),
             &[b'Z'; 60]
@@ -12088,6 +12089,10 @@ mod tests {
         assert_eq!(restored.variable("MICRO-X").unwrap().bytes(), &[0xff; 4]);
         assert_eq!(restored.variable("MINOR-X").unwrap().bytes(), &[0xff; 4]);
         assert_eq!(restored.variable("NEXT-TRANS-X").unwrap().bytes(), b"    ");
+        assert_eq!(
+            restored.variable("NETWORK-NAME-X").unwrap().bytes(),
+            b"T000    "
+        );
         assert_eq!(
             restored.variable("OPERATION-X").unwrap().bytes(),
             &[b' '; 64]

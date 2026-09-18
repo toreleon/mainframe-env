@@ -105,6 +105,15 @@ pub(in crate::service) fn encode_session(session: &Session) -> Result<Vec<u8>, H
         || session.user_corr_effect_key.is_none() && !session.user_corr_data.is_empty()
         || session.user_corr_effect_key.is_some() != session.user_corr_request_digest.is_some()
         || session.input.message_length > 32_767
+        || session.input.terminal_id.as_ref().is_some_and(|value| {
+            value.len() != 4
+                || !value.as_bytes()[0].is_ascii_uppercase()
+                || !value.bytes().all(|byte| {
+                    byte.is_ascii_uppercase()
+                        || byte.is_ascii_digit()
+                        || matches!(byte, b'$' | b'@' | b'#')
+                })
+        })
         || session.input.payload.as_ref().is_some_and(|payload| {
             usize::try_from(session.input.message_length).ok() != Some(payload.len())
         })
@@ -115,7 +124,7 @@ pub(in crate::service) fn encode_session(session: &Session) -> Result<Vec<u8>, H
         IdempotencyKey::new(key, InvocationLimits::default())
             .map_err(|_| HostProblem::InfrastructureFailure)?;
     }
-    let mut out = b"MECSA".to_vec();
+    let mut out = b"MECSB".to_vec();
     out.extend_from_slice(&session.rows.to_be_bytes());
     out.extend_from_slice(&session.columns.to_be_bytes());
     field(&mut out, session.principal.as_bytes())?;
@@ -182,6 +191,15 @@ pub(in crate::service) fn encode_session(session: &Session) -> Result<Vec<u8>, H
     }
     encode_handle_state(&mut out, &session.handle_state)?;
     out.extend_from_slice(&session.input.message_length.to_be_bytes());
+    field(
+        &mut out,
+        session
+            .input
+            .terminal_id
+            .as_deref()
+            .unwrap_or("")
+            .as_bytes(),
+    )?;
     Ok(out)
 }
 

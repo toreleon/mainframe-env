@@ -103,6 +103,8 @@ pub(super) fn validate(
         "INPUTMSGLEN",
         "INVOKINGPROG",
         "INPARTN",
+        "FACILITY",
+        "NETNAME",
     ] {
         let Some(value) = clauses.get(name) else {
             continue;
@@ -171,6 +173,7 @@ pub(super) fn validate(
             || (name == "LDCNUM" && target.length != 1)
             || (name == "ERRORMSG" && target.length != 500)
             || (name == "FCI" && target.length != 1)
+            || (name == "FACILITY" && target.length != 4)
             || (name == "INITPARM" && target.length != 60)
             || (name == "INPARTN" && !(1..=2).contains(&target.length))
             || (name == "INVOKINGPROG" && target.length != 8)
@@ -179,6 +182,7 @@ pub(super) fn validate(
             || (name == "OPSECURITY" && target.length != 3)
             || (name == "ORGABCODE" && target.length != 4)
             || (name == "NEXTTRANSID" && target.length != 4)
+            || (name == "NETNAME" && target.length != 8)
             || (name == "PARTNSET" && target.length != 6)
             || (name == "PARTNPAGE" && target.length != 2)
             || (name == "PRINSYSID" && target.length != 4)

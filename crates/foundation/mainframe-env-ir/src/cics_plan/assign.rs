@@ -93,6 +93,8 @@ pub const CICS_ASSIGN_OUTPUT_NAMES: &[&str] = &[
     "INPUTMSGLEN",
     "INVOKINGPROG",
     "INPARTN",
+    "FACILITY",
+    "NETNAME",
 ];
 
 impl CicsAssignOutput {

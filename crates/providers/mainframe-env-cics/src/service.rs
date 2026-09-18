@@ -615,6 +615,7 @@ impl CicsService {
         let expires_at_tick = now_tick
             .checked_add(idle_timeout_ticks)
             .ok_or(HostProblem::ResourceExhausted)?;
+        let mut state = self.lock()?;
         let created = Session {
             rows,
             columns,
@@ -630,7 +631,7 @@ impl CicsService {
             connected: true,
             aid: 0,
             screen: Vec::new(),
-            input: handlers::TerminalInput::default(),
+            input: handlers::allocate_terminal_input(&state.sessions)?,
             suspended: false,
             mapset: None,
             map: None,
@@ -647,7 +648,6 @@ impl CicsService {
             "ME01",
             "S001",
         );
-        let mut state = self.lock()?;
         if state.sessions.len() >= self.limits.max_sessions
             || state.runs.len() >= self.limits.max_runs
         {
@@ -7782,8 +7782,10 @@ mod tests {
                 ("DEFSCRNWD".into(), argument(b"DEFAULT-WIDTH-OUT")),
                 ("DS3270".into(), argument(b"DS3270-OUT")),
                 ("DSSCS".into(), argument(b"DSSCS-OUT")),
+                ("FACILITY".into(), argument(b"FACILITY-OUT")),
                 ("FCI".into(), argument(b"FCI-OUT")),
                 ("INPARTN".into(), argument(b"INPUT-PARTITION-OUT")),
+                ("NETNAME".into(), argument(b"NETWORK-NAME-OUT")),
                 ("PARTNSET".into(), argument(b"PARTITION-SET-OUT")),
                 ("SCRNHT".into(), argument(b"SCREEN-HEIGHT-OUT")),
                 ("SCRNWD".into(), argument(b"SCREEN-WIDTH-OUT")),
@@ -7819,7 +7821,9 @@ mod tests {
             "DEFSCRNWD",
             "DS3270",
             "DSSCS",
+            "FACILITY",
             "INPARTN",
+            "NETNAME",
             "PARTNSET",
             "SCRNHT",
             "SCRNWD",
@@ -7948,6 +7952,49 @@ mod tests {
                 assert_eq!(capability.outputs[*name].bytes(), &[0], "{name}");
             }
         }
+
+        let terminal_identity = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("FACILITY".into(), argument(b"FACILITY-OUT")),
+                ("NETNAME".into(), argument(b"NETWORK-NAME-OUT")),
+            ]),
+            204,
+        );
+        let terminal_identity = terminal_service
+            .invoke(
+                &effect(
+                    &terminal_invocation.run_unit_id,
+                    terminal_identity.clone(),
+                    204,
+                ),
+                terminal_identity,
+            )
+            .unwrap();
+        assert_eq!(terminal_identity.outputs["FACILITY"].bytes(), b"T000");
+        assert_eq!(terminal_identity.outputs["NETNAME"].bytes(), b"T000    ");
+        let second_terminal_invocation =
+            invocation_for("assign-capabilities-second", BTreeMap::new());
+        let second_terminal_session = SessionId::new("assign-capabilities-second", 64).unwrap();
+        terminal_service
+            .launch_terminal(
+                second_terminal_invocation,
+                &second_terminal_session,
+                "MENU",
+                24,
+                80,
+                "assign-capabilities-second-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        assert_eq!(
+            terminal_service.lock().unwrap().sessions[second_terminal_session.as_str()]
+                .input
+                .terminal_id
+                .as_deref(),
+            Some("T001")
+        );
 
         let mut no_positioned_map = request(
             CicsOperation::Assign,
@@ -8525,6 +8572,7 @@ mod tests {
             BTreeMap::from([
                 ("APPLID".into(), argument(b"APP-OUT")),
                 ("DESTCOUNT".into(), argument(b"DESTINATION-COUNT-OUT")),
+                ("FACILITY".into(), argument(b"FACILITY-OUT")),
                 ("INPARTN".into(), argument(b"INPUT-PARTITION-OUT")),
                 ("LDCMNEM".into(), argument(b"LDC-MNEMONIC-OUT")),
                 ("LDCNUM".into(), argument(b"LDC-NUMBER-OUT")),
@@ -8554,6 +8602,7 @@ mod tests {
         assert_eq!(no_bms_overflow.outputs["APPLID"].bytes(), b"ME01");
         for name in [
             "DESTCOUNT",
+            "FACILITY",
             "INPARTN",
             "LDCMNEM",
             "LDCNUM",
@@ -8562,6 +8611,19 @@ mod tests {
         ] {
             assert!(!no_bms_overflow.outputs.contains_key(name));
         }
+
+        let unavailable_netname = request(
+            CicsOperation::Assign,
+            BTreeMap::from([("NETNAME".into(), argument(b"NETWORK-NAME-OUT"))]),
+            67,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, unavailable_netname.clone(), 67),
+                unavailable_netname,
+            ),
+            Err(HostProblem::InfrastructureFailure)
+        );
 
         let mut no_intersystem_facility = request(
             CicsOperation::Assign,
@@ -10772,7 +10834,13 @@ mod tests {
             assert!(!latest.dump_requested);
             assert_eq!(latest.program, None);
             let mut legacy8 = handlers::encode_session(&state.sessions[session.as_str()]).unwrap();
-            assert_eq!(&legacy8[..5], b"MECSA");
+            assert_eq!(&legacy8[..5], b"MECSB");
+            let terminal_field_bytes = 4 + state.sessions[session.as_str()]
+                .input
+                .terminal_id
+                .as_ref()
+                .map_or(0, String::len);
+            legacy8.truncate(legacy8.len() - terminal_field_bytes);
             legacy8.truncate(legacy8.len() - 4);
             legacy8.truncate(legacy8.len() - 8);
             legacy8[..5].copy_from_slice(b"MECS8");
@@ -11441,9 +11509,17 @@ mod tests {
             let store: Arc<dyn ProviderStateStore> =
                 Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
             let service = service(store);
-            service.create_session(&session, 24, 80).unwrap();
             service
-                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .launch_terminal(
+                    invocation.clone(),
+                    &session,
+                    "MENU",
+                    24,
+                    80,
+                    "sqlite-association-csrf",
+                    1,
+                    10_000,
+                )
                 .unwrap();
             service
                 .invoke(
@@ -11460,16 +11536,24 @@ mod tests {
                 .unwrap();
             let current = service.lock().unwrap().sessions[session.as_str()].clone();
             assert_eq!(current.input.message_length, 15);
+            assert_eq!(current.input.terminal_id.as_deref(), Some("T000"));
             let encoded = handlers::encode_session(&current).unwrap();
-            assert_eq!(&encoded[..5], b"MECSA");
+            assert_eq!(&encoded[..5], b"MECSB");
             let mut corrupted = encoded.clone();
-            let depth = corrupted.len() - 9;
+            let depth = corrupted.len() - 17;
             corrupted[depth..depth + 4].copy_from_slice(&65_u32.to_be_bytes());
             assert!(matches!(
                 decode_session(&corrupted, current.version, CicsLimits::default()),
                 Err(HostProblem::ResourceExhausted)
             ));
-            let mut legacy9 = encoded;
+            let mut legacy10 = encoded;
+            legacy10.truncate(legacy10.len() - 8);
+            legacy10[..5].copy_from_slice(b"MECSA");
+            let decoded =
+                decode_session(&legacy10, current.version, CicsLimits::default()).unwrap();
+            assert_eq!(decoded.input.message_length, 15);
+            assert_eq!(decoded.input.terminal_id, None);
+            let mut legacy9 = legacy10;
             legacy9.truncate(legacy9.len() - 4);
             legacy9[..5].copy_from_slice(b"MECS9");
             let decoded = decode_session(&legacy9, current.version, CicsLimits::default()).unwrap();
@@ -11530,6 +11614,7 @@ mod tests {
             let service = service(store);
             let current = service.lock().unwrap().sessions[session.as_str()].clone();
             assert_eq!(current.input.message_length, 15);
+            assert_eq!(current.input.terminal_id.as_deref(), Some("T000"));
             assert_eq!(current.user_corr_data, vec![b'B'; 64]);
             assert_eq!(current.user_corr_effect_key.as_deref(), Some("outer-334"));
             service

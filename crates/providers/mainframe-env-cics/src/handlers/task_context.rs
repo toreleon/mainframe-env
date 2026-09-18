@@ -1,7 +1,7 @@
-use super::super::{CicsService, Run, bounded, decimal_payload};
+use super::super::{CicsService, Run, Session, bounded, decimal_payload};
 use mainframe_env_execution_api::{ExecutionId, Invocation, RunUnitId};
 use mainframe_env_host_api::{CicsDisposition, CicsRequest, CicsResponse, HostProblem};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 const TERMINAL_CAPABILITY_INDICATORS: [(&str, u8); 20] = [
     ("APLKYBD", 0x00),
@@ -28,6 +28,29 @@ const TERMINAL_CAPABILITY_INDICATORS: [(&str, u8); 20] = [
 
 const LOCAL_CCSID: i64 = 37;
 const BMS_OVERFLOW_OPTIONS: [&str; 5] = ["DESTCOUNT", "LDCMNEM", "LDCNUM", "PAGENUM", "PARTNPAGE"];
+
+pub(in crate::service) fn allocate_terminal_input(
+    sessions: &BTreeMap<String, Session>,
+) -> Result<super::TerminalInput, HostProblem> {
+    const DIGITS: &[u8; 36] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let used = sessions
+        .values()
+        .filter_map(|session| session.input.terminal_id.as_deref())
+        .collect::<BTreeSet<_>>();
+    for ordinal in 0..36_usize.pow(3) {
+        let candidate = [
+            b'T',
+            DIGITS[(ordinal / (36 * 36)) % 36],
+            DIGITS[(ordinal / 36) % 36],
+            DIGITS[ordinal % 36],
+        ];
+        let candidate = String::from_utf8(candidate.to_vec()).expect("ASCII terminal identifier");
+        if !used.contains(candidate.as_str()) {
+            return Ok(super::TerminalInput::identified(candidate));
+        }
+    }
+    Err(HostProblem::ResourceExhausted)
+}
 
 #[derive(Clone)]
 pub(in crate::service) struct CurrentProgramFrame {
@@ -89,9 +112,13 @@ pub(in crate::service) fn assign(
         .iter()
         .any(|name| request.arguments.contains_key(*name));
     let input_partition_requested = request.arguments.contains_key("INPARTN");
+    let terminal_identity_requested = ["FACILITY", "NETNAME"]
+        .iter()
+        .any(|name| request.arguments.contains_key(*name));
     let terminal_required = screen_requested
         || terminal_indicator_requested
         || input_partition_requested
+        || terminal_identity_requested
         || request.arguments.contains_key("PARTNSET")
         || request.arguments.contains_key("TERMPRIORITY")
         || map_geometry_requested;
@@ -117,6 +144,14 @@ pub(in crate::service) fn assign(
         return Err(HostProblem::InfrastructureFailure);
     }
     let input_partition_missing = input_partition == Some(false);
+    let terminal_identity = if !dpl && terminal_identity_requested && dimensions.is_some() {
+        terminal_identity(service, run)?
+    } else {
+        None
+    };
+    if !dpl && terminal_identity_requested && dimensions.is_some() && terminal_identity.is_none() {
+        return Err(HostProblem::InfrastructureFailure);
+    }
     let intersystem_facility_missing = request.arguments.contains_key("PRINSYSID");
     let ati_missing = !dpl && request.arguments.contains_key("QNAME");
     let bts_missing = ["ACTIVITY", "ACTIVITYID", "PROCESS", "PROCESSTYPE"]
@@ -151,6 +186,7 @@ pub(in crate::service) fn assign(
                 "DESTID",
                 "DESTIDLENG",
                 "DESTCOUNT",
+                "FACILITY",
                 "FCI",
                 "INPARTN",
                 "MAPCOLUMN",
@@ -172,6 +208,9 @@ pub(in crate::service) fn assign(
             ]
             .iter()
             .any(|name| request.arguments.contains_key(*name)));
+    if dpl && request.arguments.contains_key("NETNAME") && !dpl_prohibited {
+        return Err(HostProblem::InfrastructureFailure);
+    }
     let mut response = if dpl_prohibited
         || terminal_missing
         || map_missing
@@ -339,6 +378,18 @@ pub(in crate::service) fn assign(
                     .outputs
                     .insert(name.into(), decimal_payload(i64::from(value))?);
             }
+        }
+    }
+    if let Some(terminal_id) = terminal_identity {
+        if request.arguments.contains_key("FACILITY") {
+            response
+                .outputs
+                .insert("FACILITY".into(), bounded(terminal_id.as_bytes().to_vec())?);
+        }
+        if request.arguments.contains_key("NETNAME") {
+            let mut netname = terminal_id.into_bytes();
+            netname.resize(8, b' ');
+            response.outputs.insert("NETNAME".into(), bounded(netname)?);
         }
     }
     if !dpl_prohibited && request.arguments.contains_key("FCI") {
@@ -517,6 +568,19 @@ fn terminal_has_positioned_map(
     }
 }
 
+fn terminal_identity(service: &CicsService, run: &Run) -> Result<Option<String>, HostProblem> {
+    let state = service.lock()?;
+    let session = state
+        .sessions
+        .get(&run.session)
+        .ok_or(HostProblem::InfrastructureFailure)?;
+    Ok((session.principal == run.invocation.principal.id().as_str()
+        && session.run_unit == run.invocation.run_unit_id.as_str()
+        && session.transaction == run.transaction)
+        .then(|| session.input.terminal_id.clone())
+        .flatten())
+}
+
 fn assign_link_level(run: &Run, dpl: bool) -> Result<i64, HostProblem> {
     if dpl {
         Ok(2)
@@ -666,6 +730,8 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "INPUTMSGLEN",
         "INVOKINGPROG",
         "INPARTN",
+        "FACILITY",
+        "NETNAME",
     ];
     if request.arguments.len() > 16
         || request.arguments.iter().any(|(name, value)| {

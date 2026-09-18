@@ -45,13 +45,15 @@ pub(super) fn validate_output(
         return Err(invalid_plan("ASSIGN input partition has the wrong width"));
     }
     let exact_length = match name {
-        "ABCODE" | "BRIDGE" | "NEXTTRANSID" | "ORGABCODE" | "PRINSYSID" | "QNAME" => Some(4),
+        "ABCODE" | "BRIDGE" | "FACILITY" | "NEXTTRANSID" | "ORGABCODE" | "PRINSYSID" | "QNAME" => {
+            Some(4)
+        }
         "ABDUMP" | "APLKYBD" | "APLTEXT" | "BTRANS" | "COLOR" | "DS3270" | "DSSCS" | "EWASUPP"
         | "EXTDS" | "FCI" | "GMMI" | "HILIGHT" | "KATAKANA" | "MSRCONTROL" | "OUTLINE"
         | "LDCNUM" | "PARTNS" | "PS" | "RESTART" | "SOSI" | "TEXTKYBD" | "TEXTPRINT"
         | "UNATTEND" | "VALIDATION" | "CMDSEC" | "RESSEC" => Some(1),
         "ABPROGRAM" | "ASRAINTRPT" | "ASRAPSW" | "DESTID" | "INVOKINGPROG" | "OPERKEYS"
-        | "PROGRAM" | "PROCESSTYPE" | "RETURNPROG" => Some(8),
+        | "NETNAME" | "PROGRAM" | "PROCESSTYPE" | "RETURNPROG" => Some(8),
         "ACTIVITY" | "ASRAPSW16" => Some(16),
         "ACTIVITYID" => Some(52),
         "ASRAREGS" => Some(64),

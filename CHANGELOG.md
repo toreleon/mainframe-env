@@ -6,6 +6,14 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added durable four-character virtual-terminal identities and typed CICS
+  `ASSIGN FACILITY`/`NETNAME`. New terminal sessions allocate unique active
+  identifiers such as `T000`; NETNAME follows the pinned default to that name
+  padded to eight bytes. Local nonterminal requests return 16/5, FACILITY is
+  DPL-prohibited at 16/200, and NETNAME without remote identity fails closed.
+  Session codec `MECSB` retains strict historical reads and output tags
+  107–108 are append-only.
+
 - Added source-defined negative CICS `ASSIGN INPARTN` handling. A local
   terminal before map positioning returns `INVREQ` 16/2, local nonterminal use
   returns 16/5, and DPL returns 16/200, preserving the one- or two-byte
@@ -20,8 +28,9 @@ All notable changes to mainframe-env are documented here.
 - Added typed CICS `ASSIGN INPUTMSGLEN` with a bounded durable terminal-input
   length that survives RECEIVE consumption and SQLite reopen. No input returns
   halfword zero; normalized map input returns its exact byte length in local and
-  DPL contexts. Session codec `MECSA` retains strict `MECS1`–`MECS9` reads, and
-  append-only output tag 104 preserves existing plans.
+  DPL contexts. Its length remains in current session codec `MECSB`, which
+  strictly retains `MECS1`–`MECSA` reads, and append-only output tag 104
+  preserves existing plans.
 
 - Added typed CICS `ASSIGN LANGINUSE`. The runtime's unoverridden English
   national-language default maps through the pinned CICS table to exact

@@ -242,7 +242,7 @@ is empty: local purge succeeds idempotently without changing the already
 displayed screen or current map. DPL use returns `INVREQ` 16/200. Deleting a
 nonempty accumulated message and surfacing temporary-storage `TSIOERR` remain
 unready until that logical-message authority exists.
-The typed ASSIGN subset carries each of its 89 admitted context values as a
+The typed ASSIGN subset carries each of its 91 admitted context values as a
 pre-resolved output binding under one bounded output-name authority. It retains
 the existing 16-option maximum, exact receiver checks, partial-INVREQ behavior,
 local/DPL matrix, EIBFN and provider semantics without carrying source command
@@ -263,11 +263,17 @@ task priority; it follows the local nonterminal 16/5 and DPL 16/200 condition
 matrix. `LANGINUSE` maps the runtime's unoverridden English language default to
 the source-defined three-byte `ENU` in local and DPL contexts. `INPUTMSGLEN`
 reads the bounded last normalized terminal-input byte length from durable
-session codec `MECSA`; RECEIVE consumes the payload without erasing that
+session codec `MECSB`; RECEIVE consumes the payload without erasing that
 context, and no input returns halfword zero in local and DPL execution.
 `INPARTN` preserves its one- or two-byte receiver and returns 16/2 before any
 map is positioned, 16/5 without a terminal, and 16/200 in DPL; a positioned-map
-request fails closed until input-partition state exists. The other 24 generated
+request fails closed until input-partition state exists. New terminal sessions
+allocate a durable unique four-character virtual-terminal identifier;
+`FACILITY` returns it and `NETNAME` follows the pinned TERMINAL default by
+padding the same name to eight bytes. Local nonterminal use returns 16/5,
+FACILITY is DPL-prohibited at 16/200, and DPL NETNAME fails closed until remote
+terminal identity is propagated. Historical sessions without an identifier
+remain readable but do not acquire a fabricated one. The other 22 generated
 ASSIGN semantic options remain compiler rejections until
 their contexts are implemented.
 The legacy route admits only the source-valid option subset whose behavior is
