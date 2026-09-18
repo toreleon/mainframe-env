@@ -11789,6 +11789,14 @@ mod tests {
             .replace(
                 "EXEC CICS ASSIGN INITPARM(INITPARM-X)",
                 "EXEC CICS ASSIGN RETURNPROG(RETURN-PROGRAM-X) INITPARM(INITPARM-X)",
+            )
+            .replace(
+                "01 PRIORITY-X PIC S9(4) COMP VALUE 200.",
+                "01 PRIORITY-X PIC S9(4) COMP VALUE 200.\n01 TERMINAL-PRIORITY-X PIC S9(4) COMP VALUE 7.",
+            )
+            .replace(
+                "EXEC CICS ASSIGN CMDSEC(CMDSEC-X)",
+                "EXEC CICS ASSIGN TERMPRIORITY(TERMINAL-PRIORITY-X) CMDSEC(CMDSEC-X)",
             );
         let path = LogicalPath::new("SCHEDULE.cbl", limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
@@ -11957,6 +11965,10 @@ mod tests {
         assert_eq!(
             restored.variable("OBSERVED-PRIORITY").unwrap().bytes(),
             &[0, 200]
+        );
+        assert_eq!(
+            restored.variable("TERMINAL-PRIORITY-X").unwrap().bytes(),
+            &[0, 0]
         );
         assert_eq!(restored.variable("ABCODE-X").unwrap().bytes(), b"    ");
         assert_eq!(restored.variable("ABDUMP-X").unwrap().bytes(), &[0]);

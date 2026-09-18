@@ -7762,6 +7762,7 @@ mod tests {
                 ("PARTNSET".into(), argument(b"PARTITION-SET-OUT")),
                 ("SCRNHT".into(), argument(b"SCREEN-HEIGHT-OUT")),
                 ("SCRNWD".into(), argument(b"SCREEN-WIDTH-OUT")),
+                ("TERMPRIORITY".into(), argument(b"TERMINAL-PRIORITY-OUT")),
                 ("UNATTEND".into(), argument(b"UNATTEND-OUT")),
             ]),
             26,
@@ -7796,6 +7797,7 @@ mod tests {
             "PARTNSET",
             "SCRNHT",
             "SCRNWD",
+            "TERMPRIORITY",
             "UNATTEND",
         ] {
             assert!(!no_terminal.outputs.contains_key(name));
@@ -8285,6 +8287,35 @@ mod tests {
             .unwrap();
         assert_eq!(local_ccsid.condition, "NORMAL");
         assert_eq!(local_ccsid.outputs["LOCALCCSID"].bytes(), b"37");
+
+        let mut terminal_priority = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("APPLID".into(), argument(b"APP-OUT")),
+                ("TERMPRIORITY".into(), argument(b"TERMINAL-PRIORITY-OUT")),
+            ]),
+            66,
+        );
+        terminal_priority.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let terminal_priority = service
+            .invoke(
+                &effect(&invocation.run_unit_id, terminal_priority.clone(), 66),
+                terminal_priority,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                terminal_priority.condition.as_str(),
+                terminal_priority.response,
+                terminal_priority.response2,
+            ),
+            ("INVREQ", 16, 200)
+        );
+        assert_eq!(terminal_priority.outputs["APPLID"].bytes(), b"ME01");
+        assert!(!terminal_priority.outputs.contains_key("TERMPRIORITY"));
 
         let unavailable_lineage = request(
             CicsOperation::Assign,

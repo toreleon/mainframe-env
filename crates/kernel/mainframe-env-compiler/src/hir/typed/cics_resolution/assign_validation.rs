@@ -98,6 +98,7 @@ pub(super) fn validate(
         "PAGENUM",
         "PARTNPAGE",
         "RETURNPROG",
+        "TERMPRIORITY",
     ] {
         let Some(value) = clauses.get(name) else {
             continue;
@@ -140,6 +141,7 @@ pub(super) fn validate(
                 | "SCRNHT"
                 | "SCRNWD"
                 | "TCTUALENG"
+                | "TERMPRIORITY"
                 | "TWALENG"
         ) && (target.usage != CobolUsage::Binary || target.length != 2 || target.scale != 0)
         {

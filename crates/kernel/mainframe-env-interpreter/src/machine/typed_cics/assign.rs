@@ -34,6 +34,7 @@ pub(super) fn validate_output(
             | "SCRNWD"
             | "TASKPRIORITY"
             | "TCTUALENG"
+            | "TERMPRIORITY"
             | "TWALENG"
     ) && (layout.category != LayoutCategory::Binary || layout.length != 2 || layout.scale != 0)
     {

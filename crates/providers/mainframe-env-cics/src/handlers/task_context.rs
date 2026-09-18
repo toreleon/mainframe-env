@@ -88,6 +88,7 @@ pub(in crate::service) fn assign(
     let terminal_required = screen_requested
         || terminal_indicator_requested
         || request.arguments.contains_key("PARTNSET")
+        || request.arguments.contains_key("TERMPRIORITY")
         || map_geometry_requested;
     let dimensions = if !dpl && (terminal_required || request.arguments.contains_key("FCI")) {
         terminal_dimensions(service, run)?
@@ -149,6 +150,7 @@ pub(in crate::service) fn assign(
                 "SCRNHT",
                 "SCRNWD",
                 "TCTUALENG",
+                "TERMPRIORITY",
             ]
             .iter()
             .any(|name| request.arguments.contains_key(*name)));
@@ -283,6 +285,11 @@ pub(in crate::service) fn assign(
                     .outputs
                     .insert(name.into(), decimal_payload(i64::from(value))?);
             }
+        }
+        if request.arguments.contains_key("TERMPRIORITY") {
+            response
+                .outputs
+                .insert("TERMPRIORITY".into(), decimal_payload(0)?);
         }
         if request.arguments.contains_key("PARTNSET") {
             response
@@ -567,6 +574,7 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "PAGENUM",
         "PARTNPAGE",
         "RETURNPROG",
+        "TERMPRIORITY",
     ];
     if request.arguments.len() > 16
         || request.arguments.iter().any(|(name, value)| {

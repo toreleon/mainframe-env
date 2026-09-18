@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `ASSIGN TERMPRIORITY`. The runtime's terminal definition
+  uses the source default zero independently of a later `CHANGE TASK`; local
+  nonterminal use returns `INVREQ` 16/5 and DPL returns 16/200. Append-only
+  output tag 102 preserves every existing typed-plan tag.
+
 - Added typed CICS `ASSIGN RETURNPROG` for a local highest-level program. It
   returns the source-defined eight blanks, refreshes the current frame's parent
   identity from each authenticated invocation, and fails closed for LINK-child
