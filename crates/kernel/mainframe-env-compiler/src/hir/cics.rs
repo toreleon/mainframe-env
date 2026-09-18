@@ -172,6 +172,7 @@ impl PlanContext<'_> {
                 HirCicsOperandName::Program => CicsOperandName::Program,
                 HirCicsOperandName::Commarea => CicsOperandName::Commarea,
                 HirCicsOperandName::TransId => CicsOperandName::TransId,
+                HirCicsOperandName::TermId => CicsOperandName::TermId,
                 HirCicsOperandName::ReturnTransId => CicsOperandName::ReturnTransId,
                 HirCicsOperandName::ReturnTermId => CicsOperandName::ReturnTermId,
                 HirCicsOperandName::UserId => CicsOperandName::UserId,

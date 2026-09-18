@@ -83,6 +83,7 @@ pub(super) fn invalid_shape(
         CicsPlanOperation::Start => {
             let allowed = BTreeSet::from([
                 CicsOperandName::TransId,
+                CicsOperandName::TermId,
                 CicsOperandName::ReqId,
                 CicsOperandName::From,
                 CicsOperandName::Length,
@@ -136,11 +137,13 @@ pub(super) fn invalid_shape(
                             operand.value,
                             CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
                         )
-                        || operand.name == CicsOperandName::UserId
-                            && !matches!(
-                                operand.value,
-                                CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
-                            )
+                        || matches!(
+                            operand.name,
+                            CicsOperandName::UserId | CicsOperandName::TermId
+                        ) && !matches!(
+                            operand.value,
+                            CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+                        )
                 })
                 || scheduling_options
                 || outputs.contains(&CicsOutputName::Into)

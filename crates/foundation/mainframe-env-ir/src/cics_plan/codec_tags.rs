@@ -134,6 +134,7 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::Seconds => 35,
         CicsOperandName::Milliseconds => 36,
         CicsOperandName::DataLength => 37,
+        CicsOperandName::TermId => 38,
     }
 }
 
@@ -177,6 +178,7 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         35 => Ok(CicsOperandName::Seconds),
         36 => Ok(CicsOperandName::Milliseconds),
         37 => Ok(CicsOperandName::DataLength),
+        38 => Ok(CicsOperandName::TermId),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

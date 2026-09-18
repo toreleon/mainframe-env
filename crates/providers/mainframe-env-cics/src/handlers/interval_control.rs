@@ -96,7 +96,7 @@ impl CicsService {
             state: WorkState::Queued,
             priority,
             attempt: 0,
-            max_attempts: 3,
+            max_attempts: if record.terminal.is_some() { 86_400 } else { 3 },
             available_tick: record.expiration_tick,
             deadline_tick: record
                 .expiration_tick
@@ -221,6 +221,19 @@ fn start(
     });
     let return_transaction = optional_name_argument(request, "RTRANSID", 4)?;
     let return_terminal = optional_name_argument(request, "RTERMID", 4)?;
+    let terminal = optional_name_argument(request, "TERMID", 4)?;
+    let terminal_principal = terminal
+        .as_deref()
+        .map(|terminal| service.start_terminal_principal(terminal))
+        .transpose()?
+        .flatten();
+    if terminal.is_some() && terminal_principal.is_none() {
+        return Err(HostProblem::Condition {
+            name: "TERMIDERR".into(),
+            response: 11,
+            response2: 0,
+        });
+    }
     let queue = optional_name_argument(request, "QUEUE", 8)?;
     let execution_user = optional_name_argument(request, "USERID", 8)?;
     if queue.as_deref() == Some(request_id.as_str()) {
@@ -309,10 +322,12 @@ fn start(
     let record = IntervalStartRecord {
         request_id,
         transaction,
-        principal: execution_user.unwrap_or_else(|| run.invocation.principal.id().as_str().into()),
+        principal: execution_user
+            .or(terminal_principal)
+            .unwrap_or_else(|| run.invocation.principal.id().as_str().into()),
         originating_run_unit: run.invocation.run_unit_id.as_str().into(),
         expiration_tick,
-        terminal: None,
+        terminal,
         data: source[..length].to_vec(),
         return_transaction,
         return_terminal,
@@ -444,6 +459,7 @@ fn validate_start_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "RTERMID",
         "RTRANSID",
         "SECONDS",
+        "TERMID",
         "TIME",
         "TRANSID",
         "USERID",
@@ -460,6 +476,7 @@ fn validate_start_request(request: &CicsRequest) -> Result<(), HostProblem> {
     if !request.arguments.contains_key("TRANSID")
         || schedule_selectors > 1
         || explicit_mode != explicit_components
+        || request.arguments.contains_key("TERMID") && request.arguments.contains_key("USERID")
         || request.arguments.contains_key("LENGTH") && !request.arguments.contains_key("FROM")
         || request.arguments.contains_key("OPTION.FMH") && !request.arguments.contains_key("FROM")
         || request.arguments.iter().any(|(name, value)| {

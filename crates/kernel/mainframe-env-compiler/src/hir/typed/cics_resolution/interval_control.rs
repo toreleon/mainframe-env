@@ -165,6 +165,9 @@ fn start_operands(
     clauses: &Clauses,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
+    if clauses.contains_key("TERMID") && clauses.contains_key("USERID") {
+        return Err(ResolutionFailure::Unsupported);
+    }
     let transaction = bounded_name(&clauses["TRANSID"], semantic, 4, "START", "TRANSID")?;
     let mut operands = vec![HirCicsNamedOperand {
         name: HirCicsOperandName::TransId,
@@ -228,6 +231,7 @@ fn start_operands(
         }
     }
     for (clause, name, max) in [
+        ("TERMID", HirCicsOperandName::TermId, 4),
         ("RTRANSID", HirCicsOperandName::ReturnTransId, 4),
         ("RTERMID", HirCicsOperandName::ReturnTermId, 4),
         ("QUEUE", HirCicsOperandName::Queue, 8),

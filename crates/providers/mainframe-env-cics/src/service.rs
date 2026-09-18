@@ -4870,6 +4870,110 @@ mod tests {
     }
 
     #[test]
+    fn start_termid_validates_and_routes_retrieve_to_the_named_terminal() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (issuer, _) = registered(&service);
+        let target = invocation_for("run-termid-target", BTreeMap::new());
+        let target_session = SessionId::new("termid-target", 64).unwrap();
+        service
+            .launch_terminal(
+                target.clone(),
+                &target_session,
+                "NEXT",
+                24,
+                80,
+                "termid-target-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+
+        let start = request(
+            CicsOperation::Start,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"NEXT")),
+                ("TERMID".into(), argument(b"T000")),
+                ("REQID".into(), argument(b"TERM0001")),
+                ("FROM".into(), argument(b"PAYLOAD")),
+                ("INTERVAL".into(), cics_decimal(0)),
+            ]),
+            1,
+        );
+        service
+            .invoke(&effect(&issuer.run_unit_id, start.clone(), 1), start)
+            .unwrap();
+        let work = store
+            .claim(
+                "termid-worker",
+                Some(CICS_START_WORK_GENERATION),
+                1_000,
+                100,
+            )
+            .unwrap()
+            .unwrap();
+        let promoted = service.promote_start_work(&work, 1_000).unwrap();
+        assert_eq!(promoted.terminal.as_deref(), Some("T000"));
+        assert_eq!(promoted.principal, "IBMUSER");
+
+        let mut retrieve = request(
+            CicsOperation::Retrieve,
+            BTreeMap::from([
+                ("INTO".into(), argument(b"DATA-X")),
+                ("LENGTH".into(), cics_decimal(8)),
+            ]),
+            2,
+        );
+        retrieve.mutation.as_mut().unwrap().transaction = Some("NEXT".into());
+        let retrieved = service
+            .invoke(&effect(&target.run_unit_id, retrieve.clone(), 2), retrieve)
+            .unwrap();
+        assert_eq!(retrieved.outputs["INTO"].bytes(), b"PAYLOAD");
+
+        let mut missing = request(
+            CicsOperation::Start,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"NEXT")),
+                ("TERMID".into(), argument(b"T999")),
+                ("REQID".into(), argument(b"TERM0002")),
+                ("FROM".into(), argument(b"MISSING")),
+                ("INTERVAL".into(), cics_decimal(0)),
+                ("RESP".into(), argument(b"RESP-X")),
+                ("RESP2".into(), argument(b"RESP2-X")),
+            ]),
+            3,
+        );
+        missing.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let rejected = service
+            .invoke(&effect(&issuer.run_unit_id, missing.clone(), 3), missing)
+            .unwrap();
+        assert_eq!(
+            (
+                rejected.condition.as_str(),
+                rejected.response,
+                rejected.response2
+            ),
+            ("TERMIDERR", 11, 0)
+        );
+        assert!(
+            store
+                .get_provider_state("cics-interval-start-v1", "TERM0002")
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
     fn start_after_and_at_units_drive_deadlines_and_exact_component_conditions() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = CicsService::open_with_runtime(

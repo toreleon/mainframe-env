@@ -2,7 +2,7 @@ use super::super::{
     CicsService, Session, handlers, reject_reserved_nested_origin, validate_terminal_identity,
 };
 use super::IntervalStartRecord;
-use mainframe_env_execution_api::Invocation;
+use mainframe_env_execution_api::{Invocation, InvocationLimits, PrincipalId};
 use mainframe_env_host_api::{HostProblem, SessionId};
 use std::collections::BTreeMap;
 
@@ -19,6 +19,17 @@ pub struct CicsStartTask {
     pub terminal: Option<String>,
 }
 
+/// Retained terminal session selected by a terminal-associated START.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CicsStartTerminal {
+    /// Durable session identity that owns the virtual terminal.
+    pub session: SessionId,
+    /// Signed-on terminal principal.
+    pub principal: PrincipalId,
+    /// Whether no CICS run currently owns the terminal.
+    pub available: bool,
+}
+
 pub(in crate::service) fn from_interval_record(record: &IntervalStartRecord) -> CicsStartTask {
     CicsStartTask {
         request_id: record.request_id.clone(),
@@ -29,6 +40,59 @@ pub(in crate::service) fn from_interval_record(record: &IntervalStartRecord) -> 
 }
 
 impl CicsService {
+    /// Resolve an active virtual terminal for a promoted START request.
+    pub fn resolve_start_terminal(
+        &self,
+        terminal: &str,
+    ) -> Result<Option<CicsStartTerminal>, HostProblem> {
+        validate_terminal_identity(terminal, 4)?;
+        let state = self.lock()?;
+        let mut matches = state.sessions.iter().filter(|(_, session)| {
+            session.connected && session.input.terminal_id.as_deref() == Some(terminal)
+        });
+        let Some((session_name, session)) = matches.next() else {
+            return Ok(None);
+        };
+        if matches.next().is_some() || session.principal.is_empty() {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        let session_id =
+            SessionId::new(session_name, InvocationLimits::default().max_binding_bytes)
+                .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let principal = PrincipalId::new(&session.principal, InvocationLimits::default())
+            .map_err(|_| HostProblem::InfrastructureFailure)?;
+        let available = !state
+            .runs
+            .values()
+            .any(|run| run.session == session_name.as_str());
+        Ok(Some(CicsStartTerminal {
+            session: session_id,
+            principal,
+            available,
+        }))
+    }
+
+    pub(in crate::service) fn start_terminal_principal(
+        &self,
+        terminal: &str,
+    ) -> Result<Option<String>, HostProblem> {
+        let state = self.lock()?;
+        let mut principals = state
+            .sessions
+            .values()
+            .filter(|session| {
+                session.connected
+                    && session.input.terminal_id.as_deref() == Some(terminal)
+                    && !session.principal.is_empty()
+            })
+            .map(|session| session.principal.clone());
+        let principal = principals.next();
+        if principals.next().is_some() {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        Ok(principal)
+    }
+
     /// Create or restore the facility-less CICS task owned by a local START request.
     pub fn launch_background_task(
         &self,
@@ -116,6 +180,84 @@ impl CicsService {
                     undo,
                     undo_version,
                     handle_state: current.handle_state,
+                },
+            ),
+        );
+        Ok(())
+    }
+
+    /// Create or restore a started task on an available terminal session.
+    pub fn launch_started_terminal_task(
+        &self,
+        invocation: Invocation,
+        session: &SessionId,
+        transaction: &str,
+        now_tick: u64,
+    ) -> Result<(), HostProblem> {
+        reject_reserved_nested_origin(&invocation)?;
+        validate_terminal_identity(transaction, 16)?;
+        let current = self.public_session(session, invocation.principal.id(), None, now_tick)?;
+        if current.input.terminal_id.is_none() {
+            return Err(HostProblem::Malformed);
+        }
+        self.authorize_terminal(&invocation, transaction)?;
+        let (undo, undo_version) = self.load_undo(&invocation.run_unit_id)?;
+        let mut state = self.lock()?;
+        if let Some(run) = state.runs.get(&invocation.run_unit_id) {
+            return if run.session == session.as_str()
+                && run.transaction == transaction.to_ascii_uppercase()
+                && run.invocation == invocation
+            {
+                Ok(())
+            } else {
+                Err(HostProblem::IdempotencyConflict)
+            };
+        }
+        if state
+            .runs
+            .values()
+            .any(|run| run.session == session.as_str())
+        {
+            return Err(HostProblem::IdempotencyConflict);
+        }
+        if state.runs.len() >= self.limits.max_runs {
+            return Err(HostProblem::ResourceExhausted);
+        }
+        let retained = current.run_unit == invocation.run_unit_id.as_str()
+            && current.transaction == transaction.to_ascii_uppercase();
+        let active = if retained {
+            current
+        } else {
+            let mut active = current;
+            let previous = active.version;
+            active.version = previous
+                .checked_add(1)
+                .ok_or(HostProblem::ResourceExhausted)?;
+            active.run_unit = invocation.run_unit_id.as_str().into();
+            active.transaction = transaction.to_ascii_uppercase();
+            active.expires_at_tick = now_tick
+                .checked_add(active.idle_timeout_ticks)
+                .ok_or(HostProblem::ResourceExhausted)?;
+            self.persist_session(session.as_str(), &active, Some(previous))?;
+            state
+                .sessions
+                .insert(session.as_str().into(), active.clone());
+            active
+        };
+        state.runs.insert(
+            invocation.run_unit_id.clone(),
+            handlers::new_run_with_state(
+                invocation.clone(),
+                session.as_str(),
+                transaction,
+                "ME01",
+                "S001",
+                handlers::RunSeed {
+                    originating_task: invocation.run_unit_id.as_str().into(),
+                    retrieve: Vec::new(),
+                    undo,
+                    undo_version,
+                    handle_state: active.handle_state,
                 },
             ),
         );

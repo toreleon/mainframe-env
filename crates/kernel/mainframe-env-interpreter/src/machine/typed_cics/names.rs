@@ -107,6 +107,7 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::Program => "PROGRAM",
         CicsOperandName::Commarea => "COMMAREA",
         CicsOperandName::TransId => "TRANSID",
+        CicsOperandName::TermId => "TERMID",
         CicsOperandName::ReturnTransId => "RTRANSID",
         CicsOperandName::ReturnTermId => "RTERMID",
         CicsOperandName::UserId => "USERID",

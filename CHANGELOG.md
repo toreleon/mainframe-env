@@ -6,6 +6,15 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed local CICS START `TERMID` through append-only operand tag 38.
+  The provider resolves active virtual terminals at command time, returns exact
+  `TERMIDERR` 11/0 for an unknown identifier, persists terminal association,
+  and makes RETRIEVE match that facility. At expiration, a free terminal is
+  retasked through the durable coordinator; a busy terminal defers the work
+  lease until available, and a deleted terminal discards the asynchronous
+  request. Combined `TERMID`/`USERID`, remote/APPC facilities, and same-terminal
+  multi-request coalescing remain fail-closed or pending.
+
 - Added SQLite process-restart proof for facility-less CICS START launch. A
   claimed request can survive shutdown after promotion but before target
   creation, reclaim under a fresh lease, run its RETRIEVE target, then survive

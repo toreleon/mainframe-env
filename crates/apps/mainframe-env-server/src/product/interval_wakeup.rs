@@ -1,6 +1,6 @@
 use super::{
-    ONLINE_EXCHANGE_NAMESPACE, ProductServer, decode_online_exchange, normalize_online_name,
-    store_error,
+    JesWorkOutcome, ONLINE_EXCHANGE_NAMESPACE, ProductServer, decode_online_exchange,
+    normalize_online_name, store_error,
 };
 use crate::jes_worker::{CicsWorkOutcome, process_cics_work};
 use mainframe_env_cics::{CicsLimits, CicsStartTask};
@@ -20,15 +20,17 @@ impl ProductServer {
         &self,
         work: &WorkRecord,
         now_tick: u64,
-    ) -> Result<bool, HostProblem> {
-        match process_cics_work(&self.cics, work, now_tick)? {
+    ) -> Result<Option<JesWorkOutcome>, HostProblem> {
+        Ok(match process_cics_work(&self.cics, work, now_tick)? {
             Some(CicsWorkOutcome::Start(task)) => {
-                self.launch_started_task(work, &task, now_tick)?;
+                Some(self.launch_started_task(work, &task, now_tick)?)
             }
-            Some(CicsWorkOutcome::Delay) => self.wake_delayed_online_task(work, now_tick)?,
-            None => return Ok(false),
-        }
-        Ok(true)
+            Some(CicsWorkOutcome::Delay) => {
+                self.wake_delayed_online_task(work, now_tick)?;
+                Some(JesWorkOutcome::Completed)
+            }
+            None => None,
+        })
     }
 
     fn launch_started_task(
@@ -36,10 +38,7 @@ impl ProductServer {
         work: &WorkRecord,
         task: &CicsStartTask,
         now_tick: u64,
-    ) -> Result<(), HostProblem> {
-        if task.terminal.is_some() {
-            return Ok(());
-        }
+    ) -> Result<JesWorkOutcome, HostProblem> {
         let transaction = normalize_online_name(&task.transaction, 16)?;
         let Some(program) = self
             .online_transactions
@@ -48,7 +47,7 @@ impl ProductServer {
             .get(&transaction)
             .cloned()
         else {
-            return Ok(());
+            return Ok(JesWorkOutcome::Completed);
         };
         let Some(artifact) = self
             .online_programs
@@ -57,15 +56,26 @@ impl ProductServer {
             .get(&program)
             .cloned()
         else {
-            return Ok(());
+            return Ok(JesWorkOutcome::Completed);
         };
         let invocation = started_task_invocation(work, task, artifact)?;
-        let session = SessionId::new(
-            format!("{START_TASK_SESSION_PREFIX}{}", work.execution_id),
-            InvocationLimits::default().max_binding_bytes,
-        )
-        .map_err(|_| HostProblem::InfrastructureFailure)?;
         let principal = invocation.principal.id().clone();
+        let terminal = match task.terminal.as_deref() {
+            Some(terminal) => match self.cics.resolve_start_terminal(terminal)? {
+                Some(terminal) if terminal.principal == principal => Some(terminal),
+                Some(_) | None => return Ok(JesWorkOutcome::Completed),
+            },
+            None => None,
+        };
+        let background = terminal.is_none();
+        let session = match &terminal {
+            Some(terminal) => terminal.session.clone(),
+            None => SessionId::new(
+                format!("{START_TASK_SESSION_PREFIX}{}", work.execution_id),
+                InvocationLimits::default().max_binding_bytes,
+            )
+            .map_err(|_| HostProblem::InfrastructureFailure)?,
+        };
         if let Some(execution) = self
             .store
             .get_execution(&invocation.execution_id)
@@ -83,23 +93,55 @@ impl ProductServer {
                 return Err(HostProblem::InfrastructureFailure);
             }
             if execution.state == ExecutionState::Suspended {
-                return Ok(());
+                return Ok(JesWorkOutcome::Completed);
             }
             if execution.state.terminal() && self.online_exchange(&session)?.is_none() {
-                self.cleanup_started_task_if_idle(&session, &principal)?;
-                return Ok(());
+                if background {
+                    self.cleanup_started_task_if_idle(&session, &principal)?;
+                }
+                return Ok(JesWorkOutcome::Completed);
             }
         }
-        match self
-            .cics
-            .launch_background_task(invocation.clone(), &session, &transaction)
+        let exchange = self.online_exchange(&session)?;
+        if let Some(exchange) = &exchange
+            && exchange.execution_id != invocation.execution_id.as_str()
         {
-            Ok(()) => {}
-            Err(HostProblem::NotFound | HostProblem::Unauthorized) => return Ok(()),
-            Err(problem) => return Err(problem),
+            return Ok(JesWorkOutcome::Deferred);
+        }
+        if exchange.is_none() {
+            let launched = match &terminal {
+                Some(terminal) if !terminal.available => return Ok(JesWorkOutcome::Deferred),
+                Some(_) => self.cics.launch_started_terminal_task(
+                    invocation.clone(),
+                    &session,
+                    &transaction,
+                    now_tick,
+                ),
+                None => {
+                    self.cics
+                        .launch_background_task(invocation.clone(), &session, &transaction)
+                }
+            };
+            match launched {
+                Ok(()) => {}
+                Err(HostProblem::IdempotencyConflict) if terminal.is_some() => {
+                    return Ok(JesWorkOutcome::Deferred);
+                }
+                Err(HostProblem::NotFound | HostProblem::Unauthorized | HostProblem::TimedOut) => {
+                    return Ok(JesWorkOutcome::Completed);
+                }
+                Err(problem) => return Err(problem),
+            }
         }
         let result = self.run_online_exchange(&session, &principal, &program, now_tick);
-        self.settle_started_exchange(&session, &principal, &invocation.execution_id, result)
+        self.settle_started_exchange(
+            &session,
+            &principal,
+            &invocation.execution_id,
+            background,
+            result,
+        )?;
+        Ok(JesWorkOutcome::Completed)
     }
 
     fn settle_started_exchange(
@@ -107,6 +149,7 @@ impl ProductServer {
         session: &SessionId,
         principal: &PrincipalId,
         execution_id: &ExecutionId,
+        background: bool,
         result: Result<(), HostProblem>,
     ) -> Result<(), HostProblem> {
         if let Err(problem) = result
@@ -118,7 +161,10 @@ impl ProductServer {
         {
             return Err(problem);
         }
-        self.cleanup_started_task_if_idle(session, principal)
+        if background {
+            self.cleanup_started_task_if_idle(session, principal)?;
+        }
+        Ok(())
     }
 
     fn cleanup_started_task_if_idle(
@@ -179,7 +225,7 @@ impl ProductServer {
             let execution =
                 ExecutionId::new(state.execution_id.as_str(), InvocationLimits::default())
                     .map_err(|_| HostProblem::InfrastructureFailure)?;
-            return self.settle_started_exchange(&session, &principal, &execution, result);
+            return self.settle_started_exchange(&session, &principal, &execution, true, result);
         }
         result
     }

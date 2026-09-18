@@ -94,6 +94,8 @@ pub enum CicsOperandName {
     Commarea,
     /// `TRANSID(...)` next-transaction name.
     TransId,
+    /// `TERMID(...)` principal facility for a started task.
+    TermId,
     /// `RTRANSID(...)` metadata passed to a started task.
     ReturnTransId,
     /// `RTERMID(...)` metadata passed to a started task.

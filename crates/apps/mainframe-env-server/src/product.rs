@@ -2780,8 +2780,8 @@ impl ProductServer {
     }
 
     fn process_claimed_jes_work(&self, work: &WorkRecord) -> Result<JesWorkOutcome, HostProblem> {
-        if self.process_interval_work(work, self.jes_tick()?)? {
-            return Ok(JesWorkOutcome::Completed);
+        if let Some(outcome) = self.process_interval_work(work, self.jes_tick()?)? {
+            return Ok(outcome);
         }
         if work.state != WorkState::Claimed
             || work.required_generation != JES_WORK_GENERATION
@@ -10457,16 +10457,7 @@ mod tests {
             .unwrap();
         server
             .cics
-            .launch_terminal(
-                receiver_invocation.clone(),
-                &receiver_session,
-                "NX00",
-                24,
-                80,
-                "interval-receiver-csrf",
-                1,
-                10_000,
-            )
+            .launch_background_task(receiver_invocation.clone(), &receiver_session, "NX00")
             .unwrap();
         let receiver_context = server
             .cics
@@ -10949,6 +10940,149 @@ mod tests {
         );
         drop((third, third_store));
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn compiled_start_termid_binds_the_named_virtual_terminal() {
+        let issuer = published_source_fixture(
+            "STARTTRM",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. STARTTRM.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE 'PAYLOAD'.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('NEXT') TERMID('T000') REQID('TRMID001') FROM(DATA-X) INTERVAL(0) END-EXEC.\nSTOP RUN.\n",
+        );
+        let target = published_source_fixture(
+            "TRMTRGT",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. TRMTRGT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE ALL 'Z'.\n01 LENGTH-X PIC S9(4) COMP VALUE 8.\nPROCEDURE DIVISION.\nEXEC CICS RETRIEVE INTO(DATA-X) LENGTH(LENGTH-X) END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = |artifact: &PublishedArtifact| {
+            ArtifactRef::new(
+                format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let issuer_ref = artifact_ref(&issuer);
+        let target_ref = artifact_ref(&target);
+        let program = |name: &str, artifact: &PublishedArtifact, reference: ArtifactRef| {
+            OnlineProgramDefinition {
+                name: name.into(),
+                artifact: reference,
+                payload: artifact.payload().to_vec(),
+                manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                semantic_identity: artifact.semantic_id().to_reference(),
+            }
+        };
+        let clock = Arc::new(ManualJesClock::new(100));
+        let platform: Arc<dyn PlatformStore> = Arc::new(MemoryStore::new(Default::default()));
+        let server = ProductServer::open_with_clock(config(), platform, clock.clone()).unwrap();
+        let execution_clock = clock.clone();
+        server
+            .program
+            .bind_execution_control(Arc::new(move |_: &Invocation| {
+                Ok(ExecutionControl {
+                    now_tick: execution_clock
+                        .now_tick()
+                        .map_err(|_| ExecutionControlError::Unavailable)?,
+                    cancellation_requested: false,
+                })
+            }))
+            .unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![
+                    program("STARTTRM", &issuer, issuer_ref.clone()),
+                    program("TRMTRGT", &target, target_ref),
+                ],
+                transactions: BTreeMap::from([
+                    ("STRM".into(), "STARTTRM".into()),
+                    ("NEXT".into(), "TRMTRGT".into()),
+                ]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "STARTTRM".into(),
+                    map: "STARTTRM".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("start-termid-issuer", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "STRM", Some(issuer_ref.clone()))
+            .unwrap();
+        let launch_tick = server.jes_tick().unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation,
+                &session,
+                "STRM",
+                24,
+                80,
+                "start-termid-csrf",
+                launch_tick,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "STARTTRM", launch_tick)
+            .unwrap();
+        let busy = server
+            .cics_invocation("IBMUSER", "STRM", Some(issuer_ref))
+            .unwrap();
+        server
+            .cics
+            .resume_terminal(busy, &session, "start-termid-csrf", launch_tick)
+            .unwrap();
+        let deferred = server
+            .claim_jes_work("start-termid-worker")
+            .unwrap()
+            .unwrap();
+        let outcome = server.process_claimed_jes_work(&deferred).unwrap();
+        assert_eq!(outcome, JesWorkOutcome::Deferred);
+        server
+            .finish_claimed_jes_work(&deferred, Ok(outcome))
+            .unwrap();
+        assert_eq!(
+            server
+                .store
+                .get_work(&deferred.work_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            WorkState::Queued
+        );
+        server
+            .cics
+            .complete_terminal_run(&session, &principal, launch_tick)
+            .unwrap();
+        clock.advance(JES_IDLE_MILLIS);
+        let work = server
+            .claim_jes_work("start-termid-worker-retry")
+            .unwrap()
+            .unwrap();
+        let outcome = server.process_claimed_jes_work(&work).unwrap();
+        server.finish_claimed_jes_work(&work, Ok(outcome)).unwrap();
+        assert_eq!(
+            server
+                .store
+                .get_execution(&work.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Completed
+        );
+        let terminal = server
+            .cics
+            .terminal_snapshot(&session, &principal, server.jes_tick().unwrap())
+            .unwrap();
+        assert_eq!(terminal.transaction, "NEXT");
+        assert_eq!(
+            server.store.get_work(&work.work_id).unwrap().unwrap().state,
+            WorkState::Completed
+        );
     }
 
     #[test]

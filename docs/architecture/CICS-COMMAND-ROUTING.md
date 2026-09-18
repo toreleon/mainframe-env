@@ -343,7 +343,7 @@ differentials, or make 0.9.0 release-ready.
 | `file-control` | file status, keyed I/O, and browse behavior |
 | `queue-control` | transient-data queue writes |
 | `recovery` | SYNCPOINT coordination, rollback, and subsystem unit-of-work completion |
-| `interval-control` | bounded local START scheduling/cancellation and facility-less target launch plus zero, relative, and absolute DELAY |
+| `interval-control` | bounded local START scheduling/cancellation with facility-less or virtual-terminal target launch plus zero, relative, and absolute DELAY |
 
 This table describes the eight families already present in the 40-operation runtime
 collection. The 263-row application registry also assigns every row a

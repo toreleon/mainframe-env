@@ -35,12 +35,16 @@ pub(super) fn invoke(
         .map_err(|_| HostProblem::ResourceExhausted)?;
     let record = {
         let mut state = service.lock()?;
+        let terminal = state
+            .sessions
+            .get(&run.session)
+            .and_then(|session| session.input.terminal_id.clone());
         consume_next(
             service.store.as_ref(),
             &mut state.interval_records,
             IntervalConsumeRequest {
                 transaction: &run.transaction,
-                terminal: None,
+                terminal: terminal.as_deref(),
                 now_tick,
                 effect_key: mutation.idempotency_key.as_str(),
                 request_digest: digest,

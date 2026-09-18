@@ -194,6 +194,7 @@ pub enum HirCicsOperandName {
     Program,
     Commarea,
     TransId,
+    TermId,
     ReturnTransId,
     ReturnTermId,
     File,
@@ -3318,16 +3319,16 @@ mod tests {
             assert!(commands[1].outputs.iter().any(|output| output.name == name));
         }
 
-        let deferred = "TERMID('T001')";
-        let analysis = analyze(&format!(
-            "IDENTIFICATION DIVISION. PROGRAM-ID. LATER. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') REQID('REQ0002') FROM(DATA-X) {deferred} END-EXEC. STOP RUN."
-        ));
-        assert!(analysis.hir.is_none(), "{deferred}");
-        assert!(analysis.diagnostics.iter().any(|diagnostic| {
-            diagnostic
-                .public_message()
-                .contains(deferred.split('(').next().unwrap())
-        }));
+        let terminal = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. LATER. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') REQID('REQ0002') FROM(DATA-X) TERMID('T001') END-EXEC. STOP RUN.",
+        )
+        .hir
+        .expect("START TERMID must lower");
+        assert!(terminal.statements.iter().any(|statement| matches!(
+            statement.resolved.as_ref(),
+            Some(HirResolvedStatement::Cics(HirCicsStatement { operands, .. }))
+                if operands.iter().any(|operand| operand.name == HirCicsOperandName::TermId)
+        )));
     }
 
     #[test]

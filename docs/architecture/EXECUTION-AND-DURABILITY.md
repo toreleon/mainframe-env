@@ -143,6 +143,14 @@ redispatch. Task conditions and known
 terminal failures belong to the asynchronously created task; unresolved
 infrastructure or effect uncertainty still blocks work completion.
 
+Terminal-associated START resolves the retained virtual-terminal identity at
+both admission and expiration. An occupied terminal returns the work lease to
+the queue; a deleted or principal-replaced terminal discards the asynchronous
+request. Once available, the existing durable session is retasked with the
+START execution and run-unit identities and remains connected after the target
+task finishes. RETRIEVE includes the run's terminal identity in the interval
+record match, preventing cross-terminal consumption.
+
 CICS also retains the exact bounded outer response for every mutating file,
 transient-queue, program-link, enqueue/dequeue, and syncpoint request. The replay key is checked
 against the canonical request digest. New replay envelopes also retain the
