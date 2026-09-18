@@ -4735,6 +4735,133 @@ mod tests {
     }
 
     #[test]
+    fn start_after_and_at_units_drive_deadlines_and_exact_component_conditions() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (issuer, _) = registered(&service);
+        let start = |request_id: &[u8], sequence, schedule| {
+            let mut arguments = BTreeMap::from([
+                ("TRANSID".into(), argument(b"NEXT")),
+                ("REQID".into(), argument(request_id)),
+                ("FROM".into(), argument(b"PAYLOAD")),
+            ]);
+            arguments.extend(schedule);
+            request(CicsOperation::Start, arguments, sequence)
+        };
+
+        let after = start(
+            b"AFTER001",
+            1,
+            BTreeMap::from([
+                ("OPTION.AFTER".into(), cics_option()),
+                ("HOURS".into(), cics_decimal(1)),
+                ("SECONDS".into(), cics_decimal(3)),
+            ]),
+        );
+        service
+            .invoke(&effect(&issuer.run_unit_id, after.clone(), 1), after)
+            .unwrap();
+        assert_eq!(
+            store
+                .get_work("cics-start:AFTER001")
+                .unwrap()
+                .unwrap()
+                .available_tick,
+            3_604_000
+        );
+
+        let at = start(
+            b"AT000001",
+            2,
+            BTreeMap::from([
+                ("OPTION.AT".into(), cics_option()),
+                ("MINUTES".into(), cics_decimal(62)),
+            ]),
+        );
+        service
+            .invoke(&effect(&issuer.run_unit_id, at.clone(), 2), at)
+            .unwrap();
+        assert_eq!(
+            store
+                .get_work("cics-start:AT000001")
+                .unwrap()
+                .unwrap()
+                .available_tick,
+            44_824_211
+        );
+
+        for (request_id, sequence, units, response2) in [
+            (b"BADHOUR1".as_slice(), 3, vec![("HOURS", 100)], 4),
+            (
+                b"BADMIN01".as_slice(),
+                4,
+                vec![("HOURS", 0), ("MINUTES", 60)],
+                5,
+            ),
+            (
+                b"BADSEC01".as_slice(),
+                5,
+                vec![("HOURS", 0), ("SECONDS", 60)],
+                6,
+            ),
+        ] {
+            let mut schedule = BTreeMap::from([("OPTION.AFTER".into(), cics_option())]);
+            schedule.extend(
+                units
+                    .into_iter()
+                    .map(|(name, value)| (name.into(), cics_decimal(value))),
+            );
+            let invalid = start(request_id, sequence, schedule);
+            assert_eq!(
+                service.invoke(
+                    &effect(&issuer.run_unit_id, invalid.clone(), sequence),
+                    invalid,
+                ),
+                Err(HostProblem::Condition {
+                    name: "INVREQ".into(),
+                    response: 16,
+                    response2,
+                })
+            );
+            assert!(
+                store
+                    .get_provider_state(
+                        "cics-interval-start-v1",
+                        std::str::from_utf8(request_id).unwrap(),
+                    )
+                    .unwrap()
+                    .is_none()
+            );
+        }
+
+        for schedule in [
+            BTreeMap::from([("OPTION.AFTER".into(), cics_option())]),
+            BTreeMap::from([("HOURS".into(), cics_decimal(1))]),
+            BTreeMap::from([
+                ("OPTION.AFTER".into(), cics_option()),
+                ("OPTION.AT".into(), cics_option()),
+                ("HOURS".into(), cics_decimal(1)),
+            ]),
+        ] {
+            let malformed = start(b"BADFORM1", 6, schedule);
+            assert_eq!(
+                service.invoke(
+                    &effect(&issuer.run_unit_id, malformed.clone(), 6),
+                    malformed
+                ),
+                Err(HostProblem::Malformed)
+            );
+        }
+    }
+
+    #[test]
     fn interval_start_work_promotes_and_retrieve_consumes_exactly_once() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let provider_store: Arc<dyn ProviderStateStore> = store.clone();

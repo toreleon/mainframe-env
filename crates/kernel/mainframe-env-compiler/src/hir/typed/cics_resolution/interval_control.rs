@@ -7,6 +7,7 @@ use crate::{DataCategory, SemanticModel};
 
 pub(super) fn validate_constraints(
     clauses: &Clauses,
+    options: &[String],
     operation: HirCicsOperation,
 ) -> Resolution<()> {
     match operation {
@@ -37,9 +38,23 @@ pub(super) fn validate_constraints(
             ));
         }
         HirCicsOperation::Start => {
-            if clauses.contains_key("INTERVAL") && clauses.contains_key("TIME") {
+            let after = options.iter().any(|option| option == "AFTER");
+            let at = options.iter().any(|option| option == "AT");
+            let units = ["HOURS", "MINUTES", "SECONDS"]
+                .into_iter()
+                .any(|name| clauses.contains_key(name));
+            let schedule_selectors = usize::from(clauses.contains_key("INTERVAL"))
+                + usize::from(clauses.contains_key("TIME"))
+                + usize::from(after)
+                + usize::from(at);
+            if schedule_selectors > 1 {
                 return Err(ResolutionFailure::Invalid(
-                    "CICS START INTERVAL and TIME are mutually exclusive".into(),
+                    "CICS START accepts exactly one INTERVAL, TIME, AFTER, or AT schedule".into(),
+                ));
+            }
+            if (after || at) != units {
+                return Err(ResolutionFailure::Invalid(
+                    "CICS START AFTER or AT requires at least one explicit time unit".into(),
                 ));
             }
             if clauses.contains_key("LENGTH") && !clauses.contains_key("FROM") {
@@ -67,13 +82,14 @@ fn valid_hhmmss(value: i64) -> bool {
 
 pub(super) fn operands(
     clauses: &Clauses,
+    options: &[String],
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
     match operation {
         HirCicsOperation::Cancel => cancel_operands(clauses, semantic),
         HirCicsOperation::Delay => delay_operands(clauses, semantic),
-        HirCicsOperation::Start => start_operands(clauses, semantic),
+        HirCicsOperation::Start => start_operands(clauses, options, semantic),
         HirCicsOperation::Retrieve => retrieve_operands(clauses, semantic),
         _ => Ok(Vec::new()),
     }
@@ -120,6 +136,7 @@ fn cancel_operands(
 
 fn start_operands(
     clauses: &Clauses,
+    options: &[String],
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
     let transaction = bounded_name(&clauses["TRANSID"], semantic, 4, "START", "TRANSID")?;
@@ -172,6 +189,16 @@ fn start_operands(
             });
         }
     }
+    if let Some(name) = options.iter().find_map(|option| match option.as_str() {
+        "AFTER" => Some(HirCicsOperandName::Interval),
+        "AT" => Some(HirCicsOperandName::StartTime),
+        _ => None,
+    }) {
+        operands.push(HirCicsNamedOperand {
+            name,
+            value: HirCicsValue::Integer(normalized_explicit_time(clauses)?),
+        });
+    }
     for (clause, name, max) in [
         ("RTRANSID", HirCicsOperandName::ReturnTransId, 4),
         ("RTERMID", HirCicsOperandName::ReturnTermId, 4),
@@ -186,6 +213,50 @@ fn start_operands(
         }
     }
     Ok(operands)
+}
+
+fn normalized_explicit_time(clauses: &Clauses) -> Resolution<i64> {
+    let component = |name: &str| {
+        clauses
+            .get(name)
+            .map(|value| {
+                if value.len() == 1 {
+                    value[0].parse::<i64>().map_err(|_| ())
+                } else {
+                    Err(())
+                }
+                .map_err(|()| {
+                    ResolutionFailure::Invalid(format!(
+                        "typed CICS START {name} currently requires a literal value"
+                    ))
+                })
+            })
+            .transpose()
+    };
+    let (hours, minutes, seconds) = (
+        component("HOURS")?,
+        component("MINUTES")?,
+        component("SECONDS")?,
+    );
+    let minute_limit = if hours.is_some() || seconds.is_some() {
+        59
+    } else {
+        5_999
+    };
+    let second_limit = if hours.is_some() || minutes.is_some() {
+        59
+    } else {
+        359_999
+    };
+    let valid =
+        |value: Option<i64>, maximum| value.is_none_or(|value| (0..=maximum).contains(&value));
+    if !valid(hours, 99) || !valid(minutes, minute_limit) || !valid(seconds, second_limit) {
+        return Err(ResolutionFailure::Invalid(
+            "typed CICS START explicit time component is out of range".into(),
+        ));
+    }
+    let total = hours.unwrap_or(0) * 3_600 + minutes.unwrap_or(0) * 60 + seconds.unwrap_or(0);
+    Ok(total / 3_600 * 10_000 + total / 60 % 60 * 100 + total % 60)
 }
 
 fn retrieve_operands(

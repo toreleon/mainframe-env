@@ -744,8 +744,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Syncpoint => &["RESP", "RESP2"],
         HirCicsOperation::Suspend => &["RESP", "RESP2"],
         HirCicsOperation::Start => &[
-            "TRANSID", "REQID", "FROM", "LENGTH", "INTERVAL", "TIME", "RTRANSID", "RTERMID",
-            "QUEUE", "USERID", "RESP", "RESP2",
+            "TRANSID", "REQID", "FROM", "LENGTH", "INTERVAL", "TIME", "HOURS", "MINUTES",
+            "SECONDS", "RTRANSID", "RTERMID", "QUEUE", "USERID", "RESP", "RESP2",
         ],
         HirCicsOperation::Retrieve => &[
             "INTO", "SET", "LENGTH", "RTRANSID", "RTERMID", "QUEUE", "RESP", "RESP2",
@@ -777,7 +777,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::PushHandle
         | HirCicsOperation::SetAssociationUserCorrData
         | HirCicsOperation::Suspend => &["NOHANDLE"],
-        HirCicsOperation::Start => &["FMH", "PROTECT", "NOHANDLE"],
+        HirCicsOperation::Start => &["AFTER", "AT", "FMH", "PROTECT", "NOHANDLE"],
         HirCicsOperation::Cancel | HirCicsOperation::Delay => &["NOHANDLE"],
         HirCicsOperation::Retrieve => &["WAIT", "NOHANDLE"],
         HirCicsOperation::FormatTime => &["DATESEP", "TIMESEP", "NOHANDLE"],
@@ -828,7 +828,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     file_operands::validate_constraints(&clauses, operation)?;
     queue_control::validate_constraints(&clauses, operation)?;
     terminal_control::validate_constraints(&clauses, operation)?;
-    interval_control::validate_constraints(&clauses, operation)?;
+    interval_control::validate_constraints(&clauses, &raw_options, operation)?;
     for required in match operation {
         HirCicsOperation::AddressSet => &["SET", "USING"][..],
         HirCicsOperation::Asktime => &["ABSTIME"][..],
@@ -976,7 +976,12 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     operands.extend(file_operands::resolve(&clauses, operation, semantic)?);
     operands.extend(queue_control::operands(&clauses, operation, semantic)?);
     operands.extend(terminal_control::operands(&clauses, operation, semantic)?);
-    operands.extend(interval_control::operands(&clauses, operation, semantic)?);
+    operands.extend(interval_control::operands(
+        &clauses,
+        &raw_options,
+        operation,
+        semantic,
+    )?);
     if matches!(operation, HirCicsOperation::Deq | HirCicsOperation::Enq) {
         let resource = complete_data_reference(&clauses["RESOURCE"], semantic)?;
         operands.push(HirCicsNamedOperand {
@@ -1043,6 +1048,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
                 HirCicsOperation::HandleCondition | HirCicsOperation::IgnoreCondition
             ) && is_condition_name(option))
                 && !(operation == HirCicsOperation::HandleAid && is_aid_name(option))
+                && !(operation == HirCicsOperation::Start
+                    && matches!(option.as_str(), "AFTER" | "AT"))
         })
         .map(|option| match option.as_str() {
             "CANCEL" => HirCicsOption::Cancel,

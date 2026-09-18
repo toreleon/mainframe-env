@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added local START `AFTER`/`AT` scheduling with explicit HOURS, MINUTES, and
+  SECONDS. The provider enforces IBM's conditional single-unit and combined-unit
+  ranges with exact INVREQ 16 response2 4/5/6, while compiled literal forms
+  normalize to the existing relative/absolute schedule identity and durable
+  worker deadline.
+
 - Added RACF-backed START USERID validity checks before surrogate authorization.
   A typed non-login principal-status request now maps unknown identities to
   USERIDERR 69/8, indeterminate/locked identities to 69/10, revoked identities

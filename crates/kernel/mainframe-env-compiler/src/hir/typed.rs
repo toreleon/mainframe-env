@@ -3262,6 +3262,46 @@ mod tests {
     }
 
     #[test]
+    fn cics_start_after_and_at_normalize_literal_unit_forms() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. STARTUNIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8) VALUE 'PAYLOAD'. PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') REQID('AFTER001') FROM(DATA-X) AFTER HOURS(1) SECONDS(3) END-EXEC. EXEC CICS START TRANSID('NEXT') REQID('AT000001') FROM(DATA-X) AT MINUTES(62) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("START units: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 2);
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Interval
+                && operand.value == HirCicsValue::Integer(10_003)
+        }));
+        assert!(commands[1].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::StartTime
+                && operand.value == HirCicsValue::Integer(10_200)
+        }));
+
+        for invalid in [
+            "AFTER",
+            "HOURS(1)",
+            "AFTER AT HOURS(1)",
+            "INTERVAL(1) AFTER HOURS(1)",
+            "AFTER HOURS(100)",
+            "AFTER MINUTES(TIME-X)",
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADUNIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). 01 TIME-X PIC S9(9) COMP VALUE 1. PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') FROM(DATA-X) {invalid} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{invalid}");
+        }
+    }
+
+    #[test]
     fn cics_retrieve_set_requires_a_pointer_and_has_output_only_length() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. RETSET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. 01 LENGTH-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS RETRIEVE SET(PTR-X) LENGTH(LENGTH-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);

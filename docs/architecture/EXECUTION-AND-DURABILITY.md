@@ -183,6 +183,12 @@ output-only LENGTH. START admission, the work row, interval state, and replay
 receipts share the durable store, so a SQLite reopen preserves the
 producer-to-consumer cycle. Remote routing, terminal starts, generated request
 identifiers, WAIT, and automatic target-task launch remain outside this slice.
+START `AFTER`/`AT` uses the same durable deadline authority as packed
+INTERVAL/TIME. Literal unit forms are normalized at compilation while retaining
+the source-defined single-unit versus combined-unit bounds; provider callers
+may supply canonical explicit components and receive exact per-component
+INVREQ response2 values. Both paths persist one resolved expiration tick, so
+replay and restart never recalculate against a later wall-clock observation.
 The bounded metadata extension
 also accepts local START RTRANSID, RTERMID, and QUEUE names and returns only the
 requested values through exact-width RETRIEVE outputs. A requested value absent

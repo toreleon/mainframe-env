@@ -277,6 +277,10 @@ fn start(
         CicsIntervalTime::from_hhmmss(CicsIntervalMode::Relative, value)
     } else if let Some(value) = optional_decimal(request, "TIME")? {
         CicsIntervalTime::from_hhmmss(CicsIntervalMode::Absolute, value)
+    } else if request.arguments.contains_key("OPTION.AFTER") {
+        explicit_start_time(request, CicsIntervalMode::Relative)
+    } else if request.arguments.contains_key("OPTION.AT") {
+        explicit_start_time(request, CicsIntervalMode::Absolute)
     } else {
         Ok(CicsIntervalTime::immediate())
     }
@@ -396,11 +400,30 @@ fn userid_condition(response2: i32) -> HostProblem {
     }
 }
 
+fn explicit_start_time(
+    request: &CicsRequest,
+    mode: CicsIntervalMode,
+) -> Result<CicsIntervalTime, crate::CicsIntervalError> {
+    let component = |name| {
+        optional_decimal(request, name).map_err(|_| crate::CicsIntervalError::InvalidRequest)
+    };
+    CicsIntervalTime::from_components(
+        mode,
+        component("HOURS")?,
+        component("MINUTES")?,
+        component("SECONDS")?,
+    )
+}
+
 fn validate_start_request(request: &CicsRequest) -> Result<(), HostProblem> {
     const ALLOWED: &[&str] = &[
         "FROM",
+        "HOURS",
         "INTERVAL",
         "LENGTH",
+        "MINUTES",
+        "OPTION.AFTER",
+        "OPTION.AT",
         "OPTION.FMH",
         "OPTION.NOHANDLE",
         "OPTION.PROTECT",
@@ -410,20 +433,38 @@ fn validate_start_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "RESP2",
         "RTERMID",
         "RTRANSID",
+        "SECONDS",
         "TIME",
         "TRANSID",
         "USERID",
     ];
+    let schedule_selectors = ["INTERVAL", "TIME", "OPTION.AFTER", "OPTION.AT"]
+        .into_iter()
+        .filter(|name| request.arguments.contains_key(*name))
+        .count();
+    let explicit_mode = request.arguments.contains_key("OPTION.AFTER")
+        || request.arguments.contains_key("OPTION.AT");
+    let explicit_components = ["HOURS", "MINUTES", "SECONDS"]
+        .into_iter()
+        .any(|name| request.arguments.contains_key(name));
     if !request.arguments.contains_key("FROM")
         || !request.arguments.contains_key("TRANSID")
-        || request.arguments.contains_key("INTERVAL") && request.arguments.contains_key("TIME")
+        || schedule_selectors > 1
+        || explicit_mode != explicit_components
         || request.arguments.iter().any(|(name, value)| {
             !ALLOWED.contains(&name.as_str())
-                || if matches!(name.as_str(), "INTERVAL" | "LENGTH" | "TIME") {
+                || if matches!(
+                    name.as_str(),
+                    "HOURS" | "INTERVAL" | "LENGTH" | "MINUTES" | "SECONDS" | "TIME"
+                ) {
                     value.schema() != "mainframe-env.cics.decimal@1"
                 } else if matches!(
                     name.as_str(),
-                    "OPTION.FMH" | "OPTION.NOHANDLE" | "OPTION.PROTECT"
+                    "OPTION.AFTER"
+                        | "OPTION.AT"
+                        | "OPTION.FMH"
+                        | "OPTION.NOHANDLE"
+                        | "OPTION.PROTECT"
                 ) {
                     value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
                 } else {
