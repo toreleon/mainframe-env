@@ -14,6 +14,7 @@ mod terminal_control;
 mod terminal_run;
 mod time;
 
+use super::{CicsService, Run};
 use mainframe_env_host_api::HostProblem;
 use mainframe_env_store_api::StoreError;
 
@@ -59,10 +60,15 @@ pub(super) use task_control::{
 };
 pub use task_enqueue::CicsEnqueueModelDefinition;
 pub(super) use task_enqueue::{
-    load_enqueue_models, release_task as release_task_enqueues,
-    release_uow as release_uow_enqueues, validate_store as validate_enqueue_store,
+    load_enqueue_models, release_uow as release_uow_enqueues,
+    validate_store as validate_enqueue_store,
 };
 pub(super) use terminal_control::{
     invoke as invoke_terminal_control, valid_aid as valid_terminal_aid,
 };
 pub(super) use time::invoke as invoke_time;
+
+pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
+    task_enqueue::release_task(service, run)?;
+    interval_control::release_task(service, run)
+}

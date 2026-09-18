@@ -3263,8 +3263,8 @@ mod tests {
     }
 
     #[test]
-    fn cics_delay_lowers_only_bare_and_literal_packed_interval() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELAY0. PROCEDURE DIVISION. EXEC CICS DELAY END-EXEC. EXEC CICS DELAY INTERVAL(0) END-EXEC. EXEC CICS DELAY INTERVAL(1) END-EXEC. STOP RUN.";
+    fn cics_delay_lowers_literal_intervals_and_bounded_names() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELAY0. DATA DIVISION. WORKING-STORAGE SECTION. 01 REQ-X PIC X(8) VALUE 'WAIT0002'. PROCEDURE DIVISION. EXEC CICS DELAY END-EXEC. EXEC CICS DELAY INTERVAL(0) END-EXEC. EXEC CICS DELAY INTERVAL(1) END-EXEC. EXEC CICS DELAY INTERVAL(2) REQID('WAIT0001') END-EXEC. EXEC CICS DELAY INTERVAL(3) REQID(REQ-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);
         let hir = analysis
             .hir
@@ -3277,7 +3277,7 @@ mod tests {
                 _ => None,
             })
             .collect::<Vec<_>>();
-        assert_eq!(commands.len(), 3);
+        assert_eq!(commands.len(), 5);
         assert!(
             commands
                 .iter()
@@ -3298,6 +3298,16 @@ mod tests {
                 value: HirCicsValue::Integer(1),
             }]
         );
+        for (command, expected) in [(&commands[3], "WAIT0001"), (&commands[4], "REQ-X")] {
+            assert!(command.operands.iter().any(|operand| {
+                operand.name == HirCicsOperandName::ReqId
+                    && match &operand.value {
+                        HirCicsValue::Literal(value) => value == expected,
+                        HirCicsValue::Data(reference) => reference.qualified_name == expected,
+                        _ => false,
+                    }
+            }));
+        }
 
         for command in [
             "DELAY INTERVAL(60)",
@@ -3305,6 +3315,7 @@ mod tests {
             "DELAY TIME(0)",
             "DELAY FOR SECONDS(0)",
             "DELAY REQID('WAIT0001')",
+            "DELAY INTERVAL(0) REQID('WAIT0001')",
         ] {
             let analysis = analyze(&format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. DELBAD. DATA DIVISION. WORKING-STORAGE SECTION. 01 WHEN-X PIC S9(6) COMP-3 VALUE 0. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."

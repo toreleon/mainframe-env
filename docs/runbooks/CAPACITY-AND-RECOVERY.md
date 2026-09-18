@@ -93,13 +93,18 @@ supported by this bounded slice.
 
 Back up `cics-delay-v1` provider rows with their matching shared work rows of
 the same generation. A row binds one task/run-unit and source-statement identity
-to its packed interval, expiration tick, producing effect, and deterministic
-work ID. Pending, ready, and consumed states are CAS-versioned; replacing either
-row can wake the wrong source cycle or turn a later loop iteration into a replay.
-On restart, let the shared workers reclaim expired leases and promote only due
-work. Do not mark a delay ready, consumed, or completed by hand. Current resume
-is request-driven: the original online exchange must be invoked again after due
-promotion. Automatic redispatch and task-timeout cleanup are not yet provided.
+to its packed interval, optional application REQID, expiration tick, producing
+effect, and deterministic work ID. Pending, ready, consumed, and abandoned
+states are CAS-versioned; ready/consumed rows also retain any other-task CANCEL
+identity needed for exact replay and RESP2 23. Replacing either row can wake the
+wrong source cycle or turn a later loop iteration into a replay. On restart, let
+the shared workers reclaim expired leases and promote only due work. Do not mark
+a delay ready, consumed, abandoned, or completed by hand. Restore named-delay,
+work, session, online-exchange, and machine-continuation rows together.
+Disconnect and timeout abandon outstanding task-owned delays and cancel their
+work; repeating those cleanup paths is safe. Current resume is request-driven:
+the original online exchange must be invoked again after due promotion or local
+named cancellation. Automatic redispatch is not yet provided.
 
 Back up `cics-session` rows containing task association or HANDLE state before
 enabling typed `SET ASSOCIATION USERCORRDATA` or durable handlers. Current

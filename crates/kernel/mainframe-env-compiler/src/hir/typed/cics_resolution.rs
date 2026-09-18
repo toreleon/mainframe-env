@@ -727,7 +727,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::SendText => &["FROM", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::Assign => &["RESP", "RESP2"],
         HirCicsOperation::Cancel => &["REQID", "TRANSID", "RESP", "RESP2"],
-        HirCicsOperation::Delay => &["INTERVAL", "RESP", "RESP2"],
+        HirCicsOperation::Delay => &["INTERVAL", "REQID", "RESP", "RESP2"],
         HirCicsOperation::PurgeMessage => &["RESP", "RESP2"],
         HirCicsOperation::Read => &[
             "FILE",

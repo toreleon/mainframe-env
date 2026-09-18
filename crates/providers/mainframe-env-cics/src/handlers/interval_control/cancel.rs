@@ -24,12 +24,17 @@ pub(super) fn invoke(
         .transpose()?;
     let digest = canonical_request_digest(&HostRequest::Cics(request.clone()))
         .map_err(|_| HostProblem::ResourceExhausted)?;
-    let record = service
-        .lock()?
-        .interval_records
-        .get(&request_id)
-        .cloned()
-        .ok_or_else(not_found)?;
+    let record = service.lock()?.interval_records.get(&request_id).cloned();
+    let Some(record) = record else {
+        return super::delay::cancel_named(
+            service,
+            run,
+            &request_id,
+            selected_transaction.as_deref(),
+            mutation.idempotency_key.as_str(),
+            digest,
+        );
+    };
     let replay = record.state == IntervalStartState::Cancelled
         && record.consumer_effect_key.as_deref() == Some(mutation.idempotency_key.as_str())
         && record.consumer_request_digest == Some(digest);

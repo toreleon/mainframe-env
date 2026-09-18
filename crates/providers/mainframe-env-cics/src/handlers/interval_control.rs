@@ -177,6 +177,10 @@ pub(in crate::service) fn invoke(
     }
 }
 
+pub(super) fn release_task(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
+    delay::release_task(service, run)
+}
+
 fn start(
     service: &CicsService,
     run: &mut Run,

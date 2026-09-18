@@ -928,7 +928,7 @@ impl CicsService {
             .cloned()
             .collect::<Vec<_>>()
         {
-            handlers::release_task_enqueues(self, &run)?;
+            handlers::release_task_state(self, &run)?;
         }
         self.store
             .delete_provider_state("cics-session", session.as_str(), current.version)
@@ -1993,7 +1993,7 @@ impl CicsService {
                 .cloned()
                 .collect::<Vec<_>>()
             {
-                handlers::release_task_enqueues(self, &run)?;
+                handlers::release_task_state(self, &run)?;
             }
             self.store
                 .delete_provider_state("cics-session", session.as_str(), current.version)
@@ -4424,6 +4424,15 @@ mod tests {
         .unwrap()
     }
 
+    fn cics_literal(value: &[u8]) -> BoundedPayload {
+        BoundedPayload::new(
+            "mainframe-env.cics.literal@1",
+            value.to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap()
+    }
+
     fn cics_option() -> BoundedPayload {
         BoundedPayload::new(
             "mainframe-env.cics.option@1",
@@ -4561,6 +4570,16 @@ mod tests {
                 .map(|mutation| mutation.idempotency_key.clone()),
             request: HostRequest::Cics(request),
         }
+    }
+
+    fn delay_work_id(request: &CicsRequest) -> String {
+        let mutation = request.mutation.as_ref().unwrap();
+        let digest = canonical_request_digest(&HostRequest::Cics(request.clone())).unwrap();
+        let identity = format!(
+            "{:x}",
+            Sha256::digest([mutation.idempotency_key.as_str().as_bytes(), &digest].concat())
+        );
+        format!("cics-delay:{}", &identity[..32])
     }
 
     fn completed_cics_effect(
@@ -5188,6 +5207,318 @@ mod tests {
     }
 
     #[test]
+    fn named_delay_cancel_is_other_task_only_and_returns_response2_23() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (issuer, _) = registered(&service);
+        let canceller = invocation_for("delay-canceller", BTreeMap::new());
+        let canceller_session = SessionId::new("delay-canceller-session", 64).unwrap();
+        service.create_session(&canceller_session, 24, 80).unwrap();
+        service
+            .register_run(
+                canceller.clone(),
+                &canceller_session,
+                "MENU",
+                "MEAPPL",
+                "MESYS",
+            )
+            .unwrap();
+        let arguments = BTreeMap::from([
+            ("INTERVAL".into(), cics_decimal(1)),
+            (
+                "DELAY.ID".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.delay-id@1",
+                    format!("{}:42", issuer.run_unit_id).into_bytes(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            ),
+            ("REQID".into(), cics_literal(b"WAIT0001")),
+        ]);
+        let first = request(CicsOperation::Delay, arguments.clone(), 1);
+        let work_id = delay_work_id(&first);
+        assert_eq!(
+            service
+                .invoke(&effect(&issuer.run_unit_id, first.clone(), 1), first)
+                .unwrap()
+                .disposition,
+            CicsDisposition::Suspended
+        );
+
+        let mut self_cancel = request(
+            CicsOperation::Cancel,
+            BTreeMap::from([("REQID".into(), argument(b"WAIT0001"))]),
+            10,
+        );
+        self_cancel.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP".into(),
+            response2_field: Some("RESP2".into()),
+        };
+        let response = service
+            .invoke(
+                &effect(&issuer.run_unit_id, self_cancel.clone(), 10),
+                self_cancel,
+            )
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("NOTFND", 13)
+        );
+
+        let mut duplicate_arguments = arguments.clone();
+        duplicate_arguments.insert(
+            "DELAY.ID".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.delay-id@1",
+                format!("{}:99", canceller.run_unit_id).into_bytes(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        let mut duplicate = request(CicsOperation::Delay, duplicate_arguments, 9);
+        duplicate.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP".into(),
+            response2_field: Some("RESP2".into()),
+        };
+        let response = service
+            .invoke(
+                &effect(&canceller.run_unit_id, duplicate.clone(), 9),
+                duplicate,
+            )
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("INVREQ", 16)
+        );
+
+        let cancel = request(
+            CicsOperation::Cancel,
+            BTreeMap::from([("REQID".into(), argument(b"WAIT0001"))]),
+            11,
+        );
+        let cancelled = service
+            .invoke(
+                &effect(&canceller.run_unit_id, cancel.clone(), 11),
+                cancel.clone(),
+            )
+            .unwrap();
+        assert_eq!((cancelled.response, cancelled.response2), (0, 0));
+        assert_eq!(
+            service
+                .invoke(&effect(&canceller.run_unit_id, cancel.clone(), 11), cancel)
+                .unwrap(),
+            cancelled
+        );
+        let work = store.get_work(&work_id).unwrap().unwrap();
+        assert_eq!(work.state, WorkState::Cancelled);
+
+        let resumed = request(CicsOperation::Delay, arguments, 2);
+        let response = service
+            .invoke(&effect(&issuer.run_unit_id, resumed.clone(), 2), resumed)
+            .unwrap();
+        assert_eq!(response.disposition, CicsDisposition::Complete);
+        assert_eq!((response.response, response.response2), (0, 23));
+    }
+
+    #[test]
+    fn named_delay_cancel_loses_to_expiration_boundary() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let clock = Arc::new(TestCicsClock::fixed(1_000));
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            clock.clone(),
+        )
+        .unwrap();
+        let (issuer, _) = registered(&service);
+        let canceller = invocation_for("expired-delay-canceller", BTreeMap::new());
+        let session = SessionId::new("expired-delay-canceller-session", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(canceller.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let arguments = BTreeMap::from([
+            ("INTERVAL".into(), cics_decimal(1)),
+            (
+                "DELAY.ID".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.delay-id@1",
+                    format!("{}:77", issuer.run_unit_id).into_bytes(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            ),
+            ("REQID".into(), cics_literal(b"EXPIRE01")),
+        ]);
+        let delay = request(CicsOperation::Delay, arguments.clone(), 1);
+        service
+            .invoke(&effect(&issuer.run_unit_id, delay.clone(), 1), delay)
+            .unwrap();
+        clock.tick.store(2_000, Ordering::SeqCst);
+
+        let mut cancel = request(
+            CicsOperation::Cancel,
+            BTreeMap::from([("REQID".into(), argument(b"EXPIRE01"))]),
+            10,
+        );
+        cancel.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP".into(),
+            response2_field: Some("RESP2".into()),
+        };
+        let response = service
+            .invoke(&effect(&canceller.run_unit_id, cancel.clone(), 10), cancel)
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("NOTFND", 13)
+        );
+
+        let work = store
+            .claim(
+                "expired-delay-worker",
+                Some(CICS_DELAY_WORK_GENERATION),
+                2_000,
+                100,
+            )
+            .unwrap()
+            .unwrap();
+        service.promote_delay_work(&work, 2_000).unwrap();
+        store
+            .complete(
+                &work.work_id,
+                work.lease_id.as_deref().unwrap(),
+                work.lease_epoch,
+                2_000,
+            )
+            .unwrap();
+        let resumed = request(CicsOperation::Delay, arguments, 2);
+        let response = service
+            .invoke(&effect(&issuer.run_unit_id, resumed.clone(), 2), resumed)
+            .unwrap();
+        assert_eq!((response.response, response.response2), (0, 0));
+    }
+
+    #[test]
+    fn terminal_task_cleanup_abandons_delay_and_cancels_work() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let issuer = invocation_for("delay-cleanup", BTreeMap::new());
+        let session = SessionId::new("delay-cleanup-session", 64).unwrap();
+        service
+            .launch_terminal(
+                issuer.clone(),
+                &session,
+                "MENU",
+                24,
+                80,
+                "delay-cleanup-csrf",
+                1_000,
+                10_000,
+            )
+            .unwrap();
+        let arguments = BTreeMap::from([
+            ("INTERVAL".into(), cics_decimal(1)),
+            (
+                "DELAY.ID".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.delay-id@1",
+                    format!("{}:9", issuer.run_unit_id).into_bytes(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            ),
+        ]);
+        let delay = request(CicsOperation::Delay, arguments.clone(), 1);
+        let work_id = delay_work_id(&delay);
+        service
+            .invoke(&effect(&issuer.run_unit_id, delay.clone(), 1), delay)
+            .unwrap();
+        service
+            .disconnect_terminal(&session, issuer.principal.id(), "delay-cleanup-csrf", 1_000)
+            .unwrap();
+        let work = store.get_work(&work_id).unwrap().unwrap();
+        assert_eq!(work.state, WorkState::Cancelled);
+        assert!(
+            store
+                .claim(
+                    "abandoned-delay-worker",
+                    Some(CICS_DELAY_WORK_GENERATION),
+                    2_000,
+                    100
+                )
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn terminal_timeout_abandons_delay_and_cancels_work() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let issuer = invocation_for("delay-timeout", BTreeMap::new());
+        let session = SessionId::new("delay-timeout-session", 64).unwrap();
+        service
+            .launch_terminal(
+                issuer.clone(),
+                &session,
+                "MENU",
+                24,
+                80,
+                "delay-timeout-csrf",
+                1_000,
+                1,
+            )
+            .unwrap();
+        let arguments = BTreeMap::from([
+            ("INTERVAL".into(), cics_decimal(1)),
+            (
+                "DELAY.ID".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.delay-id@1",
+                    format!("{}:9", issuer.run_unit_id).into_bytes(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            ),
+        ]);
+        let delay = request(CicsOperation::Delay, arguments, 1);
+        let work_id = delay_work_id(&delay);
+        service
+            .invoke(&effect(&issuer.run_unit_id, delay.clone(), 1), delay)
+            .unwrap();
+        assert_eq!(
+            service.terminal_execution(&session, issuer.principal.id(), 1_001),
+            Err(HostProblem::TimedOut)
+        );
+        let work = store.get_work(&work_id).unwrap().unwrap();
+        assert_eq!(work.state, WorkState::Cancelled);
+    }
+
+    #[test]
     fn positive_interval_delay_survives_sqlite_reopen() {
         let root = std::env::temp_dir().join(format!(
             "mainframe-env-cics-delay-{}-{:?}",
@@ -5275,6 +5606,98 @@ mod tests {
                 CicsDisposition::Complete
             );
         }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn named_delay_cancel_survives_sqlite_reopen() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-delay-cancel-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let issuer = invocation_for("named-delay-reopen", BTreeMap::new());
+        let issuer_session = SessionId::new("named-delay-reopen-session", 64).unwrap();
+        let arguments = BTreeMap::from([
+            ("INTERVAL".into(), cics_decimal(1)),
+            (
+                "DELAY.ID".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.delay-id@1",
+                    format!("{}:7", issuer.run_unit_id).into_bytes(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            ),
+            ("REQID".into(), cics_literal(b"WAITSQL1")),
+        ]);
+
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = CicsService::open_with_runtime(
+                authorities(),
+                store.clone(),
+                store,
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(1_000)),
+            )
+            .unwrap();
+            service.create_session(&issuer_session, 24, 80).unwrap();
+            service
+                .register_run(issuer.clone(), &issuer_session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let delay = request(CicsOperation::Delay, arguments.clone(), 1);
+            assert_eq!(
+                service
+                    .invoke(&effect(&issuer.run_unit_id, delay.clone(), 1), delay)
+                    .unwrap()
+                    .disposition,
+                CicsDisposition::Suspended
+            );
+        }
+
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = CicsService::open_with_runtime(
+                authorities(),
+                store.clone(),
+                store,
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(1_000)),
+            )
+            .unwrap();
+            service
+                .register_run(issuer.clone(), &issuer_session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let canceller = invocation_for("named-delay-cancel-reopen", BTreeMap::new());
+            let canceller_session = SessionId::new("named-delay-cancel-session", 64).unwrap();
+            service.create_session(&canceller_session, 24, 80).unwrap();
+            service
+                .register_run(
+                    canceller.clone(),
+                    &canceller_session,
+                    "MENU",
+                    "MEAPPL",
+                    "MESYS",
+                )
+                .unwrap();
+            let cancel = request(
+                CicsOperation::Cancel,
+                BTreeMap::from([("REQID".into(), argument(b"WAITSQL1"))]),
+                10,
+            );
+            service
+                .invoke(&effect(&canceller.run_unit_id, cancel.clone(), 10), cancel)
+                .unwrap();
+            let resumed = request(CicsOperation::Delay, arguments, 2);
+            let response = service
+                .invoke(&effect(&issuer.run_unit_id, resumed.clone(), 2), resumed)
+                .unwrap();
+            assert_eq!((response.response, response.response2), (0, 23));
+        }
+
         std::fs::remove_dir_all(root).unwrap();
     }
 

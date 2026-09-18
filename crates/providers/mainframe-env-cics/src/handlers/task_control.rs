@@ -507,7 +507,7 @@ fn abend(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     validate_abend_request(request)?;
-    super::release_task_enqueues(service, run)?;
+    super::release_task_state(service, run)?;
     let code = argument_bytes(request, "ABCODE").unwrap_or_default();
     let dump_requested =
         !request.arguments.contains_key("OPTION.NODUMP") && valid_abend_code(&code);

@@ -6,20 +6,29 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added local application-named CICS DELAY cancellation and task cleanup.
+  Positive literal INTERVAL may bind a one-to-eight-character REQID; another
+  task can cancel it before expiration, the original DELAY resumes with NORMAL
+  RESP2 23, and exact replay/NOTFND/expiration races remain fenced by the delay
+  row and work identity. Disconnect, timeout, return, abend, and terminal
+  teardown abandon outstanding delays and cancel their work. The version-two
+  row codec retains version-one reads and survives SQLite reopen. Remote
+  routing, TIME/units, automatic redispatch, PostgreSQL evidence, generic
+  retention, and licensed differential remain pending.
+
 - Added positive literal CICS DELAY intervals over the shared durable worker
   lane. Each task/statement cycle persists a strict versioned delay row and one
   `cics-delay-v1` work item, suspends until fenced due promotion, completes on
   reissue, survives SQLite reopen, and creates a fresh identity when a loop
-  reaches the statement again. TIME and explicit units, named cancellation,
-  timeout/task cleanup, automatic redispatch, PostgreSQL evidence, and licensed
-  differential remain pending.
+  reaches the statement again. TIME and explicit units, automatic redispatch,
+  PostgreSQL evidence, and licensed differential remain pending.
 
 - Added the typed zero-delay CICS DELAY boundary. Bare/default DELAY and
   compile-time literal INTERVAL(0) now cross the typed compiler, plan,
   interpreter, canonical host request, provider, durable coordinator, and
   selected product route without creating timer state or suspending the task.
-  Dynamic timing, TIME, FOR/UNTIL units, REQID/CANCEL, EXPIRED, and automatic
-  resumption remain pending.
+  Dynamic timing, TIME, FOR/UNTIL units, REQID on zero delay, EXPIRED, and
+  automatic resumption remain pending.
 
 - Added the typed bounded local CICS CANCEL route for unhonored committed START
   records. Explicit REQID with optional local TRANSID now authorizes the target,

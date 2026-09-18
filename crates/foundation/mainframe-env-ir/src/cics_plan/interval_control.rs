@@ -19,12 +19,25 @@ pub(super) fn invalid_shape(
                 || outputs.contains(&CicsOutputName::Into)
         }
         CicsPlanOperation::Delay => {
-            let allowed = BTreeSet::from([CicsOperandName::Interval]);
+            let allowed = BTreeSet::from([CicsOperandName::Interval, CicsOperandName::ReqId]);
             !inputs.is_subset(&allowed)
                 || plan.operands.iter().any(|operand| {
-                    operand.name != CicsOperandName::Interval
-                        || !matches!(operand.value, CicsOperandValue::Integer(value) if valid_hhmmss(value))
+                    match operand.name {
+                        CicsOperandName::Interval => {
+                            !matches!(operand.value, CicsOperandValue::Integer(value) if valid_hhmmss(value))
+                        }
+                        CicsOperandName::ReqId => !matches!(
+                            operand.value,
+                            CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+                        ),
+                        _ => true,
+                    }
                 })
+                || inputs.contains(&CicsOperandName::ReqId)
+                    && !matches!(
+                        operand_value(plan, CicsOperandName::Interval),
+                        Some(CicsOperandValue::Integer(value)) if *value > 0
+                    )
                 || scheduling_options
                 || outputs.contains(&CicsOutputName::Into)
         }

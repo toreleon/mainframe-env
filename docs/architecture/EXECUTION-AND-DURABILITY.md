@@ -211,9 +211,15 @@ the online exchange and continuation attached, reissues the command, and only
 the ready-to-consumed CAS completes it. The same consumer request replays the
 completion, while a later loop encounter creates a new cycle and work identity.
 Provider open strictly validates retained rows, and Memory and SQLite reopen
-preserve the transition. Named cancellation, task-timeout cleanup, automatic
-redispatch, TIME/explicit units, PostgreSQL evidence, and retention eligibility
-remain separate obligations.
+preserve the transition. A positive literal delay may also carry a bounded
+application REQID. Another task can atomically turn an unexpired pending cycle
+into early expiration, cancel its queued work, and let the suspended issuer
+complete with NORMAL RESP2 23; issuer cancellation and cancellation after the
+expiration boundary return NOTFND. Disconnect, timeout, return, abend, and
+terminal teardown move an outstanding cycle to an abandoned tombstone and
+cancel queued or claimed work. Version-two rows retain strict version-one
+reads. Automatic redispatch, TIME/explicit units, remote routing, PostgreSQL
+evidence, and retention eligibility remain separate obligations.
 
 An ENQ wait is not a terminal-input handoff. Its execution remains
 `Suspended`, and both the coordinator checkpoint and product continuation stay

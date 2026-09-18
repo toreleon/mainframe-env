@@ -88,7 +88,7 @@ impl CicsService {
                 .insert(session.as_str().into(), released);
         }
         if let Some(run) = state.runs.get(&run_id).cloned() {
-            handlers::release_task_enqueues(self, &run)?;
+            handlers::release_task_state(self, &run)?;
         }
         state.runs.remove(&run_id);
         Ok(trace)
@@ -137,7 +137,7 @@ impl CicsService {
                 .continuations
                 .insert(session.as_str().into(), released);
         }
-        handlers::release_task_enqueues(self, &run)?;
+        handlers::release_task_state(self, &run)?;
         state.runs.remove(&run_id);
         Ok(())
     }

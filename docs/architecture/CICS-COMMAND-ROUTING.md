@@ -97,8 +97,10 @@ The typed DELAY route completes bare/default and literal-zero INTERVAL without
 timer state. Valid positive packed literal INTERVAL values bind a hidden
 task/statement identity, persist one versioned cycle and shared work item, and
 reissue from the durable checkpoint only after lease-fenced due promotion.
-Dynamic intervals, TIME and explicit units, REQID cancellation, automatic
-redispatch, and task-timeout cleanup remain explicit gaps.
+Positive literal delays may bind a bounded REQID for other-task local CANCEL;
+task teardown abandons their durable cycle and cancels work. Dynamic intervals,
+TIME and explicit units, remote cancellation, and automatic redispatch remain
+explicit gaps.
 `ABEND` also lowers through a typed task plan: ABCODE is captured as a bounded
 literal or a pre-resolved 1–4 character storage input, and CANCEL/NODUMP remain
 distinct flags. Retained raw ABEND artifacts remain readable, but new

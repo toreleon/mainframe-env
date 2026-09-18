@@ -82,7 +82,7 @@ pub(in crate::service) fn invoke(
             .map_err(mutation_problem)?;
         state.continuations.remove(&run.session);
     }
-    super::release_task_enqueues(service, run)?;
+    super::release_task_state(service, run)?;
     service.response(
         run,
         CicsDisposition::Returned,

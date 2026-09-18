@@ -24,6 +24,18 @@ pub(super) fn validate_constraints(
                     .into(),
             ));
         }
+        HirCicsOperation::Delay
+            if clauses.contains_key("REQID")
+                && clauses
+                    .get("INTERVAL")
+                    .and_then(|value| value.first())
+                    .and_then(|value| value.parse::<i64>().ok())
+                    .is_none_or(|value| value == 0) =>
+        {
+            return Err(ResolutionFailure::Invalid(
+                "typed CICS DELAY REQID requires a positive literal INTERVAL".into(),
+            ));
+        }
         HirCicsOperation::Start => {
             if clauses.contains_key("INTERVAL") && clauses.contains_key("TIME") {
                 return Err(ResolutionFailure::Invalid(
@@ -70,15 +82,22 @@ fn delay_operands(
     clauses: &Clauses,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
-    clauses
+    let mut operands = clauses
         .get("INTERVAL")
         .map(|value| {
-            Ok(vec![HirCicsNamedOperand {
+            Ok::<_, ResolutionFailure>(vec![HirCicsNamedOperand {
                 name: HirCicsOperandName::Interval,
                 value: cics_integer_value(value, semantic)?,
             }])
         })
-        .unwrap_or_else(|| Ok(Vec::new()))
+        .unwrap_or_else(|| Ok(Vec::new()))?;
+    if let Some(request_id) = clauses.get("REQID") {
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::ReqId,
+            value: bounded_name(request_id, semantic, 8, "DELAY", "REQID")?,
+        });
+    }
+    Ok(operands)
 }
 
 fn cancel_operands(
