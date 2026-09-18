@@ -748,7 +748,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "QUEUE", "RESP", "RESP2",
         ],
         HirCicsOperation::Retrieve => &[
-            "INTO", "LENGTH", "RTRANSID", "RTERMID", "QUEUE", "RESP", "RESP2",
+            "INTO", "SET", "LENGTH", "RTRANSID", "RTERMID", "QUEUE", "RESP", "RESP2",
         ],
     };
     let allowed_options: &[&str] = match operation {
@@ -862,7 +862,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::Suspend => &[][..],
         HirCicsOperation::Cancel => &["REQID"][..],
         HirCicsOperation::Start => &["TRANSID", "REQID", "FROM"][..],
-        HirCicsOperation::Retrieve => &["INTO", "LENGTH"][..],
+        HirCicsOperation::Retrieve => &["LENGTH"][..],
         HirCicsOperation::Deq | HirCicsOperation::Enq => &["RESOURCE"][..],
         HirCicsOperation::Link | HirCicsOperation::Xctl => &["PROGRAM"][..],
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA"][..],
@@ -1015,15 +1015,20 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         operands.extend(format_time::operands(&clauses, semantic)?);
     }
     let mut outputs = output_bindings::resolve(&clauses, &raw_options, operation, semantic)?;
-    if matches!(
-        operation,
-        HirCicsOperation::Read | HirCicsOperation::Retrieve
-    ) && let Some(HirCicsNamedOperand {
-        value: HirCicsValue::Data(target),
-        ..
-    }) = operands
-        .iter()
-        .find(|operand| operand.name == HirCicsOperandName::Length)
+    if operation == HirCicsOperation::Retrieve {
+        let target = complete_data_reference(&clauses["LENGTH"], semantic)?;
+        require_writable(&target)?;
+        outputs.push(HirCicsOutputBinding {
+            name: HirCicsOutputName::Length,
+            target,
+        });
+    } else if operation == HirCicsOperation::Read
+        && let Some(HirCicsNamedOperand {
+            value: HirCicsValue::Data(target),
+            ..
+        }) = operands
+            .iter()
+            .find(|operand| operand.name == HirCicsOperandName::Length)
     {
         require_writable(target)?;
         outputs.push(HirCicsOutputBinding {

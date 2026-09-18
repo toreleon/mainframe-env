@@ -77,6 +77,13 @@ eligible for generic retention. Schema rollback therefore requires stopping
 admission and restoring a pre-change backup; older binaries must not write a
 store containing these rows.
 
+RETRIEVE SET capacity is fenced before that consumed transition. Preserve the
+canonical `SET.MAXLENGTH` request metadata in effect journals, and preserve the
+machine checkpoint's allocated base, pointer bytes, and linkage-address map as
+one unit. Removing only the allocated base can turn a valid virtual pointer
+into corrupt task state; reducing task storage limits can make a retained
+pre-response request fail closed instead of consuming its record.
+
 Also retain the matching shared work row whose ID is `cics-start:<REQID>` and
 generation is `cics-start-v1`. A queued row makes the pending interval record
 eligible at its expiration tick; a claimed row is fenced by its lease ID and

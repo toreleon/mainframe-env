@@ -6,12 +6,21 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added RETRIEVE SET over interpreter-owned virtual storage. Typed RETRIEVE now
+  accepts exactly one of INTO or a POINTER/POINTER-32 SET target with mandatory
+  LENGTH. SET returns the full START record, writes its actual length, and
+  installs a checked non-native pointer to task-owned bytes that survive
+  checkpoint/resume. The interpreter advertises its exact remaining allocation
+  capacity before the provider's consume CAS, so capacity failure leaves the
+  ready record available. WAIT, terminal association, automatic task launch,
+  PostgreSQL, and licensed evidence remain pending.
+
 - Added START FMH propagation through RETRIEVE. The typed START data route now
   persists the source FMH flag in its versioned interval row; successful
   RETRIEVE returns a strict one-byte EIBFMH value (`X'FF'` with FMH, `X'00'`
   otherwise), and the interpreter owns the implicit EIB field across compiled
   checkpoint/resume. Historical retained responses without the additive output
-  remain readable. Broader FMH parsing, SET, WAIT, terminal association,
+  remain readable. Broader FMH parsing, WAIT, terminal association,
   automatic task launch, PostgreSQL, and licensed evidence remain pending.
 
 - Added bounded START-to-RETRIEVE metadata propagation. Local data-bearing
@@ -20,7 +29,7 @@ All notable changes to mainframe-env are documented here.
   exact-width metadata outputs alongside INTO/LENGTH. Requesting metadata the
   corresponding START omitted returns ENVDEFERR without consuming the ready
   record. Compiler, plan codec, interpreter, provider, SQLite-compatible state,
-  and the compiled product route share the same identities. SET, WAIT,
+  and the compiled product route share the same identities. WAIT,
   terminal association, automatic task launch, PostgreSQL, and licensed
   evidence remain pending.
 

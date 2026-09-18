@@ -130,8 +130,10 @@ request exact-width writable destinations for any corresponding value.
 ENVDEFERR is decided before one-time consumption when the producer omitted a
 requested field. START FMH is persisted with the data record; RETRIEVE emits a
 strict typed EIBFMH byte that the interpreter applies to its implicit EIB
-state. SET, WAIT, terminal association, and automatic task launch remain
-fail-closed or deferred.
+state. RETRIEVE may alternatively use SET with mandatory LENGTH: the compiler
+requires a pointer target, and the interpreter returns task-owned bytes through
+its checked virtual-address model. WAIT, terminal association, and automatic
+task launch remain fail-closed or deferred.
 The typed default-cursor file-browse subset binds STARTBR, READNEXT, READPREV,
 and ENDBR to exactly one FILE/DATASET alias. STARTBR captures a writable
 RIDFLD without returning a record and admits the default-equivalent `GTEQ`

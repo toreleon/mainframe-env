@@ -49,10 +49,11 @@ pub(super) fn validate_constraints(
             }
         }
         HirCicsOperation::Retrieve
-            if !clauses.contains_key("INTO") || !clauses.contains_key("LENGTH") =>
+            if clauses.contains_key("INTO") == clauses.contains_key("SET")
+                || !clauses.contains_key("LENGTH") =>
         {
             return Err(ResolutionFailure::Invalid(
-                "typed CICS RETRIEVE requires INTO and LENGTH".into(),
+                "typed CICS RETRIEVE requires exactly one of INTO or SET plus LENGTH".into(),
             ));
         }
         _ => {}
@@ -205,14 +206,17 @@ fn retrieve_operands(
             }
         }
     }
-    let length = &clauses["LENGTH"];
-    let reference = complete_data_reference(length, semantic)?;
+    let reference = complete_data_reference(&clauses["LENGTH"], semantic)?;
     require_numeric(&reference)?;
     require_writable(&reference)?;
-    Ok(vec![HirCicsNamedOperand {
-        name: HirCicsOperandName::Length,
-        value: HirCicsValue::Data(reference),
-    }])
+    Ok(clauses
+        .contains_key("INTO")
+        .then_some(HirCicsNamedOperand {
+            name: HirCicsOperandName::Length,
+            value: HirCicsValue::Data(reference),
+        })
+        .into_iter()
+        .collect())
 }
 
 fn bounded_name(

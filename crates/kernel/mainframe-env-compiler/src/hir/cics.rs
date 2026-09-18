@@ -222,6 +222,7 @@ impl PlanContext<'_> {
                 HirCicsOutputName::Abstime => CicsOutputName::Abstime,
                 HirCicsOutputName::Commarea => CicsOutputName::Commarea,
                 HirCicsOutputName::Into => CicsOutputName::Into,
+                HirCicsOutputName::SetPointer => CicsOutputName::SetPointer,
                 HirCicsOutputName::Ridfld => CicsOutputName::Ridfld,
                 HirCicsOutputName::Milliseconds => CicsOutputName::Milliseconds,
                 HirCicsOutputName::Mmddyy => CicsOutputName::Mmddyy,

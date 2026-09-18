@@ -39,6 +39,7 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         CicsOutputName::Abstime => SlotUse::AbstimeOutput,
         CicsOutputName::Commarea => SlotUse::Output,
         CicsOutputName::Into => SlotUse::Output,
+        CicsOutputName::SetPointer => SlotUse::PointerOutput,
         CicsOutputName::Ridfld => SlotUse::Output,
         CicsOutputName::ReturnTransId | CicsOutputName::ReturnTermId | CicsOutputName::Queue => {
             SlotUse::Output
@@ -141,6 +142,7 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::Abstime => "ABSTIME",
         CicsOutputName::Commarea => "COMMAREA",
         CicsOutputName::Into => "INTO",
+        CicsOutputName::SetPointer => "SET",
         CicsOutputName::Ridfld => "RIDFLD",
         CicsOutputName::Milliseconds => "MILLISECONDS",
         CicsOutputName::Mmddyy => "MMDDYY",

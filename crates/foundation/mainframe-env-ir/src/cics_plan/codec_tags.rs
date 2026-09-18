@@ -230,6 +230,7 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u8 {
         CicsOutputName::ReturnTransId => 92,
         CicsOutputName::ReturnTermId => 93,
         CicsOutputName::Queue => 94,
+        CicsOutputName::SetPointer => 95,
     }
 }
 
@@ -252,6 +253,7 @@ pub(super) fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodec
         92 => Ok(CicsOutputName::ReturnTransId),
         93 => Ok(CicsOutputName::ReturnTermId),
         94 => Ok(CicsOutputName::Queue),
+        95 => Ok(CicsOutputName::SetPointer),
         value => CicsAssignOutput::from_tag(
             value
                 .checked_sub(ASSIGN_OUTPUT_TAG_BASE)

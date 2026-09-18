@@ -264,6 +264,7 @@ pub enum HirCicsOutputName {
     Abstime,
     Commarea,
     Into,
+    SetPointer,
     Ridfld,
     Milliseconds,
     Mmddyy,
@@ -3243,6 +3244,42 @@ mod tests {
                     .public_message()
                     .contains(deferred.split('(').next().unwrap())
             }));
+        }
+    }
+
+    #[test]
+    fn cics_retrieve_set_requires_a_pointer_and_has_output_only_length() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. RETSET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. 01 LENGTH-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS RETRIEVE SET(PTR-X) LENGTH(LENGTH-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("RETRIEVE SET: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed RETRIEVE SET");
+        assert_eq!(command.operation, HirCicsOperation::Retrieve);
+        assert!(command.operands.is_empty());
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::SetPointer && output.target.qualified_name == "PTR-X"
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::Length && output.target.qualified_name == "LENGTH-X"
+        }));
+
+        for invalid in [
+            "SET(DATA-X) LENGTH(LENGTH-X)",
+            "INTO(DATA-X) SET(PTR-X) LENGTH(LENGTH-X)",
+            "SET(PTR-X)",
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADSET. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). 01 PTR-X POINTER. 01 LENGTH-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS RETRIEVE {invalid} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{invalid}");
         }
     }
 

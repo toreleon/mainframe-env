@@ -9,6 +9,7 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
         CicsPlanOperation::Read | CicsPlanOperation::Retrieve => matches!(
             output,
             CicsOutputName::Into
+                | CicsOutputName::SetPointer
                 | CicsOutputName::Resp
                 | CicsOutputName::Resp2
                 | CicsOutputName::Length

@@ -4790,13 +4790,83 @@ mod tests {
             .unwrap();
         assert_eq!(replayed, retrieved);
 
+        let set_start = request(
+            CicsOperation::Start,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"NEXT")),
+                ("REQID".into(), argument(b"REQ0002")),
+                ("FROM".into(), argument(b"SETDATA")),
+                ("LENGTH".into(), cics_decimal(7)),
+                ("INTERVAL".into(), cics_decimal(0)),
+            ]),
+            3,
+        );
+        service
+            .invoke(
+                &effect(&issuer.run_unit_id, set_start.clone(), 3),
+                set_start,
+            )
+            .unwrap();
+        let work = store
+            .claim("cics-worker", Some(CICS_START_WORK_GENERATION), 1_000, 100)
+            .unwrap()
+            .unwrap();
+        assert_eq!(work.payload, b"REQ0002");
+        service.promote_start_work(&work, 1_000).unwrap();
+        store
+            .complete(
+                &work.work_id,
+                work.lease_id.as_deref().unwrap(),
+                work.lease_epoch,
+                1_000,
+            )
+            .unwrap();
+
+        let mut undersized_set = request(
+            CicsOperation::Retrieve,
+            BTreeMap::from([
+                ("SET".into(), argument(b"PTR-X")),
+                ("SET.MAXLENGTH".into(), cics_decimal(3)),
+                ("LENGTH".into(), argument(b"LENGTH-X")),
+            ]),
+            4,
+        );
+        undersized_set.mutation.as_mut().unwrap().transaction = Some("NEXT".into());
+        assert_eq!(
+            service.invoke(
+                &effect(&next.run_unit_id, undersized_set.clone(), 4),
+                undersized_set,
+            ),
+            Err(HostProblem::ResourceExhausted)
+        );
+        let mut retrieve_set = request(
+            CicsOperation::Retrieve,
+            BTreeMap::from([
+                ("SET".into(), argument(b"PTR-X")),
+                ("SET.MAXLENGTH".into(), cics_decimal(16)),
+                ("LENGTH".into(), argument(b"LENGTH-X")),
+            ]),
+            5,
+        );
+        retrieve_set.mutation.as_mut().unwrap().transaction = Some("NEXT".into());
+        let retrieved_set = service
+            .invoke(
+                &effect(&next.run_unit_id, retrieve_set.clone(), 5),
+                retrieve_set,
+            )
+            .unwrap();
+        assert_eq!(retrieved_set.payload.bytes(), b"SETDATA");
+        assert_eq!(retrieved_set.outputs["SET"].bytes(), b"SETDATA");
+        assert_eq!(retrieved_set.outputs["LENGTH"].bytes(), b"7");
+        assert!(!retrieved_set.outputs.contains_key("INTO"));
+
         let mut exhausted = request(
             CicsOperation::Retrieve,
             BTreeMap::from([
                 ("INTO".into(), argument(b"DATA-OUT")),
                 ("LENGTH".into(), cics_decimal(16)),
             ]),
-            3,
+            6,
         );
         exhausted.mutation.as_mut().unwrap().transaction = Some("NEXT".into());
         exhausted.condition_policy = CicsConditionPolicy::Respond {
@@ -4804,7 +4874,7 @@ mod tests {
             response2_field: Some("RESP2".into()),
         };
         let exhausted = service
-            .invoke(&effect(&next.run_unit_id, exhausted.clone(), 3), exhausted)
+            .invoke(&effect(&next.run_unit_id, exhausted.clone(), 6), exhausted)
             .unwrap();
         assert_eq!(
             (

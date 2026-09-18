@@ -281,6 +281,8 @@ pub enum CicsPlanOption {
 pub enum CicsOutputName {
     /// Record payload destination.
     Into,
+    /// Pointer receiving interpreter-owned retrieved storage.
+    SetPointer,
     /// Returned browse record identifier.
     Ridfld,
     /// Returned communication-area destination.
@@ -1319,6 +1321,8 @@ mod tests {
         assert_eq!(operand_from_tag(26), Ok(CicsOperandName::KeyLength));
         assert_eq!(output_tag(CicsOutputName::Length), 91);
         assert_eq!(output_from_tag(91), Ok(CicsOutputName::Length));
+        assert_eq!(output_tag(CicsOutputName::SetPointer), 95);
+        assert_eq!(output_from_tag(95), Ok(CicsOutputName::SetPointer));
 
         let plan = read_plan();
         let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
@@ -2117,6 +2121,48 @@ mod tests {
             .outputs
             .retain(|output| output.name != CicsOutputName::Resp);
         assert!(encode_cics_effect_plan(&bad_response, limits).is_err());
+    }
+
+    #[test]
+    fn retrieve_set_requires_a_pointer_output_and_length_without_an_input_maximum() {
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Retrieve,
+            operands: Vec::new(),
+            options: BTreeSet::new(),
+            outputs: vec![
+                CicsOutputBinding {
+                    name: CicsOutputName::SetPointer,
+                    target: slot(1, "RESULT.POINTER"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::Length,
+                    target: slot(2, "RESULT.LENGTH"),
+                },
+            ],
+            condition: CicsCondition::Default,
+        };
+        let limits = CicsPlanLimits::default();
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
+
+        let mut with_input_maximum = plan.clone();
+        with_input_maximum.operands.push(CicsNamedOperand {
+            name: CicsOperandName::Length,
+            value: CicsOperandValue::Storage(slot(2, "RESULT.LENGTH")),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&with_input_maximum, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut both_destinations = plan;
+        both_destinations.outputs.push(CicsOutputBinding {
+            name: CicsOutputName::Into,
+            target: slot(3, "RESULT.DATA"),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&both_destinations, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
     }
 
     proptest! {

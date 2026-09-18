@@ -73,6 +73,7 @@ pub(super) fn invalid_shape(
         CicsPlanOperation::Retrieve => {
             let allowed_outputs = BTreeSet::from([
                 CicsOutputName::Into,
+                CicsOutputName::SetPointer,
                 CicsOutputName::Length,
                 CicsOutputName::ReturnTransId,
                 CicsOutputName::ReturnTermId,
@@ -80,15 +81,25 @@ pub(super) fn invalid_shape(
                 CicsOutputName::Resp,
                 CicsOutputName::Resp2,
             ]);
-            *inputs != BTreeSet::from([CicsOperandName::Length])
+            let into_form = outputs.contains(&CicsOutputName::Into);
+            let set_form = outputs.contains(&CicsOutputName::SetPointer);
+            into_form == set_form
+                || if into_form {
+                    *inputs != BTreeSet::from([CicsOperandName::Length])
+                } else {
+                    !inputs.is_empty()
+                }
                 || !outputs.is_subset(&allowed_outputs)
-                || !outputs.contains(&CicsOutputName::Into)
                 || !outputs.contains(&CicsOutputName::Length)
-                || match operand_value(plan, CicsOperandName::Length) {
-                    Some(CicsOperandValue::Storage(slot)) => {
-                        output_target(&plan.outputs, CicsOutputName::Length) != Some(slot)
+                || if into_form {
+                    match operand_value(plan, CicsOperandName::Length) {
+                        Some(CicsOperandValue::Storage(slot)) => {
+                            output_target(&plan.outputs, CicsOutputName::Length) != Some(slot)
+                        }
+                        Some(_) | None => true,
                     }
-                    Some(_) | None => true,
+                } else {
+                    operand_value(plan, CicsOperandName::Length).is_some()
                 }
                 || scheduling_options
         }

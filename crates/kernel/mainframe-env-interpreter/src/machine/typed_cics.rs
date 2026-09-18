@@ -12,6 +12,7 @@ use mainframe_env_ir::{
 mod assign;
 mod legacy;
 mod names;
+mod retrieve;
 pub(super) use legacy::execute_legacy;
 use names::SlotUse;
 
@@ -356,6 +357,17 @@ pub(super) fn execute(
                 outputs.insert(key.into(), target);
             }
             CicsOutputName::Into => into = Some(target),
+            CicsOutputName::SetPointer => {
+                let capacity = retrieve::allocation_capacity(machine, &target)?;
+                arguments.insert(
+                    "SET.MAXLENGTH".into(),
+                    payload(
+                        "mainframe-env.cics.decimal@1",
+                        capacity.to_string().into_bytes(),
+                    )?,
+                );
+                outputs.insert(key.into(), target);
+            }
             CicsOutputName::Ridfld => {
                 outputs.insert(key.into(), target);
             }
@@ -480,6 +492,9 @@ pub(super) fn write_output(
     target: &CicsTarget,
     value: &BoundedPayload,
 ) -> Result<(), MachineProblem> {
+    if name == "SET" {
+        return retrieve::write_set_output(machine, target, value);
+    }
     if matches!(name, "ABSTIME" | "MILLISECONDS" | "LENGTH")
         && value.schema() != "mainframe-env.cics.decimal@1"
         || matches!(

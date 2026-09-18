@@ -10306,11 +10306,11 @@ mod tests {
     fn compiled_start_and_retrieve_cross_shared_worker_and_durable_coordinator() {
         let starter = published_source_fixture(
             "STARTER",
-            "IDENTIFICATION DIVISION.\nPROGRAM-ID. STARTER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE 'PAYLOAD'.\n01 LENGTH-X PIC S9(4) COMP VALUE 7.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('NX00') REQID('REQ0001') FROM(DATA-X) LENGTH(LENGTH-X) INTERVAL(0) RTRANSID('BACK') RTERMID('T001') QUEUE('WORKQ') FMH RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. STARTER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE 'PAYLOAD'.\n01 DATA-Y PIC X(8) VALUE 'SETDATA'.\n01 LENGTH-X PIC S9(4) COMP VALUE 7.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('NX00') REQID('REQ0001') FROM(DATA-X) LENGTH(LENGTH-X) INTERVAL(0) RTRANSID('BACK') RTERMID('T001') QUEUE('WORKQ') FMH RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS START TRANSID('NX00') REQID('REQ0002') FROM(DATA-Y) LENGTH(LENGTH-X) INTERVAL(0) FMH RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
         );
         let receiver = published_source_fixture(
             "RECEIVER",
-            "IDENTIFICATION DIVISION.\nPROGRAM-ID. RECEIVER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE ALL 'Z'.\n01 LENGTH-X PIC S9(4) COMP VALUE 8.\n01 RTRANS-X PIC X(4) VALUE SPACES.\n01 RTERM-X PIC X(4) VALUE SPACES.\n01 QUEUE-X PIC X(8) VALUE SPACES.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS RETRIEVE INTO(DATA-X) LENGTH(LENGTH-X) RTRANSID(RTRANS-X) RTERMID(RTERM-X) QUEUE(QUEUE-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. RECEIVER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE ALL 'Z'.\n01 SET-DATA-X PIC X(8) VALUE ALL 'Q'.\n01 LENGTH-X PIC S9(4) COMP VALUE 8.\n01 SET-LENGTH-X PIC S9(4) COMP VALUE 0.\n01 PTR-X POINTER.\n01 RTRANS-X PIC X(4) VALUE SPACES.\n01 RTERM-X PIC X(4) VALUE SPACES.\n01 QUEUE-X PIC X(8) VALUE SPACES.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nLINKAGE SECTION.\n01 LINK-X PIC X(7).\nPROCEDURE DIVISION.\nEXEC CICS RETRIEVE INTO(DATA-X) LENGTH(LENGTH-X) RTRANSID(RTRANS-X) RTERMID(RTERM-X) QUEUE(QUEUE-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS RETRIEVE SET(PTR-X) LENGTH(SET-LENGTH-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nSET ADDRESS OF LINK-X TO PTR-X.\nMOVE LINK-X TO SET-DATA-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
         );
         let artifact_ref = |artifact: &PublishedArtifact| {
             ArtifactRef::new(
@@ -10391,13 +10391,16 @@ mod tests {
                 .any(|entry| entry.operation == CicsOperation::Start)
         );
 
-        let work = server
-            .claim_jes_work("interval-worker")
-            .unwrap()
-            .expect("due START work");
-        assert_eq!(work.required_generation, CICS_START_WORK_GENERATION);
-        let outcome = server.process_claimed_jes_work(&work).unwrap();
-        server.finish_claimed_jes_work(&work, Ok(outcome)).unwrap();
+        for request_id in [b"REQ0001".as_slice(), b"REQ0002".as_slice()] {
+            let work = server
+                .claim_jes_work("interval-worker")
+                .unwrap()
+                .expect("due START work");
+            assert_eq!(work.required_generation, CICS_START_WORK_GENERATION);
+            assert_eq!(work.payload, request_id);
+            let outcome = server.process_claimed_jes_work(&work).unwrap();
+            server.finish_claimed_jes_work(&work, Ok(outcome)).unwrap();
+        }
 
         let receiver_session = SessionId::new("interval-receiver", 64).unwrap();
         let receiver_invocation = server
@@ -10440,7 +10443,21 @@ mod tests {
             .restore_checkpoint(&continuation.checkpoint)
             .unwrap();
         assert_eq!(restored.variable("DATA-X").unwrap().bytes(), b"PAYLOAD ");
+        assert_eq!(
+            restored.variable("SET-DATA-X").unwrap().bytes(),
+            b"SETDATA "
+        );
+        assert_eq!(restored.variable("LINK-X").unwrap().bytes(), b"SETDATA");
         assert_eq!(restored.variable("LENGTH-X").unwrap().bytes(), &[0, 7]);
+        assert_eq!(restored.variable("SET-LENGTH-X").unwrap().bytes(), &[0, 7]);
+        assert!(
+            restored
+                .variable("PTR-X")
+                .unwrap()
+                .bytes()
+                .iter()
+                .any(|byte| *byte != 0)
+        );
         assert_eq!(restored.variable("RTRANS-X").unwrap().bytes(), b"BACK");
         assert_eq!(restored.variable("RTERM-X").unwrap().bytes(), b"T001");
         assert_eq!(restored.variable("QUEUE-X").unwrap().bytes(), b"WORKQ   ");

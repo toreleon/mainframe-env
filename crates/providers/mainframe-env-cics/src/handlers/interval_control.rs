@@ -329,6 +329,9 @@ fn retrieve(
         .as_ref()
         .ok_or(HostProblem::MissingIdempotency)?;
     let now_tick = service.durable_tick()?;
+    let max_data_length = optional_decimal(request, "SET.MAXLENGTH")?
+        .map(|value| usize::try_from(value).map_err(|_| HostProblem::Malformed))
+        .transpose()?;
     let digest = canonical_request_digest(&HostRequest::Cics(request.clone()))
         .map_err(|_| HostProblem::ResourceExhausted)?;
     let record = {
@@ -345,6 +348,7 @@ fn retrieve(
                 return_transaction: request.arguments.contains_key("RTRANSID"),
                 return_terminal: request.arguments.contains_key("RTERMID"),
                 queue: request.arguments.contains_key("QUEUE"),
+                max_data_length,
             },
             service.limits,
         )?
@@ -362,9 +366,13 @@ fn retrieve(
         );
     };
     let actual = record.data.len();
-    let maximum = optional_decimal(request, "LENGTH")?
-        .map(|value| usize::try_from(value.max(0)).unwrap_or(0))
-        .unwrap_or(actual);
+    let maximum = if request.arguments.contains_key("INTO") {
+        optional_decimal(request, "LENGTH")?
+            .map(|value| usize::try_from(value.max(0)).unwrap_or(0))
+            .unwrap_or(actual)
+    } else {
+        actual
+    };
     let returned = record.data[..actual.min(maximum)].to_vec();
     let mut response = if maximum < actual {
         super::condition::respond(
@@ -396,7 +404,14 @@ fn retrieve(
     )
     .map_err(|_| HostProblem::ResourceExhausted)?;
     response.payload = returned_payload.clone();
-    response.outputs.insert("INTO".into(), returned_payload);
+    if request.arguments.contains_key("INTO") {
+        response
+            .outputs
+            .insert("INTO".into(), returned_payload.clone());
+    }
+    if request.arguments.contains_key("SET") {
+        response.outputs.insert("SET".into(), returned_payload);
+    }
     if request.arguments.contains_key("LENGTH") {
         response.outputs.insert(
             "LENGTH".into(),
@@ -492,12 +507,24 @@ fn validate_retrieve_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "RESP2",
         "RTERMID",
         "RTRANSID",
+        "SET",
+        "SET.MAXLENGTH",
     ];
-    if !request.arguments.contains_key("INTO")
+    let into_form = request.arguments.contains_key("INTO");
+    let set_form = request.arguments.contains_key("SET");
+    if into_form == set_form
         || !request.arguments.contains_key("LENGTH")
+        || set_form != request.arguments.contains_key("SET.MAXLENGTH")
         || request.arguments.iter().any(|(name, value)| {
             !ALLOWED.contains(&name.as_str())
                 || if name == "LENGTH" {
+                    value.schema()
+                        != if into_form {
+                            "mainframe-env.cics.decimal@1"
+                        } else {
+                            "mainframe-env.cics.argument@1"
+                        }
+                } else if name == "SET.MAXLENGTH" {
                     value.schema() != "mainframe-env.cics.decimal@1"
                 } else if name == "OPTION.NOHANDLE" {
                     value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
@@ -614,6 +641,7 @@ pub(in crate::service) struct IntervalConsumeRequest<'a> {
     pub(in crate::service) return_transaction: bool,
     pub(in crate::service) return_terminal: bool,
     pub(in crate::service) queue: bool,
+    pub(in crate::service) max_data_length: Option<usize>,
 }
 
 pub(in crate::service) fn load(
@@ -823,6 +851,12 @@ pub(in crate::service) fn consume_next(
             response: 56,
             response2: 0,
         });
+    }
+    if request
+        .max_data_length
+        .is_some_and(|maximum| selected.data.len() > maximum)
+    {
+        return Err(HostProblem::ResourceExhausted);
     }
     replace_state(
         store,
@@ -1231,6 +1265,7 @@ mod tests {
             return_transaction: false,
             return_terminal: false,
             queue: false,
+            max_data_length: None,
         };
         let first = consume_next(store.as_ref(), &mut records, request.clone(), limits)
             .unwrap()
@@ -1256,6 +1291,7 @@ mod tests {
                     return_transaction: false,
                     return_terminal: false,
                     queue: false,
+                    max_data_length: None,
                 },
                 limits,
             )
@@ -1285,6 +1321,7 @@ mod tests {
             return_transaction: false,
             return_terminal: false,
             queue: true,
+            max_data_length: None,
         };
         assert_eq!(
             consume_next(store.as_ref(), &mut records, requested.clone(), limits),
@@ -1364,6 +1401,7 @@ mod tests {
                 return_transaction: false,
                 return_terminal: false,
                 queue: false,
+                max_data_length: None,
             },
             limits,
         )

@@ -178,11 +178,12 @@ adds one `cics-start-v1` work row for each accepted START record. The core
 workers claim that generation under the ordinary lease/epoch fence and promote
 the matching record to ready; they do not yet create the target CICS task.
 Typed RETRIEVE then consumes the oldest ready record for the target transaction
-through explicit INTO and in/out LENGTH bindings. START admission, the work
-row, interval state, and replay receipts share the durable store, so a SQLite
-reopen preserves the producer-to-consumer cycle. Remote routing, terminal and
-protected starts, generated request identifiers, WAIT, SET, and automatic
-target-task launch remain outside this slice. The bounded metadata extension
+through explicit INTO and in/out LENGTH bindings, or through SET with an
+output-only LENGTH. START admission, the work row, interval state, and replay
+receipts share the durable store, so a SQLite reopen preserves the
+producer-to-consumer cycle. Remote routing, terminal and protected starts,
+generated request identifiers, WAIT, and automatic target-task launch remain
+outside this slice. The bounded metadata extension
 also accepts local START RTRANSID, RTERMID, and QUEUE names and returns only the
 requested values through exact-width RETRIEVE outputs. A requested value absent
 from the producing START returns ENVDEFERR before the record is consumed, so a
@@ -192,6 +193,15 @@ START's FMH flag is retained in that row. RETRIEVE emits one strict typed
 EIBFMH byte, and the interpreter updates its implicit field to `X'FF'` for FMH
 data or `X'00'` otherwise. Historical replay responses without this additive
 output preserve their prior implicit value.
+
+For SET, the interpreter places its exact remaining task-allocation capacity in
+the canonical host request. The interval authority rejects a larger record
+before its consumed-state CAS. A successful response is copied into a new
+bounded virtual base, and only its checked four- or eight-byte virtual address
+is written to the COBOL pointer. Base bytes, pointer value, and linkage-address
+state use the ordinary machine checkpoint codec, so replay from the same
+pre-response checkpoint recreates the same allocation identity without exposing
+a native address.
 
 Typed local CANCEL requires an explicit REQID and accepts an optional local
 TRANSID solely for routing authorization. It first verifies the matching shared
