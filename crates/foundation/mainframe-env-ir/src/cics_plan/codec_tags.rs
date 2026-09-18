@@ -124,6 +124,8 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::ReqId => 27,
         CicsOperandName::Interval => 28,
         CicsOperandName::StartTime => 29,
+        CicsOperandName::ReturnTransId => 30,
+        CicsOperandName::ReturnTermId => 31,
     }
 }
 
@@ -159,6 +161,8 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         27 => Ok(CicsOperandName::ReqId),
         28 => Ok(CicsOperandName::Interval),
         29 => Ok(CicsOperandName::StartTime),
+        30 => Ok(CicsOperandName::ReturnTransId),
+        31 => Ok(CicsOperandName::ReturnTermId),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -221,6 +225,9 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u8 {
         CicsOutputName::Ridfld => 12,
         CicsOutputName::Assign(output) => ASSIGN_OUTPUT_TAG_BASE + output.tag(),
         CicsOutputName::Length => 91,
+        CicsOutputName::ReturnTransId => 92,
+        CicsOutputName::ReturnTermId => 93,
+        CicsOutputName::Queue => 94,
     }
 }
 
@@ -240,6 +247,9 @@ pub(super) fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodec
         11 => Ok(CicsOutputName::Commarea),
         12 => Ok(CicsOutputName::Ridfld),
         91 => Ok(CicsOutputName::Length),
+        92 => Ok(CicsOutputName::ReturnTransId),
+        93 => Ok(CicsOutputName::ReturnTermId),
+        94 => Ok(CicsOutputName::Queue),
         value => CicsAssignOutput::from_tag(
             value
                 .checked_sub(ASSIGN_OUTPUT_TAG_BASE)

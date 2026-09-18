@@ -124,6 +124,12 @@ continuation identity. RETURN carries no COMMAREA output. `LENGTH(LENGTH OF
 commarea)` selects the captured prefix; other explicit lengths, channel,
 input-message, IMMEDIATE, ENDACTIVITY, higher-level, and DPL forms remain
 fail-closed.
+The typed local START/RETRIEVE data cycle also carries the bounded metadata
+subset: START may supply RTRANSID, RTERMID, and QUEUE names, and RETRIEVE may
+request exact-width writable destinations for any corresponding value.
+ENVDEFERR is decided before one-time consumption when the producer omitted a
+requested field. SET, WAIT, FMH, terminal association, and automatic task
+launch remain fail-closed or deferred.
 The typed default-cursor file-browse subset binds STARTBR, READNEXT, READPREV,
 and ENDBR to exactly one FILE/DATASET alias. STARTBR captures a writable
 RIDFLD without returning a record and admits the default-equivalent `GTEQ`

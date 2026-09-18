@@ -12,6 +12,9 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
                 | CicsOutputName::Resp
                 | CicsOutputName::Resp2
                 | CicsOutputName::Length
+                | CicsOutputName::ReturnTransId
+                | CicsOutputName::ReturnTermId
+                | CicsOutputName::Queue
         ),
         CicsPlanOperation::FormatTime => matches!(
             output,

@@ -193,6 +193,16 @@ fn start(
         .ok_or(HostProblem::MissingIdempotency)?;
     let transaction = name_argument(request, "TRANSID", 4)?;
     let request_id = name_argument(request, "REQID", 8)?;
+    let return_transaction = optional_name_argument(request, "RTRANSID", 4)?;
+    let return_terminal = optional_name_argument(request, "RTERMID", 4)?;
+    let queue = optional_name_argument(request, "QUEUE", 8)?;
+    if queue.as_deref() == Some(request_id.as_str()) {
+        return Err(HostProblem::Condition {
+            name: "INVREQ".into(),
+            response: 16,
+            response2: 0,
+        });
+    }
     let source = request
         .arguments
         .get("FROM")
@@ -255,9 +265,9 @@ fn start(
         expiration_tick,
         terminal: None,
         data: source[..length].to_vec(),
-        return_transaction: None,
-        return_terminal: None,
-        queue: None,
+        return_transaction,
+        return_terminal,
+        queue,
         fmh: false,
         state: IntervalStartState::Pending,
         producer_effect_key: mutation.idempotency_key.as_str().into(),
@@ -332,6 +342,9 @@ fn retrieve(
                 now_tick,
                 effect_key: mutation.idempotency_key.as_str(),
                 request_digest: digest,
+                return_transaction: request.arguments.contains_key("RTRANSID"),
+                return_terminal: request.arguments.contains_key("RTERMID"),
+                queue: request.arguments.contains_key("QUEUE"),
             },
             service.limits,
         )?
@@ -395,6 +408,26 @@ fn retrieve(
             .map_err(|_| HostProblem::ResourceExhausted)?,
         );
     }
+    for (name, value) in [
+        ("RTRANSID", record.return_transaction.as_deref()),
+        ("RTERMID", record.return_terminal.as_deref()),
+        ("QUEUE", record.queue.as_deref()),
+    ] {
+        if request.arguments.contains_key(name) {
+            response.outputs.insert(
+                name.into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.payload@1",
+                    value
+                        .ok_or(HostProblem::InfrastructureFailure)?
+                        .as_bytes()
+                        .to_vec(),
+                    InvocationLimits::default(),
+                )
+                .map_err(|_| HostProblem::ResourceExhausted)?,
+            );
+        }
+    }
     Ok(response)
 }
 
@@ -404,9 +437,12 @@ fn validate_start_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "INTERVAL",
         "LENGTH",
         "OPTION.NOHANDLE",
+        "QUEUE",
         "REQID",
         "RESP",
         "RESP2",
+        "RTERMID",
+        "RTRANSID",
         "TIME",
         "TRANSID",
     ];
@@ -437,7 +473,16 @@ fn validate_start_request(request: &CicsRequest) -> Result<(), HostProblem> {
 }
 
 fn validate_retrieve_request(request: &CicsRequest) -> Result<(), HostProblem> {
-    const ALLOWED: &[&str] = &["INTO", "LENGTH", "OPTION.NOHANDLE", "RESP", "RESP2"];
+    const ALLOWED: &[&str] = &[
+        "INTO",
+        "LENGTH",
+        "OPTION.NOHANDLE",
+        "QUEUE",
+        "RESP",
+        "RESP2",
+        "RTERMID",
+        "RTRANSID",
+    ];
     if !request.arguments.contains_key("INTO")
         || !request.arguments.contains_key("LENGTH")
         || request.arguments.iter().any(|(name, value)| {
@@ -468,6 +513,18 @@ fn name_argument(request: &CicsRequest, name: &str, max: usize) -> Result<String
     } else {
         Err(HostProblem::Malformed)
     }
+}
+
+fn optional_name_argument(
+    request: &CicsRequest,
+    name: &str,
+    max: usize,
+) -> Result<Option<String>, HostProblem> {
+    request
+        .arguments
+        .contains_key(name)
+        .then(|| name_argument(request, name, max))
+        .transpose()
 }
 
 fn optional_decimal(request: &CicsRequest, name: &str) -> Result<Option<i64>, HostProblem> {
@@ -544,6 +601,9 @@ pub(in crate::service) struct IntervalConsumeRequest<'a> {
     pub(in crate::service) now_tick: u64,
     pub(in crate::service) effect_key: &'a str,
     pub(in crate::service) request_digest: [u8; 32],
+    pub(in crate::service) return_transaction: bool,
+    pub(in crate::service) return_terminal: bool,
+    pub(in crate::service) queue: bool,
 }
 
 pub(in crate::service) fn load(
@@ -741,6 +801,19 @@ pub(in crate::service) fn consume_next(
     let Some(request_id) = candidate else {
         return Ok(None);
     };
+    let selected = records
+        .get(&request_id)
+        .ok_or(HostProblem::InfrastructureFailure)?;
+    if request.return_transaction && selected.return_transaction.is_none()
+        || request.return_terminal && selected.return_terminal.is_none()
+        || request.queue && selected.queue.is_none()
+    {
+        return Err(HostProblem::Condition {
+            name: "ENVDEFERR".into(),
+            response: 56,
+            response2: 0,
+        });
+    }
     replace_state(
         store,
         records,
@@ -1145,6 +1218,9 @@ mod tests {
             now_tick: 150,
             effect_key: "consumer-1",
             request_digest: [9; 32],
+            return_transaction: false,
+            return_terminal: false,
+            queue: false,
         };
         let first = consume_next(store.as_ref(), &mut records, request.clone(), limits)
             .unwrap()
@@ -1167,6 +1243,9 @@ mod tests {
                     now_tick: 150,
                     effect_key: "consumer-2",
                     request_digest: [8; 32],
+                    return_transaction: false,
+                    return_terminal: false,
+                    queue: false,
                 },
                 limits,
             )
@@ -1176,6 +1255,49 @@ mod tests {
 
         let reopened = load(store.as_ref(), limits).unwrap();
         assert_eq!(reopened, records);
+    }
+
+    #[test]
+    fn missing_requested_metadata_returns_envdeferr_without_consuming() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let limits = CicsLimits::default();
+        let mut records = BTreeMap::new();
+        let mut missing = record("METALESS", 100, "producer-metadata");
+        missing.queue = None;
+        schedule(store.as_ref(), &mut records, missing, limits).unwrap();
+        promote_due(store.as_ref(), &mut records, 100, 8, limits).unwrap();
+        let requested = IntervalConsumeRequest {
+            transaction: "NEXT",
+            terminal: None,
+            now_tick: 100,
+            effect_key: "consumer-metadata",
+            request_digest: [5; 32],
+            return_transaction: false,
+            return_terminal: false,
+            queue: true,
+        };
+        assert_eq!(
+            consume_next(store.as_ref(), &mut records, requested.clone(), limits),
+            Err(HostProblem::Condition {
+                name: "ENVDEFERR".into(),
+                response: 56,
+                response2: 0,
+            })
+        );
+        assert_eq!(records["METALESS"].state, IntervalStartState::Ready);
+        assert!(
+            consume_next(
+                store.as_ref(),
+                &mut records,
+                IntervalConsumeRequest {
+                    queue: false,
+                    ..requested
+                },
+                limits,
+            )
+            .unwrap()
+            .is_some()
+        );
     }
 
     #[test]
@@ -1229,6 +1351,9 @@ mod tests {
                 now_tick: 100,
                 effect_key: "consumer-sql",
                 request_digest: [7; 32],
+                return_transaction: false,
+                return_terminal: false,
+                queue: false,
             },
             limits,
         )

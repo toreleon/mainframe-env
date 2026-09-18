@@ -161,6 +161,10 @@ pub enum CicsOperandName {
     Commarea,
     /// `TRANSID(...)` next-transaction name.
     TransId,
+    /// `RTRANSID(...)` metadata passed to a started task.
+    ReturnTransId,
+    /// `RTERMID(...)` metadata passed to a started task.
+    ReturnTermId,
     /// `FILE(...)` resource binding.
     File,
     /// `DATASET(...)` resource alias.
@@ -303,6 +307,12 @@ pub enum CicsOutputName {
     Assign(CicsAssignOutput),
     /// Actual record length destination for `READ`.
     Length,
+    /// Retrieved `RTRANSID(...)` metadata destination.
+    ReturnTransId,
+    /// Retrieved `RTERMID(...)` metadata destination.
+    ReturnTermId,
+    /// Retrieved `QUEUE(...)` metadata destination.
+    Queue,
 }
 
 /// One pre-resolved result binding.

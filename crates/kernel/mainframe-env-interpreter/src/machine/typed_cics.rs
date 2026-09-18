@@ -349,6 +349,9 @@ pub(super) fn execute(
             | CicsOutputName::Yyddd
             | CicsOutputName::Yymmdd
             | CicsOutputName::Yyyymmdd
+            | CicsOutputName::ReturnTransId
+            | CicsOutputName::ReturnTermId
+            | CicsOutputName::Queue
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }
@@ -479,7 +482,10 @@ pub(super) fn write_output(
 ) -> Result<(), MachineProblem> {
     if matches!(name, "ABSTIME" | "MILLISECONDS" | "LENGTH")
         && value.schema() != "mainframe-env.cics.decimal@1"
-        || matches!(name, "COMMAREA" | "RIDFLD") && value.schema() != "mainframe-env.cics.payload@1"
+        || matches!(
+            name,
+            "COMMAREA" | "RIDFLD" | "RTRANSID" | "RTERMID" | "QUEUE"
+        ) && value.schema() != "mainframe-env.cics.payload@1"
         || matches!(
             name,
             "MMDDYY" | "MMDDYYYY" | "TIME" | "YYDDD" | "YYMMDD" | "YYYYMMDD"

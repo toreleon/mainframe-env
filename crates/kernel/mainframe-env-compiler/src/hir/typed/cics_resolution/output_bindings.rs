@@ -21,6 +21,9 @@ pub(super) fn resolve(
         ("RESP", HirCicsOutputName::Resp),
         ("RESP2", HirCicsOutputName::Resp2),
         ("RIDFLD", HirCicsOutputName::Ridfld),
+        ("RTRANSID", HirCicsOutputName::ReturnTransId),
+        ("RTERMID", HirCicsOutputName::ReturnTermId),
+        ("QUEUE", HirCicsOutputName::Queue),
         ("TIME", HirCicsOutputName::Time),
         ("YYDDD", HirCicsOutputName::Yyddd),
         ("YYMMDD", HirCicsOutputName::Yymmdd),
@@ -34,6 +37,11 @@ pub(super) fn resolve(
                 operation,
                 HirCicsOperation::ReadNext | HirCicsOperation::ReadPrev
             )
+        {
+            continue;
+        }
+        if matches!(name, "RTRANSID" | "RTERMID" | "QUEUE")
+            && operation != HirCicsOperation::Retrieve
         {
             continue;
         }

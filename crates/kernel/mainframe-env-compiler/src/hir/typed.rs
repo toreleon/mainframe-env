@@ -194,6 +194,8 @@ pub enum HirCicsOperandName {
     Program,
     Commarea,
     TransId,
+    ReturnTransId,
+    ReturnTermId,
     File,
     Dataset,
     From,
@@ -273,6 +275,9 @@ pub enum HirCicsOutputName {
     Yyyymmdd,
     Assign(CicsAssignOutput),
     Length,
+    ReturnTransId,
+    ReturnTermId,
+    Queue,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -3165,7 +3170,7 @@ mod tests {
 
     #[test]
     fn cics_start_and_retrieve_lower_the_bounded_local_data_route() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. INTERVAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(16) VALUE 'PAYLOAD'. 01 LENGTH-X PIC S9(4) COMP VALUE 7. 01 WHEN-X PIC S9(6) COMP-3 VALUE 0. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') REQID('REQ0001') FROM(DATA-X) LENGTH(LENGTH-X) INTERVAL(WHEN-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. EXEC CICS RETRIEVE INTO(DATA-X) LENGTH(LENGTH-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. INTERVAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(16) VALUE 'PAYLOAD'. 01 LENGTH-X PIC S9(4) COMP VALUE 7. 01 WHEN-X PIC S9(6) COMP-3 VALUE 0. 01 RTRANS-X PIC X(4). 01 RTERM-X PIC X(4). 01 QUEUE-X PIC X(8). 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') REQID('REQ0001') FROM(DATA-X) LENGTH(LENGTH-X) INTERVAL(WHEN-X) RTRANSID('BACK') RTERMID('T001') QUEUE('WORKQ') RESP(RESP-X) RESP2(RESP2-X) END-EXEC. EXEC CICS RETRIEVE INTO(DATA-X) LENGTH(LENGTH-X) RTRANSID(RTRANS-X) RTERMID(RTERM-X) QUEUE(QUEUE-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);
         let hir = analysis
             .hir
@@ -3185,6 +3190,18 @@ mod tests {
             operand.name == HirCicsOperandName::ReqId
                 && operand.value == HirCicsValue::Literal("REQ0001".into())
         }));
+        for name in [
+            HirCicsOperandName::ReturnTransId,
+            HirCicsOperandName::ReturnTermId,
+            HirCicsOperandName::Queue,
+        ] {
+            assert!(
+                commands[0]
+                    .operands
+                    .iter()
+                    .any(|operand| operand.name == name)
+            );
+        }
         assert!(commands[0].operands.iter().any(|operand| {
             matches!(
                 operand,
@@ -3206,6 +3223,13 @@ mod tests {
                 .iter()
                 .any(|output| output.name == HirCicsOutputName::Length)
         );
+        for name in [
+            HirCicsOutputName::ReturnTransId,
+            HirCicsOutputName::ReturnTermId,
+            HirCicsOutputName::Queue,
+        ] {
+            assert!(commands[1].outputs.iter().any(|output| output.name == name));
+        }
 
         for deferred in ["TERMID('T001')", "USERID('OTHER')", "PROTECT"] {
             let analysis = analyze(&format!(

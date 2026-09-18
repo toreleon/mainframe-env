@@ -874,6 +874,9 @@ fn cics_slots(plan: &CicsEffectPlan) -> Vec<PlanSlot<'_>> {
             | CicsOutputName::Yyddd
             | CicsOutputName::Yymmdd
             | CicsOutputName::Yyyymmdd
+            | CicsOutputName::ReturnTransId
+            | CicsOutputName::ReturnTermId
+            | CicsOutputName::Queue
             | CicsOutputName::Assign(_) => SlotUse::WRITE,
             CicsOutputName::Abstime
             | CicsOutputName::Milliseconds

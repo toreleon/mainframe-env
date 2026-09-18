@@ -40,6 +40,9 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         CicsOutputName::Commarea => SlotUse::Output,
         CicsOutputName::Into => SlotUse::Output,
         CicsOutputName::Ridfld => SlotUse::Output,
+        CicsOutputName::ReturnTransId | CicsOutputName::ReturnTermId | CicsOutputName::Queue => {
+            SlotUse::Output
+        }
         CicsOutputName::Milliseconds => SlotUse::MillisecondsOutput,
         CicsOutputName::Mmddyy | CicsOutputName::Time | CicsOutputName::Yymmdd => {
             SlotUse::FormatTextOutput(8)
@@ -103,6 +106,8 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::Program => "PROGRAM",
         CicsOperandName::Commarea => "COMMAREA",
         CicsOperandName::TransId => "TRANSID",
+        CicsOperandName::ReturnTransId => "RTRANSID",
+        CicsOperandName::ReturnTermId => "RTERMID",
         CicsOperandName::File => "FILE",
         CicsOperandName::Dataset => "DATASET",
         CicsOperandName::From => "FROM",
@@ -148,6 +153,9 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::Yyyymmdd => "YYYYMMDD",
         CicsOutputName::Assign(output) => output.name(),
         CicsOutputName::Length => "LENGTH",
+        CicsOutputName::ReturnTransId => "RTRANSID",
+        CicsOutputName::ReturnTermId => "RTERMID",
+        CicsOutputName::Queue => "QUEUE",
     }
 }
 

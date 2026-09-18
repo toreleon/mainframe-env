@@ -67,7 +67,10 @@ single-region key profile.
 Back up `cics-interval-start-v1` with the CICS provider state. Do not delete or
 edit pending, protected-pending, ready, consumed, or cancelled rows manually. A row binds
 its REQID to the producing effect and canonical request; replacing it can turn
-a duplicate START into a false replay. A consumed row retains the exact
+a duplicate START into a false replay. Optional RTRANSID, RTERMID, and QUEUE
+metadata live in that same row and must not be split into a separate restore or
+manually synthesized; RETRIEVE uses their presence to decide ENVDEFERR before
+consumption. A consumed row retains the exact
 consumer identity needed to close the result-journal crash gap and is not yet
 eligible for generic retention. Schema rollback therefore requires stopping
 admission and restoring a pre-change backup; older binaries must not write a

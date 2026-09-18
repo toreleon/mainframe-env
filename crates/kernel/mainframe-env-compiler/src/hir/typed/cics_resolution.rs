@@ -744,9 +744,12 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Syncpoint => &["RESP", "RESP2"],
         HirCicsOperation::Suspend => &["RESP", "RESP2"],
         HirCicsOperation::Start => &[
-            "TRANSID", "REQID", "FROM", "LENGTH", "INTERVAL", "TIME", "RESP", "RESP2",
+            "TRANSID", "REQID", "FROM", "LENGTH", "INTERVAL", "TIME", "RTRANSID", "RTERMID",
+            "QUEUE", "RESP", "RESP2",
         ],
-        HirCicsOperation::Retrieve => &["INTO", "LENGTH", "RESP", "RESP2"],
+        HirCicsOperation::Retrieve => &[
+            "INTO", "LENGTH", "RTRANSID", "RTERMID", "QUEUE", "RESP", "RESP2",
+        ],
     };
     let allowed_options: &[&str] = match operation {
         HirCicsOperation::Abend => &["CANCEL", "NODUMP", "NOHANDLE"],

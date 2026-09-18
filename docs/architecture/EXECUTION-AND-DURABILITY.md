@@ -181,8 +181,13 @@ Typed RETRIEVE then consumes the oldest ready record for the target transaction
 through explicit INTO and in/out LENGTH bindings. START admission, the work
 row, interval state, and replay receipts share the durable store, so a SQLite
 reopen preserves the producer-to-consumer cycle. Remote routing, terminal and
-origin metadata, protected starts, generated request identifiers, FMH, WAIT,
-SET, and automatic target-task launch remain outside this slice.
+protected starts, generated request identifiers, FMH, WAIT, SET, and automatic
+target-task launch remain outside this slice. The bounded metadata extension
+also accepts local START RTRANSID, RTERMID, and QUEUE names and returns only the
+requested values through exact-width RETRIEVE outputs. A requested value absent
+from the producing START returns ENVDEFERR before the record is consumed, so a
+corrected canonical request can still retrieve it. Those fields use the same
+row codec and producer/consumer replay fence; they add no side queue or worker.
 
 Typed local CANCEL requires an explicit REQID and accepts an optional local
 TRANSID solely for routing authorization. It first verifies the matching shared

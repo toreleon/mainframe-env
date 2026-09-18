@@ -170,6 +170,18 @@ fn start_operands(
             });
         }
     }
+    for (clause, name, max) in [
+        ("RTRANSID", HirCicsOperandName::ReturnTransId, 4),
+        ("RTERMID", HirCicsOperandName::ReturnTermId, 4),
+        ("QUEUE", HirCicsOperandName::Queue, 8),
+    ] {
+        if let Some(value) = clauses.get(clause) {
+            operands.push(HirCicsNamedOperand {
+                name,
+                value: bounded_name(value, semantic, max, "START", clause)?,
+            });
+        }
+    }
     Ok(operands)
 }
 
@@ -177,6 +189,22 @@ fn retrieve_operands(
     clauses: &Clauses,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
+    for (name, length) in [("RTRANSID", 4), ("RTERMID", 4), ("QUEUE", 8)] {
+        if let Some(value) = clauses.get(name) {
+            let reference = complete_data_reference(value, semantic)?;
+            require_writable(&reference)?;
+            if reference.length != length
+                || !matches!(
+                    reference.category,
+                    DataCategory::Alphabetic | DataCategory::Alphanumeric
+                )
+            {
+                return Err(ResolutionFailure::Invalid(format!(
+                    "CICS RETRIEVE {name} requires an exact {length}-character writable area"
+                )));
+            }
+        }
+    }
     let length = &clauses["LENGTH"];
     let reference = complete_data_reference(length, semantic)?;
     require_numeric(&reference)?;

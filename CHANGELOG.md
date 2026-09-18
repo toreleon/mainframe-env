@@ -6,6 +6,16 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added bounded START-to-RETRIEVE metadata propagation. Local data-bearing
+  START now accepts source-checked RTRANSID, RTERMID, and QUEUE names, persists
+  them in the existing versioned interval row, and RETRIEVE writes requested
+  exact-width metadata outputs alongside INTO/LENGTH. Requesting metadata the
+  corresponding START omitted returns ENVDEFERR without consuming the ready
+  record. Compiler, plan codec, interpreter, provider, SQLite-compatible state,
+  and the compiled product route share the same identities. SET, WAIT, FMH,
+  terminal association, automatic task launch, PostgreSQL, and licensed
+  evidence remain pending.
+
 - Added local application-named CICS DELAY cancellation and task cleanup.
   Positive literal INTERVAL may bind a one-to-eight-character REQID; another
   task can cancel it before expiration, the original DELAY resumes with NORMAL

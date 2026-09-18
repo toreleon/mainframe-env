@@ -49,6 +49,9 @@ pub(super) fn invalid_shape(
                 CicsOperandName::Length,
                 CicsOperandName::Interval,
                 CicsOperandName::StartTime,
+                CicsOperandName::ReturnTransId,
+                CicsOperandName::ReturnTermId,
+                CicsOperandName::Queue,
             ]);
             !inputs.is_subset(&allowed)
                 || !inputs.contains(&CicsOperandName::TransId)
@@ -68,7 +71,17 @@ pub(super) fn invalid_shape(
                 || outputs.contains(&CicsOutputName::Into)
         }
         CicsPlanOperation::Retrieve => {
+            let allowed_outputs = BTreeSet::from([
+                CicsOutputName::Into,
+                CicsOutputName::Length,
+                CicsOutputName::ReturnTransId,
+                CicsOutputName::ReturnTermId,
+                CicsOutputName::Queue,
+                CicsOutputName::Resp,
+                CicsOutputName::Resp2,
+            ]);
             *inputs != BTreeSet::from([CicsOperandName::Length])
+                || !outputs.is_subset(&allowed_outputs)
                 || !outputs.contains(&CicsOutputName::Into)
                 || !outputs.contains(&CicsOutputName::Length)
                 || match operand_value(plan, CicsOperandName::Length) {

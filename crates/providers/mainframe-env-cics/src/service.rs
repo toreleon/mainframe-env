@@ -4721,6 +4721,9 @@ mod tests {
                 ("FROM".into(), argument(b"PAYLOAD")),
                 ("LENGTH".into(), cics_decimal(4)),
                 ("INTERVAL".into(), cics_decimal(0)),
+                ("RTRANSID".into(), argument(b"BACK")),
+                ("RTERMID".into(), argument(b"T001")),
+                ("QUEUE".into(), argument(b"WORKQ")),
             ]),
             1,
         );
@@ -4758,6 +4761,9 @@ mod tests {
             BTreeMap::from([
                 ("INTO".into(), argument(b"DATA-OUT")),
                 ("LENGTH".into(), cics_decimal(16)),
+                ("RTRANSID".into(), argument(b"RTRANS-X")),
+                ("RTERMID".into(), argument(b"RTERM-X")),
+                ("QUEUE".into(), argument(b"QUEUE-X")),
             ]),
             2,
         );
@@ -4770,6 +4776,9 @@ mod tests {
             .unwrap();
         assert_eq!(retrieved.outputs["INTO"].bytes(), b"PAYL");
         assert_eq!(retrieved.outputs["LENGTH"].bytes(), b"4");
+        assert_eq!(retrieved.outputs["RTRANSID"].bytes(), b"BACK");
+        assert_eq!(retrieved.outputs["RTERMID"].bytes(), b"T001");
+        assert_eq!(retrieved.outputs["QUEUE"].bytes(), b"WORKQ");
         assert_eq!(retrieved.payload.bytes(), b"PAYL");
         let replayed = service
             .invoke(

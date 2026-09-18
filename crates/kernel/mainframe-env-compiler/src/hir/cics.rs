@@ -172,6 +172,8 @@ impl PlanContext<'_> {
                 HirCicsOperandName::Program => CicsOperandName::Program,
                 HirCicsOperandName::Commarea => CicsOperandName::Commarea,
                 HirCicsOperandName::TransId => CicsOperandName::TransId,
+                HirCicsOperandName::ReturnTransId => CicsOperandName::ReturnTransId,
+                HirCicsOperandName::ReturnTermId => CicsOperandName::ReturnTermId,
                 HirCicsOperandName::File => CicsOperandName::File,
                 HirCicsOperandName::Dataset => CicsOperandName::Dataset,
                 HirCicsOperandName::From => CicsOperandName::From,
@@ -232,6 +234,9 @@ impl PlanContext<'_> {
                 HirCicsOutputName::Yyyymmdd => CicsOutputName::Yyyymmdd,
                 HirCicsOutputName::Assign(output) => CicsOutputName::Assign(output),
                 HirCicsOutputName::Length => CicsOutputName::Length,
+                HirCicsOutputName::ReturnTransId => CicsOutputName::ReturnTransId,
+                HirCicsOutputName::ReturnTermId => CicsOutputName::ReturnTermId,
+                HirCicsOutputName::Queue => CicsOutputName::Queue,
             },
             target: self.slot(&output.target)?,
         })
