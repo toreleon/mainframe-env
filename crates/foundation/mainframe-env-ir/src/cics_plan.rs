@@ -128,6 +128,10 @@ pub enum CicsPlanOperation {
     Assign,
     /// Discard the current full-BMS logical message, if one is being built.
     PurgeMessage,
+    /// Schedule one local interval-control START data record.
+    Start,
+    /// Consume one expired interval-control START data record.
+    Retrieve,
 }
 
 /// A resolved storage slot in the containing IR module.
@@ -196,6 +200,12 @@ pub enum CicsOperandName {
     TimeSep,
     /// `KEYLENGTH(...)` file key length.
     KeyLength,
+    /// `REQID(...)` interval-control request identity.
+    ReqId,
+    /// Packed `INTERVAL(...)` relative expiration.
+    Interval,
+    /// Packed `TIME(...)` absolute expiration.
+    StartTime,
 }
 
 /// Literal bytes or a runtime read from resolved storage.
@@ -749,6 +759,45 @@ fn validate_operation_shape(
         }
         CicsPlanOperation::PurgeMessage => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
+        }
+        CicsPlanOperation::Start => {
+            let allowed = BTreeSet::from([
+                CicsOperandName::TransId,
+                CicsOperandName::ReqId,
+                CicsOperandName::From,
+                CicsOperandName::Length,
+                CicsOperandName::Interval,
+                CicsOperandName::StartTime,
+            ]);
+            !inputs.is_subset(&allowed)
+                || !inputs.contains(&CicsOperandName::TransId)
+                || !inputs.contains(&CicsOperandName::ReqId)
+                || !inputs.contains(&CicsOperandName::From)
+                || inputs.contains(&CicsOperandName::Interval)
+                    && inputs.contains(&CicsOperandName::StartTime)
+                || plan.operands.iter().any(|operand| {
+                    matches!(
+                        operand.name,
+                        CicsOperandName::Length
+                            | CicsOperandName::Interval
+                            | CicsOperandName::StartTime
+                    ) && matches!(operand.value, CicsOperandValue::Literal(_))
+                })
+                || scheduling_options
+                || outputs.contains(&CicsOutputName::Into)
+        }
+        CicsPlanOperation::Retrieve => {
+            *inputs != BTreeSet::from([CicsOperandName::Length])
+                || !outputs.contains(&CicsOutputName::Into)
+                || !outputs.contains(&CicsOutputName::Length)
+                || match operand_value(plan, CicsOperandName::Length) {
+                    Some(CicsOperandValue::Storage(slot)) => {
+                        output_target(&plan.outputs, CicsOutputName::Length) != Some(slot)
+                    }
+                    Some(_) => true,
+                    None => true,
+                }
+                || scheduling_options
         }
     };
     if unexpected_output

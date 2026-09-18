@@ -67,14 +67,12 @@ It contains all 263 API registry shapes with deterministic recognition,
 option-shape, family, EIBFN and handler identities. Readiness is deliberately
 split:
 
-- 34 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
+- 36 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
   `SYNCPOINT` routes and the reviewed incremental family slices;
-- 1 `legacy-compatibility` API route that remains on the pre-existing raw
-  compatibility path; and
-- 228 `unready` rows that are recognized but fail explicitly as unsupported.
+- 0 `legacy-compatibility` API routes; and
+- 227 `unready` rows that are recognized but fail explicitly as unsupported.
 
-The remaining raw compatibility route's implemented option subset is owned by the
-separate versioned
+The now-empty raw compatibility set remains owned by the separate versioned
 [`legacy-execution-options.json`](../../conformance/0.9/cics/legacy-execution-options.json)
 catalog and its
 [`schema`](../../conformance/0.9/schemas/cics-legacy-execution-options.schema.json).
@@ -84,7 +82,7 @@ source receipts. The generator requires its route identities to match the
 legacy API runtime set exactly and verifies every admitted option against a
 current accepted source projection before emitting the registry.
 
-The current 35 API routes are the only advertised application commands.
+The current 36 API routes are the only advertised application commands.
 `ASKTIME ABSTIME` returns its packed-decimal destination and refreshes EIBDATE
 and EIBTIME. Bare `ASKTIME` is a distinct route that refreshes only those two
 packed-decimal EIB fields; it cannot manufacture an ABSTIME destination. Both
@@ -228,8 +226,9 @@ differentials, or make 0.9.0 release-ready.
 | `file-control` | file status, keyed I/O, and browse behavior |
 | `queue-control` | transient-data queue writes |
 | `recovery` | SYNCPOINT coordination, rollback, and subsystem unit-of-work completion |
+| `interval-control` | bounded local START scheduling and durable work promotion |
 
-This table describes the seven families already present in the 25-row runtime
+This table describes the eight families already present in the 38-operation runtime
 collection. The 263-row application registry also assigns every row a
 deterministic future family owner, but that assignment is routing shape rather
 than an executable handler. `CicsService::invoke_run` selects an existing

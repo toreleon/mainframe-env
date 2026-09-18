@@ -85,6 +85,7 @@ EXPECTED_FAMILIES = {
     "file-control": "FileControl",
     "queue-control": "QueueControl",
     "recovery": "Recovery",
+    "interval-control": "IntervalControl",
 }
 EXPECTED_RUNTIME_OPERATIONS = [
     ("Abend", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0001"),
@@ -123,7 +124,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("ReadNext", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0157"),
     ("ReadPrev", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0158"),
     ("ReceiveMap", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0163"),
-    ("Retrieve", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0175"),
+    ("Retrieve", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0175"),
     ("Return", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0178"),
     ("Rewrite", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0181"),
     ("SendMap", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0189"),
@@ -142,6 +143,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
         True,
         f"{OFFICIAL_BASELINE}:spi-commands-unique:0224",
     ),
+    ("Start", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0205"),
     ("StartBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0208"),
     ("Suspend", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0214"),
     ("Syncpoint", "api", "recovery", True, f"{OFFICIAL_BASELINE}:api-commands:0218"),
@@ -392,6 +394,8 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "SetAssociationUserCorrData",
         "Suspend",
         "Syncpoint",
+        "Start",
+        "Retrieve",
     }
 )
 ENQUEUE_COMMAND_ROWS = frozenset(
@@ -539,6 +543,10 @@ TYPED_RUNTIME_IR_EFFECTS = {
         {"memory-read", "memory-write", "condition"}
     ),
     "Suspend": frozenset({"memory-write", "suspension", "condition"}),
+    "Start": frozenset(
+        {"memory-read", "memory-write", "clock", "condition", "transaction"}
+    ),
+    "Retrieve": frozenset({"memory-write", "condition", "transaction"}),
 }
 
 
@@ -738,6 +746,7 @@ def _load_typed_execution_registrations(
         "PurgeMessage",
         "PushHandle",
         "SetAssociationUserCorrData",
+        "Start",
         "Suspend",
     ]:
         raise DescriptorError(f"{path} registration identities or order differ")
@@ -1039,6 +1048,7 @@ def load_catalog(
                 "PurgeMessage",
                 "PushHandle",
                 "SetAssociationUserCorrData",
+                "Start",
                 "Suspend",
             }
         ]
@@ -3343,8 +3353,8 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
         for row in catalog["_runtime_operations"]
         if row["interface"] == "api"
     }
-    if len(existing_runtime) != 35:
-        raise DescriptorError("CICS application runtime set must remain exactly 35 rows")
+    if len(existing_runtime) != 36:
+        raise DescriptorError("CICS application runtime set must remain exactly 36 rows")
 
     loaded_batches = []
     for batch_id, start, end, projection_path, review_path in CONTRACT_BATCHES:
@@ -3598,12 +3608,12 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
     if (
         len(registry_rows) != 263
         or len(set(handler_ids)) != 263
-        or len(typed_rows) != 34
-        or len(legacy_rows) != 1
+        or len(typed_rows) != 36
+        or len(legacy_rows) != 0
         or {row["runtime_operation"] for row in typed_rows}
         != TYPED_RUNTIME_OPERATIONS
-        or len(advertised_rows) != 35
-        or len(unready_rows) != 228
+        or len(advertised_rows) != 36
+        or len(unready_rows) != 227
         or any(row["unready_result"] != "explicit-unsupported" for row in unready_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in typed_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in legacy_rows)

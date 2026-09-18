@@ -89,6 +89,8 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::Suspend => CicsOperation::Suspend,
         CicsPlanOperation::Assign => CicsOperation::Assign,
         CicsPlanOperation::PurgeMessage => CicsOperation::PurgeMessage,
+        CicsPlanOperation::Start => CicsOperation::Start,
+        CicsPlanOperation::Retrieve => CicsOperation::Retrieve,
     }
 }
 
@@ -121,6 +123,9 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::DateSep => "DATESEP",
         CicsOperandName::TimeSep => "TIMESEP",
         CicsOperandName::KeyLength => "KEYLENGTH",
+        CicsOperandName::ReqId => "REQID",
+        CicsOperandName::Interval => "INTERVAL",
+        CicsOperandName::StartTime => "TIME",
     }
 }
 

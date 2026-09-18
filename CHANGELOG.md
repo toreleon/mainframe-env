@@ -6,11 +6,14 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
-- Added the internal versioned CICS interval START-record authority with
-  duplicate-REQID versus replay identity, ordered expiry promotion,
-  protected-pending state, one-time replay-safe consumption, strict bounds,
-  and memory/SQLite reopen checks. START remains unadvertised and RETRIEVE is
-  not widened until their typed shared-worker slices seal.
+- Added the versioned CICS interval START-record authority and the first typed
+  local-data START-to-RETRIEVE cycle. The bounded route lowers START and
+  RETRIEVE through typed plans, admits due work to the shared durable queue,
+  promotes it under a fenced worker lease, consumes it once with replay-safe
+  INTO/LENGTH and ENDDATA/LENGERR behavior, authorizes the target transaction,
+  and survives SQLite reopen. Remote, terminal, protected, generated-REQID,
+  metadata/FMH, WAIT, SET, and automatic target-task launch semantics remain
+  pending, so neither command receives whole-row credit.
 
 - Added verified offline IBM-documentation search/read commands and a cache-first
   source-review workflow for semantic development.

@@ -19,6 +19,7 @@ pub(crate) enum CicsCommandFamily {
     FileControl,
     QueueControl,
     Recovery,
+    IntervalControl,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -204,7 +205,7 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         syntax: "RETRIEVE",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0175",
         family: CicsCommandFamily::TaskControl,
-        mutating: false,
+        mutating: true,
     },
     CicsCommandDescriptor {
         operation: CicsOperation::Return,
@@ -246,6 +247,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         syntax: "SET FILE",
         official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0224",
         family: CicsCommandFamily::FileControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
+        operation: CicsOperation::Start,
+        syntax: "START",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0205",
+        family: CicsCommandFamily::IntervalControl,
         mutating: true,
     },
     CicsCommandDescriptor {
@@ -325,11 +333,12 @@ pub(crate) const fn command_descriptor(operation: CicsOperation) -> &'static Cic
         CicsOperation::SendText => &CICS_COMMAND_DESCRIPTORS[28],
         CicsOperation::SetAssociationUserCorrData => &CICS_COMMAND_DESCRIPTORS[29],
         CicsOperation::SetFileStatus => &CICS_COMMAND_DESCRIPTORS[30],
-        CicsOperation::StartBrowse => &CICS_COMMAND_DESCRIPTORS[31],
-        CicsOperation::Suspend => &CICS_COMMAND_DESCRIPTORS[32],
-        CicsOperation::Syncpoint => &CICS_COMMAND_DESCRIPTORS[33],
-        CicsOperation::Write => &CICS_COMMAND_DESCRIPTORS[34],
-        CicsOperation::WriteTransientData => &CICS_COMMAND_DESCRIPTORS[35],
-        CicsOperation::Xctl => &CICS_COMMAND_DESCRIPTORS[36],
+        CicsOperation::Start => &CICS_COMMAND_DESCRIPTORS[31],
+        CicsOperation::StartBrowse => &CICS_COMMAND_DESCRIPTORS[32],
+        CicsOperation::Suspend => &CICS_COMMAND_DESCRIPTORS[33],
+        CicsOperation::Syncpoint => &CICS_COMMAND_DESCRIPTORS[34],
+        CicsOperation::Write => &CICS_COMMAND_DESCRIPTORS[35],
+        CicsOperation::WriteTransientData => &CICS_COMMAND_DESCRIPTORS[36],
+        CicsOperation::Xctl => &CICS_COMMAND_DESCRIPTORS[37],
     }
 }

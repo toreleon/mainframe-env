@@ -1,26 +1,492 @@
 //! Durable producer/consumer state for CICS interval START records.
 //!
-//! This module owns only the versioned record transition. Command lowering,
-//! shared work admission, task creation, and RETRIEVE storage bindings remain
-//! separate slices. Keeping the state authority internal prevents incomplete
-//! interval behavior from becoming an advertised route.
+//! The typed local-data route connects these transitions to shared work admission
+//! and RETRIEVE storage bindings. Protected-record release and bounded due scans
+//! remain internal foundations for later interval-control slices.
 
-#![cfg_attr(
-    not(test),
-    allow(
-        dead_code,
-        reason = "records-core is intentionally unreachable until START and RETRIEVE seal"
-    )
-)]
-
-use super::super::{CicsLimits, field, store_error};
-use mainframe_env_execution_api::{IdempotencyKey, InvocationLimits};
-use mainframe_env_host_api::HostProblem;
-use mainframe_env_store_api::{ProviderStateRecord, ProviderStateStore};
+use super::super::{CicsLimits, CicsReplayClock, CicsService, Run, field, store_error};
+use crate::{CicsIntervalMode, CicsIntervalTime};
+use mainframe_env_execution_api::{
+    ArtifactRef, BoundedPayload, ExecutionId, IdempotencyKey, InvocationLimits, Selector,
+};
+use mainframe_env_host_api::{
+    AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, ClockRequest,
+    HostProblem, HostRequest, HostResult, ScopedHostService, canonical_request_digest,
+};
+use mainframe_env_store_api::{
+    ProviderStateRecord, ProviderStateStore, StoreError, WorkRecord, WorkState, WorkStore,
+};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 const NAMESPACE: &str = "cics-interval-start-v1";
 const MAGIC: &[u8; 7] = b"MECISR1";
+
+/// Durable work-generation identity used by interval START records.
+pub const CICS_START_WORK_GENERATION: &str = "cics-start-v1";
+
+impl CicsService {
+    /// Open with the shared durable clock and work authority used by interval START.
+    pub fn open_with_runtime(
+        host: Arc<ScopedHostService>,
+        store: Arc<dyn ProviderStateStore>,
+        work_store: Arc<dyn WorkStore>,
+        limits: CicsLimits,
+        replay_clock: Arc<dyn CicsReplayClock>,
+    ) -> Result<Arc<Self>, HostProblem> {
+        Self::open_inner(host, store, limits, Some(replay_clock), Some(work_store))
+    }
+
+    fn durable_tick(&self) -> Result<u64, HostProblem> {
+        let tick = self
+            .replay_clock
+            .as_ref()
+            .ok_or(HostProblem::InfrastructureFailure)?
+            .now_tick()?;
+        if tick == 0 {
+            Err(HostProblem::InfrastructureFailure)
+        } else {
+            Ok(tick)
+        }
+    }
+
+    fn enqueue_interval_work(
+        &self,
+        record: &IntervalStartRecord,
+        priority: u8,
+    ) -> Result<(), HostProblem> {
+        let work_store = self
+            .work_store
+            .as_ref()
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let limits = InvocationLimits::default();
+        let identity = format!(
+            "{:x}",
+            Sha256::digest(
+                [
+                    record.request_id.as_bytes(),
+                    &record.producer_request_digest,
+                ]
+                .concat(),
+            ),
+        );
+        let work = WorkRecord {
+            work_id: format!("cics-start:{}", record.request_id),
+            execution_id: ExecutionId::new(format!("cics-start-{}", &identity[..24]), limits)
+                .map_err(|_| HostProblem::ResourceExhausted)?,
+            required_selector: Selector::new("cics:start", limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            required_generation: CICS_START_WORK_GENERATION.into(),
+            artifact: ArtifactRef::new("artifact:none", limits)
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+            state: WorkState::Queued,
+            priority,
+            attempt: 0,
+            max_attempts: 3,
+            available_tick: record.expiration_tick,
+            deadline_tick: record
+                .expiration_tick
+                .checked_add(86_400_000)
+                .ok_or(HostProblem::ResourceExhausted)?,
+            cancellation_requested: false,
+            worker_id: None,
+            lease_id: None,
+            lease_epoch: 0,
+            lease_expiry_tick: None,
+            heartbeat_tick: None,
+            terminal_tick: None,
+            checkpoint_id: None,
+            effect_sequence: 0,
+            payload: record.request_id.as_bytes().to_vec(),
+        };
+        match work_store.enqueue(work.clone()) {
+            Ok(()) => Ok(()),
+            Err(StoreError::AlreadyExists | StoreError::Conflict)
+                if work_store
+                    .get_work(&work.work_id)
+                    .map_err(store_error)?
+                    .as_ref()
+                    .is_some_and(|existing| same_interval_work(existing, &work)) =>
+            {
+                Ok(())
+            }
+            Err(problem) => Err(store_error(problem)),
+        }
+    }
+
+    /// Promote one claimed START work item into the ready-record authority.
+    pub fn promote_start_work(&self, work: &WorkRecord, now_tick: u64) -> Result<(), HostProblem> {
+        if work.required_generation != CICS_START_WORK_GENERATION
+            || work.required_selector.as_str() != "cics:start"
+            || work.artifact.as_str() != "artifact:none"
+            || work.state != WorkState::Claimed
+            || work.lease_id.is_none()
+            || work.lease_epoch == 0
+            || now_tick < work.available_tick
+        {
+            return Err(HostProblem::Malformed);
+        }
+        let request_id = std::str::from_utf8(&work.payload)
+            .map_err(|_| HostProblem::Malformed)?
+            .to_string();
+        if work.work_id != format!("cics-start:{request_id}") {
+            return Err(HostProblem::Malformed);
+        }
+        let mut state = self.lock()?;
+        promote_request(
+            self.store.as_ref(),
+            &mut state.interval_records,
+            &request_id,
+            now_tick,
+            self.limits,
+        )
+    }
+}
+
+fn same_interval_work(existing: &WorkRecord, expected: &WorkRecord) -> bool {
+    existing.work_id == expected.work_id
+        && existing.execution_id == expected.execution_id
+        && existing.required_selector == expected.required_selector
+        && existing.required_generation == expected.required_generation
+        && existing.artifact == expected.artifact
+        && existing.priority == expected.priority
+        && existing.max_attempts == expected.max_attempts
+        && existing.available_tick == expected.available_tick
+        && existing.deadline_tick == expected.deadline_tick
+        && existing.payload == expected.payload
+}
+
+pub(in crate::service) fn invoke(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    match request.operation {
+        CicsOperation::Start => start(service, run, request),
+        CicsOperation::Retrieve => retrieve(service, run, request),
+        _ => Err(HostProblem::InfrastructureFailure),
+    }
+}
+
+fn start(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    validate_start_request(request)?;
+    let mutation = request
+        .mutation
+        .as_ref()
+        .ok_or(HostProblem::MissingIdempotency)?;
+    let transaction = name_argument(request, "TRANSID", 4)?;
+    let request_id = name_argument(request, "REQID", 8)?;
+    let source = request
+        .arguments
+        .get("FROM")
+        .ok_or(HostProblem::Malformed)?
+        .bytes();
+    let length = optional_decimal(request, "LENGTH")?
+        .unwrap_or(i64::try_from(source.len()).map_err(|_| HostProblem::ResourceExhausted)?);
+    let length = usize::try_from(length).map_err(|_| HostProblem::Condition {
+        name: "LENGERR".into(),
+        response: 22,
+        response2: 0,
+    })?;
+    if length == 0 || length > source.len() {
+        return Err(HostProblem::Condition {
+            name: "LENGERR".into(),
+            response: 22,
+            response2: 0,
+        });
+    }
+    service
+        .authorize(
+            run,
+            "TCICSTRN",
+            &format!("CICS.{transaction}"),
+            AccessIntent::Execute,
+        )
+        .map_err(|problem| match problem {
+            HostProblem::Unauthorized => HostProblem::Condition {
+                name: "NOTAUTH".into(),
+                response: 70,
+                response2: 7,
+            },
+            other => other,
+        })?;
+    let time = if let Some(value) = optional_decimal(request, "INTERVAL")? {
+        CicsIntervalTime::from_hhmmss(CicsIntervalMode::Relative, value)
+    } else if let Some(value) = optional_decimal(request, "TIME")? {
+        CicsIntervalTime::from_hhmmss(CicsIntervalMode::Absolute, value)
+    } else {
+        Ok(CicsIntervalTime::immediate())
+    }
+    .map_err(|problem| HostProblem::Condition {
+        name: "INVREQ".into(),
+        response: 16,
+        response2: problem.start_response2(),
+    })?;
+    let timestamp = match service.nested(run, HostRequest::Clock(ClockRequest::UtcTimestamp))? {
+        HostResult::Clock(value) => value,
+        _ => return Err(HostProblem::ProviderFailure),
+    };
+    let local_millis = clock_millis_since_midnight(&timestamp)?;
+    let expiration_tick = time
+        .deadline_tick(service.durable_tick()?, local_millis)
+        .ok_or(HostProblem::ResourceExhausted)?;
+    let record = IntervalStartRecord {
+        request_id,
+        transaction,
+        principal: run.invocation.principal.id().as_str().into(),
+        originating_run_unit: run.invocation.run_unit_id.as_str().into(),
+        expiration_tick,
+        terminal: None,
+        data: source[..length].to_vec(),
+        return_transaction: None,
+        return_terminal: None,
+        queue: None,
+        fmh: false,
+        state: IntervalStartState::Pending,
+        producer_effect_key: mutation.idempotency_key.as_str().into(),
+        producer_request_digest: canonical_request_digest(&HostRequest::Cics(request.clone()))
+            .map_err(|_| HostProblem::ResourceExhausted)?,
+        consumer_effect_key: None,
+        consumer_request_digest: None,
+        version: 1,
+    };
+    let outcome = {
+        let mut state = service.lock()?;
+        schedule(
+            service.store.as_ref(),
+            &mut state.interval_records,
+            record.clone(),
+            service.limits,
+        )?
+    };
+    if outcome == IntervalScheduleOutcome::DuplicateRequestId {
+        return Err(HostProblem::Condition {
+            name: "IOERR".into(),
+            response: 17,
+            response2: 0,
+        });
+    }
+    service.enqueue_interval_work(&record, run.invocation.priority)?;
+    service.response(
+        run,
+        CicsDisposition::Complete,
+        "NORMAL",
+        0,
+        0,
+        None,
+        None,
+        Vec::new(),
+    )
+}
+
+fn retrieve(
+    service: &CicsService,
+    run: &Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    if request.arguments.is_empty() && !run.retrieve.is_empty() {
+        return service.response(
+            run,
+            CicsDisposition::Complete,
+            "NORMAL",
+            0,
+            0,
+            None,
+            None,
+            run.retrieve.clone(),
+        );
+    }
+    validate_retrieve_request(request)?;
+    let mutation = request
+        .mutation
+        .as_ref()
+        .ok_or(HostProblem::MissingIdempotency)?;
+    let now_tick = service.durable_tick()?;
+    let digest = canonical_request_digest(&HostRequest::Cics(request.clone()))
+        .map_err(|_| HostProblem::ResourceExhausted)?;
+    let record = {
+        let mut state = service.lock()?;
+        consume_next(
+            service.store.as_ref(),
+            &mut state.interval_records,
+            IntervalConsumeRequest {
+                transaction: &run.transaction,
+                terminal: None,
+                now_tick,
+                effect_key: mutation.idempotency_key.as_str(),
+                request_digest: digest,
+            },
+            service.limits,
+        )?
+    };
+    let Some(record) = record else {
+        return super::condition::respond(
+            service,
+            run,
+            &request.condition_policy,
+            HostProblem::Condition {
+                name: "ENDDATA".into(),
+                response: 29,
+                response2: 0,
+            },
+        );
+    };
+    let actual = record.data.len();
+    let maximum = optional_decimal(request, "LENGTH")?
+        .map(|value| usize::try_from(value.max(0)).unwrap_or(0))
+        .unwrap_or(actual);
+    let returned = record.data[..actual.min(maximum)].to_vec();
+    let mut response = if maximum < actual {
+        super::condition::respond(
+            service,
+            run,
+            &request.condition_policy,
+            HostProblem::Condition {
+                name: "LENGERR".into(),
+                response: 22,
+                response2: 0,
+            },
+        )?
+    } else {
+        service.response(
+            run,
+            CicsDisposition::Complete,
+            "NORMAL",
+            0,
+            0,
+            None,
+            None,
+            returned.clone(),
+        )?
+    };
+    let returned_payload = BoundedPayload::new(
+        "mainframe-env.cics.payload@1",
+        returned.clone(),
+        InvocationLimits::default(),
+    )
+    .map_err(|_| HostProblem::ResourceExhausted)?;
+    response.payload = returned_payload.clone();
+    response.outputs.insert("INTO".into(), returned_payload);
+    if request.arguments.contains_key("LENGTH") {
+        response.outputs.insert(
+            "LENGTH".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.decimal@1",
+                actual.to_string().into_bytes(),
+                InvocationLimits::default(),
+            )
+            .map_err(|_| HostProblem::ResourceExhausted)?,
+        );
+    }
+    Ok(response)
+}
+
+fn validate_start_request(request: &CicsRequest) -> Result<(), HostProblem> {
+    const ALLOWED: &[&str] = &[
+        "FROM",
+        "INTERVAL",
+        "LENGTH",
+        "OPTION.NOHANDLE",
+        "REQID",
+        "RESP",
+        "RESP2",
+        "TIME",
+        "TRANSID",
+    ];
+    if !request.arguments.contains_key("FROM")
+        || !request.arguments.contains_key("REQID")
+        || !request.arguments.contains_key("TRANSID")
+        || request.arguments.contains_key("INTERVAL") && request.arguments.contains_key("TIME")
+        || request.arguments.iter().any(|(name, value)| {
+            !ALLOWED.contains(&name.as_str())
+                || if matches!(name.as_str(), "INTERVAL" | "LENGTH" | "TIME") {
+                    value.schema() != "mainframe-env.cics.decimal@1"
+                } else if name == "OPTION.NOHANDLE" {
+                    value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+                } else {
+                    !matches!(
+                        value.schema(),
+                        "mainframe-env.cics.literal@1"
+                            | "mainframe-env.cics.storage-value@1"
+                            | "mainframe-env.cics.argument@1"
+                    )
+                }
+        })
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_retrieve_request(request: &CicsRequest) -> Result<(), HostProblem> {
+    const ALLOWED: &[&str] = &["INTO", "LENGTH", "OPTION.NOHANDLE", "RESP", "RESP2"];
+    if !request.arguments.contains_key("INTO")
+        || !request.arguments.contains_key("LENGTH")
+        || request.arguments.iter().any(|(name, value)| {
+            !ALLOWED.contains(&name.as_str())
+                || if name == "LENGTH" {
+                    value.schema() != "mainframe-env.cics.decimal@1"
+                } else if name == "OPTION.NOHANDLE" {
+                    value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+                } else {
+                    value.schema() != "mainframe-env.cics.argument@1"
+                }
+        })
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
+}
+
+fn name_argument(request: &CicsRequest, name: &str, max: usize) -> Result<String, HostProblem> {
+    let value = request.arguments.get(name).ok_or(HostProblem::Malformed)?;
+    let text = std::str::from_utf8(value.bytes())
+        .map_err(|_| HostProblem::Malformed)?
+        .trim()
+        .to_ascii_uppercase();
+    if valid_name(&text, max) {
+        Ok(text)
+    } else {
+        Err(HostProblem::Malformed)
+    }
+}
+
+fn optional_decimal(request: &CicsRequest, name: &str) -> Result<Option<i64>, HostProblem> {
+    request
+        .arguments
+        .get(name)
+        .map(|value| {
+            std::str::from_utf8(value.bytes())
+                .map_err(|_| HostProblem::Malformed)?
+                .parse::<i64>()
+                .map_err(|_| HostProblem::Malformed)
+        })
+        .transpose()
+}
+
+fn clock_millis_since_midnight(timestamp: &str) -> Result<u64, HostProblem> {
+    if timestamp.len() != 17 || !timestamp.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(HostProblem::ProviderFailure);
+    }
+    let part = |range: std::ops::Range<usize>| {
+        timestamp[range]
+            .parse::<u64>()
+            .map_err(|_| HostProblem::ProviderFailure)
+    };
+    let (hour, minute, second, millis) =
+        (part(8..10)?, part(10..12)?, part(12..14)?, part(14..17)?);
+    if hour > 23 || minute > 59 || second > 59 || millis > 999 {
+        return Err(HostProblem::ProviderFailure);
+    }
+    Ok(hour * 3_600_000 + minute * 60_000 + second * 1_000 + millis)
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::service) enum IntervalStartState {
@@ -133,6 +599,7 @@ pub(in crate::service) fn schedule(
     Ok(IntervalScheduleOutcome::Created)
 }
 
+#[allow(dead_code, reason = "reserved for the bounded due-scan worker slice")]
 pub(in crate::service) fn promote_due(
     store: &dyn ProviderStateStore,
     records: &mut BTreeMap<String, IntervalStartRecord>,
@@ -168,6 +635,32 @@ pub(in crate::service) fn promote_due(
     Ok(selected.len())
 }
 
+pub(in crate::service) fn promote_request(
+    store: &dyn ProviderStateStore,
+    records: &mut BTreeMap<String, IntervalStartRecord>,
+    request_id: &str,
+    now_tick: u64,
+    limits: CicsLimits,
+) -> Result<(), HostProblem> {
+    let current = records.get(request_id).ok_or(HostProblem::NotFound)?;
+    if current.state == IntervalStartState::Ready && current.expiration_tick <= now_tick {
+        return Ok(());
+    }
+    if current.state != IntervalStartState::Pending || current.expiration_tick > now_tick {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    replace_state(
+        store,
+        records,
+        request_id,
+        IntervalStartState::Ready,
+        None,
+        None,
+        limits,
+    )
+}
+
+#[allow(dead_code, reason = "reserved for the START PROTECT completion slice")]
 pub(in crate::service) fn release_protected(
     store: &dyn ProviderStateStore,
     records: &mut BTreeMap<String, IntervalStartRecord>,

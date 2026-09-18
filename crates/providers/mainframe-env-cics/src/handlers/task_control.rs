@@ -225,16 +225,7 @@ pub(in crate::service) fn invoke(
         CicsOperation::PopHandle => pop_handle(service, run, request),
         CicsOperation::PushHandle => push_handle(service, run, request),
         CicsOperation::Assign => super::task_context::assign(service, run, request),
-        CicsOperation::Retrieve => service.response(
-            run,
-            CicsDisposition::Complete,
-            "NORMAL",
-            0,
-            0,
-            None,
-            None,
-            run.retrieve.clone(),
-        ),
+        CicsOperation::Retrieve => super::interval_control::invoke(service, run, request),
         CicsOperation::Return => super::task_return::invoke(service, run, request),
         CicsOperation::SetAssociationUserCorrData => {
             set_association_user_corr_data(service, run, request)

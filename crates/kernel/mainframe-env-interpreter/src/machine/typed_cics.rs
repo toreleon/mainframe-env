@@ -279,6 +279,8 @@ pub(super) fn execute(
                         | CicsOperandName::MaxLifetime
                         | CicsOperandName::Priority
                         | CicsOperandName::Abstime
+                        | CicsOperandName::Interval
+                        | CicsOperandName::StartTime
                 ) =>
             {
                 (

@@ -1492,7 +1492,7 @@ mod tests {
     fn typed_cics_is_proof_bound_in_hir_and_the_published_executable() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSP. DATA DIVISION. WORKING-STORAGE SECTION. 01 AB-CODE PIC X(4) VALUE 'B001'. 01 ABS-X PIC S9(15) COMP-3. 01 DATE-X PIC X(10). 01 TIME-X PIC X(8). 01 MS-X PIC S9(9) COMP. 01 RECORD-X PIC X(4). 01 KEY-X PIC X(3) VALUE '003'. 01 LOCK-X PIC X(4) VALUE 'LOCK'. 01 PTR-X POINTER. 01 CORR-X PIC X(80) VALUE ALL 'A'. 01 PRIORITY-X PIC S9(4) COMP VALUE 200. 01 CODE-A PIC S9(9) COMP. 01 CODE-B PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS ASKTIME END-EXEC. EXEC CICS ASKTIME ABSTIME(ABS-X) END-EXEC. EXEC CICS FORMATTIME ABSTIME(ABS-X) DATESEP('-') YYYYMMDD(DATE-X) TIMESEP(':') TIME(TIME-X) MILLISECONDS(MS-X) END-EXEC. EXEC CICS LINK PROGRAM('CHILD') COMMAREA(RECORD-X) END-EXEC. EXEC CICS XCTL PROGRAM('NEXT') COMMAREA(RECORD-X) END-EXEC. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) END-EXEC. EXEC CICS READNEXT FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS READPREV DATASET('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS ENDBR FILE('ACCTDAT') END-EXEC. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS DELETE FILE('ACCTDAT') RIDFLD(KEY-X) END-EXEC. EXEC CICS READ FILE('ACCTDAT') UPDATE INTO(RECORD-X) RIDFLD(KEY-X) RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS REWRITE DATASET('ACCTDAT') FROM(RECORD-X) END-EXEC. EXEC CICS ENQ RESOURCE(LOCK-X) LENGTH(4) UOW NOSUSPEND END-EXEC. EXEC CICS DEQ RESOURCE(LOCK-X) LENGTH(4) UOW END-EXEC. EXEC CICS ADDRESS SET(PTR-X) USING(ADDRESS OF RECORD-X) END-EXEC. EXEC CICS CHANGE TASK PRIORITY(PRIORITY-X) RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS HANDLE AID ANYKEY(AID-HANDLER) ENTER END-EXEC. EXEC CICS HANDLE ABEND PROGRAM('ABEXIT') END-EXEC. EXEC CICS HANDLE CONDITION ERROR(ERROR-HANDLER) LENGERR END-EXEC. EXEC CICS IGNORE CONDITION PGMIDERR END-EXEC. EXEC CICS PUSH HANDLE END-EXEC. EXEC CICS POP HANDLE RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS SET ASSOCIATION USERCORRDATA(CORR-X) RESP(CODE-A) RESP2(CODE-B) END-EXEC. EXEC CICS SUSPEND END-EXEC. EXEC CICS SYNCPOINT ROLLBACK NOHANDLE END-EXEC. EXEC CICS ABEND ABCODE(AB-CODE) NODUMP END-EXEC. EXEC CICS RETURN TRANSID('NEXT') COMMAREA(RECORD-X) END-EXEC.";
         let source = format!(
-            "{source} EXEC CICS WRITEQ TD QUEUE('OUTQ') FROM(RECORD-X) LENGTH(4) END-EXEC. EXEC CICS SEND MAP('MENU') MAPSET('MAIN') FROM(RECORD-X) END-EXEC. EXEC CICS RECEIVE MAP('MENU') MAPSET('MAIN') END-EXEC. EXEC CICS SEND TEXT FROM(RECORD-X) END-EXEC. EXEC CICS ASSIGN ABCODE(AB-CODE) END-EXEC. EXEC CICS PURGE MESSAGE END-EXEC."
+            "{source} EXEC CICS WRITEQ TD QUEUE('OUTQ') FROM(RECORD-X) LENGTH(4) END-EXEC. EXEC CICS SEND MAP('MENU') MAPSET('MAIN') FROM(RECORD-X) END-EXEC. EXEC CICS RECEIVE MAP('MENU') MAPSET('MAIN') END-EXEC. EXEC CICS SEND TEXT FROM(RECORD-X) END-EXEC. EXEC CICS ASSIGN ABCODE(AB-CODE) END-EXEC. EXEC CICS PURGE MESSAGE END-EXEC. EXEC CICS START TRANSID('NEXT') REQID('REQ0001') FROM(RECORD-X) LENGTH(4) INTERVAL(0) END-EXEC. EXEC CICS RETRIEVE INTO(RECORD-X) LENGTH(PRIORITY-X) END-EXEC."
         );
         let compiler = CobolCompiler::default();
         let analysis = compiler.analyze(&bundle(&source));
@@ -1525,7 +1525,7 @@ mod tests {
                     && operation.identity.major() == 2
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed_hir.len(), 34);
+        assert_eq!(typed_hir.len(), 36);
         let mut hir_plans = Vec::new();
         for operation in typed_hir {
             assert!(!operation.attributes.contains_key("arguments"));
@@ -1608,6 +1608,8 @@ mod tests {
                 }
                 CicsPlanOperation::Syncpoint => crate::HirCicsOperation::Syncpoint,
                 CicsPlanOperation::Suspend => crate::HirCicsOperation::Suspend,
+                CicsPlanOperation::Start => crate::HirCicsOperation::Start,
+                CicsPlanOperation::Retrieve => crate::HirCicsOperation::Retrieve,
             };
             assert_eq!(
                 operation.effects,
@@ -1662,6 +1664,8 @@ mod tests {
                 CicsPlanOperation::SetAssociationUserCorrData,
                 CicsPlanOperation::Syncpoint,
                 CicsPlanOperation::Suspend,
+                CicsPlanOperation::Start,
+                CicsPlanOperation::Retrieve,
             ])
         );
         let read = hir_plans
@@ -1744,6 +1748,7 @@ mod tests {
             artifact.manifest().dialect_contracts,
             BTreeSet::from([
                 "cics.file@1".into(),
+                "cics.interval@1".into(),
                 "cics.program@1".into(),
                 "cics.queue@1".into(),
                 "cics.recovery@1".into(),
@@ -1763,6 +1768,7 @@ mod tests {
                 matches!(
                     operation.identity.namespace(),
                     "cics.file"
+                        | "cics.interval"
                         | "cics.program"
                         | "cics.queue"
                         | "cics.recovery"
@@ -1772,7 +1778,7 @@ mod tests {
                 )
             })
             .collect::<Vec<_>>();
-        assert_eq!(operations.len(), 34);
+        assert_eq!(operations.len(), 36);
         assert_eq!(
             operations
                 .iter()
@@ -1904,22 +1910,28 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_and_numeric_cics_forms_keep_the_version_one_route() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSL. DATA DIVISION. WORKING-STORAGE SECTION. 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS RETRIEVE INTO(RECORD-X) END-EXEC. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(003) END-EXEC. STOP RUN.";
+    fn typed_retrieve_and_numeric_file_form_keep_distinct_routes() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSL. DATA DIVISION. WORKING-STORAGE SECTION. 01 RECORD-X PIC X(4). 01 LENGTH-X PIC S9(4) COMP VALUE 4. PROCEDURE DIVISION. EXEC CICS RETRIEVE INTO(RECORD-X) LENGTH(LENGTH-X) END-EXEC. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(003) END-EXEC. STOP RUN.";
         let compiler = CobolCompiler::default();
         let analysis = compiler.analyze(&bundle(source));
-        let hir = analysis.hir.as_ref().expect("legacy-compatible CICS HIR");
+        let hir = analysis
+            .hir
+            .as_ref()
+            .expect("mixed typed and compatibility CICS HIR");
         let statements = hir
             .statements
             .iter()
             .filter(|statement| statement.kind == crate::StatementKind::ExecCics)
             .collect::<Vec<_>>();
         assert_eq!(statements.len(), 2);
-        assert!(
-            statements
-                .iter()
-                .all(|statement| statement.resolved.is_none())
-        );
+        assert!(matches!(
+            statements[0].resolved.as_ref(),
+            Some(crate::HirResolvedStatement::Cics(crate::HirCicsStatement {
+                operation: crate::HirCicsOperation::Retrieve,
+                ..
+            }))
+        ));
+        assert!(statements[1].resolved.is_none());
         assert!(
             statements[0]
                 .arguments
@@ -1938,25 +1950,29 @@ mod tests {
             .iter()
             .flat_map(|region| &region.blocks)
             .flat_map(|block| &block.operations)
-            .filter(|operation| operation.identity.name() == "exec_cics")
+            .filter(|operation| matches!(operation.identity.name(), "exec_cics" | "retrieve"))
             .collect::<Vec<_>>();
         assert_eq!(hir_operations.len(), 2);
-        assert!(hir_operations.iter().all(|operation| {
+        assert!(hir_operations.iter().any(|operation| {
+            operation.identity.namespace() == "cobol.hir"
+                && operation.identity.major() == 2
+                && operation.attributes.contains_key("cics_plan")
+        }));
+        assert!(hir_operations.iter().any(|operation| {
             operation.identity.namespace() == "cobol.hir"
                 && operation.identity.major() == 1
                 && operation.attributes.contains_key("arguments")
-                && !operation.attributes.contains_key("cics_plan")
         }));
 
         let CompilerResult::Published { artifact, .. } = compiler
             .compile(request(source, CompilationMode::Executable))
             .unwrap()
         else {
-            panic!("published legacy CICS")
+            panic!("published mixed CICS")
         };
         assert_eq!(
             artifact.manifest().dialect_contracts,
-            BTreeSet::from(["mainframe.core.cobol@1".into()])
+            BTreeSet::from(["cics.task@1".into(), "mainframe.core.cobol@1".into()])
         );
         let module = decode_binary(artifact.payload(), CodecLimits::default()).unwrap();
         let operations = module
@@ -1964,19 +1980,25 @@ mod tests {
             .iter()
             .flat_map(|region| &region.blocks)
             .flat_map(|block| &block.operations)
-            .filter(|operation| operation.identity.name() == "exec_cics")
+            .filter(|operation| matches!(operation.identity.name(), "exec_cics" | "retrieve"))
             .collect::<Vec<_>>();
         assert_eq!(operations.len(), 2);
-        assert!(operations.iter().all(|operation| {
+        assert!(operations.iter().any(|operation| {
+            operation.identity.namespace() == "cics.task"
+                && operation.identity.name() == "retrieve"
+                && operation.attributes.contains_key("cics_plan")
+        }));
+        assert!(operations.iter().any(|operation| {
             operation.identity.namespace() == "mainframe.core.cobol"
                 && operation.identity.major() == 1
                 && operation.attributes.contains_key("arguments")
-                && !operation.attributes.contains_key("cics_plan")
         }));
         let numeric = operations
             .iter()
-            .find_map(|operation| match &operation.attributes["arguments"] {
-                Attribute::Bytes(bytes) if bytes.windows(3).any(|window| window == b"003") => {
+            .find_map(|operation| match operation.attributes.get("arguments") {
+                Some(Attribute::Bytes(bytes))
+                    if bytes.windows(3).any(|window| window == b"003") =>
+                {
                     Some(bytes)
                 }
                 _ => None,

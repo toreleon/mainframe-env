@@ -194,6 +194,9 @@ impl PlanContext<'_> {
                 HirCicsOperandName::DateSep => CicsOperandName::DateSep,
                 HirCicsOperandName::TimeSep => CicsOperandName::TimeSep,
                 HirCicsOperandName::KeyLength => CicsOperandName::KeyLength,
+                HirCicsOperandName::ReqId => CicsOperandName::ReqId,
+                HirCicsOperandName::Interval => CicsOperandName::Interval,
+                HirCicsOperandName::StartTime => CicsOperandName::StartTime,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -306,6 +309,8 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::SendText => CicsPlanOperation::SendText,
         HirCicsOperation::Assign => CicsPlanOperation::Assign,
         HirCicsOperation::PurgeMessage => CicsPlanOperation::PurgeMessage,
+        HirCicsOperation::Start => CicsPlanOperation::Start,
+        HirCicsOperation::Retrieve => CicsPlanOperation::Retrieve,
         HirCicsOperation::PopHandle => CicsPlanOperation::PopHandle,
         HirCicsOperation::PushHandle => CicsPlanOperation::PushHandle,
     }

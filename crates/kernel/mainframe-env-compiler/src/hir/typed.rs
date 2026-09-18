@@ -181,6 +181,8 @@ pub enum HirCicsOperation {
     SetAssociationUserCorrData,
     Syncpoint,
     Suspend,
+    Start,
+    Retrieve,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -214,6 +216,9 @@ pub enum HirCicsOperandName {
     DateSep,
     TimeSep,
     KeyLength,
+    ReqId,
+    Interval,
+    StartTime,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -3157,6 +3162,63 @@ mod tests {
     }
 
     #[test]
+    fn cics_start_and_retrieve_lower_the_bounded_local_data_route() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. INTERVAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(16) VALUE 'PAYLOAD'. 01 LENGTH-X PIC S9(4) COMP VALUE 7. 01 WHEN-X PIC S9(6) COMP-3 VALUE 0. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') REQID('REQ0001') FROM(DATA-X) LENGTH(LENGTH-X) INTERVAL(WHEN-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. EXEC CICS RETRIEVE INTO(DATA-X) LENGTH(LENGTH-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("START/RETRIEVE: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 2);
+        assert_eq!(commands[0].operation, HirCicsOperation::Start);
+        assert_eq!(commands[1].operation, HirCicsOperation::Retrieve);
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::ReqId
+                && operand.value == HirCicsValue::Literal("REQ0001".into())
+        }));
+        assert!(commands[0].operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::Interval,
+                    value: HirCicsValue::Data(reference),
+                } if reference.qualified_name == "WHEN-X"
+            )
+        }));
+        assert!(
+            commands[1]
+                .outputs
+                .iter()
+                .any(|output| output.name == HirCicsOutputName::Into)
+        );
+        assert!(
+            commands[1]
+                .outputs
+                .iter()
+                .any(|output| output.name == HirCicsOutputName::Length)
+        );
+
+        for deferred in ["TERMID('T001')", "USERID('OTHER')", "PROTECT"] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. LATER. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') REQID('REQ0002') FROM(DATA-X) {deferred} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{deferred}");
+            assert!(analysis.diagnostics.iter().any(|diagnostic| {
+                diagnostic
+                    .public_message()
+                    .contains(deferred.split('(').next().unwrap())
+            }));
+        }
+    }
+
+    #[test]
     fn catalog_known_unready_cics_command_fails_before_legacy_lowering() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSWAIT. DATA DIVISION. \
             WORKING-STORAGE SECTION. 01 PTR-X PIC X(8). PROCEDURE DIVISION. \
@@ -3170,47 +3232,14 @@ mod tests {
     }
 
     #[test]
-    fn legacy_cics_compatibility_routes_are_explicit_and_not_typed() {
+    fn application_cics_routes_have_no_remaining_legacy_lowering() {
         let legacy = mainframe_env_ir::CICS_APPLICATION_REGISTRY
             .iter()
             .filter(|descriptor| {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 1);
-        assert!(
-            legacy.iter().all(|descriptor| {
-                descriptor.advertised && descriptor.runtime_operation.is_some()
-            })
-        );
-        assert!(legacy.iter().all(|descriptor| {
-            !matches!(
-                descriptor.label_tokens,
-                ["ABEND"]
-                    | ["ASSIGN"]
-                    | ["PURGE", "MESSAGE"]
-                    | ["DEQ"]
-                    | ["ENQ"]
-                    | ["HANDLE", "ABEND"]
-                    | ["HANDLE", "CONDITION"]
-                    | ["LINK"]
-                    | ["XCTL"]
-                    | ["RETURN"]
-                    | ["STARTBR"]
-                    | ["READNEXT"]
-                    | ["READPREV"]
-                    | ["ENDBR"]
-                    | ["DELETE"]
-                    | ["WRITE", "FILE"]
-                    | ["WRITEQ", "TD"]
-                    | ["RECEIVE", "MAP"]
-                    | ["SEND", "MAP"]
-                    | ["SEND", "TEXT"]
-                    | ["READ"]
-                    | ["REWRITE"]
-                    | ["SYNCPOINT"]
-            )
-        }));
+        assert!(legacy.is_empty());
     }
 
     #[test]

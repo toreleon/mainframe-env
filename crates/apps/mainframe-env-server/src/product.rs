@@ -3,8 +3,9 @@ use crate::cobol::bind_compatible_runtime_services;
 use crate::console_retention::{decode_console_log_rows, encode_console_log};
 use crate::jes_admission::ChildAdmissionResult;
 use crate::jes_worker::{
-    DurableJesClock, JES_HEARTBEAT_MILLIS, JES_IDLE_MILLIS, JES_LEASE_TICKS, JES_WORK_GENERATION,
-    JES_WORKER_COUNT, JES_WORKER_FRESHNESS_MILLIS, JesClock, JesWorkPayload,
+    DurableJesClock, JES_HEARTBEAT_MILLIS, JES_IDLE_MILLIS, JES_WORK_GENERATION, JES_WORKER_COUNT,
+    JES_WORKER_FRESHNESS_MILLIS, JesClock, JesWorkPayload, claim_durable_work,
+    clear_worker_progress, heartbeat_durable_work,
 };
 use crate::retention_maintenance::provider::RetentionPlanner;
 use crate::{
@@ -25,8 +26,8 @@ use mainframe_env_batch::{
     BatchControllerSelector, BatchLimits, BatchService, JclBundle,
 };
 use mainframe_env_cics::{
-    BmsMapDefinition, CicsReplayClock, CicsService, CicsTerminalExecution, CicsTerminalSnapshot,
-    CicsTraceEntry, cics_provider,
+    BmsMapDefinition, CICS_START_WORK_GENERATION, CicsReplayClock, CicsService,
+    CicsTerminalExecution, CicsTerminalSnapshot, CicsTraceEntry, cics_provider,
 };
 use mainframe_env_dataset::{DatasetReplayClock, DatasetService, dataset_providers};
 use mainframe_env_db2::{
@@ -62,7 +63,7 @@ use mainframe_env_store_api::{
     ProviderStateStore, ProviderStateWrite, RetentionAgeReconciliation, RetentionArchive,
     RetentionArchivePruneOutcome, RetentionArchivePruneRequest, RetentionForecast,
     RetentionLegacyRow, RetentionReceipt, RetentionReconciliationReceipt, RetentionTarget,
-    SaturationLevel, StoreError, WorkRecord, WorkState,
+    SaturationLevel, StoreError, WorkRecord, WorkState, WorkStore,
 };
 use mainframe_env_zosmf::{
     Authentication, GatewayCallContext, GatewayProblem, GatewayRequest, GatewayResponse,
@@ -726,9 +727,11 @@ impl ProductServer {
             false,
             None,
         )?;
-        let cics = CicsService::open_with_replay_clock(
+        let cics_work_store: Arc<dyn WorkStore> = store.clone();
+        let cics = CicsService::open_with_runtime(
             inner,
             provider_store.clone(),
+            cics_work_store,
             Default::default(),
             enterprise_replay_clock,
         )?;
@@ -2667,7 +2670,7 @@ impl ProductServer {
                 return;
             };
             if product.jes_workers_stopping.load(Ordering::SeqCst) {
-                product.clear_jes_worker_progress(ordinal);
+                clear_worker_progress(&product.jes_worker_last_progress, ordinal);
                 return;
             }
             let claim_product = product.clone();
@@ -2750,16 +2753,8 @@ impl ProductServer {
     }
 
     fn record_jes_worker_failure(&self, ordinal: usize) {
-        self.clear_jes_worker_progress(ordinal);
+        clear_worker_progress(&self.jes_worker_last_progress, ordinal);
         self.jes_worker_failures.fetch_add(1, Ordering::Relaxed);
-    }
-
-    fn clear_jes_worker_progress(&self, ordinal: usize) {
-        if let Ok(mut progress) = self.jes_worker_last_progress.lock()
-            && let Some(slot) = progress.get_mut(ordinal)
-        {
-            *slot = None;
-        }
     }
 
     fn fresh_jes_workers_at(&self, now: Instant) -> usize {
@@ -2777,31 +2772,18 @@ impl ProductServer {
     }
 
     fn claim_jes_work(&self, worker: &str) -> Result<Option<WorkRecord>, HostProblem> {
-        let now_tick = self.jes_tick()?;
-        self.store
-            .claim(worker, Some(JES_WORK_GENERATION), now_tick, JES_LEASE_TICKS)
-            .map_err(store_error)
+        claim_durable_work(self.store.as_ref(), worker, self.jes_tick()?).map_err(store_error)
     }
 
     fn heartbeat_jes_work(&self, work: &WorkRecord) -> Result<(), HostProblem> {
-        let lease = work
-            .lease_id
-            .as_deref()
-            .ok_or(HostProblem::InfrastructureFailure)?;
-        let now_tick = self.jes_tick()?;
-        self.store
-            .heartbeat(
-                &work.work_id,
-                lease,
-                work.lease_epoch,
-                now_tick,
-                JES_LEASE_TICKS,
-            )
-            .map(|_| ())
-            .map_err(store_error)
+        heartbeat_durable_work(self.store.as_ref(), work, self.jes_tick()?).map_err(store_error)
     }
 
     fn process_claimed_jes_work(&self, work: &WorkRecord) -> Result<JesWorkOutcome, HostProblem> {
+        if work.required_generation == CICS_START_WORK_GENERATION {
+            self.cics.promote_start_work(work, self.jes_tick()?)?;
+            return Ok(JesWorkOutcome::Completed);
+        }
         if work.state != WorkState::Claimed
             || work.required_generation != JES_WORK_GENERATION
             || work.required_selector.as_str() != "zosmf:job-submit"
@@ -6924,17 +6906,21 @@ mod tests {
     }
 
     fn published_fixture(name: &str, body: &str) -> PublishedArtifact {
-        let limits = SourceLimits::default();
-        let path = LogicalPath::new(format!("{name}.cbl"), limits.max_path_bytes).unwrap();
         let source = format!(
             "IDENTIFICATION DIVISION.\nPROGRAM-ID. {name}.\nPROCEDURE DIVISION.\n{body}\nSTOP RUN.\n"
         );
+        published_source_fixture(name, &source)
+    }
+
+    fn published_source_fixture(name: &str, source: &str) -> PublishedArtifact {
+        let limits = SourceLimits::default();
+        let path = LogicalPath::new(format!("{name}.cbl"), limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
             &path,
             vec![
                 SourceFile::input(
                     path.as_str(),
-                    source.into_bytes(),
+                    source.as_bytes().to_vec(),
                     SourceFormat::Free,
                     SourceEncoding::Utf8,
                     limits,
@@ -10313,6 +10299,156 @@ mod tests {
                     mainframe_env_execution_api::LifecycleEventKind::EffectIntent { .. }
                 )),
             "online host effects bypassed the durable journal"
+        );
+    }
+
+    #[test]
+    fn compiled_start_and_retrieve_cross_shared_worker_and_durable_coordinator() {
+        let starter = published_source_fixture(
+            "STARTER",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. STARTER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE 'PAYLOAD'.\n01 LENGTH-X PIC S9(4) COMP VALUE 7.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('NX00') REQID('REQ0001') FROM(DATA-X) LENGTH(LENGTH-X) INTERVAL(0) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let receiver = published_source_fixture(
+            "RECEIVER",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. RECEIVER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE ALL 'Z'.\n01 LENGTH-X PIC S9(4) COMP VALUE 8.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS RETRIEVE INTO(DATA-X) LENGTH(LENGTH-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = |artifact: &PublishedArtifact| {
+            ArtifactRef::new(
+                format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let starter_ref = artifact_ref(&starter);
+        let receiver_ref = artifact_ref(&receiver);
+        let program = |name: &str, artifact: &PublishedArtifact, reference: ArtifactRef| {
+            OnlineProgramDefinition {
+                name: name.into(),
+                artifact: reference,
+                payload: artifact.payload().to_vec(),
+                manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                semantic_identity: artifact.semantic_id().to_reference(),
+            }
+        };
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![
+                    program("STARTER", &starter, starter_ref.clone()),
+                    program("RECEIVER", &receiver, receiver_ref.clone()),
+                ],
+                transactions: BTreeMap::from([
+                    ("ST00".into(), "STARTER".into()),
+                    ("NX00".into(), "RECEIVER".into()),
+                ]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "INTERVL".into(),
+                    map: "INTERVL".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+
+        let starter_session = SessionId::new("interval-starter", 64).unwrap();
+        let starter_invocation = server
+            .cics_invocation("IBMUSER", "ST00", Some(starter_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                starter_invocation,
+                &starter_session,
+                "ST00",
+                24,
+                80,
+                "interval-starter-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let starter_context = server
+            .cics
+            .terminal_execution(&starter_session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&starter_session, "STARTER", &starter_context)
+            .unwrap();
+        server
+            .run_online_exchange(&starter_session, &principal, "STARTER", 2)
+            .unwrap();
+        assert!(
+            server
+                .cics
+                .terminal_run_trace(&starter_session, &principal, 2)
+                .unwrap()
+                .iter()
+                .any(|entry| entry.operation == CicsOperation::Start)
+        );
+
+        let work = server
+            .claim_jes_work("interval-worker")
+            .unwrap()
+            .expect("due START work");
+        assert_eq!(work.required_generation, CICS_START_WORK_GENERATION);
+        let outcome = server.process_claimed_jes_work(&work).unwrap();
+        server.finish_claimed_jes_work(&work, Ok(outcome)).unwrap();
+
+        let receiver_session = SessionId::new("interval-receiver", 64).unwrap();
+        let receiver_invocation = server
+            .cics_invocation("IBMUSER", "NX00", Some(receiver_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                receiver_invocation.clone(),
+                &receiver_session,
+                "NX00",
+                24,
+                80,
+                "interval-receiver-csrf",
+                3,
+                10_000,
+            )
+            .unwrap();
+        let receiver_context = server
+            .cics
+            .terminal_execution(&receiver_session, &principal, 4)
+            .unwrap();
+        server
+            .begin_online_exchange(&receiver_session, "RECEIVER", &receiver_context)
+            .unwrap();
+        server
+            .run_online_exchange(&receiver_session, &principal, "RECEIVER", 4)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&receiver_session)
+            .unwrap()
+            .unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            receiver.payload(),
+            receiver_invocation,
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("DATA-X").unwrap().bytes(), b"PAYLOAD ");
+        assert_eq!(restored.variable("LENGTH-X").unwrap().bytes(), &[0, 7]);
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert!(
+            server
+                .cics
+                .terminal_run_trace(&receiver_session, &principal, 4)
+                .unwrap()
+                .iter()
+                .any(|entry| entry.operation == CicsOperation::Retrieve)
         );
     }
 

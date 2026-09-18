@@ -1365,6 +1365,11 @@
         "id": "recovery",
         "rust_variant": "Recovery",
         "responsibility": "Unit-of-work commit, rollback, and reconciliation semantics."
+      },
+      {
+        "id": "interval-control",
+        "rust_variant": "IntervalControl",
+        "responsibility": "Durable interval START scheduling and RETRIEVE record semantics."
       }
     ],
     "operations": [
@@ -1470,7 +1475,7 @@
         "operation": "Retrieve",
         "interface": "api",
         "family": "task-control",
-        "mutating": false,
+        "mutating": true,
         "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0175"
       },
       {

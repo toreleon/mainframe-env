@@ -6,13 +6,15 @@ JES jobs/active work/spool/events, SQL rows/payloads, and immutable artifacts.
 At 100% of any bound, admission fails before mutation. No queue or retry loop
 grows automatically.
 
-The core server owns exactly two JES workers. Their generation-scoped claim
-prevents them from consuming another durable work lane. Higher JES priority is
-selected first; oldest available admission tick plus work ID provides a
-deterministic FIFO tie-break within a priority. Each
-worker heartbeats a 30-second lease every 5 seconds through the persisted
-logical clock, and admitted work has a 24-hour deadline. After an ungraceful
-process exit, wait until that lease expires;
+The core server owns exactly two shared durable workers. Each poll claims JES
+work first and, when none is available, claims the CICS `cics-start-v1`
+generation; generation-scoped claims prevent either operation from consuming a
+foreign durable work lane. Within a generation, higher priority is selected
+first; oldest available admission tick plus work ID provides a deterministic
+FIFO tie-break within a priority. Each worker heartbeats a 30-second lease
+every 5 seconds through the persisted logical clock, and admitted work has a
+24-hour deadline. After an ungraceful process exit, wait until that lease
+expires;
 the next server advances the same durable clock and reclaims with a higher
 epoch. Never edit a lease ID, epoch, heartbeat, or clock record by hand.
 
@@ -70,6 +72,15 @@ consumer identity needed to close the result-journal crash gap and is not yet
 eligible for generic retention. Schema rollback therefore requires stopping
 admission and restoring a pre-change backup; older binaries must not write a
 store containing these rows.
+
+Also retain the matching shared work row whose ID is `cics-start:<REQID>` and
+generation is `cics-start-v1`. A queued row makes the pending interval record
+eligible at its expiration tick; a claimed row is fenced by its lease ID and
+epoch; a completed row records that promotion was attempted. On restart, let
+the shared workers reclaim an expired lease normally. Never promote the
+provider row by hand or enqueue a replacement with a different execution,
+deadline, or payload identity. Current workers make the record retrievable but
+do not launch the target transaction automatically.
 
 Back up `cics-session` rows containing task association or HANDLE state before
 enabling typed `SET ASSOCIATION USERCORRDATA` or durable handlers. Current

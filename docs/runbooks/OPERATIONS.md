@@ -138,9 +138,10 @@ true only when all reported checks pass:
 - every required host capability is registered;
 - the selected local/shared artifact authority passes a bounded read/write
   probe and every enforced object/byte quota has headroom; and
-- exactly two JES worker tasks are running and each has successfully polled,
-  heartbeated, or committed the durable queue within three heartbeat intervals.
-  A live task with a hung store operation ages out and fails readiness.
+- exactly two shared durable worker tasks are running and each has successfully
+  polled, heartbeated, or committed the JES/CICS START work lanes within three
+  heartbeat intervals. A live task with a hung store operation ages out and
+  fails readiness.
 
 `retention_capacity` reports `healthy`, `low-watermark`, `high-watermark`,
 `full`, or `unavailable`. Healthy and low-watermark stores remain ready, with

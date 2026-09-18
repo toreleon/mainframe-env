@@ -14,6 +14,29 @@ mod terminal_control;
 mod terminal_run;
 mod time;
 
+use mainframe_env_host_api::HostProblem;
+use mainframe_env_store_api::StoreError;
+
+pub(crate) fn field(out: &mut Vec<u8>, value: &[u8]) -> Result<(), HostProblem> {
+    out.extend_from_slice(
+        &u32::try_from(value.len())
+            .map_err(|_| HostProblem::ResourceExhausted)?
+            .to_be_bytes(),
+    );
+    out.extend_from_slice(value);
+    Ok(())
+}
+
+pub(crate) fn store_error(error: StoreError) -> HostProblem {
+    match error {
+        StoreError::Conflict => HostProblem::IdempotencyConflict,
+        StoreError::CapacityExceeded | StoreError::PayloadTooLarge => {
+            HostProblem::ResourceExhausted
+        }
+        _ => HostProblem::InfrastructureFailure,
+    }
+}
+
 pub(super) use bms_map::{
     decode_terminal_address, encode_terminal_address, terminal_field_address, validate_map,
 };
@@ -23,7 +46,9 @@ pub(super) use handle_state::{
     AbendExit, AbendRecord, HandleFrame, HandleState, decode_session_handle_state,
     session_schema_version,
 };
-pub(super) use interval_control::{IntervalStartRecord, load as load_interval_records};
+pub use interval_control::CICS_START_WORK_GENERATION;
+pub(super) use interval_control::load as load_interval_records;
+pub(super) use interval_control::{IntervalStartRecord, invoke as invoke_interval_control};
 pub(super) use program_control::invoke as invoke_program_control;
 pub(super) use queue_control::invoke as invoke_queue_control;
 pub(super) use recovery::invoke as invoke_recovery;

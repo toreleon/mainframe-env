@@ -51,9 +51,10 @@ silently disappear through a default serializer. A schema change requires
 review of the protocol version, golden vectors and persistence compatibility.
 The `AddressSet`, `ChangeTask`, `Deq`, `Enq`, `HandleAid`, `HandleCondition`,
 `IgnoreCondition`, `PopHandle`, `PushHandle`, `SetAssociationUserCorrData`, and
-`Suspend` CICS operation identities and `Ignored` CICS disposition are additive
-named variants: they do not alter the canonical bytes of any existing value,
-and their exact variant-name bytes are frozen by golden tests.
+`Start`, `Suspend`, and `Retrieve` CICS operation identities and `Ignored` CICS
+disposition are additive named variants: they do not alter the canonical bytes
+of any existing value, and their exact variant-name bytes are frozen by golden
+tests.
 
 A terminal CICS ABEND records `ABEND.DUMP` in the response output map with
 schema `mainframe-env.cics.abend-dump@1` and exact value `requested` or

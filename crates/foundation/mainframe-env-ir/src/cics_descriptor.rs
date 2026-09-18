@@ -162,6 +162,22 @@ const PURGE_MESSAGE_EFFECTS: &[Effect] = &[
     Effect::Condition,
     Effect::Transaction,
 ];
+const START_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Clock,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+    Effect::Transaction,
+];
+const RETRIEVE_EFFECTS: &[Effect] = &[
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+    Effect::Transaction,
+];
 
 /// Static executable facts owned by the typed CICS dialect.
 ///
@@ -516,7 +532,7 @@ pub fn cics_application_registry_for_runtime_operation(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 34] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 36] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -789,6 +805,22 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 34] = [
         effects: PURGE_MESSAGE_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Start,
+        namespace: "cics.interval",
+        name: "start",
+        major: 1,
+        effects: START_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Retrieve,
+        namespace: "cics.task",
+        name: "retrieve",
+        major: 1,
+        effects: RETRIEVE_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
 ];
 
 /// Resolves the executable descriptor for a decoded CICS plan operation.
@@ -831,6 +863,8 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::SendText => &CICS_EXECUTABLE_DESCRIPTORS[31],
         CicsPlanOperation::Assign => &CICS_EXECUTABLE_DESCRIPTORS[32],
         CicsPlanOperation::PurgeMessage => &CICS_EXECUTABLE_DESCRIPTORS[33],
+        CicsPlanOperation::Start => &CICS_EXECUTABLE_DESCRIPTORS[34],
+        CicsPlanOperation::Retrieve => &CICS_EXECUTABLE_DESCRIPTORS[35],
     }
 }
 
@@ -892,7 +926,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 34);
+        assert_eq!(typed.len(), 36);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -902,7 +936,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 1);
+        assert_eq!(legacy.len(), 0);
         assert!(legacy.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && !descriptor.legacy_execution_options.is_empty()));
@@ -910,7 +944,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 228);
+        assert_eq!(unready.len(), 227);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -1145,6 +1179,8 @@ mod tests {
                 CicsPlanOperation::Syncpoint,
                 CicsPlanOperation::SetAssociationUserCorrData,
                 CicsPlanOperation::Suspend,
+                CicsPlanOperation::Start,
+                CicsPlanOperation::Retrieve,
             ])
         );
         assert_eq!(

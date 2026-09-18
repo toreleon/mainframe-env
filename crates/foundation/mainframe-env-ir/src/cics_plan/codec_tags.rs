@@ -41,6 +41,8 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::SendText => 31,
         CicsPlanOperation::Assign => 32,
         CicsPlanOperation::PurgeMessage => 33,
+        CicsPlanOperation::Start => 34,
+        CicsPlanOperation::Retrieve => 35,
     }
 }
 
@@ -80,6 +82,8 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         31 => Ok(CicsPlanOperation::SendText),
         32 => Ok(CicsPlanOperation::Assign),
         33 => Ok(CicsPlanOperation::PurgeMessage),
+        34 => Ok(CicsPlanOperation::Start),
+        35 => Ok(CicsPlanOperation::Retrieve),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -113,6 +117,9 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::Map => 24,
         CicsOperandName::Mapset => 25,
         CicsOperandName::KeyLength => 26,
+        CicsOperandName::ReqId => 27,
+        CicsOperandName::Interval => 28,
+        CicsOperandName::StartTime => 29,
     }
 }
 
@@ -145,6 +152,9 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         24 => Ok(CicsOperandName::Map),
         25 => Ok(CicsOperandName::Mapset),
         26 => Ok(CicsOperandName::KeyLength),
+        27 => Ok(CicsOperandName::ReqId),
+        28 => Ok(CicsOperandName::Interval),
+        29 => Ok(CicsOperandName::StartTime),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

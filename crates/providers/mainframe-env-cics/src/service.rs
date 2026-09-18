@@ -7,10 +7,11 @@ use crate::retention::{
     CICS_OUTER_EFFECT_ORIGIN_BINDING, CICS_OUTER_EFFECT_ORIGIN_SCHEMA, DecodedUow,
     UowRetentionMetadata,
 };
-pub use handlers::CicsEnqueueModelDefinition;
+pub use handlers::{CICS_START_WORK_GENERATION, CicsEnqueueModelDefinition};
 use handlers::{
     decode_terminal_address, encode_terminal_address, terminal_field_address, validate_map,
 };
+pub(super) use handlers::{field, store_error};
 use mainframe_env_encoding::CodePage;
 use mainframe_env_execution_api::{
     BoundedPayload, CapabilityId, ExecutionId, IdempotencyKey, Invocation, InvocationLimits,
@@ -27,7 +28,7 @@ use mainframe_env_host_api::{
     CicsConditionPolicy, ClockRequest, DatasetRequest, DatasetResult, ProgramRequest,
 };
 use mainframe_env_store_api::{
-    ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
+    ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError, WorkStore,
 };
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -295,6 +296,7 @@ pub struct CicsService {
     limits: CicsLimits,
     state: Mutex<State>,
     replay_clock: Option<Arc<dyn CicsReplayClock>>,
+    work_store: Option<Arc<dyn WorkStore>>,
     replay_unknown_after_persist: AtomicBool,
 }
 
@@ -327,7 +329,7 @@ impl CicsService {
         store: Arc<dyn ProviderStateStore>,
         limits: CicsLimits,
     ) -> Result<Arc<Self>, HostProblem> {
-        Self::open_inner(host, store, limits, None)
+        Self::open_inner(host, store, limits, None, None)
     }
 
     /// Open with the durable clock used to resolve outer replay and UOW age.
@@ -337,7 +339,7 @@ impl CicsService {
         limits: CicsLimits,
         replay_clock: Arc<dyn CicsReplayClock>,
     ) -> Result<Arc<Self>, HostProblem> {
-        Self::open_inner(host, store, limits, Some(replay_clock))
+        Self::open_inner(host, store, limits, Some(replay_clock), None)
     }
 
     fn open_inner(
@@ -345,6 +347,7 @@ impl CicsService {
         store: Arc<dyn ProviderStateStore>,
         limits: CicsLimits,
         replay_clock: Option<Arc<dyn CicsReplayClock>>,
+        work_store: Option<Arc<dyn WorkStore>>,
     ) -> Result<Arc<Self>, HostProblem> {
         let mut sessions = BTreeMap::new();
         for row in store
@@ -438,6 +441,7 @@ impl CicsService {
             store,
             limits,
             replay_clock,
+            work_store,
             replay_unknown_after_persist: AtomicBool::new(false),
             state: Mutex::new(State {
                 sessions,
@@ -1711,7 +1715,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 37);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 38);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -1730,6 +1734,9 @@ impl CicsService {
             CicsCommandFamily::QueueControl => handlers::invoke_queue_control(self, run, &request),
             CicsCommandFamily::Recovery => {
                 handlers::invoke_recovery(self, run, &request, retention_tick)
+            }
+            CicsCommandFamily::IntervalControl => {
+                handlers::invoke_interval_control(self, run, &request)
             }
         }
         .or_else(|problem| handlers::condition(self, run, &request.condition_policy, problem))
@@ -3670,16 +3677,6 @@ pub(crate) fn cics_effect_replay_binding_digest(replay: &CicsEffectReplay) -> [u
     hash.finalize().into()
 }
 
-fn field(out: &mut Vec<u8>, value: &[u8]) -> Result<(), HostProblem> {
-    out.extend_from_slice(
-        &u32::try_from(value.len())
-            .map_err(|_| HostProblem::ResourceExhausted)?
-            .to_be_bytes(),
-    );
-    out.extend_from_slice(value);
-    Ok(())
-}
-
 struct Reader<'a> {
     bytes: &'a [u8],
     at: usize,
@@ -3713,15 +3710,6 @@ impl<'a> Reader<'a> {
     }
 }
 
-fn store_error(error: StoreError) -> HostProblem {
-    match error {
-        StoreError::Conflict => HostProblem::IdempotencyConflict,
-        StoreError::CapacityExceeded | StoreError::PayloadTooLarge => {
-            HostProblem::ResourceExhausted
-        }
-        _ => HostProblem::InfrastructureFailure,
-    }
-}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4644,6 +4632,7 @@ mod tests {
                 "SET ASSOCIATION USERCORRDATA(DATA-X)",
                 CicsOperation::SetAssociationUserCorrData,
             ),
+            ("START", CicsOperation::Start),
             ("STARTBR", CicsOperation::StartBrowse),
             ("SUSPEND", CicsOperation::Suspend),
             ("SYNCPOINT", CicsOperation::Syncpoint),
@@ -4662,7 +4651,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 37);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 38);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -4674,7 +4663,7 @@ mod tests {
             assert_eq!(command_descriptor(descriptor.operation), descriptor);
             families.insert(format!("{:?}", descriptor.family));
         }
-        assert_eq!(families.len(), 7);
+        assert_eq!(families.len(), 8);
         let asktime = command_descriptor(CicsOperation::Asktime);
         assert_eq!(asktime.syntax, "ASKTIME ABSTIME");
         assert_eq!(
@@ -4687,6 +4676,203 @@ mod tests {
             bare_asktime.official_row,
             "ibm-cics-ts-6x-2026-08-31:api-commands:0009"
         );
+    }
+
+    #[test]
+    fn interval_start_work_promotes_and_retrieve_consumes_exactly_once() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let work_store: Arc<dyn WorkStore> = store.clone();
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            provider_store,
+            work_store,
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (issuer, _) = registered(&service);
+        let start = request(
+            CicsOperation::Start,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"NEXT")),
+                ("REQID".into(), argument(b"REQ0001")),
+                ("FROM".into(), argument(b"PAYLOAD")),
+                ("LENGTH".into(), cics_decimal(4)),
+                ("INTERVAL".into(), cics_decimal(0)),
+            ]),
+            1,
+        );
+        let started = service
+            .invoke(
+                &effect(&issuer.run_unit_id, start.clone(), 1),
+                start.clone(),
+            )
+            .unwrap();
+        assert_eq!((started.response, started.response2), (0, 0));
+
+        let work = store
+            .claim("cics-worker", Some(CICS_START_WORK_GENERATION), 1_000, 100)
+            .unwrap()
+            .unwrap();
+        assert_eq!(work.payload, b"REQ0001");
+        service.promote_start_work(&work, 1_000).unwrap();
+        store
+            .complete(
+                &work.work_id,
+                work.lease_id.as_deref().unwrap(),
+                work.lease_epoch,
+                1_000,
+            )
+            .unwrap();
+
+        let next = invocation_for("run-next", BTreeMap::new());
+        let next_session = SessionId::new("next-session", 64).unwrap();
+        service.create_session(&next_session, 24, 80).unwrap();
+        service
+            .register_run(next.clone(), &next_session, "NEXT", "MEAPPL", "MESYS")
+            .unwrap();
+        let mut retrieve = request(
+            CicsOperation::Retrieve,
+            BTreeMap::from([
+                ("INTO".into(), argument(b"DATA-OUT")),
+                ("LENGTH".into(), cics_decimal(16)),
+            ]),
+            2,
+        );
+        retrieve.mutation.as_mut().unwrap().transaction = Some("NEXT".into());
+        let retrieved = service
+            .invoke(
+                &effect(&next.run_unit_id, retrieve.clone(), 2),
+                retrieve.clone(),
+            )
+            .unwrap();
+        assert_eq!(retrieved.outputs["INTO"].bytes(), b"PAYL");
+        assert_eq!(retrieved.outputs["LENGTH"].bytes(), b"4");
+        assert_eq!(retrieved.payload.bytes(), b"PAYL");
+        let replayed = service
+            .invoke(
+                &effect(&next.run_unit_id, retrieve.clone(), 2),
+                retrieve.clone(),
+            )
+            .unwrap();
+        assert_eq!(replayed, retrieved);
+
+        let mut exhausted = request(
+            CicsOperation::Retrieve,
+            BTreeMap::from([
+                ("INTO".into(), argument(b"DATA-OUT")),
+                ("LENGTH".into(), cics_decimal(16)),
+            ]),
+            3,
+        );
+        exhausted.mutation.as_mut().unwrap().transaction = Some("NEXT".into());
+        exhausted.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP".into(),
+            response2_field: Some("RESP2".into()),
+        };
+        let exhausted = service
+            .invoke(&effect(&next.run_unit_id, exhausted.clone(), 3), exhausted)
+            .unwrap();
+        assert_eq!(
+            (
+                exhausted.condition.as_str(),
+                exhausted.response,
+                exhausted.response2
+            ),
+            ("ENDDATA", 29, 0)
+        );
+    }
+
+    #[test]
+    fn interval_start_work_and_retrieve_survive_sqlite_reopen() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-start-retrieve-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+            let work_store: Arc<dyn WorkStore> = store;
+            let service = CicsService::open_with_runtime(
+                authorities(),
+                provider_store,
+                work_store,
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(1_000)),
+            )
+            .unwrap();
+            let (issuer, _) = registered(&service);
+            let start = request(
+                CicsOperation::Start,
+                BTreeMap::from([
+                    ("TRANSID".into(), argument(b"NEXT")),
+                    ("REQID".into(), argument(b"REQSQL01")),
+                    ("FROM".into(), argument(b"RESTART")),
+                    ("LENGTH".into(), cics_decimal(7)),
+                    ("INTERVAL".into(), cics_decimal(0)),
+                ]),
+                1,
+            );
+            service
+                .invoke(&effect(&issuer.run_unit_id, start.clone(), 1), start)
+                .unwrap();
+        }
+
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+            let work_store: Arc<dyn WorkStore> = store.clone();
+            let service = CicsService::open_with_runtime(
+                authorities(),
+                provider_store,
+                work_store,
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(1_000)),
+            )
+            .unwrap();
+            let work = store
+                .claim("cics-worker", Some(CICS_START_WORK_GENERATION), 1_000, 100)
+                .unwrap()
+                .unwrap();
+            assert_eq!(work.payload, b"REQSQL01");
+            service.promote_start_work(&work, 1_000).unwrap();
+            store
+                .complete(
+                    &work.work_id,
+                    work.lease_id.as_deref().unwrap(),
+                    work.lease_epoch,
+                    1_000,
+                )
+                .unwrap();
+
+            let next = invocation_for("sqlite-run-next", BTreeMap::new());
+            let next_session = SessionId::new("sqlite-next-session", 64).unwrap();
+            service.create_session(&next_session, 24, 80).unwrap();
+            service
+                .register_run(next.clone(), &next_session, "NEXT", "MEAPPL", "MESYS")
+                .unwrap();
+            let mut retrieve = request(
+                CicsOperation::Retrieve,
+                BTreeMap::from([
+                    ("INTO".into(), argument(b"DATA-OUT")),
+                    ("LENGTH".into(), cics_decimal(16)),
+                ]),
+                2,
+            );
+            retrieve.mutation.as_mut().unwrap().transaction = Some("NEXT".into());
+            let response = service
+                .invoke(&effect(&next.run_unit_id, retrieve.clone(), 2), retrieve)
+                .unwrap();
+            assert_eq!(response.payload.bytes(), b"RESTART");
+            assert_eq!(response.outputs["LENGTH"].bytes(), b"7");
+        }
+
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

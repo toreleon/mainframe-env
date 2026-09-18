@@ -173,9 +173,16 @@ terminal and originating metadata, bounded data and FMH state, plus canonical
 producer and consumer idempotency identities. Pending, protected-pending,
 ready, and consumed are explicit states. Promotion is ordered by expiration
 then request identifier; consumption is one fenced CAS transition and only the
-same canonical consumer request can replay it. The records-core boundary is
-internal until shared work admission and typed START/RETRIEVE routes seal, so
-its presence alone does not advertise either command.
+same canonical consumer request can replay it. The bounded local-data route
+adds one `cics-start-v1` work row for each accepted START record. The core
+workers claim that generation under the ordinary lease/epoch fence and promote
+the matching record to ready; they do not yet create the target CICS task.
+Typed RETRIEVE then consumes the oldest ready record for the target transaction
+through explicit INTO and in/out LENGTH bindings. START admission, the work
+row, interval state, and replay receipts share the durable store, so a SQLite
+reopen preserves the producer-to-consumer cycle. Remote routing, terminal and
+origin metadata, protected starts, generated request identifiers, FMH, WAIT,
+SET, and automatic target-task launch remain outside this slice.
 
 An ENQ wait is not a terminal-input handoff. Its execution remains
 `Suspended`, and both the coordinator checkpoint and product continuation stay

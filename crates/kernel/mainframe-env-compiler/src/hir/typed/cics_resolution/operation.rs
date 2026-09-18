@@ -39,6 +39,8 @@ pub(super) fn resolve(
         ["SET", "ASSOCIATION", "USERCORRDATA"] => HirCicsOperation::SetAssociationUserCorrData,
         ["SYNCPOINT"] => HirCicsOperation::Syncpoint,
         ["SUSPEND"] => HirCicsOperation::Suspend,
+        ["START"] => HirCicsOperation::Start,
+        ["RETRIEVE"] => HirCicsOperation::Retrieve,
         _ => return Err(ResolutionFailure::Unsupported),
     })
 }
