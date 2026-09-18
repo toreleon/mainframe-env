@@ -87,6 +87,7 @@ pub const CICS_ASSIGN_OUTPUT_NAMES: &[&str] = &[
     "LDCNUM",
     "PAGENUM",
     "PARTNPAGE",
+    "RETURNPROG",
 ];
 
 impl CicsAssignOutput {

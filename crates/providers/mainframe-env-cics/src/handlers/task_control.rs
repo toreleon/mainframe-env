@@ -59,7 +59,10 @@ pub(in crate::service) fn new_run_with_state(
     sysid: &str,
     seed: RunSeed,
 ) -> Run {
-    let current_program = super::task_context::current_program(&invocation);
+    let current_program = super::CurrentProgramFrame {
+        current: super::task_context::current_program(&invocation),
+        parent_execution_id: invocation.parent_execution_id.clone(),
+    };
     let HandleState {
         handlers,
         aid_handlers,
@@ -531,7 +534,7 @@ fn abend(
         code: code.clone(),
         original_code,
         dump_requested,
-        program: run.current_program.clone(),
+        program: run.current_program.current.clone(),
     });
     if HandleState::from_run(run) != previous {
         persist_handle_state(service, run, previous)?;

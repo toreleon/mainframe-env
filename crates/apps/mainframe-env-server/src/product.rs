@@ -11781,6 +11781,14 @@ mod tests {
             .replace(
                 "EXEC CICS ASSIGN ABCODE(ABCODE-X)",
                 "EXEC CICS ASSIGN DESTCOUNT(BMS-DESTCOUNT-X) LDCMNEM(BMS-LDCMNEM-X) LDCNUM(BMS-LDCNUM-X) PAGENUM(BMS-PAGENUM-X) PARTNPAGE(BMS-PARTNPAGE-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE RESP-X TO BMS-RESP-X.\nMOVE RESP2-X TO BMS-RESP2-X.\nEXEC CICS ASSIGN ABCODE(ABCODE-X)",
+            )
+            .replace(
+                "01 INITPARM-X PIC X(60) VALUE ALL 'Z'.",
+                "01 RETURN-PROGRAM-X PIC X(8) VALUE ALL 'Z'.\n01 INITPARM-X PIC X(60) VALUE ALL 'Z'.",
+            )
+            .replace(
+                "EXEC CICS ASSIGN INITPARM(INITPARM-X)",
+                "EXEC CICS ASSIGN RETURNPROG(RETURN-PROGRAM-X) INITPARM(INITPARM-X)",
             );
         let path = LogicalPath::new("SCHEDULE.cbl", limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
@@ -12048,6 +12056,10 @@ mod tests {
         );
         assert_eq!(restored.variable("RESTART-X").unwrap().bytes(), &[0]);
         assert_eq!(restored.variable("RESSEC-X").unwrap().bytes(), b"X");
+        assert_eq!(
+            restored.variable("RETURN-PROGRAM-X").unwrap().bytes(),
+            &[b' '; 8]
+        );
         assert_eq!(
             restored.variable("SCREEN-HEIGHT-X").unwrap().bytes(),
             &[0, 24]

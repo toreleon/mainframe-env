@@ -97,6 +97,7 @@ pub(super) fn validate(
         "LDCNUM",
         "PAGENUM",
         "PARTNPAGE",
+        "RETURNPROG",
     ] {
         let Some(value) = clauses.get(name) else {
             continue;
@@ -176,6 +177,7 @@ pub(super) fn validate(
             || (name == "PROGRAM" && target.length != 8)
             || (name == "QNAME" && target.length != 4)
             || (name == "RESTART" && target.length != 1)
+            || (name == "RETURNPROG" && target.length != 8)
             || (matches!(
                 name,
                 "APLKYBD"

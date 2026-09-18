@@ -46,7 +46,7 @@ pub(super) fn validate_output(
         | "LDCNUM" | "PARTNS" | "PS" | "RESTART" | "SOSI" | "TEXTKYBD" | "TEXTPRINT"
         | "UNATTEND" | "VALIDATION" | "CMDSEC" | "RESSEC" => Some(1),
         "ABPROGRAM" | "ASRAINTRPT" | "ASRAPSW" | "DESTID" | "OPERKEYS" | "PROGRAM"
-        | "PROCESSTYPE" => Some(8),
+        | "PROCESSTYPE" | "RETURNPROG" => Some(8),
         "ACTIVITY" | "ASRAPSW16" => Some(16),
         "ACTIVITYID" => Some(52),
         "ASRAREGS" => Some(64),

@@ -189,7 +189,7 @@ pub struct CicsTerminalExecution {
 #[derive(Clone)]
 struct Run {
     invocation: Invocation,
-    current_program: Option<String>,
+    current_program: handlers::CurrentProgramFrame,
     session: String,
     transaction: String,
     applid: String,
@@ -7534,6 +7534,27 @@ mod tests {
         assert_eq!(initparm.outputs["INITPARMLEN"].bytes(), b"0");
         assert_eq!(initparm.outputs["BRIDGE"].bytes(), &[b' '; 4]);
 
+        let top_level_return_program = request(
+            CicsOperation::Assign,
+            BTreeMap::from([("RETURNPROG".into(), argument(b"RETURN-PROGRAM-OUT"))]),
+            326,
+        );
+        let top_level_return_program = service
+            .invoke(
+                &effect(
+                    &invocation.run_unit_id,
+                    top_level_return_program.clone(),
+                    326,
+                ),
+                top_level_return_program,
+            )
+            .unwrap();
+        assert_eq!(top_level_return_program.condition, "NORMAL");
+        assert_eq!(
+            top_level_return_program.outputs["RETURNPROG"].bytes(),
+            &[b' '; 8]
+        );
+
         let mut no_ati = request(
             CicsOperation::Assign,
             BTreeMap::from([
@@ -7978,6 +7999,18 @@ mod tests {
             ),
             Err(HostProblem::InfrastructureFailure)
         );
+        let nested_lineage = request(
+            CicsOperation::Assign,
+            BTreeMap::from([("RETURNPROG".into(), argument(b"RETURN-PROGRAM-OUT"))]),
+            2,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&nested_invocation.run_unit_id, nested_lineage.clone(), 2),
+                nested_lineage,
+            ),
+            Err(HostProblem::InfrastructureFailure)
+        );
 
         for (sequence, name, value) in [
             (31, "ASRAKEY", argument(b"ASRA-KEY-OUT")),
@@ -8101,7 +8134,8 @@ mod tests {
                 .runs
                 .get(&invocation.run_unit_id)
                 .unwrap()
-                .current_program,
+                .current_program
+                .current,
             None
         );
 
@@ -8116,8 +8150,42 @@ mod tests {
                 .get(&invocation.run_unit_id)
                 .unwrap()
                 .current_program
+                .current
                 .as_deref(),
             Some("CURRENT")
+        );
+        let return_program = request(
+            CicsOperation::Assign,
+            BTreeMap::from([("RETURNPROG".into(), argument(b"RETURN-PROGRAM-OUT"))]),
+            1,
+        );
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, return_program.clone(), 1),
+                    return_program,
+                )
+                .unwrap()
+                .outputs["RETURNPROG"]
+                .bytes(),
+            &[b' '; 8]
+        );
+
+        let mut child = frame.clone();
+        child.parent_execution_id =
+            Some(ExecutionId::new("parent-execution", InvocationLimits::default()).unwrap());
+        service.ensure_run(&child).unwrap();
+        let child_return_program = request(
+            CicsOperation::Assign,
+            BTreeMap::from([("RETURNPROG".into(), argument(b"RETURN-PROGRAM-OUT"))]),
+            2,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, child_return_program.clone(), 2),
+                child_return_program,
+            ),
+            Err(HostProblem::InfrastructureFailure)
         );
 
         let mut foreign = frame;
@@ -8136,6 +8204,7 @@ mod tests {
                 .get(&invocation.run_unit_id)
                 .unwrap()
                 .current_program
+                .current
                 .as_deref(),
             Some("CURRENT")
         );
@@ -8216,6 +8285,19 @@ mod tests {
             .unwrap();
         assert_eq!(local_ccsid.condition, "NORMAL");
         assert_eq!(local_ccsid.outputs["LOCALCCSID"].bytes(), b"37");
+
+        let unavailable_lineage = request(
+            CicsOperation::Assign,
+            BTreeMap::from([("RETURNPROG".into(), argument(b"RETURN-PROGRAM-OUT"))]),
+            65,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, unavailable_lineage.clone(), 65),
+                unavailable_lineage,
+            ),
+            Err(HostProblem::InfrastructureFailure)
+        );
 
         let initparm = request(
             CicsOperation::Assign,

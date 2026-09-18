@@ -242,7 +242,7 @@ is empty: local purge succeeds idempotently without changing the already
 displayed screen or current map. DPL use returns `INVREQ` 16/200. Deleting a
 nonempty accumulated message and surfacing temporary-storage `TSIOERR` remain
 unready until that logical-message authority exists.
-The typed ASSIGN subset carries each of its 83 admitted context values as a
+The typed ASSIGN subset carries each of its 84 admitted context values as a
 pre-resolved output binding under one bounded output-name authority. It retains
 the existing 16-option maximum, exact receiver checks, partial-INVREQ behavior,
 local/DPL matrix, EIBFN and provider semantics without carrying source command
@@ -250,8 +250,12 @@ text across the executable boundary. The append-only BMS-overflow outputs
 `DESTCOUNT`, `LDCMNEM`, `LDCNUM`, `PAGENUM`, and `PARTNPAGE` return `INVREQ`
 16/2 locally because no executable BMS route establishes overflow state, and
 the source-defined DPL restriction returns 16/200; both paths preserve their
-receivers. The other 30 generated ASSIGN semantic options remain compiler
-rejections until their contexts are implemented.
+receivers. `RETURNPROG` is admitted only for a local highest-level frame, where
+the source value is eight blanks; the provider refreshes the current parent
+identity from each trusted invocation and fails closed for LINK-child and DPL
+lineage until it owns a durable caller stack. The other 29 generated ASSIGN
+semantic options remain compiler rejections until their contexts are
+implemented.
 The legacy route admits only the source-valid option subset whose behavior is
 implemented by that raw handler. A catalog-known option outside that subset
 fails explicitly before compatibility lowering instead of being silently

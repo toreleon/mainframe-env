@@ -1,5 +1,5 @@
 use super::super::{CicsService, Run, bounded, decimal_payload};
-use mainframe_env_execution_api::{Invocation, RunUnitId};
+use mainframe_env_execution_api::{ExecutionId, Invocation, RunUnitId};
 use mainframe_env_host_api::{CicsDisposition, CicsRequest, CicsResponse, HostProblem};
 use std::collections::BTreeMap;
 
@@ -29,6 +29,12 @@ const TERMINAL_CAPABILITY_INDICATORS: [(&str, u8); 20] = [
 const LOCAL_CCSID: i64 = 37;
 const BMS_OVERFLOW_OPTIONS: [&str; 5] = ["DESTCOUNT", "LDCMNEM", "LDCNUM", "PAGENUM", "PARTNPAGE"];
 
+#[derive(Clone)]
+pub(in crate::service) struct CurrentProgramFrame {
+    pub(in crate::service) current: Option<String>,
+    pub(in crate::service) parent_execution_id: Option<ExecutionId>,
+}
+
 pub(in crate::service) fn current_program(invocation: &Invocation) -> Option<String> {
     invocation
         .selector
@@ -48,8 +54,9 @@ pub(in crate::service) fn synchronize_current_program(
     if run.invocation.principal.id() != invocation.principal.id() {
         return Err(HostProblem::Unauthorized);
     }
+    run.current_program.parent_execution_id = invocation.parent_execution_id.clone();
     if let Some(program) = current_program(invocation) {
-        run.current_program = Some(program);
+        run.current_program.current = Some(program);
     }
     Ok(true)
 }
@@ -113,6 +120,9 @@ pub(in crate::service) fn assign(
         .contains_key("LINKLEVEL")
         .then(|| assign_link_level(run, dpl))
         .transpose()?;
+    if request.arguments.contains_key("RETURNPROG") {
+        validate_top_level_return_program(run, dpl)?;
+    }
     let dpl_prohibited = dpl
         && (terminal_indicator_requested
             || [
@@ -307,11 +317,17 @@ pub(in crate::service) fn assign(
     if request.arguments.contains_key("PROGRAM") {
         let program = run
             .current_program
+            .current
             .as_ref()
             .ok_or(HostProblem::InfrastructureFailure)?;
         response
             .outputs
             .insert("PROGRAM".into(), bounded(program.as_bytes().to_vec())?);
+    }
+    if request.arguments.contains_key("RETURNPROG") {
+        response
+            .outputs
+            .insert("RETURNPROG".into(), bounded(vec![b' '; 8])?);
     }
     for (name, length) in [
         ("APPLICATION", 64),
@@ -441,6 +457,13 @@ fn assign_link_level(run: &Run, dpl: bool) -> Result<i64, HostProblem> {
     }
 }
 
+fn validate_top_level_return_program(run: &Run, dpl: bool) -> Result<(), HostProblem> {
+    if dpl || run.current_program.parent_execution_id.is_some() {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(())
+}
+
 fn assign_dpl_context(run: &Run) -> Result<bool, HostProblem> {
     let Some(context) = run.invocation.bindings.get("cics.execution-context") else {
         return Ok(false);
@@ -543,6 +566,7 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "LDCNUM",
         "PAGENUM",
         "PARTNPAGE",
+        "RETURNPROG",
     ];
     if request.arguments.len() > 16
         || request.arguments.iter().any(|(name, value)| {

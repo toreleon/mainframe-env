@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `ASSIGN RETURNPROG` for a local highest-level program. It
+  returns the source-defined eight blanks, refreshes the current frame's parent
+  identity from each authenticated invocation, and fails closed for LINK-child
+  and DPL lineage until a durable caller stack exists. Append-only output tag
+  101 preserves every existing typed-plan tag.
+
 - Added exact negative CICS `ASSIGN` handling for `DESTCOUNT`, `LDCMNEM`,
   `LDCNUM`, `PAGENUM`, and `PARTNPAGE`. Without prior BMS overflow processing,
   local requests return `INVREQ` 16/2 and preserve every receiver; DPL requests
