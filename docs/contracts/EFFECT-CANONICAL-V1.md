@@ -49,7 +49,7 @@ explicit boundaries. There are no floating-point host values in this schema.
 Adding a field/variant requires updating an exhaustive implementation; it cannot
 silently disappear through a default serializer. A schema change requires
 review of the protocol version, golden vectors and persistence compatibility.
-The `AddressSet`, `Cancel`, `ChangeTask`, `Deq`, `Enq`, `HandleAid`, `HandleCondition`,
+The `AddressSet`, `Cancel`, `ChangeTask`, `Delay`, `Deq`, `Enq`, `HandleAid`, `HandleCondition`,
 `IgnoreCondition`, `PopHandle`, `PushHandle`, `SetAssociationUserCorrData`, and
 `Start`, `Suspend`, and `Retrieve` CICS operation identities and `Ignored` CICS
 disposition are additive named variants: they do not alter the canonical bytes

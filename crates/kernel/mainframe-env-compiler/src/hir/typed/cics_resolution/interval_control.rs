@@ -10,6 +10,16 @@ pub(super) fn validate_constraints(
     operation: HirCicsOperation,
 ) -> Resolution<()> {
     match operation {
+        HirCicsOperation::Delay
+            if clauses.get("INTERVAL").is_some_and(|value| {
+                value.len() != 1 || value[0].parse::<i64>().ok() != Some(0)
+            }) =>
+        {
+            return Err(ResolutionFailure::Invalid(
+                "typed CICS DELAY currently requires literal INTERVAL(0) or the bare default"
+                    .into(),
+            ));
+        }
         HirCicsOperation::Start => {
             if clauses.contains_key("INTERVAL") && clauses.contains_key("TIME") {
                 return Err(ResolutionFailure::Invalid(
@@ -41,10 +51,26 @@ pub(super) fn operands(
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
     match operation {
         HirCicsOperation::Cancel => cancel_operands(clauses, semantic),
+        HirCicsOperation::Delay => delay_operands(clauses, semantic),
         HirCicsOperation::Start => start_operands(clauses, semantic),
         HirCicsOperation::Retrieve => retrieve_operands(clauses, semantic),
         _ => Ok(Vec::new()),
     }
+}
+
+fn delay_operands(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    clauses
+        .get("INTERVAL")
+        .map(|value| {
+            Ok(vec![HirCicsNamedOperand {
+                name: HirCicsOperandName::Interval,
+                value: cics_integer_value(value, semantic)?,
+            }])
+        })
+        .unwrap_or_else(|| Ok(Vec::new()))
 }
 
 fn cancel_operands(

@@ -61,6 +61,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::AsktimeEib => CicsOperation::AsktimeEib,
         CicsPlanOperation::FormatTime => CicsOperation::FormatTime,
         CicsPlanOperation::Cancel => CicsOperation::Cancel,
+        CicsPlanOperation::Delay => CicsOperation::Delay,
         CicsPlanOperation::ChangeTask => CicsOperation::ChangeTask,
         CicsPlanOperation::Deq => CicsOperation::Deq,
         CicsPlanOperation::Enq => CicsOperation::Enq,

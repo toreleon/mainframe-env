@@ -32,6 +32,7 @@ pub(super) fn resolve(
         ["SEND", "TEXT"] => HirCicsOperation::SendText,
         ["ASSIGN"] => HirCicsOperation::Assign,
         ["CANCEL"] => HirCicsOperation::Cancel,
+        ["DELAY"] => HirCicsOperation::Delay,
         ["PURGE", "MESSAGE"] => HirCicsOperation::PurgeMessage,
         ["POP", "HANDLE"] => HirCicsOperation::PopHandle,
         ["PUSH", "HANDLE"] => HirCicsOperation::PushHandle,

@@ -153,6 +153,7 @@ pub enum HirCicsOperation {
     AsktimeEib,
     FormatTime,
     Cancel,
+    Delay,
     ChangeTask,
     Deq,
     Enq,
@@ -3256,6 +3257,50 @@ mod tests {
         ] {
             let analysis = analyze(&format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. CANBAD. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
+        }
+    }
+
+    #[test]
+    fn cics_delay_lowers_only_bare_and_literal_zero_interval() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELAY0. PROCEDURE DIVISION. EXEC CICS DELAY END-EXEC. EXEC CICS DELAY INTERVAL(0) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("DELAY zero: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 2);
+        assert!(
+            commands
+                .iter()
+                .all(|command| command.operation == HirCicsOperation::Delay)
+        );
+        assert!(commands[0].operands.is_empty());
+        assert_eq!(
+            commands[1].operands,
+            [HirCicsNamedOperand {
+                name: HirCicsOperandName::Interval,
+                value: HirCicsValue::Integer(0),
+            }]
+        );
+
+        for command in [
+            "DELAY INTERVAL(1)",
+            "DELAY INTERVAL(WHEN-X)",
+            "DELAY TIME(0)",
+            "DELAY FOR SECONDS(0)",
+            "DELAY REQID('WAIT0001')",
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. DELBAD. DATA DIVISION. WORKING-STORAGE SECTION. 01 WHEN-X PIC S9(6) COMP-3 VALUE 0. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
             ));
             assert!(analysis.hir.is_none(), "{command}");
         }

@@ -6,6 +6,13 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added the typed zero-delay CICS DELAY boundary. Bare/default DELAY and
+  compile-time literal INTERVAL(0) now cross the typed compiler, plan,
+  interpreter, canonical host request, provider, durable coordinator, and
+  selected product route without creating timer state or suspending the task.
+  Positive/dynamic timing, TIME, FOR/UNTIL units, REQID/CANCEL, EXPIRED, and
+  durable resumption remain pending.
+
 - Added the typed bounded local CICS CANCEL route for unhonored committed START
   records. Explicit REQID with optional local TRANSID now authorizes the target,
   atomically tombstones the interval record, cancels queued or claimed shared

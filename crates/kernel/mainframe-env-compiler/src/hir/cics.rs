@@ -281,6 +281,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::AsktimeEib => CicsPlanOperation::AsktimeEib,
         HirCicsOperation::FormatTime => CicsPlanOperation::FormatTime,
         HirCicsOperation::Cancel => CicsPlanOperation::Cancel,
+        HirCicsOperation::Delay => CicsPlanOperation::Delay,
         HirCicsOperation::ChangeTask => CicsPlanOperation::ChangeTask,
         HirCicsOperation::Read => CicsPlanOperation::Read,
         HirCicsOperation::Rewrite => CicsPlanOperation::Rewrite,

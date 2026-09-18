@@ -195,6 +195,14 @@ consumed, or already-cancelled-by-another-request records are not cancellable.
 The tombstone intentionally defers immediate REQID reuse until the parent
 START/CANCEL lifecycle owns bounded replay retention.
 
+Typed zero-delay DELAY is deliberately stateless. Bare DELAY and a
+compile-time literal `INTERVAL(0)` return NORMAL immediately and never create a
+timer row, work item, checkpoint, or suspension. The compiler rejects every
+positive or dynamic interval and all TIME, FOR/UNTIL, and REQID forms before
+publication. Durable timer admission, EXPIRED/cancelled wakeup, and task resume
+belong to the positive-delay child and are not inferred from this immediate
+boundary.
+
 An ENQ wait is not a terminal-input handoff. Its execution remains
 `Suspended`, and both the coordinator checkpoint and product continuation stay
 attached to the same online exchange. Resume reissues the ENQ as a new bounded

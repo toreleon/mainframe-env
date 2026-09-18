@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:0bda49084e0d8983a36edc1be20664907fcf30945eedade073df2ac6bee5d99e",
+      "sha256": "sha256:5fbe1a348886a9b915a6b13e197ceec045baa9f00ae31630ed092bb04c134be2",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -345,7 +345,7 @@
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
       "relative_links": 22,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:184afe541cea853983b50cb2d42dc8746ebc9c79b27a4ccaaf6a44c1accacfe2",
+      "sha256": "sha256:28fb04e0a5ab167f87864e6e48d78cf87c8aa8e1efaefbe6074711e6dedad580",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -429,7 +429,7 @@
       "path": "docs/architecture/EXECUTION-AND-DURABILITY.md",
       "relative_links": 1,
       "scope": "execution lifecycle, effects, work, checkpoints, and durability",
-      "sha256": "sha256:c95e42977925868238752e4490e12e47e2c122904721d28e8c7fba842c831152",
+      "sha256": "sha256:8092f2f93441dba73b0822e6326706ff1b611cdf789ea7322ef142a42a82f62f",
       "status": "Accepted by repository owner",
       "title": "Execution and Durability Architecture",
       "xtask_commands": 0
@@ -545,7 +545,7 @@
       "path": "docs/contracts/EFFECT-CANONICAL-V1.md",
       "relative_links": 0,
       "scope": "canonical persisted host request/result digest representation",
-      "sha256": "sha256:e0af42669c375487ba0bc874a75e704c5370e9902bac7f2925744bc8490ec81e",
+      "sha256": "sha256:2bc49ff378fe0c608e80aded7f1dab7c136150093c0703dd69099b026a680836",
       "status": "Frozen contract; implementation deviations tracked before 0.9.0",
       "title": "Canonical host effect representation, version 1",
       "xtask_commands": 0
@@ -1062,7 +1062,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:5f25ccd6c80a74a956424fbd0e9a2a942c53d370e000fa99dcb09c4cf56629a0",
+      "sha256": "sha256:0095e0309d15799c6ee1a2c253fe296f284082e678fa9a58dc093610a2801be3",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },

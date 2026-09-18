@@ -1715,7 +1715,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 39);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 40);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -4608,6 +4608,7 @@ mod tests {
             ("CHANGE TASK", CicsOperation::ChangeTask),
             ("CANCEL", CicsOperation::Cancel),
             ("DEQ", CicsOperation::Deq),
+            ("DELAY", CicsOperation::Delay),
             ("DELETE", CicsOperation::Delete),
             ("ENDBR", CicsOperation::EndBrowse),
             ("ENQ", CicsOperation::Enq),
@@ -4652,7 +4653,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 39);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 40);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -5042,6 +5043,56 @@ mod tests {
             )
             .unwrap();
         assert_eq!(released.state, WorkState::Cancelled);
+    }
+
+    #[test]
+    fn interval_delay_zero_completes_without_timer_state() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+        for (sequence, arguments) in [
+            (1, BTreeMap::new()),
+            (2, BTreeMap::from([("INTERVAL".into(), cics_decimal(0))])),
+        ] {
+            let request = request(CicsOperation::Delay, arguments, sequence);
+            let response = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), sequence),
+                    request,
+                )
+                .unwrap();
+            assert_eq!(
+                (
+                    response.condition.as_str(),
+                    response.response,
+                    response.response2
+                ),
+                ("NORMAL", 0, 0)
+            );
+        }
+
+        let mut nonzero = request(
+            CicsOperation::Delay,
+            BTreeMap::from([("INTERVAL".into(), cics_decimal(1))]),
+            3,
+        );
+        nonzero.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP".into(),
+            response2_field: Some("RESP2".into()),
+        };
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, nonzero.clone(), 3),
+                nonzero,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                response.condition.as_str(),
+                response.response,
+                response.response2
+            ),
+            ("INVREQ", 16, 0)
+        );
     }
 
     #[test]

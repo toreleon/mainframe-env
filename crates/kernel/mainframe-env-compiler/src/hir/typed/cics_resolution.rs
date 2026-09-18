@@ -727,6 +727,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::SendText => &["FROM", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::Assign => &["RESP", "RESP2"],
         HirCicsOperation::Cancel => &["REQID", "TRANSID", "RESP", "RESP2"],
+        HirCicsOperation::Delay => &["INTERVAL", "RESP", "RESP2"],
         HirCicsOperation::PurgeMessage => &["RESP", "RESP2"],
         HirCicsOperation::Read => &[
             "FILE",
@@ -773,9 +774,10 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::PushHandle
         | HirCicsOperation::SetAssociationUserCorrData
         | HirCicsOperation::Suspend => &["NOHANDLE"],
-        HirCicsOperation::Cancel | HirCicsOperation::Start | HirCicsOperation::Retrieve => {
-            &["NOHANDLE"]
-        }
+        HirCicsOperation::Cancel
+        | HirCicsOperation::Delay
+        | HirCicsOperation::Start
+        | HirCicsOperation::Retrieve => &["NOHANDLE"],
         HirCicsOperation::FormatTime => &["DATESEP", "TIMESEP", "NOHANDLE"],
         HirCicsOperation::SendMap => &["ERASE", "CURSOR", "FREEKB", "NOHANDLE"],
         HirCicsOperation::SendText => &["ERASE", "FREEKB", "NOHANDLE"],
@@ -852,6 +854,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::SendMap
         | HirCicsOperation::SendText
         | HirCicsOperation::Assign
+        | HirCicsOperation::Delay
         | HirCicsOperation::PurgeMessage
         | HirCicsOperation::Suspend => &[][..],
         HirCicsOperation::Cancel => &["REQID"][..],

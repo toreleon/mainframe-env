@@ -5,6 +5,7 @@
 //! remain internal foundations for later interval-control slices.
 
 mod cancel;
+mod delay;
 
 use super::super::{CicsLimits, CicsReplayClock, CicsService, Run, field, store_error};
 use crate::{CicsIntervalMode, CicsIntervalTime};
@@ -166,6 +167,7 @@ pub(in crate::service) fn invoke(
 ) -> Result<CicsResponse, HostProblem> {
     match request.operation {
         CicsOperation::Cancel => cancel::invoke(service, run, request),
+        CicsOperation::Delay => delay::invoke(service, run, request),
         CicsOperation::Start => start(service, run, request),
         CicsOperation::Retrieve => retrieve(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),

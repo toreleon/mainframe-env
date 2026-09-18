@@ -17,6 +17,8 @@ pub enum CicsOperation {
     Cancel,
     /// Change the issuing CICS task's dispatch priority.
     ChangeTask,
+    /// Complete the source-defined zero-delay interval-control boundary.
+    Delay,
     /// Release one matching task enqueue ownership level.
     Deq,
     Delete,
@@ -74,6 +76,7 @@ impl CicsOperation {
             Self::Assign => "Assign",
             Self::Cancel => "Cancel",
             Self::ChangeTask => "ChangeTask",
+            Self::Delay => "Delay",
             Self::Deq => "Deq",
             Self::Delete => "Delete",
             Self::Enq => "Enq",
@@ -158,6 +161,7 @@ impl CicsOperation {
             ("ASSIGN", _) => Self::Assign,
             ("CANCEL", _) => Self::Cancel,
             ("CHANGE", Some("TASK")) => Self::ChangeTask,
+            ("DELAY", _) => Self::Delay,
             ("DEQ", _) => Self::Deq,
             ("DELETE", _) => Self::Delete,
             ("ENQ", _) => Self::Enq,

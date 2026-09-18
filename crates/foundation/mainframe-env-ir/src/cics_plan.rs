@@ -75,6 +75,8 @@ pub enum CicsPlanOperation {
     ChangeTask,
     /// Cancel one unhonored local interval-control START request.
     Cancel,
+    /// Complete a source-defined zero-delay request without suspension.
+    Delay,
     /// Release one task-owned enqueue.
     Deq,
     /// Acquire one task-owned enqueue.
@@ -763,7 +765,10 @@ fn validate_operation_shape(
         CicsPlanOperation::PurgeMessage => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
-        CicsPlanOperation::Cancel | CicsPlanOperation::Start | CicsPlanOperation::Retrieve => {
+        CicsPlanOperation::Cancel
+        | CicsPlanOperation::Delay
+        | CicsPlanOperation::Start
+        | CicsPlanOperation::Retrieve => {
             interval_control::invalid_shape(plan, inputs, outputs, scheduling_options)
         }
     };
