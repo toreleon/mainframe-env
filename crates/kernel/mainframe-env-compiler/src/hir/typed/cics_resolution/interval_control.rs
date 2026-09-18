@@ -123,7 +123,6 @@ fn start_operands(
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
     let transaction = bounded_name(&clauses["TRANSID"], semantic, 4, "START", "TRANSID")?;
-    let request_id = bounded_name(&clauses["REQID"], semantic, 8, "START", "REQID")?;
     let HirCicsValue::Data(from) = cics_value(&clauses["FROM"], semantic)? else {
         return Err(ResolutionFailure::Invalid(
             "CICS START FROM requires a data area".into(),
@@ -135,14 +134,16 @@ fn start_operands(
             value: transaction,
         },
         HirCicsNamedOperand {
-            name: HirCicsOperandName::ReqId,
-            value: request_id,
-        },
-        HirCicsNamedOperand {
             name: HirCicsOperandName::From,
             value: HirCicsValue::Data(from),
         },
     ];
+    if let Some(request_id) = clauses.get("REQID") {
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::ReqId,
+            value: bounded_name(request_id, semantic, 8, "START", "REQID")?,
+        });
+    }
     if let Some(length) = clauses.get("LENGTH") {
         let value = if length
             .first()

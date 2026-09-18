@@ -861,7 +861,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::PurgeMessage
         | HirCicsOperation::Suspend => &[][..],
         HirCicsOperation::Cancel => &["REQID"][..],
-        HirCicsOperation::Start => &["TRANSID", "REQID", "FROM"][..],
+        HirCicsOperation::Start => &["TRANSID", "FROM"][..],
         HirCicsOperation::Retrieve => &["LENGTH"][..],
         HirCicsOperation::Deq | HirCicsOperation::Enq => &["RESOURCE"][..],
         HirCicsOperation::Link | HirCicsOperation::Xctl => &["PROGRAM"][..],

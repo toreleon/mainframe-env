@@ -138,6 +138,9 @@ protected-pending records; explicit rollback removes those records. The typed
 ABEND route also removes still-protected records before transferring or
 terminating. CANCEL returns NOTFND while a protected row is uncommitted and
 uses the ordinary pending-work cancellation fence after committing SYNCPOINT.
+When local START omits REQID, the provider derives one replay-stable
+eight-character identifier and the interpreter writes it to implicit EIBREQID;
+that value owns the same record and work identities as an explicit REQID.
 WAIT, terminal association, non-command abnormal/task-end cleanup, and
 automatic task launch remain fail-closed or deferred.
 The typed default-cursor file-browse subset binds STARTBR, READNEXT, READPREV,

@@ -112,6 +112,12 @@ only after that START is committed. Before commit, preserve the row and return
 NOTFND; after commit, restore and cancel the pending interval row together with
 its deterministic work row and cancellation flag.
 
+For START without REQID, preserve the mutation idempotency key and canonical
+request bytes: together they deterministically regenerate the eight-character
+EIBREQID and therefore the provider-row and work IDs. A hash collision with a
+different retained producer fails through the duplicate-REQID fence; never
+rename only one side or invent a replacement EIBREQID during recovery.
+
 A typed local CANCEL leaves the interval row as a cancelled replay tombstone
 and calls the work store's cancellation transition. Queued work becomes
 cancelled immediately; claimed work retains its lease with

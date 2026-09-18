@@ -2170,6 +2170,29 @@ mod tests {
         );
     }
 
+    #[test]
+    fn start_plan_allows_runtime_generated_request_identity() {
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Start,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::TransId,
+                    value: CicsOperandValue::Literal(b"NEXT".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::From,
+                    value: CicsOperandValue::Storage(slot(1, "REQUEST.DATA")),
+                },
+            ],
+            options: BTreeSet::from([CicsPlanOption::Protect]),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let limits = CicsPlanLimits::default();
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
+    }
+
     proptest! {
         #[test]
         fn arbitrary_input_never_panics(bytes in prop::collection::vec(any::<u8>(), 0..4096)) {

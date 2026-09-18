@@ -3286,6 +3286,31 @@ mod tests {
     }
 
     #[test]
+    fn cics_start_may_defer_request_identity_generation_to_runtime() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. GENREQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8) VALUE 'PAYLOAD'. PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') FROM(DATA-X) PROTECT END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("generated START REQID: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed START");
+        assert_eq!(command.operation, HirCicsOperation::Start);
+        assert!(command.options.contains(&HirCicsOption::Protect));
+        assert!(
+            command
+                .operands
+                .iter()
+                .all(|operand| operand.name != HirCicsOperandName::ReqId)
+        );
+    }
+
+    #[test]
     fn cics_cancel_lowers_only_the_bounded_local_start_form() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CANCELL. DATA DIVISION. WORKING-STORAGE SECTION. 01 REQ-X PIC X(8) VALUE 'REQ0001'. 01 TRANS-X PIC X(4) VALUE 'NEXT'. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS CANCEL REQID(REQ-X) TRANSID(TRANS-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);

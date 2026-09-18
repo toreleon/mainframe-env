@@ -10306,7 +10306,7 @@ mod tests {
     fn compiled_start_and_retrieve_cross_shared_worker_and_durable_coordinator() {
         let starter = published_source_fixture(
             "STARTER",
-            "IDENTIFICATION DIVISION.\nPROGRAM-ID. STARTER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE 'PAYLOAD'.\n01 DATA-Y PIC X(8) VALUE 'SETDATA'.\n01 LENGTH-X PIC S9(4) COMP VALUE 7.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('NX00') REQID('REQ0001') FROM(DATA-X) LENGTH(LENGTH-X) INTERVAL(0) RTRANSID('BACK') RTERMID('T001') QUEUE('WORKQ') FMH RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS START TRANSID('NX00') REQID('REQ0002') FROM(DATA-Y) LENGTH(LENGTH-X) INTERVAL(0) FMH PROTECT RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SYNCPOINT RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. STARTER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE 'PAYLOAD'.\n01 DATA-Y PIC X(8) VALUE 'SETDATA'.\n01 LENGTH-X PIC S9(4) COMP VALUE 7.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('NX00') REQID('REQ0001') FROM(DATA-X) LENGTH(LENGTH-X) INTERVAL(0) RTRANSID('BACK') RTERMID('T001') QUEUE('WORKQ') FMH RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS START TRANSID('NX00') FROM(DATA-Y) LENGTH(LENGTH-X) INTERVAL(0) FMH PROTECT RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SYNCPOINT RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
         );
         let receiver = published_source_fixture(
             "RECEIVER",
@@ -10362,7 +10362,7 @@ mod tests {
         server
             .cics
             .launch_terminal(
-                starter_invocation,
+                starter_invocation.clone(),
                 &starter_session,
                 "ST00",
                 24,
@@ -10390,8 +10390,28 @@ mod tests {
                 .iter()
                 .any(|entry| entry.operation == CicsOperation::Start)
         );
+        let starter_continuation = server
+            .online_machine_continuation(&starter_session)
+            .unwrap()
+            .unwrap();
+        let mut restored_starter = ReferenceMachine::from_binary(
+            starter.payload(),
+            starter_invocation,
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored_starter
+            .restore_checkpoint(&starter_continuation.checkpoint)
+            .unwrap();
+        let generated_request_id = restored_starter
+            .variable("EIBREQID")
+            .unwrap()
+            .bytes()
+            .to_vec();
+        assert_eq!(generated_request_id.len(), 8);
+        assert!(generated_request_id.iter().all(u8::is_ascii_hexdigit));
 
-        for request_id in [b"REQ0001".as_slice(), b"REQ0002".as_slice()] {
+        for request_id in [b"REQ0001".as_slice(), generated_request_id.as_slice()] {
             let work = server
                 .claim_jes_work("interval-worker")
                 .unwrap()

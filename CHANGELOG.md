@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added runtime-generated START request identities. Typed local START no longer
+  requires REQID; when omitted, the provider derives a replay-stable
+  eight-character uppercase identifier from the effect key and canonical
+  request digest, uses it for the interval/work identity, and returns it through
+  strict implicit EIBREQID state. Explicit REQID behavior is unchanged.
+
 - Added the source-defined cancellation boundary for START PROTECT. CANCEL now
   has explicit regression coverage for NOTFND before the protected START is
   committed and normal cancellation after a committing SYNCPOINT admits its

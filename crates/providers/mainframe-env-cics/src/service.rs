@@ -5065,6 +5065,48 @@ mod tests {
     }
 
     #[test]
+    fn start_without_reqid_generates_replay_stable_eibreqid_and_work_identity() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (issuer, _) = registered(&service);
+        let start = request(
+            CicsOperation::Start,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"NEXT")),
+                ("FROM".into(), argument(b"GENERATE")),
+                ("LENGTH".into(), cics_decimal(8)),
+                ("INTERVAL".into(), cics_decimal(0)),
+            ]),
+            1,
+        );
+        let response = service
+            .invoke(
+                &effect(&issuer.run_unit_id, start.clone(), 1),
+                start.clone(),
+            )
+            .unwrap();
+        let request_id = std::str::from_utf8(response.outputs["EIBREQID"].bytes()).unwrap();
+        assert_eq!(request_id.len(), 8);
+        assert!(request_id.bytes().all(|byte| byte.is_ascii_hexdigit()));
+        let work = store
+            .get_work(&format!("cics-start:{request_id}"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(work.payload, request_id.as_bytes());
+        let replayed = service
+            .invoke(&effect(&issuer.run_unit_id, start.clone(), 1), start)
+            .unwrap();
+        assert_eq!(replayed, response);
+    }
+
+    #[test]
     fn protected_start_cancel_requires_a_committing_syncpoint() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = CicsService::open_with_runtime(

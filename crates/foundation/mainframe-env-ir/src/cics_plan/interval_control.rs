@@ -55,7 +55,6 @@ pub(super) fn invalid_shape(
             ]);
             !inputs.is_subset(&allowed)
                 || !inputs.contains(&CicsOperandName::TransId)
-                || !inputs.contains(&CicsOperandName::ReqId)
                 || !inputs.contains(&CicsOperandName::From)
                 || inputs.contains(&CicsOperandName::Interval)
                     && inputs.contains(&CicsOperandName::StartTime)

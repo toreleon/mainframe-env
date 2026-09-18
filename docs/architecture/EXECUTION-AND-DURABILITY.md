@@ -221,6 +221,14 @@ record ordinary pending work. CANCEL after that commit uses the same durable
 tombstone, work cancellation, replay identity, and worker fence as every other
 local START cancellation.
 
+REQID is optional on the typed local START route. When absent, the provider
+hashes a domain separator, the mutation idempotency key, and the canonical
+request digest into an eight-character uppercase identifier. That deterministic
+name closes retries before the outer response journal exists, becomes the
+interval row and work payload identity, and is returned as a strict EIBREQID
+output. The interpreter validates and checkpoints the eight-byte implicit EIB
+field. Explicit names never receive this synthetic output.
+
 Typed local CANCEL requires an explicit REQID and accepts an optional local
 TRANSID solely for routing authorization. It first verifies the matching shared
 work identity, then CAS-transitions only a committed pending record to a

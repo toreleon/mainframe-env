@@ -195,7 +195,17 @@ fn start(
         .as_ref()
         .ok_or(HostProblem::MissingIdempotency)?;
     let transaction = name_argument(request, "TRANSID", 4)?;
-    let request_id = name_argument(request, "REQID", 8)?;
+    let producer_request_digest = canonical_request_digest(&HostRequest::Cics(request.clone()))
+        .map_err(|_| HostProblem::ResourceExhausted)?;
+    let supplied_request_id = request
+        .arguments
+        .get("REQID")
+        .map(|_| name_argument(request, "REQID", 8))
+        .transpose()?;
+    let request_id_was_generated = supplied_request_id.is_none();
+    let request_id = supplied_request_id.unwrap_or_else(|| {
+        generated_request_id(mutation.idempotency_key.as_str(), &producer_request_digest)
+    });
     let return_transaction = optional_name_argument(request, "RTRANSID", 4)?;
     let return_terminal = optional_name_argument(request, "RTERMID", 4)?;
     let queue = optional_name_argument(request, "QUEUE", 8)?;
@@ -278,8 +288,7 @@ fn start(
             IntervalStartState::Pending
         },
         producer_effect_key: mutation.idempotency_key.as_str().into(),
-        producer_request_digest: canonical_request_digest(&HostRequest::Cics(request.clone()))
-            .map_err(|_| HostProblem::ResourceExhausted)?,
+        producer_request_digest,
         consumer_effect_key: None,
         consumer_request_digest: None,
         version: 1,
@@ -303,7 +312,7 @@ fn start(
     if record.state == IntervalStartState::Pending {
         service.enqueue_interval_work(&record, run.invocation.priority)?;
     }
-    service.response(
+    let mut response = service.response(
         run,
         CicsDisposition::Complete,
         "NORMAL",
@@ -312,7 +321,19 @@ fn start(
         None,
         None,
         Vec::new(),
-    )
+    )?;
+    if request_id_was_generated {
+        response.outputs.insert(
+            "EIBREQID".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.reqid@1",
+                record.request_id.as_bytes().to_vec(),
+                InvocationLimits::default(),
+            )
+            .map_err(|_| HostProblem::ResourceExhausted)?,
+        );
+    }
+    Ok(response)
 }
 
 fn retrieve(
@@ -482,7 +503,6 @@ fn validate_start_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "TRANSID",
     ];
     if !request.arguments.contains_key("FROM")
-        || !request.arguments.contains_key("REQID")
         || !request.arguments.contains_key("TRANSID")
         || request.arguments.contains_key("INTERVAL") && request.arguments.contains_key("TIME")
         || request.arguments.iter().any(|(name, value)| {
@@ -588,6 +608,14 @@ fn optional_decimal(request: &CicsRequest, name: &str) -> Result<Option<i64>, Ho
                 .map_err(|_| HostProblem::Malformed)
         })
         .transpose()
+}
+
+fn generated_request_id(effect_key: &str, request_digest: &[u8; 32]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"mainframe-env.cics.start.generated-reqid@1\0");
+    hasher.update(effect_key.as_bytes());
+    hasher.update(request_digest);
+    format!("{:X}", hasher.finalize())[..8].into()
 }
 
 fn clock_millis_since_midnight(timestamp: &str) -> Result<u64, HostProblem> {
