@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added SQLite process-restart proof for automatic CICS DELAY wakeup. A due
+  DELAY survives product/store teardown, reopens its installed program,
+  terminal session, exchange, checkpoint, provider timer, and work item, then
+  resumes through the ordinary worker without a client CICS resume call.
+
 - Added in-process automatic wakeup for durable CICS DELAY work. After the
   shared worker promotes a due row, the product resolves its bounded durable
   online exchange by run-unit identity and resumes the checkpoint without a

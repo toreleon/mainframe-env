@@ -107,7 +107,8 @@ other units and retains millisecond precision through the durable deadline.
 Packed INTERVAL accepts either a literal or resolved packed numeric value under
 the existing plan tag. A due DELAY worker also resolves the bounded durable
 online exchange by run-unit identity and resumes it without a client resume
-request. Process-restart wake and remote cancellation remain explicit gaps.
+request, including after the SQLite-backed product/store is reopened. PostgreSQL
+restart wake and remote cancellation remain explicit gaps.
 `ABEND` also lowers through a typed task plan: ABCODE is captured as a bounded
 literal or a pre-resolved 1–4 character storage input, and CANCEL/NODUMP remain
 distinct flags. Retained raw ABEND artifacts remain readable, but new

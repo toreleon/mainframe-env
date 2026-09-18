@@ -11236,6 +11236,149 @@ mod tests {
     }
 
     #[test]
+    fn sqlite_restart_promotes_delay_and_resumes_the_durable_exchange() {
+        let artifact = published_source_fixture(
+            "DELAYR",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. DELAYR.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DONE-X PIC X VALUE '0'.\n01 TIME-X PIC S9(9) COMP VALUE 1.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS DELAY FOR SECONDS(TIME-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE '1' TO DONE-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-delay-restart-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let mut server_config = config();
+        server_config.store_profile = crate::StoreProfile::Sqlite;
+        server_config.sqlite_url = url.clone();
+        server_config.artifact_root = directory.join("artifacts");
+        server_config.timeout_millis = 10_000;
+
+        let first_clock = Arc::new(ManualJesClock::new(100));
+        let first_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let first_platform: Arc<dyn PlatformStore> = first_store.clone();
+        let first = ProductServer::open_with_clock(
+            server_config.clone(),
+            first_platform,
+            first_clock.clone(),
+        )
+        .unwrap();
+        let execution_clock = first_clock.clone();
+        first
+            .program
+            .bind_execution_control(Arc::new(move |_: &Invocation| {
+                Ok(ExecutionControl {
+                    now_tick: execution_clock
+                        .now_tick()
+                        .map_err(|_| ExecutionControlError::Unavailable)?,
+                    cancellation_requested: false,
+                })
+            }))
+            .unwrap();
+        first.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        first
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "DELAYR".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("DL0R".into(), "DELAYR".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "DELAYR".into(),
+                    map: "DELAYR".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("interval-delay-restart", 64).unwrap();
+        let invocation = first
+            .cics_invocation("IBMUSER", "DL0R", Some(artifact_ref))
+            .unwrap();
+        first
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "DL0R",
+                24,
+                80,
+                "interval-delay-restart-csrf",
+                100,
+                10_000,
+            )
+            .unwrap();
+        let context = first
+            .cics
+            .terminal_execution(&session, &principal, 100)
+            .unwrap();
+        first
+            .begin_online_exchange(&session, "DELAYR", &context)
+            .unwrap();
+        first
+            .run_online_exchange(&session, &principal, "DELAYR", 100)
+            .unwrap();
+        assert!(first.claim_jes_work("before-restart").unwrap().is_none());
+        drop((first, first_store));
+
+        let second_clock = Arc::new(ManualJesClock::new(1_100));
+        let second_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let second_platform: Arc<dyn PlatformStore> = second_store.clone();
+        let second =
+            ProductServer::open_with_clock(server_config, second_platform, second_clock.clone())
+                .unwrap();
+        let execution_clock = second_clock;
+        second
+            .program
+            .bind_execution_control(Arc::new(move |_: &Invocation| {
+                Ok(ExecutionControl {
+                    now_tick: execution_clock
+                        .now_tick()
+                        .map_err(|_| ExecutionControlError::Unavailable)?,
+                    cancellation_requested: false,
+                })
+            }))
+            .unwrap();
+        let work_id = second
+            .run_jes_worker_once("after-restart")
+            .unwrap()
+            .expect("the restarted worker must claim the due DELAY");
+        assert!(work_id.starts_with("cics-delay:"));
+        assert_eq!(
+            second_store.get_work(&work_id).unwrap().unwrap().state,
+            WorkState::Completed
+        );
+        let continuation = second
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("DONE-X").unwrap().bytes(), b"1");
+
+        drop((second, second_store));
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
     fn compiled_dynamic_packed_time_suspends_promotes_and_resumes() {
         let artifact = published_source_fixture(
             "DELAYT",

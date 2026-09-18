@@ -336,7 +336,10 @@ then resumes the saved machine checkpoint through the ordinary durable
 coordinator before completing the work lease. Promotion and resume are both
 retryable; if execution finalized and cleared its exchange before the work CAS,
 a reclaimed worker treats the missing exchange as completed. Duplicate matches
-fail closed. Process-restart wake remains a separate acceptance boundary.
+fail closed. SQLite reopen reconstructs the installed online application,
+terminal session, exchange, continuation, provider timer, and queued work before
+the same worker path resumes the task. PostgreSQL restart wake remains a
+separate acceptance boundary.
 
 An ENQ wait is not a terminal-input handoff. Its execution remains
 `Suspended`, and both the coordinator checkpoint and product continuation stay
