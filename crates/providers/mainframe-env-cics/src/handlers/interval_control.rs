@@ -129,7 +129,11 @@ impl CicsService {
     }
 
     /// Promote one claimed START work item into the ready-record authority.
-    pub fn promote_start_work(&self, work: &WorkRecord, now_tick: u64) -> Result<(), HostProblem> {
+    pub fn promote_start_work(
+        &self,
+        work: &WorkRecord,
+        now_tick: u64,
+    ) -> Result<super::CicsStartTask, HostProblem> {
         if work.required_generation != CICS_START_WORK_GENERATION
             || work.required_selector.as_str() != "cics:start"
             || work.artifact.as_str() != "artifact:none"
@@ -153,7 +157,12 @@ impl CicsService {
             &request_id,
             now_tick,
             self.limits,
-        )
+        )?;
+        state
+            .interval_records
+            .get(&request_id)
+            .map(super::start_task::from_interval_record)
+            .ok_or(HostProblem::InfrastructureFailure)
     }
 }
 
@@ -709,7 +718,11 @@ pub(in crate::service) fn promote_request(
     limits: CicsLimits,
 ) -> Result<(), HostProblem> {
     let current = records.get(request_id).ok_or(HostProblem::NotFound)?;
-    if current.state == IntervalStartState::Ready && current.expiration_tick <= now_tick {
+    if matches!(
+        current.state,
+        IntervalStartState::Ready | IntervalStartState::Consumed
+    ) && current.expiration_tick <= now_tick
+    {
         return Ok(());
     }
     if current.state != IntervalStartState::Pending || current.expiration_tick > now_tick {

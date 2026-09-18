@@ -133,6 +133,15 @@ length before this boundary, so the copied prefix—not adjacent task storage—
 the payload journaled for dispatch, replacement, or continuation. XCTL target
 EIBCALEN is derived from that exact copied prefix.
 
+Due local CICS START work uses the work row's immutable execution identifier
+as the started task's coordinator identity. At expiration the worker resolves
+the installed transaction and program, restores the principal captured by the
+START row, and creates a facility-less CICS run before driving the ordinary
+online exchange. A lease retry after target completion validates the retained
+execution tuple and completes without redispatch. Task conditions and known
+terminal failures belong to the asynchronously created task; unresolved
+infrastructure or effect uncertainty still blocks work completion.
+
 CICS also retains the exact bounded outer response for every mutating file,
 transient-queue, program-link, enqueue/dequeue, and syncpoint request. The replay key is checked
 against the canonical request digest. New replay envelopes also retain the

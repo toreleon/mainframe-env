@@ -10551,8 +10551,19 @@ mod tests {
                 .expect("due START work");
             assert_eq!(work.required_generation, CICS_START_WORK_GENERATION);
             assert_eq!(work.payload, request_id);
-            let outcome = server.process_claimed_jes_work(&work).unwrap();
-            server.finish_claimed_jes_work(&work, Ok(outcome)).unwrap();
+            server
+                .cics
+                .promote_start_work(&work, server.jes_tick().unwrap())
+                .unwrap();
+            server
+                .store
+                .complete(
+                    &work.work_id,
+                    work.lease_id.as_deref().unwrap(),
+                    work.lease_epoch,
+                    server.jes_tick().unwrap(),
+                )
+                .unwrap();
         }
 
         server
@@ -10599,6 +10610,142 @@ mod tests {
                 .unwrap()
                 .iter()
                 .any(|entry| entry.operation == CicsOperation::Retrieve)
+        );
+    }
+
+    #[test]
+    fn due_local_start_launches_one_facilityless_target_across_worker_retry() {
+        let starter = published_source_fixture(
+            "AUTOSTRT",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. AUTOSTRT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE 'PAYLOAD'.\n01 LENGTH-X PIC S9(4) COMP VALUE 7.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('ATGT') REQID('AUTO0001') FROM(DATA-X) LENGTH(LENGTH-X) INTERVAL(0) END-EXEC.\nSTOP RUN.\n",
+        );
+        let target = published_source_fixture(
+            "AUTOTRGT",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. AUTOTRGT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE ALL 'Z'.\n01 LENGTH-X PIC S9(4) COMP VALUE 8.\nPROCEDURE DIVISION.\nEXEC CICS RETRIEVE INTO(DATA-X) LENGTH(LENGTH-X) END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = |artifact: &PublishedArtifact| {
+            ArtifactRef::new(
+                format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let starter_ref = artifact_ref(&starter);
+        let target_ref = artifact_ref(&target);
+        let program = |name: &str, artifact: &PublishedArtifact, reference: ArtifactRef| {
+            OnlineProgramDefinition {
+                name: name.into(),
+                artifact: reference,
+                payload: artifact.payload().to_vec(),
+                manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                semantic_identity: artifact.semantic_id().to_reference(),
+            }
+        };
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![
+                    program("AUTOSTRT", &starter, starter_ref.clone()),
+                    program("AUTOTRGT", &target, target_ref),
+                ],
+                transactions: BTreeMap::from([
+                    ("ASTR".into(), "AUTOSTRT".into()),
+                    ("ATGT".into(), "AUTOTRGT".into()),
+                ]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "AUTOSTRT".into(),
+                    map: "AUTOSTRT".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("automatic-start-issuer", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "ASTR", Some(starter_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation,
+                &session,
+                "ASTR",
+                24,
+                80,
+                "automatic-start-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "AUTOSTRT", 2)
+            .unwrap();
+
+        let first = server
+            .claim_jes_work("automatic-start-worker-1")
+            .unwrap()
+            .expect("due START work");
+        assert_eq!(first.work_id, "cics-start:AUTO0001");
+        assert!(matches!(
+            server.process_claimed_jes_work(&first).unwrap(),
+            JesWorkOutcome::Completed
+        ));
+        let first_execution = server
+            .store
+            .get_execution(&first.execution_id)
+            .unwrap()
+            .expect("started target execution");
+        assert_eq!(first_execution.state, ExecutionState::Completed);
+        let first_version = first_execution.version;
+
+        let retry_tick = server.jes_tick().unwrap();
+        server
+            .store
+            .release(
+                &first.work_id,
+                first.lease_id.as_deref().unwrap(),
+                first.lease_epoch,
+                retry_tick,
+                retry_tick,
+            )
+            .unwrap();
+        let retry = server
+            .claim_jes_work("automatic-start-worker-2")
+            .unwrap()
+            .expect("reclaimed START work");
+        assert!(retry.lease_epoch > first.lease_epoch);
+        let outcome = server.process_claimed_jes_work(&retry).unwrap();
+        server.finish_claimed_jes_work(&retry, Ok(outcome)).unwrap();
+        let retried_execution = server
+            .store
+            .get_execution(&retry.execution_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(retried_execution.state, ExecutionState::Completed);
+        assert_eq!(retried_execution.version, first_version);
+        assert_eq!(
+            server
+                .store
+                .get_work(&retry.work_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            WorkState::Completed
+        );
+        assert!(
+            server
+                .store
+                .get_provider_state(
+                    "cics-session",
+                    &format!("cics-start-task-{}", retry.execution_id),
+                )
+                .unwrap()
+                .is_none()
         );
     }
 

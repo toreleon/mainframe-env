@@ -1,4 +1,6 @@
-use mainframe_env_cics::{CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION, CicsService};
+use mainframe_env_cics::{
+    CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION, CicsService, CicsStartTask,
+};
 use mainframe_env_host_api::HostProblem;
 use mainframe_env_store_api::{PlatformStore, StoreError, WorkRecord};
 use serde::{Deserialize, Serialize};
@@ -62,17 +64,26 @@ pub(crate) fn heartbeat_durable_work(
         .map(|_| ())
 }
 
+pub(crate) enum CicsWorkOutcome {
+    Start(CicsStartTask),
+    Delay,
+}
+
 pub(crate) fn process_cics_work(
     cics: &CicsService,
     work: &WorkRecord,
     now_tick: u64,
-) -> Result<bool, HostProblem> {
-    match work.required_generation.as_str() {
-        CICS_START_WORK_GENERATION => cics.promote_start_work(work, now_tick)?,
-        CICS_DELAY_WORK_GENERATION => cics.promote_delay_work(work, now_tick)?,
-        _ => return Ok(false),
-    }
-    Ok(true)
+) -> Result<Option<CicsWorkOutcome>, HostProblem> {
+    Ok(match work.required_generation.as_str() {
+        CICS_START_WORK_GENERATION => Some(CicsWorkOutcome::Start(
+            cics.promote_start_work(work, now_tick)?,
+        )),
+        CICS_DELAY_WORK_GENERATION => {
+            cics.promote_delay_work(work, now_tick)?;
+            Some(CicsWorkOutcome::Delay)
+        }
+        _ => None,
+    })
 }
 
 pub(crate) fn clear_worker_progress(progress: &Mutex<Vec<Option<Instant>>>, ordinal: usize) {

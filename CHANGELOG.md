@@ -6,6 +6,14 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added automatic facility-less task launch for due local CICS START work. The
+  fenced work identity now becomes the target's durable execution identity,
+  the stored START principal and transaction are reauthorized at creation, and
+  the started program can consume its data through RETRIEVE. A worker retry
+  after target completion observes the same terminal execution and cannot
+  launch a duplicate task; unavailable target definitions retain IBM's
+  asynchronous no-task outcome.
+
 - Added typed CICS `ASSIGN TNADDR` for an owned local terminal. Because the
   runtime deliberately retains no client network endpoint, the source-defined
   unresolved-address value is 39 blanks; local nonterminal use returns 16/5,

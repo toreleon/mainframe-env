@@ -6,6 +6,7 @@ mod interval_control;
 mod program_control;
 mod queue_control;
 mod recovery;
+mod start_task;
 mod task_context;
 mod task_control;
 mod task_enqueue;
@@ -55,6 +56,7 @@ pub(super) use interval_control::{IntervalStartRecord, invoke as invoke_interval
 pub(super) use program_control::invoke as invoke_program_control;
 pub(super) use queue_control::invoke as invoke_queue_control;
 pub(super) use recovery::invoke as invoke_recovery;
+pub use start_task::CicsStartTask;
 pub(super) use task_context::{
     CurrentProgramFrame, allocate_terminal_input, synchronize_current_program,
 };
