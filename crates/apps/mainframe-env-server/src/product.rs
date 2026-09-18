@@ -11768,7 +11768,7 @@ mod tests {
             )
             .replace(
                 "PROCEDURE DIVISION.\nEXEC CICS CHANGE TASK",
-                "PROCEDURE DIVISION.\nEXEC CICS SEND MAP('SCHEDUL') MAPSET('SCHEDUL') END-EXEC.\nEXEC CICS PURGE MESSAGE END-EXEC.\nMOVE EIBFN TO PURGE-FN.\nEXEC CICS CHANGE TASK",
+                "PROCEDURE DIVISION.\nEXEC CICS ASSIGN INPARTN(INPUT-PARTITION-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE RESP-X TO INPUT-PARTITION-RESP-X.\nMOVE RESP2-X TO INPUT-PARTITION-RESP2-X.\nEXEC CICS SEND MAP('SCHEDUL') MAPSET('SCHEDUL') END-EXEC.\nEXEC CICS PURGE MESSAGE END-EXEC.\nMOVE EIBFN TO PURGE-FN.\nEXEC CICS CHANGE TASK",
             )
             .replace(
                 "HILIGHT(CAPABILITY-X) RESP(RESP-X)",
@@ -11784,7 +11784,7 @@ mod tests {
             )
             .replace(
                 "01 INITPARM-X PIC X(60) VALUE ALL 'Z'.",
-                "01 INVOKING-PROGRAM-X PIC X(8) VALUE ALL 'Z'.\n01 RETURN-PROGRAM-X PIC X(8) VALUE ALL 'Z'.\n01 INITPARM-X PIC X(60) VALUE ALL 'Z'.",
+                "01 INVOKING-PROGRAM-X PIC X(8) VALUE ALL 'Z'.\n01 RETURN-PROGRAM-X PIC X(8) VALUE ALL 'Z'.\n01 INPUT-PARTITION-X PIC X(2) VALUE 'ZZ'.\n01 INPUT-PARTITION-RESP-X PIC S9(9) COMP.\n01 INPUT-PARTITION-RESP2-X PIC S9(9) COMP.\n01 INITPARM-X PIC X(60) VALUE ALL 'Z'.",
             )
             .replace(
                 "EXEC CICS ASSIGN INITPARM(INITPARM-X)",
@@ -12059,6 +12059,21 @@ mod tests {
             restored.variable("INPUT-LENGTH-X").unwrap().bytes(),
             &[0; 2]
         );
+        assert_eq!(
+            restored.variable("INPUT-PARTITION-X").unwrap().bytes(),
+            b"ZZ"
+        );
+        assert_eq!(
+            restored.variable("INPUT-PARTITION-RESP-X").unwrap().bytes(),
+            &[0, 0, 0, 16]
+        );
+        assert_eq!(
+            restored
+                .variable("INPUT-PARTITION-RESP2-X")
+                .unwrap()
+                .bytes(),
+            &[0, 0, 0, 2]
+        );
         assert_eq!(restored.variable("LINK-LEVEL-X").unwrap().bytes(), &[0, 1]);
         assert_eq!(restored.variable("LANGUAGE-X").unwrap().bytes(), b"ENU");
         assert_eq!(
@@ -12156,6 +12171,7 @@ mod tests {
                 (10, mainframe_env_execution_api::AuditDecision::Success),
                 (11, mainframe_env_execution_api::AuditDecision::Success),
                 (12, mainframe_env_execution_api::AuditDecision::Success),
+                (13, mainframe_env_execution_api::AuditDecision::Success),
             ]
         );
     }

@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added source-defined negative CICS `ASSIGN INPARTN` handling. A local
+  terminal before map positioning returns `INVREQ` 16/2, local nonterminal use
+  returns 16/5, and DPL returns 16/200, preserving the one- or two-byte
+  receiver. Positioned-map use remains fail-closed until input-partition state
+  exists; append-only output tag 106 preserves existing plan tags.
+
 - Added typed CICS `ASSIGN INVOKINGPROG` for the local initial program. A
   trusted durable entry marker returns the source-defined eight blanks and
   keeps XCTL, LINK-child, and DPL lineage fail-closed until the runtime owns the

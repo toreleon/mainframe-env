@@ -41,6 +41,9 @@ pub(super) fn validate_output(
     {
         return Err(invalid_plan("ASSIGN halfword output has the wrong layout"));
     }
+    if name == "INPARTN" && !(1..=2).contains(&layout.length) {
+        return Err(invalid_plan("ASSIGN input partition has the wrong width"));
+    }
     let exact_length = match name {
         "ABCODE" | "BRIDGE" | "NEXTTRANSID" | "ORGABCODE" | "PRINSYSID" | "QNAME" => Some(4),
         "ABDUMP" | "APLKYBD" | "APLTEXT" | "BTRANS" | "COLOR" | "DS3270" | "DSSCS" | "EWASUPP"

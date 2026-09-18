@@ -7783,6 +7783,7 @@ mod tests {
                 ("DS3270".into(), argument(b"DS3270-OUT")),
                 ("DSSCS".into(), argument(b"DSSCS-OUT")),
                 ("FCI".into(), argument(b"FCI-OUT")),
+                ("INPARTN".into(), argument(b"INPUT-PARTITION-OUT")),
                 ("PARTNSET".into(), argument(b"PARTITION-SET-OUT")),
                 ("SCRNHT".into(), argument(b"SCREEN-HEIGHT-OUT")),
                 ("SCRNWD".into(), argument(b"SCREEN-WIDTH-OUT")),
@@ -7818,6 +7819,7 @@ mod tests {
             "DEFSCRNWD",
             "DS3270",
             "DSSCS",
+            "INPARTN",
             "PARTNSET",
             "SCRNHT",
             "SCRNWD",
@@ -7953,6 +7955,7 @@ mod tests {
                 ("APPLID".into(), argument(b"APP-OUT")),
                 ("MAPCOLUMN".into(), argument(b"MAP-COLUMN-OUT")),
                 ("MAPHEIGHT".into(), argument(b"MAP-HEIGHT-OUT")),
+                ("INPARTN".into(), argument(b"INPUT-PARTITION-OUT")),
                 ("MAPLINE".into(), argument(b"MAP-LINE-OUT")),
                 ("MAPWIDTH".into(), argument(b"MAP-WIDTH-OUT")),
             ]),
@@ -7983,8 +7986,32 @@ mod tests {
         assert_eq!(no_positioned_map.outputs["APPLID"].bytes(), b"ME01");
         assert!(!no_positioned_map.outputs.contains_key("MAPCOLUMN"));
         assert!(!no_positioned_map.outputs.contains_key("MAPHEIGHT"));
+        assert!(!no_positioned_map.outputs.contains_key("INPARTN"));
         assert!(!no_positioned_map.outputs.contains_key("MAPLINE"));
         assert!(!no_positioned_map.outputs.contains_key("MAPWIDTH"));
+
+        {
+            let mut state = terminal_service.lock().unwrap();
+            let terminal = state.sessions.get_mut(terminal_session.as_str()).unwrap();
+            terminal.mapset = Some("MAPSET".into());
+            terminal.map = Some("MAP".into());
+        }
+        let positioned_input_partition = request(
+            CicsOperation::Assign,
+            BTreeMap::from([("INPARTN".into(), argument(b"INPUT-PARTITION-OUT"))]),
+            206,
+        );
+        assert_eq!(
+            terminal_service.invoke(
+                &effect(
+                    &terminal_invocation.run_unit_id,
+                    positioned_input_partition.clone(),
+                    206,
+                ),
+                positioned_input_partition,
+            ),
+            Err(HostProblem::InfrastructureFailure)
+        );
 
         let missing_program = request(
             CicsOperation::Assign,
@@ -8498,6 +8525,7 @@ mod tests {
             BTreeMap::from([
                 ("APPLID".into(), argument(b"APP-OUT")),
                 ("DESTCOUNT".into(), argument(b"DESTINATION-COUNT-OUT")),
+                ("INPARTN".into(), argument(b"INPUT-PARTITION-OUT")),
                 ("LDCMNEM".into(), argument(b"LDC-MNEMONIC-OUT")),
                 ("LDCNUM".into(), argument(b"LDC-NUMBER-OUT")),
                 ("PAGENUM".into(), argument(b"PAGE-NUMBER-OUT")),
@@ -8524,7 +8552,14 @@ mod tests {
             ("INVREQ", 16, 200)
         );
         assert_eq!(no_bms_overflow.outputs["APPLID"].bytes(), b"ME01");
-        for name in ["DESTCOUNT", "LDCMNEM", "LDCNUM", "PAGENUM", "PARTNPAGE"] {
+        for name in [
+            "DESTCOUNT",
+            "INPARTN",
+            "LDCMNEM",
+            "LDCNUM",
+            "PAGENUM",
+            "PARTNPAGE",
+        ] {
             assert!(!no_bms_overflow.outputs.contains_key(name));
         }
 

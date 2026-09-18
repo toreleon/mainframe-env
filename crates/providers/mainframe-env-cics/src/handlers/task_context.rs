@@ -88,8 +88,10 @@ pub(in crate::service) fn assign(
     let map_geometry_requested = ["MAPCOLUMN", "MAPHEIGHT", "MAPLINE", "MAPWIDTH"]
         .iter()
         .any(|name| request.arguments.contains_key(*name));
+    let input_partition_requested = request.arguments.contains_key("INPARTN");
     let terminal_required = screen_requested
         || terminal_indicator_requested
+        || input_partition_requested
         || request.arguments.contains_key("PARTNSET")
         || request.arguments.contains_key("TERMPRIORITY")
         || map_geometry_requested;
@@ -106,6 +108,15 @@ pub(in crate::service) fn assign(
     };
     let map_missing =
         !dpl && map_geometry_requested && dimensions.is_some() && map_geometry.is_none();
+    let input_partition = if !dpl && input_partition_requested {
+        terminal_has_positioned_map(service, run)?
+    } else {
+        None
+    };
+    if input_partition == Some(true) {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let input_partition_missing = input_partition == Some(false);
     let intersystem_facility_missing = request.arguments.contains_key("PRINSYSID");
     let ati_missing = !dpl && request.arguments.contains_key("QNAME");
     let bts_missing = ["ACTIVITY", "ACTIVITYID", "PROCESS", "PROCESSTYPE"]
@@ -141,6 +152,7 @@ pub(in crate::service) fn assign(
                 "DESTIDLENG",
                 "DESTCOUNT",
                 "FCI",
+                "INPARTN",
                 "MAPCOLUMN",
                 "MAPHEIGHT",
                 "MAPLINE",
@@ -163,6 +175,7 @@ pub(in crate::service) fn assign(
     let mut response = if dpl_prohibited
         || terminal_missing
         || map_missing
+        || input_partition_missing
         || intersystem_facility_missing
         || ati_missing
         || bts_missing
@@ -180,7 +193,7 @@ pub(in crate::service) fn assign(
                     200
                 } else if terminal_missing || intersystem_facility_missing {
                     5
-                } else if map_missing || bms_overflow_missing {
+                } else if map_missing || bms_overflow_missing || input_partition_missing {
                     2
                 } else if ati_missing {
                     4
@@ -482,6 +495,28 @@ fn positioned_map_geometry(
     )))
 }
 
+fn terminal_has_positioned_map(
+    service: &CicsService,
+    run: &Run,
+) -> Result<Option<bool>, HostProblem> {
+    let state = service.lock()?;
+    let session = state
+        .sessions
+        .get(&run.session)
+        .ok_or(HostProblem::InfrastructureFailure)?;
+    if session.principal != run.invocation.principal.id().as_str()
+        || session.run_unit != run.invocation.run_unit_id.as_str()
+        || session.transaction != run.transaction
+    {
+        return Ok(None);
+    }
+    match (session.mapset.is_some(), session.map.is_some()) {
+        (false, false) => Ok(Some(false)),
+        (true, true) => Ok(Some(true)),
+        _ => Err(HostProblem::InfrastructureFailure),
+    }
+}
+
 fn assign_link_level(run: &Run, dpl: bool) -> Result<i64, HostProblem> {
     if dpl {
         Ok(2)
@@ -630,6 +665,7 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "LANGINUSE",
         "INPUTMSGLEN",
         "INVOKINGPROG",
+        "INPARTN",
     ];
     if request.arguments.len() > 16
         || request.arguments.iter().any(|(name, value)| {
