@@ -127,6 +127,9 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::ReturnTransId => 30,
         CicsOperandName::ReturnTermId => 31,
         CicsOperandName::UserId => 32,
+        CicsOperandName::Hours => 33,
+        CicsOperandName::Minutes => 34,
+        CicsOperandName::Seconds => 35,
     }
 }
 
@@ -165,6 +168,9 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         30 => Ok(CicsOperandName::ReturnTransId),
         31 => Ok(CicsOperandName::ReturnTermId),
         32 => Ok(CicsOperandName::UserId),
+        33 => Ok(CicsOperandName::Hours),
+        34 => Ok(CicsOperandName::Minutes),
+        35 => Ok(CicsOperandName::Seconds),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -189,6 +195,8 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u8 {
         CicsPlanOption::Fmh => 15,
         CicsPlanOption::Protect => 16,
         CicsPlanOption::Wait => 17,
+        CicsPlanOption::After => 18,
+        CicsPlanOption::At => 19,
     }
 }
 
@@ -212,6 +220,8 @@ pub(super) fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodec
         15 => Ok(CicsPlanOption::Fmh),
         16 => Ok(CicsPlanOption::Protect),
         17 => Ok(CicsPlanOption::Wait),
+        18 => Ok(CicsPlanOption::After),
+        19 => Ok(CicsPlanOption::At),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

@@ -200,6 +200,9 @@ impl PlanContext<'_> {
                 HirCicsOperandName::ReqId => CicsOperandName::ReqId,
                 HirCicsOperandName::Interval => CicsOperandName::Interval,
                 HirCicsOperandName::StartTime => CicsOperandName::StartTime,
+                HirCicsOperandName::Hours => CicsOperandName::Hours,
+                HirCicsOperandName::Minutes => CicsOperandName::Minutes,
+                HirCicsOperandName::Seconds => CicsOperandName::Seconds,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -345,5 +348,7 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::Fmh => CicsPlanOption::Fmh,
         HirCicsOption::Protect => CicsPlanOption::Protect,
         HirCicsOption::Wait => CicsPlanOption::Wait,
+        HirCicsOption::After => CicsPlanOption::After,
+        HirCicsOption::At => CicsPlanOption::At,
     }
 }

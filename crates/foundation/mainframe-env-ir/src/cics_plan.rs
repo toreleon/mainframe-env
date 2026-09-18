@@ -218,6 +218,10 @@ pub enum CicsOperandName {
     StartTime,
     /// `USERID(...)` authority selected for a started task.
     UserId,
+    /// Explicit START unit components.
+    Hours,
+    Minutes,
+    Seconds,
 }
 
 /// Literal bytes or a runtime read from resolved storage.
@@ -281,6 +285,8 @@ pub enum CicsPlanOption {
     Protect,
     /// Wait for an expired START record rather than returning ENDDATA immediately.
     Wait,
+    After,
+    At,
 }
 
 /// Named result binding written after the host result arrives.
@@ -1320,6 +1326,12 @@ mod tests {
         assert_eq!(operand_from_tag(26), Ok(CicsOperandName::KeyLength));
         assert_eq!(operand_tag(CicsOperandName::UserId), 32);
         assert_eq!(operand_from_tag(32), Ok(CicsOperandName::UserId));
+        assert_eq!(operand_tag(CicsOperandName::Hours), 33);
+        assert_eq!(operand_from_tag(33), Ok(CicsOperandName::Hours));
+        assert_eq!(operand_tag(CicsOperandName::Minutes), 34);
+        assert_eq!(operand_from_tag(34), Ok(CicsOperandName::Minutes));
+        assert_eq!(operand_tag(CicsOperandName::Seconds), 35);
+        assert_eq!(operand_from_tag(35), Ok(CicsOperandName::Seconds));
         assert_eq!(output_tag(CicsOutputName::Length), 91);
         assert_eq!(output_from_tag(91), Ok(CicsOutputName::Length));
         assert_eq!(output_tag(CicsOutputName::SetPointer), 95);
@@ -1328,6 +1340,10 @@ mod tests {
         assert_eq!(option_from_tag(16), Ok(CicsPlanOption::Protect));
         assert_eq!(option_tag(CicsPlanOption::Wait), 17);
         assert_eq!(option_from_tag(17), Ok(CicsPlanOption::Wait));
+        assert_eq!(option_tag(CicsPlanOption::After), 18);
+        assert_eq!(option_from_tag(18), Ok(CicsPlanOption::After));
+        assert_eq!(option_tag(CicsPlanOption::At), 19);
+        assert_eq!(option_from_tag(19), Ok(CicsPlanOption::At));
 
         let plan = read_plan();
         let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
@@ -2219,8 +2235,12 @@ mod tests {
                     name: CicsOperandName::UserId,
                     value: CicsOperandValue::Literal(b"TARGET".to_vec()),
                 },
+                CicsNamedOperand {
+                    name: CicsOperandName::Minutes,
+                    value: CicsOperandValue::Storage(slot(2, "REQUEST.MINUTES")),
+                },
             ],
-            options: BTreeSet::from([CicsPlanOption::Protect]),
+            options: BTreeSet::from([CicsPlanOption::Protect, CicsPlanOption::After]),
             outputs: Vec::new(),
             condition: CicsCondition::Default,
         };

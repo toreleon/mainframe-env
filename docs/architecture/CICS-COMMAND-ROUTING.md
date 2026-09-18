@@ -124,15 +124,14 @@ continuation identity. RETURN carries no COMMAREA output. `LENGTH(LENGTH OF
 commarea)` selects the captured prefix; other explicit lengths, channel,
 input-message, IMMEDIATE, ENDACTIVITY, higher-level, and DPL forms remain
 fail-closed.
-Typed local START scheduling accepts packed INTERVAL/TIME and literal explicit
-`AFTER`/`AT` unit forms. HOURS, MINUTES, and SECONDS retain source-presence
-semantics: a lone MINUTES may reach 5999 and lone SECONDS 359999, while any
-combined form narrows minutes and seconds to 59. Valid literal unit forms are
-normalized into the existing relative or absolute typed operand before the
-interpreter builds the host request. The provider also validates canonical
-explicit-component requests and returns INVREQ 16 with response2 4, 5, or 6
-for the respective out-of-range component. Dynamic compiled unit operands
-remain fail-closed.
+Typed local START scheduling accepts packed INTERVAL/TIME and explicit
+`AFTER`/`AT` unit forms from literals or numeric storage. Append-only plan tags
+retain the mode and each present HOURS, MINUTES, or SECONDS component through
+codec/checkpoint and interpreter request construction. Source-presence
+semantics therefore survive runtime evaluation: a lone MINUTES may reach 5999
+and lone SECONDS 359999, while any combined form narrows minutes and seconds to
+59. The provider returns INVREQ 16 with response2 4, 5, or 6 for the respective
+out-of-range component.
 The typed local START/RETRIEVE data cycle also carries the bounded metadata
 subset: START may supply RTRANSID, RTERMID, and QUEUE names, and RETRIEVE may
 request exact-width writable destinations for any corresponding value.

@@ -8,7 +8,11 @@ pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
         ),
         CicsPlanOperation::Start => !matches!(
             option,
-            CicsPlanOption::NoHandle | CicsPlanOption::Fmh | CicsPlanOption::Protect
+            CicsPlanOption::NoHandle
+                | CicsPlanOption::Fmh
+                | CicsPlanOption::Protect
+                | CicsPlanOption::After
+                | CicsPlanOption::At
         ),
         CicsPlanOperation::Retrieve => {
             !matches!(option, CicsPlanOption::NoHandle | CicsPlanOption::Wait)

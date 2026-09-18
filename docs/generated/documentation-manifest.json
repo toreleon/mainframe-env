@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:72b6bd03f05c8a5bbcae5c225a51163896dcaca4cf9e3d36f29864b85c87fe78",
+      "sha256": "sha256:dd45ebdf44eda4ea883a05d3158ff18cc52c58203a9e6722fc88429a6c9eb7c9",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -345,7 +345,7 @@
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
       "relative_links": 22,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:82fea36a7b3c836c8921ece00842029e277a59cd1cac0e494837de94688249b8",
+      "sha256": "sha256:b01192423febc15844b48734c552f43133bc42e644c08961f204483355423221",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -429,7 +429,7 @@
       "path": "docs/architecture/EXECUTION-AND-DURABILITY.md",
       "relative_links": 1,
       "scope": "execution lifecycle, effects, work, checkpoints, and durability",
-      "sha256": "sha256:915186b0030046e8f9571f94d653034c6bf4e7701cde12e4efe09e0bcf4cade3",
+      "sha256": "sha256:bbd5a0a7bc0555df63cf1e9833596b43dcc29f3c7142b61e07cc4719635d2eec",
       "status": "Accepted by repository owner",
       "title": "Execution and Durability Architecture",
       "xtask_commands": 0
@@ -1062,7 +1062,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:7afec467de167611f2446bcc4a278620bbb8625a1cb94e06067ef125d9e944bc",
+      "sha256": "sha256:154e0039ab34d698efad6336082c6945e34a634bb653c55adc1e198c3e17c05f",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },

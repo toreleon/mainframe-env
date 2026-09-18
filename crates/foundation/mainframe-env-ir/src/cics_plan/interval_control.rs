@@ -1,6 +1,6 @@
 use super::{
     CicsEffectPlan, CicsOperandName, CicsOperandValue, CicsOutputName, CicsPlanOperation,
-    operand_value, output_target,
+    CicsPlanOption, operand_value, output_target,
 };
 use std::collections::BTreeSet;
 
@@ -53,19 +53,47 @@ pub(super) fn invalid_shape(
                 CicsOperandName::ReturnTermId,
                 CicsOperandName::Queue,
                 CicsOperandName::UserId,
+                CicsOperandName::Hours,
+                CicsOperandName::Minutes,
+                CicsOperandName::Seconds,
             ]);
+            let components = [
+                CicsOperandName::Hours,
+                CicsOperandName::Minutes,
+                CicsOperandName::Seconds,
+            ]
+            .into_iter()
+            .filter(|name| inputs.contains(name))
+            .count();
+            let explicit_modes = usize::from(plan.options.contains(&CicsPlanOption::After))
+                + usize::from(plan.options.contains(&CicsPlanOption::At));
+            let schedules = usize::from(inputs.contains(&CicsOperandName::Interval))
+                + usize::from(inputs.contains(&CicsOperandName::StartTime))
+                + explicit_modes;
             !inputs.is_subset(&allowed)
                 || !inputs.contains(&CicsOperandName::TransId)
                 || !inputs.contains(&CicsOperandName::From)
-                || inputs.contains(&CicsOperandName::Interval)
-                    && inputs.contains(&CicsOperandName::StartTime)
+                || schedules > 1
+                || (components > 0) != (explicit_modes == 1)
                 || plan.operands.iter().any(|operand| {
                     matches!(
                         operand.name,
                         CicsOperandName::Length
                             | CicsOperandName::Interval
                             | CicsOperandName::StartTime
+                            | CicsOperandName::Hours
+                            | CicsOperandName::Minutes
+                            | CicsOperandName::Seconds
                     ) && matches!(operand.value, CicsOperandValue::Literal(_))
+                        || matches!(
+                            operand.name,
+                            CicsOperandName::Hours
+                                | CicsOperandName::Minutes
+                                | CicsOperandName::Seconds
+                        ) && !matches!(
+                            operand.value,
+                            CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
+                        )
                         || operand.name == CicsOperandName::UserId
                             && !matches!(
                                 operand.value,

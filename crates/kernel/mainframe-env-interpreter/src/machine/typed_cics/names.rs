@@ -135,6 +135,9 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::ReqId => "REQID",
         CicsOperandName::Interval => "INTERVAL",
         CicsOperandName::StartTime => "TIME",
+        CicsOperandName::Hours => "HOURS",
+        CicsOperandName::Minutes => "MINUTES",
+        CicsOperandName::Seconds => "SECONDS",
     }
 }
 
@@ -182,5 +185,7 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::Fmh => "FMH",
         CicsPlanOption::Protect => "PROTECT",
         CicsPlanOption::Wait => "WAIT",
+        CicsPlanOption::After => "AFTER",
+        CicsPlanOption::At => "AT",
     }
 }

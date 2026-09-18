@@ -224,6 +224,9 @@ pub enum HirCicsOperandName {
     Interval,
     StartTime,
     UserId,
+    Hours,
+    Minutes,
+    Seconds,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -260,6 +263,8 @@ pub enum HirCicsOption {
     Fmh,
     Protect,
     Wait,
+    After,
+    At,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -3262,8 +3267,8 @@ mod tests {
     }
 
     #[test]
-    fn cics_start_after_and_at_normalize_literal_unit_forms() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. STARTUNIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8) VALUE 'PAYLOAD'. PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') REQID('AFTER001') FROM(DATA-X) AFTER HOURS(1) SECONDS(3) END-EXEC. EXEC CICS START TRANSID('NEXT') REQID('AT000001') FROM(DATA-X) AT MINUTES(62) END-EXEC. STOP RUN.";
+    fn cics_start_after_and_at_preserve_literal_and_dynamic_unit_forms() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. STARTUNIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8) VALUE 'PAYLOAD'. 01 TIME-X PIC S9(9) COMP VALUE 1. PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') REQID('AFTER001') FROM(DATA-X) AFTER HOURS(1) SECONDS(3) END-EXEC. EXEC CICS START TRANSID('NEXT') REQID('AT000001') FROM(DATA-X) AT MINUTES(62) END-EXEC. EXEC CICS START TRANSID('NEXT') REQID('DYN00001') FROM(DATA-X) AFTER MINUTES(TIME-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);
         let hir = analysis
             .hir
@@ -3276,14 +3281,27 @@ mod tests {
                 _ => None,
             })
             .collect::<Vec<_>>();
-        assert_eq!(commands.len(), 2);
+        assert_eq!(commands.len(), 3);
+        assert!(commands[0].options.contains(&HirCicsOption::After));
+        assert!(commands[1].options.contains(&HirCicsOption::At));
         assert!(commands[0].operands.iter().any(|operand| {
-            operand.name == HirCicsOperandName::Interval
-                && operand.value == HirCicsValue::Integer(10_003)
+            operand.name == HirCicsOperandName::Hours && operand.value == HirCicsValue::Integer(1)
+        }));
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Seconds && operand.value == HirCicsValue::Integer(3)
         }));
         assert!(commands[1].operands.iter().any(|operand| {
-            operand.name == HirCicsOperandName::StartTime
-                && operand.value == HirCicsValue::Integer(10_200)
+            operand.name == HirCicsOperandName::Minutes
+                && operand.value == HirCicsValue::Integer(62)
+        }));
+        assert!(commands[2].operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::Minutes,
+                    value: HirCicsValue::Data(reference),
+                } if reference.qualified_name == "TIME-X"
+            )
         }));
 
         for invalid in [
@@ -3291,14 +3309,19 @@ mod tests {
             "HOURS(1)",
             "AFTER AT HOURS(1)",
             "INTERVAL(1) AFTER HOURS(1)",
-            "AFTER HOURS(100)",
-            "AFTER MINUTES(TIME-X)",
         ] {
             let analysis = analyze(&format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. BADUNIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). 01 TIME-X PIC S9(9) COMP VALUE 1. PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') FROM(DATA-X) {invalid} END-EXEC. STOP RUN."
             ));
             assert!(analysis.hir.is_none(), "{invalid}");
         }
+        let out_of_range = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. RANGEERR. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') FROM(DATA-X) AFTER HOURS(100) END-EXEC. STOP RUN.",
+        );
+        assert!(
+            out_of_range.hir.is_some(),
+            "out-of-range values are runtime conditions"
+        );
     }
 
     #[test]

@@ -6,11 +6,15 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added dynamic compiled START `AFTER`/`AT` units. Append-only CICS plan tags
+  retain mode and HOURS/MINUTES/SECONDS storage identities through checkpoint,
+  codec, and interpreter request construction so provider-side bounds and
+  response2 conditions apply to runtime values as well as literals.
+
 - Added local START `AFTER`/`AT` scheduling with explicit HOURS, MINUTES, and
   SECONDS. The provider enforces IBM's conditional single-unit and combined-unit
-  ranges with exact INVREQ 16 response2 4/5/6, while compiled literal forms
-  normalize to the existing relative/absolute schedule identity and durable
-  worker deadline.
+  ranges with exact INVREQ 16 response2 4/5/6 and resolves one durable worker
+  deadline for either relative or absolute mode.
 
 - Added RACF-backed START USERID validity checks before surrogate authorization.
   A typed non-login principal-status request now maps unknown identities to

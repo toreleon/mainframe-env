@@ -976,12 +976,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     operands.extend(file_operands::resolve(&clauses, operation, semantic)?);
     operands.extend(queue_control::operands(&clauses, operation, semantic)?);
     operands.extend(terminal_control::operands(&clauses, operation, semantic)?);
-    operands.extend(interval_control::operands(
-        &clauses,
-        &raw_options,
-        operation,
-        semantic,
-    )?);
+    operands.extend(interval_control::operands(&clauses, operation, semantic)?);
     if matches!(operation, HirCicsOperation::Deq | HirCicsOperation::Enq) {
         let resource = complete_data_reference(&clauses["RESOURCE"], semantic)?;
         operands.push(HirCicsNamedOperand {
@@ -1048,8 +1043,6 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
                 HirCicsOperation::HandleCondition | HirCicsOperation::IgnoreCondition
             ) && is_condition_name(option))
                 && !(operation == HirCicsOperation::HandleAid && is_aid_name(option))
-                && !(operation == HirCicsOperation::Start
-                    && matches!(option.as_str(), "AFTER" | "AT"))
         })
         .map(|option| match option.as_str() {
             "CANCEL" => HirCicsOption::Cancel,
@@ -1070,6 +1063,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "FMH" => HirCicsOption::Fmh,
             "PROTECT" => HirCicsOption::Protect,
             "WAIT" => HirCicsOption::Wait,
+            "AFTER" => HirCicsOption::After,
+            "AT" => HirCicsOption::At,
             _ => unreachable!("allowed CICS option"),
         })
         .collect::<BTreeSet<_>>();

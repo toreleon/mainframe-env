@@ -284,6 +284,9 @@ pub(super) fn execute(
                         | CicsOperandName::Abstime
                         | CicsOperandName::Interval
                         | CicsOperandName::StartTime
+                        | CicsOperandName::Hours
+                        | CicsOperandName::Minutes
+                        | CicsOperandName::Seconds
                 ) =>
             {
                 (

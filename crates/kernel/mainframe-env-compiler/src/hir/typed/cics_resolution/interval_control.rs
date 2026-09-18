@@ -82,14 +82,13 @@ fn valid_hhmmss(value: i64) -> bool {
 
 pub(super) fn operands(
     clauses: &Clauses,
-    options: &[String],
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
     match operation {
         HirCicsOperation::Cancel => cancel_operands(clauses, semantic),
         HirCicsOperation::Delay => delay_operands(clauses, semantic),
-        HirCicsOperation::Start => start_operands(clauses, options, semantic),
+        HirCicsOperation::Start => start_operands(clauses, semantic),
         HirCicsOperation::Retrieve => retrieve_operands(clauses, semantic),
         _ => Ok(Vec::new()),
     }
@@ -136,7 +135,6 @@ fn cancel_operands(
 
 fn start_operands(
     clauses: &Clauses,
-    options: &[String],
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
     let transaction = bounded_name(&clauses["TRANSID"], semantic, 4, "START", "TRANSID")?;
@@ -189,15 +187,17 @@ fn start_operands(
             });
         }
     }
-    if let Some(name) = options.iter().find_map(|option| match option.as_str() {
-        "AFTER" => Some(HirCicsOperandName::Interval),
-        "AT" => Some(HirCicsOperandName::StartTime),
-        _ => None,
-    }) {
-        operands.push(HirCicsNamedOperand {
-            name,
-            value: HirCicsValue::Integer(normalized_explicit_time(clauses)?),
-        });
+    for (clause, name) in [
+        ("HOURS", HirCicsOperandName::Hours),
+        ("MINUTES", HirCicsOperandName::Minutes),
+        ("SECONDS", HirCicsOperandName::Seconds),
+    ] {
+        if let Some(value) = clauses.get(clause) {
+            operands.push(HirCicsNamedOperand {
+                name,
+                value: cics_integer_value(value, semantic)?,
+            });
+        }
     }
     for (clause, name, max) in [
         ("RTRANSID", HirCicsOperandName::ReturnTransId, 4),
@@ -213,50 +213,6 @@ fn start_operands(
         }
     }
     Ok(operands)
-}
-
-fn normalized_explicit_time(clauses: &Clauses) -> Resolution<i64> {
-    let component = |name: &str| {
-        clauses
-            .get(name)
-            .map(|value| {
-                if value.len() == 1 {
-                    value[0].parse::<i64>().map_err(|_| ())
-                } else {
-                    Err(())
-                }
-                .map_err(|()| {
-                    ResolutionFailure::Invalid(format!(
-                        "typed CICS START {name} currently requires a literal value"
-                    ))
-                })
-            })
-            .transpose()
-    };
-    let (hours, minutes, seconds) = (
-        component("HOURS")?,
-        component("MINUTES")?,
-        component("SECONDS")?,
-    );
-    let minute_limit = if hours.is_some() || seconds.is_some() {
-        59
-    } else {
-        5_999
-    };
-    let second_limit = if hours.is_some() || minutes.is_some() {
-        59
-    } else {
-        359_999
-    };
-    let valid =
-        |value: Option<i64>, maximum| value.is_none_or(|value| (0..=maximum).contains(&value));
-    if !valid(hours, 99) || !valid(minutes, minute_limit) || !valid(seconds, second_limit) {
-        return Err(ResolutionFailure::Invalid(
-            "typed CICS START explicit time component is out of range".into(),
-        ));
-    }
-    let total = hours.unwrap_or(0) * 3_600 + minutes.unwrap_or(0) * 60 + seconds.unwrap_or(0);
-    Ok(total / 3_600 * 10_000 + total / 60 % 60 * 100 + total % 60)
 }
 
 fn retrieve_operands(
