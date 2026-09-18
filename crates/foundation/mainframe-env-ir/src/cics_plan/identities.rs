@@ -57,6 +57,8 @@ pub enum CicsPlanOperation {
     Write,
     /// Write one bounded record to a transient data queue.
     WriteTransientData,
+    /// Delete every record from one local transient-data queue.
+    DeleteTransientData,
     /// Receive one mapped terminal input message.
     ReceiveMap,
     /// Send one mapped terminal output message.

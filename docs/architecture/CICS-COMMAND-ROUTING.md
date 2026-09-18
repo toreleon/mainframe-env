@@ -220,8 +220,10 @@ The typed local WRITEQ TD subset requires a bounded QUEUE selector and FROM
 storage input, with optional numeric LENGTH or `LENGTH OF` that input. The
 provider writes exactly the selected prefix under the request's mutation
 identity, so retries compare the semantic record rather than ignored trailing
-bytes. Remote SYSID routing and TDQUEUE definition-state conditions remain
-deferred.
+bytes. Typed local DELETEQ TD accepts only the bounded QUEUE selector, requires
+update access to the same queue resource, and atomically removes the durable
+queue plus its retained-byte accounting. A missing queue returns QIDERR 44/0.
+Remote SYSID routing and TDQUEUE definition-state conditions remain deferred.
 The typed local BMS subset binds `RECEIVE MAP`, `SEND MAP`, and `SEND TEXT` to
 the terminal family. Map names are prevalidated 1–7 character literals or
 alpha/alphanumeric fields; a `RECEIVE MAP` MAPSET field may be eight bytes so
@@ -341,11 +343,11 @@ differentials, or make 0.9.0 release-ready.
 | `program-control` | program inquiry, LINK, and XCTL |
 | `terminal-control` / `terminal-run` | BMS and text send/receive behavior plus terminal-task lifecycle cleanup |
 | `file-control` | file status, keyed I/O, and browse behavior |
-| `queue-control` | transient-data queue writes |
+| `queue-control` | transient-data queue writes and local queue deletion |
 | `recovery` | SYNCPOINT coordination, rollback, and subsystem unit-of-work completion |
 | `interval-control` | bounded local START scheduling/cancellation with facility-less or virtual-terminal target launch plus zero, relative, and absolute DELAY |
 
-This table describes the eight families already present in the 40-operation runtime
+This table describes the eight families already present in the 41-operation runtime
 collection. The 263-row application registry also assigns every row a
 deterministic future family owner, but that assignment is routing shape rather
 than an executable handler. `CicsService::invoke_run` selects an existing

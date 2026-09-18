@@ -499,6 +499,9 @@ fn validate_operation_shape(
         CicsPlanOperation::WriteTransientData => {
             queue_control::invalid_write_transient_data_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::DeleteTransientData => {
+            queue_control::invalid_delete_transient_data_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::ReceiveMap
         | CicsPlanOperation::SendMap
         | CicsPlanOperation::SendText => terminal_control::invalid_shape(plan, inputs, outputs),

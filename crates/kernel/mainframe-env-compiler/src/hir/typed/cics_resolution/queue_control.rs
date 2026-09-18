@@ -9,13 +9,15 @@ pub(super) fn validate_constraints(
     clauses: &Clauses,
     operation: HirCicsOperation,
 ) -> Resolution<()> {
-    if operation != HirCicsOperation::WriteTransientData {
-        return Ok(());
-    }
-    for name in ["QUEUE", "FROM"] {
-        if !clauses.contains_key(name) {
+    let (command, required) = match operation {
+        HirCicsOperation::WriteTransientData => ("CICS WRITEQ TD", &["QUEUE", "FROM"][..]),
+        HirCicsOperation::DeleteTransientData => ("CICS DELETEQ TD", &["QUEUE"][..]),
+        _ => return Ok(()),
+    };
+    for name in required {
+        if !clauses.contains_key(*name) {
             return Err(ResolutionFailure::Invalid(format!(
-                "CICS WRITEQ TD requires {name}"
+                "{command} requires {name}"
             )));
         }
     }
@@ -27,7 +29,10 @@ pub(super) fn operands(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
-    if operation != HirCicsOperation::WriteTransientData {
+    if !matches!(
+        operation,
+        HirCicsOperation::WriteTransientData | HirCicsOperation::DeleteTransientData
+    ) {
         return Ok(Vec::new());
     }
     let queue = cics_value(&clauses["QUEUE"], semantic)?;
@@ -46,8 +51,14 @@ pub(super) fn operands(
     };
     if !valid_queue {
         return Err(ResolutionFailure::Invalid(
-            "CICS WRITEQ TD QUEUE requires a 1-4 character name".into(),
+            "CICS transient-data QUEUE requires a 1-4 character name".into(),
         ));
+    }
+    if operation == HirCicsOperation::DeleteTransientData {
+        return Ok(vec![HirCicsNamedOperand {
+            name: HirCicsOperandName::Queue,
+            value: queue,
+        }]);
     }
     let HirCicsValue::Data(from) = cics_value(&clauses["FROM"], semantic)? else {
         return Err(ResolutionFailure::Invalid(

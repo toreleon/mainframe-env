@@ -11086,6 +11086,96 @@ mod tests {
     }
 
     #[test]
+    fn compiled_deleteq_td_deallocates_the_queue_and_reports_missing_redelete() {
+        let artifact = published_source_fixture(
+            "DELETETD",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. DELETETD.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(6) VALUE 'ABCDEF'.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS WRITEQ TD QUEUE('OUTQ') FROM(DATA-X) LENGTH(3) END-EXEC.\nEXEC CICS DELETEQ TD QUEUE('OUTQ') END-EXEC.\nEXEC CICS DELETEQ TD QUEUE('OUTQ') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .racf
+            .define_profile("QUEUE", "CICS.TD.OUTQ", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit("QUEUE", "CICS.TD.OUTQ", "IBMUSER", AccessIntent::Update)
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "DELETETD".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("DQTD".into(), "DELETETD".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "DELETETD".into(),
+                    map: "DELETETD".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("deleteq-td-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "DQTD", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "DQTD",
+                24,
+                80,
+                "deleteq-td-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "DELETETD", 2)
+            .unwrap();
+        assert!(server.cics.transient_records("OUTQ").unwrap().is_empty());
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 44]);
+        assert_eq!(restored.variable("RESP2-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 2)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::DeleteTransientData)
+                .count(),
+            2
+        );
+    }
+
+    #[test]
     fn compiled_start_without_data_queues_the_target_without_a_false_payload() {
         let artifact = published_source_fixture(
             "NODATA",

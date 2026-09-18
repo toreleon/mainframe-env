@@ -377,6 +377,13 @@ All notable changes to mainframe-env are documented here.
   data area, and optional numeric LENGTH or `LENGTH OF` selects the persisted
   prefix before idempotency comparison. Remote SYSID routing and unimplemented
   TDQUEUE definition/open/disabled condition semantics remain fail-closed.
+- Added the typed local `DELETEQ TD` subset. QUEUE uses the same validated
+  selector and RACF queue resource as `WRITEQ TD`; successful execution
+  atomically removes the durable queue and releases its retained-byte count,
+  while a missing queue returns exact `QIDERR` 44/0. Memory, three-open SQLite,
+  and selected compiled-route regressions cover deletion and repeated-delete
+  behavior. Remote SYSID and TDQUEUE definition, extrapartition, disabled, and
+  locked states remain fail-closed.
 - Migrated bounded local `RECEIVE MAP`, `SEND MAP`, and `SEND TEXT` subsets to
   typed terminal plans. MAP and optional MAPSET are validated 1–7 character
   selectors, with an eight-byte RECEIVE MAPSET field admitted for a valid name

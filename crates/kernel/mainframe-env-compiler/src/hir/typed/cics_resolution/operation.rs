@@ -27,6 +27,7 @@ pub(super) fn resolve(
         ["DELETE"] => HirCicsOperation::Delete,
         ["WRITE", "FILE"] => HirCicsOperation::Write,
         ["WRITEQ", "TD"] => HirCicsOperation::WriteTransientData,
+        ["DELETEQ", "TD"] => HirCicsOperation::DeleteTransientData,
         ["RECEIVE", "MAP"] => HirCicsOperation::ReceiveMap,
         ["SEND", "MAP"] => HirCicsOperation::SendMap,
         ["SEND", "TEXT"] => HirCicsOperation::SendText,

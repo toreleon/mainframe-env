@@ -22,6 +22,8 @@ pub enum CicsOperation {
     /// Release one matching task enqueue ownership level.
     Deq,
     Delete,
+    /// Delete every record from one local transient-data queue.
+    DeleteTransientData,
     /// Acquire or wait for one task enqueue resource.
     Enq,
     EndBrowse,
@@ -79,6 +81,7 @@ impl CicsOperation {
             Self::Delay => "Delay",
             Self::Deq => "Deq",
             Self::Delete => "Delete",
+            Self::DeleteTransientData => "DeleteTransientData",
             Self::Enq => "Enq",
             Self::EndBrowse => "EndBrowse",
             Self::FormatTime => "FormatTime",
@@ -117,6 +120,7 @@ impl CicsOperation {
         matches!(
             self,
             Self::Delete
+                | Self::DeleteTransientData
                 | Self::Cancel
                 | Self::Delay
                 | Self::Deq
@@ -165,6 +169,7 @@ impl CicsOperation {
             ("DELAY", _) => Self::Delay,
             ("DEQ", _) => Self::Deq,
             ("DELETE", _) => Self::Delete,
+            ("DELETEQ", Some("TD")) => Self::DeleteTransientData,
             ("ENQ", _) => Self::Enq,
             ("ENDBR", _) => Self::EndBrowse,
             ("FORMATTIME", _) => Self::FormatTime,

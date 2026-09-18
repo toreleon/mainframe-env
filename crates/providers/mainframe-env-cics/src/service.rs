@@ -1715,7 +1715,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 40);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 41);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -4707,7 +4707,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 40);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 41);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -9058,6 +9058,105 @@ mod tests {
             service.transient_records("OUTQ").unwrap(),
             [b"ABC".to_vec()]
         );
+
+        let delete = request(
+            CicsOperation::DeleteTransientData,
+            BTreeMap::from([("QUEUE".into(), argument(b"OUTQ"))]),
+            3,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, delete.clone(), 3), delete)
+            .unwrap();
+        assert!(service.transient_records("OUTQ").unwrap().is_empty());
+        let mut missing = request(
+            CicsOperation::DeleteTransientData,
+            BTreeMap::from([
+                ("QUEUE".into(), argument(b"OUTQ")),
+                ("RESP".into(), argument(b"RESP-X")),
+                ("RESP2".into(), argument(b"RESP2-X")),
+            ]),
+            4,
+        );
+        missing.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let missing = service
+            .invoke(
+                &effect(&invocation.run_unit_id, missing.clone(), 4),
+                missing,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                missing.condition.as_str(),
+                missing.response,
+                missing.response2
+            ),
+            ("QIDERR", 44, 0)
+        );
+    }
+
+    #[test]
+    fn deleteq_td_deallocation_survives_sqlite_reopen() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-deleteq-td-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            let (invocation, _) = registered(&service);
+            let write = request(
+                CicsOperation::WriteTransientData,
+                BTreeMap::from([
+                    ("QUEUE".into(), argument(b"OUTQ")),
+                    ("FROM".into(), argument(b"DURABLE")),
+                ]),
+                1,
+            );
+            service
+                .invoke(&effect(&invocation.run_unit_id, write.clone(), 1), write)
+                .unwrap();
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            assert_eq!(
+                service.transient_records("OUTQ").unwrap(),
+                [b"DURABLE".to_vec()]
+            );
+            let invocation = invocation_for("deleteq-td-reopen", BTreeMap::new());
+            let session = SessionId::new("deleteq-td-reopen", 64).unwrap();
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let delete = request(
+                CicsOperation::DeleteTransientData,
+                BTreeMap::from([("QUEUE".into(), argument(b"OUTQ"))]),
+                2,
+            );
+            service
+                .invoke(&effect(&invocation.run_unit_id, delete.clone(), 2), delete)
+                .unwrap();
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let provider: Arc<dyn ProviderStateStore> = store.clone();
+            let service = service(provider);
+            assert!(service.transient_records("OUTQ").unwrap().is_empty());
+            assert!(
+                store
+                    .get_provider_state("cics-tdq", "OUTQ")
+                    .unwrap()
+                    .is_none()
+            );
+        }
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     /// Issue #207: bare separators use slash/colon and compact forms keep compact widths.

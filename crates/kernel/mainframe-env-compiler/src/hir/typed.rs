@@ -171,6 +171,7 @@ pub enum HirCicsOperation {
     Delete,
     Write,
     WriteTransientData,
+    DeleteTransientData,
     ReceiveMap,
     SendMap,
     SendText,
@@ -2761,6 +2762,26 @@ mod tests {
             operand.name == HirCicsOperandName::Length && operand.value == HirCicsValue::Integer(3)
         }));
 
+        let deleted = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTDQD. PROCEDURE DIVISION. EXEC CICS DELETEQ TD QUEUE('OUTQ') END-EXEC. STOP RUN.",
+        );
+        let deleted = deleted
+            .hir
+            .unwrap_or_else(|| panic!("DELETEQ TD: {:?}", deleted.diagnostics));
+        let deleted = deleted
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed DELETEQ TD");
+        assert_eq!(deleted.operation, HirCicsOperation::DeleteTransientData);
+        assert!(deleted.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Queue
+                && operand.value == HirCicsValue::Literal("OUTQ".into())
+        }));
+
         let length_of = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTDQL. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(6). PROCEDURE DIVISION. EXEC CICS WRITEQ TD QUEUE('OUTQ') FROM(DATA-X) LENGTH(LENGTH OF DATA-X) END-EXEC. STOP RUN.",
         );
@@ -2809,6 +2830,15 @@ mod tests {
                 analysis.diagnostics
             );
         }
+        let remote = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTDQR. PROCEDURE DIVISION. EXEC CICS DELETEQ TD QUEUE('OUTQ') SYSID('R001') END-EXEC. STOP RUN.",
+        );
+        assert!(remote.hir.is_none());
+        assert!(remote.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("typed lowering is unready for SYSID")
+        }));
     }
 
     #[test]
