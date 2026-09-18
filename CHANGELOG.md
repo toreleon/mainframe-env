@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added exact negative CICS `ASSIGN` handling for `DESTCOUNT`, `LDCMNEM`,
+  `LDCNUM`, `PAGENUM`, and `PARTNPAGE`. Without prior BMS overflow processing,
+  local requests return `INVREQ` 16/2 and preserve every receiver; DPL requests
+  return the source-defined `INVREQ` 16/200. Append-only output tags 96–100
+  preserve every existing typed-plan tag.
+
 - Added typed local CICS LINK `DATALENGTH`. The value is preserved in the
   canonical request but, as IBM defines for a static local link, is not checked
   and does not shorten the LENGTH-selected COMMAREA; remote optimization and

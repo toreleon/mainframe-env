@@ -11773,6 +11773,14 @@ mod tests {
             .replace(
                 "HILIGHT(CAPABILITY-X) RESP(RESP-X)",
                 "HILIGHT(CAPABILITY-X) MAPCOLUMN(MAP-COLUMN-X) MAPHEIGHT(MAP-HEIGHT-X) MAPLINE(MAP-LINE-X) MAPWIDTH(MAP-WIDTH-X) RESP(RESP-X)",
+            )
+            .replace(
+                "01 CWA-LENGTH-X PIC S9(4) COMP.",
+                "01 BMS-DESTCOUNT-X PIC S9(4) COMP VALUE 7.\n01 BMS-LDCMNEM-X PIC X(2) VALUE 'ZZ'.\n01 BMS-LDCNUM-X PIC X VALUE 'Z'.\n01 BMS-PAGENUM-X PIC S9(4) COMP VALUE 7.\n01 BMS-PARTNPAGE-X PIC X(2) VALUE 'ZZ'.\n01 BMS-RESP-X PIC S9(9) COMP.\n01 BMS-RESP2-X PIC S9(9) COMP.\n01 CWA-LENGTH-X PIC S9(4) COMP.",
+            )
+            .replace(
+                "EXEC CICS ASSIGN ABCODE(ABCODE-X)",
+                "EXEC CICS ASSIGN DESTCOUNT(BMS-DESTCOUNT-X) LDCMNEM(BMS-LDCMNEM-X) LDCNUM(BMS-LDCNUM-X) PAGENUM(BMS-PAGENUM-X) PARTNPAGE(BMS-PARTNPAGE-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE RESP-X TO BMS-RESP-X.\nMOVE RESP2-X TO BMS-RESP2-X.\nEXEC CICS ASSIGN ABCODE(ABCODE-X)",
             );
         let path = LogicalPath::new("SCHEDULE.cbl", limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
@@ -11967,6 +11975,22 @@ mod tests {
             &[0; 128]
         );
         assert_eq!(restored.variable("BRIDGE-X").unwrap().bytes(), b"    ");
+        assert_eq!(
+            restored.variable("BMS-DESTCOUNT-X").unwrap().bytes(),
+            &[0, 7]
+        );
+        assert_eq!(restored.variable("BMS-LDCMNEM-X").unwrap().bytes(), b"ZZ");
+        assert_eq!(restored.variable("BMS-LDCNUM-X").unwrap().bytes(), b"Z");
+        assert_eq!(restored.variable("BMS-PAGENUM-X").unwrap().bytes(), &[0, 7]);
+        assert_eq!(restored.variable("BMS-PARTNPAGE-X").unwrap().bytes(), b"ZZ");
+        assert_eq!(
+            restored.variable("BMS-RESP-X").unwrap().bytes(),
+            &[0, 0, 0, 16]
+        );
+        assert_eq!(
+            restored.variable("BMS-RESP2-X").unwrap().bytes(),
+            &[0, 0, 0, 2]
+        );
         assert_eq!(restored.variable("CAPABILITY-X").unwrap().bytes(), &[0]);
         assert_eq!(restored.variable("CHANNEL-X").unwrap().bytes(), &[b' '; 16]);
         assert_eq!(restored.variable("CMDSEC-X").unwrap().bytes(), b"X");
@@ -12082,6 +12106,7 @@ mod tests {
                 (9, mainframe_env_execution_api::AuditDecision::Success),
                 (10, mainframe_env_execution_api::AuditDecision::Success),
                 (11, mainframe_env_execution_api::AuditDecision::Success),
+                (12, mainframe_env_execution_api::AuditDecision::Success),
             ]
         );
     }

@@ -92,6 +92,11 @@ pub(super) fn validate(
         "UNATTEND",
         "USERID",
         "VALIDATION",
+        "DESTCOUNT",
+        "LDCMNEM",
+        "LDCNUM",
+        "PAGENUM",
+        "PARTNPAGE",
     ] {
         let Some(value) = clauses.get(name) else {
             continue;
@@ -122,6 +127,7 @@ pub(super) fn validate(
                 | "DEFSCRNHT"
                 | "DEFSCRNWD"
                 | "DESTIDLENG"
+                | "DESTCOUNT"
                 | "ERRORMSGLEN"
                 | "INITPARMLEN"
                 | "LINKLEVEL"
@@ -129,6 +135,7 @@ pub(super) fn validate(
                 | "MAPHEIGHT"
                 | "MAPLINE"
                 | "MAPWIDTH"
+                | "PAGENUM"
                 | "SCRNHT"
                 | "SCRNWD"
                 | "TCTUALENG"
@@ -152,6 +159,8 @@ pub(super) fn validate(
             || (name == "ASRAREGS64" && target.length != 128)
             || (name == "BRIDGE" && target.length != 4)
             || (name == "DESTID" && target.length != 8)
+            || (name == "LDCMNEM" && target.length != 2)
+            || (name == "LDCNUM" && target.length != 1)
             || (name == "ERRORMSG" && target.length != 500)
             || (name == "FCI" && target.length != 1)
             || (name == "INITPARM" && target.length != 60)
@@ -160,6 +169,7 @@ pub(super) fn validate(
             || (name == "ORGABCODE" && target.length != 4)
             || (name == "NEXTTRANSID" && target.length != 4)
             || (name == "PARTNSET" && target.length != 6)
+            || (name == "PARTNPAGE" && target.length != 2)
             || (name == "PRINSYSID" && target.length != 4)
             || (name == "PROCESS" && target.length != 36)
             || (name == "PROCESSTYPE" && target.length != 8)

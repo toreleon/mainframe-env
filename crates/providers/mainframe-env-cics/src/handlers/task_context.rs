@@ -27,6 +27,7 @@ const TERMINAL_CAPABILITY_INDICATORS: [(&str, u8); 20] = [
 ];
 
 const LOCAL_CCSID: i64 = 37;
+const BMS_OVERFLOW_OPTIONS: [&str; 5] = ["DESTCOUNT", "LDCMNEM", "LDCNUM", "PAGENUM", "PARTNPAGE"];
 
 pub(in crate::service) fn current_program(invocation: &Invocation) -> Option<String> {
     invocation
@@ -103,6 +104,10 @@ pub(in crate::service) fn assign(
         && ["DESTID", "DESTIDLENG"]
             .iter()
             .any(|name| request.arguments.contains_key(*name));
+    let bms_overflow_missing = !dpl
+        && BMS_OVERFLOW_OPTIONS
+            .iter()
+            .any(|name| request.arguments.contains_key(*name));
     let link_level = request
         .arguments
         .contains_key("LINKLEVEL")
@@ -117,14 +122,19 @@ pub(in crate::service) fn assign(
                 "DEFSCRNWD",
                 "DESTID",
                 "DESTIDLENG",
+                "DESTCOUNT",
                 "FCI",
                 "MAPCOLUMN",
                 "MAPHEIGHT",
                 "MAPLINE",
                 "MAPWIDTH",
+                "LDCMNEM",
+                "LDCNUM",
                 "NEXTTRANSID",
                 "OPSECURITY",
                 "PARTNSET",
+                "PAGENUM",
+                "PARTNPAGE",
                 "QNAME",
                 "SCRNHT",
                 "SCRNWD",
@@ -139,6 +149,7 @@ pub(in crate::service) fn assign(
         || ati_missing
         || bts_missing
         || bdi_missing
+        || bms_overflow_missing
     {
         super::condition::respond(
             service,
@@ -151,7 +162,7 @@ pub(in crate::service) fn assign(
                     200
                 } else if terminal_missing || intersystem_facility_missing {
                     5
-                } else if map_missing {
+                } else if map_missing || bms_overflow_missing {
                     2
                 } else if ati_missing {
                     4
@@ -527,6 +538,11 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "UNATTEND",
         "USERID",
         "VALIDATION",
+        "DESTCOUNT",
+        "LDCMNEM",
+        "LDCNUM",
+        "PAGENUM",
+        "PARTNPAGE",
     ];
     if request.arguments.len() > 16
         || request.arguments.iter().any(|(name, value)| {

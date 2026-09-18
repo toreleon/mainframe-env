@@ -21,6 +21,7 @@ pub(super) fn validate_output(
             | "DEFSCRNHT"
             | "DEFSCRNWD"
             | "DESTIDLENG"
+            | "DESTCOUNT"
             | "ERRORMSGLEN"
             | "INITPARMLEN"
             | "LINKLEVEL"
@@ -28,6 +29,7 @@ pub(super) fn validate_output(
             | "MAPHEIGHT"
             | "MAPLINE"
             | "MAPWIDTH"
+            | "PAGENUM"
             | "SCRNHT"
             | "SCRNWD"
             | "TASKPRIORITY"
@@ -41,8 +43,8 @@ pub(super) fn validate_output(
         "ABCODE" | "BRIDGE" | "NEXTTRANSID" | "ORGABCODE" | "PRINSYSID" | "QNAME" => Some(4),
         "ABDUMP" | "APLKYBD" | "APLTEXT" | "BTRANS" | "COLOR" | "DS3270" | "DSSCS" | "EWASUPP"
         | "EXTDS" | "FCI" | "GMMI" | "HILIGHT" | "KATAKANA" | "MSRCONTROL" | "OUTLINE"
-        | "PARTNS" | "PS" | "RESTART" | "SOSI" | "TEXTKYBD" | "TEXTPRINT" | "UNATTEND"
-        | "VALIDATION" | "CMDSEC" | "RESSEC" => Some(1),
+        | "LDCNUM" | "PARTNS" | "PS" | "RESTART" | "SOSI" | "TEXTKYBD" | "TEXTPRINT"
+        | "UNATTEND" | "VALIDATION" | "CMDSEC" | "RESSEC" => Some(1),
         "ABPROGRAM" | "ASRAINTRPT" | "ASRAPSW" | "DESTID" | "OPERKEYS" | "PROGRAM"
         | "PROCESSTYPE" => Some(8),
         "ACTIVITY" | "ASRAPSW16" => Some(16),
@@ -52,6 +54,7 @@ pub(super) fn validate_output(
         "ERRORMSG" => Some(500),
         "INITPARM" => Some(60),
         "OPSECURITY" => Some(3),
+        "LDCMNEM" | "PARTNPAGE" => Some(2),
         "PARTNSET" => Some(6),
         "PROCESS" => Some(36),
         _ => None,

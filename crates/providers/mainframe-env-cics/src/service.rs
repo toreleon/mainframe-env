@@ -7616,6 +7616,41 @@ mod tests {
         assert!(!no_bdi.outputs.contains_key("DESTID"));
         assert!(!no_bdi.outputs.contains_key("DESTIDLENG"));
 
+        let mut no_bms_overflow = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("APPLID".into(), argument(b"APP-OUT")),
+                ("DESTCOUNT".into(), argument(b"DESTINATION-COUNT-OUT")),
+                ("LDCMNEM".into(), argument(b"LDC-MNEMONIC-OUT")),
+                ("LDCNUM".into(), argument(b"LDC-NUMBER-OUT")),
+                ("PAGENUM".into(), argument(b"PAGE-NUMBER-OUT")),
+                ("PARTNPAGE".into(), argument(b"PARTITION-PAGE-OUT")),
+            ]),
+            325,
+        );
+        no_bms_overflow.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let no_bms_overflow = service
+            .invoke(
+                &effect(&invocation.run_unit_id, no_bms_overflow.clone(), 325),
+                no_bms_overflow,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                no_bms_overflow.condition.as_str(),
+                no_bms_overflow.response,
+                no_bms_overflow.response2,
+            ),
+            ("INVREQ", 16, 2)
+        );
+        assert_eq!(no_bms_overflow.outputs["APPLID"].bytes(), b"MEAPPL");
+        for name in ["DESTCOUNT", "LDCMNEM", "LDCNUM", "PAGENUM", "PARTNPAGE"] {
+            assert!(!no_bms_overflow.outputs.contains_key(name));
+        }
+
         let mut no_intersystem_facility = request(
             CicsOperation::Assign,
             BTreeMap::from([
@@ -8256,6 +8291,41 @@ mod tests {
         assert_eq!(no_bdi.outputs["APPLID"].bytes(), b"ME01");
         assert!(!no_bdi.outputs.contains_key("DESTID"));
         assert!(!no_bdi.outputs.contains_key("DESTIDLENG"));
+
+        let mut no_bms_overflow = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("APPLID".into(), argument(b"APP-OUT")),
+                ("DESTCOUNT".into(), argument(b"DESTINATION-COUNT-OUT")),
+                ("LDCMNEM".into(), argument(b"LDC-MNEMONIC-OUT")),
+                ("LDCNUM".into(), argument(b"LDC-NUMBER-OUT")),
+                ("PAGENUM".into(), argument(b"PAGE-NUMBER-OUT")),
+                ("PARTNPAGE".into(), argument(b"PARTITION-PAGE-OUT")),
+            ]),
+            64,
+        );
+        no_bms_overflow.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let no_bms_overflow = service
+            .invoke(
+                &effect(&invocation.run_unit_id, no_bms_overflow.clone(), 64),
+                no_bms_overflow,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                no_bms_overflow.condition.as_str(),
+                no_bms_overflow.response,
+                no_bms_overflow.response2,
+            ),
+            ("INVREQ", 16, 200)
+        );
+        assert_eq!(no_bms_overflow.outputs["APPLID"].bytes(), b"ME01");
+        for name in ["DESTCOUNT", "LDCMNEM", "LDCNUM", "PAGENUM", "PARTNPAGE"] {
+            assert!(!no_bms_overflow.outputs.contains_key(name));
+        }
 
         let mut no_intersystem_facility = request(
             CicsOperation::Assign,

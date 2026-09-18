@@ -4,6 +4,8 @@ use super::{
 };
 
 const ASSIGN_OUTPUT_TAG_BASE: u8 = 13;
+const ASSIGN_OUTPUT_LEGACY_COUNT: u8 = 78;
+const ASSIGN_OUTPUT_EXTENSION_TAG_BASE: u8 = 96;
 
 pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
     match value {
@@ -251,7 +253,14 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u8 {
         CicsOutputName::Yyyymmdd => 10,
         CicsOutputName::Commarea => 11,
         CicsOutputName::Ridfld => 12,
-        CicsOutputName::Assign(output) => ASSIGN_OUTPUT_TAG_BASE + output.tag(),
+        CicsOutputName::Assign(output) => {
+            let tag = output.tag();
+            if tag < ASSIGN_OUTPUT_LEGACY_COUNT {
+                ASSIGN_OUTPUT_TAG_BASE + tag
+            } else {
+                ASSIGN_OUTPUT_EXTENSION_TAG_BASE + (tag - ASSIGN_OUTPUT_LEGACY_COUNT)
+            }
+        }
         CicsOutputName::Length => 91,
         CicsOutputName::ReturnTransId => 92,
         CicsOutputName::ReturnTermId => 93,
@@ -280,12 +289,14 @@ pub(super) fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodec
         93 => Ok(CicsOutputName::ReturnTermId),
         94 => Ok(CicsOutputName::Queue),
         95 => Ok(CicsOutputName::SetPointer),
-        value => CicsAssignOutput::from_tag(
-            value
-                .checked_sub(ASSIGN_OUTPUT_TAG_BASE)
-                .ok_or(CicsPlanCodecProblem::Malformed)?,
-        )
-        .map(CicsOutputName::Assign)
-        .ok_or(CicsPlanCodecProblem::Malformed),
+        13..=90 => CicsAssignOutput::from_tag(value - ASSIGN_OUTPUT_TAG_BASE)
+            .map(CicsOutputName::Assign)
+            .ok_or(CicsPlanCodecProblem::Malformed),
+        96..=u8::MAX => value
+            .checked_sub(ASSIGN_OUTPUT_EXTENSION_TAG_BASE)
+            .and_then(|tag| tag.checked_add(ASSIGN_OUTPUT_LEGACY_COUNT))
+            .and_then(CicsAssignOutput::from_tag)
+            .map(CicsOutputName::Assign)
+            .ok_or(CicsPlanCodecProblem::Malformed),
     }
 }

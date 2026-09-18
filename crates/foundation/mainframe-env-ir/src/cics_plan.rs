@@ -1576,12 +1576,36 @@ mod tests {
             decoded.operands[1].value,
             CicsOperandValue::Literal(ref bytes) if bytes == b"003"
         ));
-        assert_eq!(CICS_ASSIGN_OUTPUT_NAMES.len(), 78);
+        assert_eq!(CICS_ASSIGN_OUTPUT_NAMES.len(), 83);
         assert!(
-            CICS_ASSIGN_OUTPUT_NAMES
+            CICS_ASSIGN_OUTPUT_NAMES[..78]
                 .windows(2)
                 .all(|pair| pair[0] < pair[1])
         );
+        assert!(
+            CICS_ASSIGN_OUTPUT_NAMES[78..]
+                .windows(2)
+                .all(|pair| pair[0] < pair[1])
+        );
+        assert_eq!(
+            CICS_ASSIGN_OUTPUT_NAMES
+                .iter()
+                .copied()
+                .collect::<BTreeSet<_>>()
+                .len(),
+            CICS_ASSIGN_OUTPUT_NAMES.len()
+        );
+        for (name, tag) in [
+            ("DESTCOUNT", 96),
+            ("LDCMNEM", 97),
+            ("LDCNUM", 98),
+            ("PAGENUM", 99),
+            ("PARTNPAGE", 100),
+        ] {
+            let output = CicsAssignOutput::from_name(name).unwrap();
+            assert_eq!(output_tag(CicsOutputName::Assign(output)), tag);
+            assert_eq!(output_from_tag(tag), Ok(CicsOutputName::Assign(output)));
+        }
         for name in CICS_ASSIGN_OUTPUT_NAMES {
             let output = CicsAssignOutput::from_name(name).expect("canonical ASSIGN output");
             assert_eq!(output.name(), *name);
