@@ -2,6 +2,7 @@ mod bms_map;
 mod condition;
 mod file_control;
 mod handle_state;
+mod interval_control;
 mod program_control;
 mod queue_control;
 mod recovery;
@@ -22,6 +23,7 @@ pub(super) use handle_state::{
     AbendExit, AbendRecord, HandleFrame, HandleState, decode_session_handle_state,
     session_schema_version,
 };
+pub(super) use interval_control::{IntervalStartRecord, load as load_interval_records};
 pub(super) use program_control::invoke as invoke_program_control;
 pub(super) use queue_control::invoke as invoke_queue_control;
 pub(super) use recovery::invoke as invoke_recovery;

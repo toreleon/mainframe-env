@@ -166,6 +166,17 @@ model/catalog state prevents provider open. The pinned source set does not
 establish precedence among overlapping generic models, so installation rejects
 overlap rather than choosing an undocumented winner.
 
+CICS interval START records use `cics-interval-start-v1`, keyed by the exact
+one-to-eight-character request identifier. The version-one payload binds the
+target transaction, issuing principal and run unit, expiration tick, optional
+terminal and originating metadata, bounded data and FMH state, plus canonical
+producer and consumer idempotency identities. Pending, protected-pending,
+ready, and consumed are explicit states. Promotion is ordered by expiration
+then request identifier; consumption is one fenced CAS transition and only the
+same canonical consumer request can replay it. The records-core boundary is
+internal until shared work admission and typed START/RETRIEVE routes seal, so
+its presence alone does not advertise either command.
+
 An ENQ wait is not a terminal-input handoff. Its execution remains
 `Suspended`, and both the coordinator checkpoint and product continuation stay
 attached to the same online exchange. Resume reissues the ENQ as a new bounded

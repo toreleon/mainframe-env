@@ -269,6 +269,10 @@ struct State {
     continuations: BTreeMap<String, DurableContinuation>,
     transient: BTreeMap<String, TransientQueue>,
     transient_bytes: usize,
+    // Internal authority for the declared records-core slice. Command handlers
+    // remain deliberately disconnected until the producer/consumer slices seal.
+    #[allow(dead_code)]
+    interval_records: BTreeMap<String, handlers::IntervalStartRecord>,
     #[cfg(feature = "fault-injection")]
     file_failure: Option<(CicsOperation, String)>,
     #[cfg(feature = "fault-injection")]
@@ -428,6 +432,7 @@ impl CicsService {
             }
         }
         handlers::validate_enqueue_store(store.as_ref(), limits)?;
+        let interval_records = handlers::load_interval_records(store.as_ref(), limits)?;
         Ok(Arc::new(Self {
             host,
             store,
@@ -445,6 +450,7 @@ impl CicsService {
                 continuations,
                 transient,
                 transient_bytes,
+                interval_records,
                 #[cfg(feature = "fault-injection")]
                 file_failure: None,
                 #[cfg(feature = "fault-injection")]

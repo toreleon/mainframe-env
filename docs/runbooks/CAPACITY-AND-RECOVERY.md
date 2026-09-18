@@ -62,6 +62,15 @@ closed. Do not delete the model catalog to force local routing: model-aware lock
 keys contain either APPLID/SYSID or ENQSCOPE and are not compatible with the
 single-region key profile.
 
+Back up `cics-interval-start-v1` with the CICS provider state. Do not delete or
+edit pending, protected-pending, ready, or consumed rows manually. A row binds
+its REQID to the producing effect and canonical request; replacing it can turn
+a duplicate START into a false replay. A consumed row retains the exact
+consumer identity needed to close the result-journal crash gap and is not yet
+eligible for generic retention. Schema rollback therefore requires stopping
+admission and restoring a pre-change backup; older binaries must not write a
+store containing these rows.
+
 Back up `cics-session` rows containing task association or HANDLE state before
 enabling typed `SET ASSOCIATION USERCORRDATA` or durable handlers. Current
 `MECS7` rows carry at most 64 correlator bytes, the last mutation key and

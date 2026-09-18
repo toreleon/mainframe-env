@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added the internal versioned CICS interval START-record authority with
+  duplicate-REQID versus replay identity, ordered expiry promotion,
+  protected-pending state, one-time replay-safe consumption, strict bounds,
+  and memory/SQLite reopen checks. START remains unadvertised and RETRIEVE is
+  not widened until their typed shared-worker slices seal.
+
 - Added verified offline IBM-documentation search/read commands and a cache-first
   source-review workflow for semantic development.
 - Added repository contributor guidelines in `AGENTS.md` covering structure,
