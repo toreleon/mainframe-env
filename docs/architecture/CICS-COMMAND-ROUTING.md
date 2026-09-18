@@ -142,7 +142,13 @@ Normal machine completion and highest-level RETURN now apply the same commit
 transition implicitly before task cleanup. Known execution failure applies
 rollback deletion; scheduler/WAIT suspension does not finalize the task.
 Terminal disconnect and idle timeout also apply rollback deletion through the
-caller-held cleanup boundary. Crash-gap outcome reconciliation remains deferred.
+caller-held cleanup boundary. If durable execution reaches a terminal outcome
+before product/CICS cleanup, recovery reconstructs the exact invocation from
+the retained exchange, restores its checkpointed priority, and reloads the
+durable CICS undo state before cleanup. `Completed` commits protected START;
+cancelled, timed-out, failed, and dead-letter outcomes roll it back. A completed
+handoff retains its already-applied RETURN finalization and is discarded without
+committing twice.
 When local START omits REQID, the provider derives one replay-stable
 eight-character identifier and the interpreter writes it to implicit EIBREQID;
 that value owns the same record and work identities as an explicit REQID.
@@ -154,8 +160,8 @@ terminal combinations, and actual target-task creation remain deferred.
 RETRIEVE WAIT durably checkpoints and reissues the same statement when no
 eligible record exists; explicit execution re-entry after worker promotion
 consumes through the ordinary one-time fence. Deadlock timeout, shutdown/AICB,
-automatic wake, terminal association, crash-gap lifecycle reconciliation, and
-automatic task launch remain fail-closed or deferred.
+automatic wake, process-restart WAIT resume, terminal association, and automatic
+task launch remain fail-closed or deferred.
 The typed default-cursor file-browse subset binds STARTBR, READNEXT, READPREV,
 and ENDBR to exactly one FILE/DATASET alias. STARTBR captures a writable
 RIDFLD without returning a record and admits the default-equivalent `GTEQ`

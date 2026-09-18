@@ -113,9 +113,15 @@ the volatile run. Known execution failure is rollback: delete still-protected
 rows and never enqueue them. Suspension is neither outcome. Terminal disconnect
 and idle timeout are also rollback; their caller-held cleanup must delete
 protected rows before removing the run and session. If execution terminalization
-and CICS cleanup are separated by a crash, quarantine the protected rows until
-the durable terminal disposition is reconciled; do not infer commit solely from
-a missing run.
+and CICS cleanup are separated by a crash, retain the online exchange and
+machine continuation. Recovery reconstructs that exact invocation and saved
+priority, reloads its durable CICS undo state, and applies the journaled
+terminal disposition: `Completed` commits protected rows; `Cancelled`,
+`TimedOut`, `Failed`, and `DeadLetter` roll them back. `HandoffCompleted` keeps
+the RETURN finalization already applied and only discards the rebuilt volatile
+run. Clear the continuation, checkpoint, and exchange after the CICS result;
+missing identity or a nonterminal execution fails closed rather than inferring
+commit from a missing run.
 
 Do not force CANCEL across a protected-pending row. IBM semantics allow CANCEL
 only after that START is committed. Before commit, preserve the row and return

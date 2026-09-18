@@ -156,20 +156,52 @@ impl ProductServer {
         now_tick: u64,
         preserve_handle_state: bool,
     ) -> Result<(), HostProblem> {
-        let trace = if preserve_handle_state {
-            self.cics
-                .discard_handed_off_terminal_run_if_present(session, principal, now_tick)
-        } else {
-            self.cics
-                .discard_terminal_run_if_present(session, principal, now_tick)
-        }?;
-        self.online_traces
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?
-            .entry(session.as_str().into())
-            .or_default()
-            .extend(trace);
-        Ok(())
+        let exchange = self
+            .online_exchange(session)?
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let mut invocation = self.online_exchange_invocation(&exchange)?;
+        let saved = self.online_machine_continuation(session)?;
+        restore_online_machine_priority(&mut invocation, saved.as_ref());
+        let execution = self
+            .store
+            .get_execution(&invocation.execution_id)
+            .map_err(store_error)?
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        self.cics.restore_terminal_run(
+            invocation,
+            session,
+            &exchange.transaction,
+            exchange.commarea,
+            now_tick,
+        )?;
+        if preserve_handle_state {
+            let trace = self
+                .cics
+                .discard_handed_off_terminal_run_if_present(session, principal, now_tick)?;
+            self.online_traces
+                .lock()
+                .map_err(|_| HostProblem::InfrastructureFailure)?
+                .entry(session.as_str().into())
+                .or_default()
+                .extend(trace);
+            return Ok(());
+        }
+        match execution.state {
+            ExecutionState::Completed => {
+                self.finish_online_machine_run(session, principal, now_tick)
+            }
+            ExecutionState::Cancelled
+            | ExecutionState::TimedOut
+            | ExecutionState::Failed
+            | ExecutionState::DeadLetter => {
+                self.abort_online_machine_run(session, principal, now_tick)
+            }
+            ExecutionState::Admitted
+            | ExecutionState::Queued
+            | ExecutionState::Running
+            | ExecutionState::Suspended
+            | ExecutionState::Completing => Err(HostProblem::InfrastructureFailure),
+        }
     }
 
     fn suspend_online_machine_run(

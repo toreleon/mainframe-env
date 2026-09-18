@@ -2012,6 +2012,12 @@ impl ProductServer {
         // Evaluate every cleanup before propagating the first failure. This
         // prevents a recoverable stale row from repeatedly blocking a session.
         let program_result = self.program.finish_run_unit(&invocation);
+        let cics_result = self.discard_online_machine_run_if_present(
+            session,
+            principal,
+            now_tick,
+            preserve_handoff,
+        );
         let continuation_result = if preserve_handoff {
             Ok(())
         } else {
@@ -2021,12 +2027,6 @@ impl ProductServer {
             )
         };
         let checkpoint_result = self.clear_execution_checkpoint(&invocation.execution_id);
-        let cics_result = self.discard_online_machine_run_if_present(
-            session,
-            principal,
-            now_tick,
-            preserve_handoff,
-        );
         let exchange_result = self.clear_online_exchange(session, exchange);
         for result in [
             program_result,
@@ -6343,6 +6343,76 @@ mod tests {
         .map_err(|_| HostProblem::ResourceExhausted)
     }
 
+    fn stage_protected_start(
+        server: &ProductServer,
+        invocation: &Invocation,
+        current_transaction: &str,
+        target_transaction: &str,
+        request_id: &str,
+        sequence: u64,
+    ) {
+        let argument = |schema: &str, bytes: Vec<u8>| {
+            BoundedPayload::new(schema, bytes, InvocationLimits::default()).unwrap()
+        };
+        let request = CicsRequest {
+            operation: CicsOperation::Start,
+            arguments: BTreeMap::from([
+                (
+                    "TRANSID".into(),
+                    argument(
+                        "mainframe-env.cics.literal@1",
+                        target_transaction.as_bytes().to_vec(),
+                    ),
+                ),
+                (
+                    "REQID".into(),
+                    argument(
+                        "mainframe-env.cics.literal@1",
+                        request_id.as_bytes().to_vec(),
+                    ),
+                ),
+                (
+                    "FROM".into(),
+                    argument("mainframe-env.cics.storage-value@1", b"RECOVER".to_vec()),
+                ),
+                (
+                    "INTERVAL".into(),
+                    argument("mainframe-env.cics.decimal@1", b"0".to_vec()),
+                ),
+                (
+                    "OPTION.PROTECT".into(),
+                    argument("mainframe-env.cics.option@1", Vec::new()),
+                ),
+            ]),
+            condition_policy: CicsConditionPolicy::Default,
+            mutation: Some(Mutation {
+                sequence,
+                idempotency_key: IdempotencyKey::new(
+                    format!("recover-protected-start-{request_id}"),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+                transaction: Some(current_transaction.into()),
+            }),
+        };
+        server
+            .cics
+            .invoke(
+                &EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence,
+                    deadline_tick: invocation.deadline_tick,
+                    idempotency_key: request
+                        .mutation
+                        .as_ref()
+                        .map(|mutation| mutation.idempotency_key.clone()),
+                    request: HostRequest::Cics(request.clone()),
+                },
+                request,
+            )
+            .unwrap();
+    }
+
     #[test]
     fn system_clock_provider_emits_bounded_utc_shapes() {
         assert_eq!(civil_from_unix_days(0), (1970, 1, 1));
@@ -10590,7 +10660,7 @@ mod tests {
             .cics
             .terminal_execution(&session, &principal, 2)
             .unwrap();
-        server
+        let exchange = server
             .begin_online_exchange(&session, "ENDCOMMIT", &context)
             .unwrap();
         server
@@ -10620,6 +10690,57 @@ mod tests {
             Err(HostProblem::NotFound),
             "normal completion removed the volatile run after committing protected work"
         );
+
+        // Recreate the durable-terminal crash gap: the coordinator has
+        // committed Completed, while the exchange and protected START undo
+        // rows still await product/CICS cleanup.
+        server
+            .store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: ONLINE_EXCHANGE_NAMESPACE.into(),
+                    key: session.as_str().into(),
+                    version: exchange.version,
+                    payload: encode_online_exchange(&exchange).unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        server
+            .cics
+            .restore_terminal_run(
+                context.invocation.clone(),
+                &session,
+                &context.transaction,
+                context.commarea.clone(),
+                3,
+            )
+            .unwrap();
+        stage_protected_start(&server, &context.invocation, "TE00", "NX00", "RECVEND1", 99);
+        assert!(
+            server
+                .store
+                .get_work("cics-start:RECVEND1")
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            server
+                .recover_terminal_online_exchange(&session, &principal, &exchange, 3)
+                .unwrap(),
+            Some(TerminalExchangeRecovery::Completed)
+        );
+        assert_eq!(
+            server
+                .store
+                .get_work("cics-start:RECVEND1")
+                .unwrap()
+                .unwrap()
+                .state,
+            WorkState::Queued,
+            "Completed recovery did not commit the protected START"
+        );
+        assert!(server.online_exchange(&session).unwrap().is_none());
     }
 
     #[test]
@@ -13969,7 +14090,7 @@ mod tests {
     #[test]
     fn online_unknown_reconciles_and_known_failure_does_not_strand_session() {
         let limits = SourceLimits::default();
-        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. RECOVER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(4) VALUE 'AA11'.\nPROCEDURE DIVISION.\nEXEC CICS WRITE FILE('RECFILE') FROM(DATA-X) END-EXEC.\nSTOP RUN.\n";
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. RECOVER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(4) VALUE 'AA11'.\n01 KEY-X PIC X(4) VALUE '0001'.\nPROCEDURE DIVISION.\nEXEC CICS WRITE FILE('RECFILE') FROM(DATA-X) RIDFLD(KEY-X) END-EXEC.\nSTOP RUN.\n";
         let path = LogicalPath::new("RECOVER.cbl", limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
             &path,
@@ -13988,16 +14109,16 @@ mod tests {
             limits,
         )
         .unwrap();
-        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+        let recovery_compilation = CobolCompiler::default()
             .compile(CompilerRequest {
                 source: bundle,
                 mode: CompilationMode::Executable,
                 target: CompileTarget::new("reference").unwrap(),
                 options: CompileOptions::new(BTreeMap::new()).unwrap(),
             })
-            .unwrap()
-        else {
-            panic!("recovery fixture did not publish");
+            .unwrap();
+        let CompilerResult::Published { artifact, .. } = recovery_compilation else {
+            panic!("recovery fixture did not publish: {recovery_compilation:?}");
         };
         let known_source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. KNOWNFAIL.\nPROCEDURE DIVISION.\nCALL 'MISSING-PROGRAM'.\nSTOP RUN.\n";
         let known_path = LogicalPath::new("KNOWNFAIL.cbl", limits.max_path_bytes).unwrap();
@@ -14287,11 +14408,41 @@ mod tests {
                 6,
             )
             .unwrap();
+        stage_protected_start(
+            &server,
+            &known_context.invocation,
+            "KFLR",
+            "RCVY",
+            "RECVFAIL",
+            99,
+        );
+        assert!(
+            server
+                .store
+                .get_work("cics-start:RECVFAIL")
+                .unwrap()
+                .is_none()
+        );
         assert_eq!(
             server
                 .recover_terminal_online_exchange(&known_session, &principal, &known_exchange, 6,)
                 .unwrap(),
             Some(TerminalExchangeRecovery::Failed)
+        );
+        assert!(
+            server
+                .store
+                .get_provider_state("cics-interval-start-v1", "RECVFAIL")
+                .unwrap()
+                .is_none(),
+            "Failed recovery retained the protected START"
+        );
+        assert!(
+            server
+                .store
+                .get_work("cics-start:RECVFAIL")
+                .unwrap()
+                .is_none()
         );
         assert!(server.online_exchange(&known_session).unwrap().is_none());
         let retry_invocation = server

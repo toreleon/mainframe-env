@@ -213,7 +213,8 @@ Explicit SYNCPOINT ROLLBACK durably finalizes the rollback before deleting
 protected-pending records, so the REQID can be reused. Typed ABEND performs the
 same bounded deletion before its handler transfer or terminal disposition.
 Known non-command failure/disconnect/timeout and implicit task-end behavior are
-covered below; crash-gap lifecycle reconciliation is not yet claimed.
+covered below, including recovery after durable terminalization precedes
+product/CICS cleanup.
 
 CANCEL follows the source-defined PROTECT boundary: protected-pending rows are
 not cancelable and return NOTFND, while a committing SYNCPOINT first makes the
@@ -237,8 +238,14 @@ before releasing other task state. A scheduler or data wait suspension performs
 neither transition. Terminal disconnect and idle timeout delete still-protected
 rows in the same caller-held cleanup pass that abandons delays and releases
 enqueue state. Recovery that begins after a terminal execution outcome but
-before product/CICS cleanup still requires separate disposition-bound
-reconciliation proof.
+before product/CICS cleanup reads the retained exchange and machine
+continuation, reconstructs the exact invocation and priority, reloads durable
+CICS undo state, then follows the journaled disposition. `Completed` commits
+protected rows and admits deterministic work; cancelled, timed-out, failed, or
+dead-letter outcomes delete protected rows without work. Handoff completion
+uses its already-applied RETURN finalization and does not repeat the syncpoint.
+Cleanup removes continuation, checkpoint, and exchange state only after that
+disposition-bound CICS transition has been attempted.
 
 An optional local START USERID is part of the canonical producer request and
 the duplicate-REQID fence. Before schedule persistence, the provider authorizes

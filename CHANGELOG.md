@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added disposition-bound crash-gap recovery for protected START. When durable
+  execution terminalization precedes product/CICS cleanup, recovery rebuilds
+  the exact terminal run and saved priority, commits protected rows only for
+  `Completed`, rolls them back for cancelled, timed-out, failed, or dead-letter
+  outcomes, and preserves handoff finalization without applying it twice.
+
 - Added terminal disconnect and idle-timeout rollback cleanup for protected
   START. The existing caller-held terminal cleanup boundary now deletes the
   exact run's still-protected rows before releasing delay/enqueue state and
@@ -14,8 +20,7 @@ All notable changes to mainframe-env are documented here.
 - Added implicit task-end finalization for protected START requests. Normal
   compiled completion and highest-level RETURN commit protected rows and admit
   their work; known abnormal execution completion deletes those rows without
-  work. Suspension remains nonterminal. Crash-gap outcome reconciliation
-  remains pending.
+  work. Suspension remains nonterminal.
 
 - Added bounded START USERID surrogate admission. Typed local START accepts a
   one-to-eight-character execution identity, requires the issuing principal to
