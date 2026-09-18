@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added storage-backed packed CICS DELAY `INTERVAL`. The compiler and typed
+  plan now preserve numeric storage under existing operand tag 28, while
+  malformed runtime packed values reach the provider's exact INVREQ response
+  path. Named dynamic delays retain cancellation and checkpoint behavior.
+
 - Added typed CICS DELAY `FOR MILLISECS` as a literal or resolved numeric
   storage value, alone or with HOURS/MINUTES/SECONDS. The shared interval value
   now retains millisecond precision, enforces pure/combined bounds with INVREQ

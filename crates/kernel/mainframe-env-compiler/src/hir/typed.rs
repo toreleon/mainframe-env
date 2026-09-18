@@ -3464,7 +3464,7 @@ mod tests {
 
     #[test]
     fn cics_delay_lowers_literal_intervals_and_bounded_names() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELAY0. DATA DIVISION. WORKING-STORAGE SECTION. 01 REQ-X PIC X(8) VALUE 'WAIT0002'. PROCEDURE DIVISION. EXEC CICS DELAY END-EXEC. EXEC CICS DELAY INTERVAL(0) END-EXEC. EXEC CICS DELAY INTERVAL(1) END-EXEC. EXEC CICS DELAY INTERVAL(2) REQID('WAIT0001') END-EXEC. EXEC CICS DELAY INTERVAL(3) REQID(REQ-X) END-EXEC. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELAY0. DATA DIVISION. WORKING-STORAGE SECTION. 01 REQ-X PIC X(8) VALUE 'WAIT0002'. 01 WHEN-X PIC S9(6) COMP-3 VALUE 1. PROCEDURE DIVISION. EXEC CICS DELAY END-EXEC. EXEC CICS DELAY INTERVAL(0) END-EXEC. EXEC CICS DELAY INTERVAL(1) END-EXEC. EXEC CICS DELAY INTERVAL(2) REQID('WAIT0001') END-EXEC. EXEC CICS DELAY INTERVAL(3) REQID(REQ-X) END-EXEC. EXEC CICS DELAY INTERVAL(WHEN-X) REQID('WAIT0003') END-EXEC. EXEC CICS DELAY INTERVAL(60) END-EXEC. STOP RUN.";
         let analysis = analyze(source);
         let hir = analysis
             .hir
@@ -3477,7 +3477,7 @@ mod tests {
                 _ => None,
             })
             .collect::<Vec<_>>();
-        assert_eq!(commands.len(), 5);
+        assert_eq!(commands.len(), 7);
         assert!(
             commands
                 .iter()
@@ -3508,10 +3508,21 @@ mod tests {
                     }
             }));
         }
+        assert!(commands[5].operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::Interval,
+                    value: HirCicsValue::Data(reference),
+                } if reference.qualified_name == "WHEN-X"
+            )
+        }));
+        assert!(commands[6].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Interval
+                && operand.value == HirCicsValue::Integer(60)
+        }));
 
         for command in [
-            "DELAY INTERVAL(60)",
-            "DELAY INTERVAL(WHEN-X)",
             "DELAY FOR",
             "DELAY HOURS(1)",
             "DELAY FOR UNTIL HOURS(1)",

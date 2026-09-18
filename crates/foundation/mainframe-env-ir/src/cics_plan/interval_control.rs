@@ -47,32 +47,35 @@ pub(super) fn invalid_shape(
                 || (components > 0) != (explicit_modes == 1)
                 || inputs.contains(&CicsOperandName::Milliseconds)
                     && !plan.options.contains(&CicsPlanOption::For)
-                || plan.operands.iter().any(|operand| {
-                    match operand.name {
-                        CicsOperandName::Interval => {
-                            !matches!(operand.value, CicsOperandValue::Integer(value) if valid_hhmmss(value))
-                        }
-                        CicsOperandName::StartTime => !matches!(
-                            operand.value,
-                            CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
-                        ),
-                        CicsOperandName::ReqId => !matches!(
-                            operand.value,
-                            CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
-                        ),
-                        CicsOperandName::Hours
-                        | CicsOperandName::Minutes
-                        | CicsOperandName::Seconds
-                        | CicsOperandName::Milliseconds => !matches!(
-                            operand.value,
-                            CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
-                        ),
-                        _ => true,
-                    }
+                || plan.operands.iter().any(|operand| match operand.name {
+                    CicsOperandName::Interval => !matches!(
+                        operand.value,
+                        CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
+                    ),
+                    CicsOperandName::StartTime => !matches!(
+                        operand.value,
+                        CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
+                    ),
+                    CicsOperandName::ReqId => !matches!(
+                        operand.value,
+                        CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+                    ),
+                    CicsOperandName::Hours
+                    | CicsOperandName::Minutes
+                    | CicsOperandName::Seconds
+                    | CicsOperandName::Milliseconds => !matches!(
+                        operand.value,
+                        CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
+                    ),
+                    _ => true,
                 })
                 || inputs.contains(&CicsOperandName::ReqId)
                     && explicit_modes == 0
                     && !inputs.contains(&CicsOperandName::StartTime)
+                    && !matches!(
+                        operand_value(plan, CicsOperandName::Interval),
+                        Some(CicsOperandValue::Storage(_))
+                    )
                     && !matches!(operand_value(plan, CicsOperandName::Interval), Some(CicsOperandValue::Integer(value)) if *value > 0)
                 || scheduling_options
                 || outputs.contains(&CicsOutputName::Into)
@@ -177,8 +180,4 @@ pub(super) fn invalid_shape(
         }
         _ => true,
     }
-}
-
-fn valid_hhmmss(value: i64) -> bool {
-    (0..=995_959).contains(&value) && value / 100 % 100 <= 59 && value % 100 <= 59
 }

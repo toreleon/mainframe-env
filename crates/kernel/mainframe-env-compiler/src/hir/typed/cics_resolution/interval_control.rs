@@ -32,26 +32,13 @@ pub(super) fn validate_constraints(
                     "CICS DELAY MILLISECS is valid only with FOR".into(),
                 ));
             }
-            if clauses.get("INTERVAL").is_some_and(|value| {
-                value.len() != 1
-                    || value[0]
-                        .parse::<i64>()
-                        .ok()
-                        .is_none_or(|value| !valid_hhmmss(value))
-            }) {
-                return Err(ResolutionFailure::Invalid(
-                    "typed CICS DELAY currently requires a literal packed INTERVAL".into(),
-                ));
-            }
             if clauses.contains_key("REQID")
                 && !relative
                 && !absolute
                 && !clauses.contains_key("TIME")
-                && clauses
-                    .get("INTERVAL")
-                    .and_then(|value| value.first())
-                    .and_then(|value| value.parse::<i64>().ok())
-                    .is_none_or(|value| value == 0)
+                && clauses.get("INTERVAL").is_none_or(|tokens| {
+                    tokens.first().and_then(|value| value.parse::<i64>().ok()) == Some(0)
+                })
             {
                 return Err(ResolutionFailure::Invalid(
                     "typed CICS DELAY REQID requires a positive schedule".into(),
@@ -100,10 +87,6 @@ pub(super) fn validate_constraints(
         _ => {}
     }
     Ok(())
-}
-
-fn valid_hhmmss(value: i64) -> bool {
-    (0..=995_959).contains(&value) && value / 100 % 100 <= 59 && value % 100 <= 59
 }
 
 pub(super) fn operands(

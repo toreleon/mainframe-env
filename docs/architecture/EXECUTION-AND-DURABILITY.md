@@ -293,10 +293,10 @@ START/CANCEL lifecycle owns bounded replay retention.
 
 Typed zero-delay DELAY is deliberately stateless. Bare DELAY and a
 compile-time literal `INTERVAL(0)` return NORMAL immediately and never create a
-timer row, work item, checkpoint, or suspension. Positive literal packed
-intervals and typed FOR/UNTIL unit forms use the durable path below; they are
-not inferred from this immediate boundary. Dynamic packed INTERVAL and
-remote forms remain rejected before publication.
+timer row, work item, checkpoint, or suspension. Positive literal or
+storage-backed packed intervals and typed FOR/UNTIL unit forms use the durable
+path below; they are not inferred from this immediate boundary. Remote forms
+use separate reviewed boundaries.
 
 Positive literal packed `INTERVAL` DELAY uses `cics-delay-v1` provider rows and
 work generation. A hidden task/run-unit plus statement-position identity keeps
@@ -326,6 +326,9 @@ remain separate obligations. Packed TIME shares the absolute path:
 the compiler preserves either an integer constant or packed numeric storage,
 the interpreter emits its canonical decimal value, and the provider retains a
 domain-separated identity plus the resolved deadline before suspension.
+Packed INTERVAL now follows the same typed storage path under its existing tag;
+literal and dynamic values are both validated at provider execution time so
+INVREQ conditions and no-state failures do not diverge by source form.
 
 An ENQ wait is not a terminal-input handoff. Its execution remains
 `Suspended`, and both the coordinator checkpoint and product continuation stay
