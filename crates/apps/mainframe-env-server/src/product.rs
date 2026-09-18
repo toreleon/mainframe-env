@@ -11239,6 +11239,115 @@ mod tests {
     }
 
     #[test]
+    fn compiled_dynamic_packed_time_suspends_promotes_and_resumes() {
+        let artifact = published_source_fixture(
+            "DELAYT",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. DELAYT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DONE-X PIC X VALUE '0'.\n01 TIME-X PIC S9(6) COMP-3 VALUE 995959.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS DELAY TIME(TIME-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE '1' TO DONE-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let clock = Arc::new(ManualJesClock::new(100));
+        let platform_store: Arc<dyn PlatformStore> = Arc::new(MemoryStore::new(Default::default()));
+        let mut settings = config();
+        settings.timeout_millis = 500_000_000;
+        let server =
+            ProductServer::open_with_clock(settings, platform_store, clock.clone()).unwrap();
+        let execution_clock = clock.clone();
+        server
+            .program
+            .bind_execution_control(Arc::new(move |_: &Invocation| {
+                Ok(ExecutionControl {
+                    now_tick: execution_clock
+                        .now_tick()
+                        .map_err(|_| ExecutionControlError::Unavailable)?,
+                    cancellation_requested: false,
+                })
+            }))
+            .unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "DELAYT".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("DL0T".into(), "DELAYT".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "DELAYT".into(),
+                    map: "DELAYT".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("interval-delay-packed-time", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "DL0T", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "DL0T",
+                24,
+                80,
+                "interval-delay-packed-time-csrf",
+                100,
+                500_000_000,
+            )
+            .unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 100)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "DELAYT", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "DELAYT", 100)
+            .unwrap();
+
+        let mut claimed = None;
+        for _ in 0..=100 {
+            clock.advance(3_600_000);
+            claimed = server.claim_jes_work("packed-time-product-worker").unwrap();
+            if claimed.is_some() {
+                break;
+            }
+        }
+        let work = claimed.expect("packed TIME work must become due within 100 hours");
+        assert_eq!(work.required_generation, CICS_DELAY_WORK_GENERATION);
+        let outcome = server.process_claimed_jes_work(&work).unwrap();
+        server.finish_claimed_jes_work(&work, Ok(outcome)).unwrap();
+        let resume_tick = clock.now_tick().unwrap();
+        server
+            .run_online_exchange(&session, &principal, "DELAYT", resume_tick)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("DONE-X").unwrap().bytes(), b"1");
+    }
+
+    #[test]
     fn compiled_named_delay_is_cancelled_by_another_task_and_resumes() {
         let delay_artifact = published_source_fixture(
             "DELAY2",

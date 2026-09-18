@@ -2255,6 +2255,13 @@ mod tests {
             encode_cics_effect_plan(&plan, limits),
             Err(CicsPlanCodecProblem::Malformed)
         );
+
+        plan.operands = vec![CicsNamedOperand {
+            name: CicsOperandName::StartTime,
+            value: CicsOperandValue::Storage(slot(2, "DELAY.TIME")),
+        }];
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
     }
 
     #[test]

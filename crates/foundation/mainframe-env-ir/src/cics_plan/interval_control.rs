@@ -21,6 +21,7 @@ pub(super) fn invalid_shape(
         CicsPlanOperation::Delay => {
             let allowed = BTreeSet::from([
                 CicsOperandName::Interval,
+                CicsOperandName::StartTime,
                 CicsOperandName::ReqId,
                 CicsOperandName::Hours,
                 CicsOperandName::Minutes,
@@ -36,8 +37,9 @@ pub(super) fn invalid_shape(
             .count();
             let explicit_modes = usize::from(plan.options.contains(&CicsPlanOption::For))
                 + usize::from(plan.options.contains(&CicsPlanOption::Until));
-            let schedules =
-                usize::from(inputs.contains(&CicsOperandName::Interval)) + explicit_modes;
+            let schedules = usize::from(inputs.contains(&CicsOperandName::Interval))
+                + usize::from(inputs.contains(&CicsOperandName::StartTime))
+                + explicit_modes;
             !inputs.is_subset(&allowed)
                 || schedules > 1
                 || (components > 0) != (explicit_modes == 1)
@@ -46,6 +48,10 @@ pub(super) fn invalid_shape(
                         CicsOperandName::Interval => {
                             !matches!(operand.value, CicsOperandValue::Integer(value) if valid_hhmmss(value))
                         }
+                        CicsOperandName::StartTime => !matches!(
+                            operand.value,
+                            CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
+                        ),
                         CicsOperandName::ReqId => !matches!(
                             operand.value,
                             CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
@@ -61,6 +67,7 @@ pub(super) fn invalid_shape(
                 })
                 || inputs.contains(&CicsOperandName::ReqId)
                     && explicit_modes == 0
+                    && !inputs.contains(&CicsOperandName::StartTime)
                     && !matches!(operand_value(plan, CicsOperandName::Interval), Some(CicsOperandValue::Integer(value)) if *value > 0)
                 || scheduling_options
                 || outputs.contains(&CicsOutputName::Into)

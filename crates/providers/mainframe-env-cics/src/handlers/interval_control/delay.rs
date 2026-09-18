@@ -189,10 +189,13 @@ enum DelayDefinition {
 
 fn delay_definition(request: &CicsRequest) -> Result<DelayDefinition, HostProblem> {
     let interval = optional_decimal(request, "INTERVAL")?;
+    let start_time = optional_decimal(request, "TIME")?;
     let relative = request.arguments.contains_key("OPTION.FOR");
     let absolute = request.arguments.contains_key("OPTION.UNTIL");
     let time = if let Some(value) = interval {
         CicsIntervalTime::from_hhmmss(CicsIntervalMode::Relative, value)
+    } else if let Some(value) = start_time {
+        CicsIntervalTime::from_hhmmss(CicsIntervalMode::Absolute, value)
     } else if relative || absolute {
         CicsIntervalTime::from_components(
             if relative {
@@ -215,10 +218,12 @@ fn delay_definition(request: &CicsRequest) -> Result<DelayDefinition, HostProble
     if time.mode() == CicsIntervalMode::Relative && time.seconds() == 0 {
         return Ok(DelayDefinition::Immediate);
     }
-    let identity = match (interval, time.mode()) {
-        (Some(value), _) => value,
-        (None, CicsIntervalMode::Relative) => 1_000_000 + i64::from(time.seconds()),
-        (None, CicsIntervalMode::Absolute) => 2_000_000 + i64::from(time.seconds()),
+    let identity = match (interval, start_time, time.mode()) {
+        (Some(value), None, _) => value,
+        (None, None, CicsIntervalMode::Relative) => 1_000_000 + i64::from(time.seconds()),
+        (None, None, CicsIntervalMode::Absolute) => 2_000_000 + i64::from(time.seconds()),
+        (None, Some(value), CicsIntervalMode::Absolute) => 3_000_000 + value,
+        _ => return Err(HostProblem::Malformed),
     };
     Ok(DelayDefinition::Scheduled { identity, time })
 }
@@ -711,20 +716,23 @@ fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "RESP",
         "RESP2",
         "SECONDS",
+        "TIME",
     ];
     let components = ["HOURS", "MINUTES", "SECONDS"]
         .into_iter()
         .any(|name| request.arguments.contains_key(name));
     let modes = usize::from(request.arguments.contains_key("OPTION.FOR"))
         + usize::from(request.arguments.contains_key("OPTION.UNTIL"));
-    let schedules = usize::from(request.arguments.contains_key("INTERVAL")) + modes;
+    let schedules = usize::from(request.arguments.contains_key("INTERVAL"))
+        + usize::from(request.arguments.contains_key("TIME"))
+        + modes;
     if schedules > 1
         || components != (modes == 1)
         || request.arguments.iter().any(|(name, value)| {
             !ALLOWED.contains(&name.as_str())
                 || match name.as_str() {
                     "DELAY.ID" => value.schema() != "mainframe-env.cics.delay-id@1",
-                    "HOURS" | "INTERVAL" | "MINUTES" | "SECONDS" => {
+                    "HOURS" | "INTERVAL" | "MINUTES" | "SECONDS" | "TIME" => {
                         value.schema() != "mainframe-env.cics.decimal@1"
                     }
                     "REQID" => !matches!(

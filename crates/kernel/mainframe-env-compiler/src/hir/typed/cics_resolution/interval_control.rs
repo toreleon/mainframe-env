@@ -18,11 +18,12 @@ pub(super) fn validate_constraints(
                 .into_iter()
                 .any(|name| clauses.contains_key(name));
             let schedules = usize::from(clauses.contains_key("INTERVAL"))
+                + usize::from(clauses.contains_key("TIME"))
                 + usize::from(relative)
                 + usize::from(absolute);
             if schedules > 1 || (relative || absolute) != units {
                 return Err(ResolutionFailure::Invalid(
-                    "CICS DELAY accepts one INTERVAL or one FOR/UNTIL explicit-unit schedule"
+                    "CICS DELAY accepts one INTERVAL, TIME, or FOR/UNTIL explicit-unit schedule"
                         .into(),
                 ));
             }
@@ -40,6 +41,7 @@ pub(super) fn validate_constraints(
             if clauses.contains_key("REQID")
                 && !relative
                 && !absolute
+                && !clauses.contains_key("TIME")
                 && clauses
                     .get("INTERVAL")
                     .and_then(|value| value.first())
@@ -126,6 +128,12 @@ fn delay_operands(
             }])
         })
         .unwrap_or_else(|| Ok(Vec::new()))?;
+    if let Some(value) = clauses.get("TIME") {
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::StartTime,
+            value: cics_integer_value(value, semantic)?,
+        });
+    }
     if let Some(request_id) = clauses.get("REQID") {
         operands.push(HirCicsNamedOperand {
             name: HirCicsOperandName::ReqId,

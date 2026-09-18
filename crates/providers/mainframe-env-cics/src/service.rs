@@ -6473,6 +6473,118 @@ mod tests {
     }
 
     #[test]
+    fn packed_delay_time_uses_absolute_deadlines_and_exact_conditions() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        let delay_id = |suffix: u8| {
+            BoundedPayload::new(
+                "mainframe-env.cics.delay-id@1",
+                format!("{}:{suffix}", invocation.run_unit_id).into_bytes(),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+
+        let future = request(
+            CicsOperation::Delay,
+            BTreeMap::from([
+                ("DELAY.ID".into(), delay_id(70)),
+                ("TIME".into(), cics_decimal(130_000)),
+                ("REQID".into(), cics_literal(b"CLOCK001")),
+            ]),
+            70,
+        );
+        assert_eq!(
+            service
+                .invoke(&effect(&invocation.run_unit_id, future.clone(), 70), future)
+                .unwrap()
+                .disposition,
+            CicsDisposition::Suspended
+        );
+        assert!(
+            store
+                .claim(
+                    "packed-time-worker",
+                    Some(CICS_DELAY_WORK_GENERATION),
+                    1_504_210,
+                    100,
+                )
+                .unwrap()
+                .is_none()
+        );
+        let work = store
+            .claim(
+                "packed-time-worker",
+                Some(CICS_DELAY_WORK_GENERATION),
+                1_504_211,
+                100,
+            )
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            work.payload,
+            format!("{}:70", invocation.run_unit_id).as_bytes()
+        );
+
+        let expired_request = request(
+            CicsOperation::Delay,
+            BTreeMap::from([
+                ("DELAY.ID".into(), delay_id(71)),
+                ("TIME".into(), cics_decimal(120_000)),
+            ]),
+            71,
+        );
+        let expired = service
+            .invoke(
+                &effect(&invocation.run_unit_id, expired_request.clone(), 71),
+                expired_request,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                expired.disposition,
+                expired.condition.as_str(),
+                expired.response
+            ),
+            (CicsDisposition::Ignored, "EXPIRED", 31)
+        );
+
+        for (value, response2) in [(1_000_000, 4), (126_000, 5), (123_460, 6)] {
+            let mut invalid = request(
+                CicsOperation::Delay,
+                BTreeMap::from([
+                    ("DELAY.ID".into(), delay_id(response2 as u8 + 72)),
+                    ("TIME".into(), cics_decimal(value)),
+                ]),
+                72 + u64::try_from(response2).unwrap(),
+            );
+            invalid.condition_policy = CicsConditionPolicy::Respond {
+                response_field: "RESP".into(),
+                response2_field: Some("RESP2".into()),
+            };
+            let response = service
+                .invoke(
+                    &effect(
+                        &invocation.run_unit_id,
+                        invalid.clone(),
+                        72 + u64::try_from(response2).unwrap(),
+                    ),
+                    invalid,
+                )
+                .unwrap();
+            assert_eq!((response.response, response.response2), (16, response2));
+        }
+    }
+
+    #[test]
     fn named_delay_cancel_is_other_task_only_and_returns_response2_23() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = CicsService::open_with_runtime(

@@ -728,7 +728,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Assign => &["RESP", "RESP2"],
         HirCicsOperation::Cancel => &["REQID", "TRANSID", "RESP", "RESP2"],
         HirCicsOperation::Delay => &[
-            "INTERVAL", "HOURS", "MINUTES", "SECONDS", "REQID", "RESP", "RESP2",
+            "INTERVAL", "TIME", "HOURS", "MINUTES", "SECONDS", "REQID", "RESP", "RESP2",
         ],
         HirCicsOperation::PurgeMessage => &["RESP", "RESP2"],
         HirCicsOperation::Read => &[
@@ -1132,8 +1132,19 @@ fn cics_address_value(
 
 fn cics_integer_value(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsValue> {
     if let [value] = tokens
-        && let Ok(value) = value.parse::<i64>()
+        && let Some(literal) = numeric_literal(value)
+        && literal.scale == 0
     {
+        let magnitude = literal.digits.parse::<i64>().map_err(|_| {
+            ResolutionFailure::Invalid("CICS integer operand is out of range".into())
+        })?;
+        let value = if literal.negative {
+            magnitude.checked_neg().ok_or_else(|| {
+                ResolutionFailure::Invalid("CICS integer operand is out of range".into())
+            })?
+        } else {
+            magnitude
+        };
         return Ok(HirCicsValue::Integer(value));
     }
     let reference = complete_data_reference(tokens, semantic)?;

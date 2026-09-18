@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS DELAY packed `TIME` scheduling for integer constants and
+  packed numeric storage. TIME now remains an input outside FORMATTIME, uses a
+  domain-separated absolute delay identity, returns EXPIRED 31 for an elapsed
+  target, and resumes through the existing durable delay worker path.
+
 - Added typed CICS DELAY `FOR`/`UNTIL` HOURS, MINUTES, and SECONDS with
   literal or numeric-storage components. The provider uses one shared clock
   observation per new cycle, enforces conditional component ranges with INVREQ

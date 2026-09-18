@@ -3511,7 +3511,6 @@ mod tests {
         for command in [
             "DELAY INTERVAL(60)",
             "DELAY INTERVAL(WHEN-X)",
-            "DELAY TIME(0)",
             "DELAY FOR",
             "DELAY HOURS(1)",
             "DELAY FOR UNTIL HOURS(1)",
@@ -3529,7 +3528,7 @@ mod tests {
 
     #[test]
     fn cics_delay_for_until_preserve_literal_and_dynamic_units() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELUNIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 TIME-X PIC S9(9) COMP VALUE 3. PROCEDURE DIVISION. EXEC CICS DELAY FOR HOURS(1) SECONDS(TIME-X) END-EXEC. EXEC CICS DELAY UNTIL MINUTES(759) REQID('UNTIL001') END-EXEC. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELUNIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 TIME-X PIC S9(9) COMP VALUE 3. 01 CLOCK-X PIC S9(6) COMP-3 VALUE 130000. PROCEDURE DIVISION. EXEC CICS DELAY FOR HOURS(1) SECONDS(TIME-X) END-EXEC. EXEC CICS DELAY UNTIL MINUTES(759) REQID('UNTIL001') END-EXEC. EXEC CICS DELAY TIME(124500) END-EXEC. EXEC CICS DELAY TIME(CLOCK-X) REQID('CLOCK001') END-EXEC. STOP RUN.";
         let analysis = analyze(source);
         let hir = analysis
             .hir
@@ -3542,7 +3541,7 @@ mod tests {
                 _ => None,
             })
             .collect::<Vec<_>>();
-        assert_eq!(commands.len(), 2);
+        assert_eq!(commands.len(), 4);
         assert!(commands[0].options.contains(&HirCicsOption::For));
         assert!(commands[1].options.contains(&HirCicsOption::Until));
         assert!(commands[0].operands.iter().any(|operand| {
@@ -3560,6 +3559,19 @@ mod tests {
         assert!(commands[1].operands.iter().any(|operand| {
             operand.name == HirCicsOperandName::Minutes
                 && operand.value == HirCicsValue::Integer(759)
+        }));
+        assert!(commands[2].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::StartTime
+                && operand.value == HirCicsValue::Integer(124_500)
+        }));
+        assert!(commands[3].operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::StartTime,
+                    value: HirCicsValue::Data(reference),
+                } if reference.qualified_name == "CLOCK-X"
+            )
         }));
     }
 

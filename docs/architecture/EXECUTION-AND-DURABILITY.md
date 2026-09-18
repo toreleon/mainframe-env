@@ -295,7 +295,7 @@ Typed zero-delay DELAY is deliberately stateless. Bare DELAY and a
 compile-time literal `INTERVAL(0)` return NORMAL immediately and never create a
 timer row, work item, checkpoint, or suspension. Positive literal packed
 intervals and typed FOR/UNTIL unit forms use the durable path below; they are
-not inferred from this immediate boundary. Dynamic packed intervals, TIME, and
+not inferred from this immediate boundary. Dynamic packed INTERVAL and
 MILLISECS remain rejected before publication.
 
 Positive literal packed `INTERVAL` DELAY uses `cics-delay-v1` provider rows and
@@ -318,8 +318,11 @@ reads. FOR/UNTIL HOURS/MINUTES/SECONDS reuse the same rows after resolving one
 relative or absolute deadline from the durable and host clocks. An already
 elapsed UNTIL target returns EXPIRED 31 through normal condition policy, whose
 default is ignored; invalid components retain INVREQ RESP2 4/5/6. Automatic
-redispatch, packed TIME, MILLISECS, remote routing, PostgreSQL evidence, and
-retention eligibility remain separate obligations.
+redispatch, MILLISECS, remote routing, PostgreSQL evidence, and retention
+eligibility remain separate obligations. Packed TIME shares the absolute path:
+the compiler preserves either an integer constant or packed numeric storage,
+the interpreter emits its canonical decimal value, and the provider retains a
+domain-separated identity plus the resolved deadline before suspension.
 
 An ENQ wait is not a terminal-input handoff. Its execution remains
 `Suspended`, and both the coordinator checkpoint and product continuation stay

@@ -33,6 +33,9 @@ pub(super) fn resolve(
         if name == "ABSTIME" && operation == HirCicsOperation::FormatTime {
             continue;
         }
+        if name == "TIME" && operation != HirCicsOperation::FormatTime {
+            continue;
+        }
         if name == "RIDFLD"
             && !matches!(
                 operation,
