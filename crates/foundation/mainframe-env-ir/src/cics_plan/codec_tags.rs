@@ -43,6 +43,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::PurgeMessage => 33,
         CicsPlanOperation::Start => 34,
         CicsPlanOperation::Retrieve => 35,
+        CicsPlanOperation::Cancel => 36,
     }
 }
 
@@ -84,6 +85,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         33 => Ok(CicsPlanOperation::PurgeMessage),
         34 => Ok(CicsPlanOperation::Start),
         35 => Ok(CicsPlanOperation::Retrieve),
+        36 => Ok(CicsPlanOperation::Cancel),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

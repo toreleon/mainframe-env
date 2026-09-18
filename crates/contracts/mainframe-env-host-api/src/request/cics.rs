@@ -13,6 +13,8 @@ pub enum CicsOperation {
     /// Refresh only the implicit EIB date and time fields.
     AsktimeEib,
     Assign,
+    /// Cancel one unhonored local interval-control START request.
+    Cancel,
     /// Change the issuing CICS task's dispatch priority.
     ChangeTask,
     /// Release one matching task enqueue ownership level.
@@ -70,6 +72,7 @@ impl CicsOperation {
             Self::Asktime => "Asktime",
             Self::AsktimeEib => "AsktimeEib",
             Self::Assign => "Assign",
+            Self::Cancel => "Cancel",
             Self::ChangeTask => "ChangeTask",
             Self::Deq => "Deq",
             Self::Delete => "Delete",
@@ -111,6 +114,7 @@ impl CicsOperation {
         matches!(
             self,
             Self::Delete
+                | Self::Cancel
                 | Self::Deq
                 | Self::Enq
                 | Self::Rewrite
@@ -152,6 +156,7 @@ impl CicsOperation {
             }
             ("ASKTIME", _) => Self::AsktimeEib,
             ("ASSIGN", _) => Self::Assign,
+            ("CANCEL", _) => Self::Cancel,
             ("CHANGE", Some("TASK")) => Self::ChangeTask,
             ("DEQ", _) => Self::Deq,
             ("DELETE", _) => Self::Delete,

@@ -171,7 +171,7 @@ one-to-eight-character request identifier. The version-one payload binds the
 target transaction, issuing principal and run unit, expiration tick, optional
 terminal and originating metadata, bounded data and FMH state, plus canonical
 producer and consumer idempotency identities. Pending, protected-pending,
-ready, and consumed are explicit states. Promotion is ordered by expiration
+ready, consumed, and cancelled are explicit states. Promotion is ordered by expiration
 then request identifier; consumption is one fenced CAS transition and only the
 same canonical consumer request can replay it. The bounded local-data route
 adds one `cics-start-v1` work row for each accepted START record. The core
@@ -183,6 +183,17 @@ row, interval state, and replay receipts share the durable store, so a SQLite
 reopen preserves the producer-to-consumer cycle. Remote routing, terminal and
 origin metadata, protected starts, generated request identifiers, FMH, WAIT,
 SET, and automatic target-task launch remain outside this slice.
+
+Typed local CANCEL requires an explicit REQID and accepts an optional local
+TRANSID solely for routing authorization. It first verifies the matching shared
+work identity, then CAS-transitions only a committed pending record to a
+cancelled replay tombstone and requests cancellation of the queued or claimed
+work. A worker that crossed the claim boundary cannot promote the cancelled
+record. The identical canonical CANCEL request can finish or replay a crash-gap
+cancellation; another request receives NOTFND. Protected-uncommitted, ready,
+consumed, or already-cancelled-by-another-request records are not cancellable.
+The tombstone intentionally defers immediate REQID reuse until the parent
+START/CANCEL lifecycle owns bounded replay retention.
 
 An ENQ wait is not a terminal-input handoff. Its execution remains
 `Suspended`, and both the coordinator checkpoint and product continuation stay

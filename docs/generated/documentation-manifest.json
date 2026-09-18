@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:d5214f68113fd9f1906eabd12e362ae1ba1f760b0fd0e34eff3c596d9265dbb1",
+      "sha256": "sha256:0bda49084e0d8983a36edc1be20664907fcf30945eedade073df2ac6bee5d99e",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -345,7 +345,7 @@
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
       "relative_links": 22,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:99efa5e9dbf18cefd562fe71de0aee7e4ac907c4c9c2f97b912f6fa9c31feb5c",
+      "sha256": "sha256:184afe541cea853983b50cb2d42dc8746ebc9c79b27a4ccaaf6a44c1accacfe2",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -429,7 +429,7 @@
       "path": "docs/architecture/EXECUTION-AND-DURABILITY.md",
       "relative_links": 1,
       "scope": "execution lifecycle, effects, work, checkpoints, and durability",
-      "sha256": "sha256:5de76380dde3a481e5b7829cfc64144951eb2b73eac4159655ac04291abdbbef",
+      "sha256": "sha256:c95e42977925868238752e4490e12e47e2c122904721d28e8c7fba842c831152",
       "status": "Accepted by repository owner",
       "title": "Execution and Durability Architecture",
       "xtask_commands": 0
@@ -545,7 +545,7 @@
       "path": "docs/contracts/EFFECT-CANONICAL-V1.md",
       "relative_links": 0,
       "scope": "canonical persisted host request/result digest representation",
-      "sha256": "sha256:80cb678743dc4a0638b9a299e141374236b4f90db5a0e3c58cc1369e120a8ac4",
+      "sha256": "sha256:e0af42669c375487ba0bc874a75e704c5370e9902bac7f2925744bc8490ec81e",
       "status": "Frozen contract; implementation deviations tracked before 0.9.0",
       "title": "Canonical host effect representation, version 1",
       "xtask_commands": 0
@@ -1062,7 +1062,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:8c318bdd32b9359b49e712a57720684d16222837768dbac7dd9e4c5360ad7c33",
+      "sha256": "sha256:5f25ccd6c80a74a956424fbd0e9a2a942c53d370e000fa99dcb09c4cf56629a0",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },
@@ -1438,7 +1438,7 @@
       "normative": false,
       "path": "docs/runbooks/CAPACITY-AND-RECOVERY.md",
       "relative_links": 2,
-      "sha256": "sha256:4e3a397088dd7050b9d0af639c4ce8b3c7d7ce50149359a994534823302f76e9",
+      "sha256": "sha256:7d9334982ef390cd739ee3362baff9cb7541416fca548109bb695895a73bb733",
       "title": "Capacity and recovery",
       "xtask_commands": 0
     },

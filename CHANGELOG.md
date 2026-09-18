@@ -6,6 +6,13 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added the typed bounded local CICS CANCEL route for unhonored committed START
+  records. Explicit REQID with optional local TRANSID now authorizes the target,
+  atomically tombstones the interval record, cancels queued or claimed shared
+  work, returns exact NOTFND on later requests, replays the original mutation,
+  and survives SQLite reopen. POST, DELAY, SYSID routing, protected-uncommitted
+  START, immediate REQID reuse, and licensed differential remain pending.
+
 - Added the versioned CICS interval START-record authority and the first typed
   local-data START-to-RETRIEVE cycle. The bounded route lowers START and
   RETRIEVE through typed plans, admits due work to the shared durable queue,

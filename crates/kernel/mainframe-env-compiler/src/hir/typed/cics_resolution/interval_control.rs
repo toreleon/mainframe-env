@@ -40,18 +40,36 @@ pub(super) fn operands(
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
     match operation {
+        HirCicsOperation::Cancel => cancel_operands(clauses, semantic),
         HirCicsOperation::Start => start_operands(clauses, semantic),
         HirCicsOperation::Retrieve => retrieve_operands(clauses, semantic),
         _ => Ok(Vec::new()),
     }
 }
 
+fn cancel_operands(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    let mut operands = vec![HirCicsNamedOperand {
+        name: HirCicsOperandName::ReqId,
+        value: bounded_name(&clauses["REQID"], semantic, 8, "CANCEL", "REQID")?,
+    }];
+    if let Some(transaction) = clauses.get("TRANSID") {
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::TransId,
+            value: bounded_name(transaction, semantic, 4, "CANCEL", "TRANSID")?,
+        });
+    }
+    Ok(operands)
+}
+
 fn start_operands(
     clauses: &Clauses,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
-    let transaction = bounded_name(&clauses["TRANSID"], semantic, 4, "TRANSID")?;
-    let request_id = bounded_name(&clauses["REQID"], semantic, 8, "REQID")?;
+    let transaction = bounded_name(&clauses["TRANSID"], semantic, 4, "START", "TRANSID")?;
+    let request_id = bounded_name(&clauses["REQID"], semantic, 8, "START", "REQID")?;
     let HirCicsValue::Data(from) = cics_value(&clauses["FROM"], semantic)? else {
         return Err(ResolutionFailure::Invalid(
             "CICS START FROM requires a data area".into(),
@@ -120,6 +138,7 @@ fn bounded_name(
     tokens: &[String],
     semantic: &SemanticModel,
     max: usize,
+    command: &str,
     label: &str,
 ) -> Resolution<HirCicsValue> {
     let value = cics_value(tokens, semantic)?;
@@ -145,7 +164,7 @@ fn bounded_name(
         Ok(value)
     } else {
         Err(ResolutionFailure::Invalid(format!(
-            "CICS START {label} requires a 1-{max} character name"
+            "CICS {command} {label} requires a 1-{max} character name"
         )))
     }
 }

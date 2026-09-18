@@ -1715,7 +1715,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 38);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 39);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -3724,7 +3724,7 @@ mod tests {
     use mainframe_env_racf::{MemorySecretResolver, RacfService, racf_providers};
     use mainframe_env_store::{MemoryStore, PostgresStateStore, SqliteStateStore};
     use mainframe_env_store_api::{
-        EffectDigestFormat, EffectIntentMetadata, EffectRecord, EffectState,
+        EffectDigestFormat, EffectIntentMetadata, EffectRecord, EffectState, WorkState,
     };
     use mainframe_env_store_api::{ProviderStateMutation, ProviderStateWrite};
     use std::collections::BTreeSet;
@@ -4606,6 +4606,7 @@ mod tests {
             ("ASSIGN", CicsOperation::Assign),
             ("PURGE MESSAGE", CicsOperation::PurgeMessage),
             ("CHANGE TASK", CicsOperation::ChangeTask),
+            ("CANCEL", CicsOperation::Cancel),
             ("DEQ", CicsOperation::Deq),
             ("DELETE", CicsOperation::Delete),
             ("ENDBR", CicsOperation::EndBrowse),
@@ -4651,7 +4652,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 38);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 39);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -4873,6 +4874,174 @@ mod tests {
         }
 
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn interval_cancel_start_is_replay_safe_and_survives_sqlite_reopen() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-cancel-start-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = CicsService::open_with_runtime(
+                authorities(),
+                store.clone(),
+                store.clone(),
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(1_000)),
+            )
+            .unwrap();
+            let (issuer, _) = registered(&service);
+            let start = request(
+                CicsOperation::Start,
+                BTreeMap::from([
+                    ("TRANSID".into(), argument(b"NEXT")),
+                    ("REQID".into(), argument(b"CAN0001")),
+                    ("FROM".into(), argument(b"CANCELME")),
+                    ("INTERVAL".into(), cics_decimal(100)),
+                ]),
+                1,
+            );
+            service
+                .invoke(&effect(&issuer.run_unit_id, start.clone(), 1), start)
+                .unwrap();
+            let cancel = request(
+                CicsOperation::Cancel,
+                BTreeMap::from([
+                    ("REQID".into(), argument(b"CAN0001")),
+                    ("TRANSID".into(), argument(b"NEXT")),
+                ]),
+                2,
+            );
+            let cancelled = service
+                .invoke(
+                    &effect(&issuer.run_unit_id, cancel.clone(), 2),
+                    cancel.clone(),
+                )
+                .unwrap();
+            assert_eq!((cancelled.response, cancelled.response2), (0, 0));
+            assert_eq!(
+                service
+                    .invoke(&effect(&issuer.run_unit_id, cancel.clone(), 2), cancel)
+                    .unwrap(),
+                cancelled
+            );
+            let work = store.get_work("cics-start:CAN0001").unwrap().unwrap();
+            assert_eq!(work.state, WorkState::Cancelled);
+            assert!(work.cancellation_requested);
+        }
+
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = CicsService::open_with_runtime(
+                authorities(),
+                store.clone(),
+                store.clone(),
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(1_000)),
+            )
+            .unwrap();
+            let invocation = invocation_for("cancel-reopen", BTreeMap::new());
+            let session = SessionId::new("cancel-reopen-session", 64).unwrap();
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let mut cancel = request(
+                CicsOperation::Cancel,
+                BTreeMap::from([("REQID".into(), argument(b"CAN0001"))]),
+                3,
+            );
+            cancel.condition_policy = CicsConditionPolicy::Respond {
+                response_field: "RESP".into(),
+                response2_field: Some("RESP2".into()),
+            };
+            let response = service
+                .invoke(&effect(&invocation.run_unit_id, cancel.clone(), 3), cancel)
+                .unwrap();
+            assert_eq!(
+                (
+                    response.condition.as_str(),
+                    response.response,
+                    response.response2
+                ),
+                ("NOTFND", 13, 0)
+            );
+            assert!(
+                store
+                    .claim(
+                        "cancel-worker",
+                        Some(CICS_START_WORK_GENERATION),
+                        100_000,
+                        100
+                    )
+                    .unwrap()
+                    .is_none()
+            );
+        }
+
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn interval_cancel_fences_a_claimed_but_unhonored_start() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (issuer, _) = registered(&service);
+        let start = request(
+            CicsOperation::Start,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"NEXT")),
+                ("REQID".into(), argument(b"CANRACE")),
+                ("FROM".into(), argument(b"RACE")),
+                ("INTERVAL".into(), cics_decimal(0)),
+            ]),
+            1,
+        );
+        service
+            .invoke(&effect(&issuer.run_unit_id, start.clone(), 1), start)
+            .unwrap();
+        let work = store
+            .claim("race-worker", Some(CICS_START_WORK_GENERATION), 1_000, 100)
+            .unwrap()
+            .unwrap();
+        let cancel = request(
+            CicsOperation::Cancel,
+            BTreeMap::from([("REQID".into(), argument(b"CANRACE"))]),
+            2,
+        );
+        service
+            .invoke(&effect(&issuer.run_unit_id, cancel.clone(), 2), cancel)
+            .unwrap();
+        let cancelled = store.get_work(&work.work_id).unwrap().unwrap();
+        assert_eq!(cancelled.state, WorkState::Claimed);
+        assert!(cancelled.cancellation_requested);
+        assert_eq!(
+            service.promote_start_work(&work, 1_000),
+            Err(HostProblem::InfrastructureFailure)
+        );
+        let released = store
+            .release(
+                &work.work_id,
+                work.lease_id.as_deref().unwrap(),
+                work.lease_epoch,
+                1_000,
+                1_001,
+            )
+            .unwrap();
+        assert_eq!(released.state, WorkState::Cancelled);
     }
 
     #[test]

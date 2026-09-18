@@ -18,6 +18,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0009"
     },
     {
+      "operation": "Cancel",
+      "interface": "api",
+      "family": "interval-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0016"
+    },
+    {
       "operation": "ChangeTask",
       "interface": "api",
       "family": "task-control",

@@ -1369,7 +1369,7 @@
       {
         "id": "interval-control",
         "rust_variant": "IntervalControl",
-        "responsibility": "Durable interval START scheduling and RETRIEVE record semantics."
+        "responsibility": "Durable interval START scheduling, cancellation, and RETRIEVE record semantics."
       }
     ],
     "operations": [

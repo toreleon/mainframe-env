@@ -65,7 +65,7 @@ keys contain either APPLID/SYSID or ENQSCOPE and are not compatible with the
 single-region key profile.
 
 Back up `cics-interval-start-v1` with the CICS provider state. Do not delete or
-edit pending, protected-pending, ready, or consumed rows manually. A row binds
+edit pending, protected-pending, ready, consumed, or cancelled rows manually. A row binds
 its REQID to the producing effect and canonical request; replacing it can turn
 a duplicate START into a false replay. A consumed row retains the exact
 consumer identity needed to close the result-journal crash gap and is not yet
@@ -81,6 +81,15 @@ the shared workers reclaim an expired lease normally. Never promote the
 provider row by hand or enqueue a replacement with a different execution,
 deadline, or payload identity. Current workers make the record retrievable but
 do not launch the target transaction automatically.
+
+A typed local CANCEL leaves the interval row as a cancelled replay tombstone
+and calls the work store's cancellation transition. Queued work becomes
+cancelled immediately; claimed work retains its lease with
+`cancellation_requested=true`, and the failed promotion/release path observes
+that flag. Restore the interval and work rows together. Deleting the tombstone
+can turn a crash-gap retry into NOTFND, while requeueing canceled work creates a
+permanent failed-promotion loop. Immediate reuse of a cancelled REQID is not
+supported by this bounded slice.
 
 Back up `cics-session` rows containing task association or HANDLE state before
 enabling typed `SET ASSOCIATION USERCORRDATA` or durable handlers. Current

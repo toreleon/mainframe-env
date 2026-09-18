@@ -9,6 +9,7 @@ mod browse;
 mod codec_tags;
 mod file_mutation;
 mod handle_abend;
+mod interval_control;
 mod output_shape;
 mod program_control;
 mod queue_control;
@@ -72,6 +73,8 @@ pub enum CicsPlanOperation {
     FormatTime,
     /// Change the issuing task's dispatch priority and optionally yield.
     ChangeTask,
+    /// Cancel one unhonored local interval-control START request.
+    Cancel,
     /// Release one task-owned enqueue.
     Deq,
     /// Acquire one task-owned enqueue.
@@ -760,44 +763,8 @@ fn validate_operation_shape(
         CicsPlanOperation::PurgeMessage => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
-        CicsPlanOperation::Start => {
-            let allowed = BTreeSet::from([
-                CicsOperandName::TransId,
-                CicsOperandName::ReqId,
-                CicsOperandName::From,
-                CicsOperandName::Length,
-                CicsOperandName::Interval,
-                CicsOperandName::StartTime,
-            ]);
-            !inputs.is_subset(&allowed)
-                || !inputs.contains(&CicsOperandName::TransId)
-                || !inputs.contains(&CicsOperandName::ReqId)
-                || !inputs.contains(&CicsOperandName::From)
-                || inputs.contains(&CicsOperandName::Interval)
-                    && inputs.contains(&CicsOperandName::StartTime)
-                || plan.operands.iter().any(|operand| {
-                    matches!(
-                        operand.name,
-                        CicsOperandName::Length
-                            | CicsOperandName::Interval
-                            | CicsOperandName::StartTime
-                    ) && matches!(operand.value, CicsOperandValue::Literal(_))
-                })
-                || scheduling_options
-                || outputs.contains(&CicsOutputName::Into)
-        }
-        CicsPlanOperation::Retrieve => {
-            *inputs != BTreeSet::from([CicsOperandName::Length])
-                || !outputs.contains(&CicsOutputName::Into)
-                || !outputs.contains(&CicsOutputName::Length)
-                || match operand_value(plan, CicsOperandName::Length) {
-                    Some(CicsOperandValue::Storage(slot)) => {
-                        output_target(&plan.outputs, CicsOutputName::Length) != Some(slot)
-                    }
-                    Some(_) => true,
-                    None => true,
-                }
-                || scheduling_options
+        CicsPlanOperation::Cancel | CicsPlanOperation::Start | CicsPlanOperation::Retrieve => {
+            interval_control::invalid_shape(plan, inputs, outputs, scheduling_options)
         }
     };
     if unexpected_output
@@ -810,7 +777,10 @@ fn validate_operation_shape(
     }
 }
 
-fn operand_value(plan: &CicsEffectPlan, name: CicsOperandName) -> Option<&CicsOperandValue> {
+pub(super) fn operand_value(
+    plan: &CicsEffectPlan,
+    name: CicsOperandName,
+) -> Option<&CicsOperandValue> {
     plan.operands
         .iter()
         .find(|operand| operand.name == name)
@@ -841,7 +811,10 @@ fn validate_condition(
     }
 }
 
-fn output_target(outputs: &[CicsOutputBinding], name: CicsOutputName) -> Option<&CicsStorageSlot> {
+pub(super) fn output_target(
+    outputs: &[CicsOutputBinding],
+    name: CicsOutputName,
+) -> Option<&CicsStorageSlot> {
     outputs
         .iter()
         .find(|output| output.name == name)

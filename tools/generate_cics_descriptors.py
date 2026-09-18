@@ -93,6 +93,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("AsktimeEib", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0009"),
     ("Asktime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0010"),
     ("Assign", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0011"),
+    ("Cancel", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0016"),
     ("ChangeTask", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0022"),
     ("Delete", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0040"),
     ("Deq", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0050"),
@@ -361,6 +362,7 @@ POLICY_BINDINGS = {
 TYPED_RUNTIME_OPERATIONS = frozenset(
     {
         "Abend",
+        "Cancel",
         "ChangeTask",
         "AddressSet",
         "Asktime",
@@ -530,6 +532,7 @@ TYPED_RUNTIME_IR_EFFECTS = {
     ),
     "Assign": frozenset({"memory-write", "condition", "transaction"}),
     "PurgeMessage": frozenset({"memory-write", "condition", "transaction"}),
+    "Cancel": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "PopHandle": frozenset({"memory-write", "condition"}),
     "PushHandle": frozenset({"memory-write", "condition"}),
     "Read": frozenset(
@@ -737,6 +740,7 @@ def _load_typed_execution_registrations(
     if [row["operation"] for row in normalized] != [
         "AddressSet",
         "AsktimeEib",
+        "Cancel",
         "ChangeTask",
         "Deq",
         "Enq",
@@ -1040,6 +1044,7 @@ def load_catalog(
                 "ChangeTask",
                 "AddressSet",
                 "AsktimeEib",
+                "Cancel",
                 "Deq",
                 "Enq",
                 "HandleAid",
@@ -3353,8 +3358,8 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
         for row in catalog["_runtime_operations"]
         if row["interface"] == "api"
     }
-    if len(existing_runtime) != 36:
-        raise DescriptorError("CICS application runtime set must remain exactly 36 rows")
+    if len(existing_runtime) != 37:
+        raise DescriptorError("CICS application runtime set must remain exactly 37 rows")
 
     loaded_batches = []
     for batch_id, start, end, projection_path, review_path in CONTRACT_BATCHES:
@@ -3608,12 +3613,12 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
     if (
         len(registry_rows) != 263
         or len(set(handler_ids)) != 263
-        or len(typed_rows) != 36
+        or len(typed_rows) != 37
         or len(legacy_rows) != 0
         or {row["runtime_operation"] for row in typed_rows}
         != TYPED_RUNTIME_OPERATIONS
-        or len(advertised_rows) != 36
-        or len(unready_rows) != 227
+        or len(advertised_rows) != 37
+        or len(unready_rows) != 226
         or any(row["unready_result"] != "explicit-unsupported" for row in unready_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in typed_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in legacy_rows)

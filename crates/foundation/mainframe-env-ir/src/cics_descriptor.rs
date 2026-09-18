@@ -178,6 +178,14 @@ const RETRIEVE_EFFECTS: &[Effect] = &[
     Effect::Condition,
     Effect::Transaction,
 ];
+const CANCEL_EFFECTS: &[Effect] = &[
+    Effect::MemoryRead,
+    Effect::MemoryWrite,
+    Effect::Security,
+    Effect::Audit,
+    Effect::Condition,
+    Effect::Transaction,
+];
 
 /// Static executable facts owned by the typed CICS dialect.
 ///
@@ -532,7 +540,7 @@ pub fn cics_application_registry_for_runtime_operation(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 36] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 37] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -821,6 +829,14 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 36] = [
         effects: RETRIEVE_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Cancel,
+        namespace: "cics.interval",
+        name: "cancel",
+        major: 1,
+        effects: CANCEL_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
 ];
 
 /// Resolves the executable descriptor for a decoded CICS plan operation.
@@ -865,6 +881,7 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::PurgeMessage => &CICS_EXECUTABLE_DESCRIPTORS[33],
         CicsPlanOperation::Start => &CICS_EXECUTABLE_DESCRIPTORS[34],
         CicsPlanOperation::Retrieve => &CICS_EXECUTABLE_DESCRIPTORS[35],
+        CicsPlanOperation::Cancel => &CICS_EXECUTABLE_DESCRIPTORS[36],
     }
 }
 
@@ -926,7 +943,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 36);
+        assert_eq!(typed.len(), 37);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -944,7 +961,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 227);
+        assert_eq!(unready.len(), 226);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -1181,6 +1198,7 @@ mod tests {
                 CicsPlanOperation::Suspend,
                 CicsPlanOperation::Start,
                 CicsPlanOperation::Retrieve,
+                CicsPlanOperation::Cancel,
             ])
         );
         assert_eq!(

@@ -152,6 +152,7 @@ pub enum HirCicsOperation {
     Asktime,
     AsktimeEib,
     FormatTime,
+    Cancel,
     ChangeTask,
     Deq,
     Enq,
@@ -3215,6 +3216,48 @@ mod tests {
                     .public_message()
                     .contains(deferred.split('(').next().unwrap())
             }));
+        }
+    }
+
+    #[test]
+    fn cics_cancel_lowers_only_the_bounded_local_start_form() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CANCELL. DATA DIVISION. WORKING-STORAGE SECTION. 01 REQ-X PIC X(8) VALUE 'REQ0001'. 01 TRANS-X PIC X(4) VALUE 'NEXT'. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS CANCEL REQID(REQ-X) TRANSID(TRANS-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("CANCEL: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed CANCEL");
+        assert_eq!(command.operation, HirCicsOperation::Cancel);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::ReqId
+                && matches!(
+                    &operand.value,
+                    HirCicsValue::Data(reference) if reference.qualified_name == "REQ-X"
+                )
+        }));
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::TransId
+                && matches!(
+                    &operand.value,
+                    HirCicsValue::Data(reference) if reference.qualified_name == "TRANS-X"
+                )
+        }));
+
+        for command in [
+            "CANCEL TRANSID('NEXT')",
+            "CANCEL REQID('REQ0001') SYSID('R001')",
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CANBAD. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
         }
     }
 

@@ -4,6 +4,8 @@
 //! and RETRIEVE storage bindings. Protected-record release and bounded due scans
 //! remain internal foundations for later interval-control slices.
 
+mod cancel;
+
 use super::super::{CicsLimits, CicsReplayClock, CicsService, Run, field, store_error};
 use crate::{CicsIntervalMode, CicsIntervalTime};
 use mainframe_env_execution_api::{
@@ -163,6 +165,7 @@ pub(in crate::service) fn invoke(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     match request.operation {
+        CicsOperation::Cancel => cancel::invoke(service, run, request),
         CicsOperation::Start => start(service, run, request),
         CicsOperation::Retrieve => retrieve(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
@@ -494,6 +497,7 @@ pub(in crate::service) enum IntervalStartState {
     ProtectedPending,
     Ready,
     Consumed,
+    Cancelled,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -835,8 +839,12 @@ fn validate(record: &IntervalStartRecord, limits: CicsLimits) -> Result<(), Host
         record.consumer_effect_key.as_deref(),
         record.consumer_request_digest,
     ) {
-        (IntervalStartState::Consumed, Some(key), Some(_)) => checked_effect_key(key),
-        (IntervalStartState::Consumed, _, _) => Err(HostProblem::Malformed),
+        (IntervalStartState::Consumed | IntervalStartState::Cancelled, Some(key), Some(_)) => {
+            checked_effect_key(key)
+        }
+        (IntervalStartState::Consumed | IntervalStartState::Cancelled, _, _) => {
+            Err(HostProblem::Malformed)
+        }
         (_, None, None) => Ok(()),
         _ => Err(HostProblem::Malformed),
     }
@@ -894,6 +902,7 @@ fn encode(record: &IntervalStartRecord, limits: CicsLimits) -> Result<Vec<u8>, H
         IntervalStartState::ProtectedPending => 2,
         IntervalStartState::Ready => 3,
         IntervalStartState::Consumed => 4,
+        IntervalStartState::Cancelled => 5,
     });
     field(&mut out, record.producer_effect_key.as_bytes())?;
     out.extend_from_slice(&record.producer_request_digest);
@@ -934,6 +943,7 @@ fn decode(
             2 => IntervalStartState::ProtectedPending,
             3 => IntervalStartState::Ready,
             4 => IntervalStartState::Consumed,
+            5 => IntervalStartState::Cancelled,
             _ => return Err(HostProblem::InfrastructureFailure),
         },
         producer_effect_key: reader.text(InvocationLimits::default().max_binding_bytes)?,
