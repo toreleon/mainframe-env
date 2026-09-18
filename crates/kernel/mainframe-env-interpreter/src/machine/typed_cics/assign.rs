@@ -65,6 +65,7 @@ pub(super) fn validate_output(
         "LDCMNEM" | "PARTNPAGE" => Some(2),
         "PARTNSET" => Some(6),
         "PROCESS" => Some(36),
+        "TNADDR" => Some(39),
         _ => None,
     };
     if exact_length.is_some_and(|expected| layout.length != expected) {

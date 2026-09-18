@@ -115,10 +115,12 @@ pub(in crate::service) fn assign(
     let terminal_identity_requested = ["FACILITY", "NETNAME"]
         .iter()
         .any(|name| request.arguments.contains_key(*name));
+    let terminal_address_requested = request.arguments.contains_key("TNADDR");
     let terminal_required = screen_requested
         || terminal_indicator_requested
         || input_partition_requested
         || terminal_identity_requested
+        || terminal_address_requested
         || request.arguments.contains_key("PARTNSET")
         || request.arguments.contains_key("TERMPRIORITY")
         || map_geometry_requested;
@@ -208,7 +210,12 @@ pub(in crate::service) fn assign(
             ]
             .iter()
             .any(|name| request.arguments.contains_key(*name)));
-    if dpl && request.arguments.contains_key("NETNAME") && !dpl_prohibited {
+    if dpl
+        && ["NETNAME", "TNADDR"]
+            .iter()
+            .any(|name| request.arguments.contains_key(*name))
+        && !dpl_prohibited
+    {
         return Err(HostProblem::InfrastructureFailure);
     }
     let mut response = if dpl_prohibited
@@ -391,6 +398,11 @@ pub(in crate::service) fn assign(
             netname.resize(8, b' ');
             response.outputs.insert("NETNAME".into(), bounded(netname)?);
         }
+    }
+    if dimensions.is_some() && request.arguments.contains_key("TNADDR") {
+        response
+            .outputs
+            .insert("TNADDR".into(), bounded(vec![b' '; 39])?);
     }
     if !dpl_prohibited && request.arguments.contains_key("FCI") {
         response
@@ -732,6 +744,7 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "INPARTN",
         "FACILITY",
         "NETNAME",
+        "TNADDR",
     ];
     if request.arguments.len() > 16
         || request.arguments.iter().any(|(name, value)| {

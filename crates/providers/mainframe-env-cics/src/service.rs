@@ -7832,6 +7832,34 @@ mod tests {
         ] {
             assert!(!no_terminal.outputs.contains_key(name));
         }
+        let mut no_terminal_address = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("APPLID".into(), argument(b"APP-OUT")),
+                ("TNADDR".into(), argument(b"TN-ADDRESS-OUT")),
+            ]),
+            128,
+        );
+        no_terminal_address.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let no_terminal_address = service
+            .invoke(
+                &effect(&invocation.run_unit_id, no_terminal_address.clone(), 128),
+                no_terminal_address,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                no_terminal_address.condition.as_str(),
+                no_terminal_address.response,
+                no_terminal_address.response2,
+            ),
+            ("INVREQ", 16, 5)
+        );
+        assert_eq!(no_terminal_address.outputs["APPLID"].bytes(), b"MEAPPL");
+        assert!(!no_terminal_address.outputs.contains_key("TNADDR"));
         for (offset, name) in [
             "APLKYBD",
             "APLTEXT",
@@ -7958,6 +7986,7 @@ mod tests {
             BTreeMap::from([
                 ("FACILITY".into(), argument(b"FACILITY-OUT")),
                 ("NETNAME".into(), argument(b"NETWORK-NAME-OUT")),
+                ("TNADDR".into(), argument(b"TN-ADDRESS-OUT")),
             ]),
             204,
         );
@@ -7973,6 +8002,7 @@ mod tests {
             .unwrap();
         assert_eq!(terminal_identity.outputs["FACILITY"].bytes(), b"T000");
         assert_eq!(terminal_identity.outputs["NETNAME"].bytes(), b"T000    ");
+        assert_eq!(terminal_identity.outputs["TNADDR"].bytes(), &[b' '; 39]);
         let second_terminal_invocation =
             invocation_for("assign-capabilities-second", BTreeMap::new());
         let second_terminal_session = SessionId::new("assign-capabilities-second", 64).unwrap();
@@ -8612,15 +8642,22 @@ mod tests {
             assert!(!no_bms_overflow.outputs.contains_key(name));
         }
 
-        let unavailable_netname = request(
+        let unavailable_remote_terminal = request(
             CicsOperation::Assign,
-            BTreeMap::from([("NETNAME".into(), argument(b"NETWORK-NAME-OUT"))]),
+            BTreeMap::from([
+                ("NETNAME".into(), argument(b"NETWORK-NAME-OUT")),
+                ("TNADDR".into(), argument(b"TN-ADDRESS-OUT")),
+            ]),
             67,
         );
         assert_eq!(
             service.invoke(
-                &effect(&invocation.run_unit_id, unavailable_netname.clone(), 67),
-                unavailable_netname,
+                &effect(
+                    &invocation.run_unit_id,
+                    unavailable_remote_terminal.clone(),
+                    67,
+                ),
+                unavailable_remote_terminal,
             ),
             Err(HostProblem::InfrastructureFailure)
         );

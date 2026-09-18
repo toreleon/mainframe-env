@@ -242,7 +242,7 @@ is empty: local purge succeeds idempotently without changing the already
 displayed screen or current map. DPL use returns `INVREQ` 16/200. Deleting a
 nonempty accumulated message and surfacing temporary-storage `TSIOERR` remain
 unready until that logical-message authority exists.
-The typed ASSIGN subset carries each of its 91 admitted context values as a
+The typed ASSIGN subset carries each of its 92 admitted context values as a
 pre-resolved output binding under one bounded output-name authority. It retains
 the existing 16-option maximum, exact receiver checks, partial-INVREQ behavior,
 local/DPL matrix, EIBFN and provider semantics without carrying source command
@@ -273,7 +273,10 @@ allocate a durable unique four-character virtual-terminal identifier;
 padding the same name to eight bytes. Local nonterminal use returns 16/5,
 FACILITY is DPL-prohibited at 16/200, and DPL NETNAME fails closed until remote
 terminal identity is propagated. Historical sessions without an identifier
-remain readable but do not acquire a fabricated one. The other 22 generated
+remain readable but do not acquire a fabricated one. Because no client network
+endpoint is retained, local `TNADDR` returns the source-defined 39 blanks for
+an unresolved address; nonterminal use returns 16/5 and DPL fails closed until
+remote endpoint context exists. The other 21 generated
 ASSIGN semantic options remain compiler rejections until
 their contexts are implemented.
 The legacy route admits only the source-valid option subset whose behavior is

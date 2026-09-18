@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `ASSIGN TNADDR` for an owned local terminal. Because the
+  runtime deliberately retains no client network endpoint, the source-defined
+  unresolved-address value is 39 blanks; local nonterminal use returns 16/5,
+  and DPL fails closed until remote endpoint context exists. Append-only output
+  tag 109 preserves existing plans.
+
 - Added durable four-character virtual-terminal identities and typed CICS
   `ASSIGN FACILITY`/`NETNAME`. New terminal sessions allocate unique active
   identifiers such as `T000`; NETNAME follows the pinned default to that name

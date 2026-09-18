@@ -11784,11 +11784,11 @@ mod tests {
             )
             .replace(
                 "01 INITPARM-X PIC X(60) VALUE ALL 'Z'.",
-                "01 FACILITY-X PIC X(4) VALUE 'ZZZZ'.\n01 NETWORK-NAME-X PIC X(8) VALUE ALL 'Z'.\n01 INVOKING-PROGRAM-X PIC X(8) VALUE ALL 'Z'.\n01 RETURN-PROGRAM-X PIC X(8) VALUE ALL 'Z'.\n01 INPUT-PARTITION-X PIC X(2) VALUE 'ZZ'.\n01 INPUT-PARTITION-RESP-X PIC S9(9) COMP.\n01 INPUT-PARTITION-RESP2-X PIC S9(9) COMP.\n01 INITPARM-X PIC X(60) VALUE ALL 'Z'.",
+                "01 FACILITY-X PIC X(4) VALUE 'ZZZZ'.\n01 NETWORK-NAME-X PIC X(8) VALUE ALL 'Z'.\n01 TN-ADDRESS-X PIC X(39) VALUE ALL 'Z'.\n01 INVOKING-PROGRAM-X PIC X(8) VALUE ALL 'Z'.\n01 RETURN-PROGRAM-X PIC X(8) VALUE ALL 'Z'.\n01 INPUT-PARTITION-X PIC X(2) VALUE 'ZZ'.\n01 INPUT-PARTITION-RESP-X PIC S9(9) COMP.\n01 INPUT-PARTITION-RESP2-X PIC S9(9) COMP.\n01 INITPARM-X PIC X(60) VALUE ALL 'Z'.",
             )
             .replace(
                 "EXEC CICS ASSIGN INITPARM(INITPARM-X)",
-                "EXEC CICS ASSIGN FACILITY(FACILITY-X) NETNAME(NETWORK-NAME-X) INVOKINGPROG(INVOKING-PROGRAM-X) RETURNPROG(RETURN-PROGRAM-X) INITPARM(INITPARM-X)",
+                "EXEC CICS ASSIGN FACILITY(FACILITY-X) NETNAME(NETWORK-NAME-X) TNADDR(TN-ADDRESS-X) INVOKINGPROG(INVOKING-PROGRAM-X) RETURNPROG(RETURN-PROGRAM-X) INITPARM(INITPARM-X)",
             )
             .replace(
                 "01 PRIORITY-X PIC S9(4) COMP VALUE 200.",
@@ -12131,6 +12131,10 @@ mod tests {
             &[0; 2]
         );
         assert_eq!(restored.variable("TWA-LENGTH-X").unwrap().bytes(), &[0; 2]);
+        assert_eq!(
+            restored.variable("TN-ADDRESS-X").unwrap().bytes(),
+            &[b' '; 39]
+        );
         assert_eq!(restored.variable("USER-X").unwrap().bytes(), b"IBMUSER ");
         assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0; 4]);
         assert_eq!(restored.variable("RESP2-X").unwrap().bytes(), &[0; 4]);
