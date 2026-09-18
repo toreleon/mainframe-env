@@ -287,6 +287,7 @@ pub(super) fn execute(
                         | CicsOperandName::Hours
                         | CicsOperandName::Minutes
                         | CicsOperandName::Seconds
+                        | CicsOperandName::Milliseconds
                 ) =>
             {
                 (

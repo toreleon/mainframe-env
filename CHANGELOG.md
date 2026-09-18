@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS DELAY `FOR MILLISECS` as a literal or resolved numeric
+  storage value, alone or with HOURS/MINUTES/SECONDS. The shared interval value
+  now retains millisecond precision, enforces pure/combined bounds with INVREQ
+  RESP2 22, and returns EXPIRED for source-defined sub-50 ms delays.
+
 - Added typed CICS DELAY packed `TIME` scheduling for integer constants and
   packed numeric storage. TIME now remains an input outside FORMATTIME, uses a
   domain-separated absolute delay identity, returns EXPIRED 31 for an elapsed

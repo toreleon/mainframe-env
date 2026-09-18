@@ -11123,7 +11123,7 @@ mod tests {
     fn compiled_dynamic_for_delay_suspends_promotes_and_resumes() {
         let artifact = published_source_fixture(
             "DELAY1",
-            "IDENTIFICATION DIVISION.\nPROGRAM-ID. DELAY1.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DONE-X PIC X VALUE '0'.\n01 TIME-X PIC S9(9) COMP VALUE 1.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS DELAY FOR SECONDS(TIME-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE '1' TO DONE-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. DELAY1.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DONE-X PIC X VALUE '0'.\n01 TIME-X PIC S9(9) COMP VALUE 1.\n01 MS-X PIC S9(9) COMP VALUE 250.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS DELAY FOR SECONDS(TIME-X) MILLISECS(MS-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE '1' TO DONE-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
         );
         let artifact_ref = ArtifactRef::new(
             format!("sha256:{:x}", Sha256::digest(artifact.payload())),
@@ -11202,7 +11202,7 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
-        clock.advance(1_000);
+        clock.advance(1_250);
         let work = server
             .claim_jes_work("delay-product-worker")
             .unwrap()
@@ -11211,7 +11211,7 @@ mod tests {
         let outcome = server.process_claimed_jes_work(&work).unwrap();
         server.finish_claimed_jes_work(&work, Ok(outcome)).unwrap();
         server
-            .run_online_exchange(&session, &principal, "DELAY1", 1_100)
+            .run_online_exchange(&session, &principal, "DELAY1", 1_350)
             .unwrap();
         let continuation = server
             .online_machine_continuation(&session)
@@ -11229,7 +11229,7 @@ mod tests {
         assert_eq!(
             server
                 .cics
-                .terminal_run_trace(&session, &principal, 1_100)
+                .terminal_run_trace(&session, &principal, 1_350)
                 .unwrap()
                 .iter()
                 .filter(|entry| entry.operation == CicsOperation::Delay)

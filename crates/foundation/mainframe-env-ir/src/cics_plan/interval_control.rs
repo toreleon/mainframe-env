@@ -26,11 +26,13 @@ pub(super) fn invalid_shape(
                 CicsOperandName::Hours,
                 CicsOperandName::Minutes,
                 CicsOperandName::Seconds,
+                CicsOperandName::Milliseconds,
             ]);
             let components = [
                 CicsOperandName::Hours,
                 CicsOperandName::Minutes,
                 CicsOperandName::Seconds,
+                CicsOperandName::Milliseconds,
             ]
             .into_iter()
             .filter(|name| inputs.contains(name))
@@ -43,6 +45,8 @@ pub(super) fn invalid_shape(
             !inputs.is_subset(&allowed)
                 || schedules > 1
                 || (components > 0) != (explicit_modes == 1)
+                || inputs.contains(&CicsOperandName::Milliseconds)
+                    && !plan.options.contains(&CicsPlanOption::For)
                 || plan.operands.iter().any(|operand| {
                     match operand.name {
                         CicsOperandName::Interval => {
@@ -58,7 +62,8 @@ pub(super) fn invalid_shape(
                         ),
                         CicsOperandName::Hours
                         | CicsOperandName::Minutes
-                        | CicsOperandName::Seconds => !matches!(
+                        | CicsOperandName::Seconds
+                        | CicsOperandName::Milliseconds => !matches!(
                             operand.value,
                             CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
                         ),

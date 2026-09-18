@@ -203,6 +203,7 @@ impl PlanContext<'_> {
                 HirCicsOperandName::Hours => CicsOperandName::Hours,
                 HirCicsOperandName::Minutes => CicsOperandName::Minutes,
                 HirCicsOperandName::Seconds => CicsOperandName::Seconds,
+                HirCicsOperandName::Milliseconds => CicsOperandName::Milliseconds,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {

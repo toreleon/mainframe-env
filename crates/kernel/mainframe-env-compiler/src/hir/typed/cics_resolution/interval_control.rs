@@ -14,7 +14,7 @@ pub(super) fn validate_constraints(
         HirCicsOperation::Delay => {
             let relative = options.iter().any(|option| option == "FOR");
             let absolute = options.iter().any(|option| option == "UNTIL");
-            let units = ["HOURS", "MINUTES", "SECONDS"]
+            let units = ["HOURS", "MINUTES", "SECONDS", "MILLISECS"]
                 .into_iter()
                 .any(|name| clauses.contains_key(name));
             let schedules = usize::from(clauses.contains_key("INTERVAL"))
@@ -25,6 +25,11 @@ pub(super) fn validate_constraints(
                 return Err(ResolutionFailure::Invalid(
                     "CICS DELAY accepts one INTERVAL, TIME, or FOR/UNTIL explicit-unit schedule"
                         .into(),
+                ));
+            }
+            if absolute && clauses.contains_key("MILLISECS") {
+                return Err(ResolutionFailure::Invalid(
+                    "CICS DELAY MILLISECS is valid only with FOR".into(),
                 ));
             }
             if clauses.get("INTERVAL").is_some_and(|value| {
@@ -144,6 +149,7 @@ fn delay_operands(
         ("HOURS", HirCicsOperandName::Hours),
         ("MINUTES", HirCicsOperandName::Minutes),
         ("SECONDS", HirCicsOperandName::Seconds),
+        ("MILLISECS", HirCicsOperandName::Milliseconds),
     ] {
         if let Some(value) = clauses.get(clause) {
             operands.push(HirCicsNamedOperand {

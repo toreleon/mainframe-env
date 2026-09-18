@@ -216,11 +216,11 @@ pub enum CicsOperandName {
     Interval,
     /// Packed `TIME(...)` absolute expiration.
     StartTime,
-    /// `USERID(...)` authority selected for a started task.
     UserId,
     Hours,
     Minutes,
     Seconds,
+    Milliseconds,
 }
 
 /// Literal bytes or a runtime read from resolved storage.
@@ -1333,6 +1333,8 @@ mod tests {
         assert_eq!(operand_from_tag(34), Ok(CicsOperandName::Minutes));
         assert_eq!(operand_tag(CicsOperandName::Seconds), 35);
         assert_eq!(operand_from_tag(35), Ok(CicsOperandName::Seconds));
+        assert_eq!(operand_tag(CicsOperandName::Milliseconds), 36);
+        assert_eq!(operand_from_tag(36), Ok(CicsOperandName::Milliseconds));
         assert_eq!(output_tag(CicsOutputName::Length), 91);
         assert_eq!(output_from_tag(91), Ok(CicsOutputName::Length));
         assert_eq!(output_tag(CicsOutputName::SetPointer), 95);
@@ -2262,6 +2264,19 @@ mod tests {
         }];
         let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
         assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
+
+        plan.operands = vec![CicsNamedOperand {
+            name: CicsOperandName::Milliseconds,
+            value: CicsOperandValue::Storage(slot(3, "DELAY.MILLISECONDS")),
+        }];
+        plan.options.insert(CicsPlanOption::For);
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
+        plan.options = BTreeSet::from([CicsPlanOption::Until]);
+        assert_eq!(
+            encode_cics_effect_plan(&plan, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
     }
 
     #[test]

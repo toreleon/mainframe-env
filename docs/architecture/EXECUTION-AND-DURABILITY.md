@@ -296,7 +296,7 @@ compile-time literal `INTERVAL(0)` return NORMAL immediately and never create a
 timer row, work item, checkpoint, or suspension. Positive literal packed
 intervals and typed FOR/UNTIL unit forms use the durable path below; they are
 not inferred from this immediate boundary. Dynamic packed INTERVAL and
-MILLISECS remain rejected before publication.
+remote forms remain rejected before publication.
 
 Positive literal packed `INTERVAL` DELAY uses `cics-delay-v1` provider rows and
 work generation. A hidden task/run-unit plus statement-position identity keeps
@@ -317,9 +317,12 @@ cancel queued or claimed work. Version-two rows retain strict version-one
 reads. FOR/UNTIL HOURS/MINUTES/SECONDS reuse the same rows after resolving one
 relative or absolute deadline from the durable and host clocks. An already
 elapsed UNTIL target returns EXPIRED 31 through normal condition policy, whose
-default is ignored; invalid components retain INVREQ RESP2 4/5/6. Automatic
-redispatch, MILLISECS, remote routing, PostgreSQL evidence, and retention
-eligibility remain separate obligations. Packed TIME shares the absolute path:
+default is ignored; invalid components retain INVREQ RESP2 4/5/6. FOR
+MILLISECS extends the same value with an exact millisecond remainder: pure
+values admit 0–359,999,999, combined values admit 0–999, and sub-50 ms delays
+return EXPIRED before state. Invalid milliseconds return RESP2 22. Automatic
+redispatch, remote routing, PostgreSQL evidence, and retention eligibility
+remain separate obligations. Packed TIME shares the absolute path:
 the compiler preserves either an integer constant or packed numeric storage,
 the interpreter emits its canonical decimal value, and the provider retains a
 domain-separated identity plus the resolved deadline before suspension.

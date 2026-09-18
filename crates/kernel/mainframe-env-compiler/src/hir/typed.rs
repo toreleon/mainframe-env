@@ -227,6 +227,7 @@ pub enum HirCicsOperandName {
     Hours,
     Minutes,
     Seconds,
+    Milliseconds,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -3515,7 +3516,6 @@ mod tests {
             "DELAY HOURS(1)",
             "DELAY FOR UNTIL HOURS(1)",
             "DELAY INTERVAL(1) FOR HOURS(1)",
-            "DELAY FOR MILLISECS(1)",
             "DELAY REQID('WAIT0001')",
             "DELAY INTERVAL(0) REQID('WAIT0001')",
         ] {
@@ -3528,7 +3528,7 @@ mod tests {
 
     #[test]
     fn cics_delay_for_until_preserve_literal_and_dynamic_units() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELUNIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 TIME-X PIC S9(9) COMP VALUE 3. 01 CLOCK-X PIC S9(6) COMP-3 VALUE 130000. PROCEDURE DIVISION. EXEC CICS DELAY FOR HOURS(1) SECONDS(TIME-X) END-EXEC. EXEC CICS DELAY UNTIL MINUTES(759) REQID('UNTIL001') END-EXEC. EXEC CICS DELAY TIME(124500) END-EXEC. EXEC CICS DELAY TIME(CLOCK-X) REQID('CLOCK001') END-EXEC. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELUNIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 TIME-X PIC S9(9) COMP VALUE 3. 01 CLOCK-X PIC S9(6) COMP-3 VALUE 130000. 01 MS-X PIC S9(9) COMP VALUE 250. PROCEDURE DIVISION. EXEC CICS DELAY FOR HOURS(1) SECONDS(TIME-X) END-EXEC. EXEC CICS DELAY UNTIL MINUTES(759) REQID('UNTIL001') END-EXEC. EXEC CICS DELAY TIME(124500) END-EXEC. EXEC CICS DELAY TIME(CLOCK-X) REQID('CLOCK001') END-EXEC. EXEC CICS DELAY FOR MILLISECS(MS-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);
         let hir = analysis
             .hir
@@ -3541,7 +3541,7 @@ mod tests {
                 _ => None,
             })
             .collect::<Vec<_>>();
-        assert_eq!(commands.len(), 4);
+        assert_eq!(commands.len(), 5);
         assert!(commands[0].options.contains(&HirCicsOption::For));
         assert!(commands[1].options.contains(&HirCicsOption::Until));
         assert!(commands[0].operands.iter().any(|operand| {
@@ -3573,6 +3573,21 @@ mod tests {
                 } if reference.qualified_name == "CLOCK-X"
             )
         }));
+        assert!(commands[4].options.contains(&HirCicsOption::For));
+        assert!(commands[4].operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::Milliseconds,
+                    value: HirCicsValue::Data(reference),
+                } if reference.qualified_name == "MS-X"
+            )
+        }));
+
+        let invalid = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADMS. PROCEDURE DIVISION. EXEC CICS DELAY UNTIL MILLISECS(1) END-EXEC. STOP RUN.",
+        );
+        assert!(invalid.hir.is_none());
     }
 
     #[test]

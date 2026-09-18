@@ -27,6 +27,8 @@ pub enum CicsIntervalError {
     MinutesOutOfRange,
     /// SECONDS exceeds the bound for the supplied combination of components.
     SecondsOutOfRange,
+    /// MILLISECS exceeds the bound for the supplied combination of components.
+    MillisecondsOutOfRange,
 }
 
 impl CicsIntervalError {
@@ -38,13 +40,17 @@ impl CicsIntervalError {
             Self::HoursOutOfRange => 4,
             Self::MinutesOutOfRange => 5,
             Self::SecondsOutOfRange => 6,
+            Self::MillisecondsOutOfRange => 0,
         }
     }
 
     /// DELAY's INVREQ RESP2 for packed INTERVAL operand failures.
     #[must_use]
     pub const fn delay_response2(self) -> i32 {
-        self.start_response2()
+        match self {
+            Self::MillisecondsOutOfRange => 22,
+            _ => self.start_response2(),
+        }
     }
 }
 
@@ -52,11 +58,11 @@ impl CicsIntervalError {
 ///
 /// Component presence matters: MINUTES(62) is valid, while HOURS(0)
 /// MINUTES(62) is invalid. Constructors retain that distinction while checking
-/// bounds, then normalize the valid value to whole seconds.
+/// bounds, then normalize the valid value to milliseconds.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CicsIntervalTime {
     mode: CicsIntervalMode,
-    seconds: u32,
+    milliseconds: u32,
 }
 
 impl CicsIntervalTime {
@@ -65,7 +71,7 @@ impl CicsIntervalTime {
     pub const fn immediate() -> Self {
         Self {
             mode: CicsIntervalMode::Relative,
-            seconds: 0,
+            milliseconds: 0,
         }
     }
 
@@ -92,16 +98,27 @@ impl CicsIntervalTime {
         minutes: Option<i64>,
         seconds: Option<i64>,
     ) -> Result<Self, CicsIntervalError> {
-        if hours.is_none() && minutes.is_none() && seconds.is_none() {
+        Self::from_delay_components(mode, hours, minutes, seconds, None)
+    }
+
+    /// Validate DELAY's explicit components, including optional milliseconds.
+    pub fn from_delay_components(
+        mode: CicsIntervalMode,
+        hours: Option<i64>,
+        minutes: Option<i64>,
+        seconds: Option<i64>,
+        milliseconds: Option<i64>,
+    ) -> Result<Self, CicsIntervalError> {
+        if hours.is_none() && minutes.is_none() && seconds.is_none() && milliseconds.is_none() {
             return Err(CicsIntervalError::InvalidRequest);
         }
         let hour = checked_component(hours, 99, CicsIntervalError::HoursOutOfRange)?;
-        let minute_limit = if hours.is_some() || seconds.is_some() {
+        let minute_limit = if hours.is_some() || seconds.is_some() || milliseconds.is_some() {
             59
         } else {
             5_999
         };
-        let second_limit = if hours.is_some() || minutes.is_some() {
+        let second_limit = if hours.is_some() || minutes.is_some() || milliseconds.is_some() {
             59
         } else {
             359_999
@@ -110,17 +127,33 @@ impl CicsIntervalTime {
             checked_component(minutes, minute_limit, CicsIntervalError::MinutesOutOfRange)?;
         let second =
             checked_component(seconds, second_limit, CicsIntervalError::SecondsOutOfRange)?;
-        // All three checked ranges fit 99:59:59; arithmetic cannot wrap.
+        let millisecond_limit = if hours.is_some() || minutes.is_some() || seconds.is_some() {
+            999
+        } else {
+            359_999_999
+        };
+        let millisecond = checked_component(
+            milliseconds,
+            millisecond_limit,
+            CicsIntervalError::MillisecondsOutOfRange,
+        )?;
+        // Every accepted form fits 359,999,999 milliseconds.
         Ok(Self {
             mode,
-            seconds: hour * 3_600 + minute * 60 + second,
+            milliseconds: hour * 3_600_000 + minute * 60_000 + second * 1_000 + millisecond,
         })
     }
 
     /// The normalized seconds, including explicit hours beyond the current day.
     #[must_use]
     pub const fn seconds(self) -> u32 {
-        self.seconds
+        self.milliseconds / 1_000
+    }
+
+    /// The normalized total milliseconds.
+    #[must_use]
+    pub const fn milliseconds(self) -> u32 {
+        self.milliseconds
     }
 
     /// Whether this value is relative to execution or to local midnight.
@@ -140,7 +173,7 @@ impl CicsIntervalTime {
         if local_millis_since_midnight >= DAY_MILLIS {
             return None;
         }
-        let target = u64::from(self.seconds) * 1_000;
+        let target = u64::from(self.milliseconds);
         match self.mode {
             CicsIntervalMode::Relative => Some(target),
             CicsIntervalMode::Absolute if target >= DAY_MILLIS => {
@@ -257,6 +290,42 @@ mod tests {
         assert_eq!(Error::HoursOutOfRange.start_response2(), 4);
         assert_eq!(Error::MinutesOutOfRange.start_response2(), 5);
         assert_eq!(Error::SecondsOutOfRange.start_response2(), 6);
+    }
+
+    #[test]
+    fn delay_milliseconds_preserve_source_dependent_bounds() {
+        let pure =
+            Time::from_delay_components(Mode::Relative, None, None, None, Some(15_000)).unwrap();
+        assert_eq!(pure.milliseconds(), 15_000);
+        assert_eq!(pure.delay_millis(0), Some(15_000));
+        let combined =
+            Time::from_delay_components(Mode::Relative, None, None, Some(1), Some(250)).unwrap();
+        assert_eq!(combined.milliseconds(), 1_250);
+        assert_eq!(combined.seconds(), 1);
+        for (hours, minutes, seconds, milliseconds, expected) in [
+            (
+                None,
+                None,
+                None,
+                Some(360_000_000),
+                Error::MillisecondsOutOfRange,
+            ),
+            (
+                Some(0),
+                None,
+                None,
+                Some(1_000),
+                Error::MillisecondsOutOfRange,
+            ),
+            (None, Some(60), None, Some(0), Error::MinutesOutOfRange),
+            (None, None, Some(60), Some(0), Error::SecondsOutOfRange),
+        ] {
+            assert_eq!(
+                Time::from_delay_components(Mode::Relative, hours, minutes, seconds, milliseconds,),
+                Err(expected)
+            );
+        }
+        assert_eq!(Error::MillisecondsOutOfRange.delay_response2(), 22);
     }
 
     #[test]

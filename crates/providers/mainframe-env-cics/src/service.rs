@@ -6585,6 +6585,131 @@ mod tests {
     }
 
     #[test]
+    fn delay_milliseconds_use_subsecond_deadlines_and_exact_bounds() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        let delay_id = |suffix: u8| {
+            BoundedPayload::new(
+                "mainframe-env.cics.delay-id@1",
+                format!("{}:{suffix}", invocation.run_unit_id).into_bytes(),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+
+        let combined = request(
+            CicsOperation::Delay,
+            BTreeMap::from([
+                ("DELAY.ID".into(), delay_id(80)),
+                ("SECONDS".into(), cics_decimal(1)),
+                ("MILLISECS".into(), cics_decimal(250)),
+                ("OPTION.FOR".into(), cics_option()),
+            ]),
+            80,
+        );
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, combined.clone(), 80),
+                    combined,
+                )
+                .unwrap()
+                .disposition,
+            CicsDisposition::Suspended
+        );
+        assert!(
+            store
+                .claim(
+                    "millisecond-worker",
+                    Some(CICS_DELAY_WORK_GENERATION),
+                    2_249,
+                    100,
+                )
+                .unwrap()
+                .is_none()
+        );
+        let work = store
+            .claim(
+                "millisecond-worker",
+                Some(CICS_DELAY_WORK_GENERATION),
+                2_250,
+                100,
+            )
+            .unwrap()
+            .unwrap();
+        service.promote_delay_work(&work, 2_250).unwrap();
+        store
+            .complete(
+                &work.work_id,
+                work.lease_id.as_deref().unwrap(),
+                work.lease_epoch,
+                2_250,
+            )
+            .unwrap();
+
+        let short_request = request(
+            CicsOperation::Delay,
+            BTreeMap::from([
+                ("DELAY.ID".into(), delay_id(81)),
+                ("MILLISECS".into(), cics_decimal(49)),
+                ("OPTION.FOR".into(), cics_option()),
+            ]),
+            81,
+        );
+        let short = service
+            .invoke(
+                &effect(&invocation.run_unit_id, short_request.clone(), 81),
+                short_request,
+            )
+            .unwrap();
+        assert_eq!(
+            (short.disposition, short.condition.as_str(), short.response),
+            (CicsDisposition::Ignored, "EXPIRED", 31)
+        );
+
+        for (arguments, sequence) in [
+            (
+                BTreeMap::from([
+                    ("DELAY.ID".into(), delay_id(82)),
+                    ("MILLISECS".into(), cics_decimal(360_000_000)),
+                    ("OPTION.FOR".into(), cics_option()),
+                ]),
+                82,
+            ),
+            (
+                BTreeMap::from([
+                    ("DELAY.ID".into(), delay_id(83)),
+                    ("HOURS".into(), cics_decimal(0)),
+                    ("MILLISECS".into(), cics_decimal(1_000)),
+                    ("OPTION.FOR".into(), cics_option()),
+                ]),
+                83,
+            ),
+        ] {
+            let mut invalid = request(CicsOperation::Delay, arguments, sequence);
+            invalid.condition_policy = CicsConditionPolicy::Respond {
+                response_field: "RESP".into(),
+                response2_field: Some("RESP2".into()),
+            };
+            let response = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, invalid.clone(), sequence),
+                    invalid,
+                )
+                .unwrap();
+            assert_eq!((response.response, response.response2), (16, 22));
+        }
+    }
+
+    #[test]
     fn named_delay_cancel_is_other_task_only_and_returns_response2_23() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = CicsService::open_with_runtime(

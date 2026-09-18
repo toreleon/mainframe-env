@@ -102,8 +102,10 @@ task teardown abandons their durable cycle and cancels work. `FOR` and `UNTIL`
 also accept literal or resolved numeric HOURS/MINUTES/SECONDS and retain their
 mode in append-only typed-plan tags. Packed TIME accepts an integer constant or
 resolved packed numeric storage and uses the same absolute deadline path.
-Dynamic packed INTERVAL, MILLISECS, remote cancellation, and automatic
-redispatch remain explicit gaps.
+`FOR MILLISECS` accepts literal or resolved fullword values alone or with the
+other units and retains millisecond precision through the durable deadline.
+Dynamic packed INTERVAL, remote cancellation, and automatic redispatch remain
+explicit gaps.
 `ABEND` also lowers through a typed task plan: ABCODE is captured as a bounded
 literal or a pre-resolved 1–4 character storage input, and CANCEL/NODUMP remain
 distinct flags. Retained raw ABEND artifacts remain readable, but new

@@ -138,6 +138,7 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::Hours => "HOURS",
         CicsOperandName::Minutes => "MINUTES",
         CicsOperandName::Seconds => "SECONDS",
+        CicsOperandName::Milliseconds => "MILLISECS",
     }
 }
 
