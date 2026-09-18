@@ -214,6 +214,12 @@ pub(in crate::service) fn assign(
             decimal_payload(i64::from(run.invocation.priority))?,
         );
     }
+    if request.arguments.contains_key("INPUTMSGLEN") {
+        response.outputs.insert(
+            "INPUTMSGLEN".into(),
+            decimal_payload(session_input_message_length(service, run)?)?,
+        );
+    }
     if request.arguments.contains_key("ABOFFSET") {
         response
             .outputs
@@ -429,6 +435,15 @@ fn terminal_dimensions(
         .then_some((session.rows, session.columns)))
 }
 
+fn session_input_message_length(service: &CicsService, run: &Run) -> Result<i64, HostProblem> {
+    let state = service.lock()?;
+    let session = state
+        .sessions
+        .get(&run.session)
+        .ok_or(HostProblem::InfrastructureFailure)?;
+    Ok(i64::from(session.input.message_length))
+}
+
 fn positioned_map_geometry(
     service: &CicsService,
     run: &Run,
@@ -581,6 +596,7 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "RETURNPROG",
         "TERMPRIORITY",
         "LANGINUSE",
+        "INPUTMSGLEN",
     ];
     if request.arguments.len() > 16
         || request.arguments.iter().any(|(name, value)| {

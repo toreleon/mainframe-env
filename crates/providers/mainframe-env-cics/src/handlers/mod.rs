@@ -45,8 +45,7 @@ pub(super) use bms_map::{
 pub(super) use condition::respond as condition;
 pub(super) use file_control::invoke as invoke_file_control;
 pub(super) use handle_state::{
-    AbendExit, AbendRecord, HandleFrame, HandleState, decode_session_handle_state,
-    session_schema_version,
+    AbendExit, AbendRecord, HandleFrame, HandleState, decode_session_tail, session_schema_version,
 };
 #[cfg(test)]
 pub(super) use interval_control::IntervalStartState;
@@ -67,7 +66,7 @@ pub(super) use task_enqueue::{
     validate_store as validate_enqueue_store,
 };
 pub(super) use terminal_control::{
-    invoke as invoke_terminal_control, valid_aid as valid_terminal_aid,
+    TerminalInput, invoke as invoke_terminal_control, valid_aid as valid_terminal_aid,
 };
 pub(super) use time::invoke as invoke_time;
 

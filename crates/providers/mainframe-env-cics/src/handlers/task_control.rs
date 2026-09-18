@@ -103,6 +103,10 @@ pub(in crate::service) fn encode_session(session: &Session) -> Result<Vec<u8>, H
     if session.user_corr_data.len() > 64
         || session.user_corr_effect_key.is_none() && !session.user_corr_data.is_empty()
         || session.user_corr_effect_key.is_some() != session.user_corr_request_digest.is_some()
+        || session.input.message_length > 32_767
+        || session.input.payload.as_ref().is_some_and(|payload| {
+            usize::try_from(session.input.message_length).ok() != Some(payload.len())
+        })
     {
         return Err(HostProblem::InfrastructureFailure);
     }
@@ -110,7 +114,7 @@ pub(in crate::service) fn encode_session(session: &Session) -> Result<Vec<u8>, H
         IdempotencyKey::new(key, InvocationLimits::default())
             .map_err(|_| HostProblem::InfrastructureFailure)?;
     }
-    let mut out = b"MECS9".to_vec();
+    let mut out = b"MECSA".to_vec();
     out.extend_from_slice(&session.rows.to_be_bytes());
     out.extend_from_slice(&session.columns.to_be_bytes());
     field(&mut out, session.principal.as_bytes())?;
@@ -152,7 +156,7 @@ pub(in crate::service) fn encode_session(session: &Session) -> Result<Vec<u8>, H
         field(&mut out, value)?;
     }
     field(&mut out, &session.screen)?;
-    match &session.input {
+    match &session.input.payload {
         Some(input) => {
             out.push(1);
             field(&mut out, input)?;
@@ -176,6 +180,7 @@ pub(in crate::service) fn encode_session(session: &Session) -> Result<Vec<u8>, H
         None => out.push(0),
     }
     encode_handle_state(&mut out, &session.handle_state)?;
+    out.extend_from_slice(&session.input.message_length.to_be_bytes());
     Ok(out)
 }
 

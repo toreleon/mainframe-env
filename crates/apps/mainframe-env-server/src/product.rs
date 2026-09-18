@@ -11805,6 +11805,14 @@ mod tests {
             .replace(
                 "TERMPRIORITY(TERMINAL-PRIORITY-X) CMDSEC(CMDSEC-X)",
                 "LANGINUSE(LANGUAGE-X) TERMPRIORITY(TERMINAL-PRIORITY-X) CMDSEC(CMDSEC-X)",
+            )
+            .replace(
+                "01 INITPARM-LENGTH-X PIC S9(4) COMP.",
+                "01 INITPARM-LENGTH-X PIC S9(4) COMP.\n01 INPUT-LENGTH-X PIC S9(4) COMP VALUE 7.",
+            )
+            .replace(
+                "LANGINUSE(LANGUAGE-X) TERMPRIORITY",
+                "INPUTMSGLEN(INPUT-LENGTH-X) LANGINUSE(LANGUAGE-X) TERMPRIORITY",
             );
         let path = LogicalPath::new("SCHEDULE.cbl", limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
@@ -12045,6 +12053,10 @@ mod tests {
         );
         assert_eq!(
             restored.variable("INITPARM-LENGTH-X").unwrap().bytes(),
+            &[0; 2]
+        );
+        assert_eq!(
+            restored.variable("INPUT-LENGTH-X").unwrap().bytes(),
             &[0; 2]
         );
         assert_eq!(restored.variable("LINK-LEVEL-X").unwrap().bytes(), &[0, 1]);
@@ -13891,13 +13903,23 @@ mod tests {
     fn online_handle_aid_survives_a_durable_terminal_handoff() {
         let limits = SourceLimits::default();
         let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. HARES.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 AID-HIT PIC X VALUE '0'.\n01 UNEXPECTED-HIT PIC X VALUE '0'.\nPROCEDURE DIVISION.\nEXEC CICS HANDLE AID ANYKEY(AID-HANDLER) END-EXEC.\nEXEC CICS SEND MAP('HARES') MAPSET('HARES') END-EXEC.\nEXEC CICS RECEIVE MAP('HARES') MAPSET('HARES') END-EXEC.\nMOVE '1' TO UNEXPECTED-HIT.\nSTOP RUN.\nAID-HANDLER.\nMOVE '1' TO AID-HIT.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let source = std::str::from_utf8(source)
+            .unwrap()
+            .replace(
+                "01 UNEXPECTED-HIT PIC X VALUE '0'.",
+                "01 UNEXPECTED-HIT PIC X VALUE '0'.\n01 INPUT-LENGTH-X PIC S9(4) COMP VALUE 0.",
+            )
+            .replace(
+                "AID-HANDLER.\nMOVE '1' TO AID-HIT.",
+                "AID-HANDLER.\nEXEC CICS ASSIGN INPUTMSGLEN(INPUT-LENGTH-X) END-EXEC.\nMOVE '1' TO AID-HIT.",
+            );
         let path = LogicalPath::new("HARES.cbl", limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
             &path,
             vec![
                 SourceFile::input(
                     "HARES.cbl",
-                    source.to_vec(),
+                    source.as_bytes().to_vec(),
                     SourceFormat::Free,
                     SourceEncoding::Utf8,
                     limits,
@@ -13944,7 +13966,22 @@ mod tests {
                     column: 1,
                     rows: 24,
                     columns: 80,
-                    fields: Vec::new(),
+                    fields: vec![mainframe_env_cics::BmsFieldDefinition {
+                        name: "INPUT".into(),
+                        row: 1,
+                        column: 1,
+                        length: 8,
+                        initial: Vec::new(),
+                        color: None,
+                        highlight: None,
+                        protected: false,
+                        secret: false,
+                        fset: false,
+                        justify_right: false,
+                        fill_zero: false,
+                        output_offset: None,
+                        attribute_offset: None,
+                    }],
                 }],
             })
             .unwrap();
@@ -13994,7 +14031,7 @@ mod tests {
                 &principal,
                 "handle-aid-handoff-csrf",
                 0xf1,
-                &BTreeMap::new(),
+                &BTreeMap::from([("INPUT".into(), b"AB".to_vec())]),
                 3,
             )
             .unwrap();
@@ -14019,6 +14056,10 @@ mod tests {
             .restore_checkpoint(&continuation.checkpoint)
             .unwrap();
         assert_eq!(restored.variable("AID-HIT").unwrap().bytes(), b"1");
+        assert_eq!(
+            restored.variable("INPUT-LENGTH-X").unwrap().bytes(),
+            &[0, 15]
+        );
         assert_eq!(restored.variable("UNEXPECTED-HIT").unwrap().bytes(), b"0");
     }
 

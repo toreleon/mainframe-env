@@ -100,6 +100,7 @@ pub(super) fn validate(
         "RETURNPROG",
         "TERMPRIORITY",
         "LANGINUSE",
+        "INPUTMSGLEN",
     ] {
         let Some(value) = clauses.get(name) else {
             continue;
@@ -133,6 +134,7 @@ pub(super) fn validate(
                 | "DESTCOUNT"
                 | "ERRORMSGLEN"
                 | "INITPARMLEN"
+                | "INPUTMSGLEN"
                 | "LINKLEVEL"
                 | "MAPCOLUMN"
                 | "MAPHEIGHT"

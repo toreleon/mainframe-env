@@ -17,6 +17,7 @@ pub(in crate::service) fn session_schema_version(schema: &[u8]) -> Option<u8> {
         b"MECS7" => Some(7),
         b"MECS8" => Some(8),
         b"MECS9" => Some(9),
+        b"MECSA" => Some(10),
         _ => None,
     }
 }
@@ -299,9 +300,42 @@ pub(in crate::service) fn decode_session_handle_state(
         6 => decode_handle_state(reader, true, 0),
         7 => decode_handle_state(reader, false, 0),
         8 => decode_handle_state(reader, false, 1),
-        9 => decode_handle_state(reader, false, 2),
+        9 | 10 => decode_handle_state(reader, false, 2),
         _ => Ok(HandleState::default()),
     }
+}
+
+pub(in crate::service) fn decode_session_tail(
+    reader: &mut Reader<'_>,
+    schema: u8,
+    payload: Option<Vec<u8>>,
+) -> Result<(HandleState, super::TerminalInput), HostProblem> {
+    let handle_state = decode_session_handle_state(reader, schema)?;
+    let message_length = if schema >= 10 {
+        u32::from_be_bytes(
+            reader
+                .take(4)?
+                .try_into()
+                .map_err(|_| HostProblem::InfrastructureFailure)?,
+        )
+    } else {
+        u32::try_from(payload.as_ref().map_or(0, Vec::len))
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+    };
+    if message_length > 32_767
+        || payload
+            .as_ref()
+            .is_some_and(|value| usize::try_from(message_length).ok() != Some(value.len()))
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok((
+        handle_state,
+        super::TerminalInput {
+            payload,
+            message_length,
+        },
+    ))
 }
 
 fn decode_abend_record(

@@ -149,7 +149,7 @@ struct Session {
     connected: bool,
     aid: u8,
     screen: Vec<u8>,
-    input: Option<Vec<u8>>,
+    input: handlers::TerminalInput,
     suspended: bool,
     mapset: Option<String>,
     map: Option<String>,
@@ -565,7 +565,7 @@ impl CicsService {
             connected: true,
             aid: 0,
             screen: Vec::new(),
-            input: None,
+            input: handlers::TerminalInput::default(),
             suspended: false,
             mapset: None,
             map: None,
@@ -630,7 +630,7 @@ impl CicsService {
             connected: true,
             aid: 0,
             screen: Vec::new(),
-            input: None,
+            input: handlers::TerminalInput::default(),
             suspended: false,
             mapset: None,
             map: None,
@@ -838,7 +838,7 @@ impl CicsService {
             .checked_add(next.idle_timeout_ticks)
             .ok_or(HostProblem::ResourceExhausted)?;
         next.aid = aid;
-        next.input = Some(encoded);
+        next.input.replace(encoded)?;
         next.suspended = false;
         let mut state = self.lock()?;
         if state
@@ -1403,7 +1403,7 @@ impl CicsService {
         let mut next = current.clone();
         next.version += 1;
         next.aid = aid;
-        next.input = Some(encoded);
+        next.input.replace(encoded)?;
         next.suspended = false;
         self.persist_session(session.as_str(), &next, Some(current.version))?;
         state.sessions.insert(session.as_str().into(), next);
@@ -3257,7 +3257,7 @@ fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Sess
         BTreeMap::new()
     };
     let screen = reader.field(limits.max_screen_bytes)?;
-    let input = match reader.take(1)?[0] {
+    let input_payload = match reader.take(1)?[0] {
         0 => None,
         1 => Some(reader.field(limits.max_screen_bytes)?),
         _ => return Err(HostProblem::InfrastructureFailure),
@@ -3292,7 +3292,7 @@ fn decode_session(bytes: &[u8], version: u64, limits: CicsLimits) -> Result<Sess
     } else {
         (Vec::new(), None, None)
     };
-    let handle_state = handlers::decode_session_handle_state(&mut reader, schema)?;
+    let (handle_state, input) = handlers::decode_session_tail(&mut reader, schema, input_payload)?;
     if reader.at != bytes.len() || rows == 0 || columns == 0 {
         return Err(HostProblem::InfrastructureFailure);
     }
@@ -7333,7 +7333,7 @@ mod tests {
     #[test]
     fn carddemo_time_inquire_link_retrieve_and_assign_subforms_execute() {
         let service = service(Arc::new(MemoryStore::new(Default::default())));
-        let (invocation, _) = registered(&service);
+        let (invocation, session) = registered(&service);
 
         let asktime = request(CicsOperation::Asktime, BTreeMap::new(), 1);
         let asked = service
@@ -7498,6 +7498,7 @@ mod tests {
             CicsOperation::Assign,
             BTreeMap::from([
                 ("CMDSEC".into(), argument(b"CMDSEC-OUT")),
+                ("INPUTMSGLEN".into(), argument(b"INPUT-LENGTH-OUT")),
                 ("LANGINUSE".into(), argument(b"LANGUAGE-OUT")),
                 ("OPSECURITY".into(), argument(b"OPSECURITY-OUT")),
                 ("RESSEC".into(), argument(b"RESSEC-OUT")),
@@ -7512,10 +7513,31 @@ mod tests {
             )
             .unwrap();
         assert_eq!(local_only.outputs["CMDSEC"].bytes(), b"X");
+        assert_eq!(local_only.outputs["INPUTMSGLEN"].bytes(), b"0");
         assert_eq!(local_only.outputs["LANGINUSE"].bytes(), b"ENU");
         assert_eq!(local_only.outputs["OPSECURITY"].bytes(), &[0; 3]);
         assert_eq!(local_only.outputs["RESSEC"].bytes(), b"X");
         assert_eq!(local_only.outputs["TCTUALENG"].bytes(), b"0");
+
+        service
+            .submit_input(
+                &session,
+                0x7d,
+                &BTreeMap::from([("INPUT".into(), b"AB".to_vec())]),
+            )
+            .unwrap();
+        let input_length = request(
+            CicsOperation::Assign,
+            BTreeMap::from([("INPUTMSGLEN".into(), argument(b"INPUT-LENGTH-OUT"))]),
+            327,
+        );
+        let input_length = service
+            .invoke(
+                &effect(&invocation.run_unit_id, input_length.clone(), 327),
+                input_length,
+            )
+            .unwrap();
+        assert_eq!(input_length.outputs["INPUTMSGLEN"].bytes(), b"15");
 
         let initparm = request(
             CicsOperation::Assign,
@@ -8339,6 +8361,7 @@ mod tests {
                 ("CMDSEC".into(), argument(b"CMDSEC-OUT")),
                 ("INITPARM".into(), argument(b"INITPARM-OUT")),
                 ("INITPARMLEN".into(), argument(b"INITPARM-LENGTH-OUT")),
+                ("INPUTMSGLEN".into(), argument(b"INPUT-LENGTH-OUT")),
                 ("LANGINUSE".into(), argument(b"LANGUAGE-OUT")),
                 ("RESSEC".into(), argument(b"RESSEC-OUT")),
             ]),
@@ -8353,6 +8376,7 @@ mod tests {
         assert_eq!(initparm.condition, "NORMAL");
         assert!(!initparm.outputs.contains_key("INITPARM"));
         assert_eq!(initparm.outputs["INITPARMLEN"].bytes(), b"0");
+        assert_eq!(initparm.outputs["INPUTMSGLEN"].bytes(), b"0");
         assert_eq!(initparm.outputs["BRIDGE"].bytes(), &[b' '; 4]);
         assert_eq!(initparm.outputs["CMDSEC"].bytes(), b"X");
         assert_eq!(initparm.outputs["LANGINUSE"].bytes(), b"ENU");
@@ -10294,7 +10318,8 @@ mod tests {
                 let mut state = service.lock().unwrap();
                 let terminal = state.sessions.get_mut(session.as_str()).unwrap();
                 terminal.aid = aid;
-                terminal.input = Some(Vec::new());
+                terminal.input.payload = Some(Vec::new());
+                terminal.input.message_length = 0;
             }
             let response = invoke(CicsOperation::ReceiveMap, BTreeMap::new(), sequence).unwrap();
             assert_eq!(
@@ -10652,7 +10677,8 @@ mod tests {
             assert!(!latest.dump_requested);
             assert_eq!(latest.program, None);
             let mut legacy8 = handlers::encode_session(&state.sessions[session.as_str()]).unwrap();
-            assert_eq!(&legacy8[..5], b"MECS9");
+            assert_eq!(&legacy8[..5], b"MECSA");
+            legacy8.truncate(legacy8.len() - 4);
             legacy8.truncate(legacy8.len() - 8);
             legacy8[..5].copy_from_slice(b"MECS8");
             let decoded = decode_session(
@@ -11330,17 +11356,30 @@ mod tests {
                     set.clone(),
                 )
                 .unwrap();
+            service
+                .submit_input(
+                    &session,
+                    0x7d,
+                    &BTreeMap::from([("INPUT".into(), b"AB".to_vec())]),
+                )
+                .unwrap();
             let current = service.lock().unwrap().sessions[session.as_str()].clone();
+            assert_eq!(current.input.message_length, 15);
             let encoded = handlers::encode_session(&current).unwrap();
-            assert_eq!(&encoded[..5], b"MECS9");
+            assert_eq!(&encoded[..5], b"MECSA");
             let mut corrupted = encoded.clone();
-            let depth = corrupted.len() - 5;
+            let depth = corrupted.len() - 9;
             corrupted[depth..depth + 4].copy_from_slice(&65_u32.to_be_bytes());
             assert!(matches!(
                 decode_session(&corrupted, current.version, CicsLimits::default()),
                 Err(HostProblem::ResourceExhausted)
             ));
-            let mut legacy8 = encoded;
+            let mut legacy9 = encoded;
+            legacy9.truncate(legacy9.len() - 4);
+            legacy9[..5].copy_from_slice(b"MECS9");
+            let decoded = decode_session(&legacy9, current.version, CicsLimits::default()).unwrap();
+            assert_eq!(decoded.input.message_length, 15);
+            let mut legacy8 = legacy9;
             legacy8[..5].copy_from_slice(b"MECS8");
             let decoded = decode_session(&legacy8, current.version, CicsLimits::default()).unwrap();
             assert_eq!(decoded.handle_state, handlers::HandleState::default());
@@ -11395,6 +11434,7 @@ mod tests {
                 Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
             let service = service(store);
             let current = service.lock().unwrap().sessions[session.as_str()].clone();
+            assert_eq!(current.input.message_length, 15);
             assert_eq!(current.user_corr_data, vec![b'B'; 64]);
             assert_eq!(current.user_corr_effect_key.as_deref(), Some("outer-334"));
             service

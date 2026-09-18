@@ -24,6 +24,7 @@ pub(super) fn validate_output(
             | "DESTCOUNT"
             | "ERRORMSGLEN"
             | "INITPARMLEN"
+            | "INPUTMSGLEN"
             | "LINKLEVEL"
             | "MAPCOLUMN"
             | "MAPHEIGHT"

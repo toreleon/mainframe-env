@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `ASSIGN INPUTMSGLEN` with a bounded durable terminal-input
+  length that survives RECEIVE consumption and SQLite reopen. No input returns
+  halfword zero; normalized map input returns its exact byte length in local and
+  DPL contexts. Session codec `MECSA` retains strict `MECS1`–`MECS9` reads, and
+  append-only output tag 104 preserves existing plans.
+
 - Added typed CICS `ASSIGN LANGINUSE`. The runtime's unoverridden English
   national-language default maps through the pinned CICS table to exact
   three-byte `ENU` in local and DPL contexts. Append-only output tag 103
