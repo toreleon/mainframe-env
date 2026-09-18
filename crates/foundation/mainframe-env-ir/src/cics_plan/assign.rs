@@ -91,6 +91,7 @@ pub const CICS_ASSIGN_OUTPUT_NAMES: &[&str] = &[
     "TERMPRIORITY",
     "LANGINUSE",
     "INPUTMSGLEN",
+    "INVOKINGPROG",
 ];
 
 impl CicsAssignOutput {

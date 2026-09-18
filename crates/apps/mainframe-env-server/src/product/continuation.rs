@@ -507,6 +507,7 @@ impl ProductServer {
             )
             .map_err(|_| HostProblem::ResourceExhausted)?,
         );
+        bindings.insert("cics.program-entry".into(), program_entry_payload(b"xctl")?);
         let mut next = Invocation::new(
             RequestId::new(format!("online-transfer-request-{sequence}"), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
@@ -785,6 +786,33 @@ pub(super) fn restore_online_machine_priority(
     if let Some(priority) = continuation.and_then(|continuation| continuation.priority) {
         invocation.priority = priority;
     }
+}
+
+pub(super) fn restore_online_machine_context(
+    invocation: &mut Invocation,
+    continuation: Option<&OnlineMachineContinuation>,
+) -> Result<(), HostProblem> {
+    restore_online_machine_priority(invocation, continuation);
+    let entry = if invocation.selector.as_str().starts_with("cics:") {
+        b"initial".as_slice()
+    } else if invocation.selector.as_str().starts_with("program:") {
+        b"xctl".as_slice()
+    } else {
+        return Err(HostProblem::InfrastructureFailure);
+    };
+    invocation
+        .bindings
+        .insert("cics.program-entry".into(), program_entry_payload(entry)?);
+    Ok(())
+}
+
+fn program_entry_payload(entry: &[u8]) -> Result<BoundedPayload, HostProblem> {
+    BoundedPayload::new(
+        "mainframe-env.cics.program-entry@1",
+        entry.to_vec(),
+        InvocationLimits::default(),
+    )
+    .map_err(|_| HostProblem::ResourceExhausted)
 }
 
 fn encode_provider_generations(

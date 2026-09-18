@@ -62,6 +62,7 @@ pub(in crate::service) fn new_run_with_state(
     let current_program = super::CurrentProgramFrame {
         current: super::task_context::current_program(&invocation),
         parent_execution_id: invocation.parent_execution_id.clone(),
+        initial_entry: false,
     };
     let HandleState {
         handlers,

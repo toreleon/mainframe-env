@@ -47,8 +47,8 @@ pub(super) fn validate_output(
         | "EXTDS" | "FCI" | "GMMI" | "HILIGHT" | "KATAKANA" | "MSRCONTROL" | "OUTLINE"
         | "LDCNUM" | "PARTNS" | "PS" | "RESTART" | "SOSI" | "TEXTKYBD" | "TEXTPRINT"
         | "UNATTEND" | "VALIDATION" | "CMDSEC" | "RESSEC" => Some(1),
-        "ABPROGRAM" | "ASRAINTRPT" | "ASRAPSW" | "DESTID" | "OPERKEYS" | "PROGRAM"
-        | "PROCESSTYPE" | "RETURNPROG" => Some(8),
+        "ABPROGRAM" | "ASRAINTRPT" | "ASRAPSW" | "DESTID" | "INVOKINGPROG" | "OPERKEYS"
+        | "PROGRAM" | "PROCESSTYPE" | "RETURNPROG" => Some(8),
         "ACTIVITY" | "ASRAPSW16" => Some(16),
         "ACTIVITYID" => Some(52),
         "ASRAREGS" => Some(64),

@@ -33,6 +33,7 @@ const BMS_OVERFLOW_OPTIONS: [&str; 5] = ["DESTCOUNT", "LDCMNEM", "LDCNUM", "PAGE
 pub(in crate::service) struct CurrentProgramFrame {
     pub(in crate::service) current: Option<String>,
     pub(in crate::service) parent_execution_id: Option<ExecutionId>,
+    pub(in crate::service) initial_entry: bool,
 }
 
 pub(in crate::service) fn current_program(invocation: &Invocation) -> Option<String> {
@@ -48,6 +49,7 @@ pub(in crate::service) fn synchronize_current_program(
     runs: &mut BTreeMap<RunUnitId, Run>,
     invocation: &Invocation,
 ) -> Result<bool, HostProblem> {
+    let initial_entry = initial_program_entry(invocation)?;
     let Some(run) = runs.get_mut(&invocation.run_unit_id) else {
         return Ok(false);
     };
@@ -55,6 +57,7 @@ pub(in crate::service) fn synchronize_current_program(
         return Err(HostProblem::Unauthorized);
     }
     run.current_program.parent_execution_id = invocation.parent_execution_id.clone();
+    run.current_program.initial_entry = initial_entry;
     if let Some(program) = current_program(invocation) {
         run.current_program.current = Some(program);
     }
@@ -121,6 +124,9 @@ pub(in crate::service) fn assign(
         .contains_key("LINKLEVEL")
         .then(|| assign_link_level(run, dpl))
         .transpose()?;
+    if request.arguments.contains_key("INVOKINGPROG") {
+        validate_initial_program(run, dpl)?;
+    }
     if request.arguments.contains_key("RETURNPROG") {
         validate_top_level_return_program(run, dpl)?;
     }
@@ -337,10 +343,12 @@ pub(in crate::service) fn assign(
             .outputs
             .insert("PROGRAM".into(), bounded(program.as_bytes().to_vec())?);
     }
-    if request.arguments.contains_key("RETURNPROG") {
-        response
-            .outputs
-            .insert("RETURNPROG".into(), bounded(vec![b' '; 8])?);
+    for name in ["INVOKINGPROG", "RETURNPROG"] {
+        if request.arguments.contains_key(name) {
+            response
+                .outputs
+                .insert(name.into(), bounded(vec![b' '; 8])?);
+        }
     }
     for (name, length) in [
         ("APPLICATION", 64),
@@ -484,11 +492,35 @@ fn assign_link_level(run: &Run, dpl: bool) -> Result<i64, HostProblem> {
     }
 }
 
+fn validate_initial_program(run: &Run, dpl: bool) -> Result<(), HostProblem> {
+    if dpl
+        || run.current_program.parent_execution_id.is_some()
+        || !run.current_program.initial_entry
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(())
+}
+
 fn validate_top_level_return_program(run: &Run, dpl: bool) -> Result<(), HostProblem> {
     if dpl || run.current_program.parent_execution_id.is_some() {
         return Err(HostProblem::InfrastructureFailure);
     }
     Ok(())
+}
+
+fn initial_program_entry(invocation: &Invocation) -> Result<bool, HostProblem> {
+    let Some(entry) = invocation.bindings.get("cics.program-entry") else {
+        return Ok(false);
+    };
+    if entry.schema() != "mainframe-env.cics.program-entry@1" {
+        return Err(HostProblem::Malformed);
+    }
+    match entry.bytes() {
+        b"initial" => Ok(true),
+        b"xctl" => Ok(false),
+        _ => Err(HostProblem::Malformed),
+    }
 }
 
 fn assign_dpl_context(run: &Run) -> Result<bool, HostProblem> {
@@ -597,6 +629,7 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "TERMPRIORITY",
         "LANGINUSE",
         "INPUTMSGLEN",
+        "INVOKINGPROG",
     ];
     if request.arguments.len() > 16
         || request.arguments.iter().any(|(name, value)| {

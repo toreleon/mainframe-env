@@ -2153,7 +2153,7 @@ impl ProductServer {
                 .provider_generations
                 .clone_from(&continuation.provider_generations);
         }
-        continuation::restore_online_machine_priority(&mut invocation, saved.as_ref());
+        continuation::restore_online_machine_context(&mut invocation, saved.as_ref())?;
         invocation.bindings.insert(
             "cics.commarea".into(),
             BoundedPayload::new(
@@ -11784,11 +11784,11 @@ mod tests {
             )
             .replace(
                 "01 INITPARM-X PIC X(60) VALUE ALL 'Z'.",
-                "01 RETURN-PROGRAM-X PIC X(8) VALUE ALL 'Z'.\n01 INITPARM-X PIC X(60) VALUE ALL 'Z'.",
+                "01 INVOKING-PROGRAM-X PIC X(8) VALUE ALL 'Z'.\n01 RETURN-PROGRAM-X PIC X(8) VALUE ALL 'Z'.\n01 INITPARM-X PIC X(60) VALUE ALL 'Z'.",
             )
             .replace(
                 "EXEC CICS ASSIGN INITPARM(INITPARM-X)",
-                "EXEC CICS ASSIGN RETURNPROG(RETURN-PROGRAM-X) INITPARM(INITPARM-X)",
+                "EXEC CICS ASSIGN INVOKINGPROG(INVOKING-PROGRAM-X) RETURNPROG(RETURN-PROGRAM-X) INITPARM(INITPARM-X)",
             )
             .replace(
                 "01 PRIORITY-X PIC S9(4) COMP VALUE 200.",
@@ -12089,6 +12089,10 @@ mod tests {
         );
         assert_eq!(restored.variable("RESTART-X").unwrap().bytes(), &[0]);
         assert_eq!(restored.variable("RESSEC-X").unwrap().bytes(), b"X");
+        assert_eq!(
+            restored.variable("INVOKING-PROGRAM-X").unwrap().bytes(),
+            &[b' '; 8]
+        );
         assert_eq!(
             restored.variable("RETURN-PROGRAM-X").unwrap().bytes(),
             &[b' '; 8]

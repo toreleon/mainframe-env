@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `ASSIGN INVOKINGPROG` for the local initial program. A
+  trusted durable entry marker returns the source-defined eight blanks and
+  keeps XCTL, LINK-child, and DPL lineage fail-closed until the runtime owns the
+  caller name. Append-only output tag 105 preserves existing typed-plan tags.
+
 - Added typed CICS `ASSIGN INPUTMSGLEN` with a bounded durable terminal-input
   length that survives RECEIVE consumption and SQLite reopen. No input returns
   halfword zero; normalized map input returns its exact byte length in local and

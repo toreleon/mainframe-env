@@ -7558,24 +7558,24 @@ mod tests {
         assert_eq!(initparm.outputs["INITPARMLEN"].bytes(), b"0");
         assert_eq!(initparm.outputs["BRIDGE"].bytes(), &[b' '; 4]);
 
-        let top_level_return_program = request(
+        let top_level_program_lineage = request(
             CicsOperation::Assign,
             BTreeMap::from([("RETURNPROG".into(), argument(b"RETURN-PROGRAM-OUT"))]),
             326,
         );
-        let top_level_return_program = service
+        let top_level_program_lineage = service
             .invoke(
                 &effect(
                     &invocation.run_unit_id,
-                    top_level_return_program.clone(),
+                    top_level_program_lineage.clone(),
                     326,
                 ),
-                top_level_return_program,
+                top_level_program_lineage,
             )
             .unwrap();
-        assert_eq!(top_level_return_program.condition, "NORMAL");
+        assert_eq!(top_level_program_lineage.condition, "NORMAL");
         assert_eq!(
-            top_level_return_program.outputs["RETURNPROG"].bytes(),
+            top_level_program_lineage.outputs["RETURNPROG"].bytes(),
             &[b' '; 8]
         );
 
@@ -8027,7 +8027,10 @@ mod tests {
         );
         let nested_lineage = request(
             CicsOperation::Assign,
-            BTreeMap::from([("RETURNPROG".into(), argument(b"RETURN-PROGRAM-OUT"))]),
+            BTreeMap::from([
+                ("INVOKINGPROG".into(), argument(b"INVOKING-PROGRAM-OUT")),
+                ("RETURNPROG".into(), argument(b"RETURN-PROGRAM-OUT")),
+            ]),
             2,
         );
         assert_eq!(
@@ -8167,6 +8170,15 @@ mod tests {
 
         let mut frame = invocation.clone();
         frame.selector = Selector::new("program:current", InvocationLimits::default()).unwrap();
+        frame.bindings.insert(
+            "cics.program-entry".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.program-entry@1",
+                b"initial".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
         service.ensure_run(&frame).unwrap();
         assert_eq!(
             service
@@ -8180,16 +8192,58 @@ mod tests {
                 .as_deref(),
             Some("CURRENT")
         );
-        let return_program = request(
+        let program_lineage = request(
+            CicsOperation::Assign,
+            BTreeMap::from([
+                ("INVOKINGPROG".into(), argument(b"INVOKING-PROGRAM-OUT")),
+                ("RETURNPROG".into(), argument(b"RETURN-PROGRAM-OUT")),
+            ]),
+            1,
+        );
+        let program_lineage = service
+            .invoke(
+                &effect(&invocation.run_unit_id, program_lineage.clone(), 1),
+                program_lineage,
+            )
+            .unwrap();
+        for name in ["INVOKINGPROG", "RETURNPROG"] {
+            assert_eq!(program_lineage.outputs[name].bytes(), &[b' '; 8]);
+        }
+
+        let mut transferred = frame.clone();
+        transferred.selector = Selector::new("program:next", InvocationLimits::default()).unwrap();
+        transferred.bindings.insert(
+            "cics.program-entry".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.program-entry@1",
+                b"xctl".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        service.ensure_run(&transferred).unwrap();
+        let invoking_after_xctl = request(
+            CicsOperation::Assign,
+            BTreeMap::from([("INVOKINGPROG".into(), argument(b"INVOKING-PROGRAM-OUT"))]),
+            2,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, invoking_after_xctl.clone(), 2),
+                invoking_after_xctl,
+            ),
+            Err(HostProblem::InfrastructureFailure)
+        );
+        let return_after_xctl = request(
             CicsOperation::Assign,
             BTreeMap::from([("RETURNPROG".into(), argument(b"RETURN-PROGRAM-OUT"))]),
-            1,
+            3,
         );
         assert_eq!(
             service
                 .invoke(
-                    &effect(&invocation.run_unit_id, return_program.clone(), 1),
-                    return_program,
+                    &effect(&invocation.run_unit_id, return_after_xctl.clone(), 3),
+                    return_after_xctl,
                 )
                 .unwrap()
                 .outputs["RETURNPROG"]
@@ -8201,15 +8255,18 @@ mod tests {
         child.parent_execution_id =
             Some(ExecutionId::new("parent-execution", InvocationLimits::default()).unwrap());
         service.ensure_run(&child).unwrap();
-        let child_return_program = request(
+        let child_program_lineage = request(
             CicsOperation::Assign,
-            BTreeMap::from([("RETURNPROG".into(), argument(b"RETURN-PROGRAM-OUT"))]),
-            2,
+            BTreeMap::from([
+                ("INVOKINGPROG".into(), argument(b"INVOKING-PROGRAM-OUT")),
+                ("RETURNPROG".into(), argument(b"RETURN-PROGRAM-OUT")),
+            ]),
+            4,
         );
         assert_eq!(
             service.invoke(
-                &effect(&invocation.run_unit_id, child_return_program.clone(), 2),
-                child_return_program,
+                &effect(&invocation.run_unit_id, child_program_lineage.clone(), 4),
+                child_program_lineage,
             ),
             Err(HostProblem::InfrastructureFailure)
         );
@@ -8343,7 +8400,10 @@ mod tests {
 
         let unavailable_lineage = request(
             CicsOperation::Assign,
-            BTreeMap::from([("RETURNPROG".into(), argument(b"RETURN-PROGRAM-OUT"))]),
+            BTreeMap::from([
+                ("INVOKINGPROG".into(), argument(b"INVOKING-PROGRAM-OUT")),
+                ("RETURNPROG".into(), argument(b"RETURN-PROGRAM-OUT")),
+            ]),
             65,
         );
         assert_eq!(
