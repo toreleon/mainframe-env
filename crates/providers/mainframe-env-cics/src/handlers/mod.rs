@@ -47,6 +47,8 @@ pub(super) use handle_state::{
     AbendExit, AbendRecord, HandleFrame, HandleState, decode_session_handle_state,
     session_schema_version,
 };
+#[cfg(test)]
+pub(super) use interval_control::IntervalStartState;
 pub(super) use interval_control::load as load_interval_records;
 pub use interval_control::{CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION};
 pub(super) use interval_control::{IntervalStartRecord, invoke as invoke_interval_control};

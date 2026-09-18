@@ -2056,7 +2056,7 @@ impl ProductServer {
             self.program.finish_run_unit(invocation),
             self.clear_online_machine_continuation(session, saved_version),
             self.clear_execution_checkpoint(&invocation.execution_id),
-            self.finish_online_machine_run(session, principal, now_tick),
+            self.abort_online_machine_run(session, principal, now_tick),
             self.clear_online_exchange(session, exchange),
         ];
         for result in results {
@@ -10528,6 +10528,97 @@ mod tests {
                 .unwrap()
                 .iter()
                 .any(|entry| entry.operation == CicsOperation::Retrieve)
+        );
+    }
+
+    #[test]
+    fn compiled_task_end_commits_protected_start_without_explicit_syncpoint() {
+        let artifact = published_source_fixture(
+            "ENDCOMMIT",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. ENDCOMMIT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE 'TASK-END'.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('NX00') REQID('ENDCMT01') FROM(DATA-X) INTERVAL(0) PROTECT RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "ENDCOMMIT".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([
+                    ("TE00".into(), "ENDCOMMIT".into()),
+                    ("NX00".into(), "ENDCOMMIT".into()),
+                ]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "ENDCMT".into(),
+                    map: "ENDCMT".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("implicit-task-end", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "TE00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "TE00",
+                24,
+                80,
+                "implicit-task-end-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "ENDCOMMIT", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "ENDCOMMIT", 2)
+            .unwrap();
+
+        assert_eq!(
+            server
+                .store
+                .get_execution(&invocation.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Completed
+        );
+        assert_eq!(
+            server
+                .store
+                .get_work("cics-start:ENDCMT01")
+                .unwrap()
+                .unwrap()
+                .state,
+            WorkState::Queued
+        );
+        assert_eq!(
+            server.cics.terminal_run_trace(&session, &principal, 2),
+            Err(HostProblem::NotFound),
+            "normal completion removed the volatile run after committing protected work"
         );
     }
 

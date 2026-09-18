@@ -98,6 +98,22 @@ pub(super) struct PendingOnlineTransfer {
 }
 
 impl ProductServer {
+    pub(super) fn abort_online_machine_run(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        now_tick: u64,
+    ) -> Result<(), HostProblem> {
+        let trace = self.cics.terminal_run_trace(session, principal, now_tick)?;
+        self.online_traces
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .entry(session.as_str().into())
+            .or_default()
+            .extend(trace);
+        self.cics.abort_terminal_run(session, principal, now_tick)
+    }
+
     pub(super) fn online_exchange(
         &self,
         session: &SessionId,

@@ -212,8 +212,8 @@ absent, closing the state-transition/enqueue crash gap without duplicating work.
 Explicit SYNCPOINT ROLLBACK durably finalizes the rollback before deleting
 protected-pending records, so the REQID can be reused. Typed ABEND performs the
 same bounded deletion before its handler transfer or terminal disposition.
-Non-command abnormal termination and implicit task-end syncpoint behavior are
-not claimed by these children.
+Known non-command failure/disconnect/timeout and implicit task-end behavior are
+covered below; crash-gap lifecycle reconciliation is not yet claimed.
 
 CANCEL follows the source-defined PROTECT boundary: protected-pending rows are
 not cancelable and return NOTFND, while a committing SYNCPOINT first makes the
@@ -228,6 +228,15 @@ name closes retries before the outer response journal exists, becomes the
 interval row and work payload identity, and is returned as a strict EIBREQID
 output. The interpreter validates and checkpoints the eight-byte implicit EIB
 field. Explicit names never receive this synthetic output.
+
+Protected START also participates in implicit task-end syncpoints. Normal
+compiled completion and highest-level RETURN transition the issuing run's
+protected rows to pending and idempotently admit work before volatile task
+cleanup. Known execution failure deletes only that run's still-protected rows
+before releasing other task state. A scheduler or data wait suspension performs
+neither transition. Disconnect/timeout cleanup and recovery that begins after a
+terminal execution outcome but before product/CICS cleanup still require
+separate disposition-bound reconciliation proof.
 
 An optional local START USERID is part of the canonical producer request and
 the duplicate-REQID fence. Before schedule persistence, the provider authorizes

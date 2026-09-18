@@ -107,6 +107,14 @@ row should exist for those deleted requests. If manual recovery restores such a
 provider row without its pre-abend task state, leave it quarantined rather than
 admitting work.
 
+Normal task completion and highest-level RETURN are implicit committing
+syncpoints for protected START. Admit the deterministic work before removing
+the volatile run. Known execution failure is rollback: delete still-protected
+rows and never enqueue them. Suspension is neither outcome. Disconnect/timeout
+cleanup remains separate. If execution terminalization and CICS cleanup are
+separated by a crash, quarantine the protected rows until the durable terminal
+disposition is reconciled; do not infer commit solely from a missing run.
+
 Do not force CANCEL across a protected-pending row. IBM semantics allow CANCEL
 only after that START is committed. Before commit, preserve the row and return
 NOTFND; after commit, restore and cancel the pending interval row together with

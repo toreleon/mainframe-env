@@ -138,6 +138,10 @@ protected-pending records; explicit rollback removes those records. The typed
 ABEND route also removes still-protected records before transferring or
 terminating. CANCEL returns NOTFND while a protected row is uncommitted and
 uses the ordinary pending-work cancellation fence after committing SYNCPOINT.
+Normal machine completion and highest-level RETURN now apply the same commit
+transition implicitly before task cleanup. Known execution failure applies
+rollback deletion; scheduler/WAIT suspension does not finalize the task.
+Disconnect/timeout cleanup and crash-gap outcome reconciliation remain deferred.
 When local START omits REQID, the provider derives one replay-stable
 eight-character identifier and the interpreter writes it to implicit EIBREQID;
 that value owns the same record and work identities as an explicit REQID.
@@ -149,8 +153,8 @@ terminal combinations, and actual target-task creation remain deferred.
 RETRIEVE WAIT durably checkpoints and reissues the same statement when no
 eligible record exists; explicit execution re-entry after worker promotion
 consumes through the ordinary one-time fence. Deadlock timeout, shutdown/AICB,
-automatic wake, terminal association, non-command abnormal/task-end cleanup,
-and automatic task launch remain fail-closed or deferred.
+automatic wake, terminal association, crash-gap lifecycle reconciliation, and
+automatic task launch remain fail-closed or deferred.
 The typed default-cursor file-browse subset binds STARTBR, READNEXT, READPREV,
 and ENDBR to exactly one FILE/DATASET alias. STARTBR captures a writable
 RIDFLD without returning a record and admits the default-equivalent `GTEQ`

@@ -5177,6 +5177,131 @@ mod tests {
     }
 
     #[test]
+    fn task_end_commits_protected_start_while_known_abort_discards_it() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let start = |request_id: &[u8], sequence| {
+            request(
+                CicsOperation::Start,
+                BTreeMap::from([
+                    ("TRANSID".into(), argument(b"NEXT")),
+                    ("REQID".into(), argument(request_id)),
+                    ("FROM".into(), argument(b"PROTECTED")),
+                    ("INTERVAL".into(), cics_decimal(0)),
+                    ("OPTION.PROTECT".into(), cics_option()),
+                ]),
+                sequence,
+            )
+        };
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+
+        let completed = invocation_for("implicit-commit-run", BTreeMap::new());
+        let completed_session = SessionId::new("implicit-commit-session", 64).unwrap();
+        service
+            .launch_terminal(
+                completed.clone(),
+                &completed_session,
+                "MENU",
+                24,
+                80,
+                "implicit-commit-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let start_request = start(b"IMPLCMT1", 1);
+        service
+            .invoke(
+                &effect(&completed.run_unit_id, start_request.clone(), 1),
+                start_request,
+            )
+            .unwrap();
+        assert!(store.get_work("cics-start:IMPLCMT1").unwrap().is_none());
+        service
+            .complete_terminal_run(&completed_session, &principal, 2)
+            .unwrap();
+        assert_eq!(
+            service.lock().unwrap().interval_records["IMPLCMT1"].state,
+            handlers::IntervalStartState::Pending
+        );
+        assert!(store.get_work("cics-start:IMPLCMT1").unwrap().is_some());
+
+        let aborted = invocation_for("implicit-abort-run", BTreeMap::new());
+        let aborted_session = SessionId::new("implicit-abort-session", 64).unwrap();
+        service
+            .launch_terminal(
+                aborted.clone(),
+                &aborted_session,
+                "MENU",
+                24,
+                80,
+                "implicit-abort-csrf",
+                3,
+                10_000,
+            )
+            .unwrap();
+        let start_request = start(b"IMPLABT1", 2);
+        service
+            .invoke(
+                &effect(&aborted.run_unit_id, start_request.clone(), 2),
+                start_request,
+            )
+            .unwrap();
+        service
+            .abort_terminal_run(&aborted_session, &principal, 4)
+            .unwrap();
+        assert!(
+            store
+                .get_provider_state("cics-interval-start-v1", "IMPLABT1")
+                .unwrap()
+                .is_none()
+        );
+        assert!(store.get_work("cics-start:IMPLABT1").unwrap().is_none());
+
+        let returned = invocation_for("implicit-return-run", BTreeMap::new());
+        let returned_session = SessionId::new("implicit-return-session", 64).unwrap();
+        service
+            .launch_terminal(
+                returned.clone(),
+                &returned_session,
+                "MENU",
+                24,
+                80,
+                "implicit-return-csrf",
+                5,
+                10_000,
+            )
+            .unwrap();
+        let start_request = start(b"IMPLRET1", 3);
+        service
+            .invoke(
+                &effect(&returned.run_unit_id, start_request.clone(), 3),
+                start_request,
+            )
+            .unwrap();
+        let return_request = request(CicsOperation::Return, BTreeMap::new(), 4);
+        let response = service
+            .invoke(
+                &effect(&returned.run_unit_id, return_request.clone(), 4),
+                return_request,
+            )
+            .unwrap();
+        assert_eq!(response.disposition, CicsDisposition::Returned);
+        assert_eq!(
+            service.lock().unwrap().interval_records["IMPLRET1"].state,
+            handlers::IntervalStartState::Pending
+        );
+        assert!(store.get_work("cics-start:IMPLRET1").unwrap().is_some());
+    }
+
+    #[test]
     fn start_without_reqid_generates_replay_stable_eibreqid_and_work_identity() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = CicsService::open_with_runtime(
