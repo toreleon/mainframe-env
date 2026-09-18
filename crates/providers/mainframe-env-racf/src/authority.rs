@@ -1,3 +1,5 @@
+mod principal_status;
+
 use crate::command::CommandDiagnostic;
 use crate::database::SecurityDatabase;
 use crate::model::{
@@ -1018,11 +1020,8 @@ impl RacfService {
             })
     }
 
-    /// Verify that an active credentialed principal retains every bootstrap
-    /// administrator attribute.
-    ///
-    /// This is a proof of durable bootstrap completion, not an authorization
-    /// decision for an end-user request.
+    /// Verify that an active credentialed principal retains all bootstrap attributes.
+    /// This proves durable bootstrap completion, not an end-user authorization decision.
     pub fn bootstrap_administrator_ready(&self, user: &PrincipalId) -> Result<bool, HostProblem> {
         let snapshot = self.database.read()?;
         if !snapshot.subsystem.running || !snapshot.database_status.active {
@@ -1113,6 +1112,7 @@ impl RacfService {
                 user,
                 credential_reference,
             } => self.authenticate(&user, &credential_reference),
+            SecurityRequest::ValidatePrincipal { principal } => self.principal_status(&principal),
             SecurityRequest::Authorize {
                 principal,
                 class,
@@ -1543,6 +1543,38 @@ mod tests {
     fn resolved_secret_has_no_clone_debug_display_or_serialization() {
         let secret = ResolvedSecret::new(b"bounded-secret".to_vec()).unwrap();
         assert_eq!(&*secret, b"bounded-secret");
+    }
+
+    #[test]
+    fn principal_status_distinguishes_unknown_active_expired_and_revoked_users() {
+        let (service, resolver) = setup();
+        resolver.insert("secret:user", b"PASSWORD".to_vec());
+        let reference = SecretRef::new("secret:user", Default::default()).unwrap();
+        service.add_user("IBMUSER", &reference).unwrap();
+        let known = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let missing = PrincipalId::new("MISSING", InvocationLimits::default()).unwrap();
+        assert_eq!(
+            service.principal_status(&missing).unwrap(),
+            SecurityDecision::NotFound
+        );
+        assert_eq!(
+            service.principal_status(&known).unwrap(),
+            SecurityDecision::Allow
+        );
+        service
+            .set_user_state("IBMUSER", true, false, false)
+            .unwrap();
+        assert_eq!(
+            service.principal_status(&known).unwrap(),
+            SecurityDecision::Expired
+        );
+        service
+            .set_user_state("IBMUSER", false, true, false)
+            .unwrap();
+        assert_eq!(
+            service.principal_status(&known).unwrap(),
+            SecurityDecision::Revoked
+        );
     }
 
     #[test]

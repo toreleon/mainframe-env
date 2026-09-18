@@ -10406,6 +10406,7 @@ mod tests {
         server
             .bootstrap_administrator("IBMUSER", b"TESTPASS")
             .unwrap();
+        server.bootstrap_identity("TARGET", b"TARGETPASS").unwrap();
         server
             .racf
             .execute_command(
@@ -10598,6 +10599,120 @@ mod tests {
                 .unwrap()
                 .iter()
                 .any(|entry| entry.operation == CicsOperation::Retrieve)
+        );
+    }
+
+    #[test]
+    fn compiled_start_userid_rejects_unknown_and_revoked_principals_before_surrogate() {
+        let artifact = published_source_fixture(
+            "USERSTAT",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. USERSTAT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE 'AS-USER'.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('NX00') REQID('MISSUSR1') FROM(DATA-X) INTERVAL(0) USERID('MISSING') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS START TRANSID('NX00') REQID('REVKUSR1') FROM(DATA-X) INTERVAL(0) USERID('REVOKED') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .bootstrap_identity("REVOKED", b"REVOKEDPASS")
+            .unwrap();
+        server
+            .racf
+            .set_user_state("REVOKED", false, true, false)
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "USERSTAT".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([
+                    ("UV00".into(), "USERSTAT".into()),
+                    ("NX00".into(), "USERSTAT".into()),
+                ]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "USERSTAT".into(),
+                    map: "USERSTAT".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("start-user-validation", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "UV00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "UV00",
+                24,
+                80,
+                "start-user-validation-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "USERSTAT", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "USERSTAT", 2)
+            .unwrap();
+
+        let start_outcomes = server
+            .cics
+            .terminal_run_trace(&session, &principal, 2)
+            .unwrap()
+            .into_iter()
+            .filter(|entry| entry.operation == CicsOperation::Start)
+            .map(|entry| (entry.outcome, entry.response, entry.response2))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            start_outcomes,
+            vec![("USERIDERR".into(), 69, 8), ("USERIDERR".into(), 69, 19)]
+        );
+        for request_id in ["MISSUSR1", "REVKUSR1"] {
+            assert!(
+                server
+                    .store
+                    .get_provider_state("cics-interval-start-v1", request_id)
+                    .unwrap()
+                    .is_none()
+            );
+            assert!(
+                server
+                    .store
+                    .get_work(&format!("cics-start:{request_id}"))
+                    .unwrap()
+                    .is_none()
+            );
+        }
+        assert_eq!(
+            server
+                .store
+                .get_execution(&invocation.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Suspended
         );
     }
 

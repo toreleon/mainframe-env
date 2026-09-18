@@ -1,5 +1,4 @@
-// Frozen explicit host wire schema. Field and variant changes require a protocol review.
-// Destructuring is exhaustive: adding a field or variant cannot silently omit it.
+// Frozen exhaustive host wire schema: every field or variant requires protocol review.
 use super::*;
 
 impl Canonical for SpaceUnit {
@@ -2428,6 +2427,7 @@ impl Canonical for SecurityRequest {
                 resource.encode(out)?;
                 Ok(())
             }
+            Self::ValidatePrincipal { principal } => encode_principal_validation(out, principal),
             Self::Audit(v0) => {
                 out.variant("SecurityRequest", "Audit", 1)?;
                 out.text("0")?;

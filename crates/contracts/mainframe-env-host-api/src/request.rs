@@ -1,3 +1,4 @@
+use crate::clock::ClockRequest;
 use crate::dataset::{
     CatalogKind, CatalogListEntry, CatalogResolution, DatasetDefinition, DatasetDescription,
     DatasetDiagnostic, DatasetLifecycleState, DatasetLockMode, DatasetLockReceipt,
@@ -739,6 +740,12 @@ pub enum SecurityRequest {
         user: PrincipalId,
         credential_reference: SecretRef,
     },
+    /// Validate a non-login execution identity from durable security state.
+    /// This request never carries or resolves a credential.
+    /// It is distinct from credential authentication.
+    ValidatePrincipal {
+        principal: PrincipalId,
+    },
     Authorize {
         principal: PrincipalId,
         class: String,
@@ -765,13 +772,6 @@ pub struct AuditEvent {
     pub resource_hash: String,
     pub decision: String,
     pub fields: BTreeMap<String, String>,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ClockRequest {
-    UtcTimestamp,
-    Date,
-    Time,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

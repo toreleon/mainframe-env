@@ -11,6 +11,7 @@ pub use canonical::{
 };
 
 mod cics_catalog;
+mod clock;
 mod dataset;
 mod enterprise;
 mod names;
@@ -26,6 +27,7 @@ pub use cics_catalog::{
     CicsApplicationCommandIdentityDescriptor, cics_application_command_identities,
     cics_application_command_identity,
 };
+pub use clock::ClockRequest;
 pub use dataset::{
     AllocationSpace, BufferingMode, CatalogEntryKind, CatalogKind, CatalogListEntry,
     CatalogMetadata, CatalogResolution, CompressionMode, DATASET_DEFINITION_CONTRACT,
@@ -50,7 +52,7 @@ pub use registry::{
 };
 pub use request::{
     AccessIntent, AuditEvent, CicsConditionPolicy, CicsDisposition, CicsOperation, CicsRequest,
-    CicsResponse, CicsUnitOfWorkOutcome, ClockRequest, DatasetAttributes, DatasetCloseControl,
+    CicsResponse, CicsUnitOfWorkOutcome, DatasetAttributes, DatasetCloseControl,
     DatasetOrganization, DatasetReadControl, DatasetReadLockMode, DatasetReelUnit, DatasetRequest,
     DatasetResult, Db2HostVariable, Db2Operation, Db2Request, Db2Result, Db2Row, EffectRequest,
     EffectResult, HostLimits, HostProblem, HostRequest, HostResult, ImsOperation, ImsQualifier,

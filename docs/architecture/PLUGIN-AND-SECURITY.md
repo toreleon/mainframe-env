@@ -28,6 +28,13 @@ RACF/SAF is the authoritative 0.1 security provider. Policy errors and missing
 profiles fail closed. No authorization result is inferred from HTTP routing,
 possession of a Rust handle, or successful capability lookup.
 
+The typed security host boundary also exposes a non-login principal-status
+request for CICS START USERID validation. It reads only durable RACF account
+state and never resolves a credential: active and password-expired identities
+remain known, missing identities are distinct from revoked/suspended identities,
+and locked or unavailable security state stays fail-closed. CICS performs this
+check before surrogate authorization and before interval/work mutation.
+
 Db2, IMS, and MQ add a second, typed decision inside the provider boundary.
 `EnterpriseResource` closes the supported SAF classes (`DB2TABLE`, `DB2PLAN`,
 `DB2UOW`, `IMSPSB`, `IMSDB`, `IMSUOW`, `MQQUEUE`, and `MQUOW`) and pairs a

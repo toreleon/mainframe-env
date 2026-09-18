@@ -1,4 +1,5 @@
 //! Explicit host encoding. See docs/contracts/EFFECT-CANONICAL-V1.md.
+use crate::clock::ClockRequest;
 use crate::dataset::*;
 use crate::names::*;
 use crate::request::*;
@@ -310,6 +311,8 @@ pub fn canonical_result_size(
 
 mod cics;
 mod generated;
+mod security_request;
+use security_request::encode_principal_validation;
 
 #[cfg(test)]
 mod tests;

@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added RACF-backed START USERID validity checks before surrogate authorization.
+  A typed non-login principal-status request now maps unknown identities to
+  USERIDERR 69/8, indeterminate/locked identities to 69/10, revoked identities
+  to 69/19, and an unavailable external-security interface to INVREQ 16/18,
+  with no interval or work mutation on rejection.
+
 - Added disposition-bound crash-gap recovery for protected START. When durable
   execution terminalization precedes product/CICS cleanup, recovery rebuilds
   the exact terminal run and saved priority, commits protected rows only for
@@ -26,8 +32,8 @@ All notable changes to mainframe-env are documented here.
   one-to-eight-character execution identity, requires the issuing principal to
   have READ access to `SURROGAT <userid>.DFHSTART`, returns exact NOTAUTH 70/9
   before interval/work mutation on denial, and durably binds an accepted target
-  principal. Omitted USERID continues to inherit the issuer; unknown/revoked
-  USERID conditions and automatic target launch remain pending.
+  principal. Omitted USERID continues to inherit the issuer; automatic target
+  launch remains pending.
 
 - Added the bounded RETRIEVE WAIT data-arrival path. Typed WAIT now checkpoints
   and reissues the RETRIEVE statement without ENDDATA or record consumption

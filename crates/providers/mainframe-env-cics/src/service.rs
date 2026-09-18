@@ -3885,6 +3885,7 @@ mod tests {
         descriptor: CapabilityDescriptor,
         deny_command: bool,
         deny_surrogate: bool,
+        principal_decision: SecurityDecision,
         seen: CommandSecurityTrace,
     }
 
@@ -3996,6 +3997,9 @@ mod tests {
                             SecurityDecision::Allow
                         },
                     ))
+                }
+                HostRequest::Security(SecurityRequest::ValidatePrincipal { .. }) => {
+                    Ok(HostResult::Security(self.principal_decision.clone()))
                 }
                 _ => Err(HostProblem::Unsupported),
             };
@@ -4243,6 +4247,7 @@ mod tests {
             descriptor: descriptor("host.security.authorize"),
             deny_command,
             deny_surrogate: false,
+            principal_decision: SecurityDecision::Allow,
             seen: seen.clone(),
         }) as Arc<dyn HostProvider>;
         (
@@ -4256,13 +4261,17 @@ mod tests {
         )
     }
 
-    fn start_authorities(deny_surrogate: bool) -> (Arc<ScopedHostService>, CommandSecurityTrace) {
+    fn start_authorities(
+        deny_surrogate: bool,
+        principal_decision: SecurityDecision,
+    ) -> (Arc<ScopedHostService>, CommandSecurityTrace) {
         let seen = Arc::new(Mutex::new(Vec::new()));
         let providers = vec![
             Arc::new(CommandSecurityAuthority {
                 descriptor: descriptor("host.security.authorize"),
                 deny_command: false,
                 deny_surrogate,
+                principal_decision,
                 seen: seen.clone(),
             }) as Arc<dyn HostProvider>,
             Arc::new(Authority {
@@ -5344,7 +5353,7 @@ mod tests {
     }
 
     #[test]
-    fn start_userid_requires_surrogate_read_and_binds_target_principal() {
+    fn start_userid_validates_principal_requires_surrogate_and_binds_identity() {
         let start = |request_id: &[u8], sequence| {
             let mut request = request(
                 CicsOperation::Start,
@@ -5364,7 +5373,63 @@ mod tests {
             request
         };
 
-        let (denied_host, denied_trace) = start_authorities(true);
+        for (decision, request_id, response, response2) in [
+            (SecurityDecision::NotFound, b"MISSUSR1".as_slice(), 69, 8),
+            (SecurityDecision::Revoked, b"REVKUSR1".as_slice(), 69, 19),
+            (SecurityDecision::Locked, b"LOCKUSR1".as_slice(), 69, 10),
+            (SecurityDecision::Deny, b"ESMOFF01".as_slice(), 16, 18),
+        ] {
+            let (host, trace) = start_authorities(false, decision);
+            let store = Arc::new(MemoryStore::new(Default::default()));
+            let service = CicsService::open_with_runtime(
+                host,
+                store.clone(),
+                store.clone(),
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(1_000)),
+            )
+            .unwrap();
+            let (issuer, _) = registered(&service);
+            let request = start(request_id, 1);
+            let actual = service
+                .invoke(&effect(&issuer.run_unit_id, request.clone(), 1), request)
+                .unwrap();
+            assert_eq!(
+                (actual.condition.as_str(), actual.response, actual.response2),
+                (
+                    if response == 69 {
+                        "USERIDERR"
+                    } else {
+                        "INVREQ"
+                    },
+                    response,
+                    response2,
+                )
+            );
+            let request_id = std::str::from_utf8(request_id).unwrap();
+            assert!(
+                store
+                    .get_provider_state("cics-interval-start-v1", request_id)
+                    .unwrap()
+                    .is_none()
+            );
+            assert!(
+                store
+                    .get_work(&format!("cics-start:{request_id}"))
+                    .unwrap()
+                    .is_none()
+            );
+            assert!(
+                trace
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .all(|(class, _, _)| class != "SURROGAT"),
+                "surrogate authorization ran before USERID validation"
+            );
+        }
+
+        let (denied_host, denied_trace) = start_authorities(true, SecurityDecision::Allow);
         let denied_store = Arc::new(MemoryStore::new(Default::default()));
         let denied = CicsService::open_with_runtime(
             denied_host,
@@ -5411,7 +5476,7 @@ mod tests {
             ))
         );
 
-        let (allowed_host, allowed_trace) = start_authorities(false);
+        let (allowed_host, allowed_trace) = start_authorities(false, SecurityDecision::Allow);
         let allowed_store = Arc::new(MemoryStore::new(Default::default()));
         let allowed = CicsService::open_with_runtime(
             allowed_host,

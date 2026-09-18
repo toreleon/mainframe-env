@@ -17,11 +17,13 @@ pub(super) use protect::finish_syncpoint as finish_protected_starts;
 use super::super::{CicsLimits, CicsReplayClock, CicsService, Run, field, store_error};
 use crate::{CicsIntervalMode, CicsIntervalTime};
 use mainframe_env_execution_api::{
-    ArtifactRef, BoundedPayload, ExecutionId, IdempotencyKey, InvocationLimits, Selector,
+    ArtifactRef, BoundedPayload, ExecutionId, IdempotencyKey, InvocationLimits, PrincipalId,
+    Selector,
 };
 use mainframe_env_host_api::{
     AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, ClockRequest,
-    HostProblem, HostRequest, HostResult, ScopedHostService, canonical_request_digest,
+    HostProblem, HostRequest, HostResult, ScopedHostService, SecurityDecision, SecurityRequest,
+    canonical_request_digest,
 };
 use mainframe_env_store_api::{
     ProviderStateRecord, ProviderStateStore, StoreError, WorkRecord, WorkState, WorkStore,
@@ -254,6 +256,7 @@ fn start(
             other => other,
         })?;
     if let Some(user) = execution_user.as_deref() {
+        validate_start_principal(service, run, user)?;
         service
             .authorize(
                 run,
@@ -354,6 +357,43 @@ fn start(
         );
     }
     Ok(response)
+}
+
+fn validate_start_principal(
+    service: &CicsService,
+    run: &mut Run,
+    user: &str,
+) -> Result<(), HostProblem> {
+    let principal =
+        PrincipalId::new(user, InvocationLimits::default()).map_err(|_| HostProblem::Malformed)?;
+    let decision = match service.nested(
+        run,
+        HostRequest::Security(SecurityRequest::ValidatePrincipal { principal }),
+    )? {
+        HostResult::Security(decision) => decision,
+        _ => return Err(HostProblem::ProviderFailure),
+    };
+    match decision {
+        SecurityDecision::Allow | SecurityDecision::Expired => Ok(()),
+        SecurityDecision::NotFound | SecurityDecision::InvalidCredentials => {
+            Err(userid_condition(8))
+        }
+        SecurityDecision::Revoked => Err(userid_condition(19)),
+        SecurityDecision::Locked => Err(userid_condition(10)),
+        SecurityDecision::Deny => Err(HostProblem::Condition {
+            name: "INVREQ".into(),
+            response: 16,
+            response2: 18,
+        }),
+    }
+}
+
+fn userid_condition(response2: i32) -> HostProblem {
+    HostProblem::Condition {
+        name: "USERIDERR".into(),
+        response: 69,
+        response2,
+    }
 }
 
 fn validate_start_request(request: &CicsRequest) -> Result<(), HostProblem> {

@@ -56,6 +56,14 @@ disposition are additive named variants: they do not alter the canonical bytes
 of any existing value, and their exact variant-name bytes are frozen by golden
 tests.
 
+`SecurityRequest::ValidatePrincipal` is likewise an additive named variant. It
+contains only the bounded `PrincipalId`, is non-mutating, and returns the
+existing `SecurityDecision` vocabulary. Its exact canonical variant, field, and
+newtype bytes are frozen by a golden vector; existing authentication,
+authorization, and audit request bytes are unchanged. The security request
+principal-field helper is isolated from the large generated encoder without
+changing its wire domain or version.
+
 A terminal CICS ABEND records `ABEND.DUMP` in the response output map with
 schema `mainframe-env.cics.abend-dump@1` and exact value `requested` or
 `suppressed`. The entry therefore participates in the ordinary canonical result

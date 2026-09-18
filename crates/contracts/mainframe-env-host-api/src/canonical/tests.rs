@@ -34,6 +34,22 @@ fn golden_request_and_unknown_result_are_versioned_and_domain_separated() {
 }
 
 #[test]
+fn principal_validation_is_a_frozen_named_security_variant() {
+    let principal = PrincipalId::new(
+        "TARGET",
+        mainframe_env_execution_api::InvocationLimits::default(),
+    )
+    .unwrap();
+    assert_eq!(
+        hex(&bytes(
+            &SecurityRequest::ValidatePrincipal { principal },
+            b""
+        )),
+        "41010f0000000000000053656375726974795265717565737401110000000000000056616c69646174655072696e636970616c01000000000000000109000000000000007072696e636970616c42010b000000000000005072696e636970616c4964010600000000000000544152474554"
+    );
+}
+
+#[test]
 fn cics_additive_wire_identities_are_frozen_named_variants() {
     assert_eq!(
         hex(&bytes(&CicsOperation::AddressSet, b"")),
