@@ -176,5 +176,6 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::TimeSep => "TIMESEP",
         CicsPlanOption::FreeKb => "FREEKB",
         CicsPlanOption::Gteq => "GTEQ",
+        CicsPlanOption::Fmh => "FMH",
     }
 }

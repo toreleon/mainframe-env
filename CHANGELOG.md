@@ -6,13 +6,21 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added START FMH propagation through RETRIEVE. The typed START data route now
+  persists the source FMH flag in its versioned interval row; successful
+  RETRIEVE returns a strict one-byte EIBFMH value (`X'FF'` with FMH, `X'00'`
+  otherwise), and the interpreter owns the implicit EIB field across compiled
+  checkpoint/resume. Historical retained responses without the additive output
+  remain readable. Broader FMH parsing, SET, WAIT, terminal association,
+  automatic task launch, PostgreSQL, and licensed evidence remain pending.
+
 - Added bounded START-to-RETRIEVE metadata propagation. Local data-bearing
   START now accepts source-checked RTRANSID, RTERMID, and QUEUE names, persists
   them in the existing versioned interval row, and RETRIEVE writes requested
   exact-width metadata outputs alongside INTO/LENGTH. Requesting metadata the
   corresponding START omitted returns ENVDEFERR without consuming the ready
   record. Compiler, plan codec, interpreter, provider, SQLite-compatible state,
-  and the compiled product route share the same identities. SET, WAIT, FMH,
+  and the compiled product route share the same identities. SET, WAIT,
   terminal association, automatic task launch, PostgreSQL, and licensed
   evidence remain pending.
 

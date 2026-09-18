@@ -4724,6 +4724,7 @@ mod tests {
                 ("RTRANSID".into(), argument(b"BACK")),
                 ("RTERMID".into(), argument(b"T001")),
                 ("QUEUE".into(), argument(b"WORKQ")),
+                ("OPTION.FMH".into(), cics_option()),
             ]),
             1,
         );
@@ -4779,6 +4780,7 @@ mod tests {
         assert_eq!(retrieved.outputs["RTRANSID"].bytes(), b"BACK");
         assert_eq!(retrieved.outputs["RTERMID"].bytes(), b"T001");
         assert_eq!(retrieved.outputs["QUEUE"].bytes(), b"WORKQ");
+        assert_eq!(retrieved.outputs["EIBFMH"].bytes(), &[0xff]);
         assert_eq!(retrieved.payload.bytes(), b"PAYL");
         let replayed = service
             .invoke(
@@ -4900,6 +4902,7 @@ mod tests {
                 .unwrap();
             assert_eq!(response.payload.bytes(), b"RESTART");
             assert_eq!(response.outputs["LENGTH"].bytes(), b"7");
+            assert_eq!(response.outputs["EIBFMH"].bytes(), &[0x00]);
         }
 
         std::fs::remove_dir_all(root).unwrap();

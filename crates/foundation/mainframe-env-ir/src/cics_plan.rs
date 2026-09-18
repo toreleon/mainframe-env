@@ -272,6 +272,8 @@ pub enum CicsPlanOption {
     FreeKb,
     /// Start a file browse at the first key greater than or equal to RIDFLD.
     Gteq,
+    /// Mark START data as containing function management headers.
+    Fmh,
 }
 
 /// Named result binding written after the host result arrives.
@@ -597,6 +599,9 @@ fn validate_operation_shape(
             option,
             CicsPlanOption::NoHandle | CicsPlanOption::DateSep | CicsPlanOption::TimeSep
         ),
+        CicsPlanOperation::Start => {
+            !matches!(option, CicsPlanOption::NoHandle | CicsPlanOption::Fmh)
+        }
         _ => !matches!(option, CicsPlanOption::NoHandle),
     });
     let unexpected_output = outputs

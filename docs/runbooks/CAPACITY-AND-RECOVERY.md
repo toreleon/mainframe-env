@@ -70,7 +70,8 @@ its REQID to the producing effect and canonical request; replacing it can turn
 a duplicate START into a false replay. Optional RTRANSID, RTERMID, and QUEUE
 metadata live in that same row and must not be split into a separate restore or
 manually synthesized; RETRIEVE uses their presence to decide ENVDEFERR before
-consumption. A consumed row retains the exact
+consumption. The row's FMH bit is equally authoritative because RETRIEVE
+derives EIBFMH from it. A consumed row retains the exact
 consumer identity needed to close the result-journal crash gap and is not yet
 eligible for generic retention. Schema rollback therefore requires stopping
 admission and restoring a pre-change backup; older binaries must not write a

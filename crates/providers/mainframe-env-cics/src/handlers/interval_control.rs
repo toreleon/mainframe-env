@@ -268,7 +268,7 @@ fn start(
         return_transaction,
         return_terminal,
         queue,
-        fmh: false,
+        fmh: request.arguments.contains_key("OPTION.FMH"),
         state: IntervalStartState::Pending,
         producer_effect_key: mutation.idempotency_key.as_str().into(),
         producer_request_digest: canonical_request_digest(&HostRequest::Cics(request.clone()))
@@ -408,6 +408,15 @@ fn retrieve(
             .map_err(|_| HostProblem::ResourceExhausted)?,
         );
     }
+    response.outputs.insert(
+        "EIBFMH".into(),
+        BoundedPayload::new(
+            "mainframe-env.cics.eib-fmh@1",
+            vec![if record.fmh { 0xff } else { 0x00 }],
+            InvocationLimits::default(),
+        )
+        .map_err(|_| HostProblem::ResourceExhausted)?,
+    );
     for (name, value) in [
         ("RTRANSID", record.return_transaction.as_deref()),
         ("RTERMID", record.return_terminal.as_deref()),
@@ -436,6 +445,7 @@ fn validate_start_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "FROM",
         "INTERVAL",
         "LENGTH",
+        "OPTION.FMH",
         "OPTION.NOHANDLE",
         "QUEUE",
         "REQID",
@@ -454,7 +464,7 @@ fn validate_start_request(request: &CicsRequest) -> Result<(), HostProblem> {
             !ALLOWED.contains(&name.as_str())
                 || if matches!(name.as_str(), "INTERVAL" | "LENGTH" | "TIME") {
                     value.schema() != "mainframe-env.cics.decimal@1"
-                } else if name == "OPTION.NOHANDLE" {
+                } else if matches!(name.as_str(), "OPTION.FMH" | "OPTION.NOHANDLE") {
                     value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
                 } else {
                     !matches!(

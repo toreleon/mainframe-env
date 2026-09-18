@@ -340,5 +340,6 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::TimeSep => CicsPlanOption::TimeSep,
         HirCicsOption::FreeKb => CicsPlanOption::FreeKb,
         HirCicsOption::Gteq => CicsPlanOption::Gteq,
+        HirCicsOption::Fmh => CicsPlanOption::Fmh,
     }
 }

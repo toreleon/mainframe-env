@@ -38,6 +38,7 @@ pub(super) fn implicit_values(
             }),
         ),
         ("EIBFN".into(), CobolValue::Bytes(vec![0, 0])),
+        ("EIBFMH".into(), CobolValue::Bytes(vec![0x00])),
         (
             "EIBCALEN".into(),
             CobolValue::Decimal(Decimal {
@@ -78,6 +79,16 @@ pub(super) fn write_context(
     }
     if operation == CicsOperation::ReceiveMap {
         machine.write("EIBAID", &[response.aid])?;
+    }
+    if operation == CicsOperation::Retrieve
+        && let Some(value) = response.outputs.get("EIBFMH")
+    {
+        if value.schema() != "mainframe-env.cics.eib-fmh@1"
+            || !matches!(value.bytes(), [0x00] | [0xff])
+        {
+            return Err(MachineProblem::UnexpectedHostResult);
+        }
+        machine.write("EIBFMH", value.bytes())?;
     }
     if matches!(
         operation,
