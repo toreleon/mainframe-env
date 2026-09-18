@@ -356,6 +356,11 @@ pub(in crate::service) fn assign(
                 .insert(name.into(), bounded(b"X".to_vec())?);
         }
     }
+    if request.arguments.contains_key("LANGINUSE") {
+        response
+            .outputs
+            .insert("LANGINUSE".into(), bounded(b"ENU".to_vec())?);
+    }
     for name in ["MAJORVERSION", "MICROVERSION", "MINORVERSION"] {
         if request.arguments.contains_key(name) {
             response.outputs.insert(name.into(), decimal_payload(-1)?);
@@ -575,6 +580,7 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "PARTNPAGE",
         "RETURNPROG",
         "TERMPRIORITY",
+        "LANGINUSE",
     ];
     if request.arguments.len() > 16
         || request.arguments.iter().any(|(name, value)| {

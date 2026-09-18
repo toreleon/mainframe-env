@@ -54,6 +54,7 @@ pub(super) fn validate_output(
         "ASRAREGS64" => Some(128),
         "ERRORMSG" => Some(500),
         "INITPARM" => Some(60),
+        "LANGINUSE" => Some(3),
         "OPSECURITY" => Some(3),
         "LDCMNEM" | "PARTNPAGE" => Some(2),
         "PARTNSET" => Some(6),

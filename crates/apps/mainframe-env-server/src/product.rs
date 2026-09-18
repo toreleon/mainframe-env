@@ -11797,6 +11797,14 @@ mod tests {
             .replace(
                 "EXEC CICS ASSIGN CMDSEC(CMDSEC-X)",
                 "EXEC CICS ASSIGN TERMPRIORITY(TERMINAL-PRIORITY-X) CMDSEC(CMDSEC-X)",
+            )
+            .replace(
+                "01 CMDSEC-X PIC X.",
+                "01 CMDSEC-X PIC X.\n01 LANGUAGE-X PIC X(3) VALUE 'ZZZ'.",
+            )
+            .replace(
+                "TERMPRIORITY(TERMINAL-PRIORITY-X) CMDSEC(CMDSEC-X)",
+                "LANGINUSE(LANGUAGE-X) TERMPRIORITY(TERMINAL-PRIORITY-X) CMDSEC(CMDSEC-X)",
             );
         let path = LogicalPath::new("SCHEDULE.cbl", limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
@@ -12040,6 +12048,7 @@ mod tests {
             &[0; 2]
         );
         assert_eq!(restored.variable("LINK-LEVEL-X").unwrap().bytes(), &[0, 1]);
+        assert_eq!(restored.variable("LANGUAGE-X").unwrap().bytes(), b"ENU");
         assert_eq!(
             restored.variable("LOCAL-CCSID-X").unwrap().bytes(),
             &[0, 0, 0, 37]

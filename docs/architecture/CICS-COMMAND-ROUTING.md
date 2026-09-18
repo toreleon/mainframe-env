@@ -242,7 +242,7 @@ is empty: local purge succeeds idempotently without changing the already
 displayed screen or current map. DPL use returns `INVREQ` 16/200. Deleting a
 nonempty accumulated message and surfacing temporary-storage `TSIOERR` remain
 unready until that logical-message authority exists.
-The typed ASSIGN subset carries each of its 85 admitted context values as a
+The typed ASSIGN subset carries each of its 86 admitted context values as a
 pre-resolved output binding under one bounded output-name authority. It retains
 the existing 16-option maximum, exact receiver checks, partial-INVREQ behavior,
 local/DPL matrix, EIBFN and provider semantics without carrying source command
@@ -256,8 +256,10 @@ identity from each trusted invocation and fails closed for LINK-child and DPL
 lineage until it owns a durable caller stack. `TERMPRIORITY` returns the
 terminal definition's source-default halfword zero independently of current
 task priority; it follows the local nonterminal 16/5 and DPL 16/200 condition
-matrix. The other 28 generated ASSIGN semantic options remain compiler
-rejections until their contexts are implemented.
+matrix. `LANGINUSE` maps the runtime's unoverridden English language default to
+the source-defined three-byte `ENU` in local and DPL contexts. The other 27
+generated ASSIGN semantic options remain compiler rejections until their
+contexts are implemented.
 The legacy route admits only the source-valid option subset whose behavior is
 implemented by that raw handler. A catalog-known option outside that subset
 fails explicitly before compatibility lowering instead of being silently

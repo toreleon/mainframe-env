@@ -7498,6 +7498,7 @@ mod tests {
             CicsOperation::Assign,
             BTreeMap::from([
                 ("CMDSEC".into(), argument(b"CMDSEC-OUT")),
+                ("LANGINUSE".into(), argument(b"LANGUAGE-OUT")),
                 ("OPSECURITY".into(), argument(b"OPSECURITY-OUT")),
                 ("RESSEC".into(), argument(b"RESSEC-OUT")),
                 ("TCTUALENG".into(), argument(b"TCTUA-LENGTH-OUT")),
@@ -7511,6 +7512,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(local_only.outputs["CMDSEC"].bytes(), b"X");
+        assert_eq!(local_only.outputs["LANGINUSE"].bytes(), b"ENU");
         assert_eq!(local_only.outputs["OPSECURITY"].bytes(), &[0; 3]);
         assert_eq!(local_only.outputs["RESSEC"].bytes(), b"X");
         assert_eq!(local_only.outputs["TCTUALENG"].bytes(), b"0");
@@ -8337,6 +8339,7 @@ mod tests {
                 ("CMDSEC".into(), argument(b"CMDSEC-OUT")),
                 ("INITPARM".into(), argument(b"INITPARM-OUT")),
                 ("INITPARMLEN".into(), argument(b"INITPARM-LENGTH-OUT")),
+                ("LANGINUSE".into(), argument(b"LANGUAGE-OUT")),
                 ("RESSEC".into(), argument(b"RESSEC-OUT")),
             ]),
             4,
@@ -8352,6 +8355,7 @@ mod tests {
         assert_eq!(initparm.outputs["INITPARMLEN"].bytes(), b"0");
         assert_eq!(initparm.outputs["BRIDGE"].bytes(), &[b' '; 4]);
         assert_eq!(initparm.outputs["CMDSEC"].bytes(), b"X");
+        assert_eq!(initparm.outputs["LANGINUSE"].bytes(), b"ENU");
         assert_eq!(initparm.outputs["RESSEC"].bytes(), b"X");
 
         let mut no_bts = request(

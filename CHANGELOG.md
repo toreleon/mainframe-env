@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `ASSIGN LANGINUSE`. The runtime's unoverridden English
+  national-language default maps through the pinned CICS table to exact
+  three-byte `ENU` in local and DPL contexts. Append-only output tag 103
+  preserves every existing typed-plan tag.
+
 - Added typed CICS `ASSIGN TERMPRIORITY`. The runtime's terminal definition
   uses the source default zero independently of a later `CHANGE TASK`; local
   nonterminal use returns `INVREQ` 16/5 and DPL returns 16/200. Append-only

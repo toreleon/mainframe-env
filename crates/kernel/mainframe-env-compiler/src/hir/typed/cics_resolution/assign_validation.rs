@@ -99,6 +99,7 @@ pub(super) fn validate(
         "PARTNPAGE",
         "RETURNPROG",
         "TERMPRIORITY",
+        "LANGINUSE",
     ] {
         let Some(value) = clauses.get(name) else {
             continue;
@@ -167,6 +168,7 @@ pub(super) fn validate(
             || (name == "ERRORMSG" && target.length != 500)
             || (name == "FCI" && target.length != 1)
             || (name == "INITPARM" && target.length != 60)
+            || (name == "LANGINUSE" && target.length != 3)
             || (name == "OPERKEYS" && target.length != 8)
             || (name == "OPSECURITY" && target.length != 3)
             || (name == "ORGABCODE" && target.length != 4)

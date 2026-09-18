@@ -1576,7 +1576,7 @@ mod tests {
             decoded.operands[1].value,
             CicsOperandValue::Literal(ref bytes) if bytes == b"003"
         ));
-        assert_eq!(CICS_ASSIGN_OUTPUT_NAMES.len(), 85);
+        assert_eq!(CICS_ASSIGN_OUTPUT_NAMES.len(), 86);
         assert!(
             CICS_ASSIGN_OUTPUT_NAMES[..78]
                 .windows(2)
@@ -1588,7 +1588,12 @@ mod tests {
                 .all(|pair| pair[0] < pair[1])
         );
         assert!(
-            CICS_ASSIGN_OUTPUT_NAMES[83..]
+            CICS_ASSIGN_OUTPUT_NAMES[83..85]
+                .windows(2)
+                .all(|pair| pair[0] < pair[1])
+        );
+        assert!(
+            CICS_ASSIGN_OUTPUT_NAMES[85..]
                 .windows(2)
                 .all(|pair| pair[0] < pair[1])
         );
@@ -1608,6 +1613,7 @@ mod tests {
             ("PARTNPAGE", 100),
             ("RETURNPROG", 101),
             ("TERMPRIORITY", 102),
+            ("LANGINUSE", 103),
         ] {
             let output = CicsAssignOutput::from_name(name).unwrap();
             assert_eq!(output_tag(CicsOutputName::Assign(output)), tag);
