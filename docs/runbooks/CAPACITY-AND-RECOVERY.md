@@ -8,13 +8,13 @@ grows automatically.
 
 The core server owns exactly two shared durable workers. Each poll claims JES
 work first and, when none is available, claims the CICS `cics-start-v1`
-generation; generation-scoped claims prevent either operation from consuming a
-foreign durable work lane. Within a generation, higher priority is selected
-first; oldest available admission tick plus work ID provides a deterministic
-FIFO tie-break within a priority. Each worker heartbeats a 30-second lease
-every 5 seconds through the persisted logical clock, and admitted work has a
-24-hour deadline. After an ungraceful process exit, wait until that lease
-expires;
+generation, then the CICS `cics-delay-v1` generation; generation-scoped claims
+prevent any operation from consuming a foreign durable work lane. Within a
+generation, higher priority is selected first; oldest available admission tick
+plus work ID provides a deterministic FIFO tie-break within a priority. Each
+worker heartbeats a 30-second lease every 5 seconds through the persisted
+logical clock, and admitted work has a 24-hour deadline. After an ungraceful
+process exit, wait until that lease expires;
 the next server advances the same durable clock and reclaims with a higher
 epoch. Never edit a lease ID, epoch, heartbeat, or clock record by hand.
 
@@ -90,6 +90,16 @@ that flag. Restore the interval and work rows together. Deleting the tombstone
 can turn a crash-gap retry into NOTFND, while requeueing canceled work creates a
 permanent failed-promotion loop. Immediate reuse of a cancelled REQID is not
 supported by this bounded slice.
+
+Back up `cics-delay-v1` provider rows with their matching shared work rows of
+the same generation. A row binds one task/run-unit and source-statement identity
+to its packed interval, expiration tick, producing effect, and deterministic
+work ID. Pending, ready, and consumed states are CAS-versioned; replacing either
+row can wake the wrong source cycle or turn a later loop iteration into a replay.
+On restart, let the shared workers reclaim expired leases and promote only due
+work. Do not mark a delay ready, consumed, or completed by hand. Current resume
+is request-driven: the original online exchange must be invoked again after due
+promotion. Automatic redispatch and task-timeout cleanup are not yet provided.
 
 Back up `cics-session` rows containing task association or HANDLE state before
 enabling typed `SET ASSOCIATION USERCORRDATA` or durable handlers. Current

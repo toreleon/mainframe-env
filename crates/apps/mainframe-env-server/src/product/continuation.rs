@@ -538,7 +538,7 @@ impl ProductServer {
             current_version,
         )?;
         match suspension.kind.as_str() {
-            "cics-enqueue" | "cics-scheduler" => return Ok(()),
+            "cics-delay" | "cics-enqueue" | "cics-scheduler" => return Ok(()),
             "cics-terminal" => {}
             _ => return Err(HostProblem::InfrastructureFailure),
         }

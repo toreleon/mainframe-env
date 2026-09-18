@@ -12,11 +12,15 @@ pub(super) fn validate_constraints(
     match operation {
         HirCicsOperation::Delay
             if clauses.get("INTERVAL").is_some_and(|value| {
-                value.len() != 1 || value[0].parse::<i64>().ok() != Some(0)
+                value.len() != 1
+                    || value[0]
+                        .parse::<i64>()
+                        .ok()
+                        .is_none_or(|value| !valid_hhmmss(value))
             }) =>
         {
             return Err(ResolutionFailure::Invalid(
-                "typed CICS DELAY currently requires literal INTERVAL(0) or the bare default"
+                "typed CICS DELAY currently requires a literal packed INTERVAL or the bare default"
                     .into(),
             ));
         }
@@ -42,6 +46,10 @@ pub(super) fn validate_constraints(
         _ => {}
     }
     Ok(())
+}
+
+fn valid_hhmmss(value: i64) -> bool {
+    (0..=995_959).contains(&value) && value / 100 % 100 <= 59 && value % 100 <= 59
 }
 
 pub(super) fn operands(

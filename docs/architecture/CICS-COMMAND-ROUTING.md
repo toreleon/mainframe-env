@@ -57,8 +57,8 @@ coverage, semantic and differential credit.
 
 The contract also binds one 121-name EIBRESP authority for dynamic
 `HANDLE CONDITION` and `IGNORE CONDITION` clauses. Its early participant view
-records two known mutating rows, 260 bounded-effect rows, one explicit UOW
-boundary and 261 bounded-UOW rows. Those values describe current contract
+records 20 known mutating rows, 225 bounded-effect rows, one explicit UOW
+boundary and 244 bounded-UOW rows. Those values describe current contract
 certainty; they are not execution or conformance counts.
 
 The same generator emits the compact
@@ -93,6 +93,12 @@ subset: packed ABSTIME input, valued DATESEP/TIMESEP, five explicit date
 formats, TIME, MILLISECONDS, and common response options. Other official
 FORMATTIME fields remain explicit compiler rejections until their output and
 timezone contracts are implemented.
+The typed DELAY route completes bare/default and literal-zero INTERVAL without
+timer state. Valid positive packed literal INTERVAL values bind a hidden
+task/statement identity, persist one versioned cycle and shared work item, and
+reissue from the durable checkpoint only after lease-fenced due promotion.
+Dynamic intervals, TIME and explicit units, REQID cancellation, automatic
+redispatch, and task-timeout cleanup remain explicit gaps.
 `ABEND` also lowers through a typed task plan: ABCODE is captured as a bounded
 literal or a pre-resolved 1–4 character storage input, and CANCEL/NODUMP remain
 distinct flags. Retained raw ABEND artifacts remain readable, but new
@@ -226,7 +232,7 @@ differentials, or make 0.9.0 release-ready.
 | `file-control` | file status, keyed I/O, and browse behavior |
 | `queue-control` | transient-data queue writes |
 | `recovery` | SYNCPOINT coordination, rollback, and subsystem unit-of-work completion |
-| `interval-control` | bounded local START scheduling, cancellation, and durable work promotion |
+| `interval-control` | bounded local START scheduling/cancellation plus zero and durable relative DELAY |
 
 This table describes the eight families already present in the 40-operation runtime
 collection. The 263-row application registry also assigns every row a

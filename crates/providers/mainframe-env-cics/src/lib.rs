@@ -20,9 +20,10 @@ pub use retention::{
     describe_cics_undo_row, describe_cics_uow_row,
 };
 pub use service::{
-    BmsFieldDefinition, BmsMapDefinition, CICS_START_WORK_GENERATION, CicsContinuation,
-    CicsEnqueueModelDefinition, CicsFileDefinition, CicsFileStatus, CicsLimits, CicsReplayClock,
-    CicsService, CicsTerminalExecution, CicsTerminalSnapshot, CicsTraceEntry, cics_provider,
+    BmsFieldDefinition, BmsMapDefinition, CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION,
+    CicsContinuation, CicsEnqueueModelDefinition, CicsFileDefinition, CicsFileStatus, CicsLimits,
+    CicsReplayClock, CicsService, CicsTerminalExecution, CicsTerminalSnapshot, CicsTraceEntry,
+    cics_provider,
 };
 
 #[cfg(feature = "fault-injection")]

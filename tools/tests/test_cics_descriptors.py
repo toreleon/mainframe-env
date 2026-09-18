@@ -714,7 +714,7 @@ class CicsDescriptorTests(unittest.TestCase):
             contracts["participant_contract"]["mutating_rows"],
             sum(row["contract"]["effect"]["mutating"] is True for row in rows),
         )
-        self.assertEqual(contracts["participant_contract"]["mutating_rows"], 19)
+        self.assertEqual(contracts["participant_contract"]["mutating_rows"], 20)
         self.assertEqual(contracts["participant_contract"]["bounded_effect_rows"], 225)
         self.assertEqual(contracts["participant_contract"]["explicit_uow_boundary_rows"], 1)
         self.assertFalse(

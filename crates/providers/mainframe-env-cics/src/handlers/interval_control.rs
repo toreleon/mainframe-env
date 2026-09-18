@@ -7,6 +7,8 @@
 mod cancel;
 mod delay;
 
+pub use delay::CICS_DELAY_WORK_GENERATION;
+
 use super::super::{CicsLimits, CicsReplayClock, CicsService, Run, field, store_error};
 use crate::{CicsIntervalMode, CicsIntervalTime};
 use mainframe_env_execution_api::{
@@ -38,6 +40,7 @@ impl CicsService {
         limits: CicsLimits,
         replay_clock: Arc<dyn CicsReplayClock>,
     ) -> Result<Arc<Self>, HostProblem> {
+        delay::validate_store(store.as_ref(), limits)?;
         Self::open_inner(host, store, limits, Some(replay_clock), Some(work_store))
     }
 

@@ -7,7 +7,7 @@ use crate::retention::{
     CICS_OUTER_EFFECT_ORIGIN_BINDING, CICS_OUTER_EFFECT_ORIGIN_SCHEMA, DecodedUow,
     UowRetentionMetadata,
 };
-pub use handlers::{CICS_START_WORK_GENERATION, CicsEnqueueModelDefinition};
+pub use handlers::*;
 use handlers::{
     decode_terminal_address, encode_terminal_address, terminal_field_address, validate_map,
 };
@@ -5070,19 +5070,19 @@ mod tests {
             );
         }
 
-        let mut nonzero = request(
+        let mut invalid = request(
             CicsOperation::Delay,
-            BTreeMap::from([("INTERVAL".into(), cics_decimal(1))]),
+            BTreeMap::from([("INTERVAL".into(), cics_decimal(1_000_000))]),
             3,
         );
-        nonzero.condition_policy = CicsConditionPolicy::Respond {
+        invalid.condition_policy = CicsConditionPolicy::Respond {
             response_field: "RESP".into(),
             response2_field: Some("RESP2".into()),
         };
         let response = service
             .invoke(
-                &effect(&invocation.run_unit_id, nonzero.clone(), 3),
-                nonzero,
+                &effect(&invocation.run_unit_id, invalid.clone(), 3),
+                invalid,
             )
             .unwrap();
         assert_eq!(
@@ -5091,8 +5091,191 @@ mod tests {
                 response.response,
                 response.response2
             ),
-            ("INVREQ", 16, 0)
+            ("INVREQ", 16, 4)
         );
+    }
+
+    #[test]
+    fn positive_interval_delay_suspends_promotes_replays_and_repeats() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (invocation, _) = registered(&service);
+        let arguments = BTreeMap::from([
+            ("INTERVAL".into(), cics_decimal(1)),
+            (
+                "DELAY.ID".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.delay-id@1",
+                    format!("{}:42", invocation.run_unit_id).into_bytes(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            ),
+        ]);
+        let first = request(CicsOperation::Delay, arguments.clone(), 1);
+        let suspended = service
+            .invoke(
+                &effect(&invocation.run_unit_id, first.clone(), 1),
+                first.clone(),
+            )
+            .unwrap();
+        assert_eq!(suspended.disposition, CicsDisposition::Suspended);
+        assert_eq!(
+            service
+                .invoke(&effect(&invocation.run_unit_id, first.clone(), 1), first)
+                .unwrap(),
+            suspended
+        );
+        assert!(
+            store
+                .claim("delay-worker", Some(CICS_DELAY_WORK_GENERATION), 1_999, 100)
+                .unwrap()
+                .is_none()
+        );
+        let work = store
+            .claim("delay-worker", Some(CICS_DELAY_WORK_GENERATION), 2_000, 100)
+            .unwrap()
+            .unwrap();
+        service.promote_delay_work(&work, 2_000).unwrap();
+        store
+            .complete(
+                &work.work_id,
+                work.lease_id.as_deref().unwrap(),
+                work.lease_epoch,
+                2_000,
+            )
+            .unwrap();
+        let second = request(CicsOperation::Delay, arguments.clone(), 2);
+        let completed = service
+            .invoke(
+                &effect(&invocation.run_unit_id, second.clone(), 2),
+                second.clone(),
+            )
+            .unwrap();
+        assert_eq!(completed.disposition, CicsDisposition::Complete);
+        assert_eq!(
+            service
+                .invoke(&effect(&invocation.run_unit_id, second.clone(), 2), second)
+                .unwrap(),
+            completed
+        );
+
+        let repeated = request(CicsOperation::Delay, arguments, 3);
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, repeated.clone(), 3),
+                repeated,
+            )
+            .unwrap();
+        assert_eq!(response.disposition, CicsDisposition::Suspended);
+        let next = store
+            .claim(
+                "next-delay-worker",
+                Some(CICS_DELAY_WORK_GENERATION),
+                2_000,
+                100,
+            )
+            .unwrap()
+            .unwrap();
+        assert_ne!(next.work_id, work.work_id);
+    }
+
+    #[test]
+    fn positive_interval_delay_survives_sqlite_reopen() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-delay-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let invocation = invocation_for("delay-reopen", BTreeMap::new());
+        let session = SessionId::new("delay-reopen-session", 64).unwrap();
+        let arguments = BTreeMap::from([
+            ("INTERVAL".into(), cics_decimal(1)),
+            (
+                "DELAY.ID".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.delay-id@1",
+                    format!("{}:7", invocation.run_unit_id).into_bytes(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            ),
+        ]);
+
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = CicsService::open_with_runtime(
+                authorities(),
+                store.clone(),
+                store,
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(1_000)),
+            )
+            .unwrap();
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let first = request(CicsOperation::Delay, arguments.clone(), 1);
+            assert_eq!(
+                service
+                    .invoke(&effect(&invocation.run_unit_id, first.clone(), 1), first)
+                    .unwrap()
+                    .disposition,
+                CicsDisposition::Suspended
+            );
+        }
+
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = CicsService::open_with_runtime(
+                authorities(),
+                store.clone(),
+                store.clone(),
+                CicsLimits::default(),
+                Arc::new(TestCicsClock::fixed(2_000)),
+            )
+            .unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let work = store
+                .claim(
+                    "delay-reopen-worker",
+                    Some(CICS_DELAY_WORK_GENERATION),
+                    2_000,
+                    100,
+                )
+                .unwrap()
+                .unwrap();
+            service.promote_delay_work(&work, 2_000).unwrap();
+            store
+                .complete(
+                    &work.work_id,
+                    work.lease_id.as_deref().unwrap(),
+                    work.lease_epoch,
+                    2_000,
+                )
+                .unwrap();
+            let second = request(CicsOperation::Delay, arguments, 2);
+            assert_eq!(
+                service
+                    .invoke(&effect(&invocation.run_unit_id, second.clone(), 2), second)
+                    .unwrap()
+                    .disposition,
+                CicsDisposition::Complete
+            );
+        }
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

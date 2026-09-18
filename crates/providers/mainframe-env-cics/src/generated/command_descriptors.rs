@@ -86,7 +86,7 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         syntax: "DELAY",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0039",
         family: CicsCommandFamily::IntervalControl,
-        mutating: false,
+        mutating: true,
     },
     CicsCommandDescriptor {
         operation: CicsOperation::Delete,

@@ -1,4 +1,5 @@
-use mainframe_env_cics::CICS_START_WORK_GENERATION;
+use mainframe_env_cics::{CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION, CicsService};
+use mainframe_env_host_api::HostProblem;
 use mainframe_env_store_api::{PlatformStore, StoreError, WorkRecord};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -26,9 +27,18 @@ pub(crate) fn claim_durable_work(
     if jes.is_some() {
         return Ok(jes);
     }
-    store.claim(
+    let start = store.claim(
         worker,
         Some(CICS_START_WORK_GENERATION),
+        now_tick,
+        JES_LEASE_TICKS,
+    )?;
+    if start.is_some() {
+        return Ok(start);
+    }
+    store.claim(
+        worker,
+        Some(CICS_DELAY_WORK_GENERATION),
         now_tick,
         JES_LEASE_TICKS,
     )
@@ -50,6 +60,19 @@ pub(crate) fn heartbeat_durable_work(
             JES_LEASE_TICKS,
         )
         .map(|_| ())
+}
+
+pub(crate) fn process_cics_work(
+    cics: &CicsService,
+    work: &WorkRecord,
+    now_tick: u64,
+) -> Result<bool, HostProblem> {
+    match work.required_generation.as_str() {
+        CICS_START_WORK_GENERATION => cics.promote_start_work(work, now_tick)?,
+        CICS_DELAY_WORK_GENERATION => cics.promote_delay_work(work, now_tick)?,
+        _ => return Ok(false),
+    }
+    Ok(true)
 }
 
 pub(crate) fn clear_worker_progress(progress: &Mutex<Vec<Option<Instant>>>, ordinal: usize) {

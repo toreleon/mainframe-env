@@ -23,7 +23,7 @@ pub(super) fn invalid_shape(
             !inputs.is_subset(&allowed)
                 || plan.operands.iter().any(|operand| {
                     operand.name != CicsOperandName::Interval
-                        || operand.value != CicsOperandValue::Integer(0)
+                        || !matches!(operand.value, CicsOperandValue::Integer(value) if valid_hhmmss(value))
                 })
                 || scheduling_options
                 || outputs.contains(&CicsOutputName::Into)
@@ -68,4 +68,8 @@ pub(super) fn invalid_shape(
         }
         _ => true,
     }
+}
+
+fn valid_hhmmss(value: i64) -> bool {
+    (0..=995_959).contains(&value) && value / 100 % 100 <= 59 && value % 100 <= 59
 }

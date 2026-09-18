@@ -40,6 +40,12 @@ impl CicsIntervalError {
             Self::SecondsOutOfRange => 6,
         }
     }
+
+    /// DELAY's INVREQ RESP2 for packed INTERVAL operand failures.
+    #[must_use]
+    pub const fn delay_response2(self) -> i32 {
+        self.start_response2()
+    }
 }
 
 /// A validated CICS interval-control expiration value.

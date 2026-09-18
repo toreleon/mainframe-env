@@ -35,7 +35,7 @@
       "operation": "Delay",
       "interface": "api",
       "family": "interval-control",
-      "mutating": false,
+      "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0039"
     },
     {

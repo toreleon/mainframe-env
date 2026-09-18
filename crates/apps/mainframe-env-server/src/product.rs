@@ -5,7 +5,7 @@ use crate::jes_admission::ChildAdmissionResult;
 use crate::jes_worker::{
     DurableJesClock, JES_HEARTBEAT_MILLIS, JES_IDLE_MILLIS, JES_WORK_GENERATION, JES_WORKER_COUNT,
     JES_WORKER_FRESHNESS_MILLIS, JesClock, JesWorkPayload, claim_durable_work,
-    clear_worker_progress, heartbeat_durable_work,
+    clear_worker_progress, heartbeat_durable_work, process_cics_work,
 };
 use crate::retention_maintenance::provider::RetentionPlanner;
 use crate::{
@@ -26,8 +26,8 @@ use mainframe_env_batch::{
     BatchControllerSelector, BatchLimits, BatchService, JclBundle,
 };
 use mainframe_env_cics::{
-    BmsMapDefinition, CICS_START_WORK_GENERATION, CicsReplayClock, CicsService,
-    CicsTerminalExecution, CicsTerminalSnapshot, CicsTraceEntry, cics_provider,
+    BmsMapDefinition, CicsReplayClock, CicsService, CicsTerminalExecution, CicsTerminalSnapshot,
+    CicsTraceEntry, cics_provider,
 };
 use mainframe_env_dataset::{DatasetReplayClock, DatasetService, dataset_providers};
 use mainframe_env_db2::{
@@ -2780,8 +2780,7 @@ impl ProductServer {
     }
 
     fn process_claimed_jes_work(&self, work: &WorkRecord) -> Result<JesWorkOutcome, HostProblem> {
-        if work.required_generation == CICS_START_WORK_GENERATION {
-            self.cics.promote_start_work(work, self.jes_tick()?)?;
+        if process_cics_work(&self.cics, work, self.jes_tick()?)? {
             return Ok(JesWorkOutcome::Completed);
         }
         if work.state != WorkState::Claimed
@@ -6312,6 +6311,7 @@ mod tests {
         PendingOnlineTransfer, decode_online_machine_continuation,
         encode_online_machine_continuation, encode_online_machine_continuation_with_transfer,
     };
+    use mainframe_env_cics::{CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION};
     use mainframe_env_compiler::CobolCompiler;
     use mainframe_env_compiler_api::{
         ARTIFACT_CONTRACT, ArtifactManifestV2, CompilationMode, CompileOptions, CompileTarget,
@@ -10619,6 +10619,125 @@ mod tests {
                 })
                 .count(),
             2
+        );
+    }
+
+    #[test]
+    fn compiled_positive_delay_suspends_promotes_and_resumes() {
+        let artifact = published_source_fixture(
+            "DELAY1",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. DELAY1.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DONE-X PIC X VALUE '0'.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS DELAY INTERVAL(1) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE '1' TO DONE-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let clock = Arc::new(ManualJesClock::new(100));
+        let platform_store: Arc<dyn PlatformStore> = Arc::new(MemoryStore::new(Default::default()));
+        let server =
+            ProductServer::open_with_clock(config(), platform_store, clock.clone()).unwrap();
+        let execution_clock = clock.clone();
+        server
+            .program
+            .bind_execution_control(Arc::new(move |_: &Invocation| {
+                Ok(ExecutionControl {
+                    now_tick: execution_clock
+                        .now_tick()
+                        .map_err(|_| ExecutionControlError::Unavailable)?,
+                    cancellation_requested: false,
+                })
+            }))
+            .unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "DELAY1".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("DL01".into(), "DELAY1".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "DELAY1".into(),
+                    map: "DELAY1".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("interval-delay-positive", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "DL01", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "DL01",
+                24,
+                80,
+                "interval-delay-positive-csrf",
+                100,
+                10_000,
+            )
+            .unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 100)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "DELAY1", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "DELAY1", 100)
+            .unwrap();
+        assert!(
+            server
+                .claim_jes_work("delay-product-worker")
+                .unwrap()
+                .is_none()
+        );
+        clock.advance(1_000);
+        let work = server
+            .claim_jes_work("delay-product-worker")
+            .unwrap()
+            .unwrap();
+        assert_eq!(work.required_generation, CICS_DELAY_WORK_GENERATION);
+        let outcome = server.process_claimed_jes_work(&work).unwrap();
+        server.finish_claimed_jes_work(&work, Ok(outcome)).unwrap();
+        server
+            .run_online_exchange(&session, &principal, "DELAY1", 1_100)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("DONE-X").unwrap().bytes(), b"1");
+        // Restoring the terminal run starts a fresh in-memory trace segment; the
+        // durable provider tests cover the preceding suspended invocation.
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 1_100)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::Delay)
+                .count(),
+            1
         );
     }
 

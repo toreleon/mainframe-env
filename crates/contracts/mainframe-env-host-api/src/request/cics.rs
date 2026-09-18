@@ -118,6 +118,7 @@ impl CicsOperation {
             self,
             Self::Delete
                 | Self::Cancel
+                | Self::Delay
                 | Self::Deq
                 | Self::Enq
                 | Self::Rewrite

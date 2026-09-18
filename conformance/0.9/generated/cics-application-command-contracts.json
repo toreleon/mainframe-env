@@ -687,10 +687,10 @@
     "id": "INT-1601.cics-participant",
     "status": "bounded-ambiguity",
     "owner": "shared-execution-coordinator-and-cics-provider",
-    "mutating_rows": 19,
+    "mutating_rows": 20,
     "bounded_effect_rows": 225,
     "explicit_uow_boundary_rows": 1,
-    "bounded_uow_rows": 243,
+    "bounded_uow_rows": 244,
     "execution_credit": 0,
     "prepare_before_dispatch": {
       "durable_effect_intent": true,
@@ -72357,7 +72357,7 @@
             },
             {
               "name": "recovery",
-              "status": "resolved"
+              "status": "bounded-ambiguity"
             }
           ],
           "unresolved_dimensions": [],
@@ -72366,7 +72366,8 @@
             "option-bounds",
             "eib-response",
             "conditions",
-            "context-applicability"
+            "context-applicability",
+            "recovery"
           ],
           "source_issue_ids": [
             "cics-a-issue-0039-context-predicate-not-structured-47f9709f33ce",
@@ -73141,7 +73142,7 @@
               "selector_authority": "source-bound-runtime",
               "selector_completeness": "resolved",
               "fallback_selector": null,
-              "access_intent": "read",
+              "access_intent": "update",
               "authorization": "typed-saf-before-dispatch"
             },
             "capability": {
@@ -73156,8 +73157,8 @@
             },
             "effect": {
               "status": "resolved",
-              "class": "observational",
-              "mutating": false,
+              "class": "mutating",
+              "mutating": true,
               "ir_effects": [
                 "audit",
                 "condition",
@@ -73172,26 +73173,26 @@
               "status": "resolved",
               "finite_deadline": true,
               "live_probe": "before-dispatch-and-blocking-boundaries",
-              "post_dispatch": "cancelled"
+              "post_dispatch": "unknown-outcome"
             },
             "audit": {
               "status": "resolved",
               "required": true,
               "deny_and_failure_paths": true,
-              "atomic_with_effect_and_lifecycle": false
+              "atomic_with_effect_and_lifecycle": true
             },
             "recovery": {
-              "status": "resolved",
-              "durable_effect_intent": false,
-              "uow_participation": "not-applicable",
-              "prepare": "not-applicable",
-              "rollback": "not-applicable",
-              "compensation": "not-applicable",
+              "status": "bounded-ambiguity",
+              "durable_effect_intent": true,
+              "uow_participation": "bounded-ambiguity",
+              "prepare": "bounded-ambiguity",
+              "rollback": "bounded-ambiguity",
+              "compensation": "bounded-ambiguity",
               "replay_namespace": null,
-              "unknown_outcome": "not-applicable",
+              "unknown_outcome": "preserve",
               "automatic_redispatch": false,
-              "fenced_reconciliation": false,
-              "retention_protected": false
+              "fenced_reconciliation": null,
+              "retention_protected": null
             },
             "registry": {
               "family": "interval-control",
@@ -73204,7 +73205,7 @@
               "handler_sha256": "sha256:237fce0b90a985147211baa6185c0d1d419bff0fb9d5ca2b784c4a7b9005e049"
             }
           },
-          "row_contract_sha256": "sha256:10e157c7a172c74c4697c927e18f1c7cd4b74590bcb535edc974d956ce321828"
+          "row_contract_sha256": "sha256:c4307ca226657290574b3c33ddbac05d5b1b450f2be9f25e00c90608949ca2e5"
         },
         {
           "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0040",
@@ -446572,5 +446573,5 @@
       ]
     }
   ],
-  "contract_sha256": "sha256:44ec568db1d38f5c8f85f083732540ac73c789c06d7e5746767b174c9af43816"
+  "contract_sha256": "sha256:b6b6e6880c2d16cd817bc98154bddefcdf01a8a9ec01b9d97121c164399cc590"
 }

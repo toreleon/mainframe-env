@@ -143,6 +143,7 @@ pub(super) fn suspension(
 ) -> MachineDrive<EffectRequest> {
     let (kind, reissue) = match operation {
         CicsOperation::Enq => ("cics-enqueue", true),
+        CicsOperation::Delay => ("cics-delay", true),
         CicsOperation::ChangeTask | CicsOperation::Suspend => ("cics-scheduler", false),
         _ => ("cics-terminal", true),
     };
@@ -366,6 +367,15 @@ pub(super) fn execute(
         arguments.insert(
             format!("OPTION.{}", names::option(*option)),
             payload("mainframe-env.cics.option@1", Vec::new())?,
+        );
+    }
+    if plan.operation == CicsPlanOperation::Delay {
+        arguments.insert(
+            "DELAY.ID".into(),
+            payload(
+                "mainframe-env.cics.delay-id@1",
+                format!("{}:{}", machine.invocation.run_unit_id, machine.pc).into_bytes(),
+            )?,
         );
     }
 

@@ -198,10 +198,22 @@ START/CANCEL lifecycle owns bounded replay retention.
 Typed zero-delay DELAY is deliberately stateless. Bare DELAY and a
 compile-time literal `INTERVAL(0)` return NORMAL immediately and never create a
 timer row, work item, checkpoint, or suspension. The compiler rejects every
-positive or dynamic interval and all TIME, FOR/UNTIL, and REQID forms before
-publication. Durable timer admission, EXPIRED/cancelled wakeup, and task resume
-belong to the positive-delay child and are not inferred from this immediate
-boundary.
+dynamic interval and all TIME, FOR/UNTIL, and REQID forms before publication.
+Positive literal packed intervals use the durable path below; they are not
+inferred from this immediate boundary.
+
+Positive literal packed `INTERVAL` DELAY uses `cics-delay-v1` provider rows and
+work generation. A hidden task/run-unit plus statement-position identity keeps
+the same source command stable across checkpoint reissue. First admission
+persists one pending cycle and deterministic work row; the shared worker can
+promote only that due cycle under its lease/epoch fence. The interpreter keeps
+the online exchange and continuation attached, reissues the command, and only
+the ready-to-consumed CAS completes it. The same consumer request replays the
+completion, while a later loop encounter creates a new cycle and work identity.
+Provider open strictly validates retained rows, and Memory and SQLite reopen
+preserve the transition. Named cancellation, task-timeout cleanup, automatic
+redispatch, TIME/explicit units, PostgreSQL evidence, and retention eligibility
+remain separate obligations.
 
 An ENQ wait is not a terminal-input handoff. Its execution remains
 `Suspended`, and both the coordinator checkpoint and product continuation stay

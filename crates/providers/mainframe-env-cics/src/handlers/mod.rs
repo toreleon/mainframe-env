@@ -46,8 +46,8 @@ pub(super) use handle_state::{
     AbendExit, AbendRecord, HandleFrame, HandleState, decode_session_handle_state,
     session_schema_version,
 };
-pub use interval_control::CICS_START_WORK_GENERATION;
 pub(super) use interval_control::load as load_interval_records;
+pub use interval_control::{CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION};
 pub(super) use interval_control::{IntervalStartRecord, invoke as invoke_interval_control};
 pub(super) use program_control::invoke as invoke_program_control;
 pub(super) use queue_control::invoke as invoke_queue_control;

@@ -6,12 +6,20 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added positive literal CICS DELAY intervals over the shared durable worker
+  lane. Each task/statement cycle persists a strict versioned delay row and one
+  `cics-delay-v1` work item, suspends until fenced due promotion, completes on
+  reissue, survives SQLite reopen, and creates a fresh identity when a loop
+  reaches the statement again. TIME and explicit units, named cancellation,
+  timeout/task cleanup, automatic redispatch, PostgreSQL evidence, and licensed
+  differential remain pending.
+
 - Added the typed zero-delay CICS DELAY boundary. Bare/default DELAY and
   compile-time literal INTERVAL(0) now cross the typed compiler, plan,
   interpreter, canonical host request, provider, durable coordinator, and
   selected product route without creating timer state or suspending the task.
-  Positive/dynamic timing, TIME, FOR/UNTIL units, REQID/CANCEL, EXPIRED, and
-  durable resumption remain pending.
+  Dynamic timing, TIME, FOR/UNTIL units, REQID/CANCEL, EXPIRED, and automatic
+  resumption remain pending.
 
 - Added the typed bounded local CICS CANCEL route for unhonored committed START
   records. Explicit REQID with optional local TRANSID now authorizes the target,
