@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS DELAY `FOR`/`UNTIL` HOURS, MINUTES, and SECONDS with
+  literal or numeric-storage components. The provider uses one shared clock
+  observation per new cycle, enforces conditional component ranges with INVREQ
+  RESP2 4/5/6, and returns source-defined ignored-by-default EXPIRED 31 for an
+  elapsed absolute target. Packed TIME and MILLISECS remain pending.
+
 - Added local START without passed data. FROM is now optional, while LENGTH and
   FMH still require it. A no-data request schedules ordinary durable work; if
   RETRIEVE is issued for that start identity it consumes once and returns

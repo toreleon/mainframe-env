@@ -1,12 +1,12 @@
-use super::{name_argument, optional_decimal, valid_name};
+use super::{clock_millis_since_midnight, name_argument, optional_decimal, valid_name};
 use crate::service::{CicsLimits, CicsService, Run, field, store_error};
 use crate::{CicsIntervalMode, CicsIntervalTime};
 use mainframe_env_execution_api::{
     ArtifactRef, ExecutionId, IdempotencyKey, InvocationLimits, Selector,
 };
 use mainframe_env_host_api::{
-    AccessIntent, CicsDisposition, CicsRequest, CicsResponse, HostProblem, HostRequest,
-    canonical_request_digest,
+    AccessIntent, CicsDisposition, CicsRequest, CicsResponse, ClockRequest, HostProblem,
+    HostRequest, HostResult, canonical_request_digest,
 };
 use mainframe_env_store_api::{
     ProviderStateRecord, ProviderStateStore, StoreError, WorkRecord, WorkState,
@@ -83,30 +83,22 @@ pub(super) fn validate_store(
 
 pub(super) fn invoke(
     service: &CicsService,
-    run: &Run,
+    run: &mut Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     validate_request(request)?;
-    let interval = optional_decimal(request, "INTERVAL")?.unwrap_or(0);
     let request_id = request
         .arguments
         .get("REQID")
         .map(|_| name_argument(request, "REQID", 8))
         .transpose()?;
-    let time =
-        CicsIntervalTime::from_hhmmss(CicsIntervalMode::Relative, interval).map_err(|problem| {
-            HostProblem::Condition {
-                name: "INVREQ".into(),
-                response: 16,
-                response2: problem.delay_response2(),
-            }
-        })?;
-    if interval == 0 {
-        if request_id.is_some() {
-            return Err(invalid_request());
-        }
-        return complete(service, run);
-    }
+    let definition = delay_definition(request)?;
+    let DelayDefinition::Scheduled { identity, time } = definition else {
+        return match request_id {
+            None => complete(service, run),
+            Some(_) => Err(invalid_request()),
+        };
+    };
     let mutation = request
         .mutation
         .as_ref()
@@ -117,15 +109,16 @@ pub(super) fn invoke(
     let current = load_record(service.store.as_ref(), &delay_id, service.limits)?;
     match current {
         None => {
-            let now_tick = service.durable_tick()?;
+            let Some(expiration_tick) = expiration_tick(service, run, time)? else {
+                return expired(service, run, request);
+            };
             ensure_name_available(service, request_id.as_deref(), &delay_id)?;
             let record = new_record(
                 &delay_id,
                 request_id,
                 run,
-                interval,
-                time.deadline_tick(now_tick, 0)
-                    .ok_or(HostProblem::ResourceExhausted)?,
+                identity,
+                expiration_tick,
                 mutation.idempotency_key.as_str(),
                 digest,
                 1,
@@ -135,7 +128,7 @@ pub(super) fn invoke(
             suspended(service, run)
         }
         Some(record) => {
-            validate_context(&record, run, interval, request_id.as_deref())?;
+            validate_context(&record, run, identity, request_id.as_deref())?;
             match record.state {
                 DelayState::Pending => {
                     enqueue_work(service, &record)?;
@@ -153,15 +146,16 @@ pub(super) fn invoke(
                     complete_with_response2(service, run, cancellation_response2(&record))
                 }
                 DelayState::Consumed => {
-                    let now_tick = service.durable_tick()?;
+                    let Some(expiration_tick) = expiration_tick(service, run, time)? else {
+                        return expired(service, run, request);
+                    };
                     ensure_name_available(service, request_id.as_deref(), &delay_id)?;
                     let next = new_record(
                         &delay_id,
                         request_id,
                         run,
-                        interval,
-                        time.deadline_tick(now_tick, 0)
-                            .ok_or(HostProblem::ResourceExhausted)?,
+                        identity,
+                        expiration_tick,
                         mutation.idempotency_key.as_str(),
                         digest,
                         record
@@ -182,6 +176,95 @@ pub(super) fn invoke(
             }
         }
     }
+}
+
+#[derive(Clone, Copy)]
+enum DelayDefinition {
+    Immediate,
+    Scheduled {
+        identity: i64,
+        time: CicsIntervalTime,
+    },
+}
+
+fn delay_definition(request: &CicsRequest) -> Result<DelayDefinition, HostProblem> {
+    let interval = optional_decimal(request, "INTERVAL")?;
+    let relative = request.arguments.contains_key("OPTION.FOR");
+    let absolute = request.arguments.contains_key("OPTION.UNTIL");
+    let time = if let Some(value) = interval {
+        CicsIntervalTime::from_hhmmss(CicsIntervalMode::Relative, value)
+    } else if relative || absolute {
+        CicsIntervalTime::from_components(
+            if relative {
+                CicsIntervalMode::Relative
+            } else {
+                CicsIntervalMode::Absolute
+            },
+            optional_decimal(request, "HOURS")?,
+            optional_decimal(request, "MINUTES")?,
+            optional_decimal(request, "SECONDS")?,
+        )
+    } else {
+        Ok(CicsIntervalTime::immediate())
+    }
+    .map_err(|problem| HostProblem::Condition {
+        name: "INVREQ".into(),
+        response: 16,
+        response2: problem.delay_response2(),
+    })?;
+    if time.mode() == CicsIntervalMode::Relative && time.seconds() == 0 {
+        return Ok(DelayDefinition::Immediate);
+    }
+    let identity = match (interval, time.mode()) {
+        (Some(value), _) => value,
+        (None, CicsIntervalMode::Relative) => 1_000_000 + i64::from(time.seconds()),
+        (None, CicsIntervalMode::Absolute) => 2_000_000 + i64::from(time.seconds()),
+    };
+    Ok(DelayDefinition::Scheduled { identity, time })
+}
+
+fn expiration_tick(
+    service: &CicsService,
+    run: &mut Run,
+    time: CicsIntervalTime,
+) -> Result<Option<u64>, HostProblem> {
+    let local_millis = if time.mode() == CicsIntervalMode::Absolute {
+        let timestamp = match service.nested(run, HostRequest::Clock(ClockRequest::UtcTimestamp))? {
+            HostResult::Clock(value) => value,
+            _ => return Err(HostProblem::ProviderFailure),
+        };
+        clock_millis_since_midnight(&timestamp)?
+    } else {
+        0
+    };
+    let now_tick = service.durable_tick()?;
+    let delay_millis = time
+        .delay_millis(local_millis)
+        .ok_or(HostProblem::ResourceExhausted)?;
+    if time.mode() == CicsIntervalMode::Absolute && delay_millis == 0 {
+        return Ok(None);
+    }
+    now_tick
+        .checked_add(delay_millis)
+        .ok_or(HostProblem::ResourceExhausted)
+        .map(Some)
+}
+
+fn expired(
+    service: &CicsService,
+    run: &Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    super::super::condition::respond(
+        service,
+        run,
+        &request.condition_policy,
+        HostProblem::Condition {
+            name: "EXPIRED".into(),
+            response: 31,
+            response2: 0,
+        },
+    )
 }
 
 impl CicsService {
@@ -618,27 +701,43 @@ fn persist(
 fn validate_request(request: &CicsRequest) -> Result<(), HostProblem> {
     const ALLOWED: &[&str] = &[
         "DELAY.ID",
+        "HOURS",
         "INTERVAL",
+        "MINUTES",
+        "OPTION.FOR",
         "OPTION.NOHANDLE",
+        "OPTION.UNTIL",
         "REQID",
         "RESP",
         "RESP2",
+        "SECONDS",
     ];
-    if request.arguments.iter().any(|(name, value)| {
-        !ALLOWED.contains(&name.as_str())
-            || match name.as_str() {
-                "DELAY.ID" => value.schema() != "mainframe-env.cics.delay-id@1",
-                "INTERVAL" => value.schema() != "mainframe-env.cics.decimal@1",
-                "REQID" => !matches!(
-                    value.schema(),
-                    "mainframe-env.cics.literal@1" | "mainframe-env.cics.storage-value@1"
-                ),
-                "OPTION.NOHANDLE" => {
-                    value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+    let components = ["HOURS", "MINUTES", "SECONDS"]
+        .into_iter()
+        .any(|name| request.arguments.contains_key(name));
+    let modes = usize::from(request.arguments.contains_key("OPTION.FOR"))
+        + usize::from(request.arguments.contains_key("OPTION.UNTIL"));
+    let schedules = usize::from(request.arguments.contains_key("INTERVAL")) + modes;
+    if schedules > 1
+        || components != (modes == 1)
+        || request.arguments.iter().any(|(name, value)| {
+            !ALLOWED.contains(&name.as_str())
+                || match name.as_str() {
+                    "DELAY.ID" => value.schema() != "mainframe-env.cics.delay-id@1",
+                    "HOURS" | "INTERVAL" | "MINUTES" | "SECONDS" => {
+                        value.schema() != "mainframe-env.cics.decimal@1"
+                    }
+                    "REQID" => !matches!(
+                        value.schema(),
+                        "mainframe-env.cics.literal@1" | "mainframe-env.cics.storage-value@1"
+                    ),
+                    "OPTION.FOR" | "OPTION.NOHANDLE" | "OPTION.UNTIL" => {
+                        value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+                    }
+                    _ => value.schema() != "mainframe-env.cics.argument@1",
                 }
-                _ => value.schema() != "mainframe-env.cics.argument@1",
-            }
-    }) {
+        })
+    {
         Err(HostProblem::Malformed)
     } else {
         Ok(())

@@ -293,10 +293,10 @@ START/CANCEL lifecycle owns bounded replay retention.
 
 Typed zero-delay DELAY is deliberately stateless. Bare DELAY and a
 compile-time literal `INTERVAL(0)` return NORMAL immediately and never create a
-timer row, work item, checkpoint, or suspension. The compiler rejects every
-dynamic interval and all TIME, FOR/UNTIL, and REQID forms before publication.
-Positive literal packed intervals use the durable path below; they are not
-inferred from this immediate boundary.
+timer row, work item, checkpoint, or suspension. Positive literal packed
+intervals and typed FOR/UNTIL unit forms use the durable path below; they are
+not inferred from this immediate boundary. Dynamic packed intervals, TIME, and
+MILLISECS remain rejected before publication.
 
 Positive literal packed `INTERVAL` DELAY uses `cics-delay-v1` provider rows and
 work generation. A hidden task/run-unit plus statement-position identity keeps
@@ -314,8 +314,12 @@ complete with NORMAL RESP2 23; issuer cancellation and cancellation after the
 expiration boundary return NOTFND. Disconnect, timeout, return, abend, and
 terminal teardown move an outstanding cycle to an abandoned tombstone and
 cancel queued or claimed work. Version-two rows retain strict version-one
-reads. Automatic redispatch, TIME/explicit units, remote routing, PostgreSQL
-evidence, and retention eligibility remain separate obligations.
+reads. FOR/UNTIL HOURS/MINUTES/SECONDS reuse the same rows after resolving one
+relative or absolute deadline from the durable and host clocks. An already
+elapsed UNTIL target returns EXPIRED 31 through normal condition policy, whose
+default is ignored; invalid components retain INVREQ RESP2 4/5/6. Automatic
+redispatch, packed TIME, MILLISECS, remote routing, PostgreSQL evidence, and
+retention eligibility remain separate obligations.
 
 An ENQ wait is not a terminal-input handoff. Its execution remains
 `Suspended`, and both the coordinator checkpoint and product continuation stay

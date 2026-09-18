@@ -98,9 +98,10 @@ timer state. Valid positive packed literal INTERVAL values bind a hidden
 task/statement identity, persist one versioned cycle and shared work item, and
 reissue from the durable checkpoint only after lease-fenced due promotion.
 Positive literal delays may bind a bounded REQID for other-task local CANCEL;
-task teardown abandons their durable cycle and cancels work. Dynamic intervals,
-TIME and explicit units, remote cancellation, and automatic redispatch remain
-explicit gaps.
+task teardown abandons their durable cycle and cancels work. `FOR` and `UNTIL`
+also accept literal or resolved numeric HOURS/MINUTES/SECONDS and retain their
+mode in append-only typed-plan tags. Dynamic packed intervals, TIME,
+MILLISECS, remote cancellation, and automatic redispatch remain explicit gaps.
 `ABEND` also lowers through a typed task plan: ABCODE is captured as a bounded
 literal or a pre-resolved 1–4 character storage input, and CANCEL/NODUMP remain
 distinct flags. Retained raw ABEND artifacts remain readable, but new
@@ -293,7 +294,7 @@ differentials, or make 0.9.0 release-ready.
 | `file-control` | file status, keyed I/O, and browse behavior |
 | `queue-control` | transient-data queue writes |
 | `recovery` | SYNCPOINT coordination, rollback, and subsystem unit-of-work completion |
-| `interval-control` | bounded local START scheduling/cancellation plus zero and durable relative DELAY |
+| `interval-control` | bounded local START scheduling/cancellation plus zero, relative, and absolute DELAY |
 
 This table describes the eight families already present in the 40-operation runtime
 collection. The 263-row application registry also assigns every row a

@@ -350,5 +350,7 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::Wait => CicsPlanOption::Wait,
         HirCicsOption::After => CicsPlanOption::After,
         HirCicsOption::At => CicsPlanOption::At,
+        HirCicsOption::For => CicsPlanOption::For,
+        HirCicsOption::Until => CicsPlanOption::Until,
     }
 }

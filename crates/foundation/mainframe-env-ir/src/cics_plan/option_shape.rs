@@ -14,6 +14,10 @@ pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
                 | CicsPlanOption::After
                 | CicsPlanOption::At
         ),
+        CicsPlanOperation::Delay => !matches!(
+            option,
+            CicsPlanOption::NoHandle | CicsPlanOption::For | CicsPlanOption::Until
+        ),
         CicsPlanOperation::Retrieve => {
             !matches!(option, CicsPlanOption::NoHandle | CicsPlanOption::Wait)
         }

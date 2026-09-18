@@ -530,7 +530,7 @@ fn generated_request_id(effect_key: &str, request_digest: &[u8; 32]) -> String {
     format!("{:X}", hasher.finalize())[..8].into()
 }
 
-fn clock_millis_since_midnight(timestamp: &str) -> Result<u64, HostProblem> {
+pub(super) fn clock_millis_since_midnight(timestamp: &str) -> Result<u64, HostProblem> {
     if timestamp.len() != 17 || !timestamp.bytes().all(|byte| byte.is_ascii_digit()) {
         return Err(HostProblem::ProviderFailure);
     }

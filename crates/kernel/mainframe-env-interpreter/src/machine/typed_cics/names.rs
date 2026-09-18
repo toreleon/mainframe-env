@@ -187,5 +187,7 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::Wait => "WAIT",
         CicsPlanOption::After => "AFTER",
         CicsPlanOption::At => "AT",
+        CicsPlanOption::For => "FOR",
+        CicsPlanOption::Until => "UNTIL",
     }
 }

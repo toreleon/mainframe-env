@@ -19,8 +19,28 @@ pub(super) fn invalid_shape(
                 || outputs.contains(&CicsOutputName::Into)
         }
         CicsPlanOperation::Delay => {
-            let allowed = BTreeSet::from([CicsOperandName::Interval, CicsOperandName::ReqId]);
+            let allowed = BTreeSet::from([
+                CicsOperandName::Interval,
+                CicsOperandName::ReqId,
+                CicsOperandName::Hours,
+                CicsOperandName::Minutes,
+                CicsOperandName::Seconds,
+            ]);
+            let components = [
+                CicsOperandName::Hours,
+                CicsOperandName::Minutes,
+                CicsOperandName::Seconds,
+            ]
+            .into_iter()
+            .filter(|name| inputs.contains(name))
+            .count();
+            let explicit_modes = usize::from(plan.options.contains(&CicsPlanOption::For))
+                + usize::from(plan.options.contains(&CicsPlanOption::Until));
+            let schedules =
+                usize::from(inputs.contains(&CicsOperandName::Interval)) + explicit_modes;
             !inputs.is_subset(&allowed)
+                || schedules > 1
+                || (components > 0) != (explicit_modes == 1)
                 || plan.operands.iter().any(|operand| {
                     match operand.name {
                         CicsOperandName::Interval => {
@@ -30,14 +50,18 @@ pub(super) fn invalid_shape(
                             operand.value,
                             CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
                         ),
+                        CicsOperandName::Hours
+                        | CicsOperandName::Minutes
+                        | CicsOperandName::Seconds => !matches!(
+                            operand.value,
+                            CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
+                        ),
                         _ => true,
                     }
                 })
                 || inputs.contains(&CicsOperandName::ReqId)
-                    && !matches!(
-                        operand_value(plan, CicsOperandName::Interval),
-                        Some(CicsOperandValue::Integer(value)) if *value > 0
-                    )
+                    && explicit_modes == 0
+                    && !matches!(operand_value(plan, CicsOperandName::Interval), Some(CicsOperandValue::Integer(value)) if *value > 0)
                 || scheduling_options
                 || outputs.contains(&CicsOutputName::Into)
         }

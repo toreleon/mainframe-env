@@ -11,31 +11,45 @@ pub(super) fn validate_constraints(
     operation: HirCicsOperation,
 ) -> Resolution<()> {
     match operation {
-        HirCicsOperation::Delay
+        HirCicsOperation::Delay => {
+            let relative = options.iter().any(|option| option == "FOR");
+            let absolute = options.iter().any(|option| option == "UNTIL");
+            let units = ["HOURS", "MINUTES", "SECONDS"]
+                .into_iter()
+                .any(|name| clauses.contains_key(name));
+            let schedules = usize::from(clauses.contains_key("INTERVAL"))
+                + usize::from(relative)
+                + usize::from(absolute);
+            if schedules > 1 || (relative || absolute) != units {
+                return Err(ResolutionFailure::Invalid(
+                    "CICS DELAY accepts one INTERVAL or one FOR/UNTIL explicit-unit schedule"
+                        .into(),
+                ));
+            }
             if clauses.get("INTERVAL").is_some_and(|value| {
                 value.len() != 1
                     || value[0]
                         .parse::<i64>()
                         .ok()
                         .is_none_or(|value| !valid_hhmmss(value))
-            }) =>
-        {
-            return Err(ResolutionFailure::Invalid(
-                "typed CICS DELAY currently requires a literal packed INTERVAL or the bare default"
-                    .into(),
-            ));
-        }
-        HirCicsOperation::Delay
+            }) {
+                return Err(ResolutionFailure::Invalid(
+                    "typed CICS DELAY currently requires a literal packed INTERVAL".into(),
+                ));
+            }
             if clauses.contains_key("REQID")
+                && !relative
+                && !absolute
                 && clauses
                     .get("INTERVAL")
                     .and_then(|value| value.first())
                     .and_then(|value| value.parse::<i64>().ok())
-                    .is_none_or(|value| value == 0) =>
-        {
-            return Err(ResolutionFailure::Invalid(
-                "typed CICS DELAY REQID requires a positive literal INTERVAL".into(),
-            ));
+                    .is_none_or(|value| value == 0)
+            {
+                return Err(ResolutionFailure::Invalid(
+                    "typed CICS DELAY REQID requires a positive schedule".into(),
+                ));
+            }
         }
         HirCicsOperation::Start => {
             let after = options.iter().any(|option| option == "AFTER");
@@ -117,6 +131,18 @@ fn delay_operands(
             name: HirCicsOperandName::ReqId,
             value: bounded_name(request_id, semantic, 8, "DELAY", "REQID")?,
         });
+    }
+    for (clause, name) in [
+        ("HOURS", HirCicsOperandName::Hours),
+        ("MINUTES", HirCicsOperandName::Minutes),
+        ("SECONDS", HirCicsOperandName::Seconds),
+    ] {
+        if let Some(value) = clauses.get(clause) {
+            operands.push(HirCicsNamedOperand {
+                name,
+                value: cics_integer_value(value, semantic)?,
+            });
+        }
     }
     Ok(operands)
 }

@@ -218,7 +218,6 @@ pub enum CicsOperandName {
     StartTime,
     /// `USERID(...)` authority selected for a started task.
     UserId,
-    /// Explicit START unit components.
     Hours,
     Minutes,
     Seconds,
@@ -287,6 +286,8 @@ pub enum CicsPlanOption {
     Wait,
     After,
     At,
+    For,
+    Until,
 }
 
 /// Named result binding written after the host result arrives.
@@ -1344,6 +1345,10 @@ mod tests {
         assert_eq!(option_from_tag(18), Ok(CicsPlanOption::After));
         assert_eq!(option_tag(CicsPlanOption::At), 19);
         assert_eq!(option_from_tag(19), Ok(CicsPlanOption::At));
+        assert_eq!(option_tag(CicsPlanOption::For), 20);
+        assert_eq!(option_from_tag(20), Ok(CicsPlanOption::For));
+        assert_eq!(option_tag(CicsPlanOption::Until), 21);
+        assert_eq!(option_from_tag(21), Ok(CicsPlanOption::Until));
 
         let plan = read_plan();
         let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
@@ -2212,6 +2217,40 @@ mod tests {
         assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
 
         plan.operation = CicsPlanOperation::Read;
+        assert_eq!(
+            encode_cics_effect_plan(&plan, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn delay_explicit_units_require_exactly_one_for_or_until_mode() {
+        let mut plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Delay,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::Minutes,
+                    value: CicsOperandValue::Storage(slot(1, "DELAY.MINUTES")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Seconds,
+                    value: CicsOperandValue::Integer(3),
+                },
+            ],
+            options: BTreeSet::from([CicsPlanOption::For]),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let limits = CicsPlanLimits::default();
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
+
+        plan.options.insert(CicsPlanOption::Until);
+        assert_eq!(
+            encode_cics_effect_plan(&plan, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        plan.options.clear();
         assert_eq!(
             encode_cics_effect_plan(&plan, limits),
             Err(CicsPlanCodecProblem::Malformed)

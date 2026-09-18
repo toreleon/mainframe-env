@@ -727,7 +727,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::SendText => &["FROM", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::Assign => &["RESP", "RESP2"],
         HirCicsOperation::Cancel => &["REQID", "TRANSID", "RESP", "RESP2"],
-        HirCicsOperation::Delay => &["INTERVAL", "REQID", "RESP", "RESP2"],
+        HirCicsOperation::Delay => &[
+            "INTERVAL", "HOURS", "MINUTES", "SECONDS", "REQID", "RESP", "RESP2",
+        ],
         HirCicsOperation::PurgeMessage => &["RESP", "RESP2"],
         HirCicsOperation::Read => &[
             "FILE",
@@ -778,7 +780,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::SetAssociationUserCorrData
         | HirCicsOperation::Suspend => &["NOHANDLE"],
         HirCicsOperation::Start => &["AFTER", "AT", "FMH", "PROTECT", "NOHANDLE"],
-        HirCicsOperation::Cancel | HirCicsOperation::Delay => &["NOHANDLE"],
+        HirCicsOperation::Cancel => &["NOHANDLE"],
+        HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
         HirCicsOperation::Retrieve => &["WAIT", "NOHANDLE"],
         HirCicsOperation::FormatTime => &["DATESEP", "TIMESEP", "NOHANDLE"],
         HirCicsOperation::SendMap => &["ERASE", "CURSOR", "FREEKB", "NOHANDLE"],
@@ -1065,6 +1068,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "WAIT" => HirCicsOption::Wait,
             "AFTER" => HirCicsOption::After,
             "AT" => HirCicsOption::At,
+            "FOR" => HirCicsOption::For,
+            "UNTIL" => HirCicsOption::Until,
             _ => unreachable!("allowed CICS option"),
         })
         .collect::<BTreeSet<_>>();

@@ -197,6 +197,8 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u8 {
         CicsPlanOption::Wait => 17,
         CicsPlanOption::After => 18,
         CicsPlanOption::At => 19,
+        CicsPlanOption::For => 20,
+        CicsPlanOption::Until => 21,
     }
 }
 
@@ -222,6 +224,8 @@ pub(super) fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodec
         17 => Ok(CicsPlanOption::Wait),
         18 => Ok(CicsPlanOption::After),
         19 => Ok(CicsPlanOption::At),
+        20 => Ok(CicsPlanOption::For),
+        21 => Ok(CicsPlanOption::Until),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

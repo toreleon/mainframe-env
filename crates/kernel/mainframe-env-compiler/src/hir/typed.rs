@@ -265,6 +265,8 @@ pub enum HirCicsOption {
     Wait,
     After,
     At,
+    For,
+    Until,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -3510,7 +3512,11 @@ mod tests {
             "DELAY INTERVAL(60)",
             "DELAY INTERVAL(WHEN-X)",
             "DELAY TIME(0)",
-            "DELAY FOR SECONDS(0)",
+            "DELAY FOR",
+            "DELAY HOURS(1)",
+            "DELAY FOR UNTIL HOURS(1)",
+            "DELAY INTERVAL(1) FOR HOURS(1)",
+            "DELAY FOR MILLISECS(1)",
             "DELAY REQID('WAIT0001')",
             "DELAY INTERVAL(0) REQID('WAIT0001')",
         ] {
@@ -3519,6 +3525,42 @@ mod tests {
             ));
             assert!(analysis.hir.is_none(), "{command}");
         }
+    }
+
+    #[test]
+    fn cics_delay_for_until_preserve_literal_and_dynamic_units() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELUNIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 TIME-X PIC S9(9) COMP VALUE 3. PROCEDURE DIVISION. EXEC CICS DELAY FOR HOURS(1) SECONDS(TIME-X) END-EXEC. EXEC CICS DELAY UNTIL MINUTES(759) REQID('UNTIL001') END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("DELAY units: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 2);
+        assert!(commands[0].options.contains(&HirCicsOption::For));
+        assert!(commands[1].options.contains(&HirCicsOption::Until));
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Hours && operand.value == HirCicsValue::Integer(1)
+        }));
+        assert!(commands[0].operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::Seconds,
+                    value: HirCicsValue::Data(reference),
+                } if reference.qualified_name == "TIME-X"
+            )
+        }));
+        assert!(commands[1].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Minutes
+                && operand.value == HirCicsValue::Integer(759)
+        }));
     }
 
     #[test]
