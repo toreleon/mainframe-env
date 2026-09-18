@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added SQLite process-restart proof for facility-less CICS START launch. A
+  claimed request can survive shutdown after promotion but before target
+  creation, reclaim under a fresh lease, run its RETRIEVE target, then survive
+  another shutdown before work completion without changing the target's
+  durable execution journal or launching a duplicate task.
+
 - Added automatic facility-less task launch for due local CICS START work. The
   fenced work identity now becomes the target's durable execution identity,
   the stored START principal and transaction are reauthorized at creation, and

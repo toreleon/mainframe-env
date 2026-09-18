@@ -137,8 +137,9 @@ Due local CICS START work uses the work row's immutable execution identifier
 as the started task's coordinator identity. At expiration the worker resolves
 the installed transaction and program, restores the principal captured by the
 START row, and creates a facility-less CICS run before driving the ordinary
-online exchange. A lease retry after target completion validates the retained
-execution tuple and completes without redispatch. Task conditions and known
+online exchange. A lease retry or SQLite reopen before launch or after target
+completion validates the retained execution tuple and completes without
+redispatch. Task conditions and known
 terminal failures belong to the asynchronously created task; unresolved
 infrastructure or effect uncertainty still blocks work completion.
 

@@ -10750,6 +10750,208 @@ mod tests {
     }
 
     #[test]
+    fn sqlite_restart_launches_ready_start_once_and_recovers_post_execution_gap() {
+        let starter = published_source_fixture(
+            "RSTSTRT",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. RSTSTRT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE 'RESTART'.\n01 LENGTH-X PIC S9(4) COMP VALUE 7.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('RTGT') REQID('RST00001') FROM(DATA-X) LENGTH(LENGTH-X) INTERVAL(0) END-EXEC.\nSTOP RUN.\n",
+        );
+        let target = published_source_fixture(
+            "RSTTRGT",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. RSTTRGT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE ALL 'Z'.\n01 LENGTH-X PIC S9(4) COMP VALUE 8.\nPROCEDURE DIVISION.\nEXEC CICS RETRIEVE INTO(DATA-X) LENGTH(LENGTH-X) END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = |artifact: &PublishedArtifact| {
+            ArtifactRef::new(
+                format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let starter_ref = artifact_ref(&starter);
+        let target_ref = artifact_ref(&target);
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-start-launch-restart-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let mut server_config = config();
+        server_config.store_profile = crate::StoreProfile::Sqlite;
+        server_config.sqlite_url = url.clone();
+        server_config.artifact_root = directory.join("artifacts");
+        server_config.timeout_millis = 10_000;
+
+        let first_clock = Arc::new(ManualJesClock::new(100));
+        let first_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let first_platform: Arc<dyn PlatformStore> = first_store.clone();
+        let first = ProductServer::open_with_clock(
+            server_config.clone(),
+            first_platform,
+            first_clock.clone(),
+        )
+        .unwrap();
+        let execution_clock = first_clock;
+        first
+            .program
+            .bind_execution_control(Arc::new(move |_: &Invocation| {
+                Ok(ExecutionControl {
+                    now_tick: execution_clock
+                        .now_tick()
+                        .map_err(|_| ExecutionControlError::Unavailable)?,
+                    cancellation_requested: false,
+                })
+            }))
+            .unwrap();
+        first.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let program = |name: &str, artifact: &PublishedArtifact, reference: ArtifactRef| {
+            OnlineProgramDefinition {
+                name: name.into(),
+                artifact: reference,
+                payload: artifact.payload().to_vec(),
+                manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                semantic_identity: artifact.semantic_id().to_reference(),
+            }
+        };
+        first
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![
+                    program("RSTSTRT", &starter, starter_ref.clone()),
+                    program("RSTTRGT", &target, target_ref),
+                ],
+                transactions: BTreeMap::from([
+                    ("RSTR".into(), "RSTSTRT".into()),
+                    ("RTGT".into(), "RSTTRGT".into()),
+                ]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "RSTSTRT".into(),
+                    map: "RSTSTRT".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("restart-start-issuer", 64).unwrap();
+        let invocation = first
+            .cics_invocation("IBMUSER", "RSTR", Some(starter_ref))
+            .unwrap();
+        first
+            .cics
+            .launch_terminal(
+                invocation,
+                &session,
+                "RSTR",
+                24,
+                80,
+                "restart-start-csrf",
+                100,
+                10_000,
+            )
+            .unwrap();
+        first
+            .run_online_exchange(&session, &principal, "RSTSTRT", 100)
+            .unwrap();
+        let first_work = first
+            .claim_jes_work("start-before-launch-crash")
+            .unwrap()
+            .unwrap();
+        first
+            .cics
+            .promote_start_work(&first_work, first.jes_tick().unwrap())
+            .unwrap();
+        let execution_id = first_work.execution_id.clone();
+        let first_epoch = first_work.lease_epoch;
+        assert!(first.store.get_execution(&execution_id).unwrap().is_none());
+        drop((first, first_store));
+
+        let second_tick = 100 + crate::jes_worker::JES_LEASE_TICKS + 1;
+        let second_clock = Arc::new(ManualJesClock::new(second_tick));
+        let second_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let second_platform: Arc<dyn PlatformStore> = second_store.clone();
+        let second = ProductServer::open_with_clock(
+            server_config.clone(),
+            second_platform,
+            second_clock.clone(),
+        )
+        .unwrap();
+        let execution_clock = second_clock;
+        second
+            .program
+            .bind_execution_control(Arc::new(move |_: &Invocation| {
+                Ok(ExecutionControl {
+                    now_tick: execution_clock
+                        .now_tick()
+                        .map_err(|_| ExecutionControlError::Unavailable)?,
+                    cancellation_requested: false,
+                })
+            }))
+            .unwrap();
+        let second_work = second
+            .claim_jes_work("start-after-launch-crash")
+            .unwrap()
+            .unwrap();
+        assert!(second_work.lease_epoch > first_epoch);
+        assert!(matches!(
+            second.process_claimed_jes_work(&second_work).unwrap(),
+            JesWorkOutcome::Completed
+        ));
+        let completed = second.store.get_execution(&execution_id).unwrap().unwrap();
+        assert_eq!(completed.state, ExecutionState::Completed);
+        let completed_version = completed.version;
+        let second_epoch = second_work.lease_epoch;
+        drop((second, second_store));
+
+        let third_tick = second_tick + crate::jes_worker::JES_LEASE_TICKS + 1;
+        let third_clock = Arc::new(ManualJesClock::new(third_tick));
+        let third_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let third_platform: Arc<dyn PlatformStore> = third_store.clone();
+        let third =
+            ProductServer::open_with_clock(server_config, third_platform, third_clock.clone())
+                .unwrap();
+        let execution_clock = third_clock;
+        third
+            .program
+            .bind_execution_control(Arc::new(move |_: &Invocation| {
+                Ok(ExecutionControl {
+                    now_tick: execution_clock
+                        .now_tick()
+                        .map_err(|_| ExecutionControlError::Unavailable)?,
+                    cancellation_requested: false,
+                })
+            }))
+            .unwrap();
+        let third_work = third
+            .claim_jes_work("start-after-execution-crash")
+            .unwrap()
+            .unwrap();
+        assert!(third_work.lease_epoch > second_epoch);
+        let outcome = third.process_claimed_jes_work(&third_work).unwrap();
+        third
+            .finish_claimed_jes_work(&third_work, Ok(outcome))
+            .unwrap();
+        let recovered = third.store.get_execution(&execution_id).unwrap().unwrap();
+        assert_eq!(recovered.state, ExecutionState::Completed);
+        assert_eq!(recovered.version, completed_version);
+        assert_eq!(
+            third
+                .store
+                .get_work(&third_work.work_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            WorkState::Completed
+        );
+        drop((third, third_store));
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
     fn compiled_start_without_data_queues_the_target_without_a_false_payload() {
         let artifact = published_source_fixture(
             "NODATA",
