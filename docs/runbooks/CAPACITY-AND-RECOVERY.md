@@ -93,6 +93,14 @@ provider row by hand or enqueue a replacement with a different execution,
 deadline, or payload identity. Current workers make the record retrievable but
 do not launch the target transaction automatically.
 
+A protected-pending START intentionally has no matching work row before an
+explicit commit. Do not synthesize one: a successful SYNCPOINT transitions the
+record and idempotently admits its deterministic work. If recovery finds a
+pending record from that run with no work after an interrupted commit, retry
+the same syncpoint so admission is healed. SYNCPOINT ROLLBACK removes only
+still-protected records; restoring only the UOW row or only the interval rows
+can reverse that decision.
+
 A typed local CANCEL leaves the interval row as a cancelled replay tombstone
 and calls the work store's cancellation transition. Queued work becomes
 cancelled immediately; claimed work retains its lease with

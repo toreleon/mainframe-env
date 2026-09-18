@@ -257,6 +257,7 @@ pub enum HirCicsOption {
     FreeKb,
     Gteq,
     Fmh,
+    Protect,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -3172,7 +3173,7 @@ mod tests {
 
     #[test]
     fn cics_start_and_retrieve_lower_the_bounded_local_data_route() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. INTERVAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(16) VALUE 'PAYLOAD'. 01 LENGTH-X PIC S9(4) COMP VALUE 7. 01 WHEN-X PIC S9(6) COMP-3 VALUE 0. 01 RTRANS-X PIC X(4). 01 RTERM-X PIC X(4). 01 QUEUE-X PIC X(8). 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') REQID('REQ0001') FROM(DATA-X) LENGTH(LENGTH-X) INTERVAL(WHEN-X) RTRANSID('BACK') RTERMID('T001') QUEUE('WORKQ') FMH RESP(RESP-X) RESP2(RESP2-X) END-EXEC. EXEC CICS RETRIEVE INTO(DATA-X) LENGTH(LENGTH-X) RTRANSID(RTRANS-X) RTERMID(RTERM-X) QUEUE(QUEUE-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. INTERVAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(16) VALUE 'PAYLOAD'. 01 LENGTH-X PIC S9(4) COMP VALUE 7. 01 WHEN-X PIC S9(6) COMP-3 VALUE 0. 01 RTRANS-X PIC X(4). 01 RTERM-X PIC X(4). 01 QUEUE-X PIC X(8). 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') REQID('REQ0001') FROM(DATA-X) LENGTH(LENGTH-X) INTERVAL(WHEN-X) RTRANSID('BACK') RTERMID('T001') QUEUE('WORKQ') FMH PROTECT RESP(RESP-X) RESP2(RESP2-X) END-EXEC. EXEC CICS RETRIEVE INTO(DATA-X) LENGTH(LENGTH-X) RTRANSID(RTRANS-X) RTERMID(RTERM-X) QUEUE(QUEUE-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);
         let hir = analysis
             .hir
@@ -3189,6 +3190,7 @@ mod tests {
         assert_eq!(commands[0].operation, HirCicsOperation::Start);
         assert_eq!(commands[1].operation, HirCicsOperation::Retrieve);
         assert!(commands[0].options.contains(&HirCicsOption::Fmh));
+        assert!(commands[0].options.contains(&HirCicsOption::Protect));
         assert!(commands[0].operands.iter().any(|operand| {
             operand.name == HirCicsOperandName::ReqId
                 && operand.value == HirCicsValue::Literal("REQ0001".into())
@@ -3234,7 +3236,7 @@ mod tests {
             assert!(commands[1].outputs.iter().any(|output| output.name == name));
         }
 
-        for deferred in ["TERMID('T001')", "USERID('OTHER')", "PROTECT"] {
+        for deferred in ["TERMID('T001')", "USERID('OTHER')"] {
             let analysis = analyze(&format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. LATER. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') REQID('REQ0002') FROM(DATA-X) {deferred} END-EXEC. STOP RUN."
             ));

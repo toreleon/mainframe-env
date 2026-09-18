@@ -1,13 +1,15 @@
 //! Durable producer/consumer state for CICS interval START records.
 //!
 //! The typed local-data route connects these transitions to shared work admission
-//! and RETRIEVE storage bindings. Protected-record release and bounded due scans
-//! remain internal foundations for later interval-control slices.
+//! and RETRIEVE storage bindings. Explicit syncpoint owns protected-record release;
+//! bounded due scans and general protected task cleanup remain later slices.
 
 mod cancel;
 mod delay;
+mod protect;
 
 pub use delay::CICS_DELAY_WORK_GENERATION;
+pub(super) use protect::finish_syncpoint as finish_protected_starts;
 
 use super::super::{CicsLimits, CicsReplayClock, CicsService, Run, field, store_error};
 use crate::{CicsIntervalMode, CicsIntervalTime};
@@ -269,7 +271,11 @@ fn start(
         return_terminal,
         queue,
         fmh: request.arguments.contains_key("OPTION.FMH"),
-        state: IntervalStartState::Pending,
+        state: if request.arguments.contains_key("OPTION.PROTECT") {
+            IntervalStartState::ProtectedPending
+        } else {
+            IntervalStartState::Pending
+        },
         producer_effect_key: mutation.idempotency_key.as_str().into(),
         producer_request_digest: canonical_request_digest(&HostRequest::Cics(request.clone()))
             .map_err(|_| HostProblem::ResourceExhausted)?,
@@ -293,7 +299,9 @@ fn start(
             response2: 0,
         });
     }
-    service.enqueue_interval_work(&record, run.invocation.priority)?;
+    if record.state == IntervalStartState::Pending {
+        service.enqueue_interval_work(&record, run.invocation.priority)?;
+    }
     service.response(
         run,
         CicsDisposition::Complete,
@@ -462,6 +470,7 @@ fn validate_start_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "LENGTH",
         "OPTION.FMH",
         "OPTION.NOHANDLE",
+        "OPTION.PROTECT",
         "QUEUE",
         "REQID",
         "RESP",
@@ -479,7 +488,10 @@ fn validate_start_request(request: &CicsRequest) -> Result<(), HostProblem> {
             !ALLOWED.contains(&name.as_str())
                 || if matches!(name.as_str(), "INTERVAL" | "LENGTH" | "TIME") {
                     value.schema() != "mainframe-env.cics.decimal@1"
-                } else if matches!(name.as_str(), "OPTION.FMH" | "OPTION.NOHANDLE") {
+                } else if matches!(
+                    name.as_str(),
+                    "OPTION.FMH" | "OPTION.NOHANDLE" | "OPTION.PROTECT"
+                ) {
                     value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
                 } else {
                     !matches!(
@@ -769,36 +781,6 @@ pub(in crate::service) fn promote_request(
         None,
         limits,
     )
-}
-
-#[allow(dead_code, reason = "reserved for the START PROTECT completion slice")]
-pub(in crate::service) fn release_protected(
-    store: &dyn ProviderStateStore,
-    records: &mut BTreeMap<String, IntervalStartRecord>,
-    producer_effect_key: &str,
-    limits: CicsLimits,
-) -> Result<usize, HostProblem> {
-    checked_effect_key(producer_effect_key)?;
-    let selected = records
-        .values()
-        .filter(|record| {
-            record.state == IntervalStartState::ProtectedPending
-                && record.producer_effect_key == producer_effect_key
-        })
-        .map(|record| record.request_id.clone())
-        .collect::<Vec<_>>();
-    for request_id in &selected {
-        replace_state(
-            store,
-            records,
-            request_id,
-            IntervalStartState::Pending,
-            None,
-            None,
-            limits,
-        )?;
-    }
-    Ok(selected.len())
 }
 
 pub(in crate::service) fn consume_next(
@@ -1360,8 +1342,8 @@ mod tests {
             0
         );
         assert_eq!(
-            release_protected(store.as_ref(), &mut records, "producer-safe", limits).unwrap(),
-            1
+            protect::release(store.as_ref(), &mut records, "RUN-1", limits).unwrap(),
+            std::collections::BTreeSet::from(["SAFE".into()])
         );
         assert_eq!(
             promote_due(store.as_ref(), &mut records, 200, 8, limits).unwrap(),
@@ -1388,6 +1370,9 @@ mod tests {
             limits,
         )
         .unwrap();
+        let mut protected = record("PROTSQL", 100, "producer-protect-sql");
+        protected.state = IntervalStartState::ProtectedPending;
+        schedule(first.as_ref(), &mut records, protected, limits).unwrap();
         promote_due(first.as_ref(), &mut records, 100, 8, limits).unwrap();
         consume_next(
             first.as_ref(),
@@ -1409,8 +1394,13 @@ mod tests {
         drop(first);
 
         let second = SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap();
-        let reopened = load(&second, limits).unwrap();
+        let mut reopened = load(&second, limits).unwrap();
         assert_eq!(reopened, records);
+        assert_eq!(
+            protect::release(&second, &mut reopened, "RUN-1", limits).unwrap(),
+            std::collections::BTreeSet::from(["PROTSQL".into()])
+        );
+        assert_eq!(load(&second, limits).unwrap(), reopened);
         drop(second);
         std::fs::remove_dir_all(root).unwrap();
     }

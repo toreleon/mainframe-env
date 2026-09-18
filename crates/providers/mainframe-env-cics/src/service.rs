@@ -4887,6 +4887,163 @@ mod tests {
     }
 
     #[test]
+    fn protected_start_waits_for_commit_and_rollback_removes_the_request() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (issuer, _) = registered(&service);
+        let protected_start = |request_id: &[u8], sequence| {
+            request(
+                CicsOperation::Start,
+                BTreeMap::from([
+                    ("TRANSID".into(), argument(b"NEXT")),
+                    ("REQID".into(), argument(request_id)),
+                    ("FROM".into(), argument(b"PROTECTED")),
+                    ("LENGTH".into(), cics_decimal(9)),
+                    ("INTERVAL".into(), cics_decimal(0)),
+                    ("OPTION.PROTECT".into(), cics_option()),
+                ]),
+                sequence,
+            )
+        };
+
+        let start = protected_start(b"PROT0001", 1);
+        service
+            .invoke(&effect(&issuer.run_unit_id, start.clone(), 1), start)
+            .unwrap();
+        assert!(store.get_work("cics-start:PROT0001").unwrap().is_none());
+
+        let commit = request(CicsOperation::Syncpoint, BTreeMap::new(), 2);
+        let committed = service
+            .invoke(&effect(&issuer.run_unit_id, commit.clone(), 2), commit)
+            .unwrap();
+        assert_eq!(
+            committed.unit_of_work,
+            Some(CicsUnitOfWorkOutcome::Committed)
+        );
+        assert_eq!(
+            store
+                .get_work("cics-start:PROT0001")
+                .unwrap()
+                .unwrap()
+                .state,
+            WorkState::Queued
+        );
+
+        let start = protected_start(b"PROT0002", 3);
+        service
+            .invoke(&effect(&issuer.run_unit_id, start.clone(), 3), start)
+            .unwrap();
+        assert!(store.get_work("cics-start:PROT0002").unwrap().is_none());
+        let rollback = request(
+            CicsOperation::Syncpoint,
+            BTreeMap::from([("OPTION.ROLLBACK".into(), cics_option())]),
+            4,
+        );
+        let rolled_back = service
+            .invoke(&effect(&issuer.run_unit_id, rollback.clone(), 4), rollback)
+            .unwrap();
+        assert_eq!(
+            rolled_back.unit_of_work,
+            Some(CicsUnitOfWorkOutcome::RolledBack)
+        );
+        assert!(
+            store
+                .get_provider_state("cics-interval-start-v1", "PROT0002")
+                .unwrap()
+                .is_none()
+        );
+        assert!(store.get_work("cics-start:PROT0002").unwrap().is_none());
+
+        let replacement = request(
+            CicsOperation::Start,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"NEXT")),
+                ("REQID".into(), argument(b"PROT0002")),
+                ("FROM".into(), argument(b"REUSED")),
+                ("LENGTH".into(), cics_decimal(6)),
+                ("INTERVAL".into(), cics_decimal(0)),
+            ]),
+            5,
+        );
+        service
+            .invoke(
+                &effect(&issuer.run_unit_id, replacement.clone(), 5),
+                replacement,
+            )
+            .unwrap();
+        assert!(store.get_work("cics-start:PROT0002").unwrap().is_some());
+
+        let start = protected_start(b"PROT0003", 6);
+        service
+            .invoke(&effect(&issuer.run_unit_id, start.clone(), 6), start)
+            .unwrap();
+        let healing = request(CicsOperation::Syncpoint, BTreeMap::new(), 7);
+        let healing_key = healing
+            .mutation
+            .as_ref()
+            .unwrap()
+            .idempotency_key
+            .as_str()
+            .to_string();
+        let healing_metadata = UowRetentionMetadata {
+            effect_key: healing_key.clone(),
+            owner_execution: issuer.execution_id.as_str().into(),
+            owner_run_unit: issuer.run_unit_id.as_str().into(),
+            deadline_tick: 100,
+            terminal_tick: Some(100),
+        };
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "cics-uow".into(),
+                    key: healing_key.clone(),
+                    version: 1,
+                    payload: encode_uow(&UowRecord {
+                        finalized: false,
+                        outcome: CicsUnitOfWorkOutcome::Committed,
+                        transaction: "MENU".into(),
+                        metadata: Some(UowRetentionMetadata {
+                            terminal_tick: None,
+                            ..healing_metadata.clone()
+                        }),
+                    })
+                    .unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "cics-uow".into(),
+                    key: healing_key,
+                    version: 2,
+                    payload: encode_uow(&UowRecord {
+                        finalized: true,
+                        outcome: CicsUnitOfWorkOutcome::Committed,
+                        transaction: "MENU".into(),
+                        metadata: Some(healing_metadata),
+                    })
+                    .unwrap(),
+                },
+                Some(1),
+            )
+            .unwrap();
+        assert!(store.get_work("cics-start:PROT0003").unwrap().is_none());
+        service
+            .invoke(&effect(&issuer.run_unit_id, healing.clone(), 7), healing)
+            .unwrap();
+        assert!(store.get_work("cics-start:PROT0003").unwrap().is_some());
+    }
+
+    #[test]
     fn interval_start_work_and_retrieve_survive_sqlite_reopen() {
         let root = std::env::temp_dir().join(format!(
             "mainframe-env-cics-start-retrieve-{}-{:?}",

@@ -181,9 +181,9 @@ Typed RETRIEVE then consumes the oldest ready record for the target transaction
 through explicit INTO and in/out LENGTH bindings, or through SET with an
 output-only LENGTH. START admission, the work row, interval state, and replay
 receipts share the durable store, so a SQLite reopen preserves the
-producer-to-consumer cycle. Remote routing, terminal and protected starts,
-generated request identifiers, WAIT, and automatic target-task launch remain
-outside this slice. The bounded metadata extension
+producer-to-consumer cycle. Remote routing, terminal starts, generated request
+identifiers, WAIT, and automatic target-task launch remain outside this slice.
+The bounded metadata extension
 also accepts local START RTRANSID, RTERMID, and QUEUE names and returns only the
 requested values through exact-width RETRIEVE outputs. A requested value absent
 from the producing START returns ENVDEFERR before the record is consumed, so a
@@ -202,6 +202,16 @@ is written to the COBOL pointer. Base bytes, pointer value, and linkage-address
 state use the ordinary machine checkpoint codec, so replay from the same
 pre-response checkpoint recreates the same allocation identity without exposing
 a native address.
+
+The bounded local PROTECT extension keeps its START record in
+`protected-pending` and deliberately creates no shared work row. An explicit
+committing SYNCPOINT first durably finalizes the UOW, then changes every
+matching record from that issuing run to pending and admits deterministic work.
+A finalized retry scans pending records from the same run whose work is still
+absent, closing the state-transition/enqueue crash gap without duplicating work.
+Explicit SYNCPOINT ROLLBACK durably finalizes the rollback before deleting
+protected-pending records, so the REQID can be reused. General task-end and
+abend cleanup are not claimed by this child.
 
 Typed local CANCEL requires an explicit REQID and accepts an optional local
 TRANSID solely for routing authorization. It first verifies the matching shared

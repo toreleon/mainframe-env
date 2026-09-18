@@ -274,6 +274,8 @@ pub enum CicsPlanOption {
     Gteq,
     /// Mark START data as containing function management headers.
     Fmh,
+    /// Defer START work admission until a successful syncpoint.
+    Protect,
 }
 
 /// Named result binding written after the host result arrives.
@@ -601,9 +603,10 @@ fn validate_operation_shape(
             option,
             CicsPlanOption::NoHandle | CicsPlanOption::DateSep | CicsPlanOption::TimeSep
         ),
-        CicsPlanOperation::Start => {
-            !matches!(option, CicsPlanOption::NoHandle | CicsPlanOption::Fmh)
-        }
+        CicsPlanOperation::Start => !matches!(
+            option,
+            CicsPlanOption::NoHandle | CicsPlanOption::Fmh | CicsPlanOption::Protect
+        ),
         _ => !matches!(option, CicsPlanOption::NoHandle),
     });
     let unexpected_output = outputs
@@ -1323,6 +1326,8 @@ mod tests {
         assert_eq!(output_from_tag(91), Ok(CicsOutputName::Length));
         assert_eq!(output_tag(CicsOutputName::SetPointer), 95);
         assert_eq!(output_from_tag(95), Ok(CicsOutputName::SetPointer));
+        assert_eq!(option_tag(CicsPlanOption::Protect), 16);
+        assert_eq!(option_from_tag(16), Ok(CicsPlanOption::Protect));
 
         let plan = read_plan();
         let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();

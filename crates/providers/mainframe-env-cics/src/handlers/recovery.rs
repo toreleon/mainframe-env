@@ -93,6 +93,7 @@ fn syncpoint(
                 )
             }
             (true, existing_outcome) if existing_outcome == outcome => {
+                super::interval_control::finish_protected_starts(service, run, outcome)?;
                 return syncpoint_response(service, run, outcome, remote_forced_rollback);
             }
             _ => return Err(HostProblem::IdempotencyConflict),
@@ -170,6 +171,7 @@ fn syncpoint(
     {
         return Err(HostProblem::UnknownOutcome);
     }
+    super::interval_control::finish_protected_starts(service, run, outcome)?;
     syncpoint_response(service, run, outcome, remote_forced_rollback)
 }
 

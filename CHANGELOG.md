@@ -6,6 +6,15 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added the bounded local START PROTECT-to-SYNCPOINT route. PROTECT now persists
+  a protected-pending START record without admitting worker work. An explicit
+  successful SYNCPOINT commit releases matching records and idempotently
+  creates their deterministic work; SYNCPOINT ROLLBACK durably finalizes the
+  rollback, deletes those rows, and permits REQID reuse. Retry heals a committed
+  record whose work enqueue was interrupted. General task-end/abend cancellation, protected
+  CANCEL, automatic task launch, PostgreSQL, and licensed evidence remain
+  pending.
+
 - Added RETRIEVE SET over interpreter-owned virtual storage. Typed RETRIEVE now
   accepts exactly one of INTO or a POINTER/POINTER-32 SET target with mandatory
   LENGTH. SET returns the full START record, writes its actual length, and
