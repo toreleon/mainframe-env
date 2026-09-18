@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added in-process automatic wakeup for durable CICS DELAY work. After the
+  shared worker promotes a due row, the product resolves its bounded durable
+  online exchange by run-unit identity and resumes the checkpoint without a
+  client CICS resume call; retry after finalized exchange cleanup is idempotent.
+
 - Added storage-backed packed CICS DELAY `INTERVAL`. The compiler and typed
   plan now preserve numeric storage under existing operand tag 28, while
   malformed runtime packed values reach the provider's exact INVREQ response

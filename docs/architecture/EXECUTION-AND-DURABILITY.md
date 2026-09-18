@@ -330,6 +330,14 @@ Packed INTERVAL now follows the same typed storage path under its existing tag;
 literal and dynamic values are both validated at provider execution time so
 INVREQ conditions and no-state failures do not diverge by source form.
 
+After lease-fenced DELAY promotion, the product worker scans the bounded
+durable online-exchange namespace and selects the unique matching run-unit. It
+then resumes the saved machine checkpoint through the ordinary durable
+coordinator before completing the work lease. Promotion and resume are both
+retryable; if execution finalized and cleared its exchange before the work CAS,
+a reclaimed worker treats the missing exchange as completed. Duplicate matches
+fail closed. Process-restart wake remains a separate acceptance boundary.
+
 An ENQ wait is not a terminal-input handoff. Its execution remains
 `Suspended`, and both the coordinator checkpoint and product continuation stay
 attached to the same online exchange. Resume reissues the ENQ as a new bounded

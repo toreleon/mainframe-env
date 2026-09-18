@@ -5,7 +5,7 @@ use crate::jes_admission::ChildAdmissionResult;
 use crate::jes_worker::{
     DurableJesClock, JES_HEARTBEAT_MILLIS, JES_IDLE_MILLIS, JES_WORK_GENERATION, JES_WORKER_COUNT,
     JES_WORKER_FRESHNESS_MILLIS, JesClock, JesWorkPayload, claim_durable_work,
-    clear_worker_progress, heartbeat_durable_work, process_cics_work,
+    clear_worker_progress, heartbeat_durable_work,
 };
 use crate::retention_maintenance::provider::RetentionPlanner;
 use crate::{
@@ -92,7 +92,6 @@ pub struct ProductMetrics {
     pub sessions: usize,
     pub console_messages: usize,
     pub jes_workers: usize,
-    /// JES workers that completed a durable queue operation within the freshness deadline.
     pub jes_worker_healthy: usize,
     /// Successful JES queue polls, lease heartbeats, and terminal writes.
     pub jes_worker_progress: u64,
@@ -163,6 +162,7 @@ mod artifact;
 pub use artifact::{BatchProgramDefinition, OnlineProgramDefinition};
 mod bootstrap;
 mod continuation;
+mod interval_wakeup;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BatchInstallReceipt {
@@ -2780,7 +2780,7 @@ impl ProductServer {
     }
 
     fn process_claimed_jes_work(&self, work: &WorkRecord) -> Result<JesWorkOutcome, HostProblem> {
-        if process_cics_work(&self.cics, work, self.jes_tick()?)? {
+        if self.process_interval_work(work, self.jes_tick()?)? {
             return Ok(JesWorkOutcome::Completed);
         }
         if work.state != WorkState::Claimed
@@ -11210,9 +11210,6 @@ mod tests {
         assert_eq!(work.required_generation, CICS_DELAY_WORK_GENERATION);
         let outcome = server.process_claimed_jes_work(&work).unwrap();
         server.finish_claimed_jes_work(&work, Ok(outcome)).unwrap();
-        server
-            .run_online_exchange(&session, &principal, "DELAY1", 1_350)
-            .unwrap();
         let continuation = server
             .online_machine_continuation(&session)
             .unwrap()
@@ -11330,10 +11327,6 @@ mod tests {
         assert_eq!(work.required_generation, CICS_DELAY_WORK_GENERATION);
         let outcome = server.process_claimed_jes_work(&work).unwrap();
         server.finish_claimed_jes_work(&work, Ok(outcome)).unwrap();
-        let resume_tick = clock.now_tick().unwrap();
-        server
-            .run_online_exchange(&session, &principal, "DELAYT", resume_tick)
-            .unwrap();
         let continuation = server
             .online_machine_continuation(&session)
             .unwrap()
