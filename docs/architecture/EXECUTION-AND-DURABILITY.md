@@ -215,6 +215,12 @@ same bounded deletion before its handler transfer or terminal disposition.
 Non-command abnormal termination and implicit task-end syncpoint behavior are
 not claimed by these children.
 
+CANCEL follows the source-defined PROTECT boundary: protected-pending rows are
+not cancelable and return NOTFND, while a committing SYNCPOINT first makes the
+record ordinary pending work. CANCEL after that commit uses the same durable
+tombstone, work cancellation, replay identity, and worker fence as every other
+local START cancellation.
+
 Typed local CANCEL requires an explicit REQID and accepts an optional local
 TRANSID solely for routing authorization. It first verifies the matching shared
 work identity, then CAS-transitions only a committed pending record to a

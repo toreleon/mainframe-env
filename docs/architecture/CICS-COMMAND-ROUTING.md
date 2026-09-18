@@ -136,8 +136,10 @@ its checked virtual-address model. Local START PROTECT writes no worker item
 until an explicit successful SYNCPOINT commits its issuing run's
 protected-pending records; explicit rollback removes those records. The typed
 ABEND route also removes still-protected records before transferring or
-terminating. WAIT, terminal association, non-command abnormal/task-end cleanup,
-and automatic task launch remain fail-closed or deferred.
+terminating. CANCEL returns NOTFND while a protected row is uncommitted and
+uses the ordinary pending-work cancellation fence after committing SYNCPOINT.
+WAIT, terminal association, non-command abnormal/task-end cleanup, and
+automatic task launch remain fail-closed or deferred.
 The typed default-cursor file-browse subset binds STARTBR, READNEXT, READPREV,
 and ENDBR to exactly one FILE/DATASET alias. STARTBR captures a writable
 RIDFLD without returning a record and admits the default-equivalent `GTEQ`

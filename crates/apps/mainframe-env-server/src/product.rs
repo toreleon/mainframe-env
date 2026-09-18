@@ -10477,7 +10477,7 @@ mod tests {
     fn compiled_cancel_removes_unhonored_start_from_shared_worker_lane() {
         let artifact = published_source_fixture(
             "CANCELR",
-            "IDENTIFICATION DIVISION.\nPROGRAM-ID. CANCELR.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE 'CANCELME'.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('NX00') REQID('CAN0002') FROM(DATA-X) INTERVAL(100) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS CANCEL REQID('CAN0002') TRANSID('NX00') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. CANCELR.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE 'CANCELME'.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('NX00') REQID('CAN0002') FROM(DATA-X) INTERVAL(100) PROTECT RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SYNCPOINT RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS CANCEL REQID('CAN0002') TRANSID('NX00') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
         );
         let artifact_ref = ArtifactRef::new(
             format!("sha256:{:x}", Sha256::digest(artifact.payload())),
@@ -10546,6 +10546,11 @@ mod tests {
         );
         assert!(trace.iter().any(|entry| {
             entry.operation == CicsOperation::Cancel
+                && entry.outcome == "NORMAL"
+                && entry.response == 0
+        }));
+        assert!(trace.iter().any(|entry| {
+            entry.operation == CicsOperation::Syncpoint
                 && entry.outcome == "NORMAL"
                 && entry.response == 0
         }));

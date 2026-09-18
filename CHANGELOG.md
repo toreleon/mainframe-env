@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added the source-defined cancellation boundary for START PROTECT. CANCEL now
+  has explicit regression coverage for NOTFND before the protected START is
+  committed and normal cancellation after a committing SYNCPOINT admits its
+  work. The compiled product route exercises PROTECT, SYNCPOINT, and CANCEL in
+  that order while retaining the existing cancellation fence.
+
 - Added explicit ABEND cleanup for protected START requests. Before the typed
   ABEND route transfers to an installed exit or terminates the task, it deletes
   all still-protected START rows owned by that run; no work row is created, and

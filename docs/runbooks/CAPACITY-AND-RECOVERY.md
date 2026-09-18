@@ -107,6 +107,11 @@ row should exist for those deleted requests. If manual recovery restores such a
 provider row without its pre-abend task state, leave it quarantined rather than
 admitting work.
 
+Do not force CANCEL across a protected-pending row. IBM semantics allow CANCEL
+only after that START is committed. Before commit, preserve the row and return
+NOTFND; after commit, restore and cancel the pending interval row together with
+its deterministic work row and cancellation flag.
+
 A typed local CANCEL leaves the interval row as a cancelled replay tombstone
 and calls the work store's cancellation transition. Queued work becomes
 cancelled immediately; claimed work retains its lease with

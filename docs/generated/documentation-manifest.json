@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:6fb7e5be2cb297aa9c95274c91a27a5c5dc6d5569360c795eb07990ce0c4c742",
+      "sha256": "sha256:6465b5f62b759b4acd0598d5ada946cdee578322b758e8a775c14acf28bcac40",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -345,7 +345,7 @@
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
       "relative_links": 22,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:467f389d076b7bff7002649b5932383b531a41ac1542a09b21c30098ec24cad2",
+      "sha256": "sha256:299caab98931816c2cf08f7d130cc9272c3988cfb5747931b74d5c662833bdad",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -429,7 +429,7 @@
       "path": "docs/architecture/EXECUTION-AND-DURABILITY.md",
       "relative_links": 1,
       "scope": "execution lifecycle, effects, work, checkpoints, and durability",
-      "sha256": "sha256:fd6ec97dc40d8c51761908cae799bf3fdfa428c350d5dd90030f7006220a1221",
+      "sha256": "sha256:ca3f35d2d6a936c8fa47a983217b1af3f743e742b4df7ff8c31d2dea16bc6445",
       "status": "Accepted by repository owner",
       "title": "Execution and Durability Architecture",
       "xtask_commands": 0
@@ -1062,7 +1062,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:504b713f3156d93a3cee0320150bab2aefa7072a31941ebf2d0a85280f7a0bc2",
+      "sha256": "sha256:104cd1b65b726ef29b7dc871c775d5bbb637cc045023c616f1e8ade9470bd55f",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },
@@ -1438,7 +1438,7 @@
       "normative": false,
       "path": "docs/runbooks/CAPACITY-AND-RECOVERY.md",
       "relative_links": 2,
-      "sha256": "sha256:f996aa581a12f679550e56b406cf336d84c7fd233a9c3030856a4cdf9acd1fb9",
+      "sha256": "sha256:8278136191a7af87058f5179bb6e13fc31a65ed9ebfee9e590bbc39415b20f54",
       "title": "Capacity and recovery",
       "xtask_commands": 0
     },

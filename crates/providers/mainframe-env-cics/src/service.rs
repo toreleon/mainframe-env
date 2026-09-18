@@ -5065,6 +5065,78 @@ mod tests {
     }
 
     #[test]
+    fn protected_start_cancel_requires_a_committing_syncpoint() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (issuer, _) = registered(&service);
+        let start = request(
+            CicsOperation::Start,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"NEXT")),
+                ("REQID".into(), argument(b"PROTCAN1")),
+                ("FROM".into(), argument(b"PROTECTED")),
+                ("LENGTH".into(), cics_decimal(9)),
+                ("INTERVAL".into(), cics_decimal(100)),
+                ("OPTION.PROTECT".into(), cics_option()),
+            ]),
+            1,
+        );
+        service
+            .invoke(&effect(&issuer.run_unit_id, start.clone(), 1), start)
+            .unwrap();
+        let cancel = request(
+            CicsOperation::Cancel,
+            BTreeMap::from([
+                ("REQID".into(), argument(b"PROTCAN1")),
+                ("TRANSID".into(), argument(b"NEXT")),
+            ]),
+            2,
+        );
+        assert_eq!(
+            service.invoke(&effect(&issuer.run_unit_id, cancel.clone(), 2), cancel),
+            Err(HostProblem::Condition {
+                name: "NOTFND".into(),
+                response: 13,
+                response2: 0,
+            })
+        );
+        assert!(store.get_work("cics-start:PROTCAN1").unwrap().is_none());
+        assert!(
+            store
+                .get_provider_state("cics-interval-start-v1", "PROTCAN1")
+                .unwrap()
+                .is_some()
+        );
+
+        let commit = request(CicsOperation::Syncpoint, BTreeMap::new(), 3);
+        service
+            .invoke(&effect(&issuer.run_unit_id, commit.clone(), 3), commit)
+            .unwrap();
+        let cancel = request(
+            CicsOperation::Cancel,
+            BTreeMap::from([
+                ("REQID".into(), argument(b"PROTCAN1")),
+                ("TRANSID".into(), argument(b"NEXT")),
+            ]),
+            4,
+        );
+        let cancelled = service
+            .invoke(&effect(&issuer.run_unit_id, cancel.clone(), 4), cancel)
+            .unwrap();
+        assert_eq!((cancelled.response, cancelled.response2), (0, 0));
+        let work = store.get_work("cics-start:PROTCAN1").unwrap().unwrap();
+        assert_eq!(work.state, WorkState::Cancelled);
+        assert!(work.cancellation_requested);
+    }
+
+    #[test]
     fn interval_start_work_and_retrieve_survive_sqlite_reopen() {
         let root = std::env::temp_dir().join(format!(
             "mainframe-env-cics-start-retrieve-{}-{:?}",
