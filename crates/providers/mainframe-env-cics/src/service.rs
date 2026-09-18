@@ -4887,6 +4887,92 @@ mod tests {
     }
 
     #[test]
+    fn retrieve_wait_suspends_without_data_and_consumes_after_promotion() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = CicsService::open_with_runtime(
+            authorities(),
+            store.clone(),
+            store.clone(),
+            CicsLimits::default(),
+            Arc::new(TestCicsClock::fixed(1_000)),
+        )
+        .unwrap();
+        let (issuer, _) = registered(&service);
+        let consumer = invocation_for("retrieve-wait-consumer", BTreeMap::new());
+        let consumer_session = SessionId::new("retrieve-wait-session", 64).unwrap();
+        service.create_session(&consumer_session, 24, 80).unwrap();
+        service
+            .register_run(
+                consumer.clone(),
+                &consumer_session,
+                "NEXT",
+                "MEAPPL",
+                "MESYS",
+            )
+            .unwrap();
+
+        let mut waiting = request(
+            CicsOperation::Retrieve,
+            BTreeMap::from([
+                ("INTO".into(), argument(b"DATA-OUT")),
+                ("LENGTH".into(), cics_decimal(8)),
+                ("OPTION.WAIT".into(), cics_option()),
+            ]),
+            1,
+        );
+        waiting.mutation.as_mut().unwrap().transaction = Some("NEXT".into());
+        let suspended = service
+            .invoke(
+                &effect(&consumer.run_unit_id, waiting.clone(), 1),
+                waiting.clone(),
+            )
+            .unwrap();
+        assert_eq!(suspended.disposition, CicsDisposition::Suspended);
+        assert!(suspended.outputs.is_empty());
+
+        let start = request(
+            CicsOperation::Start,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"NEXT")),
+                ("REQID".into(), argument(b"WAITDATA")),
+                ("FROM".into(), argument(b"ARRIVED")),
+                ("INTERVAL".into(), cics_decimal(0)),
+            ]),
+            2,
+        );
+        service
+            .invoke(&effect(&issuer.run_unit_id, start.clone(), 2), start)
+            .unwrap();
+        let work = store
+            .claim(
+                "retrieve-wait-worker",
+                Some(CICS_START_WORK_GENERATION),
+                1_000,
+                100,
+            )
+            .unwrap()
+            .unwrap();
+        service.promote_start_work(&work, 1_000).unwrap();
+        store
+            .complete(
+                &work.work_id,
+                work.lease_id.as_deref().unwrap(),
+                work.lease_epoch,
+                1_000,
+            )
+            .unwrap();
+
+        let mut resumed = request(CicsOperation::Retrieve, waiting.arguments.clone(), 3);
+        resumed.mutation.as_mut().unwrap().transaction = Some("NEXT".into());
+        let completed = service
+            .invoke(&effect(&consumer.run_unit_id, resumed.clone(), 3), resumed)
+            .unwrap();
+        assert_eq!(completed.disposition, CicsDisposition::Complete);
+        assert_eq!(completed.outputs["INTO"].bytes(), b"ARRIVED");
+        assert_eq!(completed.outputs["LENGTH"].bytes(), b"7");
+    }
+
+    #[test]
     fn protected_start_waits_for_commit_while_rollback_and_abend_cancel() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = CicsService::open_with_runtime(

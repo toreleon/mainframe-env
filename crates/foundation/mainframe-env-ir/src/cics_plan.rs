@@ -10,6 +10,7 @@ mod codec_tags;
 mod file_mutation;
 mod handle_abend;
 mod interval_control;
+mod option_shape;
 mod output_shape;
 mod program_control;
 mod queue_control;
@@ -276,6 +277,8 @@ pub enum CicsPlanOption {
     Fmh,
     /// Defer START work admission until a successful syncpoint.
     Protect,
+    /// Wait for an expired START record rather than returning ENDDATA immediately.
+    Wait,
 }
 
 /// Named result binding written after the host result arrives.
@@ -598,17 +601,7 @@ fn validate_operation_shape(
     ]
     .into_iter()
     .collect::<BTreeSet<_>>();
-    let scheduling_options = plan.options.iter().any(|option| match plan.operation {
-        CicsPlanOperation::FormatTime => !matches!(
-            option,
-            CicsPlanOption::NoHandle | CicsPlanOption::DateSep | CicsPlanOption::TimeSep
-        ),
-        CicsPlanOperation::Start => !matches!(
-            option,
-            CicsPlanOption::NoHandle | CicsPlanOption::Fmh | CicsPlanOption::Protect
-        ),
-        _ => !matches!(option, CicsPlanOption::NoHandle),
-    });
+    let scheduling_options = option_shape::has_unsupported(plan);
     let unexpected_output = outputs
         .iter()
         .any(|output| !output_shape::allowed(plan.operation, *output));
@@ -1293,6 +1286,7 @@ mod tests {
                 CicsPlanOption::FreeKb,
                 CicsPlanOption::DateSep,
                 CicsPlanOption::TimeSep,
+                CicsPlanOption::Wait,
             ] {
                 let mut invalid = base.clone();
                 invalid.options.insert(option);
@@ -1328,6 +1322,8 @@ mod tests {
         assert_eq!(output_from_tag(95), Ok(CicsOutputName::SetPointer));
         assert_eq!(option_tag(CicsPlanOption::Protect), 16);
         assert_eq!(option_from_tag(16), Ok(CicsPlanOption::Protect));
+        assert_eq!(option_tag(CicsPlanOption::Wait), 17);
+        assert_eq!(option_from_tag(17), Ok(CicsPlanOption::Wait));
 
         let plan = read_plan();
         let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
@@ -2166,6 +2162,38 @@ mod tests {
         });
         assert_eq!(
             encode_cics_effect_plan(&both_destinations, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn retrieve_wait_round_trips_only_on_the_retrieve_shape() {
+        let mut plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Retrieve,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::Length,
+                value: CicsOperandValue::Storage(slot(1, "RESULT.LENGTH")),
+            }],
+            options: BTreeSet::from([CicsPlanOption::Wait]),
+            outputs: vec![
+                CicsOutputBinding {
+                    name: CicsOutputName::Into,
+                    target: slot(2, "RESULT.DATA"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::Length,
+                    target: slot(1, "RESULT.LENGTH"),
+                },
+            ],
+            condition: CicsCondition::Default,
+        };
+        let limits = CicsPlanLimits::default();
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
+
+        plan.operation = CicsPlanOperation::Read;
+        assert_eq!(
+            encode_cics_effect_plan(&plan, limits),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }

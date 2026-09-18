@@ -180,5 +180,6 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::Gteq => "GTEQ",
         CicsPlanOption::Fmh => "FMH",
         CicsPlanOption::Protect => "PROTECT",
+        CicsPlanOption::Wait => "WAIT",
     }
 }

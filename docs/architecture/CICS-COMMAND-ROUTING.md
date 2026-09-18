@@ -141,8 +141,11 @@ uses the ordinary pending-work cancellation fence after committing SYNCPOINT.
 When local START omits REQID, the provider derives one replay-stable
 eight-character identifier and the interpreter writes it to implicit EIBREQID;
 that value owns the same record and work identities as an explicit REQID.
-WAIT, terminal association, non-command abnormal/task-end cleanup, and
-automatic task launch remain fail-closed or deferred.
+RETRIEVE WAIT durably checkpoints and reissues the same statement when no
+eligible record exists; explicit execution re-entry after worker promotion
+consumes through the ordinary one-time fence. Deadlock timeout, shutdown/AICB,
+automatic wake, terminal association, non-command abnormal/task-end cleanup,
+and automatic task launch remain fail-closed or deferred.
 The typed default-cursor file-browse subset binds STARTBR, READNEXT, READPREV,
 and ENDBR to exactly one FILE/DATASET alias. STARTBR captures a writable
 RIDFLD without returning a record and admits the default-equivalent `GTEQ`

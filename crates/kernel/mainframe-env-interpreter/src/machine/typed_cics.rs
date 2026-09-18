@@ -145,6 +145,7 @@ pub(super) fn suspension(
     let (kind, reissue) = match operation {
         CicsOperation::Enq => ("cics-enqueue", true),
         CicsOperation::Delay => ("cics-delay", true),
+        CicsOperation::Retrieve => ("cics-retrieve", true),
         CicsOperation::ChangeTask | CicsOperation::Suspend => ("cics-scheduler", false),
         _ => ("cics-terminal", true),
     };

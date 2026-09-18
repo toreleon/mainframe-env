@@ -118,6 +118,14 @@ EIBREQID and therefore the provider-row and work IDs. A hash collision with a
 different retained producer fails through the duplicate-REQID fence; never
 rename only one side or invent a replacement EIBREQID during recovery.
 
+A suspended RETRIEVE WAIT has no provider-side waiter row. Preserve its online
+exchange, machine checkpoint, and execution state together; the checkpoint
+rewinds to the same RETRIEVE statement, while the interval row remains ready or
+absent until ordinary worker promotion. Recovery must not synthesize ENDDATA,
+consume a record on behalf of the task, or close the exchange. Resume is
+currently explicit; automatic wake and shutdown/deadlock completion are not
+part of this bounded child.
+
 A typed local CANCEL leaves the interval row as a cancelled replay tombstone
 and calls the work store's cancellation transition. Queued work becomes
 cancelled immediately; claimed work retains its lease with

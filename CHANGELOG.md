@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added the bounded RETRIEVE WAIT data-arrival path. Typed WAIT now checkpoints
+  and reissues the RETRIEVE statement without ENDDATA or record consumption
+  when no expired START data is available, then consumes normally after worker
+  promotion and explicit execution re-entry. Deadlock timeout, shutdown/AICB,
+  automatic wake, and process-restart proof remain pending.
+
 - Added runtime-generated START request identities. Typed local START no longer
   requires REQID; when omitted, the provider derives a replay-stable
   eight-character uppercase identifier from the effect key and canonical
@@ -39,16 +45,17 @@ All notable changes to mainframe-env are documented here.
   installs a checked non-native pointer to task-owned bytes that survive
   checkpoint/resume. The interpreter advertises its exact remaining allocation
   capacity before the provider's consume CAS, so capacity failure leaves the
-  ready record available. WAIT, terminal association, automatic task launch,
-  PostgreSQL, and licensed evidence remain pending.
+  ready record available. WAIT timeout/shutdown, terminal association,
+  automatic task launch, PostgreSQL, and licensed evidence remain pending.
 
 - Added START FMH propagation through RETRIEVE. The typed START data route now
   persists the source FMH flag in its versioned interval row; successful
   RETRIEVE returns a strict one-byte EIBFMH value (`X'FF'` with FMH, `X'00'`
   otherwise), and the interpreter owns the implicit EIB field across compiled
   checkpoint/resume. Historical retained responses without the additive output
-  remain readable. Broader FMH parsing, WAIT, terminal association,
-  automatic task launch, PostgreSQL, and licensed evidence remain pending.
+  remain readable. Broader FMH parsing, WAIT timeout/shutdown, terminal
+  association, automatic task launch, PostgreSQL, and licensed evidence remain
+  pending.
 
 - Added bounded START-to-RETRIEVE metadata propagation. Local data-bearing
   START now accepts source-checked RTRANSID, RTERMID, and QUEUE names, persists
@@ -56,9 +63,9 @@ All notable changes to mainframe-env are documented here.
   exact-width metadata outputs alongside INTO/LENGTH. Requesting metadata the
   corresponding START omitted returns ENVDEFERR without consuming the ready
   record. Compiler, plan codec, interpreter, provider, SQLite-compatible state,
-  and the compiled product route share the same identities. WAIT,
-  terminal association, automatic task launch, PostgreSQL, and licensed
-  evidence remain pending.
+  and the compiled product route share the same identities. WAIT
+  timeout/shutdown, terminal association, automatic task launch, PostgreSQL,
+  and licensed evidence remain pending.
 
 - Added local application-named CICS DELAY cancellation and task cleanup.
   Positive literal INTERVAL may bind a one-to-eight-character REQID; another

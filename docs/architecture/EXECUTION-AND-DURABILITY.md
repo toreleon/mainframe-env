@@ -229,6 +229,15 @@ interval row and work payload identity, and is returned as a strict EIBREQID
 output. The interpreter validates and checkpoints the eight-byte implicit EIB
 field. Explicit names never receive this synthetic output.
 
+Typed RETRIEVE WAIT uses the ordinary resumable execution boundary. A no-data
+attempt returns no condition and mutates no interval row; the interpreter moves
+the program counter back to the RETRIEVE statement and records a
+`cics-retrieve` suspension in the durable machine checkpoint. The online
+continuation keeps that exchange open. After a matching START work item is
+promoted, explicit execution re-entry issues a fresh effect and consumes the
+oldest eligible record under the existing CAS/replay identity. Automatic wake,
+deadlock timeout, shutdown/AICB, and process-restart proof remain separate.
+
 Typed local CANCEL requires an explicit REQID and accepts an optional local
 TRANSID solely for routing authorization. It first verifies the matching shared
 work identity, then CAS-transitions only a committed pending record to a

@@ -10310,7 +10310,7 @@ mod tests {
         );
         let receiver = published_source_fixture(
             "RECEIVER",
-            "IDENTIFICATION DIVISION.\nPROGRAM-ID. RECEIVER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE ALL 'Z'.\n01 SET-DATA-X PIC X(8) VALUE ALL 'Q'.\n01 LENGTH-X PIC S9(4) COMP VALUE 8.\n01 SET-LENGTH-X PIC S9(4) COMP VALUE 0.\n01 PTR-X POINTER.\n01 RTRANS-X PIC X(4) VALUE SPACES.\n01 RTERM-X PIC X(4) VALUE SPACES.\n01 QUEUE-X PIC X(8) VALUE SPACES.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nLINKAGE SECTION.\n01 LINK-X PIC X(7).\nPROCEDURE DIVISION.\nEXEC CICS RETRIEVE INTO(DATA-X) LENGTH(LENGTH-X) RTRANSID(RTRANS-X) RTERMID(RTERM-X) QUEUE(QUEUE-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS RETRIEVE SET(PTR-X) LENGTH(SET-LENGTH-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nSET ADDRESS OF LINK-X TO PTR-X.\nMOVE LINK-X TO SET-DATA-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. RECEIVER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE ALL 'Z'.\n01 SET-DATA-X PIC X(8) VALUE ALL 'Q'.\n01 LENGTH-X PIC S9(4) COMP VALUE 8.\n01 SET-LENGTH-X PIC S9(4) COMP VALUE 0.\n01 PTR-X POINTER.\n01 RTRANS-X PIC X(4) VALUE SPACES.\n01 RTERM-X PIC X(4) VALUE SPACES.\n01 QUEUE-X PIC X(8) VALUE SPACES.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nLINKAGE SECTION.\n01 LINK-X PIC X(7).\nPROCEDURE DIVISION.\nEXEC CICS RETRIEVE INTO(DATA-X) LENGTH(LENGTH-X) RTRANSID(RTRANS-X) RTERMID(RTERM-X) QUEUE(QUEUE-X) WAIT RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS RETRIEVE SET(PTR-X) LENGTH(SET-LENGTH-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nSET ADDRESS OF LINK-X TO PTR-X.\nMOVE LINK-X TO SET-DATA-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
         );
         let artifact_ref = |artifact: &PublishedArtifact| {
             ArtifactRef::new(
@@ -10355,6 +10355,43 @@ mod tests {
             .unwrap();
         let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
 
+        let receiver_session = SessionId::new("interval-receiver", 64).unwrap();
+        let receiver_invocation = server
+            .cics_invocation("IBMUSER", "NX00", Some(receiver_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                receiver_invocation.clone(),
+                &receiver_session,
+                "NX00",
+                24,
+                80,
+                "interval-receiver-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let receiver_context = server
+            .cics
+            .terminal_execution(&receiver_session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&receiver_session, "RECEIVER", &receiver_context)
+            .unwrap();
+        server
+            .run_online_exchange(&receiver_session, &principal, "RECEIVER", 2)
+            .unwrap();
+        assert_eq!(
+            server
+                .store
+                .get_execution(&receiver_invocation.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Suspended
+        );
+
         let starter_session = SessionId::new("interval-starter", 64).unwrap();
         let starter_invocation = server
             .cics_invocation("IBMUSER", "ST00", Some(starter_ref))
@@ -10368,24 +10405,24 @@ mod tests {
                 24,
                 80,
                 "interval-starter-csrf",
-                1,
+                3,
                 10_000,
             )
             .unwrap();
         let starter_context = server
             .cics
-            .terminal_execution(&starter_session, &principal, 2)
+            .terminal_execution(&starter_session, &principal, 4)
             .unwrap();
         server
             .begin_online_exchange(&starter_session, "STARTER", &starter_context)
             .unwrap();
         server
-            .run_online_exchange(&starter_session, &principal, "STARTER", 2)
+            .run_online_exchange(&starter_session, &principal, "STARTER", 4)
             .unwrap();
         assert!(
             server
                 .cics
-                .terminal_run_trace(&starter_session, &principal, 2)
+                .terminal_run_trace(&starter_session, &principal, 4)
                 .unwrap()
                 .iter()
                 .any(|entry| entry.operation == CicsOperation::Start)
@@ -10422,32 +10459,8 @@ mod tests {
             server.finish_claimed_jes_work(&work, Ok(outcome)).unwrap();
         }
 
-        let receiver_session = SessionId::new("interval-receiver", 64).unwrap();
-        let receiver_invocation = server
-            .cics_invocation("IBMUSER", "NX00", Some(receiver_ref))
-            .unwrap();
         server
-            .cics
-            .launch_terminal(
-                receiver_invocation.clone(),
-                &receiver_session,
-                "NX00",
-                24,
-                80,
-                "interval-receiver-csrf",
-                3,
-                10_000,
-            )
-            .unwrap();
-        let receiver_context = server
-            .cics
-            .terminal_execution(&receiver_session, &principal, 4)
-            .unwrap();
-        server
-            .begin_online_exchange(&receiver_session, "RECEIVER", &receiver_context)
-            .unwrap();
-        server
-            .run_online_exchange(&receiver_session, &principal, "RECEIVER", 4)
+            .run_online_exchange(&receiver_session, &principal, "RECEIVER", 5)
             .unwrap();
         let continuation = server
             .online_machine_continuation(&receiver_session)
@@ -10486,7 +10499,7 @@ mod tests {
         assert!(
             server
                 .cics
-                .terminal_run_trace(&receiver_session, &principal, 4)
+                .terminal_run_trace(&receiver_session, &principal, 5)
                 .unwrap()
                 .iter()
                 .any(|entry| entry.operation == CicsOperation::Retrieve)

@@ -186,6 +186,7 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u8 {
         CicsPlanOption::Gteq => 14,
         CicsPlanOption::Fmh => 15,
         CicsPlanOption::Protect => 16,
+        CicsPlanOption::Wait => 17,
     }
 }
 
@@ -208,6 +209,7 @@ pub(super) fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodec
         14 => Ok(CicsPlanOption::Gteq),
         15 => Ok(CicsPlanOption::Fmh),
         16 => Ok(CicsPlanOption::Protect),
+        17 => Ok(CicsPlanOption::Wait),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
