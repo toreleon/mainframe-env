@@ -4887,7 +4887,7 @@ mod tests {
     }
 
     #[test]
-    fn protected_start_waits_for_commit_and_rollback_removes_the_request() {
+    fn protected_start_waits_for_commit_while_rollback_and_abend_cancel() {
         let store = Arc::new(MemoryStore::new(Default::default()));
         let service = CicsService::open_with_runtime(
             authorities(),
@@ -5041,6 +5041,27 @@ mod tests {
             .invoke(&effect(&issuer.run_unit_id, healing.clone(), 7), healing)
             .unwrap();
         assert!(store.get_work("cics-start:PROT0003").unwrap().is_some());
+
+        let start = protected_start(b"PROT0004", 8);
+        service
+            .invoke(&effect(&issuer.run_unit_id, start.clone(), 8), start)
+            .unwrap();
+        let abend = request(
+            CicsOperation::Abend,
+            BTreeMap::from([("OPTION.NODUMP".into(), cics_option())]),
+            9,
+        );
+        let abended = service
+            .invoke(&effect(&issuer.run_unit_id, abend.clone(), 9), abend)
+            .unwrap();
+        assert_eq!(abended.disposition, CicsDisposition::Abended);
+        assert!(
+            store
+                .get_provider_state("cics-interval-start-v1", "PROT0004")
+                .unwrap()
+                .is_none()
+        );
+        assert!(store.get_work("cics-start:PROT0004").unwrap().is_none());
     }
 
     #[test]

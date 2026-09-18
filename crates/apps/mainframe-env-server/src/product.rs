@@ -12031,12 +12031,12 @@ mod tests {
     #[test]
     fn online_handle_abend_reset_reactivates_the_selected_exit_once() {
         let limits = SourceLimits::default();
-        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. HABRESET.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 COUNT-X PIC 9 VALUE 0.\n01 FIRST-FN PIC X(2).\n01 SECOND-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS HANDLE ABEND LABEL(ABEND-HANDLER) END-EXEC.\nEXEC CICS ABEND ABCODE('B001') END-EXEC.\nSTOP RUN.\nABEND-HANDLER.\nADD 1 TO COUNT-X.\nMOVE EIBFN TO FIRST-FN.\nIF COUNT-X = 1\n  EXEC CICS HANDLE ABEND RESET END-EXEC\n  EXEC CICS ABEND ABCODE('B002') END-EXEC\nEND-IF.\nMOVE EIBFN TO SECOND-FN.\nEXEC CICS HANDLE ABEND END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. HABRESET.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 COUNT-X PIC 9 VALUE 0.\n01 FIRST-FN PIC X(2).\n01 SECOND-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('HR00') REQID('PRAB0001') FROM(START-DATA) INTERVAL(0) PROTECT END-EXEC.\nEXEC CICS HANDLE ABEND LABEL(ABEND-HANDLER) END-EXEC.\nEXEC CICS ABEND ABCODE('B001') END-EXEC.\nSTOP RUN.\nABEND-HANDLER.\nADD 1 TO COUNT-X.\nMOVE EIBFN TO FIRST-FN.\nIF COUNT-X = 1\n  EXEC CICS HANDLE ABEND RESET END-EXEC\n  EXEC CICS ABEND ABCODE('B002') END-EXEC\nEND-IF.\nMOVE EIBFN TO SECOND-FN.\nEXEC CICS HANDLE ABEND END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
         let source = std::str::from_utf8(source)
             .unwrap()
             .replace(
                 "01 COUNT-X PIC 9 VALUE 0.\n",
-                "01 COUNT-X PIC 9 VALUE 0.\n01 CURRENT-ABCODE PIC X(4).\n01 ORIGINAL-ABCODE PIC X(4).\n",
+                "01 COUNT-X PIC 9 VALUE 0.\n01 START-DATA PIC X(8) VALUE 'PROTECT'.\n01 CURRENT-ABCODE PIC X(4).\n01 ORIGINAL-ABCODE PIC X(4).\n",
             )
             .replace(
                 "END-IF.\nMOVE EIBFN TO SECOND-FN.",
@@ -12157,6 +12157,20 @@ mod tests {
             restored.variable("SECOND-FN").unwrap().bytes(),
             &[0x0e, 0x0c]
         );
+        assert!(
+            server
+                .store
+                .get_provider_state("cics-interval-start-v1", "PRAB0001")
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            server
+                .store
+                .get_work("cics-start:PRAB0001")
+                .unwrap()
+                .is_none()
+        );
         assert_eq!(
             server
                 .store
@@ -12166,7 +12180,7 @@ mod tests {
                 .filter(|record| record.capability.as_str() == "host.cics.execute")
                 .map(|record| (record.effect_sequence, record.decision))
                 .collect::<Vec<_>>(),
-            (1..=7)
+            (1..=8)
                 .map(|sequence| {
                     (
                         sequence,

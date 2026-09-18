@@ -210,8 +210,10 @@ matching record from that issuing run to pending and admits deterministic work.
 A finalized retry scans pending records from the same run whose work is still
 absent, closing the state-transition/enqueue crash gap without duplicating work.
 Explicit SYNCPOINT ROLLBACK durably finalizes the rollback before deleting
-protected-pending records, so the REQID can be reused. General task-end and
-abend cleanup are not claimed by this child.
+protected-pending records, so the REQID can be reused. Typed ABEND performs the
+same bounded deletion before its handler transfer or terminal disposition.
+Non-command abnormal termination and implicit task-end syncpoint behavior are
+not claimed by these children.
 
 Typed local CANCEL requires an explicit REQID and accepts an optional local
 TRANSID solely for routing authorization. It first verifies the matching shared

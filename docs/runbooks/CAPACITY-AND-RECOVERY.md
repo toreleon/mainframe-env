@@ -101,6 +101,12 @@ the same syncpoint so admission is healed. SYNCPOINT ROLLBACK removes only
 still-protected records; restoring only the UOW row or only the interval rows
 can reverse that decision.
 
+Typed ABEND also deletes still-protected rows for its exact issuing run before
+returning the ABEND disposition or transferring to an installed exit. No work
+row should exist for those deleted requests. If manual recovery restores such a
+provider row without its pre-abend task state, leave it quarantined rather than
+admitting work.
+
 A typed local CANCEL leaves the interval row as a cancelled replay tombstone
 and calls the work store's cancellation transition. Queued work becomes
 cancelled immediately; claimed work retains its lease with

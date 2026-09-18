@@ -9,6 +9,7 @@ mod delay;
 mod protect;
 
 pub use delay::CICS_DELAY_WORK_GENERATION;
+pub(super) use protect::discard_run as discard_protected_starts;
 pub(super) use protect::finish_syncpoint as finish_protected_starts;
 
 use super::super::{CicsLimits, CicsReplayClock, CicsService, Run, field, store_error};

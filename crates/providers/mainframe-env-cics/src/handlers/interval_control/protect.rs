@@ -9,7 +9,7 @@ pub(in crate::service) fn finish_syncpoint(
 ) -> Result<(), HostProblem> {
     match outcome {
         CicsUnitOfWorkOutcome::Committed => commit(service, run),
-        CicsUnitOfWorkOutcome::RolledBack => discard(service, run),
+        CicsUnitOfWorkOutcome::RolledBack => discard_run(service, run),
     }
 }
 
@@ -83,7 +83,7 @@ pub(super) fn release(
     Ok(selected)
 }
 
-fn discard(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
+pub(in crate::service) fn discard_run(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
     let run_unit = run.invocation.run_unit_id.as_str();
     let mut state = service.lock()?;
     let selected = state

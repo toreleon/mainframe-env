@@ -6,14 +6,20 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added explicit ABEND cleanup for protected START requests. Before the typed
+  ABEND route transfers to an installed exit or terminates the task, it deletes
+  all still-protected START rows owned by that run; no work row is created, and
+  the REQID becomes reusable. Non-command abnormal termination and implicit
+  task-end syncpoint behavior remain pending.
+
 - Added the bounded local START PROTECT-to-SYNCPOINT route. PROTECT now persists
   a protected-pending START record without admitting worker work. An explicit
   successful SYNCPOINT commit releases matching records and idempotently
   creates their deterministic work; SYNCPOINT ROLLBACK durably finalizes the
   rollback, deletes those rows, and permits REQID reuse. Retry heals a committed
-  record whose work enqueue was interrupted. General task-end/abend cancellation, protected
-  CANCEL, automatic task launch, PostgreSQL, and licensed evidence remain
-  pending.
+  record whose work enqueue was interrupted. Non-command abnormal termination,
+  implicit task-end syncpoint, protected CANCEL, automatic task launch,
+  PostgreSQL, and licensed evidence remain pending.
 
 - Added RETRIEVE SET over interpreter-owned virtual storage. Typed RETRIEVE now
   accepts exactly one of INTO or a POINTER/POINTER-32 SET target with mandatory

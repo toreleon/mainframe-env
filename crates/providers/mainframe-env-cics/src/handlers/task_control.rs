@@ -507,6 +507,7 @@ fn abend(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     validate_abend_request(request)?;
+    super::interval_control::discard_protected_starts(service, run)?;
     super::release_task_state(service, run)?;
     let code = argument_bytes(request, "ABCODE").unwrap_or_default();
     let dump_requested =
