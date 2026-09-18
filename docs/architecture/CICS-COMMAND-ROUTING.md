@@ -141,7 +141,8 @@ uses the ordinary pending-work cancellation fence after committing SYNCPOINT.
 Normal machine completion and highest-level RETURN now apply the same commit
 transition implicitly before task cleanup. Known execution failure applies
 rollback deletion; scheduler/WAIT suspension does not finalize the task.
-Disconnect/timeout cleanup and crash-gap outcome reconciliation remain deferred.
+Terminal disconnect and idle timeout also apply rollback deletion through the
+caller-held cleanup boundary. Crash-gap outcome reconciliation remains deferred.
 When local START omits REQID, the provider derives one replay-stable
 eight-character identifier and the interpreter writes it to implicit EIBREQID;
 that value owns the same record and work identities as an explicit REQID.

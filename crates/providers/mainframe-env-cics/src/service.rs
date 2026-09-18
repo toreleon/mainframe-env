@@ -928,7 +928,7 @@ impl CicsService {
             .cloned()
             .collect::<Vec<_>>()
         {
-            handlers::release_task_state(self, &run)?;
+            handlers::rollback_task(self, &mut state.interval_records, &run)?;
         }
         self.store
             .delete_provider_state("cics-session", session.as_str(), current.version)
@@ -1993,7 +1993,7 @@ impl CicsService {
                 .cloned()
                 .collect::<Vec<_>>()
             {
-                handlers::release_task_state(self, &run)?;
+                handlers::rollback_task(self, &mut state.interval_records, &run)?;
             }
             self.store
                 .delete_provider_state("cics-session", session.as_str(), current.version)
@@ -6198,6 +6198,24 @@ mod tests {
         service
             .invoke(&effect(&issuer.run_unit_id, delay.clone(), 1), delay)
             .unwrap();
+        let protected = request(
+            CicsOperation::Start,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"NEXT")),
+                ("REQID".into(), argument(b"DISCEND1")),
+                ("FROM".into(), argument(b"DISCONNECT")),
+                ("INTERVAL".into(), cics_decimal(0)),
+                ("OPTION.PROTECT".into(), cics_option()),
+            ]),
+            2,
+        );
+        service
+            .invoke(
+                &effect(&issuer.run_unit_id, protected.clone(), 2),
+                protected,
+            )
+            .unwrap();
+        assert!(store.get_work("cics-start:DISCEND1").unwrap().is_none());
         service
             .disconnect_terminal(&session, issuer.principal.id(), "delay-cleanup-csrf", 1_000)
             .unwrap();
@@ -6214,6 +6232,13 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
+        assert!(
+            store
+                .get_provider_state("cics-interval-start-v1", "DISCEND1")
+                .unwrap()
+                .is_none()
+        );
+        assert!(store.get_work("cics-start:DISCEND1").unwrap().is_none());
     }
 
     #[test]
@@ -6258,12 +6283,37 @@ mod tests {
         service
             .invoke(&effect(&issuer.run_unit_id, delay.clone(), 1), delay)
             .unwrap();
+        let protected = request(
+            CicsOperation::Start,
+            BTreeMap::from([
+                ("TRANSID".into(), argument(b"NEXT")),
+                ("REQID".into(), argument(b"TIMEEND1")),
+                ("FROM".into(), argument(b"TIMEOUT")),
+                ("INTERVAL".into(), cics_decimal(0)),
+                ("OPTION.PROTECT".into(), cics_option()),
+            ]),
+            2,
+        );
+        service
+            .invoke(
+                &effect(&issuer.run_unit_id, protected.clone(), 2),
+                protected,
+            )
+            .unwrap();
+        assert!(store.get_work("cics-start:TIMEEND1").unwrap().is_none());
         assert_eq!(
             service.terminal_execution(&session, issuer.principal.id(), 1_001),
             Err(HostProblem::TimedOut)
         );
         let work = store.get_work(&work_id).unwrap().unwrap();
         assert_eq!(work.state, WorkState::Cancelled);
+        assert!(
+            store
+                .get_provider_state("cics-interval-start-v1", "TIMEEND1")
+                .unwrap()
+                .is_none()
+        );
+        assert!(store.get_work("cics-start:TIMEEND1").unwrap().is_none());
     }
 
     #[test]

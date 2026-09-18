@@ -17,6 +17,7 @@ mod time;
 use super::{CicsService, Run};
 use mainframe_env_host_api::HostProblem;
 use mainframe_env_store_api::StoreError;
+use std::collections::BTreeMap;
 
 pub(crate) fn field(out: &mut Vec<u8>, value: &[u8]) -> Result<(), HostProblem> {
     out.extend_from_slice(
@@ -73,4 +74,17 @@ pub(super) use time::invoke as invoke_time;
 pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
     task_enqueue::release_task(service, run)?;
     interval_control::release_task(service, run)
+}
+
+pub(super) fn rollback_task(
+    service: &CicsService,
+    records: &mut BTreeMap<String, IntervalStartRecord>,
+    run: &Run,
+) -> Result<(), HostProblem> {
+    interval_control::discard_protected_start_records(
+        service.store.as_ref(),
+        records,
+        run.invocation.run_unit_id.as_str(),
+    )?;
+    release_task_state(service, run)
 }

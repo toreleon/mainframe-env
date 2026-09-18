@@ -86,8 +86,19 @@ pub(super) fn release(
 pub(in crate::service) fn discard_run(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
     let run_unit = run.invocation.run_unit_id.as_str();
     let mut state = service.lock()?;
-    let selected = state
-        .interval_records
+    discard_records(
+        service.store.as_ref(),
+        &mut state.interval_records,
+        run_unit,
+    )
+}
+
+pub(in crate::service) fn discard_records(
+    store: &dyn ProviderStateStore,
+    records: &mut BTreeMap<String, IntervalStartRecord>,
+    run_unit: &str,
+) -> Result<(), HostProblem> {
+    let selected = records
         .values()
         .filter(|record| {
             record.state == IntervalStartState::ProtectedPending
@@ -96,11 +107,10 @@ pub(in crate::service) fn discard_run(service: &CicsService, run: &Run) -> Resul
         .map(|record| (record.request_id.clone(), record.version))
         .collect::<Vec<_>>();
     for (request_id, version) in selected {
-        service
-            .store
+        store
             .delete_provider_state(NAMESPACE, &request_id, version)
             .map_err(store_error)?;
-        state.interval_records.remove(&request_id);
+        records.remove(&request_id);
     }
     Ok(())
 }

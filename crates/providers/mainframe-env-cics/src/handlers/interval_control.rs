@@ -10,6 +10,7 @@ mod protect;
 mod retrieve;
 
 pub use delay::CICS_DELAY_WORK_GENERATION;
+pub(super) use protect::discard_records as discard_protected_start_records;
 pub(super) use protect::discard_run as discard_protected_starts;
 pub(super) use protect::finish_syncpoint as finish_protected_starts;
 

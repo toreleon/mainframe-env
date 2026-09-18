@@ -234,9 +234,11 @@ compiled completion and highest-level RETURN transition the issuing run's
 protected rows to pending and idempotently admit work before volatile task
 cleanup. Known execution failure deletes only that run's still-protected rows
 before releasing other task state. A scheduler or data wait suspension performs
-neither transition. Disconnect/timeout cleanup and recovery that begins after a
-terminal execution outcome but before product/CICS cleanup still require
-separate disposition-bound reconciliation proof.
+neither transition. Terminal disconnect and idle timeout delete still-protected
+rows in the same caller-held cleanup pass that abandons delays and releases
+enqueue state. Recovery that begins after a terminal execution outcome but
+before product/CICS cleanup still requires separate disposition-bound
+reconciliation proof.
 
 An optional local START USERID is part of the canonical producer request and
 the duplicate-REQID fence. Before schedule persistence, the provider authorizes
