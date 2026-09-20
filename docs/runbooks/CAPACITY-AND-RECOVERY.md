@@ -6,10 +6,12 @@ JES jobs/active work/spool/events, SQL rows/payloads, and immutable artifacts.
 At 100% of any bound, admission fails before mutation. No queue or retry loop
 grows automatically.
 
-The core server owns exactly two JES workers. Their generation-scoped claim
-prevents them from consuming another durable work lane. Higher JES priority is
-selected first; oldest available admission tick plus work ID provides a
-deterministic FIFO tie-break within a priority. Each
+The core server owns exactly two shared durable workers. Each poll claims JES
+work first and, when none is available, claims the CICS `cics-start-v1`
+generation, then the CICS `cics-delay-v1` generation; generation-scoped claims
+prevent any operation from consuming a foreign durable work lane. Within a
+generation, higher priority is selected first; oldest available admission tick
+plus work ID provides a deterministic FIFO tie-break within a priority. Each
 worker heartbeats a 30-second lease every 5 seconds through the persisted
 logical clock, and admitted work has a 24-hour deadline. After an ungraceful
 process exit, wait until that lease expires;
@@ -61,6 +63,115 @@ overlapping, noncanonical, or digest-mismatched definitions make CICS open fail
 closed. Do not delete the model catalog to force local routing: model-aware lock
 keys contain either APPLID/SYSID or ENQSCOPE and are not compatible with the
 single-region key profile.
+
+Back up `cics-interval-start-v1` with the CICS provider state. Do not delete or
+edit pending, protected-pending, ready, consumed, or cancelled rows manually. A row binds
+its REQID to the producing effect and canonical request; replacing it can turn
+a duplicate START into a false replay. Optional RTRANSID, RTERMID, and QUEUE
+metadata live in that same row and must not be split into a separate restore or
+manually synthesized; RETRIEVE uses their presence to decide ENVDEFERR before
+consumption. The row's FMH bit is equally authoritative because RETRIEVE
+derives EIBFMH from it. A consumed row retains the exact
+consumer identity needed to close the result-journal crash gap and is not yet
+eligible for generic retention. Schema rollback therefore requires stopping
+admission and restoring a pre-change backup; older binaries must not write a
+store containing these rows.
+
+RETRIEVE SET capacity is fenced before that consumed transition. Preserve the
+canonical `SET.MAXLENGTH` request metadata in effect journals, and preserve the
+machine checkpoint's allocated base, pointer bytes, and linkage-address map as
+one unit. Removing only the allocated base can turn a valid virtual pointer
+into corrupt task state; reducing task storage limits can make a retained
+pre-response request fail closed instead of consuming its record.
+
+Also retain the matching shared work row whose ID is `cics-start:<REQID>` and
+generation is `cics-start-v1`. A queued row makes the pending interval record
+eligible at its expiration tick; a claimed row is fenced by its lease ID and
+epoch; a completed row records that promotion was attempted. On restart, let
+the shared workers reclaim an expired lease normally. Never promote the
+provider row by hand or enqueue a replacement with a different execution,
+deadline, or payload identity. Current workers make the record retrievable but
+do not launch the target transaction automatically.
+
+A protected-pending START intentionally has no matching work row before an
+explicit commit. Do not synthesize one: a successful SYNCPOINT transitions the
+record and idempotently admits its deterministic work. If recovery finds a
+pending record from that run with no work after an interrupted commit, retry
+the same syncpoint so admission is healed. SYNCPOINT ROLLBACK removes only
+still-protected records; restoring only the UOW row or only the interval rows
+can reverse that decision.
+
+Typed ABEND also deletes still-protected rows for its exact issuing run before
+returning the ABEND disposition or transferring to an installed exit. No work
+row should exist for those deleted requests. If manual recovery restores such a
+provider row without its pre-abend task state, leave it quarantined rather than
+admitting work.
+
+Normal task completion and highest-level RETURN are implicit committing
+syncpoints for protected START. Admit the deterministic work before removing
+the volatile run. Known execution failure is rollback: delete still-protected
+rows and never enqueue them. Suspension is neither outcome. Terminal disconnect
+and idle timeout are also rollback; their caller-held cleanup must delete
+protected rows before removing the run and session. If execution terminalization
+and CICS cleanup are separated by a crash, retain the online exchange and
+machine continuation. Recovery reconstructs that exact invocation and saved
+priority, reloads its durable CICS undo state, and applies the journaled
+terminal disposition: `Completed` commits protected rows; `Cancelled`,
+`TimedOut`, `Failed`, and `DeadLetter` roll them back. `HandoffCompleted` keeps
+the RETURN finalization already applied and only discards the rebuilt volatile
+run. Clear the continuation, checkpoint, and exchange after the CICS result;
+missing identity or a nonterminal execution fails closed rather than inferring
+commit from a missing run.
+
+Do not force CANCEL across a protected-pending row. IBM semantics allow CANCEL
+only after that START is committed. Before commit, preserve the row and return
+NOTFND; after commit, restore and cancel the pending interval row together with
+its deterministic work row and cancellation flag.
+
+For START without REQID, preserve the mutation idempotency key and canonical
+request bytes: together they deterministically regenerate the eight-character
+EIBREQID and therefore the provider-row and work IDs. A hash collision with a
+different retained producer fails through the duplicate-REQID fence; never
+rename only one side or invent a replacement EIBREQID during recovery.
+
+A suspended RETRIEVE WAIT has no provider-side waiter row. Preserve its online
+exchange, machine checkpoint, and execution state together; the checkpoint
+rewinds to the same RETRIEVE statement, while the interval row remains ready or
+absent until ordinary worker promotion. Recovery must not synthesize ENDDATA,
+consume a record on behalf of the task, or close the exchange. Resume is
+currently explicit; automatic wake and shutdown/deadlock completion are not
+part of this bounded child.
+
+For START USERID, recover the selected execution principal from the interval
+row; do not substitute the issuer after a successful surrogate check. A denied
+check is pre-mutation and must leave no interval or work row. Replaying an
+accepted producer must preserve both its canonical USERID operand and stored
+principal, while a conflicting identity under the same REQID remains an IOERR
+duplicate rather than an identity rewrite.
+
+A typed local CANCEL leaves the interval row as a cancelled replay tombstone
+and calls the work store's cancellation transition. Queued work becomes
+cancelled immediately; claimed work retains its lease with
+`cancellation_requested=true`, and the failed promotion/release path observes
+that flag. Restore the interval and work rows together. Deleting the tombstone
+can turn a crash-gap retry into NOTFND, while requeueing canceled work creates a
+permanent failed-promotion loop. Immediate reuse of a cancelled REQID is not
+supported by this bounded slice.
+
+Back up `cics-delay-v1` provider rows with their matching shared work rows of
+the same generation. A row binds one task/run-unit and source-statement identity
+to its packed interval, optional application REQID, expiration tick, producing
+effect, and deterministic work ID. Pending, ready, consumed, and abandoned
+states are CAS-versioned; ready/consumed rows also retain any other-task CANCEL
+identity needed for exact replay and RESP2 23. Replacing either row can wake the
+wrong source cycle or turn a later loop iteration into a replay. On restart, let
+the shared workers reclaim expired leases and promote only due work. Do not mark
+a delay ready, consumed, abandoned, or completed by hand. Restore named-delay,
+work, session, online-exchange, and machine-continuation rows together.
+Disconnect and timeout abandon outstanding task-owned delays and cancel their
+work; repeating those cleanup paths is safe. Current resume is request-driven:
+the original online exchange must be invoked again after due promotion or local
+named cancellation. Automatic redispatch is not yet provided.
 
 Back up `cics-session` rows containing task association or HANDLE state before
 enabling typed `SET ASSOCIATION USERCORRDATA` or durable handlers. Current

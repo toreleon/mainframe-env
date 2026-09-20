@@ -32,3 +32,23 @@ pub(super) fn invalid_write_transient_data_shape(
             .iter()
             .any(|option| !matches!(option, CicsPlanOption::NoHandle))
 }
+
+pub(super) fn invalid_delete_transient_data_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    *inputs != BTreeSet::from([CicsOperandName::Queue])
+        || !matches!(
+            plan.operands.first().map(|operand| &operand.value),
+            Some(CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_))
+        )
+        || !outputs.is_subset(&BTreeSet::from([
+            CicsOutputName::Resp,
+            CicsOutputName::Resp2,
+        ]))
+        || plan
+            .options
+            .iter()
+            .any(|option| !matches!(option, CicsPlanOption::NoHandle))
+}

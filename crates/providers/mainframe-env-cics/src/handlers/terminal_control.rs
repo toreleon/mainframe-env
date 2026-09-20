@@ -9,6 +9,31 @@ use mainframe_env_host_api::{
 };
 use std::collections::BTreeMap;
 
+#[derive(Clone, Debug, Default)]
+pub(in crate::service) struct TerminalInput {
+    pub(in crate::service) payload: Option<Vec<u8>>,
+    pub(in crate::service) message_length: u32,
+    pub(in crate::service) terminal_id: Option<String>,
+}
+
+impl TerminalInput {
+    pub(in crate::service) fn identified(terminal_id: String) -> Self {
+        Self {
+            terminal_id: Some(terminal_id),
+            ..Self::default()
+        }
+    }
+
+    pub(in crate::service) fn replace(&mut self, payload: Vec<u8>) -> Result<(), HostProblem> {
+        self.message_length = u32::try_from(payload.len())
+            .ok()
+            .filter(|length| *length <= 32_767)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        self.payload = Some(payload);
+        Ok(())
+    }
+}
+
 pub(in crate::service) const fn valid_aid(aid: u8) -> bool {
     matches!(
         aid,
@@ -231,7 +256,7 @@ fn receive(
     }
     let mut next = current.clone();
     next.version += 1;
-    let (disposition, target, payload, fields) = if let Some(input) = next.input.take() {
+    let (disposition, target, payload, fields) = if let Some(input) = next.input.payload.take() {
         let fields = decode_map_payload(&input, service.limits)?;
         let target = aid_handler_target(&run.aid_handlers, current.aid);
         (

@@ -13,15 +13,23 @@ pub enum CicsOperation {
     /// Refresh only the implicit EIB date and time fields.
     AsktimeEib,
     Assign,
+    /// Cancel one unhonored local interval-control START request.
+    Cancel,
     /// Change the issuing CICS task's dispatch priority.
     ChangeTask,
+    /// Complete the source-defined zero-delay interval-control boundary.
+    Delay,
     /// Release one matching task enqueue ownership level.
     Deq,
     Delete,
+    /// Delete every record from one local transient-data queue.
+    DeleteTransientData,
     /// Acquire or wait for one task enqueue resource.
     Enq,
     EndBrowse,
     FormatTime,
+    /// Allocate one bounded task-local virtual storage area.
+    Getmain,
     HandleAbend,
     /// Install or deactivate one bounded set of terminal AID handlers.
     HandleAid,
@@ -49,6 +57,8 @@ pub enum CicsOperation {
     /// Overwrite the originating task's bounded user correlator data.
     SetAssociationUserCorrData,
     SetFileStatus,
+    /// Schedule one interval-control START record.
+    Start,
     StartBrowse,
     /// Relinquish control until the task is redispatched.
     Suspend,
@@ -68,12 +78,16 @@ impl CicsOperation {
             Self::Asktime => "Asktime",
             Self::AsktimeEib => "AsktimeEib",
             Self::Assign => "Assign",
+            Self::Cancel => "Cancel",
             Self::ChangeTask => "ChangeTask",
+            Self::Delay => "Delay",
             Self::Deq => "Deq",
             Self::Delete => "Delete",
+            Self::DeleteTransientData => "DeleteTransientData",
             Self::Enq => "Enq",
             Self::EndBrowse => "EndBrowse",
             Self::FormatTime => "FormatTime",
+            Self::Getmain => "Getmain",
             Self::HandleAbend => "HandleAbend",
             Self::HandleAid => "HandleAid",
             Self::HandleCondition => "HandleCondition",
@@ -94,6 +108,7 @@ impl CicsOperation {
             Self::SendMap => "SendMap",
             Self::SetAssociationUserCorrData => "SetAssociationUserCorrData",
             Self::SetFileStatus => "SetFileStatus",
+            Self::Start => "Start",
             Self::StartBrowse => "StartBrowse",
             Self::Suspend => "Suspend",
             Self::Syncpoint => "Syncpoint",
@@ -108,8 +123,12 @@ impl CicsOperation {
         matches!(
             self,
             Self::Delete
+                | Self::DeleteTransientData
+                | Self::Cancel
+                | Self::Delay
                 | Self::Deq
                 | Self::Enq
+                | Self::Getmain
                 | Self::Rewrite
                 | Self::Write
                 | Self::WriteTransientData
@@ -124,6 +143,8 @@ impl CicsOperation {
                 | Self::Abend
                 | Self::Syncpoint
                 | Self::SetFileStatus
+                | Self::Start
+                | Self::Retrieve
         )
     }
 
@@ -147,12 +168,16 @@ impl CicsOperation {
             }
             ("ASKTIME", _) => Self::AsktimeEib,
             ("ASSIGN", _) => Self::Assign,
+            ("CANCEL", _) => Self::Cancel,
             ("CHANGE", Some("TASK")) => Self::ChangeTask,
+            ("DELAY", _) => Self::Delay,
             ("DEQ", _) => Self::Deq,
             ("DELETE", _) => Self::Delete,
+            ("DELETEQ", Some("TD")) => Self::DeleteTransientData,
             ("ENQ", _) => Self::Enq,
             ("ENDBR", _) => Self::EndBrowse,
             ("FORMATTIME", _) => Self::FormatTime,
+            ("GETMAIN", _) => Self::Getmain,
             ("HANDLE", Some("ABEND")) => Self::HandleAbend,
             ("HANDLE", Some("AID")) => Self::HandleAid,
             ("HANDLE", Some("CONDITION")) => Self::HandleCondition,
@@ -172,6 +197,7 @@ impl CicsOperation {
             ("SEND", Some("MAP")) => Self::SendMap,
             ("SEND", _) => Self::SendText,
             ("SET", Some("ASSOCIATION")) => Self::SetAssociationUserCorrData,
+            ("START", _) => Self::Start,
             ("STARTBR", _) => Self::StartBrowse,
             ("SUSPEND", _) => Self::Suspend,
             ("SYNCPOINT", _) => Self::Syncpoint,

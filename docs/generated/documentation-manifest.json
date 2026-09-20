@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:19df4a08e0a42b96c8b02c4aac27cea26b244580de83d969e0bb5a873c335061",
+      "sha256": "sha256:abda2d51b1b1b5b0adace4d5fb213f7f58132b21cd5bee192e7eefaf79750fca",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -345,7 +345,7 @@
       "path": "docs/architecture/CICS-COMMAND-ROUTING.md",
       "relative_links": 22,
       "scope": "source-reviewed application-command contracts, generated registry shapes, and existing provider routes",
-      "sha256": "sha256:d952011b117bfbb0ffca92cb9edc3a5fd0695506ac17aa645f9c9d19f748a780",
+      "sha256": "sha256:80c3be9232ad1bf8092c182e71f0d264858db81d01fdb03276d2992ff803ea68",
       "status": "Implemented",
       "title": "CICS command descriptor and semantic-family routing",
       "xtask_commands": 2
@@ -357,7 +357,7 @@
       "path": "docs/architecture/COBOL-RUNTIME-SEMANTICS.md",
       "relative_links": 0,
       "scope": "COBOL runtime semantic contracts",
-      "sha256": "sha256:c7f0ab9e5b014aa776be79dadd04c29a1db734174eed05ffe5f7705f2606d328",
+      "sha256": "sha256:ae8b6611e60c972c965c57eecd51867044907ac9b8cc45e48a726bdd2fd5c201",
       "status": "Frozen for mainframe-env 0.4.0 implementation",
       "title": "COBOL runtime semantic contracts",
       "xtask_commands": 0
@@ -429,7 +429,7 @@
       "path": "docs/architecture/EXECUTION-AND-DURABILITY.md",
       "relative_links": 1,
       "scope": "execution lifecycle, effects, work, checkpoints, and durability",
-      "sha256": "sha256:dd2460e8eb88fc6fbfa9c7245a0af83158c95bd4617c5db3a0b01f729cbd4d8e",
+      "sha256": "sha256:e7ead822d4caccbfe3206924c2758c943b4b570f9080a67ee35ed28779b4b858",
       "status": "Accepted by repository owner",
       "title": "Execution and Durability Architecture",
       "xtask_commands": 0
@@ -489,7 +489,7 @@
       "path": "docs/architecture/PLUGIN-AND-SECURITY.md",
       "relative_links": 0,
       "scope": "capability, provider, plugin, secret, and transport boundaries",
-      "sha256": "sha256:2291c1f0120677dfe065a57bf8934a5020f77604205ee7cb6c6d47a3e352ffd0",
+      "sha256": "sha256:5594b95f2700ba890718369d456c93a2a9357b1c4f5d4fe03e79d2f73d51005d",
       "status": "Accepted by repository owner",
       "title": "0.1 Security and Capability Architecture",
       "xtask_commands": 0
@@ -545,7 +545,7 @@
       "path": "docs/contracts/EFFECT-CANONICAL-V1.md",
       "relative_links": 0,
       "scope": "canonical persisted host request/result digest representation",
-      "sha256": "sha256:af4ddec70539b7ffd2d1e858fc3da5b9917bfa65bd60d207c979a39362bb280b",
+      "sha256": "sha256:7bc98ddde4958e291a50884315fb187ecba1b005e226532d426c26cdb8dd35ce",
       "status": "Frozen contract; implementation deviations tracked before 0.9.0",
       "title": "Canonical host effect representation, version 1",
       "xtask_commands": 0
@@ -1062,7 +1062,7 @@
       "normative": false,
       "path": "docs/delivery/coverage-versions/status/0.9.0.md",
       "relative_links": 80,
-      "sha256": "sha256:eb86994242c139bf901d6fac6213e09a85de1e759cbe6655b37f5579e3dd30cf",
+      "sha256": "sha256:fc16550a6dd317c96c68e81ca2a8dbde697ca8f91b528b63d60e962a7733ea50",
       "title": "mainframe-env 0.9.0 implementation status",
       "xtask_commands": 0
     },
@@ -1438,7 +1438,7 @@
       "normative": false,
       "path": "docs/runbooks/CAPACITY-AND-RECOVERY.md",
       "relative_links": 2,
-      "sha256": "sha256:454a8d8c65faf3f1626a3f9c3861507b96124fd92acb56605b368734191c7993",
+      "sha256": "sha256:f2518c2677d90cc9adaf8a567cadcb4428189ead9deb6432812fdace3e07e078",
       "title": "Capacity and recovery",
       "xtask_commands": 0
     },
@@ -1478,7 +1478,7 @@
       "normative": false,
       "path": "docs/runbooks/OPERATIONS.md",
       "relative_links": 2,
-      "sha256": "sha256:ed955abceb7726503493f609f5573d351c96a89782daee7ce16126f52e36537b",
+      "sha256": "sha256:6ba9e4ea57cf66d7ab22bf139233f2c0c025480754f89dad6e91ad34492133ab",
       "title": "Core-server operations",
       "xtask_commands": 0
     },

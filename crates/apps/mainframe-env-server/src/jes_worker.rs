@@ -1,8 +1,12 @@
-use mainframe_env_store_api::{PlatformStore, StoreError};
+use mainframe_env_cics::{
+    CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION, CicsService, CicsStartTask,
+};
+use mainframe_env_host_api::HostProblem;
+use mainframe_env_store_api::{PlatformStore, StoreError, WorkRecord};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 pub(crate) const JES_WORK_GENERATION: &str = "mainframe-env-batch@1";
@@ -15,6 +19,80 @@ pub(crate) const JES_WORKER_FRESHNESS_MILLIS: u64 = JES_HEARTBEAT_MILLIS * 3;
 pub(crate) const JES_WORK_DEADLINE_TICKS: u64 = 24 * 60 * 60 * 1_000;
 const MAX_WORK_PAYLOAD_BYTES: usize = 16 * 1024;
 const MAX_CAPABILITIES: usize = 128;
+
+pub(crate) fn claim_durable_work(
+    store: &dyn PlatformStore,
+    worker: &str,
+    now_tick: u64,
+) -> Result<Option<WorkRecord>, StoreError> {
+    let jes = store.claim(worker, Some(JES_WORK_GENERATION), now_tick, JES_LEASE_TICKS)?;
+    if jes.is_some() {
+        return Ok(jes);
+    }
+    let start = store.claim(
+        worker,
+        Some(CICS_START_WORK_GENERATION),
+        now_tick,
+        JES_LEASE_TICKS,
+    )?;
+    if start.is_some() {
+        return Ok(start);
+    }
+    store.claim(
+        worker,
+        Some(CICS_DELAY_WORK_GENERATION),
+        now_tick,
+        JES_LEASE_TICKS,
+    )
+}
+
+pub(crate) fn heartbeat_durable_work(
+    store: &dyn PlatformStore,
+    work: &WorkRecord,
+    now_tick: u64,
+) -> Result<(), StoreError> {
+    store
+        .heartbeat(
+            &work.work_id,
+            work.lease_id
+                .as_deref()
+                .ok_or(StoreError::InvalidTransition)?,
+            work.lease_epoch,
+            now_tick,
+            JES_LEASE_TICKS,
+        )
+        .map(|_| ())
+}
+
+pub(crate) enum CicsWorkOutcome {
+    Start(CicsStartTask),
+    Delay,
+}
+
+pub(crate) fn process_cics_work(
+    cics: &CicsService,
+    work: &WorkRecord,
+    now_tick: u64,
+) -> Result<Option<CicsWorkOutcome>, HostProblem> {
+    Ok(match work.required_generation.as_str() {
+        CICS_START_WORK_GENERATION => Some(CicsWorkOutcome::Start(
+            cics.promote_start_work(work, now_tick)?,
+        )),
+        CICS_DELAY_WORK_GENERATION => {
+            cics.promote_delay_work(work, now_tick)?;
+            Some(CicsWorkOutcome::Delay)
+        }
+        _ => None,
+    })
+}
+
+pub(crate) fn clear_worker_progress(progress: &Mutex<Vec<Option<Instant>>>, ordinal: usize) {
+    if let Ok(mut progress) = progress.lock()
+        && let Some(slot) = progress.get_mut(ordinal)
+    {
+        *slot = None;
+    }
+}
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]

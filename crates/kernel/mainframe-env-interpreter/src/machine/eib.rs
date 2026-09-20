@@ -38,6 +38,8 @@ pub(super) fn implicit_values(
             }),
         ),
         ("EIBFN".into(), CobolValue::Bytes(vec![0, 0])),
+        ("EIBFMH".into(), CobolValue::Bytes(vec![0x00])),
+        ("EIBREQID".into(), CobolValue::Bytes(vec![0x00; 8])),
         (
             "EIBCALEN".into(),
             CobolValue::Decimal(Decimal {
@@ -78,6 +80,31 @@ pub(super) fn write_context(
     }
     if operation == CicsOperation::ReceiveMap {
         machine.write("EIBAID", &[response.aid])?;
+    }
+    if operation == CicsOperation::Retrieve
+        && let Some(value) = response.outputs.get("EIBFMH")
+    {
+        if value.schema() != "mainframe-env.cics.eib-fmh@1"
+            || !matches!(value.bytes(), [0x00] | [0xff])
+        {
+            return Err(MachineProblem::UnexpectedHostResult);
+        }
+        machine.write("EIBFMH", value.bytes())?;
+    }
+    if operation == CicsOperation::Start
+        && let Some(value) = response.outputs.get("EIBREQID")
+    {
+        if value.schema() != "mainframe-env.cics.reqid@1"
+            || value.bytes().len() != 8
+            || !value.bytes().iter().all(|byte| {
+                byte.is_ascii_uppercase()
+                    || byte.is_ascii_digit()
+                    || matches!(byte, b'-' | b'_' | b'$' | b'#' | b'@')
+            })
+        {
+            return Err(MachineProblem::UnexpectedHostResult);
+        }
+        machine.write("EIBREQID", value.bytes())?;
     }
     if matches!(
         operation,

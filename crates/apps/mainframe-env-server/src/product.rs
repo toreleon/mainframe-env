@@ -3,8 +3,9 @@ use crate::cobol::bind_compatible_runtime_services;
 use crate::console_retention::{decode_console_log_rows, encode_console_log};
 use crate::jes_admission::ChildAdmissionResult;
 use crate::jes_worker::{
-    DurableJesClock, JES_HEARTBEAT_MILLIS, JES_IDLE_MILLIS, JES_LEASE_TICKS, JES_WORK_GENERATION,
-    JES_WORKER_COUNT, JES_WORKER_FRESHNESS_MILLIS, JesClock, JesWorkPayload,
+    DurableJesClock, JES_HEARTBEAT_MILLIS, JES_IDLE_MILLIS, JES_WORK_GENERATION, JES_WORKER_COUNT,
+    JES_WORKER_FRESHNESS_MILLIS, JesClock, JesWorkPayload, claim_durable_work,
+    clear_worker_progress, heartbeat_durable_work,
 };
 use crate::retention_maintenance::provider::RetentionPlanner;
 use crate::{
@@ -62,7 +63,7 @@ use mainframe_env_store_api::{
     ProviderStateStore, ProviderStateWrite, RetentionAgeReconciliation, RetentionArchive,
     RetentionArchivePruneOutcome, RetentionArchivePruneRequest, RetentionForecast,
     RetentionLegacyRow, RetentionReceipt, RetentionReconciliationReceipt, RetentionTarget,
-    SaturationLevel, StoreError, WorkRecord, WorkState,
+    SaturationLevel, StoreError, WorkRecord, WorkState, WorkStore,
 };
 use mainframe_env_zosmf::{
     Authentication, GatewayCallContext, GatewayProblem, GatewayRequest, GatewayResponse,
@@ -91,7 +92,6 @@ pub struct ProductMetrics {
     pub sessions: usize,
     pub console_messages: usize,
     pub jes_workers: usize,
-    /// JES workers that completed a durable queue operation within the freshness deadline.
     pub jes_worker_healthy: usize,
     /// Successful JES queue polls, lease heartbeats, and terminal writes.
     pub jes_worker_progress: u64,
@@ -162,6 +162,7 @@ mod artifact;
 pub use artifact::{BatchProgramDefinition, OnlineProgramDefinition};
 mod bootstrap;
 mod continuation;
+mod interval_wakeup;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BatchInstallReceipt {
@@ -726,9 +727,11 @@ impl ProductServer {
             false,
             None,
         )?;
-        let cics = CicsService::open_with_replay_clock(
+        let cics_work_store: Arc<dyn WorkStore> = store.clone();
+        let cics = CicsService::open_with_runtime(
             inner,
             provider_store.clone(),
+            cics_work_store,
             Default::default(),
             enterprise_replay_clock,
         )?;
@@ -2009,6 +2012,12 @@ impl ProductServer {
         // Evaluate every cleanup before propagating the first failure. This
         // prevents a recoverable stale row from repeatedly blocking a session.
         let program_result = self.program.finish_run_unit(&invocation);
+        let cics_result = self.discard_online_machine_run_if_present(
+            session,
+            principal,
+            now_tick,
+            preserve_handoff,
+        );
         let continuation_result = if preserve_handoff {
             Ok(())
         } else {
@@ -2018,12 +2027,6 @@ impl ProductServer {
             )
         };
         let checkpoint_result = self.clear_execution_checkpoint(&invocation.execution_id);
-        let cics_result = self.discard_online_machine_run_if_present(
-            session,
-            principal,
-            now_tick,
-            preserve_handoff,
-        );
         let exchange_result = self.clear_online_exchange(session, exchange);
         for result in [
             program_result,
@@ -2053,7 +2056,7 @@ impl ProductServer {
             self.program.finish_run_unit(invocation),
             self.clear_online_machine_continuation(session, saved_version),
             self.clear_execution_checkpoint(&invocation.execution_id),
-            self.finish_online_machine_run(session, principal, now_tick),
+            self.abort_online_machine_run(session, principal, now_tick),
             self.clear_online_exchange(session, exchange),
         ];
         for result in results {
@@ -2150,7 +2153,7 @@ impl ProductServer {
                 .provider_generations
                 .clone_from(&continuation.provider_generations);
         }
-        continuation::restore_online_machine_priority(&mut invocation, saved.as_ref());
+        continuation::restore_online_machine_context(&mut invocation, saved.as_ref())?;
         invocation.bindings.insert(
             "cics.commarea".into(),
             BoundedPayload::new(
@@ -2667,7 +2670,7 @@ impl ProductServer {
                 return;
             };
             if product.jes_workers_stopping.load(Ordering::SeqCst) {
-                product.clear_jes_worker_progress(ordinal);
+                clear_worker_progress(&product.jes_worker_last_progress, ordinal);
                 return;
             }
             let claim_product = product.clone();
@@ -2750,16 +2753,8 @@ impl ProductServer {
     }
 
     fn record_jes_worker_failure(&self, ordinal: usize) {
-        self.clear_jes_worker_progress(ordinal);
+        clear_worker_progress(&self.jes_worker_last_progress, ordinal);
         self.jes_worker_failures.fetch_add(1, Ordering::Relaxed);
-    }
-
-    fn clear_jes_worker_progress(&self, ordinal: usize) {
-        if let Ok(mut progress) = self.jes_worker_last_progress.lock()
-            && let Some(slot) = progress.get_mut(ordinal)
-        {
-            *slot = None;
-        }
     }
 
     fn fresh_jes_workers_at(&self, now: Instant) -> usize {
@@ -2777,31 +2772,17 @@ impl ProductServer {
     }
 
     fn claim_jes_work(&self, worker: &str) -> Result<Option<WorkRecord>, HostProblem> {
-        let now_tick = self.jes_tick()?;
-        self.store
-            .claim(worker, Some(JES_WORK_GENERATION), now_tick, JES_LEASE_TICKS)
-            .map_err(store_error)
+        claim_durable_work(self.store.as_ref(), worker, self.jes_tick()?).map_err(store_error)
     }
 
     fn heartbeat_jes_work(&self, work: &WorkRecord) -> Result<(), HostProblem> {
-        let lease = work
-            .lease_id
-            .as_deref()
-            .ok_or(HostProblem::InfrastructureFailure)?;
-        let now_tick = self.jes_tick()?;
-        self.store
-            .heartbeat(
-                &work.work_id,
-                lease,
-                work.lease_epoch,
-                now_tick,
-                JES_LEASE_TICKS,
-            )
-            .map(|_| ())
-            .map_err(store_error)
+        heartbeat_durable_work(self.store.as_ref(), work, self.jes_tick()?).map_err(store_error)
     }
 
     fn process_claimed_jes_work(&self, work: &WorkRecord) -> Result<JesWorkOutcome, HostProblem> {
+        if let Some(outcome) = self.process_interval_work(work, self.jes_tick()?)? {
+            return Ok(outcome);
+        }
         if work.state != WorkState::Claimed
             || work.required_generation != JES_WORK_GENERATION
             || work.required_selector.as_str() != "zosmf:job-submit"
@@ -6330,6 +6311,7 @@ mod tests {
         PendingOnlineTransfer, decode_online_machine_continuation,
         encode_online_machine_continuation, encode_online_machine_continuation_with_transfer,
     };
+    use mainframe_env_cics::{CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION};
     use mainframe_env_compiler::CobolCompiler;
     use mainframe_env_compiler_api::{
         ARTIFACT_CONTRACT, ArtifactManifestV2, CompilationMode, CompileOptions, CompileTarget,
@@ -6359,6 +6341,76 @@ mod tests {
                 .as_millis(),
         )
         .map_err(|_| HostProblem::ResourceExhausted)
+    }
+
+    fn stage_protected_start(
+        server: &ProductServer,
+        invocation: &Invocation,
+        current_transaction: &str,
+        target_transaction: &str,
+        request_id: &str,
+        sequence: u64,
+    ) {
+        let argument = |schema: &str, bytes: Vec<u8>| {
+            BoundedPayload::new(schema, bytes, InvocationLimits::default()).unwrap()
+        };
+        let request = CicsRequest {
+            operation: CicsOperation::Start,
+            arguments: BTreeMap::from([
+                (
+                    "TRANSID".into(),
+                    argument(
+                        "mainframe-env.cics.literal@1",
+                        target_transaction.as_bytes().to_vec(),
+                    ),
+                ),
+                (
+                    "REQID".into(),
+                    argument(
+                        "mainframe-env.cics.literal@1",
+                        request_id.as_bytes().to_vec(),
+                    ),
+                ),
+                (
+                    "FROM".into(),
+                    argument("mainframe-env.cics.storage-value@1", b"RECOVER".to_vec()),
+                ),
+                (
+                    "INTERVAL".into(),
+                    argument("mainframe-env.cics.decimal@1", b"0".to_vec()),
+                ),
+                (
+                    "OPTION.PROTECT".into(),
+                    argument("mainframe-env.cics.option@1", Vec::new()),
+                ),
+            ]),
+            condition_policy: CicsConditionPolicy::Default,
+            mutation: Some(Mutation {
+                sequence,
+                idempotency_key: IdempotencyKey::new(
+                    format!("recover-protected-start-{request_id}"),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+                transaction: Some(current_transaction.into()),
+            }),
+        };
+        server
+            .cics
+            .invoke(
+                &EffectRequest {
+                    run_unit: invocation.run_unit_id.clone(),
+                    sequence,
+                    deadline_tick: invocation.deadline_tick,
+                    idempotency_key: request
+                        .mutation
+                        .as_ref()
+                        .map(|mutation| mutation.idempotency_key.clone()),
+                    request: HostRequest::Cics(request.clone()),
+                },
+                request,
+            )
+            .unwrap();
     }
 
     #[test]
@@ -6924,17 +6976,21 @@ mod tests {
     }
 
     fn published_fixture(name: &str, body: &str) -> PublishedArtifact {
-        let limits = SourceLimits::default();
-        let path = LogicalPath::new(format!("{name}.cbl"), limits.max_path_bytes).unwrap();
         let source = format!(
             "IDENTIFICATION DIVISION.\nPROGRAM-ID. {name}.\nPROCEDURE DIVISION.\n{body}\nSTOP RUN.\n"
         );
+        published_source_fixture(name, &source)
+    }
+
+    fn published_source_fixture(name: &str, source: &str) -> PublishedArtifact {
+        let limits = SourceLimits::default();
+        let path = LogicalPath::new(format!("{name}.cbl"), limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
             &path,
             vec![
                 SourceFile::input(
                     path.as_str(),
-                    source.into_bytes(),
+                    source.as_bytes().to_vec(),
                     SourceFormat::Free,
                     SourceEncoding::Utf8,
                     limits,
@@ -10317,6 +10373,2040 @@ mod tests {
     }
 
     #[test]
+    fn compiled_start_and_retrieve_cross_shared_worker_and_durable_coordinator() {
+        use mainframe_env_racf::CommandContext;
+
+        let starter = published_source_fixture(
+            "STARTER",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. STARTER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE 'PAYLOAD'.\n01 DATA-Y PIC X(8) VALUE 'SETDATA'.\n01 LENGTH-X PIC S9(4) COMP VALUE 7.\n01 TIME-X PIC S9(9) COMP VALUE 0.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('NX00') REQID('00000000') FROM(DATA-X) LENGTH(LENGTH-X) AFTER SECONDS(TIME-X) RTRANSID('BACK') RTERMID('T001') QUEUE('WORKQ') USERID('TARGET') FMH RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS START TRANSID('NX00') FROM(DATA-Y) LENGTH(LENGTH-X) INTERVAL(0) FMH PROTECT RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SYNCPOINT RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let receiver = published_source_fixture(
+            "RECEIVER",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. RECEIVER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE ALL 'Z'.\n01 SET-DATA-X PIC X(8) VALUE ALL 'Q'.\n01 LENGTH-X PIC S9(4) COMP VALUE 8.\n01 SET-LENGTH-X PIC S9(4) COMP VALUE 0.\n01 PTR-X POINTER.\n01 RTRANS-X PIC X(4) VALUE SPACES.\n01 RTERM-X PIC X(4) VALUE SPACES.\n01 QUEUE-X PIC X(8) VALUE SPACES.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nLINKAGE SECTION.\n01 LINK-X PIC X(7).\nPROCEDURE DIVISION.\nEXEC CICS RETRIEVE INTO(DATA-X) LENGTH(LENGTH-X) RTRANSID(RTRANS-X) RTERMID(RTERM-X) QUEUE(QUEUE-X) WAIT RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS RETRIEVE SET(PTR-X) LENGTH(SET-LENGTH-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nSET ADDRESS OF LINK-X TO PTR-X.\nMOVE LINK-X TO SET-DATA-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = |artifact: &PublishedArtifact| {
+            ArtifactRef::new(
+                format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let starter_ref = artifact_ref(&starter);
+        let receiver_ref = artifact_ref(&receiver);
+        let program = |name: &str, artifact: &PublishedArtifact, reference: ArtifactRef| {
+            OnlineProgramDefinition {
+                name: name.into(),
+                artifact: reference,
+                payload: artifact.payload().to_vec(),
+                manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                semantic_identity: artifact.semantic_id().to_reference(),
+            }
+        };
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server.bootstrap_identity("TARGET", b"TARGETPASS").unwrap();
+        server
+            .racf
+            .execute_command(
+                &CommandContext::new(
+                    PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap(),
+                    "interval-surrogate-class",
+                    "interval-surrogate-class",
+                    1,
+                )
+                .unwrap(),
+                "SETROPTS CLASSACT(SURROGAT)",
+            )
+            .unwrap();
+        server
+            .racf
+            .define_profile("SURROGAT", "TARGET.DFHSTART", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit("SURROGAT", "TARGET.DFHSTART", "IBMUSER", AccessIntent::Read)
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![
+                    program("STARTER", &starter, starter_ref.clone()),
+                    program("RECEIVER", &receiver, receiver_ref.clone()),
+                ],
+                transactions: BTreeMap::from([
+                    ("ST00".into(), "STARTER".into()),
+                    ("NX00".into(), "RECEIVER".into()),
+                ]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "INTERVL".into(),
+                    map: "INTERVL".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+
+        let receiver_session = SessionId::new("interval-receiver", 64).unwrap();
+        let receiver_invocation = server
+            .cics_invocation("IBMUSER", "NX00", Some(receiver_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_background_task(receiver_invocation.clone(), &receiver_session, "NX00")
+            .unwrap();
+        let receiver_context = server
+            .cics
+            .terminal_execution(&receiver_session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&receiver_session, "RECEIVER", &receiver_context)
+            .unwrap();
+        server
+            .run_online_exchange(&receiver_session, &principal, "RECEIVER", 2)
+            .unwrap();
+        assert_eq!(
+            server
+                .store
+                .get_execution(&receiver_invocation.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Suspended
+        );
+
+        let starter_session = SessionId::new("interval-starter", 64).unwrap();
+        let starter_invocation = server
+            .cics_invocation("IBMUSER", "ST00", Some(starter_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                starter_invocation.clone(),
+                &starter_session,
+                "ST00",
+                24,
+                80,
+                "interval-starter-csrf",
+                3,
+                10_000,
+            )
+            .unwrap();
+        let starter_context = server
+            .cics
+            .terminal_execution(&starter_session, &principal, 4)
+            .unwrap();
+        server
+            .begin_online_exchange(&starter_session, "STARTER", &starter_context)
+            .unwrap();
+        server
+            .run_online_exchange(&starter_session, &principal, "STARTER", 4)
+            .unwrap();
+        assert!(
+            server
+                .cics
+                .terminal_run_trace(&starter_session, &principal, 4)
+                .unwrap()
+                .iter()
+                .any(|entry| entry.operation == CicsOperation::Start)
+        );
+        let starter_continuation = server
+            .online_machine_continuation(&starter_session)
+            .unwrap()
+            .unwrap();
+        let mut restored_starter = ReferenceMachine::from_binary(
+            starter.payload(),
+            starter_invocation,
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored_starter
+            .restore_checkpoint(&starter_continuation.checkpoint)
+            .unwrap();
+        let generated_request_id = restored_starter
+            .variable("EIBREQID")
+            .unwrap()
+            .bytes()
+            .to_vec();
+        assert_eq!(generated_request_id.len(), 8);
+        assert!(generated_request_id.iter().all(u8::is_ascii_hexdigit));
+
+        for request_id in [b"00000000".as_slice(), generated_request_id.as_slice()] {
+            let work = server
+                .claim_jes_work("interval-worker")
+                .unwrap()
+                .expect("due START work");
+            assert_eq!(work.required_generation, CICS_START_WORK_GENERATION);
+            assert_eq!(work.payload, request_id);
+            server
+                .cics
+                .promote_start_work(&work, server.jes_tick().unwrap())
+                .unwrap();
+            server
+                .store
+                .complete(
+                    &work.work_id,
+                    work.lease_id.as_deref().unwrap(),
+                    work.lease_epoch,
+                    server.jes_tick().unwrap(),
+                )
+                .unwrap();
+        }
+
+        server
+            .run_online_exchange(&receiver_session, &principal, "RECEIVER", 5)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&receiver_session)
+            .unwrap()
+            .unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            receiver.payload(),
+            receiver_invocation,
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("DATA-X").unwrap().bytes(), b"PAYLOAD ");
+        assert_eq!(
+            restored.variable("SET-DATA-X").unwrap().bytes(),
+            b"SETDATA "
+        );
+        assert_eq!(restored.variable("LINK-X").unwrap().bytes(), b"SETDATA");
+        assert_eq!(restored.variable("LENGTH-X").unwrap().bytes(), &[0, 7]);
+        assert_eq!(restored.variable("SET-LENGTH-X").unwrap().bytes(), &[0, 7]);
+        assert!(
+            restored
+                .variable("PTR-X")
+                .unwrap()
+                .bytes()
+                .iter()
+                .any(|byte| *byte != 0)
+        );
+        assert_eq!(restored.variable("RTRANS-X").unwrap().bytes(), b"BACK");
+        assert_eq!(restored.variable("RTERM-X").unwrap().bytes(), b"T001");
+        assert_eq!(restored.variable("QUEUE-X").unwrap().bytes(), b"WORKQ   ");
+        assert_eq!(restored.variable("EIBFMH").unwrap().bytes(), &[0xff]);
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert!(
+            server
+                .cics
+                .terminal_run_trace(&receiver_session, &principal, 5)
+                .unwrap()
+                .iter()
+                .any(|entry| entry.operation == CicsOperation::Retrieve)
+        );
+    }
+
+    #[test]
+    fn due_local_start_launches_one_facilityless_target_across_worker_retry() {
+        let starter = published_source_fixture(
+            "AUTOSTRT",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. AUTOSTRT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE 'PAYLOAD'.\n01 LENGTH-X PIC S9(4) COMP VALUE 7.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('ATGT') REQID('AUTO0001') FROM(DATA-X) LENGTH(LENGTH-X) INTERVAL(0) END-EXEC.\nSTOP RUN.\n",
+        );
+        let target = published_source_fixture(
+            "AUTOTRGT",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. AUTOTRGT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE ALL 'Z'.\n01 LENGTH-X PIC S9(4) COMP VALUE 8.\nPROCEDURE DIVISION.\nEXEC CICS RETRIEVE INTO(DATA-X) LENGTH(LENGTH-X) END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = |artifact: &PublishedArtifact| {
+            ArtifactRef::new(
+                format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let starter_ref = artifact_ref(&starter);
+        let target_ref = artifact_ref(&target);
+        let program = |name: &str, artifact: &PublishedArtifact, reference: ArtifactRef| {
+            OnlineProgramDefinition {
+                name: name.into(),
+                artifact: reference,
+                payload: artifact.payload().to_vec(),
+                manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                semantic_identity: artifact.semantic_id().to_reference(),
+            }
+        };
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![
+                    program("AUTOSTRT", &starter, starter_ref.clone()),
+                    program("AUTOTRGT", &target, target_ref),
+                ],
+                transactions: BTreeMap::from([
+                    ("ASTR".into(), "AUTOSTRT".into()),
+                    ("ATGT".into(), "AUTOTRGT".into()),
+                ]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "AUTOSTRT".into(),
+                    map: "AUTOSTRT".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("automatic-start-issuer", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "ASTR", Some(starter_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation,
+                &session,
+                "ASTR",
+                24,
+                80,
+                "automatic-start-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "AUTOSTRT", 2)
+            .unwrap();
+
+        let first = server
+            .claim_jes_work("automatic-start-worker-1")
+            .unwrap()
+            .expect("due START work");
+        assert_eq!(first.work_id, "cics-start:AUTO0001");
+        assert!(matches!(
+            server.process_claimed_jes_work(&first).unwrap(),
+            JesWorkOutcome::Completed
+        ));
+        let first_execution = server
+            .store
+            .get_execution(&first.execution_id)
+            .unwrap()
+            .expect("started target execution");
+        assert_eq!(first_execution.state, ExecutionState::Completed);
+        let first_version = first_execution.version;
+
+        let retry_tick = server.jes_tick().unwrap();
+        server
+            .store
+            .release(
+                &first.work_id,
+                first.lease_id.as_deref().unwrap(),
+                first.lease_epoch,
+                retry_tick,
+                retry_tick,
+            )
+            .unwrap();
+        let retry = server
+            .claim_jes_work("automatic-start-worker-2")
+            .unwrap()
+            .expect("reclaimed START work");
+        assert!(retry.lease_epoch > first.lease_epoch);
+        let outcome = server.process_claimed_jes_work(&retry).unwrap();
+        server.finish_claimed_jes_work(&retry, Ok(outcome)).unwrap();
+        let retried_execution = server
+            .store
+            .get_execution(&retry.execution_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(retried_execution.state, ExecutionState::Completed);
+        assert_eq!(retried_execution.version, first_version);
+        assert_eq!(
+            server
+                .store
+                .get_work(&retry.work_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            WorkState::Completed
+        );
+        assert!(
+            server
+                .store
+                .get_provider_state(
+                    "cics-session",
+                    &format!("cics-start-task-{}", retry.execution_id),
+                )
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn sqlite_restart_launches_ready_start_once_and_recovers_post_execution_gap() {
+        let starter = published_source_fixture(
+            "RSTSTRT",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. RSTSTRT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE 'RESTART'.\n01 LENGTH-X PIC S9(4) COMP VALUE 7.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('RTGT') REQID('RST00001') FROM(DATA-X) LENGTH(LENGTH-X) INTERVAL(0) END-EXEC.\nSTOP RUN.\n",
+        );
+        let target = published_source_fixture(
+            "RSTTRGT",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. RSTTRGT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE ALL 'Z'.\n01 LENGTH-X PIC S9(4) COMP VALUE 8.\nPROCEDURE DIVISION.\nEXEC CICS RETRIEVE INTO(DATA-X) LENGTH(LENGTH-X) END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = |artifact: &PublishedArtifact| {
+            ArtifactRef::new(
+                format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let starter_ref = artifact_ref(&starter);
+        let target_ref = artifact_ref(&target);
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-start-launch-restart-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let mut server_config = config();
+        server_config.store_profile = crate::StoreProfile::Sqlite;
+        server_config.sqlite_url = url.clone();
+        server_config.artifact_root = directory.join("artifacts");
+        server_config.timeout_millis = 10_000;
+
+        let first_clock = Arc::new(ManualJesClock::new(100));
+        let first_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let first_platform: Arc<dyn PlatformStore> = first_store.clone();
+        let first = ProductServer::open_with_clock(
+            server_config.clone(),
+            first_platform,
+            first_clock.clone(),
+        )
+        .unwrap();
+        let execution_clock = first_clock;
+        first
+            .program
+            .bind_execution_control(Arc::new(move |_: &Invocation| {
+                Ok(ExecutionControl {
+                    now_tick: execution_clock
+                        .now_tick()
+                        .map_err(|_| ExecutionControlError::Unavailable)?,
+                    cancellation_requested: false,
+                })
+            }))
+            .unwrap();
+        first.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let program = |name: &str, artifact: &PublishedArtifact, reference: ArtifactRef| {
+            OnlineProgramDefinition {
+                name: name.into(),
+                artifact: reference,
+                payload: artifact.payload().to_vec(),
+                manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                semantic_identity: artifact.semantic_id().to_reference(),
+            }
+        };
+        first
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![
+                    program("RSTSTRT", &starter, starter_ref.clone()),
+                    program("RSTTRGT", &target, target_ref),
+                ],
+                transactions: BTreeMap::from([
+                    ("RSTR".into(), "RSTSTRT".into()),
+                    ("RTGT".into(), "RSTTRGT".into()),
+                ]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "RSTSTRT".into(),
+                    map: "RSTSTRT".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("restart-start-issuer", 64).unwrap();
+        let invocation = first
+            .cics_invocation("IBMUSER", "RSTR", Some(starter_ref))
+            .unwrap();
+        first
+            .cics
+            .launch_terminal(
+                invocation,
+                &session,
+                "RSTR",
+                24,
+                80,
+                "restart-start-csrf",
+                100,
+                10_000,
+            )
+            .unwrap();
+        first
+            .run_online_exchange(&session, &principal, "RSTSTRT", 100)
+            .unwrap();
+        let first_work = first
+            .claim_jes_work("start-before-launch-crash")
+            .unwrap()
+            .unwrap();
+        first
+            .cics
+            .promote_start_work(&first_work, first.jes_tick().unwrap())
+            .unwrap();
+        let execution_id = first_work.execution_id.clone();
+        let first_epoch = first_work.lease_epoch;
+        assert!(first.store.get_execution(&execution_id).unwrap().is_none());
+        drop((first, first_store));
+
+        let second_tick = 100 + crate::jes_worker::JES_LEASE_TICKS + 1;
+        let second_clock = Arc::new(ManualJesClock::new(second_tick));
+        let second_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let second_platform: Arc<dyn PlatformStore> = second_store.clone();
+        let second = ProductServer::open_with_clock(
+            server_config.clone(),
+            second_platform,
+            second_clock.clone(),
+        )
+        .unwrap();
+        let execution_clock = second_clock;
+        second
+            .program
+            .bind_execution_control(Arc::new(move |_: &Invocation| {
+                Ok(ExecutionControl {
+                    now_tick: execution_clock
+                        .now_tick()
+                        .map_err(|_| ExecutionControlError::Unavailable)?,
+                    cancellation_requested: false,
+                })
+            }))
+            .unwrap();
+        let second_work = second
+            .claim_jes_work("start-after-launch-crash")
+            .unwrap()
+            .unwrap();
+        assert!(second_work.lease_epoch > first_epoch);
+        assert!(matches!(
+            second.process_claimed_jes_work(&second_work).unwrap(),
+            JesWorkOutcome::Completed
+        ));
+        let completed = second.store.get_execution(&execution_id).unwrap().unwrap();
+        assert_eq!(completed.state, ExecutionState::Completed);
+        let completed_version = completed.version;
+        let second_epoch = second_work.lease_epoch;
+        drop((second, second_store));
+
+        let third_tick = second_tick + crate::jes_worker::JES_LEASE_TICKS + 1;
+        let third_clock = Arc::new(ManualJesClock::new(third_tick));
+        let third_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let third_platform: Arc<dyn PlatformStore> = third_store.clone();
+        let third =
+            ProductServer::open_with_clock(server_config, third_platform, third_clock.clone())
+                .unwrap();
+        let execution_clock = third_clock;
+        third
+            .program
+            .bind_execution_control(Arc::new(move |_: &Invocation| {
+                Ok(ExecutionControl {
+                    now_tick: execution_clock
+                        .now_tick()
+                        .map_err(|_| ExecutionControlError::Unavailable)?,
+                    cancellation_requested: false,
+                })
+            }))
+            .unwrap();
+        let third_work = third
+            .claim_jes_work("start-after-execution-crash")
+            .unwrap()
+            .unwrap();
+        assert!(third_work.lease_epoch > second_epoch);
+        let outcome = third.process_claimed_jes_work(&third_work).unwrap();
+        third
+            .finish_claimed_jes_work(&third_work, Ok(outcome))
+            .unwrap();
+        let recovered = third.store.get_execution(&execution_id).unwrap().unwrap();
+        assert_eq!(recovered.state, ExecutionState::Completed);
+        assert_eq!(recovered.version, completed_version);
+        assert_eq!(
+            third
+                .store
+                .get_work(&third_work.work_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            WorkState::Completed
+        );
+        drop((third, third_store));
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn compiled_start_termid_binds_the_named_virtual_terminal() {
+        let issuer = published_source_fixture(
+            "STARTTRM",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. STARTTRM.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE 'PAYLOAD'.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('NEXT') TERMID('T000') REQID('TRMID001') FROM(DATA-X) INTERVAL(0) END-EXEC.\nSTOP RUN.\n",
+        );
+        let target = published_source_fixture(
+            "TRMTRGT",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. TRMTRGT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE ALL 'Z'.\n01 LENGTH-X PIC S9(4) COMP VALUE 8.\nPROCEDURE DIVISION.\nEXEC CICS RETRIEVE INTO(DATA-X) LENGTH(LENGTH-X) END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = |artifact: &PublishedArtifact| {
+            ArtifactRef::new(
+                format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let issuer_ref = artifact_ref(&issuer);
+        let target_ref = artifact_ref(&target);
+        let program = |name: &str, artifact: &PublishedArtifact, reference: ArtifactRef| {
+            OnlineProgramDefinition {
+                name: name.into(),
+                artifact: reference,
+                payload: artifact.payload().to_vec(),
+                manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                semantic_identity: artifact.semantic_id().to_reference(),
+            }
+        };
+        let clock = Arc::new(ManualJesClock::new(100));
+        let platform: Arc<dyn PlatformStore> = Arc::new(MemoryStore::new(Default::default()));
+        let server = ProductServer::open_with_clock(config(), platform, clock.clone()).unwrap();
+        let execution_clock = clock.clone();
+        server
+            .program
+            .bind_execution_control(Arc::new(move |_: &Invocation| {
+                Ok(ExecutionControl {
+                    now_tick: execution_clock
+                        .now_tick()
+                        .map_err(|_| ExecutionControlError::Unavailable)?,
+                    cancellation_requested: false,
+                })
+            }))
+            .unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![
+                    program("STARTTRM", &issuer, issuer_ref.clone()),
+                    program("TRMTRGT", &target, target_ref),
+                ],
+                transactions: BTreeMap::from([
+                    ("STRM".into(), "STARTTRM".into()),
+                    ("NEXT".into(), "TRMTRGT".into()),
+                ]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "STARTTRM".into(),
+                    map: "STARTTRM".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("start-termid-issuer", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "STRM", Some(issuer_ref.clone()))
+            .unwrap();
+        let launch_tick = server.jes_tick().unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation,
+                &session,
+                "STRM",
+                24,
+                80,
+                "start-termid-csrf",
+                launch_tick,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "STARTTRM", launch_tick)
+            .unwrap();
+        let busy = server
+            .cics_invocation("IBMUSER", "STRM", Some(issuer_ref))
+            .unwrap();
+        server
+            .cics
+            .resume_terminal(busy, &session, "start-termid-csrf", launch_tick)
+            .unwrap();
+        let deferred = server
+            .claim_jes_work("start-termid-worker")
+            .unwrap()
+            .unwrap();
+        let outcome = server.process_claimed_jes_work(&deferred).unwrap();
+        assert_eq!(outcome, JesWorkOutcome::Deferred);
+        server
+            .finish_claimed_jes_work(&deferred, Ok(outcome))
+            .unwrap();
+        assert_eq!(
+            server
+                .store
+                .get_work(&deferred.work_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            WorkState::Queued
+        );
+        server
+            .cics
+            .complete_terminal_run(&session, &principal, launch_tick)
+            .unwrap();
+        clock.advance(JES_IDLE_MILLIS);
+        let work = server
+            .claim_jes_work("start-termid-worker-retry")
+            .unwrap()
+            .unwrap();
+        let outcome = server.process_claimed_jes_work(&work).unwrap();
+        server.finish_claimed_jes_work(&work, Ok(outcome)).unwrap();
+        assert_eq!(
+            server
+                .store
+                .get_execution(&work.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Completed
+        );
+        let terminal = server
+            .cics
+            .terminal_snapshot(&session, &principal, server.jes_tick().unwrap())
+            .unwrap();
+        assert_eq!(terminal.transaction, "NEXT");
+        assert_eq!(
+            server.store.get_work(&work.work_id).unwrap().unwrap().state,
+            WorkState::Completed
+        );
+    }
+
+    #[test]
+    fn compiled_deleteq_td_deallocates_the_queue_and_reports_missing_redelete() {
+        let artifact = published_source_fixture(
+            "DELETETD",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. DELETETD.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(6) VALUE 'ABCDEF'.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS WRITEQ TD QUEUE('OUTQ') FROM(DATA-X) LENGTH(3) END-EXEC.\nEXEC CICS DELETEQ TD QUEUE('OUTQ') END-EXEC.\nEXEC CICS DELETEQ TD QUEUE('OUTQ') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .racf
+            .define_profile("QUEUE", "CICS.TD.OUTQ", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit("QUEUE", "CICS.TD.OUTQ", "IBMUSER", AccessIntent::Update)
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "DELETETD".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("DQTD".into(), "DELETETD".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "DELETETD".into(),
+                    map: "DELETETD".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("deleteq-td-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "DQTD", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "DQTD",
+                24,
+                80,
+                "deleteq-td-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "DELETETD", 2)
+            .unwrap();
+        assert!(server.cics.transient_records("OUTQ").unwrap().is_empty());
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 44]);
+        assert_eq!(restored.variable("RESP2-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 2)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::DeleteTransientData)
+                .count(),
+            2
+        );
+    }
+
+    #[test]
+    fn compiled_getmain_allocates_checkpointed_initialized_virtual_storage() {
+        let artifact = published_source_fixture(
+            "GETMAINA",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. GETMAINA.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PTR-X POINTER.\n01 ZERO-PTR-X POINTER.\n01 LENGTH-X PIC S9(9) COMP VALUE 4.\n01 ZERO-X PIC S9(9) COMP VALUE 0.\n01 INIT-X PIC X VALUE 'Z'.\n01 OBSERVED-X PIC X(4) VALUE SPACES.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nLINKAGE SECTION.\n01 LINK-X PIC X(4).\nPROCEDURE DIVISION.\nEXEC CICS GETMAIN SET(PTR-X) FLENGTH(LENGTH-X) INITIMG(INIT-X) NOSUSPEND END-EXEC.\nSET ADDRESS OF LINK-X TO PTR-X.\nMOVE LINK-X TO OBSERVED-X.\nEXEC CICS GETMAIN SET(ZERO-PTR-X) FLENGTH(ZERO-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "GETMAINA".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("GM00".into(), "GETMAINA".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "GETMAINA".into(),
+                    map: "GETMAINA".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("getmain-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "GM00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "GM00",
+                24,
+                80,
+                "getmain-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "GETMAINA", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("LINK-X").unwrap().bytes(), b"ZZZZ");
+        assert_eq!(restored.variable("OBSERVED-X").unwrap().bytes(), b"ZZZZ");
+        assert!(
+            restored
+                .variable("PTR-X")
+                .unwrap()
+                .bytes()
+                .iter()
+                .any(|byte| *byte != 0)
+        );
+        assert!(
+            restored
+                .variable("ZERO-PTR-X")
+                .unwrap()
+                .bytes()
+                .iter()
+                .all(|byte| *byte == 0)
+        );
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 22]);
+        assert_eq!(restored.variable("RESP2-X").unwrap().bytes(), &[0, 0, 0, 1]);
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 2)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::Getmain)
+                .count(),
+            2
+        );
+    }
+
+    #[test]
+    fn compiled_start_without_data_queues_the_target_without_a_false_payload() {
+        let artifact = published_source_fixture(
+            "NODATA",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. NODATA.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('NX00') REQID('NODATA01') AFTER SECONDS(0) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "NODATA".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([
+                    ("ND00".into(), "NODATA".into()),
+                    ("NX00".into(), "NODATA".into()),
+                ]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "NODATA".into(),
+                    map: "NODATA".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("start-no-data", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "ND00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation,
+                &session,
+                "ND00",
+                24,
+                80,
+                "start-no-data-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "NODATA", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "NODATA", 2)
+            .unwrap();
+        assert_eq!(
+            server
+                .store
+                .get_work("cics-start:NODATA01")
+                .unwrap()
+                .unwrap()
+                .state,
+            WorkState::Queued
+        );
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 2)
+                .unwrap()
+                .into_iter()
+                .find(|entry| entry.operation == CicsOperation::Start)
+                .map(|entry| (entry.outcome, entry.response, entry.response2)),
+            Some(("NORMAL".into(), 0, 0))
+        );
+    }
+
+    #[test]
+    fn compiled_start_nocheck_queues_generated_identity_without_setting_eibreqid() {
+        let artifact = published_source_fixture(
+            "STARTNC",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. STARTNC.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE 'PAYLOAD'.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('NX00') FROM(DATA-X) INTERVAL(0) NOCHECK RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "STARTNC".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([
+                    ("SN00".into(), "STARTNC".into()),
+                    ("NX00".into(), "STARTNC".into()),
+                ]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "STARTNC".into(),
+                    map: "STARTNC".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("start-nocheck", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "SN00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "SN00",
+                24,
+                80,
+                "start-nocheck-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "STARTNC", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "STARTNC", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("EIBREQID").unwrap().bytes(), &[0; 8]);
+        let work = server
+            .claim_jes_work("start-nocheck-worker")
+            .unwrap()
+            .unwrap();
+        assert_eq!(work.required_generation, CICS_START_WORK_GENERATION);
+        assert_eq!(work.payload.len(), 8);
+        assert!(work.payload.iter().all(u8::is_ascii_hexdigit));
+        assert_eq!(
+            work.work_id,
+            format!("cics-start:{}", String::from_utf8_lossy(&work.payload))
+        );
+    }
+
+    #[test]
+    fn compiled_start_userid_rejects_unknown_and_revoked_principals_before_surrogate() {
+        let artifact = published_source_fixture(
+            "USERSTAT",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. USERSTAT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE 'AS-USER'.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('NX00') REQID('MISSUSR1') FROM(DATA-X) INTERVAL(0) USERID('MISSING') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS START TRANSID('NX00') REQID('REVKUSR1') FROM(DATA-X) INTERVAL(0) USERID('REVOKED') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .bootstrap_identity("REVOKED", b"REVOKEDPASS")
+            .unwrap();
+        server
+            .racf
+            .set_user_state("REVOKED", false, true, false)
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "USERSTAT".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([
+                    ("UV00".into(), "USERSTAT".into()),
+                    ("NX00".into(), "USERSTAT".into()),
+                ]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "USERSTAT".into(),
+                    map: "USERSTAT".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("start-user-validation", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "UV00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "UV00",
+                24,
+                80,
+                "start-user-validation-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "USERSTAT", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "USERSTAT", 2)
+            .unwrap();
+
+        let start_outcomes = server
+            .cics
+            .terminal_run_trace(&session, &principal, 2)
+            .unwrap()
+            .into_iter()
+            .filter(|entry| entry.operation == CicsOperation::Start)
+            .map(|entry| (entry.outcome, entry.response, entry.response2))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            start_outcomes,
+            vec![("USERIDERR".into(), 69, 8), ("USERIDERR".into(), 69, 19)]
+        );
+        for request_id in ["MISSUSR1", "REVKUSR1"] {
+            assert!(
+                server
+                    .store
+                    .get_provider_state("cics-interval-start-v1", request_id)
+                    .unwrap()
+                    .is_none()
+            );
+            assert!(
+                server
+                    .store
+                    .get_work(&format!("cics-start:{request_id}"))
+                    .unwrap()
+                    .is_none()
+            );
+        }
+        assert_eq!(
+            server
+                .store
+                .get_execution(&invocation.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Suspended
+        );
+    }
+
+    #[test]
+    fn compiled_task_end_commits_protected_start_without_explicit_syncpoint() {
+        let artifact = published_source_fixture(
+            "ENDCOMMIT",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. ENDCOMMIT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE 'TASK-END'.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('NX00') REQID('ENDCMT01') FROM(DATA-X) INTERVAL(0) PROTECT RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "ENDCOMMIT".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([
+                    ("TE00".into(), "ENDCOMMIT".into()),
+                    ("NX00".into(), "ENDCOMMIT".into()),
+                ]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "ENDCMT".into(),
+                    map: "ENDCMT".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("implicit-task-end", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "TE00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "TE00",
+                24,
+                80,
+                "implicit-task-end-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        let exchange = server
+            .begin_online_exchange(&session, "ENDCOMMIT", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "ENDCOMMIT", 2)
+            .unwrap();
+
+        assert_eq!(
+            server
+                .store
+                .get_execution(&invocation.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Completed
+        );
+        assert_eq!(
+            server
+                .store
+                .get_work("cics-start:ENDCMT01")
+                .unwrap()
+                .unwrap()
+                .state,
+            WorkState::Queued
+        );
+        assert_eq!(
+            server.cics.terminal_run_trace(&session, &principal, 2),
+            Err(HostProblem::NotFound),
+            "normal completion removed the volatile run after committing protected work"
+        );
+
+        // Recreate the durable-terminal crash gap: the coordinator has
+        // committed Completed, while the exchange and protected START undo
+        // rows still await product/CICS cleanup.
+        server
+            .store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: ONLINE_EXCHANGE_NAMESPACE.into(),
+                    key: session.as_str().into(),
+                    version: exchange.version,
+                    payload: encode_online_exchange(&exchange).unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        server
+            .cics
+            .restore_terminal_run(
+                context.invocation.clone(),
+                &session,
+                &context.transaction,
+                context.commarea.clone(),
+                3,
+            )
+            .unwrap();
+        stage_protected_start(&server, &context.invocation, "TE00", "NX00", "RECVEND1", 99);
+        assert!(
+            server
+                .store
+                .get_work("cics-start:RECVEND1")
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            server
+                .recover_terminal_online_exchange(&session, &principal, &exchange, 3)
+                .unwrap(),
+            Some(TerminalExchangeRecovery::Completed)
+        );
+        assert_eq!(
+            server
+                .store
+                .get_work("cics-start:RECVEND1")
+                .unwrap()
+                .unwrap()
+                .state,
+            WorkState::Queued,
+            "Completed recovery did not commit the protected START"
+        );
+        assert!(server.online_exchange(&session).unwrap().is_none());
+    }
+
+    #[test]
+    fn compiled_cancel_removes_unhonored_start_from_shared_worker_lane() {
+        let artifact = published_source_fixture(
+            "CANCELR",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. CANCELR.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(8) VALUE 'CANCELME'.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('NX00') REQID('CAN0002') FROM(DATA-X) INTERVAL(100) PROTECT RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SYNCPOINT RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS CANCEL REQID('CAN0002') TRANSID('NX00') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "CANCELR".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("CN00".into(), "CANCELR".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "CANCELR".into(),
+                    map: "CANCELR".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("interval-cancel", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "CN00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation,
+                &session,
+                "CN00",
+                24,
+                80,
+                "interval-cancel-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "CANCELR", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "CANCELR", 2)
+            .unwrap();
+        let trace = server
+            .cics
+            .terminal_run_trace(&session, &principal, 2)
+            .unwrap();
+        assert!(
+            trace
+                .iter()
+                .any(|entry| entry.operation == CicsOperation::Start)
+        );
+        assert!(trace.iter().any(|entry| {
+            entry.operation == CicsOperation::Cancel
+                && entry.outcome == "NORMAL"
+                && entry.response == 0
+        }));
+        assert!(trace.iter().any(|entry| {
+            entry.operation == CicsOperation::Syncpoint
+                && entry.outcome == "NORMAL"
+                && entry.response == 0
+        }));
+        let work = server
+            .store
+            .get_work("cics-start:CAN0002")
+            .unwrap()
+            .unwrap();
+        assert_eq!(work.state, WorkState::Cancelled);
+        assert!(work.cancellation_requested);
+        assert!(
+            server
+                .claim_jes_work("cancel-selected-worker")
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn compiled_zero_delay_crosses_durable_coordinator_without_suspending() {
+        let artifact = published_source_fixture(
+            "DELAY0",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. DELAY0.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS DELAY RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS DELAY INTERVAL(0) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "DELAY0".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("DL00".into(), "DELAY0".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "DELAY0".into(),
+                    map: "DELAY0".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("interval-delay-zero", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "DL00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation,
+                &session,
+                "DL00",
+                24,
+                80,
+                "interval-delay-zero-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "DELAY0", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "DELAY0", 2)
+            .unwrap();
+        let trace = server
+            .cics
+            .terminal_run_trace(&session, &principal, 2)
+            .unwrap();
+        assert_eq!(
+            trace
+                .iter()
+                .filter(|entry| {
+                    entry.operation == CicsOperation::Delay
+                        && entry.outcome == "NORMAL"
+                        && entry.response == 0
+                })
+                .count(),
+            2
+        );
+    }
+
+    #[test]
+    fn compiled_dynamic_for_delay_suspends_promotes_and_resumes() {
+        let artifact = published_source_fixture(
+            "DELAY1",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. DELAY1.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DONE-X PIC X VALUE '0'.\n01 TIME-X PIC S9(9) COMP VALUE 1.\n01 MS-X PIC S9(9) COMP VALUE 250.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS DELAY FOR SECONDS(TIME-X) MILLISECS(MS-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE '1' TO DONE-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let clock = Arc::new(ManualJesClock::new(100));
+        let platform_store: Arc<dyn PlatformStore> = Arc::new(MemoryStore::new(Default::default()));
+        let server =
+            ProductServer::open_with_clock(config(), platform_store, clock.clone()).unwrap();
+        let execution_clock = clock.clone();
+        server
+            .program
+            .bind_execution_control(Arc::new(move |_: &Invocation| {
+                Ok(ExecutionControl {
+                    now_tick: execution_clock
+                        .now_tick()
+                        .map_err(|_| ExecutionControlError::Unavailable)?,
+                    cancellation_requested: false,
+                })
+            }))
+            .unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "DELAY1".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("DL01".into(), "DELAY1".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "DELAY1".into(),
+                    map: "DELAY1".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("interval-delay-positive", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "DL01", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "DL01",
+                24,
+                80,
+                "interval-delay-positive-csrf",
+                100,
+                10_000,
+            )
+            .unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 100)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "DELAY1", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "DELAY1", 100)
+            .unwrap();
+        assert!(
+            server
+                .claim_jes_work("delay-product-worker")
+                .unwrap()
+                .is_none()
+        );
+        clock.advance(1_250);
+        let work = server
+            .claim_jes_work("delay-product-worker")
+            .unwrap()
+            .unwrap();
+        assert_eq!(work.required_generation, CICS_DELAY_WORK_GENERATION);
+        let outcome = server.process_claimed_jes_work(&work).unwrap();
+        server.finish_claimed_jes_work(&work, Ok(outcome)).unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("DONE-X").unwrap().bytes(), b"1");
+        // Restoring the terminal run starts a fresh in-memory trace segment; the
+        // durable provider tests cover the preceding suspended invocation.
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 1_350)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::Delay)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn sqlite_restart_promotes_delay_and_resumes_the_durable_exchange() {
+        let artifact = published_source_fixture(
+            "DELAYR",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. DELAYR.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DONE-X PIC X VALUE '0'.\n01 TIME-X PIC S9(9) COMP VALUE 1.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS DELAY FOR SECONDS(TIME-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE '1' TO DONE-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-delay-restart-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let mut server_config = config();
+        server_config.store_profile = crate::StoreProfile::Sqlite;
+        server_config.sqlite_url = url.clone();
+        server_config.artifact_root = directory.join("artifacts");
+        server_config.timeout_millis = 10_000;
+
+        let first_clock = Arc::new(ManualJesClock::new(100));
+        let first_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let first_platform: Arc<dyn PlatformStore> = first_store.clone();
+        let first = ProductServer::open_with_clock(
+            server_config.clone(),
+            first_platform,
+            first_clock.clone(),
+        )
+        .unwrap();
+        let execution_clock = first_clock.clone();
+        first
+            .program
+            .bind_execution_control(Arc::new(move |_: &Invocation| {
+                Ok(ExecutionControl {
+                    now_tick: execution_clock
+                        .now_tick()
+                        .map_err(|_| ExecutionControlError::Unavailable)?,
+                    cancellation_requested: false,
+                })
+            }))
+            .unwrap();
+        first.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        first
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "DELAYR".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("DL0R".into(), "DELAYR".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "DELAYR".into(),
+                    map: "DELAYR".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("interval-delay-restart", 64).unwrap();
+        let invocation = first
+            .cics_invocation("IBMUSER", "DL0R", Some(artifact_ref))
+            .unwrap();
+        first
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "DL0R",
+                24,
+                80,
+                "interval-delay-restart-csrf",
+                100,
+                10_000,
+            )
+            .unwrap();
+        let context = first
+            .cics
+            .terminal_execution(&session, &principal, 100)
+            .unwrap();
+        first
+            .begin_online_exchange(&session, "DELAYR", &context)
+            .unwrap();
+        first
+            .run_online_exchange(&session, &principal, "DELAYR", 100)
+            .unwrap();
+        assert!(first.claim_jes_work("before-restart").unwrap().is_none());
+        drop((first, first_store));
+
+        let second_clock = Arc::new(ManualJesClock::new(1_100));
+        let second_store =
+            Arc::new(SqliteStateStore::open(&url, 64 * 1024 * 1024, 262_144).unwrap());
+        let second_platform: Arc<dyn PlatformStore> = second_store.clone();
+        let second =
+            ProductServer::open_with_clock(server_config, second_platform, second_clock.clone())
+                .unwrap();
+        let execution_clock = second_clock;
+        second
+            .program
+            .bind_execution_control(Arc::new(move |_: &Invocation| {
+                Ok(ExecutionControl {
+                    now_tick: execution_clock
+                        .now_tick()
+                        .map_err(|_| ExecutionControlError::Unavailable)?,
+                    cancellation_requested: false,
+                })
+            }))
+            .unwrap();
+        let work_id = second
+            .run_jes_worker_once("after-restart")
+            .unwrap()
+            .expect("the restarted worker must claim the due DELAY");
+        assert!(work_id.starts_with("cics-delay:"));
+        assert_eq!(
+            second_store.get_work(&work_id).unwrap().unwrap().state,
+            WorkState::Completed
+        );
+        let continuation = second
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("DONE-X").unwrap().bytes(), b"1");
+
+        drop((second, second_store));
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn compiled_dynamic_packed_time_suspends_promotes_and_resumes() {
+        let artifact = published_source_fixture(
+            "DELAYT",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. DELAYT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DONE-X PIC X VALUE '0'.\n01 TIME-X PIC S9(6) COMP-3 VALUE 995959.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS DELAY TIME(TIME-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE '1' TO DONE-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let clock = Arc::new(ManualJesClock::new(100));
+        let platform_store: Arc<dyn PlatformStore> = Arc::new(MemoryStore::new(Default::default()));
+        let mut settings = config();
+        settings.timeout_millis = 500_000_000;
+        let server =
+            ProductServer::open_with_clock(settings, platform_store, clock.clone()).unwrap();
+        let execution_clock = clock.clone();
+        server
+            .program
+            .bind_execution_control(Arc::new(move |_: &Invocation| {
+                Ok(ExecutionControl {
+                    now_tick: execution_clock
+                        .now_tick()
+                        .map_err(|_| ExecutionControlError::Unavailable)?,
+                    cancellation_requested: false,
+                })
+            }))
+            .unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "DELAYT".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("DL0T".into(), "DELAYT".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "DELAYT".into(),
+                    map: "DELAYT".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("interval-delay-packed-time", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "DL0T", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "DL0T",
+                24,
+                80,
+                "interval-delay-packed-time-csrf",
+                100,
+                500_000_000,
+            )
+            .unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 100)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "DELAYT", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "DELAYT", 100)
+            .unwrap();
+
+        let mut claimed = None;
+        for _ in 0..=100 {
+            clock.advance(3_600_000);
+            claimed = server.claim_jes_work("packed-time-product-worker").unwrap();
+            if claimed.is_some() {
+                break;
+            }
+        }
+        let work = claimed.expect("packed TIME work must become due within 100 hours");
+        assert_eq!(work.required_generation, CICS_DELAY_WORK_GENERATION);
+        let outcome = server.process_claimed_jes_work(&work).unwrap();
+        server.finish_claimed_jes_work(&work, Ok(outcome)).unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("DONE-X").unwrap().bytes(), b"1");
+    }
+
+    #[test]
+    fn compiled_named_delay_is_cancelled_by_another_task_and_resumes() {
+        let delay_artifact = published_source_fixture(
+            "DELAY2",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. DELAY2.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DONE-X PIC X VALUE '0'.\n01 TIME-X PIC S9(6) COMP-3 VALUE 1.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS DELAY INTERVAL(TIME-X) REQID('WAIT0001') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE '1' TO DONE-X.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let cancel_artifact = published_source_fixture(
+            "CANCEL2",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. CANCEL2.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS CANCEL REQID('WAIT0001') RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nSTOP RUN.\n",
+        );
+        let delay_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(delay_artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let cancel_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(cancel_artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let clock = Arc::new(ManualJesClock::new(100));
+        let platform_store: Arc<dyn PlatformStore> = Arc::new(MemoryStore::new(Default::default()));
+        let server =
+            ProductServer::open_with_clock(config(), platform_store, clock.clone()).unwrap();
+        let execution_clock = clock.clone();
+        server
+            .program
+            .bind_execution_control(Arc::new(move |_: &Invocation| {
+                Ok(ExecutionControl {
+                    now_tick: execution_clock
+                        .now_tick()
+                        .map_err(|_| ExecutionControlError::Unavailable)?,
+                    cancellation_requested: false,
+                })
+            }))
+            .unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![
+                    OnlineProgramDefinition {
+                        name: "DELAY2".into(),
+                        artifact: delay_ref.clone(),
+                        payload: delay_artifact.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(delay_artifact.manifest().clone()),
+                        semantic_identity: delay_artifact.semantic_id().to_reference(),
+                    },
+                    OnlineProgramDefinition {
+                        name: "CANCEL2".into(),
+                        artifact: cancel_ref.clone(),
+                        payload: cancel_artifact.payload().to_vec(),
+                        manifest: VersionedArtifactManifest::V3(cancel_artifact.manifest().clone()),
+                        semantic_identity: cancel_artifact.semantic_id().to_reference(),
+                    },
+                ],
+                transactions: BTreeMap::from([
+                    ("DL02".into(), "DELAY2".into()),
+                    ("CN02".into(), "CANCEL2".into()),
+                ]),
+                maps: vec![
+                    BmsMapDefinition {
+                        mapset: "DELAY2".into(),
+                        map: "DELAY2".into(),
+                        line: 1,
+                        column: 1,
+                        rows: 24,
+                        columns: 80,
+                        fields: Vec::new(),
+                    },
+                    BmsMapDefinition {
+                        mapset: "CANCEL2".into(),
+                        map: "CANCEL2".into(),
+                        line: 1,
+                        column: 1,
+                        rows: 24,
+                        columns: 80,
+                        fields: Vec::new(),
+                    },
+                ],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+
+        let delay_session = SessionId::new("interval-delay-named", 64).unwrap();
+        let delay_invocation = server
+            .cics_invocation("IBMUSER", "DL02", Some(delay_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                delay_invocation.clone(),
+                &delay_session,
+                "DL02",
+                24,
+                80,
+                "interval-delay-named-csrf",
+                100,
+                10_000,
+            )
+            .unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&delay_session, &principal, 100)
+            .unwrap();
+        server
+            .begin_online_exchange(&delay_session, "DELAY2", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&delay_session, &principal, "DELAY2", 100)
+            .unwrap();
+
+        let cancel_session = SessionId::new("interval-delay-canceller", 64).unwrap();
+        let cancel_invocation = server
+            .cics_invocation("IBMUSER", "CN02", Some(cancel_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                cancel_invocation,
+                &cancel_session,
+                "CN02",
+                24,
+                80,
+                "interval-delay-canceller-csrf",
+                100,
+                10_000,
+            )
+            .unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&cancel_session, &principal, 100)
+            .unwrap();
+        server
+            .begin_online_exchange(&cancel_session, "CANCEL2", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&cancel_session, &principal, "CANCEL2", 100)
+            .unwrap();
+        assert!(
+            server
+                .claim_jes_work("cancelled-delay-worker")
+                .unwrap()
+                .is_none()
+        );
+
+        server
+            .run_online_exchange(&delay_session, &principal, "DELAY2", 100)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&delay_session)
+            .unwrap()
+            .unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            delay_artifact.payload(),
+            delay_invocation,
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("DONE-X").unwrap().bytes(), b"1");
+    }
+
+    #[test]
     fn online_task_scheduling_yields_once_and_retains_changed_priority() {
         let limits = SourceLimits::default();
         let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. SCHEDULE.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PRIORITY-X PIC S9(4) COMP VALUE 200.\n01 OBSERVED-PRIORITY PIC S9(4) COMP.\n01 ABCODE-X PIC X(4) VALUE 'ZZZZ'.\n01 ABDUMP-X PIC X VALUE 'Z'.\n01 ABOFFSET-X PIC S9(9) COMP VALUE 1.\n01 ABPROGRAM-X PIC X(8) VALUE ALL 'Z'.\n01 ALTERNATE-HEIGHT-X PIC S9(4) COMP VALUE 1.\n01 ALTERNATE-WIDTH-X PIC S9(4) COMP VALUE 1.\n01 APPLICATION-X PIC X(64).\n01 APPL-X PIC X(8).\n01 ASRA-PSW-X PIC X(8) VALUE ALL 'Z'.\n01 ASRA-PSW16-X PIC X(16) VALUE ALL 'Z'.\n01 ASRA-REGS-X PIC X(64) VALUE ALL 'Z'.\n01 ASRA-REGS64-X PIC X(128) VALUE ALL 'Z'.\n01 BRIDGE-X PIC X(4) VALUE 'ZZZZ'.\n01 CAPABILITY-X PIC X VALUE 'Z'.\n01 CHANNEL-X PIC X(16).\n01 CMDSEC-X PIC X.\n01 CWA-LENGTH-X PIC S9(4) COMP.\n01 DEFAULT-HEIGHT-X PIC S9(4) COMP VALUE 1.\n01 DEFAULT-WIDTH-X PIC S9(4) COMP VALUE 1.\n01 DS3270-X PIC X VALUE 'Z'.\n01 DSSCS-X PIC X VALUE 'Z'.\n01 FCI-X PIC X VALUE 'Z'.\n01 INITPARM-X PIC X(60) VALUE ALL 'Z'.\n01 INITPARM-LENGTH-X PIC S9(4) COMP.\n01 LINK-LEVEL-X PIC S9(4) COMP.\n01 MAJOR-X PIC S9(9) COMP.\n01 MICRO-X PIC S9(9) COMP.\n01 MINOR-X PIC S9(9) COMP.\n01 NEXT-TRANS-X PIC X(4) VALUE 'ZZZZ'.\n01 OPERATION-X PIC X(64).\n01 OPERKEYS-X PIC X(8).\n01 OPSECURITY-X PIC X(3).\n01 PARTITION-SET-X PIC X(6) VALUE 'ZZZZZZ'.\n01 PLATFORM-X PIC X(64).\n01 RESTART-X PIC X.\n01 RESSEC-X PIC X.\n01 SCREEN-HEIGHT-X PIC S9(4) COMP VALUE 1.\n01 SCREEN-WIDTH-X PIC S9(4) COMP VALUE 1.\n01 SYS-X PIC X(4).\n01 TCTUA-LENGTH-X PIC S9(4) COMP.\n01 TWA-LENGTH-X PIC S9(4) COMP.\n01 USER-X PIC X(8).\n01 ASSIGN-FN PIC X(2).\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS CHANGE TASK PRIORITY(PRIORITY-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS ASSIGN APPLICATION(APPLICATION-X) APPLID(APPL-X) BRIDGE(BRIDGE-X) CHANNEL(CHANNEL-X) MAJORVERSION(MAJOR-X) MICROVERSION(MICRO-X) MINORVERSION(MINOR-X) OPERATION(OPERATION-X) PLATFORM(PLATFORM-X) SCRNHT(SCREEN-HEIGHT-X) SCRNWD(SCREEN-WIDTH-X) SYSID(SYS-X) TASKPRIORITY(OBSERVED-PRIORITY) USERID(USER-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS ASSIGN ALTSCRNHT(ALTERNATE-HEIGHT-X) ALTSCRNWD(ALTERNATE-WIDTH-X) CWALENG(CWA-LENGTH-X) DEFSCRNHT(DEFAULT-HEIGHT-X) DEFSCRNWD(DEFAULT-WIDTH-X) DS3270(DS3270-X) DSSCS(DSSCS-X) FCI(FCI-X) LINKLEVEL(LINK-LEVEL-X) OPERKEYS(OPERKEYS-X) PARTNSET(PARTITION-SET-X) RESTART(RESTART-X) TWALENG(TWA-LENGTH-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS ASSIGN APLKYBD(CAPABILITY-X) APLTEXT(CAPABILITY-X) BTRANS(CAPABILITY-X) COLOR(CAPABILITY-X) EWASUPP(CAPABILITY-X) EXTDS(CAPABILITY-X) GMMI(CAPABILITY-X) HILIGHT(CAPABILITY-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS ASSIGN KATAKANA(CAPABILITY-X) MSRCONTROL(CAPABILITY-X) OUTLINE(CAPABILITY-X) PARTNS(CAPABILITY-X) PS(CAPABILITY-X) SOSI(CAPABILITY-X) TEXTKYBD(CAPABILITY-X) TEXTPRINT(CAPABILITY-X) VALIDATION(CAPABILITY-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS ASSIGN CMDSEC(CMDSEC-X) OPSECURITY(OPSECURITY-X) RESSEC(RESSEC-X) TCTUALENG(TCTUA-LENGTH-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS ASSIGN INITPARM(INITPARM-X) INITPARMLEN(INITPARM-LENGTH-X) NEXTTRANSID(NEXT-TRANS-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS ASSIGN ABCODE(ABCODE-X) ABDUMP(ABDUMP-X) ABOFFSET(ABOFFSET-X) ABPROGRAM(ABPROGRAM-X) ASRAPSW(ASRA-PSW-X) ASRAPSW16(ASRA-PSW16-X) ASRAREGS(ASRA-REGS-X) ASRAREGS64(ASRA-REGS64-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE EIBFN TO ASSIGN-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
@@ -10348,11 +12438,51 @@ mod tests {
             )
             .replace(
                 "PROCEDURE DIVISION.\nEXEC CICS CHANGE TASK",
-                "PROCEDURE DIVISION.\nEXEC CICS SEND MAP('SCHEDUL') MAPSET('SCHEDUL') END-EXEC.\nEXEC CICS PURGE MESSAGE END-EXEC.\nMOVE EIBFN TO PURGE-FN.\nEXEC CICS CHANGE TASK",
+                "PROCEDURE DIVISION.\nEXEC CICS ASSIGN INPARTN(INPUT-PARTITION-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE RESP-X TO INPUT-PARTITION-RESP-X.\nMOVE RESP2-X TO INPUT-PARTITION-RESP2-X.\nEXEC CICS SEND MAP('SCHEDUL') MAPSET('SCHEDUL') END-EXEC.\nEXEC CICS PURGE MESSAGE END-EXEC.\nMOVE EIBFN TO PURGE-FN.\nEXEC CICS CHANGE TASK",
             )
             .replace(
                 "HILIGHT(CAPABILITY-X) RESP(RESP-X)",
                 "HILIGHT(CAPABILITY-X) MAPCOLUMN(MAP-COLUMN-X) MAPHEIGHT(MAP-HEIGHT-X) MAPLINE(MAP-LINE-X) MAPWIDTH(MAP-WIDTH-X) RESP(RESP-X)",
+            )
+            .replace(
+                "01 CWA-LENGTH-X PIC S9(4) COMP.",
+                "01 BMS-DESTCOUNT-X PIC S9(4) COMP VALUE 7.\n01 BMS-LDCMNEM-X PIC X(2) VALUE 'ZZ'.\n01 BMS-LDCNUM-X PIC X VALUE 'Z'.\n01 BMS-PAGENUM-X PIC S9(4) COMP VALUE 7.\n01 BMS-PARTNPAGE-X PIC X(2) VALUE 'ZZ'.\n01 BMS-RESP-X PIC S9(9) COMP.\n01 BMS-RESP2-X PIC S9(9) COMP.\n01 CWA-LENGTH-X PIC S9(4) COMP.",
+            )
+            .replace(
+                "EXEC CICS ASSIGN ABCODE(ABCODE-X)",
+                "EXEC CICS ASSIGN DESTCOUNT(BMS-DESTCOUNT-X) LDCMNEM(BMS-LDCMNEM-X) LDCNUM(BMS-LDCNUM-X) PAGENUM(BMS-PAGENUM-X) PARTNPAGE(BMS-PARTNPAGE-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nMOVE RESP-X TO BMS-RESP-X.\nMOVE RESP2-X TO BMS-RESP2-X.\nEXEC CICS ASSIGN ABCODE(ABCODE-X)",
+            )
+            .replace(
+                "01 INITPARM-X PIC X(60) VALUE ALL 'Z'.",
+                "01 FACILITY-X PIC X(4) VALUE 'ZZZZ'.\n01 NETWORK-NAME-X PIC X(8) VALUE ALL 'Z'.\n01 TN-ADDRESS-X PIC X(39) VALUE ALL 'Z'.\n01 INVOKING-PROGRAM-X PIC X(8) VALUE ALL 'Z'.\n01 RETURN-PROGRAM-X PIC X(8) VALUE ALL 'Z'.\n01 INPUT-PARTITION-X PIC X(2) VALUE 'ZZ'.\n01 INPUT-PARTITION-RESP-X PIC S9(9) COMP.\n01 INPUT-PARTITION-RESP2-X PIC S9(9) COMP.\n01 INITPARM-X PIC X(60) VALUE ALL 'Z'.",
+            )
+            .replace(
+                "EXEC CICS ASSIGN INITPARM(INITPARM-X)",
+                "EXEC CICS ASSIGN FACILITY(FACILITY-X) NETNAME(NETWORK-NAME-X) TNADDR(TN-ADDRESS-X) INVOKINGPROG(INVOKING-PROGRAM-X) RETURNPROG(RETURN-PROGRAM-X) INITPARM(INITPARM-X)",
+            )
+            .replace(
+                "01 PRIORITY-X PIC S9(4) COMP VALUE 200.",
+                "01 PRIORITY-X PIC S9(4) COMP VALUE 200.\n01 TERMINAL-PRIORITY-X PIC S9(4) COMP VALUE 7.",
+            )
+            .replace(
+                "EXEC CICS ASSIGN CMDSEC(CMDSEC-X)",
+                "EXEC CICS ASSIGN TERMPRIORITY(TERMINAL-PRIORITY-X) CMDSEC(CMDSEC-X)",
+            )
+            .replace(
+                "01 CMDSEC-X PIC X.",
+                "01 CMDSEC-X PIC X.\n01 LANGUAGE-X PIC X(3) VALUE 'ZZZ'.",
+            )
+            .replace(
+                "TERMPRIORITY(TERMINAL-PRIORITY-X) CMDSEC(CMDSEC-X)",
+                "LANGINUSE(LANGUAGE-X) TERMPRIORITY(TERMINAL-PRIORITY-X) CMDSEC(CMDSEC-X)",
+            )
+            .replace(
+                "01 INITPARM-LENGTH-X PIC S9(4) COMP.",
+                "01 INITPARM-LENGTH-X PIC S9(4) COMP.\n01 INPUT-LENGTH-X PIC S9(4) COMP VALUE 7.",
+            )
+            .replace(
+                "LANGINUSE(LANGUAGE-X) TERMPRIORITY",
+                "INPUTMSGLEN(INPUT-LENGTH-X) LANGINUSE(LANGUAGE-X) TERMPRIORITY",
             );
         let path = LogicalPath::new("SCHEDULE.cbl", limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
@@ -10522,6 +12652,10 @@ mod tests {
             restored.variable("OBSERVED-PRIORITY").unwrap().bytes(),
             &[0, 200]
         );
+        assert_eq!(
+            restored.variable("TERMINAL-PRIORITY-X").unwrap().bytes(),
+            &[0, 0]
+        );
         assert_eq!(restored.variable("ABCODE-X").unwrap().bytes(), b"    ");
         assert_eq!(restored.variable("ABDUMP-X").unwrap().bytes(), &[0]);
         assert_eq!(restored.variable("ABOFFSET-X").unwrap().bytes(), &[0; 4]);
@@ -10547,6 +12681,22 @@ mod tests {
             &[0; 128]
         );
         assert_eq!(restored.variable("BRIDGE-X").unwrap().bytes(), b"    ");
+        assert_eq!(
+            restored.variable("BMS-DESTCOUNT-X").unwrap().bytes(),
+            &[0, 7]
+        );
+        assert_eq!(restored.variable("BMS-LDCMNEM-X").unwrap().bytes(), b"ZZ");
+        assert_eq!(restored.variable("BMS-LDCNUM-X").unwrap().bytes(), b"Z");
+        assert_eq!(restored.variable("BMS-PAGENUM-X").unwrap().bytes(), &[0, 7]);
+        assert_eq!(restored.variable("BMS-PARTNPAGE-X").unwrap().bytes(), b"ZZ");
+        assert_eq!(
+            restored.variable("BMS-RESP-X").unwrap().bytes(),
+            &[0, 0, 0, 16]
+        );
+        assert_eq!(
+            restored.variable("BMS-RESP2-X").unwrap().bytes(),
+            &[0, 0, 0, 2]
+        );
         assert_eq!(restored.variable("CAPABILITY-X").unwrap().bytes(), &[0]);
         assert_eq!(restored.variable("CHANNEL-X").unwrap().bytes(), &[b' '; 16]);
         assert_eq!(restored.variable("CMDSEC-X").unwrap().bytes(), b"X");
@@ -10567,6 +12717,7 @@ mod tests {
             &[0; 2]
         );
         assert_eq!(restored.variable("FCI-X").unwrap().bytes(), &[1]);
+        assert_eq!(restored.variable("FACILITY-X").unwrap().bytes(), b"T000");
         assert_eq!(
             restored.variable("INITPARM-X").unwrap().bytes(),
             &[b'Z'; 60]
@@ -10575,7 +12726,27 @@ mod tests {
             restored.variable("INITPARM-LENGTH-X").unwrap().bytes(),
             &[0; 2]
         );
+        assert_eq!(
+            restored.variable("INPUT-LENGTH-X").unwrap().bytes(),
+            &[0; 2]
+        );
+        assert_eq!(
+            restored.variable("INPUT-PARTITION-X").unwrap().bytes(),
+            b"ZZ"
+        );
+        assert_eq!(
+            restored.variable("INPUT-PARTITION-RESP-X").unwrap().bytes(),
+            &[0, 0, 0, 16]
+        );
+        assert_eq!(
+            restored
+                .variable("INPUT-PARTITION-RESP2-X")
+                .unwrap()
+                .bytes(),
+            &[0, 0, 0, 2]
+        );
         assert_eq!(restored.variable("LINK-LEVEL-X").unwrap().bytes(), &[0, 1]);
+        assert_eq!(restored.variable("LANGUAGE-X").unwrap().bytes(), b"ENU");
         assert_eq!(
             restored.variable("LOCAL-CCSID-X").unwrap().bytes(),
             &[0, 0, 0, 37]
@@ -10588,6 +12759,10 @@ mod tests {
         assert_eq!(restored.variable("MICRO-X").unwrap().bytes(), &[0xff; 4]);
         assert_eq!(restored.variable("MINOR-X").unwrap().bytes(), &[0xff; 4]);
         assert_eq!(restored.variable("NEXT-TRANS-X").unwrap().bytes(), b"    ");
+        assert_eq!(
+            restored.variable("NETWORK-NAME-X").unwrap().bytes(),
+            b"T000    "
+        );
         assert_eq!(
             restored.variable("OPERATION-X").unwrap().bytes(),
             &[b' '; 64]
@@ -10605,6 +12780,14 @@ mod tests {
         assert_eq!(restored.variable("RESTART-X").unwrap().bytes(), &[0]);
         assert_eq!(restored.variable("RESSEC-X").unwrap().bytes(), b"X");
         assert_eq!(
+            restored.variable("INVOKING-PROGRAM-X").unwrap().bytes(),
+            &[b' '; 8]
+        );
+        assert_eq!(
+            restored.variable("RETURN-PROGRAM-X").unwrap().bytes(),
+            &[b' '; 8]
+        );
+        assert_eq!(
             restored.variable("SCREEN-HEIGHT-X").unwrap().bytes(),
             &[0, 24]
         );
@@ -10618,6 +12801,10 @@ mod tests {
             &[0; 2]
         );
         assert_eq!(restored.variable("TWA-LENGTH-X").unwrap().bytes(), &[0; 2]);
+        assert_eq!(
+            restored.variable("TN-ADDRESS-X").unwrap().bytes(),
+            &[b' '; 39]
+        );
         assert_eq!(restored.variable("USER-X").unwrap().bytes(), b"IBMUSER ");
         assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0; 4]);
         assert_eq!(restored.variable("RESP2-X").unwrap().bytes(), &[0; 4]);
@@ -10662,6 +12849,8 @@ mod tests {
                 (9, mainframe_env_execution_api::AuditDecision::Success),
                 (10, mainframe_env_execution_api::AuditDecision::Success),
                 (11, mainframe_env_execution_api::AuditDecision::Success),
+                (12, mainframe_env_execution_api::AuditDecision::Success),
+                (13, mainframe_env_execution_api::AuditDecision::Success),
             ]
         );
     }
@@ -10832,7 +13021,7 @@ mod tests {
     #[test]
     fn online_link_updates_typed_commarea_through_selected_program_route() {
         let limits = SourceLimits::default();
-        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. LINKER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 LINK-AREA PIC X(160) VALUE X'7B22706172616D65746572223A6E756C6C2C22646473223A5B5D7D'.\n01 LINK-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS LINK PROGRAM('IEFBR14') COMMAREA(LINK-AREA) END-EXEC.\nMOVE EIBFN TO LINK-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. LINKER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 LINK-AREA PIC X(160) VALUE X'7B22706172616D65746572223A6E756C6C2C22646473223A5B5D7D'.\n01 LINK-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS LINK PROGRAM('IEFBR14') COMMAREA(LINK-AREA) LENGTH(LENGTH OF LINK-AREA) DATALENGTH(1) END-EXEC.\nMOVE EIBFN TO LINK-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
         let path = LogicalPath::new("LINKER.cbl", limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
             &path,
@@ -11024,11 +13213,11 @@ mod tests {
         };
         let main = compile(
             "XCTLMAIN",
-            b"IDENTIFICATION DIVISION.\nPROGRAM-ID. XCTLMAIN.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 XCTL-AREA PIC X(8) VALUE 'REQUEST'.\n01 UNEXPECTED-HIT PIC X VALUE '0'.\nPROCEDURE DIVISION.\nEXEC CICS XCTL PROGRAM('NEXT') COMMAREA(XCTL-AREA) END-EXEC.\nMOVE '1' TO UNEXPECTED-HIT.\nSTOP RUN.\n",
+            b"IDENTIFICATION DIVISION.\nPROGRAM-ID. XCTLMAIN.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 XCTL-AREA PIC X(8) VALUE 'REQUEST'.\n01 UNEXPECTED-HIT PIC X VALUE '0'.\nPROCEDURE DIVISION.\nEXEC CICS XCTL PROGRAM('NEXT') COMMAREA(XCTL-AREA) LENGTH(4) END-EXEC.\nMOVE '1' TO UNEXPECTED-HIT.\nSTOP RUN.\n",
         );
         let next = compile(
             "NEXT",
-            b"IDENTIFICATION DIVISION.\nPROGRAM-ID. NEXT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 TARGET-HIT PIC X VALUE '0'.\nLINKAGE SECTION.\n01 DFHCOMMAREA PIC X(8).\nPROCEDURE DIVISION.\nMOVE '1' TO TARGET-HIT.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+            b"IDENTIFICATION DIVISION.\nPROGRAM-ID. NEXT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 TARGET-HIT PIC X VALUE '0'.\n01 CALEN-X PIC S9(4) COMP VALUE 0.\nLINKAGE SECTION.\n01 DFHCOMMAREA PIC X(8).\nPROCEDURE DIVISION.\nMOVE EIBCALEN TO CALEN-X.\nMOVE '1' TO TARGET-HIT.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
         );
         let server = ProductServer::memory(config()).unwrap();
         server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
@@ -11131,8 +13320,9 @@ mod tests {
             .unwrap();
         assert_eq!(
             restored.variable("DFHCOMMAREA").unwrap().bytes(),
-            b"REQUEST "
+            b"REQU    "
         );
+        assert_eq!(restored.variable("CALEN-X").unwrap().bytes(), &[0, 4]);
         assert_eq!(restored.variable("TARGET-HIT").unwrap().bytes(), b"1");
         assert_eq!(
             server
@@ -11421,12 +13611,12 @@ mod tests {
     #[test]
     fn online_handle_abend_reset_reactivates_the_selected_exit_once() {
         let limits = SourceLimits::default();
-        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. HABRESET.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 COUNT-X PIC 9 VALUE 0.\n01 FIRST-FN PIC X(2).\n01 SECOND-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS HANDLE ABEND LABEL(ABEND-HANDLER) END-EXEC.\nEXEC CICS ABEND ABCODE('B001') END-EXEC.\nSTOP RUN.\nABEND-HANDLER.\nADD 1 TO COUNT-X.\nMOVE EIBFN TO FIRST-FN.\nIF COUNT-X = 1\n  EXEC CICS HANDLE ABEND RESET END-EXEC\n  EXEC CICS ABEND ABCODE('B002') END-EXEC\nEND-IF.\nMOVE EIBFN TO SECOND-FN.\nEXEC CICS HANDLE ABEND END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. HABRESET.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 COUNT-X PIC 9 VALUE 0.\n01 FIRST-FN PIC X(2).\n01 SECOND-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS START TRANSID('HR00') REQID('PRAB0001') FROM(START-DATA) INTERVAL(0) PROTECT END-EXEC.\nEXEC CICS HANDLE ABEND LABEL(ABEND-HANDLER) END-EXEC.\nEXEC CICS ABEND ABCODE('B001') END-EXEC.\nSTOP RUN.\nABEND-HANDLER.\nADD 1 TO COUNT-X.\nMOVE EIBFN TO FIRST-FN.\nIF COUNT-X = 1\n  EXEC CICS HANDLE ABEND RESET END-EXEC\n  EXEC CICS ABEND ABCODE('B002') END-EXEC\nEND-IF.\nMOVE EIBFN TO SECOND-FN.\nEXEC CICS HANDLE ABEND END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
         let source = std::str::from_utf8(source)
             .unwrap()
             .replace(
                 "01 COUNT-X PIC 9 VALUE 0.\n",
-                "01 COUNT-X PIC 9 VALUE 0.\n01 CURRENT-ABCODE PIC X(4).\n01 ORIGINAL-ABCODE PIC X(4).\n",
+                "01 COUNT-X PIC 9 VALUE 0.\n01 START-DATA PIC X(8) VALUE 'PROTECT'.\n01 CURRENT-ABCODE PIC X(4).\n01 ORIGINAL-ABCODE PIC X(4).\n",
             )
             .replace(
                 "END-IF.\nMOVE EIBFN TO SECOND-FN.",
@@ -11547,6 +13737,20 @@ mod tests {
             restored.variable("SECOND-FN").unwrap().bytes(),
             &[0x0e, 0x0c]
         );
+        assert!(
+            server
+                .store
+                .get_provider_state("cics-interval-start-v1", "PRAB0001")
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            server
+                .store
+                .get_work("cics-start:PRAB0001")
+                .unwrap()
+                .is_none()
+        );
         assert_eq!(
             server
                 .store
@@ -11556,7 +13760,7 @@ mod tests {
                 .filter(|record| record.capability.as_str() == "host.cics.execute")
                 .map(|record| (record.effect_sequence, record.decision))
                 .collect::<Vec<_>>(),
-            (1..=7)
+            (1..=8)
                 .map(|sequence| {
                     (
                         sequence,
@@ -12398,13 +14602,23 @@ mod tests {
     fn online_handle_aid_survives_a_durable_terminal_handoff() {
         let limits = SourceLimits::default();
         let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. HARES.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 AID-HIT PIC X VALUE '0'.\n01 UNEXPECTED-HIT PIC X VALUE '0'.\nPROCEDURE DIVISION.\nEXEC CICS HANDLE AID ANYKEY(AID-HANDLER) END-EXEC.\nEXEC CICS SEND MAP('HARES') MAPSET('HARES') END-EXEC.\nEXEC CICS RECEIVE MAP('HARES') MAPSET('HARES') END-EXEC.\nMOVE '1' TO UNEXPECTED-HIT.\nSTOP RUN.\nAID-HANDLER.\nMOVE '1' TO AID-HIT.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let source = std::str::from_utf8(source)
+            .unwrap()
+            .replace(
+                "01 UNEXPECTED-HIT PIC X VALUE '0'.",
+                "01 UNEXPECTED-HIT PIC X VALUE '0'.\n01 INPUT-LENGTH-X PIC S9(4) COMP VALUE 0.",
+            )
+            .replace(
+                "AID-HANDLER.\nMOVE '1' TO AID-HIT.",
+                "AID-HANDLER.\nEXEC CICS ASSIGN INPUTMSGLEN(INPUT-LENGTH-X) END-EXEC.\nMOVE '1' TO AID-HIT.",
+            );
         let path = LogicalPath::new("HARES.cbl", limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
             &path,
             vec![
                 SourceFile::input(
                     "HARES.cbl",
-                    source.to_vec(),
+                    source.as_bytes().to_vec(),
                     SourceFormat::Free,
                     SourceEncoding::Utf8,
                     limits,
@@ -12451,7 +14665,22 @@ mod tests {
                     column: 1,
                     rows: 24,
                     columns: 80,
-                    fields: Vec::new(),
+                    fields: vec![mainframe_env_cics::BmsFieldDefinition {
+                        name: "INPUT".into(),
+                        row: 1,
+                        column: 1,
+                        length: 8,
+                        initial: Vec::new(),
+                        color: None,
+                        highlight: None,
+                        protected: false,
+                        secret: false,
+                        fset: false,
+                        justify_right: false,
+                        fill_zero: false,
+                        output_offset: None,
+                        attribute_offset: None,
+                    }],
                 }],
             })
             .unwrap();
@@ -12501,7 +14730,7 @@ mod tests {
                 &principal,
                 "handle-aid-handoff-csrf",
                 0xf1,
-                &BTreeMap::new(),
+                &BTreeMap::from([("INPUT".into(), b"AB".to_vec())]),
                 3,
             )
             .unwrap();
@@ -12526,6 +14755,10 @@ mod tests {
             .restore_checkpoint(&continuation.checkpoint)
             .unwrap();
         assert_eq!(restored.variable("AID-HIT").unwrap().bytes(), b"1");
+        assert_eq!(
+            restored.variable("INPUT-LENGTH-X").unwrap().bytes(),
+            &[0, 15]
+        );
         assert_eq!(restored.variable("UNEXPECTED-HIT").unwrap().bytes(), b"0");
     }
 
@@ -13191,7 +15424,7 @@ mod tests {
     #[test]
     fn online_unknown_reconciles_and_known_failure_does_not_strand_session() {
         let limits = SourceLimits::default();
-        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. RECOVER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(4) VALUE 'AA11'.\nPROCEDURE DIVISION.\nEXEC CICS WRITE FILE('RECFILE') FROM(DATA-X) END-EXEC.\nSTOP RUN.\n";
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. RECOVER.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(4) VALUE 'AA11'.\n01 KEY-X PIC X(4) VALUE '0001'.\nPROCEDURE DIVISION.\nEXEC CICS WRITE FILE('RECFILE') FROM(DATA-X) RIDFLD(KEY-X) END-EXEC.\nSTOP RUN.\n";
         let path = LogicalPath::new("RECOVER.cbl", limits.max_path_bytes).unwrap();
         let bundle = SourceBundle::new(
             &path,
@@ -13210,16 +15443,16 @@ mod tests {
             limits,
         )
         .unwrap();
-        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+        let recovery_compilation = CobolCompiler::default()
             .compile(CompilerRequest {
                 source: bundle,
                 mode: CompilationMode::Executable,
                 target: CompileTarget::new("reference").unwrap(),
                 options: CompileOptions::new(BTreeMap::new()).unwrap(),
             })
-            .unwrap()
-        else {
-            panic!("recovery fixture did not publish");
+            .unwrap();
+        let CompilerResult::Published { artifact, .. } = recovery_compilation else {
+            panic!("recovery fixture did not publish: {recovery_compilation:?}");
         };
         let known_source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. KNOWNFAIL.\nPROCEDURE DIVISION.\nCALL 'MISSING-PROGRAM'.\nSTOP RUN.\n";
         let known_path = LogicalPath::new("KNOWNFAIL.cbl", limits.max_path_bytes).unwrap();
@@ -13509,11 +15742,41 @@ mod tests {
                 6,
             )
             .unwrap();
+        stage_protected_start(
+            &server,
+            &known_context.invocation,
+            "KFLR",
+            "RCVY",
+            "RECVFAIL",
+            99,
+        );
+        assert!(
+            server
+                .store
+                .get_work("cics-start:RECVFAIL")
+                .unwrap()
+                .is_none()
+        );
         assert_eq!(
             server
                 .recover_terminal_online_exchange(&known_session, &principal, &known_exchange, 6,)
                 .unwrap(),
             Some(TerminalExchangeRecovery::Failed)
+        );
+        assert!(
+            server
+                .store
+                .get_provider_state("cics-interval-start-v1", "RECVFAIL")
+                .unwrap()
+                .is_none(),
+            "Failed recovery retained the protected START"
+        );
+        assert!(
+            server
+                .store
+                .get_work("cics-start:RECVFAIL")
+                .unwrap()
+                .is_none()
         );
         assert!(server.online_exchange(&known_session).unwrap().is_none());
         let retry_invocation = server

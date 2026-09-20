@@ -82,6 +82,20 @@ pub const CICS_ASSIGN_OUTPUT_NAMES: &[&str] = &[
     "UNATTEND",
     "USERID",
     "VALIDATION",
+    "DESTCOUNT",
+    "LDCMNEM",
+    "LDCNUM",
+    "PAGENUM",
+    "PARTNPAGE",
+    "RETURNPROG",
+    "TERMPRIORITY",
+    "LANGINUSE",
+    "INPUTMSGLEN",
+    "INVOKINGPROG",
+    "INPARTN",
+    "FACILITY",
+    "NETNAME",
+    "TNADDR",
 ];
 
 impl CicsAssignOutput {

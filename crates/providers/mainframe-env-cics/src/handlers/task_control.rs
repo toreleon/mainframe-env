@@ -59,7 +59,11 @@ pub(in crate::service) fn new_run_with_state(
     sysid: &str,
     seed: RunSeed,
 ) -> Run {
-    let current_program = super::task_context::current_program(&invocation);
+    let current_program = super::CurrentProgramFrame {
+        current: super::task_context::current_program(&invocation),
+        parent_execution_id: invocation.parent_execution_id.clone(),
+        initial_entry: false,
+    };
     let HandleState {
         handlers,
         aid_handlers,
@@ -100,6 +104,19 @@ pub(in crate::service) fn encode_session(session: &Session) -> Result<Vec<u8>, H
     if session.user_corr_data.len() > 64
         || session.user_corr_effect_key.is_none() && !session.user_corr_data.is_empty()
         || session.user_corr_effect_key.is_some() != session.user_corr_request_digest.is_some()
+        || session.input.message_length > 32_767
+        || session.input.terminal_id.as_ref().is_some_and(|value| {
+            value.len() != 4
+                || !value.as_bytes()[0].is_ascii_uppercase()
+                || !value.bytes().all(|byte| {
+                    byte.is_ascii_uppercase()
+                        || byte.is_ascii_digit()
+                        || matches!(byte, b'$' | b'@' | b'#')
+                })
+        })
+        || session.input.payload.as_ref().is_some_and(|payload| {
+            usize::try_from(session.input.message_length).ok() != Some(payload.len())
+        })
     {
         return Err(HostProblem::InfrastructureFailure);
     }
@@ -107,7 +124,7 @@ pub(in crate::service) fn encode_session(session: &Session) -> Result<Vec<u8>, H
         IdempotencyKey::new(key, InvocationLimits::default())
             .map_err(|_| HostProblem::InfrastructureFailure)?;
     }
-    let mut out = b"MECS9".to_vec();
+    let mut out = b"MECSB".to_vec();
     out.extend_from_slice(&session.rows.to_be_bytes());
     out.extend_from_slice(&session.columns.to_be_bytes());
     field(&mut out, session.principal.as_bytes())?;
@@ -149,7 +166,7 @@ pub(in crate::service) fn encode_session(session: &Session) -> Result<Vec<u8>, H
         field(&mut out, value)?;
     }
     field(&mut out, &session.screen)?;
-    match &session.input {
+    match &session.input.payload {
         Some(input) => {
             out.push(1);
             field(&mut out, input)?;
@@ -173,6 +190,16 @@ pub(in crate::service) fn encode_session(session: &Session) -> Result<Vec<u8>, H
         None => out.push(0),
     }
     encode_handle_state(&mut out, &session.handle_state)?;
+    out.extend_from_slice(&session.input.message_length.to_be_bytes());
+    field(
+        &mut out,
+        session
+            .input
+            .terminal_id
+            .as_deref()
+            .unwrap_or("")
+            .as_bytes(),
+    )?;
     Ok(out)
 }
 
@@ -219,22 +246,14 @@ pub(in crate::service) fn invoke(
             super::task_enqueue::invoke(service, run, request, retention_tick)
         }
         CicsOperation::HandleCondition => handle_condition(service, run, request),
+        CicsOperation::Getmain => super::storage_control::invoke(service, run, request),
         CicsOperation::HandleAid => handle_aid(service, run, request),
         CicsOperation::HandleAbend => handle_abend(service, run, request),
         CicsOperation::IgnoreCondition => ignore_condition(service, run, request),
         CicsOperation::PopHandle => pop_handle(service, run, request),
         CicsOperation::PushHandle => push_handle(service, run, request),
         CicsOperation::Assign => super::task_context::assign(service, run, request),
-        CicsOperation::Retrieve => service.response(
-            run,
-            CicsDisposition::Complete,
-            "NORMAL",
-            0,
-            0,
-            None,
-            None,
-            run.retrieve.clone(),
-        ),
+        CicsOperation::Retrieve => super::interval_control::invoke(service, run, request),
         CicsOperation::Return => super::task_return::invoke(service, run, request),
         CicsOperation::SetAssociationUserCorrData => {
             set_association_user_corr_data(service, run, request)
@@ -516,7 +535,8 @@ fn abend(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     validate_abend_request(request)?;
-    super::release_task_enqueues(service, run)?;
+    super::interval_control::discard_protected_starts(service, run)?;
+    super::release_task_state(service, run)?;
     let code = argument_bytes(request, "ABCODE").unwrap_or_default();
     let dump_requested =
         !request.arguments.contains_key("OPTION.NODUMP") && valid_abend_code(&code);
@@ -539,7 +559,7 @@ fn abend(
         code: code.clone(),
         original_code,
         dump_requested,
-        program: run.current_program.clone(),
+        program: run.current_program.current.clone(),
     });
     if HandleState::from_run(run) != previous {
         persist_handle_state(service, run, previous)?;

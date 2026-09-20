@@ -47,27 +47,7 @@ pub(super) fn invalid_return_shape(
             operand.name == CicsOperandName::Commarea
                 && !matches!(operand.value, CicsOperandValue::Storage(_))
         })
-        || match (
-            plan.operands
-                .iter()
-                .find(|operand| operand.name == CicsOperandName::Commarea),
-            plan.operands
-                .iter()
-                .find(|operand| operand.name == CicsOperandName::Length),
-        ) {
-            (
-                Some(super::CicsNamedOperand {
-                    value: CicsOperandValue::Storage(commarea),
-                    ..
-                }),
-                Some(super::CicsNamedOperand {
-                    value: CicsOperandValue::LengthOf(length),
-                    ..
-                }),
-            ) => commarea != length,
-            (_, None) => false,
-            _ => true,
-        }
+        || invalid_commarea_length(plan)
         || plan
             .options
             .iter()
@@ -81,7 +61,12 @@ fn invalid_transfer_shape(
     outputs: &BTreeSet<CicsOutputName>,
     returns_commarea: bool,
 ) -> bool {
-    let allowed_inputs = BTreeSet::from([CicsOperandName::Program, CicsOperandName::Commarea]);
+    let allowed_inputs = BTreeSet::from([
+        CicsOperandName::Program,
+        CicsOperandName::Commarea,
+        CicsOperandName::Length,
+        CicsOperandName::DataLength,
+    ]);
     let program = plan
         .operands
         .iter()
@@ -108,11 +93,62 @@ fn invalid_transfer_shape(
             Some(_) => true,
             None => commarea_output.is_some(),
         }
+        || invalid_commarea_length(plan)
+        || invalid_data_length(plan)
         || plan
             .options
             .iter()
             .any(|option| !matches!(option, CicsPlanOption::NoHandle))
         || outputs.contains(&CicsOutputName::Into)
+}
+
+fn invalid_data_length(plan: &CicsEffectPlan) -> bool {
+    let Some(value) = plan
+        .operands
+        .iter()
+        .find(|operand| operand.name == CicsOperandName::DataLength)
+        .map(|operand| &operand.value)
+    else {
+        return false;
+    };
+    plan.operation != super::CicsPlanOperation::Link
+        || !plan
+            .operands
+            .iter()
+            .any(|operand| operand.name == CicsOperandName::Commarea)
+        || !plan
+            .operands
+            .iter()
+            .any(|operand| operand.name == CicsOperandName::Length)
+        || !matches!(
+            value,
+            CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
+        )
+}
+
+fn invalid_commarea_length(plan: &CicsEffectPlan) -> bool {
+    let commarea = plan
+        .operands
+        .iter()
+        .find(|operand| operand.name == CicsOperandName::Commarea);
+    let length = plan
+        .operands
+        .iter()
+        .find(|operand| operand.name == CicsOperandName::Length);
+    match (
+        commarea.map(|operand| &operand.value),
+        length.map(|operand| &operand.value),
+    ) {
+        (_, None) => false,
+        (Some(CicsOperandValue::Storage(commarea)), Some(CicsOperandValue::LengthOf(length))) => {
+            commarea != length
+        }
+        (Some(CicsOperandValue::Storage(_)), Some(value)) => !matches!(
+            value,
+            CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
+        ),
+        _ => true,
+    }
 }
 
 fn valid_program_name(bytes: &[u8]) -> bool {

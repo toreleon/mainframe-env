@@ -6,6 +6,272 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed local CICS START `TERMID` through append-only operand tag 38.
+  The provider resolves active virtual terminals at command time, returns exact
+  `TERMIDERR` 11/0 for an unknown identifier, persists terminal association,
+  and makes RETRIEVE match that facility. At expiration, a free terminal is
+  retasked through the durable coordinator; a busy terminal defers the work
+  lease until available, and a deleted terminal discards the asynchronous
+  request. Combined `TERMID`/`USERID`, remote/APPC facilities, and same-terminal
+  multi-request coalescing remain fail-closed or pending.
+
+- Added SQLite process-restart proof for facility-less CICS START launch. A
+  claimed request can survive shutdown after promotion but before target
+  creation, reclaim under a fresh lease, run its RETRIEVE target, then survive
+  another shutdown before work completion without changing the target's
+  durable execution journal or launching a duplicate task.
+
+- Added automatic facility-less task launch for due local CICS START work. The
+  fenced work identity now becomes the target's durable execution identity,
+  the stored START principal and transaction are reauthorized at creation, and
+  the started program can consume its data through RETRIEVE. A worker retry
+  after target completion observes the same terminal execution and cannot
+  launch a duplicate task; unavailable target definitions retain IBM's
+  asynchronous no-task outcome.
+
+- Added typed CICS `ASSIGN TNADDR` for an owned local terminal. Because the
+  runtime deliberately retains no client network endpoint, the source-defined
+  unresolved-address value is 39 blanks; local nonterminal use returns 16/5,
+  and DPL fails closed until remote endpoint context exists. Append-only output
+  tag 109 preserves existing plans.
+
+- Added durable four-character virtual-terminal identities and typed CICS
+  `ASSIGN FACILITY`/`NETNAME`. New terminal sessions allocate unique active
+  identifiers such as `T000`; NETNAME follows the pinned default to that name
+  padded to eight bytes. Local nonterminal requests return 16/5, FACILITY is
+  DPL-prohibited at 16/200, and NETNAME without remote identity fails closed.
+  Session codec `MECSB` retains strict historical reads and output tags
+  107–108 are append-only.
+
+- Added source-defined negative CICS `ASSIGN INPARTN` handling. A local
+  terminal before map positioning returns `INVREQ` 16/2, local nonterminal use
+  returns 16/5, and DPL returns 16/200, preserving the one- or two-byte
+  receiver. Positioned-map use remains fail-closed until input-partition state
+  exists; append-only output tag 106 preserves existing plan tags.
+
+- Added typed CICS `ASSIGN INVOKINGPROG` for the local initial program. A
+  trusted durable entry marker returns the source-defined eight blanks and
+  keeps XCTL, LINK-child, and DPL lineage fail-closed until the runtime owns the
+  caller name. Append-only output tag 105 preserves existing typed-plan tags.
+
+- Added typed CICS `ASSIGN INPUTMSGLEN` with a bounded durable terminal-input
+  length that survives RECEIVE consumption and SQLite reopen. No input returns
+  halfword zero; normalized map input returns its exact byte length in local and
+  DPL contexts. Its length remains in current session codec `MECSB`, which
+  strictly retains `MECS1`–`MECSA` reads, and append-only output tag 104
+  preserves existing plans.
+
+- Added typed CICS `ASSIGN LANGINUSE`. The runtime's unoverridden English
+  national-language default maps through the pinned CICS table to exact
+  three-byte `ENU` in local and DPL contexts. Append-only output tag 103
+  preserves every existing typed-plan tag.
+
+- Added typed CICS `ASSIGN TERMPRIORITY`. The runtime's terminal definition
+  uses the source default zero independently of a later `CHANGE TASK`; local
+  nonterminal use returns `INVREQ` 16/5 and DPL returns 16/200. Append-only
+  output tag 102 preserves every existing typed-plan tag.
+
+- Added typed CICS `ASSIGN RETURNPROG` for a local highest-level program. It
+  returns the source-defined eight blanks, refreshes the current frame's parent
+  identity from each authenticated invocation, and fails closed for LINK-child
+  and DPL lineage until a durable caller stack exists. Append-only output tag
+  101 preserves every existing typed-plan tag.
+
+- Added exact negative CICS `ASSIGN` handling for `DESTCOUNT`, `LDCMNEM`,
+  `LDCNUM`, `PAGENUM`, and `PARTNPAGE`. Without prior BMS overflow processing,
+  local requests return `INVREQ` 16/2 and preserve every receiver; DPL requests
+  return the source-defined `INVREQ` 16/200. Append-only output tags 96–100
+  preserve every existing typed-plan tag.
+
+- Added typed local CICS LINK `DATALENGTH`. The value is preserved in the
+  canonical request but, as IBM defines for a static local link, is not checked
+  and does not shorten the LENGTH-selected COMMAREA; remote optimization and
+  validation remain deferred.
+
+- Added typed COMMAREA `LENGTH` for local CICS LINK, XCTL, and RETURN. Literal,
+  numeric-storage, and matching `LENGTH OF` forms select the dispatched prefix;
+  target EIBCALEN follows that prefix and unsafe ranges return bounded LENGERR.
+
+- Added local CICS START `NOCHECK` on the typed route. An omitted REQID still
+  receives a replay-stable internal row/work identity, while EIBREQID remains
+  null as required; remote shipping and its reduced checking remain deferred.
+
+- Added SQLite process-restart proof for automatic CICS DELAY wakeup. A due
+  DELAY survives product/store teardown, reopens its installed program,
+  terminal session, exchange, checkpoint, provider timer, and work item, then
+  resumes through the ordinary worker without a client CICS resume call.
+
+- Added in-process automatic wakeup for durable CICS DELAY work. After the
+  shared worker promotes a due row, the product resolves its bounded durable
+  online exchange by run-unit identity and resumes the checkpoint without a
+  client CICS resume call; retry after finalized exchange cleanup is idempotent.
+
+- Added storage-backed packed CICS DELAY `INTERVAL`. The compiler and typed
+  plan now preserve numeric storage under existing operand tag 28, while
+  malformed runtime packed values reach the provider's exact INVREQ response
+  path. Named dynamic delays retain cancellation and checkpoint behavior.
+
+- Added typed CICS DELAY `FOR MILLISECS` as a literal or resolved numeric
+  storage value, alone or with HOURS/MINUTES/SECONDS. The shared interval value
+  now retains millisecond precision, enforces pure/combined bounds with INVREQ
+  RESP2 22, and returns EXPIRED for source-defined sub-50 ms delays.
+
+- Added typed CICS DELAY packed `TIME` scheduling for integer constants and
+  packed numeric storage. TIME now remains an input outside FORMATTIME, uses a
+  domain-separated absolute delay identity, returns EXPIRED 31 for an elapsed
+  target, and resumes through the existing durable delay worker path.
+
+- Added typed CICS DELAY `FOR`/`UNTIL` HOURS, MINUTES, and SECONDS with
+  literal or numeric-storage components. The provider uses one shared clock
+  observation per new cycle, enforces conditional component ranges with INVREQ
+  RESP2 4/5/6, and returns source-defined ignored-by-default EXPIRED 31 for an
+  elapsed absolute target. Packed TIME and MILLISECS remain pending.
+
+- Added local START without passed data. FROM is now optional, while LENGTH and
+  FMH still require it. A no-data request schedules ordinary durable work; if
+  RETRIEVE is issued for that start identity it consumes once and returns
+  replay-safe ENDDATA 29/0 instead of manufacturing a zero-length success.
+
+- Added dynamic compiled START `AFTER`/`AT` units. Append-only CICS plan tags
+  retain mode and HOURS/MINUTES/SECONDS storage identities through checkpoint,
+  codec, and interpreter request construction so provider-side bounds and
+  response2 conditions apply to runtime values as well as literals.
+
+- Added local START `AFTER`/`AT` scheduling with explicit HOURS, MINUTES, and
+  SECONDS. The provider enforces IBM's conditional single-unit and combined-unit
+  ranges with exact INVREQ 16 response2 4/5/6 and resolves one durable worker
+  deadline for either relative or absolute mode.
+
+- Added RACF-backed START USERID validity checks before surrogate authorization.
+  A typed non-login principal-status request now maps unknown identities to
+  USERIDERR 69/8, indeterminate/locked identities to 69/10, revoked identities
+  to 69/19, and an unavailable external-security interface to INVREQ 16/18,
+  with no interval or work mutation on rejection.
+
+- Added disposition-bound crash-gap recovery for protected START. When durable
+  execution terminalization precedes product/CICS cleanup, recovery rebuilds
+  the exact terminal run and saved priority, commits protected rows only for
+  `Completed`, rolls them back for cancelled, timed-out, failed, or dead-letter
+  outcomes, and preserves handoff finalization without applying it twice.
+
+- Added terminal disconnect and idle-timeout rollback cleanup for protected
+  START. The existing caller-held terminal cleanup boundary now deletes the
+  exact run's still-protected rows before releasing delay/enqueue state and
+  creates no START work, without changing frozen facade sizes.
+
+- Added implicit task-end finalization for protected START requests. Normal
+  compiled completion and highest-level RETURN commit protected rows and admit
+  their work; known abnormal execution completion deletes those rows without
+  work. Suspension remains nonterminal.
+
+- Added bounded START USERID surrogate admission. Typed local START accepts a
+  one-to-eight-character execution identity, requires the issuing principal to
+  have READ access to `SURROGAT <userid>.DFHSTART`, returns exact NOTAUTH 70/9
+  before interval/work mutation on denial, and durably binds an accepted target
+  principal. Omitted USERID continues to inherit the issuer; automatic target
+  launch remains pending.
+
+- Added the bounded RETRIEVE WAIT data-arrival path. Typed WAIT now checkpoints
+  and reissues the RETRIEVE statement without ENDDATA or record consumption
+  when no expired START data is available, then consumes normally after worker
+  promotion and explicit execution re-entry. Deadlock timeout, shutdown/AICB,
+  automatic wake, and process-restart proof remain pending.
+
+- Added runtime-generated START request identities. Typed local START no longer
+  requires REQID; when omitted, the provider derives a replay-stable
+  eight-character uppercase identifier from the effect key and canonical
+  request digest, uses it for the interval/work identity, and returns it through
+  strict implicit EIBREQID state. Explicit REQID behavior is unchanged.
+
+- Added the source-defined cancellation boundary for START PROTECT. CANCEL now
+  has explicit regression coverage for NOTFND before the protected START is
+  committed and normal cancellation after a committing SYNCPOINT admits its
+  work. The compiled product route exercises PROTECT, SYNCPOINT, and CANCEL in
+  that order while retaining the existing cancellation fence.
+
+- Added explicit ABEND cleanup for protected START requests. Before the typed
+  ABEND route transfers to an installed exit or terminates the task, it deletes
+  all still-protected START rows owned by that run; no work row is created, and
+  the REQID becomes reusable. Non-command abnormal termination and implicit
+  task-end syncpoint behavior remain pending.
+
+- Added the bounded local START PROTECT-to-SYNCPOINT route. PROTECT now persists
+  a protected-pending START record without admitting worker work. An explicit
+  successful SYNCPOINT commit releases matching records and idempotently
+  creates their deterministic work; SYNCPOINT ROLLBACK durably finalizes the
+  rollback, deletes those rows, and permits REQID reuse. Retry heals a committed
+  record whose work enqueue was interrupted. Non-command abnormal termination,
+  implicit task-end syncpoint, protected CANCEL, automatic task launch,
+  PostgreSQL, and licensed evidence remain pending.
+
+- Added RETRIEVE SET over interpreter-owned virtual storage. Typed RETRIEVE now
+  accepts exactly one of INTO or a POINTER/POINTER-32 SET target with mandatory
+  LENGTH. SET returns the full START record, writes its actual length, and
+  installs a checked non-native pointer to task-owned bytes that survive
+  checkpoint/resume. The interpreter advertises its exact remaining allocation
+  capacity before the provider's consume CAS, so capacity failure leaves the
+  ready record available. WAIT timeout/shutdown, terminal association,
+  automatic task launch, PostgreSQL, and licensed evidence remain pending.
+
+- Added START FMH propagation through RETRIEVE. The typed START data route now
+  persists the source FMH flag in its versioned interval row; successful
+  RETRIEVE returns a strict one-byte EIBFMH value (`X'FF'` with FMH, `X'00'`
+  otherwise), and the interpreter owns the implicit EIB field across compiled
+  checkpoint/resume. Historical retained responses without the additive output
+  remain readable. Broader FMH parsing, WAIT timeout/shutdown, terminal
+  association, automatic task launch, PostgreSQL, and licensed evidence remain
+  pending.
+
+- Added bounded START-to-RETRIEVE metadata propagation. Local data-bearing
+  START now accepts source-checked RTRANSID, RTERMID, and QUEUE names, persists
+  them in the existing versioned interval row, and RETRIEVE writes requested
+  exact-width metadata outputs alongside INTO/LENGTH. Requesting metadata the
+  corresponding START omitted returns ENVDEFERR without consuming the ready
+  record. Compiler, plan codec, interpreter, provider, SQLite-compatible state,
+  and the compiled product route share the same identities. WAIT
+  timeout/shutdown, terminal association, automatic task launch, PostgreSQL,
+  and licensed evidence remain pending.
+
+- Added local application-named CICS DELAY cancellation and task cleanup.
+  Positive literal INTERVAL may bind a one-to-eight-character REQID; another
+  task can cancel it before expiration, the original DELAY resumes with NORMAL
+  RESP2 23, and exact replay/NOTFND/expiration races remain fenced by the delay
+  row and work identity. Disconnect, timeout, return, abend, and terminal
+  teardown abandon outstanding delays and cancel their work. The version-two
+  row codec retains version-one reads and survives SQLite reopen. Remote
+  routing, TIME/units, automatic redispatch, PostgreSQL evidence, generic
+  retention, and licensed differential remain pending.
+
+- Added positive literal CICS DELAY intervals over the shared durable worker
+  lane. Each task/statement cycle persists a strict versioned delay row and one
+  `cics-delay-v1` work item, suspends until fenced due promotion, completes on
+  reissue, survives SQLite reopen, and creates a fresh identity when a loop
+  reaches the statement again. TIME and explicit units, automatic redispatch,
+  PostgreSQL evidence, and licensed differential remain pending.
+
+- Added the typed zero-delay CICS DELAY boundary. Bare/default DELAY and
+  compile-time literal INTERVAL(0) now cross the typed compiler, plan,
+  interpreter, canonical host request, provider, durable coordinator, and
+  selected product route without creating timer state or suspending the task.
+  Dynamic timing, TIME, FOR/UNTIL units, REQID on zero delay, EXPIRED, and
+  automatic resumption remain pending.
+
+- Added the typed bounded local CICS CANCEL route for unhonored committed START
+  records. Explicit REQID with optional local TRANSID now authorizes the target,
+  atomically tombstones the interval record, cancels queued or claimed shared
+  work, returns exact NOTFND on later requests, replays the original mutation,
+  and survives SQLite reopen. POST, DELAY, SYSID routing, protected-uncommitted
+  START, immediate REQID reuse, and licensed differential remain pending.
+
+- Added the versioned CICS interval START-record authority and the first typed
+  local-data START-to-RETRIEVE cycle. The bounded route lowers START and
+  RETRIEVE through typed plans, admits due work to the shared durable queue,
+  promotes it under a fenced worker lease, consumes it once with replay-safe
+  INTO/LENGTH and ENDDATA/LENGERR behavior, authorizes the target transaction,
+  and survives SQLite reopen. Remote, terminal, protected, generated-REQID,
+  metadata/FMH, WAIT, SET, and automatic target-task launch semantics remain
+  pending, so neither command receives whole-row credit.
+
 - Added verified offline IBM-documentation search/read commands and a cache-first
   source-review workflow for semantic development.
 - Added repository contributor guidelines in `AGENTS.md` covering structure,
@@ -111,6 +377,19 @@ All notable changes to mainframe-env are documented here.
   data area, and optional numeric LENGTH or `LENGTH OF` selects the persisted
   prefix before idempotency comparison. Remote SYSID routing and unimplemented
   TDQUEUE definition/open/disabled condition semantics remain fail-closed.
+- Added the typed local `DELETEQ TD` subset. QUEUE uses the same validated
+  selector and RACF queue resource as `WRITEQ TD`; successful execution
+  atomically removes the durable queue and releases its retained-byte count,
+  while a missing queue returns exact `QIDERR` 44/0. Memory, three-open SQLite,
+  and selected compiled-route regressions cover deletion and repeated-delete
+  behavior. Remote SYSID and TDQUEUE definition, extrapartition, disabled, and
+  locked states remain fail-closed.
+- Added a typed task-local `GETMAIN SET/FLENGTH` subset over interpreter-owned
+  virtual storage. Literal or fullword-binary lengths, one-byte `INITIMG`,
+  `NOSUSPEND`, checkpoint restoration, replay, LENGERR 22/1 pointer clearing,
+  and default-ignored NOSTG 42/2 are covered without exposing native addresses.
+  Legacy LENGTH, key/share/executable policy, FREEMAIN/64, and DPL proof remain
+  fail-closed or pending.
 - Migrated bounded local `RECEIVE MAP`, `SEND MAP`, and `SEND TEXT` subsets to
   typed terminal plans. MAP and optional MAPSET are validated 1–7 character
   selectors, with an eight-byte RECEIVE MAPSET field admitted for a valid name

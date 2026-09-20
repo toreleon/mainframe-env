@@ -57,8 +57,8 @@ coverage, semantic and differential credit.
 
 The contract also binds one 121-name EIBRESP authority for dynamic
 `HANDLE CONDITION` and `IGNORE CONDITION` clauses. Its early participant view
-records two known mutating rows, 260 bounded-effect rows, one explicit UOW
-boundary and 261 bounded-UOW rows. Those values describe current contract
+records 20 known mutating rows, 225 bounded-effect rows, one explicit UOW
+boundary and 244 bounded-UOW rows. Those values describe current contract
 certainty; they are not execution or conformance counts.
 
 The same generator emits the compact
@@ -67,14 +67,12 @@ It contains all 263 API registry shapes with deterministic recognition,
 option-shape, family, EIBFN and handler identities. Readiness is deliberately
 split:
 
-- 34 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
+- 38 `typed-runtime` API routes, including the original `READ`, `REWRITE`, and
   `SYNCPOINT` routes and the reviewed incremental family slices;
-- 1 `legacy-compatibility` API route that remains on the pre-existing raw
-  compatibility path; and
-- 228 `unready` rows that are recognized but fail explicitly as unsupported.
+- 0 `legacy-compatibility` API routes; and
+- 225 `unready` rows that are recognized but fail explicitly as unsupported.
 
-The remaining raw compatibility route's implemented option subset is owned by the
-separate versioned
+The now-empty raw compatibility set remains owned by the separate versioned
 [`legacy-execution-options.json`](../../conformance/0.9/cics/legacy-execution-options.json)
 catalog and its
 [`schema`](../../conformance/0.9/schemas/cics-legacy-execution-options.schema.json).
@@ -84,7 +82,7 @@ source receipts. The generator requires its route identities to match the
 legacy API runtime set exactly and verifies every admitted option against a
 current accepted source projection before emitting the registry.
 
-The current 35 API routes are the only advertised application commands.
+The current 38 API routes are the only advertised application commands.
 `ASKTIME ABSTIME` returns its packed-decimal destination and refreshes EIBDATE
 and EIBTIME. Bare `ASKTIME` is a distinct route that refreshes only those two
 packed-decimal EIB fields; it cannot manufacture an ABSTIME destination. Both
@@ -95,6 +93,22 @@ subset: packed ABSTIME input, valued DATESEP/TIMESEP, five explicit date
 formats, TIME, MILLISECONDS, and common response options. Other official
 FORMATTIME fields remain explicit compiler rejections until their output and
 timezone contracts are implemented.
+The typed DELAY route completes bare/default and literal-zero INTERVAL without
+timer state. Valid positive packed literal INTERVAL values bind a hidden
+task/statement identity, persist one versioned cycle and shared work item, and
+reissue from the durable checkpoint only after lease-fenced due promotion.
+Positive literal delays may bind a bounded REQID for other-task local CANCEL;
+task teardown abandons their durable cycle and cancels work. `FOR` and `UNTIL`
+also accept literal or resolved numeric HOURS/MINUTES/SECONDS and retain their
+mode in append-only typed-plan tags. Packed TIME accepts an integer constant or
+resolved packed numeric storage and uses the same absolute deadline path.
+`FOR MILLISECS` accepts literal or resolved fullword values alone or with the
+other units and retains millisecond precision through the durable deadline.
+Packed INTERVAL accepts either a literal or resolved packed numeric value under
+the existing plan tag. A due DELAY worker also resolves the bounded durable
+online exchange by run-unit identity and resumes it without a client resume
+request, including after the SQLite-backed product/store is reopened. PostgreSQL
+restart wake and remote cancellation remain explicit gaps.
 `ABEND` also lowers through a typed task plan: ABCODE is captured as a bounded
 literal or a pre-resolved 1–4 character storage input, and CANCEL/NODUMP remain
 distinct flags. Retained raw ABEND artifacts remain readable, but new
@@ -104,20 +118,90 @@ program-name input and mutually exclusive CANCEL/RESET actions; its provider
 continues to own authorization and durable active/canceled exit state.
 The typed local LINK subset binds PROGRAM and an optional COMMAREA before
 dispatch. COMMAREA is one input/output storage identity, so registering its
-return destination cannot replace the captured request bytes. Channel, explicit
-length, input-message, remote-system, transaction, and SYNCONRETURN forms remain
-compiler rejections until their separate contracts are implemented.
+return destination cannot replace the captured request bytes. Optional LENGTH
+accepts a literal, numeric storage, or matching LENGTH OF identity and truncates
+the copied request before dispatch. Local DATALENGTH is retained as a distinct
+numeric operand but deliberately does not shorten or validate that payload;
+the source assigns it only to remote/dynamic transfer optimization. Channel,
+remote DATALENGTH checking, input-message, remote-system, transaction, and
+SYNCONRETURN forms remain compiler rejections until their separate contracts
+are implemented.
 The typed local XCTL subset binds the same PROGRAM and optional COMMAREA inputs,
 but declares no COMMAREA output because control does not return to the caller.
 Its complete provider result becomes a frame-replacing transfer to the selected
-program. Channel, explicit length, and input-message forms remain compiler
+program. The same LENGTH forms select the replacement frame's copied COMMAREA
+and therefore its EIBCALEN. Channel and input-message forms remain compiler
 rejections until their separate contracts are implemented.
 The typed local RETURN subset admits bare completion and an optional TRANSID;
 COMMAREA is admitted only with TRANSID so the copied bytes have an owned durable
-continuation identity. RETURN carries no COMMAREA output. `LENGTH(LENGTH OF
-commarea)` selects the captured prefix; other explicit lengths, channel,
+continuation identity. RETURN carries no COMMAREA output. Literal, numeric
+storage, and matching `LENGTH OF` values select the captured prefix. Channel,
 input-message, IMMEDIATE, ENDACTIVITY, higher-level, and DPL forms remain
-fail-closed.
+fail-closed. All three commands bound explicit lengths before dispatch and map
+invalid ranges or missing storage to LENGERR rather than reading beyond the
+resolved data area.
+Typed local START scheduling accepts packed INTERVAL/TIME and explicit
+`AFTER`/`AT` unit forms from literals or numeric storage. Append-only plan tags
+retain the mode and each present HOURS, MINUTES, or SECONDS component through
+codec/checkpoint and interpreter request construction. Source-presence
+semantics therefore survive runtime evaluation: a lone MINUTES may reach 5999
+and lone SECONDS 359999, while any combined form narrows minutes and seconds to
+59. The provider returns INVREQ 16 with response2 4, 5, or 6 for the respective
+out-of-range component.
+Typed local START no longer requires FROM. A request with no FROM,
+RTRANSID, RTERMID, or QUEUE still creates its ordinary durable schedule/work
+identity but carries no retrievable data. RETRIEVE consumes that exact ready
+identity once and returns ENDDATA 29/0; the identical consumer request replays
+the same result. Metadata-only START is data-bearing for this rule and returns
+its requested metadata with length zero. LENGTH and FMH remain invalid without
+FROM, so omission cannot manufacture a payload or function-management-header
+state.
+The typed local START/RETRIEVE data cycle also carries the bounded metadata
+subset: START may supply RTRANSID, RTERMID, and QUEUE names, and RETRIEVE may
+request exact-width writable destinations for any corresponding value.
+ENVDEFERR is decided before one-time consumption when the producer omitted a
+requested field. START FMH is persisted with the data record; RETRIEVE emits a
+strict typed EIBFMH byte that the interpreter applies to its implicit EIB
+state. RETRIEVE may alternatively use SET with mandatory LENGTH: the compiler
+requires a pointer target, and the interpreter returns task-owned bytes through
+its checked virtual-address model. Local START PROTECT writes no worker item
+until an explicit successful SYNCPOINT commits its issuing run's
+protected-pending records; explicit rollback removes those records. The typed
+ABEND route also removes still-protected records before transferring or
+terminating. CANCEL returns NOTFND while a protected row is uncommitted and
+uses the ordinary pending-work cancellation fence after committing SYNCPOINT.
+Normal machine completion and highest-level RETURN now apply the same commit
+transition implicitly before task cleanup. Known execution failure applies
+rollback deletion; scheduler/WAIT suspension does not finalize the task.
+Terminal disconnect and idle timeout also apply rollback deletion through the
+caller-held cleanup boundary. If durable execution reaches a terminal outcome
+before product/CICS cleanup, recovery reconstructs the exact invocation from
+the retained exchange, restores its checkpointed priority, and reloads the
+durable CICS undo state before cleanup. `Completed` commits protected START;
+cancelled, timed-out, failed, and dead-letter outcomes roll it back. A completed
+handoff retains its already-applied RETURN finalization and is discarded without
+committing twice.
+When local START omits REQID, the provider derives one replay-stable
+eight-character identifier and the interpreter writes it to implicit EIBREQID;
+that value owns the same record and work identities as an explicit REQID. With
+local NOCHECK, the same internal identity is generated for replay and worker
+ownership but is deliberately not returned, leaving EIBREQID null. Remote
+NOCHECK shipping remains deferred.
+Local START USERID performs a `SURROGAT <userid>.DFHSTART` READ check under the
+issuing principal before writing an interval or work row, but only after the
+typed RACF principal-status route validates the requested non-login execution
+identity. Unknown identities return USERIDERR 69/8, revoked identities return
+69/19, and locked/indeterminate identities return 69/10; an unavailable
+external-security interface returns INVREQ 16/18. A password-expired but
+otherwise active identity remains valid for this non-login check. An accepted
+explicit identity is stored as the future task principal; omission keeps the
+issuer. Surrogate denial returns NOTAUTH 70/9 without mutation. Terminal
+combinations and actual target-task creation remain deferred.
+RETRIEVE WAIT durably checkpoints and reissues the same statement when no
+eligible record exists; explicit execution re-entry after worker promotion
+consumes through the ordinary one-time fence. Deadlock timeout, shutdown/AICB,
+automatic wake, process-restart WAIT resume, terminal association, and automatic
+task launch remain fail-closed or deferred.
 The typed default-cursor file-browse subset binds STARTBR, READNEXT, READPREV,
 and ENDBR to exactly one FILE/DATASET alias. STARTBR captures a writable
 RIDFLD without returning a record and admits the default-equivalent `GTEQ`
@@ -136,8 +220,17 @@ The typed local WRITEQ TD subset requires a bounded QUEUE selector and FROM
 storage input, with optional numeric LENGTH or `LENGTH OF` that input. The
 provider writes exactly the selected prefix under the request's mutation
 identity, so retries compare the semantic record rather than ignored trailing
-bytes. Remote SYSID routing and TDQUEUE definition-state conditions remain
-deferred.
+bytes. Typed local DELETEQ TD accepts only the bounded QUEUE selector, requires
+update access to the same queue resource, and atomically removes the durable
+queue plus its retained-byte accounting. A missing queue returns QIDERR 44/0.
+Remote SYSID routing and TDQUEUE definition-state conditions remain deferred.
+Typed local GETMAIN routes SET plus FLENGTH and optional INITIMG through the
+storage-control family. The interpreter contributes its remaining virtual
+frame/byte capacity, applies the returned initialized bytes to a checkpointed
+virtual base, and writes a checked POINTER or POINTER-32 address. Nonpositive
+or over-limit length clears SET with LENGERR 22/1; unavailable capacity returns
+default-ignored NOSTG 42/2. Native addresses, legacy LENGTH, key/share/executable attributes,
+FREEMAIN, and 64-bit forms remain deferred.
 The typed local BMS subset binds `RECEIVE MAP`, `SEND MAP`, and `SEND TEXT` to
 the terminal family. Map names are prevalidated 1–7 character literals or
 alpha/alphanumeric fields; a `RECEIVE MAP` MAPSET field may be eight bytes so
@@ -158,12 +251,43 @@ is empty: local purge succeeds idempotently without changing the already
 displayed screen or current map. DPL use returns `INVREQ` 16/200. Deleting a
 nonempty accumulated message and surfacing temporary-storage `TSIOERR` remain
 unready until that logical-message authority exists.
-The typed ASSIGN subset carries each of its 78 admitted context values as a
+The typed ASSIGN subset carries each of its 92 admitted context values as a
 pre-resolved output binding under one bounded output-name authority. It retains
 the existing 16-option maximum, exact receiver checks, partial-INVREQ behavior,
 local/DPL matrix, EIBFN and provider semantics without carrying source command
-text across the executable boundary. The other 35 generated ASSIGN semantic
-options remain compiler rejections until their contexts are implemented.
+text across the executable boundary. The append-only BMS-overflow outputs
+`DESTCOUNT`, `LDCMNEM`, `LDCNUM`, `PAGENUM`, and `PARTNPAGE` return `INVREQ`
+16/2 locally because no executable BMS route establishes overflow state, and
+the source-defined DPL restriction returns 16/200; both paths preserve their
+receivers. `RETURNPROG` is admitted only for a local highest-level frame, where
+the source value is eight blanks; the provider refreshes the current parent
+identity from each trusted invocation and fails closed for LINK-child and DPL
+lineage until it owns a durable caller stack. `INVOKINGPROG` also requires the
+trusted durable program-entry marker to identify the local initial frame and
+return eight blanks; XCTL targets, linked children, and DPL fail closed until
+their caller identities are durable.
+`TERMPRIORITY` returns the
+terminal definition's source-default halfword zero independently of current
+task priority; it follows the local nonterminal 16/5 and DPL 16/200 condition
+matrix. `LANGINUSE` maps the runtime's unoverridden English language default to
+the source-defined three-byte `ENU` in local and DPL contexts. `INPUTMSGLEN`
+reads the bounded last normalized terminal-input byte length from durable
+session codec `MECSB`; RECEIVE consumes the payload without erasing that
+context, and no input returns halfword zero in local and DPL execution.
+`INPARTN` preserves its one- or two-byte receiver and returns 16/2 before any
+map is positioned, 16/5 without a terminal, and 16/200 in DPL; a positioned-map
+request fails closed until input-partition state exists. New terminal sessions
+allocate a durable unique four-character virtual-terminal identifier;
+`FACILITY` returns it and `NETNAME` follows the pinned TERMINAL default by
+padding the same name to eight bytes. Local nonterminal use returns 16/5,
+FACILITY is DPL-prohibited at 16/200, and DPL NETNAME fails closed until remote
+terminal identity is propagated. Historical sessions without an identifier
+remain readable but do not acquire a fabricated one. Because no client network
+endpoint is retained, local `TNADDR` returns the source-defined 39 blanks for
+an unresolved address; nonterminal use returns 16/5 and DPL fails closed until
+remote endpoint context exists. The other 21 generated
+ASSIGN semantic options remain compiler rejections until
+their contexts are implemented.
 The legacy route admits only the source-valid option subset whose behavior is
 implemented by that raw handler. A catalog-known option outside that subset
 fails explicitly before compatibility lowering instead of being silently
@@ -226,10 +350,12 @@ differentials, or make 0.9.0 release-ready.
 | `program-control` | program inquiry, LINK, and XCTL |
 | `terminal-control` / `terminal-run` | BMS and text send/receive behavior plus terminal-task lifecycle cleanup |
 | `file-control` | file status, keyed I/O, and browse behavior |
-| `queue-control` | transient-data queue writes |
+| `queue-control` | transient-data queue writes and local queue deletion |
 | `recovery` | SYNCPOINT coordination, rollback, and subsystem unit-of-work completion |
+| `interval-control` | bounded local START scheduling/cancellation with facility-less or virtual-terminal target launch plus zero, relative, and absolute DELAY |
+| `storage-control` | bounded task-local virtual storage allocation |
 
-This table describes the seven families already present in the 25-row runtime
+This table describes the nine families already present in the 42-operation runtime
 collection. The 263-row application registry also assigns every row a
 deterministic future family owner, but that assignment is routing shape rather
 than an executable handler. `CicsService::invoke_run` selects an existing

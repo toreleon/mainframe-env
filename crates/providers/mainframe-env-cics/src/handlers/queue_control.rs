@@ -12,9 +12,14 @@ pub(in crate::service) fn invoke(
     run: &mut Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
-    if request.operation != CicsOperation::WriteTransientData {
-        return Err(HostProblem::InfrastructureFailure);
+    match request.operation {
+        CicsOperation::WriteTransientData => write(service, run, request),
+        CicsOperation::DeleteTransientData => delete(service, run, request),
+        _ => Err(HostProblem::InfrastructureFailure),
     }
+}
+
+fn queue_name(request: &CicsRequest) -> Result<String, HostProblem> {
     let queue = argument_text(request, "QUEUE")
         .or_else(|_| argument_text(request, "TDQUEUE"))?
         .trim()
@@ -27,6 +32,15 @@ pub(in crate::service) fn invoke(
     {
         return Err(HostProblem::Malformed);
     }
+    Ok(queue)
+}
+
+fn write(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    let queue = queue_name(request)?;
     service.authorize(
         run,
         "QUEUE",
@@ -109,6 +123,63 @@ pub(in crate::service) fn invoke(
         .map_err(mutation_problem)?;
     state.transient.insert(queue, next);
     state.transient_bytes += value.len();
+    service.response(
+        run,
+        CicsDisposition::Complete,
+        "NORMAL",
+        0,
+        0,
+        None,
+        None,
+        Vec::new(),
+    )
+}
+
+fn delete(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    if request.arguments.keys().any(|name| {
+        !matches!(
+            name.as_str(),
+            "QUEUE" | "TDQUEUE" | "RESP" | "RESP2" | "OPTION.NOHANDLE"
+        )
+    }) {
+        return Err(HostProblem::Malformed);
+    }
+    let queue = queue_name(request)?;
+    service.authorize(
+        run,
+        "QUEUE",
+        &format!("CICS.TD.{queue}"),
+        AccessIntent::Update,
+    )?;
+    let mut state = service.lock()?;
+    let current = state
+        .transient
+        .get(&queue)
+        .cloned()
+        .ok_or_else(|| HostProblem::Condition {
+            name: "QIDERR".into(),
+            response: 44,
+            response2: 0,
+        })?;
+    service
+        .store
+        .delete_provider_state("cics-tdq", &queue, current.version)
+        .map_err(store_error)
+        .map_err(mutation_problem)?;
+    let released = current
+        .records
+        .iter()
+        .try_fold(0usize, |total, (_, record)| total.checked_add(record.len()))
+        .ok_or(HostProblem::InfrastructureFailure)?;
+    state.transient.remove(&queue);
+    state.transient_bytes = state
+        .transient_bytes
+        .checked_sub(released)
+        .ok_or(HostProblem::InfrastructureFailure)?;
     service.response(
         run,
         CicsDisposition::Complete,

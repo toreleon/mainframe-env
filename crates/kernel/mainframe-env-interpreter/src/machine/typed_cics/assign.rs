@@ -21,39 +21,51 @@ pub(super) fn validate_output(
             | "DEFSCRNHT"
             | "DEFSCRNWD"
             | "DESTIDLENG"
+            | "DESTCOUNT"
             | "ERRORMSGLEN"
             | "INITPARMLEN"
+            | "INPUTMSGLEN"
             | "LINKLEVEL"
             | "MAPCOLUMN"
             | "MAPHEIGHT"
             | "MAPLINE"
             | "MAPWIDTH"
+            | "PAGENUM"
             | "SCRNHT"
             | "SCRNWD"
             | "TASKPRIORITY"
             | "TCTUALENG"
+            | "TERMPRIORITY"
             | "TWALENG"
     ) && (layout.category != LayoutCategory::Binary || layout.length != 2 || layout.scale != 0)
     {
         return Err(invalid_plan("ASSIGN halfword output has the wrong layout"));
     }
+    if name == "INPARTN" && !(1..=2).contains(&layout.length) {
+        return Err(invalid_plan("ASSIGN input partition has the wrong width"));
+    }
     let exact_length = match name {
-        "ABCODE" | "BRIDGE" | "NEXTTRANSID" | "ORGABCODE" | "PRINSYSID" | "QNAME" => Some(4),
+        "ABCODE" | "BRIDGE" | "FACILITY" | "NEXTTRANSID" | "ORGABCODE" | "PRINSYSID" | "QNAME" => {
+            Some(4)
+        }
         "ABDUMP" | "APLKYBD" | "APLTEXT" | "BTRANS" | "COLOR" | "DS3270" | "DSSCS" | "EWASUPP"
         | "EXTDS" | "FCI" | "GMMI" | "HILIGHT" | "KATAKANA" | "MSRCONTROL" | "OUTLINE"
-        | "PARTNS" | "PS" | "RESTART" | "SOSI" | "TEXTKYBD" | "TEXTPRINT" | "UNATTEND"
-        | "VALIDATION" | "CMDSEC" | "RESSEC" => Some(1),
-        "ABPROGRAM" | "ASRAINTRPT" | "ASRAPSW" | "DESTID" | "OPERKEYS" | "PROGRAM"
-        | "PROCESSTYPE" => Some(8),
+        | "LDCNUM" | "PARTNS" | "PS" | "RESTART" | "SOSI" | "TEXTKYBD" | "TEXTPRINT"
+        | "UNATTEND" | "VALIDATION" | "CMDSEC" | "RESSEC" => Some(1),
+        "ABPROGRAM" | "ASRAINTRPT" | "ASRAPSW" | "DESTID" | "INVOKINGPROG" | "OPERKEYS"
+        | "NETNAME" | "PROGRAM" | "PROCESSTYPE" | "RETURNPROG" => Some(8),
         "ACTIVITY" | "ASRAPSW16" => Some(16),
         "ACTIVITYID" => Some(52),
         "ASRAREGS" => Some(64),
         "ASRAREGS64" => Some(128),
         "ERRORMSG" => Some(500),
         "INITPARM" => Some(60),
+        "LANGINUSE" => Some(3),
         "OPSECURITY" => Some(3),
+        "LDCMNEM" | "PARTNPAGE" => Some(2),
         "PARTNSET" => Some(6),
         "PROCESS" => Some(36),
+        "TNADDR" => Some(39),
         _ => None,
     };
     if exact_length.is_some_and(|expected| layout.length != expected) {

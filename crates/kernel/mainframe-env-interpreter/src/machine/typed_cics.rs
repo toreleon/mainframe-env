@@ -12,6 +12,7 @@ use mainframe_env_ir::{
 mod assign;
 mod legacy;
 mod names;
+mod retrieve;
 pub(super) use legacy::execute_legacy;
 use names::SlotUse;
 
@@ -143,6 +144,8 @@ pub(super) fn suspension(
 ) -> MachineDrive<EffectRequest> {
     let (kind, reissue) = match operation {
         CicsOperation::Enq => ("cics-enqueue", true),
+        CicsOperation::Delay => ("cics-delay", true),
+        CicsOperation::Retrieve => ("cics-retrieve", true),
         CicsOperation::ChangeTask | CicsOperation::Suspend => ("cics-scheduler", false),
         _ => ("cics-terminal", true),
     };
@@ -275,10 +278,18 @@ pub(super) fn execute(
                 if matches!(
                     operand.name,
                     CicsOperandName::Length
+                        | CicsOperandName::DataLength
                         | CicsOperandName::KeyLength
                         | CicsOperandName::MaxLifetime
                         | CicsOperandName::Priority
                         | CicsOperandName::Abstime
+                        | CicsOperandName::Interval
+                        | CicsOperandName::StartTime
+                        | CicsOperandName::Hours
+                        | CicsOperandName::Minutes
+                        | CicsOperandName::Seconds
+                        | CicsOperandName::Milliseconds
+                        | CicsOperandName::Flength
                 ) =>
             {
                 (
@@ -346,10 +357,21 @@ pub(super) fn execute(
             | CicsOutputName::Yyddd
             | CicsOutputName::Yymmdd
             | CicsOutputName::Yyyymmdd
+            | CicsOutputName::ReturnTransId
+            | CicsOutputName::ReturnTermId
+            | CicsOutputName::Queue
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }
             CicsOutputName::Into => into = Some(target),
+            CicsOutputName::SetPointer => {
+                arguments.extend(retrieve::allocation_arguments(
+                    machine,
+                    &target,
+                    plan.operation,
+                )?);
+                outputs.insert(key.into(), target);
+            }
             CicsOutputName::Ridfld => {
                 outputs.insert(key.into(), target);
             }
@@ -364,6 +386,15 @@ pub(super) fn execute(
         arguments.insert(
             format!("OPTION.{}", names::option(*option)),
             payload("mainframe-env.cics.option@1", Vec::new())?,
+        );
+    }
+    if plan.operation == CicsPlanOperation::Delay {
+        arguments.insert(
+            "DELAY.ID".into(),
+            payload(
+                "mainframe-env.cics.delay-id@1",
+                format!("{}:{}", machine.invocation.run_unit_id, machine.pc).into_bytes(),
+            )?,
         );
     }
 
@@ -465,9 +496,15 @@ pub(super) fn write_output(
     target: &CicsTarget,
     value: &BoundedPayload,
 ) -> Result<(), MachineProblem> {
+    if name == "SET" {
+        return retrieve::write_set_output(machine, target, value);
+    }
     if matches!(name, "ABSTIME" | "MILLISECONDS" | "LENGTH")
         && value.schema() != "mainframe-env.cics.decimal@1"
-        || matches!(name, "COMMAREA" | "RIDFLD") && value.schema() != "mainframe-env.cics.payload@1"
+        || matches!(
+            name,
+            "COMMAREA" | "RIDFLD" | "RTRANSID" | "RTERMID" | "QUEUE"
+        ) && value.schema() != "mainframe-env.cics.payload@1"
         || matches!(
             name,
             "MMDDYY" | "MMDDYYYY" | "TIME" | "YYDDD" | "YYMMDD" | "YYYYMMDD"
@@ -798,6 +835,11 @@ fn validate_machine_slot(
         return Err(invalid_plan(
             "LENGTH and KEYLENGTH inputs must be halfword binary",
         ));
+    }
+    if matches!(slot_use, SlotUse::FullwordInput)
+        && (layout.category != LayoutCategory::Binary || layout.length != 4 || layout.scale != 0)
+    {
+        return Err(invalid_plan("FLENGTH input must be fullword binary"));
     }
     if let SlotUse::AssignOutput(output) = slot_use {
         assign::validate_output(layout, output)?;

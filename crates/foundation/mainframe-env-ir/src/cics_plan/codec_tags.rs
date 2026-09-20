@@ -4,6 +4,8 @@ use super::{
 };
 
 const ASSIGN_OUTPUT_TAG_BASE: u8 = 13;
+const ASSIGN_OUTPUT_LEGACY_COUNT: u8 = 78;
+const ASSIGN_OUTPUT_EXTENSION_TAG_BASE: u8 = 96;
 
 pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
     match value {
@@ -41,6 +43,12 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::SendText => 31,
         CicsPlanOperation::Assign => 32,
         CicsPlanOperation::PurgeMessage => 33,
+        CicsPlanOperation::Start => 34,
+        CicsPlanOperation::Retrieve => 35,
+        CicsPlanOperation::Cancel => 36,
+        CicsPlanOperation::Delay => 37,
+        CicsPlanOperation::DeleteTransientData => 38,
+        CicsPlanOperation::Getmain => 39,
     }
 }
 
@@ -80,6 +88,12 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         31 => Ok(CicsPlanOperation::SendText),
         32 => Ok(CicsPlanOperation::Assign),
         33 => Ok(CicsPlanOperation::PurgeMessage),
+        34 => Ok(CicsPlanOperation::Start),
+        35 => Ok(CicsPlanOperation::Retrieve),
+        36 => Ok(CicsPlanOperation::Cancel),
+        37 => Ok(CicsPlanOperation::Delay),
+        38 => Ok(CicsPlanOperation::DeleteTransientData),
+        39 => Ok(CicsPlanOperation::Getmain),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -113,6 +127,20 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::Map => 24,
         CicsOperandName::Mapset => 25,
         CicsOperandName::KeyLength => 26,
+        CicsOperandName::ReqId => 27,
+        CicsOperandName::Interval => 28,
+        CicsOperandName::StartTime => 29,
+        CicsOperandName::ReturnTransId => 30,
+        CicsOperandName::ReturnTermId => 31,
+        CicsOperandName::UserId => 32,
+        CicsOperandName::Hours => 33,
+        CicsOperandName::Minutes => 34,
+        CicsOperandName::Seconds => 35,
+        CicsOperandName::Milliseconds => 36,
+        CicsOperandName::DataLength => 37,
+        CicsOperandName::TermId => 38,
+        CicsOperandName::Flength => 39,
+        CicsOperandName::InitImage => 40,
     }
 }
 
@@ -145,6 +173,20 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         24 => Ok(CicsOperandName::Map),
         25 => Ok(CicsOperandName::Mapset),
         26 => Ok(CicsOperandName::KeyLength),
+        27 => Ok(CicsOperandName::ReqId),
+        28 => Ok(CicsOperandName::Interval),
+        29 => Ok(CicsOperandName::StartTime),
+        30 => Ok(CicsOperandName::ReturnTransId),
+        31 => Ok(CicsOperandName::ReturnTermId),
+        32 => Ok(CicsOperandName::UserId),
+        33 => Ok(CicsOperandName::Hours),
+        34 => Ok(CicsOperandName::Minutes),
+        35 => Ok(CicsOperandName::Seconds),
+        36 => Ok(CicsOperandName::Milliseconds),
+        37 => Ok(CicsOperandName::DataLength),
+        38 => Ok(CicsOperandName::TermId),
+        39 => Ok(CicsOperandName::Flength),
+        40 => Ok(CicsOperandName::InitImage),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -166,6 +208,14 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u8 {
         CicsPlanOption::TimeSep => 12,
         CicsPlanOption::FreeKb => 13,
         CicsPlanOption::Gteq => 14,
+        CicsPlanOption::Fmh => 15,
+        CicsPlanOption::Protect => 16,
+        CicsPlanOption::Wait => 17,
+        CicsPlanOption::After => 18,
+        CicsPlanOption::At => 19,
+        CicsPlanOption::For => 20,
+        CicsPlanOption::Until => 21,
+        CicsPlanOption::NoCheck => 22,
     }
 }
 
@@ -186,6 +236,14 @@ pub(super) fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodec
         12 => Ok(CicsPlanOption::TimeSep),
         13 => Ok(CicsPlanOption::FreeKb),
         14 => Ok(CicsPlanOption::Gteq),
+        15 => Ok(CicsPlanOption::Fmh),
+        16 => Ok(CicsPlanOption::Protect),
+        17 => Ok(CicsPlanOption::Wait),
+        18 => Ok(CicsPlanOption::After),
+        19 => Ok(CicsPlanOption::At),
+        20 => Ok(CicsPlanOption::For),
+        21 => Ok(CicsPlanOption::Until),
+        22 => Ok(CicsPlanOption::NoCheck),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -205,8 +263,19 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u8 {
         CicsOutputName::Yyyymmdd => 10,
         CicsOutputName::Commarea => 11,
         CicsOutputName::Ridfld => 12,
-        CicsOutputName::Assign(output) => ASSIGN_OUTPUT_TAG_BASE + output.tag(),
+        CicsOutputName::Assign(output) => {
+            let tag = output.tag();
+            if tag < ASSIGN_OUTPUT_LEGACY_COUNT {
+                ASSIGN_OUTPUT_TAG_BASE + tag
+            } else {
+                ASSIGN_OUTPUT_EXTENSION_TAG_BASE + (tag - ASSIGN_OUTPUT_LEGACY_COUNT)
+            }
+        }
         CicsOutputName::Length => 91,
+        CicsOutputName::ReturnTransId => 92,
+        CicsOutputName::ReturnTermId => 93,
+        CicsOutputName::Queue => 94,
+        CicsOutputName::SetPointer => 95,
     }
 }
 
@@ -226,12 +295,18 @@ pub(super) fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodec
         11 => Ok(CicsOutputName::Commarea),
         12 => Ok(CicsOutputName::Ridfld),
         91 => Ok(CicsOutputName::Length),
-        value => CicsAssignOutput::from_tag(
-            value
-                .checked_sub(ASSIGN_OUTPUT_TAG_BASE)
-                .ok_or(CicsPlanCodecProblem::Malformed)?,
-        )
-        .map(CicsOutputName::Assign)
-        .ok_or(CicsPlanCodecProblem::Malformed),
+        92 => Ok(CicsOutputName::ReturnTransId),
+        93 => Ok(CicsOutputName::ReturnTermId),
+        94 => Ok(CicsOutputName::Queue),
+        95 => Ok(CicsOutputName::SetPointer),
+        13..=90 => CicsAssignOutput::from_tag(value - ASSIGN_OUTPUT_TAG_BASE)
+            .map(CicsOutputName::Assign)
+            .ok_or(CicsPlanCodecProblem::Malformed),
+        96..=u8::MAX => value
+            .checked_sub(ASSIGN_OUTPUT_EXTENSION_TAG_BASE)
+            .and_then(|tag| tag.checked_add(ASSIGN_OUTPUT_LEGACY_COUNT))
+            .and_then(CicsAssignOutput::from_tag)
+            .map(CicsOutputName::Assign)
+            .ok_or(CicsPlanCodecProblem::Malformed),
     }
 }

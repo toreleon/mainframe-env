@@ -6,12 +6,20 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
             output,
             CicsOutputName::Abstime | CicsOutputName::Resp | CicsOutputName::Resp2
         ),
-        CicsPlanOperation::Read => matches!(
+        CicsPlanOperation::Read | CicsPlanOperation::Retrieve => matches!(
             output,
             CicsOutputName::Into
+                | CicsOutputName::SetPointer
                 | CicsOutputName::Resp
                 | CicsOutputName::Resp2
                 | CicsOutputName::Length
+                | CicsOutputName::ReturnTransId
+                | CicsOutputName::ReturnTermId
+                | CicsOutputName::Queue
+        ),
+        CicsPlanOperation::Getmain => matches!(
+            output,
+            CicsOutputName::SetPointer | CicsOutputName::Resp | CicsOutputName::Resp2
         ),
         CicsPlanOperation::FormatTime => matches!(
             output,

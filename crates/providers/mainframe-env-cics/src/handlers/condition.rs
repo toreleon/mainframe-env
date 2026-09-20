@@ -53,7 +53,9 @@ pub(crate) fn respond(
                     None,
                     Vec::new(),
                 )
-            } else if name == "ENQBUSY" || run.ignored_conditions.contains("ERROR") {
+            } else if matches!(name, "ENQBUSY" | "EXPIRED" | "NOSTG")
+                || run.ignored_conditions.contains("ERROR")
+            {
                 service.response(
                     run,
                     CicsDisposition::Ignored,

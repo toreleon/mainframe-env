@@ -1,3 +1,4 @@
+use crate::clock::ClockRequest;
 use crate::dataset::{
     CatalogKind, CatalogListEntry, CatalogResolution, DatasetDefinition, DatasetDescription,
     DatasetDiagnostic, DatasetLifecycleState, DatasetLockMode, DatasetLockReceipt,
@@ -739,6 +740,12 @@ pub enum SecurityRequest {
         user: PrincipalId,
         credential_reference: SecretRef,
     },
+    /// Validate a non-login execution identity from durable security state.
+    /// This request never carries or resolves a credential.
+    /// It is distinct from credential authentication.
+    ValidatePrincipal {
+        principal: PrincipalId,
+    },
     Authorize {
         principal: PrincipalId,
         class: String,
@@ -765,13 +772,6 @@ pub struct AuditEvent {
     pub resource_hash: String,
     pub decision: String,
     pub fields: BTreeMap<String, String>,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ClockRequest {
-    UtcTimestamp,
-    Date,
-    Time,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2422,9 +2422,11 @@ mod tests {
             CicsOperation::ChangeTask,
             CicsOperation::Deq,
             CicsOperation::Delete,
+            CicsOperation::DeleteTransientData,
             CicsOperation::Enq,
             CicsOperation::EndBrowse,
             CicsOperation::FormatTime,
+            CicsOperation::Getmain,
             CicsOperation::HandleAbend,
             CicsOperation::HandleAid,
             CicsOperation::HandleCondition,
@@ -2452,7 +2454,7 @@ mod tests {
             CicsOperation::WriteTransientData,
             CicsOperation::Xctl,
         ];
-        assert_eq!(forms.len(), 37);
+        assert_eq!(forms.len(), 39);
         let names = forms
             .iter()
             .map(|operation| operation.runtime_name())

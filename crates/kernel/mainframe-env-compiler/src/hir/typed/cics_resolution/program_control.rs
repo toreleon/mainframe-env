@@ -2,14 +2,30 @@ use super::super::{
     HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsOutputBinding,
     HirCicsOutputName, HirCicsValue, Resolution, ResolutionFailure, require_writable,
 };
-use super::{Clauses, complete_data_reference, program_name, transaction_name};
+use super::{Clauses, cics_integer_value, complete_data_reference, program_name, transaction_name};
 use crate::SemanticModel;
 
 pub(super) fn validate_constraints(
     operation: HirCicsOperation,
     clauses: &Clauses,
 ) -> Resolution<()> {
-    if operation == HirCicsOperation::Return
+    if matches!(
+        operation,
+        HirCicsOperation::Link | HirCicsOperation::Xctl | HirCicsOperation::Return
+    ) && clauses.contains_key("LENGTH")
+        && !clauses.contains_key("COMMAREA")
+    {
+        Err(ResolutionFailure::Invalid(format!(
+            "CICS {operation:?} LENGTH requires COMMAREA"
+        )))
+    } else if operation == HirCicsOperation::Link
+        && clauses.contains_key("DATALENGTH")
+        && (!clauses.contains_key("COMMAREA") || !clauses.contains_key("LENGTH"))
+    {
+        Err(ResolutionFailure::Invalid(
+            "CICS LINK DATALENGTH requires COMMAREA and LENGTH".into(),
+        ))
+    } else if operation == HirCicsOperation::Return
         && clauses.contains_key("COMMAREA")
         && !clauses.contains_key("TRANSID")
     {
@@ -51,6 +67,18 @@ fn transfer_operands(
             value: HirCicsValue::Data(reference),
         });
     }
+    if let Some(tokens) = clauses.get("LENGTH") {
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::Length,
+            value: commarea_length(tokens, semantic)?,
+        });
+    }
+    if let Some(tokens) = clauses.get("DATALENGTH") {
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::DataLength,
+            value: cics_integer_value(tokens, semantic)?,
+        });
+    }
     Ok(operands)
 }
 
@@ -89,21 +117,24 @@ fn return_operands(
         });
     }
     if let Some(tokens) = clauses.get("LENGTH") {
-        if !tokens
-            .first()
-            .is_some_and(|token| token.eq_ignore_ascii_case("LENGTH"))
-            || !tokens
-                .get(1)
-                .is_some_and(|token| token.eq_ignore_ascii_case("OF"))
-        {
-            return Err(ResolutionFailure::Invalid(
-                "CICS RETURN LENGTH requires LENGTH OF a data area".into(),
-            ));
-        }
         operands.push(HirCicsNamedOperand {
             name: HirCicsOperandName::Length,
-            value: HirCicsValue::LengthOf(complete_data_reference(&tokens[2..], semantic)?),
+            value: commarea_length(tokens, semantic)?,
         });
     }
     Ok(operands)
+}
+
+fn commarea_length(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsValue> {
+    if tokens
+        .first()
+        .is_some_and(|token| token.eq_ignore_ascii_case("LENGTH"))
+        && tokens
+            .get(1)
+            .is_some_and(|token| token.eq_ignore_ascii_case("OF"))
+    {
+        complete_data_reference(&tokens[2..], semantic).map(HirCicsValue::LengthOf)
+    } else {
+        cics_integer_value(tokens, semantic)
+    }
 }

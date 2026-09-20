@@ -1,7 +1,9 @@
 use super::super::{
     CicsService, DurableContinuation, Run, argument_bytes, argument_optional, mutation_problem,
 };
-use mainframe_env_host_api::{CicsDisposition, CicsRequest, CicsResponse, HostProblem};
+use mainframe_env_host_api::{
+    CicsDisposition, CicsRequest, CicsResponse, CicsUnitOfWorkOutcome, HostProblem,
+};
 
 pub(in crate::service) fn invoke(
     service: &CicsService,
@@ -82,7 +84,13 @@ pub(in crate::service) fn invoke(
             .map_err(mutation_problem)?;
         state.continuations.remove(&run.session);
     }
-    super::release_task_enqueues(service, run)?;
+    drop(state);
+    super::interval_control::finish_protected_starts(
+        service,
+        run,
+        CicsUnitOfWorkOutcome::Committed,
+    )?;
+    super::release_task_state(service, run)?;
     service.response(
         run,
         CicsDisposition::Returned,

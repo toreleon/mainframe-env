@@ -1,6 +1,6 @@
 use super::super::{CicsService, CicsTraceEntry, handlers};
 use mainframe_env_execution_api::{InvocationLimits, PrincipalId, RunUnitId};
-use mainframe_env_host_api::{HostProblem, SessionId};
+use mainframe_env_host_api::{CicsUnitOfWorkOutcome, HostProblem, SessionId};
 
 impl CicsService {
     pub fn complete_terminal_run(
@@ -9,7 +9,29 @@ impl CicsService {
         principal: &PrincipalId,
         now_tick: u64,
     ) -> Result<(), HostProblem> {
-        self.finish_terminal_run(session, principal, now_tick, true)
+        self.finish_terminal_run(
+            session,
+            principal,
+            now_tick,
+            true,
+            Some(CicsUnitOfWorkOutcome::Committed),
+        )
+    }
+
+    /// Back out task-local state after a known abnormal terminal outcome.
+    pub fn abort_terminal_run(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        now_tick: u64,
+    ) -> Result<(), HostProblem> {
+        self.finish_terminal_run(
+            session,
+            principal,
+            now_tick,
+            true,
+            Some(CicsUnitOfWorkOutcome::RolledBack),
+        )
     }
 
     /// Remove a handed-off volatile run while retaining its durable HANDLE state.
@@ -19,7 +41,7 @@ impl CicsService {
         principal: &PrincipalId,
         now_tick: u64,
     ) -> Result<(), HostProblem> {
-        self.finish_terminal_run(session, principal, now_tick, false)
+        self.finish_terminal_run(session, principal, now_tick, false, None)
     }
 
     /// Discard a terminal run and its HANDLE state after a terminal outcome.
@@ -88,7 +110,7 @@ impl CicsService {
                 .insert(session.as_str().into(), released);
         }
         if let Some(run) = state.runs.get(&run_id).cloned() {
-            handlers::release_task_enqueues(self, &run)?;
+            handlers::release_task_state(self, &run)?;
         }
         state.runs.remove(&run_id);
         Ok(trace)
@@ -100,18 +122,29 @@ impl CicsService {
         principal: &PrincipalId,
         now_tick: u64,
         clear_handle_state: bool,
+        outcome: Option<CicsUnitOfWorkOutcome>,
     ) -> Result<(), HostProblem> {
         let current = self.public_session(session, principal, None, now_tick)?;
         let run_id = RunUnitId::new(&current.run_unit, InvocationLimits::default())
             .map_err(|_| HostProblem::InfrastructureFailure)?;
-        let mut state = self.lock()?;
-        let run = state
+        let run = self
+            .lock()?
             .runs
             .get(&run_id)
             .cloned()
             .ok_or(HostProblem::NotFound)?;
         if run.session != session.as_str() || run.invocation.principal.id() != principal {
             return Err(HostProblem::Unauthorized);
+        }
+        if let Some(outcome) = outcome {
+            super::interval_control::finish_protected_starts(self, &run, outcome)?;
+        }
+        let mut state = self.lock()?;
+        if state.runs.get(&run_id).is_none_or(|current| {
+            current.session != run.session
+                || current.invocation.principal.id() != run.invocation.principal.id()
+        }) {
+            return Err(HostProblem::IdempotencyConflict);
         }
         if clear_handle_state && current.handle_state != handlers::HandleState::default() {
             let mut completed = current.clone();
@@ -137,7 +170,7 @@ impl CicsService {
                 .continuations
                 .insert(session.as_str().into(), released);
         }
-        handlers::release_task_enqueues(self, &run)?;
+        handlers::release_task_state(self, &run)?;
         state.runs.remove(&run_id);
         Ok(())
     }

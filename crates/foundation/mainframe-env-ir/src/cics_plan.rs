@@ -9,12 +9,17 @@ mod browse;
 mod codec_tags;
 mod file_mutation;
 mod handle_abend;
+mod identities;
+mod interval_control;
+mod option_shape;
 mod output_shape;
 mod program_control;
 mod queue_control;
+mod storage_control;
 mod terminal_control;
 
 pub use assign::{CICS_ASSIGN_OUTPUT_NAMES, CicsAssignOutput};
+pub use identities::{CicsOperandName, CicsOutputName, CicsPlanOperation, CicsPlanOption};
 
 use codec_tags::{
     operand_from_tag, operand_tag, operation_from_tag, operation_tag, option_from_tag, option_tag,
@@ -57,79 +62,6 @@ impl Default for CicsPlanLimits {
     }
 }
 
-/// CICS operation selected by the frontend.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum CicsPlanOperation {
-    /// Terminate the issuing task abnormally or transfer to its active exit.
-    Abend,
-    /// Copy one checked virtual pointer/address relationship.
-    AddressSet,
-    /// Refresh the EIB clock fields and return one absolute-time value.
-    Asktime,
-    /// Refresh the implicit EIB date and time fields.
-    AsktimeEib,
-    /// Transform one absolute-time value into selected display/binary fields.
-    FormatTime,
-    /// Change the issuing task's dispatch priority and optionally yield.
-    ChangeTask,
-    /// Release one task-owned enqueue.
-    Deq,
-    /// Acquire one task-owned enqueue.
-    Enq,
-    /// Install or deactivate one bounded set of terminal AID handlers.
-    HandleAid,
-    /// Activate, cancel, or reactivate one abnormal-termination exit.
-    HandleAbend,
-    /// Install or deactivate one bounded set of reviewed condition handlers.
-    HandleCondition,
-    /// Ignore one bounded set of reviewed EIBRESP conditions.
-    IgnoreCondition,
-    /// Invoke one installed program at the next logical level and return.
-    Link,
-    /// Transfer to one installed program at the same logical level without returning.
-    Xctl,
-    /// Return from the current top-level task and optionally schedule its next transaction.
-    Return,
-    /// Position one default-key file browse without reading a record.
-    StartBrowse,
-    /// Read the next record in one default-key file browse.
-    ReadNext,
-    /// Read the previous record in one default-key file browse.
-    ReadPrev,
-    /// End one default-key file browse.
-    EndBrowse,
-    /// Restore one suspended HANDLE/IGNORE specification snapshot.
-    PopHandle,
-    /// Suspend the current HANDLE/IGNORE specifications in one nested snapshot.
-    PushHandle,
-    /// Read one file record.
-    Read,
-    /// Delete an explicitly identified or currently held file record.
-    Delete,
-    /// Write one explicitly keyed file record.
-    Write,
-    /// Write one bounded record to a transient data queue.
-    WriteTransientData,
-    /// Receive one mapped terminal input message.
-    ReceiveMap,
-    /// Send one mapped terminal output message.
-    SendMap,
-    /// Send one unmapped terminal text message.
-    SendText,
-    /// Rewrite the record held by the current update context.
-    Rewrite,
-    /// Commit or roll back the current unit of work.
-    Syncpoint,
-    /// Overwrite the originating task's bounded user correlator data.
-    SetAssociationUserCorrData,
-    /// Yield the issuing task once for redispatch.
-    Suspend,
-    /// Return one bounded set of task, terminal, and invocation context values.
-    Assign,
-    /// Discard the current full-BMS logical message, if one is being built.
-    PurgeMessage,
-}
-
 /// A resolved storage slot in the containing IR module.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct CicsStorageSlot {
@@ -137,65 +69,6 @@ pub struct CicsStorageSlot {
     pub storage: StorageId,
     /// Canonical qualified COBOL layout name used for cross-checking.
     pub qualified_layout_name: String,
-}
-
-/// Named input accepted by the typed CICS pilot.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum CicsOperandName {
-    /// Optional application transaction abend code.
-    Abcode,
-    /// Source label used by a task-local control transfer.
-    Label,
-    /// Program name selected for a program-control transfer.
-    Program,
-    /// `COMMAREA(...)` input-output data area.
-    Commarea,
-    /// `TRANSID(...)` next-transaction name.
-    TransId,
-    /// `FILE(...)` resource binding.
-    File,
-    /// `DATASET(...)` resource alias.
-    Dataset,
-    /// `FROM(...)` record bytes.
-    From,
-    /// `RIDFLD(...)` record identifier.
-    Ridfld,
-    /// `QUEUE(...)` transient-data destination.
-    Queue,
-    /// `MAP(...)` BMS map name.
-    Map,
-    /// `MAPSET(...)` BMS mapset name.
-    Mapset,
-    /// `RESOURCE(...)` enqueue identity.
-    Resource,
-    /// `LENGTH(...)` file-record or enqueue content-identity length.
-    Length,
-    /// `MAXLIFETIME(...)` dynamic CVDA value.
-    MaxLifetime,
-    /// `PRIORITY(...)` task dispatch value.
-    Priority,
-    /// `USERCORRDATA(...)` task association value.
-    UserCorrData,
-    /// `SET(ADDRESS OF data-area)` target.
-    SetAddress,
-    /// `SET(pointer-reference)` target.
-    SetPointer,
-    /// `USING(ADDRESS OF data-area)` source.
-    UsingAddress,
-    /// `USING(pointer-reference)` source.
-    UsingPointer,
-    /// Canonical EIBRESP condition specifications for HANDLE or IGNORE.
-    Conditions,
-    /// Canonical terminal AID handler specifications.
-    Aids,
-    /// `ABSTIME(...)` packed-decimal input.
-    Abstime,
-    /// Optional one-byte date separator.
-    DateSep,
-    /// Optional one-byte time separator.
-    TimeSep,
-    /// `KEYLENGTH(...)` file key length.
-    KeyLength,
 }
 
 /// Literal bytes or a runtime read from resolved storage.
@@ -219,77 +92,6 @@ pub struct CicsNamedOperand {
     /// Resolved literal or storage value.
     pub value: CicsOperandValue,
 }
-
-/// Flag option accepted by the typed CICS pilot.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum CicsPlanOption {
-    /// Ignore and clear active abnormal-termination exits.
-    Cancel,
-    /// Suppress transaction-dump creation.
-    NoDump,
-    /// Reactivate the most recently canceled abnormal-termination exit.
-    Reset,
-    /// Establish a read-for-update context.
-    Update,
-    /// Roll back rather than commit at syncpoint.
-    Rollback,
-    /// Suppress default condition handling.
-    NoHandle,
-    /// Keep an enqueue until task termination.
-    Task,
-    /// Keep an enqueue until the current unit of work ends.
-    Uow,
-    /// Return `ENQBUSY` rather than suspending for a contended resource.
-    NoSuspend,
-    /// Erase the terminal buffer before mapped output is displayed.
-    Erase,
-    /// Use symbolic map cursor positioning.
-    Cursor,
-    /// Use the default date separator.
-    DateSep,
-    /// Use the default time separator.
-    TimeSep,
-    /// Unlock the terminal keyboard after output.
-    FreeKb,
-    /// Start a file browse at the first key greater than or equal to RIDFLD.
-    Gteq,
-}
-
-/// Named result binding written after the host result arrives.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum CicsOutputName {
-    /// Record payload destination.
-    Into,
-    /// Returned browse record identifier.
-    Ridfld,
-    /// Returned communication-area destination.
-    Commarea,
-    /// Primary response code destination.
-    Resp,
-    /// Secondary response code destination.
-    Resp2,
-    /// `ABSTIME(...)` packed-decimal destination.
-    Abstime,
-    /// `MILLISECONDS(...)` fullword-binary destination.
-    Milliseconds,
-    /// `MMDDYY(...)` character destination.
-    Mmddyy,
-    /// `MMDDYYYY(...)` character destination.
-    Mmddyyyy,
-    /// `TIME(...)` character destination.
-    Time,
-    /// `YYDDD(...)` character destination.
-    Yyddd,
-    /// `YYMMDD(...)` character destination.
-    Yymmdd,
-    /// `YYYYMMDD(...)` character destination.
-    Yyyymmdd,
-    /// One source-reviewed `ASSIGN` output destination.
-    Assign(CicsAssignOutput),
-    /// Actual record length destination for `READ`.
-    Length,
-}
-
 /// One pre-resolved result binding.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CicsOutputBinding {
@@ -567,13 +369,7 @@ fn validate_operation_shape(
     ]
     .into_iter()
     .collect::<BTreeSet<_>>();
-    let scheduling_options = plan.options.iter().any(|option| match plan.operation {
-        CicsPlanOperation::FormatTime => !matches!(
-            option,
-            CicsPlanOption::NoHandle | CicsPlanOption::DateSep | CicsPlanOption::TimeSep
-        ),
-        _ => !matches!(option, CicsPlanOption::NoHandle),
-    });
+    let scheduling_options = option_shape::has_unsupported(plan);
     let unexpected_output = outputs
         .iter()
         .any(|output| !output_shape::allowed(plan.operation, *output));
@@ -704,6 +500,10 @@ fn validate_operation_shape(
         CicsPlanOperation::WriteTransientData => {
             queue_control::invalid_write_transient_data_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::DeleteTransientData => {
+            queue_control::invalid_delete_transient_data_shape(plan, inputs, outputs)
+        }
+        CicsPlanOperation::Getmain => storage_control::invalid_getmain_shape(plan, inputs, outputs),
         CicsPlanOperation::ReceiveMap
         | CicsPlanOperation::SendMap
         | CicsPlanOperation::SendText => terminal_control::invalid_shape(plan, inputs, outputs),
@@ -750,6 +550,12 @@ fn validate_operation_shape(
         CicsPlanOperation::PurgeMessage => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
+        CicsPlanOperation::Cancel
+        | CicsPlanOperation::Delay
+        | CicsPlanOperation::Start
+        | CicsPlanOperation::Retrieve => {
+            interval_control::invalid_shape(plan, inputs, outputs, scheduling_options)
+        }
     };
     if unexpected_output
         || malformed
@@ -761,7 +567,10 @@ fn validate_operation_shape(
     }
 }
 
-fn operand_value(plan: &CicsEffectPlan, name: CicsOperandName) -> Option<&CicsOperandValue> {
+pub(super) fn operand_value(
+    plan: &CicsEffectPlan,
+    name: CicsOperandName,
+) -> Option<&CicsOperandValue> {
     plan.operands
         .iter()
         .find(|operand| operand.name == name)
@@ -792,7 +601,10 @@ fn validate_condition(
     }
 }
 
-fn output_target(outputs: &[CicsOutputBinding], name: CicsOutputName) -> Option<&CicsStorageSlot> {
+pub(super) fn output_target(
+    outputs: &[CicsOutputBinding],
+    name: CicsOutputName,
+) -> Option<&CicsStorageSlot> {
     outputs
         .iter()
         .find(|output| output.name == name)
@@ -1246,6 +1058,7 @@ mod tests {
                 CicsPlanOption::FreeKb,
                 CicsPlanOption::DateSep,
                 CicsPlanOption::TimeSep,
+                CicsPlanOption::Wait,
             ] {
                 let mut invalid = base.clone();
                 invalid.options.insert(option);
@@ -1275,8 +1088,36 @@ mod tests {
         }
         assert_eq!(operand_tag(CicsOperandName::KeyLength), 26);
         assert_eq!(operand_from_tag(26), Ok(CicsOperandName::KeyLength));
+        assert_eq!(operand_tag(CicsOperandName::UserId), 32);
+        assert_eq!(operand_from_tag(32), Ok(CicsOperandName::UserId));
+        assert_eq!(operand_tag(CicsOperandName::Hours), 33);
+        assert_eq!(operand_from_tag(33), Ok(CicsOperandName::Hours));
+        assert_eq!(operand_tag(CicsOperandName::Minutes), 34);
+        assert_eq!(operand_from_tag(34), Ok(CicsOperandName::Minutes));
+        assert_eq!(operand_tag(CicsOperandName::Seconds), 35);
+        assert_eq!(operand_from_tag(35), Ok(CicsOperandName::Seconds));
+        assert_eq!(operand_tag(CicsOperandName::Milliseconds), 36);
+        assert_eq!(operand_from_tag(36), Ok(CicsOperandName::Milliseconds));
+        assert_eq!(operand_tag(CicsOperandName::DataLength), 37);
+        assert_eq!(operand_from_tag(37), Ok(CicsOperandName::DataLength));
         assert_eq!(output_tag(CicsOutputName::Length), 91);
         assert_eq!(output_from_tag(91), Ok(CicsOutputName::Length));
+        assert_eq!(output_tag(CicsOutputName::SetPointer), 95);
+        assert_eq!(output_from_tag(95), Ok(CicsOutputName::SetPointer));
+        assert_eq!(option_tag(CicsPlanOption::Protect), 16);
+        assert_eq!(option_from_tag(16), Ok(CicsPlanOption::Protect));
+        assert_eq!(option_tag(CicsPlanOption::Wait), 17);
+        assert_eq!(option_from_tag(17), Ok(CicsPlanOption::Wait));
+        assert_eq!(option_tag(CicsPlanOption::After), 18);
+        assert_eq!(option_from_tag(18), Ok(CicsPlanOption::After));
+        assert_eq!(option_tag(CicsPlanOption::At), 19);
+        assert_eq!(option_from_tag(19), Ok(CicsPlanOption::At));
+        assert_eq!(option_tag(CicsPlanOption::For), 20);
+        assert_eq!(option_from_tag(20), Ok(CicsPlanOption::For));
+        assert_eq!(option_tag(CicsPlanOption::Until), 21);
+        assert_eq!(option_from_tag(21), Ok(CicsPlanOption::Until));
+        assert_eq!(option_tag(CicsPlanOption::NoCheck), 22);
+        assert_eq!(option_from_tag(22), Ok(CicsPlanOption::NoCheck));
 
         let plan = read_plan();
         let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
@@ -1444,6 +1285,14 @@ mod tests {
                     name: CicsOperandName::Commarea,
                     value: CicsOperandValue::Storage(commarea.clone()),
                 },
+                CicsNamedOperand {
+                    name: CicsOperandName::Length,
+                    value: CicsOperandValue::LengthOf(commarea.clone()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::DataLength,
+                    value: CicsOperandValue::Integer(1),
+                },
             ],
             options: BTreeSet::new(),
             outputs: vec![CicsOutputBinding {
@@ -1458,11 +1307,20 @@ mod tests {
             encode_cics_effect_plan(&missing_link_output, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
-        let xctl = CicsEffectPlan {
+        let mut mismatched_link_length = link.clone();
+        mismatched_link_length.operands[2].value =
+            CicsOperandValue::LengthOf(slot(9, "REQUEST.OTHER"));
+        assert_eq!(
+            encode_cics_effect_plan(&mismatched_link_length, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut xctl = CicsEffectPlan {
             operation: CicsPlanOperation::Xctl,
             outputs: Vec::new(),
             ..link.clone()
         };
+        xctl.operands
+            .retain(|operand| operand.name != CicsOperandName::DataLength);
         let mut returning_xctl = xctl.clone();
         returning_xctl.outputs = link.outputs.clone();
         assert_eq!(
@@ -1723,12 +1581,80 @@ mod tests {
             decoded.operands[1].value,
             CicsOperandValue::Literal(ref bytes) if bytes == b"003"
         ));
-        assert_eq!(CICS_ASSIGN_OUTPUT_NAMES.len(), 78);
+        assert_eq!(CICS_ASSIGN_OUTPUT_NAMES.len(), 92);
         assert!(
-            CICS_ASSIGN_OUTPUT_NAMES
+            CICS_ASSIGN_OUTPUT_NAMES[..78]
                 .windows(2)
                 .all(|pair| pair[0] < pair[1])
         );
+        assert!(
+            CICS_ASSIGN_OUTPUT_NAMES[78..83]
+                .windows(2)
+                .all(|pair| pair[0] < pair[1])
+        );
+        assert!(
+            CICS_ASSIGN_OUTPUT_NAMES[83..85]
+                .windows(2)
+                .all(|pair| pair[0] < pair[1])
+        );
+        assert!(
+            CICS_ASSIGN_OUTPUT_NAMES[85..86]
+                .windows(2)
+                .all(|pair| pair[0] < pair[1])
+        );
+        assert!(
+            CICS_ASSIGN_OUTPUT_NAMES[86..87]
+                .windows(2)
+                .all(|pair| pair[0] < pair[1])
+        );
+        assert!(
+            CICS_ASSIGN_OUTPUT_NAMES[87..88]
+                .windows(2)
+                .all(|pair| pair[0] < pair[1])
+        );
+        assert!(
+            CICS_ASSIGN_OUTPUT_NAMES[88..89]
+                .windows(2)
+                .all(|pair| pair[0] < pair[1])
+        );
+        assert!(
+            CICS_ASSIGN_OUTPUT_NAMES[89..91]
+                .windows(2)
+                .all(|pair| pair[0] < pair[1])
+        );
+        assert!(
+            CICS_ASSIGN_OUTPUT_NAMES[91..]
+                .windows(2)
+                .all(|pair| pair[0] < pair[1])
+        );
+        assert_eq!(
+            CICS_ASSIGN_OUTPUT_NAMES
+                .iter()
+                .copied()
+                .collect::<BTreeSet<_>>()
+                .len(),
+            CICS_ASSIGN_OUTPUT_NAMES.len()
+        );
+        for (name, tag) in [
+            ("DESTCOUNT", 96),
+            ("LDCMNEM", 97),
+            ("LDCNUM", 98),
+            ("PAGENUM", 99),
+            ("PARTNPAGE", 100),
+            ("RETURNPROG", 101),
+            ("TERMPRIORITY", 102),
+            ("LANGINUSE", 103),
+            ("INPUTMSGLEN", 104),
+            ("INVOKINGPROG", 105),
+            ("INPARTN", 106),
+            ("FACILITY", 107),
+            ("NETNAME", 108),
+            ("TNADDR", 109),
+        ] {
+            let output = CicsAssignOutput::from_name(name).unwrap();
+            assert_eq!(output_tag(CicsOutputName::Assign(output)), tag);
+            assert_eq!(output_from_tag(tag), Ok(CicsOutputName::Assign(output)));
+        }
         for name in CICS_ASSIGN_OUTPUT_NAMES {
             let output = CicsAssignOutput::from_name(name).expect("canonical ASSIGN output");
             assert_eq!(output.name(), *name);
@@ -2023,6 +1949,45 @@ mod tests {
     }
 
     #[test]
+    fn getmain_requires_flength_and_one_set_pointer_output() {
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Getmain,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::Flength,
+                    value: CicsOperandValue::Integer(16),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::InitImage,
+                    value: CicsOperandValue::Storage(slot(1, "INIT-X")),
+                },
+            ],
+            options: BTreeSet::from([CicsPlanOption::NoSuspend]),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::SetPointer,
+                target: slot(2, "PTR-X"),
+            }],
+            condition: CicsCondition::Default,
+        };
+        let limits = CicsPlanLimits::default();
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
+
+        let mut missing_set = plan.clone();
+        missing_set.outputs.clear();
+        assert_eq!(
+            encode_cics_effect_plan(&missing_set, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut literal_image = plan;
+        literal_image.operands[1].value = CicsOperandValue::Literal(vec![b'Z']);
+        assert_eq!(
+            encode_cics_effect_plan(&literal_image, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
     fn shape_duplicates_versions_and_trailing_data_fail_closed() {
         let limits = CicsPlanLimits::default();
         let mut duplicate = read_plan();
@@ -2075,6 +2040,193 @@ mod tests {
             .outputs
             .retain(|output| output.name != CicsOutputName::Resp);
         assert!(encode_cics_effect_plan(&bad_response, limits).is_err());
+    }
+
+    #[test]
+    fn retrieve_set_requires_a_pointer_output_and_length_without_an_input_maximum() {
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Retrieve,
+            operands: Vec::new(),
+            options: BTreeSet::new(),
+            outputs: vec![
+                CicsOutputBinding {
+                    name: CicsOutputName::SetPointer,
+                    target: slot(1, "RESULT.POINTER"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::Length,
+                    target: slot(2, "RESULT.LENGTH"),
+                },
+            ],
+            condition: CicsCondition::Default,
+        };
+        let limits = CicsPlanLimits::default();
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
+
+        let mut with_input_maximum = plan.clone();
+        with_input_maximum.operands.push(CicsNamedOperand {
+            name: CicsOperandName::Length,
+            value: CicsOperandValue::Storage(slot(2, "RESULT.LENGTH")),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&with_input_maximum, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut both_destinations = plan;
+        both_destinations.outputs.push(CicsOutputBinding {
+            name: CicsOutputName::Into,
+            target: slot(3, "RESULT.DATA"),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&both_destinations, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn retrieve_wait_round_trips_only_on_the_retrieve_shape() {
+        let mut plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Retrieve,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::Length,
+                value: CicsOperandValue::Storage(slot(1, "RESULT.LENGTH")),
+            }],
+            options: BTreeSet::from([CicsPlanOption::Wait]),
+            outputs: vec![
+                CicsOutputBinding {
+                    name: CicsOutputName::Into,
+                    target: slot(2, "RESULT.DATA"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::Length,
+                    target: slot(1, "RESULT.LENGTH"),
+                },
+            ],
+            condition: CicsCondition::Default,
+        };
+        let limits = CicsPlanLimits::default();
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
+
+        plan.operation = CicsPlanOperation::Read;
+        assert_eq!(
+            encode_cics_effect_plan(&plan, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn delay_explicit_units_require_exactly_one_for_or_until_mode() {
+        let mut plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Delay,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::Minutes,
+                    value: CicsOperandValue::Storage(slot(1, "DELAY.MINUTES")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Seconds,
+                    value: CicsOperandValue::Integer(3),
+                },
+            ],
+            options: BTreeSet::from([CicsPlanOption::For]),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let limits = CicsPlanLimits::default();
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
+
+        plan.options.insert(CicsPlanOption::Until);
+        assert_eq!(
+            encode_cics_effect_plan(&plan, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        plan.options.clear();
+        assert_eq!(
+            encode_cics_effect_plan(&plan, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+
+        plan.operands = vec![CicsNamedOperand {
+            name: CicsOperandName::StartTime,
+            value: CicsOperandValue::Storage(slot(2, "DELAY.TIME")),
+        }];
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
+
+        plan.operands = vec![CicsNamedOperand {
+            name: CicsOperandName::Milliseconds,
+            value: CicsOperandValue::Storage(slot(3, "DELAY.MILLISECONDS")),
+        }];
+        plan.options.insert(CicsPlanOption::For);
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
+        plan.options = BTreeSet::from([CicsPlanOption::Until]);
+        assert_eq!(
+            encode_cics_effect_plan(&plan, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn start_plan_allows_runtime_generated_request_identity() {
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Start,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::TransId,
+                    value: CicsOperandValue::Literal(b"NEXT".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::From,
+                    value: CicsOperandValue::Storage(slot(1, "REQUEST.DATA")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::UserId,
+                    value: CicsOperandValue::Literal(b"TARGET".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Minutes,
+                    value: CicsOperandValue::Storage(slot(2, "REQUEST.MINUTES")),
+                },
+            ],
+            options: BTreeSet::from([CicsPlanOption::Protect, CicsPlanOption::After]),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let limits = CicsPlanLimits::default();
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
+
+        let mut no_data = plan.clone();
+        no_data
+            .operands
+            .retain(|operand| operand.name != CicsOperandName::From);
+        let bytes = encode_cics_effect_plan(&no_data, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), no_data);
+        let mut invalid_length = no_data;
+        invalid_length.operands.push(CicsNamedOperand {
+            name: CicsOperandName::Length,
+            value: CicsOperandValue::Integer(1),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&invalid_length, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+
+        let mut invalid_user = plan;
+        invalid_user
+            .operands
+            .iter_mut()
+            .find(|operand| operand.name == CicsOperandName::UserId)
+            .unwrap()
+            .value = CicsOperandValue::Integer(1);
+        assert_eq!(
+            encode_cics_effect_plan(&invalid_user, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
     }
 
     proptest! {

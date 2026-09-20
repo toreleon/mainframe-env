@@ -240,6 +240,21 @@ selects that exact leading byte count and raises LENGERR before mutation when
 it exceeds the captured area. The persisted prefix and mutation identity drive
 idempotent replay, and normal completion updates EIBFN to `0802`. Remote SYSID
 and unavailable queue-definition state remain outside this typed subset.
+Typed local DELETEQ TD captures the same bounded QUEUE name, requires update
+authorization for that queue resource, and atomically removes its durable
+records and retained-byte accounting. A missing queue returns QIDERR 44/0;
+remote SYSID and definition-driven extrapartition, disabled, or locked states
+remain outside this typed subset.
+
+Typed local GETMAIN requires SET plus a literal or fullword-binary FLENGTH and
+optionally accepts one character INITIMG and NOSUSPEND. The interpreter reports
+its bounded frame/byte capacity, receives initialized bytes through the typed
+host result, allocates one checkpointed virtual base, and writes only the
+checked virtual address to POINTER or POINTER-32 storage. Nonpositive or
+over-limit FLENGTH returns LENGERR 22/1 and clears SET; unavailable capacity
+returns NOSTG 42/2, which is ignored by default. Native addresses, legacy LENGTH, storage keys,
+SHARED/EXECUTABLE policy, GETMAIN64, and release semantics remain outside this
+subset.
 
 CICS PUSH HANDLE moves the current condition mappings, ignored-condition set,
 and active/canceled typed ABEND exits into one bounded task-local frame, leaving a

@@ -85,6 +85,8 @@ EXPECTED_FAMILIES = {
     "file-control": "FileControl",
     "queue-control": "QueueControl",
     "recovery": "Recovery",
+    "interval-control": "IntervalControl",
+    "storage-control": "StorageControl",
 }
 EXPECTED_RUNTIME_OPERATIONS = [
     ("Abend", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0001"),
@@ -92,12 +94,22 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("AsktimeEib", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0009"),
     ("Asktime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0010"),
     ("Assign", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0011"),
+    ("Cancel", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0016"),
     ("ChangeTask", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0022"),
+    ("Delay", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0039"),
     ("Delete", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0040"),
+    (
+        "DeleteTransientData",
+        "api",
+        "queue-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0048",
+    ),
     ("Deq", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0050"),
     ("EndBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0058"),
     ("Enq", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0064"),
     ("FormatTime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0080"),
+    ("Getmain", "api", "storage-control", True, f"{OFFICIAL_BASELINE}:api-commands:0094"),
     ("HandleAbend", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0097"),
     ("HandleAid", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0098"),
     ("HandleCondition", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0099"),
@@ -123,7 +135,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("ReadNext", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0157"),
     ("ReadPrev", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0158"),
     ("ReceiveMap", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0163"),
-    ("Retrieve", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0175"),
+    ("Retrieve", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0175"),
     ("Return", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0178"),
     ("Rewrite", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0181"),
     ("SendMap", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0189"),
@@ -142,6 +154,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
         True,
         f"{OFFICIAL_BASELINE}:spi-commands-unique:0224",
     ),
+    ("Start", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0205"),
     ("StartBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0208"),
     ("Suspend", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0214"),
     ("Syncpoint", "api", "recovery", True, f"{OFFICIAL_BASELINE}:api-commands:0218"),
@@ -359,13 +372,16 @@ POLICY_BINDINGS = {
 TYPED_RUNTIME_OPERATIONS = frozenset(
     {
         "Abend",
+        "Cancel",
         "ChangeTask",
+        "Delay",
         "AddressSet",
         "Asktime",
         "AsktimeEib",
         "Deq",
         "Enq",
         "FormatTime",
+        "Getmain",
         "HandleAbend",
         "HandleAid",
         "HandleCondition",
@@ -380,6 +396,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Delete",
         "Write",
         "WriteTransientData",
+        "DeleteTransientData",
         "ReceiveMap",
         "SendMap",
         "SendText",
@@ -392,6 +409,8 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "SetAssociationUserCorrData",
         "Suspend",
         "Syncpoint",
+        "Start",
+        "Retrieve",
     }
 )
 ENQUEUE_COMMAND_ROWS = frozenset(
@@ -508,6 +527,12 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "WriteTransientData": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
+    "DeleteTransientData": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "Getmain": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
     "ReceiveMap": frozenset(
         {
             "memory-read",
@@ -526,6 +551,8 @@ TYPED_RUNTIME_IR_EFFECTS = {
     ),
     "Assign": frozenset({"memory-write", "condition", "transaction"}),
     "PurgeMessage": frozenset({"memory-write", "condition", "transaction"}),
+    "Cancel": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
+    "Delay": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
     "PopHandle": frozenset({"memory-write", "condition"}),
     "PushHandle": frozenset({"memory-write", "condition"}),
     "Read": frozenset(
@@ -539,6 +566,10 @@ TYPED_RUNTIME_IR_EFFECTS = {
         {"memory-read", "memory-write", "condition"}
     ),
     "Suspend": frozenset({"memory-write", "suspension", "condition"}),
+    "Start": frozenset(
+        {"memory-read", "memory-write", "clock", "condition", "transaction"}
+    ),
+    "Retrieve": frozenset({"memory-write", "condition", "transaction"}),
 }
 
 
@@ -729,15 +760,20 @@ def _load_typed_execution_registrations(
     if [row["operation"] for row in normalized] != [
         "AddressSet",
         "AsktimeEib",
+        "Cancel",
         "ChangeTask",
+        "Delay",
+        "DeleteTransientData",
         "Deq",
         "Enq",
+        "Getmain",
         "HandleAid",
         "IgnoreCondition",
         "PopHandle",
         "PurgeMessage",
         "PushHandle",
         "SetAssociationUserCorrData",
+        "Start",
         "Suspend",
     ]:
         raise DescriptorError(f"{path} registration identities or order differ")
@@ -1031,6 +1067,8 @@ def load_catalog(
                 "ChangeTask",
                 "AddressSet",
                 "AsktimeEib",
+                "Cancel",
+                "Delay",
                 "Deq",
                 "Enq",
                 "HandleAid",
@@ -1039,6 +1077,7 @@ def load_catalog(
                 "PurgeMessage",
                 "PushHandle",
                 "SetAssociationUserCorrData",
+                "Start",
                 "Suspend",
             }
         ]
@@ -3343,8 +3382,8 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
         for row in catalog["_runtime_operations"]
         if row["interface"] == "api"
     }
-    if len(existing_runtime) != 35:
-        raise DescriptorError("CICS application runtime set must remain exactly 35 rows")
+    if len(existing_runtime) != 40:
+        raise DescriptorError("CICS application runtime set must remain exactly 40 rows")
 
     loaded_batches = []
     for batch_id, start, end, projection_path, review_path in CONTRACT_BATCHES:
@@ -3598,12 +3637,12 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
     if (
         len(registry_rows) != 263
         or len(set(handler_ids)) != 263
-        or len(typed_rows) != 34
-        or len(legacy_rows) != 1
+        or len(typed_rows) != 40
+        or len(legacy_rows) != 0
         or {row["runtime_operation"] for row in typed_rows}
         != TYPED_RUNTIME_OPERATIONS
-        or len(advertised_rows) != 35
-        or len(unready_rows) != 228
+        or len(advertised_rows) != 40
+        or len(unready_rows) != 223
         or any(row["unready_result"] != "explicit-unsupported" for row in unready_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in typed_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in legacy_rows)

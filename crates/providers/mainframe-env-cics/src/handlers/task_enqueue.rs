@@ -101,7 +101,7 @@ pub(super) fn invoke(
     let models = models.values().cloned().collect::<Vec<_>>();
     let identity = request_identity(request, run, &models)?;
     if identity.disabled && request.operation == CicsOperation::Enq {
-        release_task(service, run)?;
+        super::release_task_state(service, run)?;
         return service.response(
             run,
             CicsDisposition::Abended,

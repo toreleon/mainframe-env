@@ -152,6 +152,9 @@ pub enum HirCicsOperation {
     Asktime,
     AsktimeEib,
     FormatTime,
+    Getmain,
+    Cancel,
+    Delay,
     ChangeTask,
     Deq,
     Enq,
@@ -169,6 +172,7 @@ pub enum HirCicsOperation {
     Delete,
     Write,
     WriteTransientData,
+    DeleteTransientData,
     ReceiveMap,
     SendMap,
     SendText,
@@ -181,6 +185,8 @@ pub enum HirCicsOperation {
     SetAssociationUserCorrData,
     Syncpoint,
     Suspend,
+    Start,
+    Retrieve,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -190,6 +196,9 @@ pub enum HirCicsOperandName {
     Program,
     Commarea,
     TransId,
+    TermId,
+    ReturnTransId,
+    ReturnTermId,
     File,
     Dataset,
     From,
@@ -214,6 +223,17 @@ pub enum HirCicsOperandName {
     DateSep,
     TimeSep,
     KeyLength,
+    ReqId,
+    Interval,
+    StartTime,
+    UserId,
+    Hours,
+    Minutes,
+    Seconds,
+    Milliseconds,
+    DataLength,
+    Flength,
+    InitImage,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -247,6 +267,14 @@ pub enum HirCicsOption {
     TimeSep,
     FreeKb,
     Gteq,
+    Fmh,
+    Protect,
+    Wait,
+    After,
+    At,
+    For,
+    Until,
+    NoCheck,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -254,6 +282,7 @@ pub enum HirCicsOutputName {
     Abstime,
     Commarea,
     Into,
+    SetPointer,
     Ridfld,
     Milliseconds,
     Mmddyy,
@@ -266,6 +295,9 @@ pub enum HirCicsOutputName {
     Yyyymmdd,
     Assign(CicsAssignOutput),
     Length,
+    ReturnTransId,
+    ReturnTermId,
+    Queue,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2300,7 +2332,7 @@ mod tests {
                 .any(|output| output.name == HirCicsOutputName::Commarea)
         );
 
-        for clause in ["CHANNEL('DATA')", "LENGTH(16)", "INPUTMSG(AREA-X)"] {
+        for clause in ["CHANNEL('DATA')", "INPUTMSG(AREA-X)"] {
             let deferred = analyze(&format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. LATERXCT. DATA DIVISION. WORKING-STORAGE SECTION. 01 AREA-X PIC X(16). PROCEDURE DIVISION. EXEC CICS XCTL PROGRAM('CHILD') {clause} END-EXEC. STOP RUN."
             ));
@@ -2380,7 +2412,6 @@ mod tests {
                 .contains("TRANSID requires a 1-4 character name")
         }));
         for option in [
-            "LENGTH(8)",
             "CHANNEL('DATA')",
             "INPUTMSG(AREA-X)",
             "IMMEDIATE",
@@ -2428,6 +2459,66 @@ mod tests {
             (&commarea.value, &length.value),
             (HirCicsValue::Data(area), HirCicsValue::LengthOf(length)) if area == length
         ));
+    }
+
+    #[test]
+    fn cics_program_transfers_resolve_literal_dynamic_and_length_of_commareas() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. XLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 AREA-X PIC X(8). 01 LENGTH-X PIC S9(4) COMP VALUE 4. PROCEDURE DIVISION. EXEC CICS LINK PROGRAM('CHILD') COMMAREA(AREA-X) LENGTH(3) DATALENGTH(2) END-EXEC. EXEC CICS XCTL PROGRAM('CHILD') COMMAREA(AREA-X) LENGTH(LENGTH-X) END-EXEC. EXEC CICS RETURN TRANSID('NEXT') COMMAREA(AREA-X) LENGTH(LENGTH OF AREA-X) END-EXEC.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("program LENGTH: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 3);
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length && operand.value == HirCicsValue::Integer(3)
+        }));
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::DataLength
+                && operand.value == HirCicsValue::Integer(2)
+        }));
+        assert!(commands[1].operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::Length,
+                    value: HirCicsValue::Data(reference),
+                } if reference.qualified_name == "LENGTH-X"
+            )
+        }));
+        assert!(commands[2].operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::Length,
+                    value: HirCicsValue::LengthOf(reference),
+                } if reference.qualified_name == "AREA-X"
+            )
+        }));
+
+        for command in ["LINK PROGRAM('CHILD')", "XCTL PROGRAM('CHILD')"] {
+            let invalid = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADLEN. PROCEDURE DIVISION. EXEC CICS {command} LENGTH(1) END-EXEC."
+            ));
+            assert!(invalid.hir.is_none(), "{command}");
+        }
+        for clauses in [
+            "PROGRAM('CHILD') DATALENGTH(1)",
+            "PROGRAM('CHILD') COMMAREA(AREA-X) DATALENGTH(1)",
+        ] {
+            let invalid = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADDATA. DATA DIVISION. WORKING-STORAGE SECTION. 01 AREA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS LINK {clauses} END-EXEC."
+            ));
+            assert!(invalid.hir.is_none(), "{clauses}");
+        }
     }
 
     #[test]
@@ -2674,6 +2765,26 @@ mod tests {
             operand.name == HirCicsOperandName::Length && operand.value == HirCicsValue::Integer(3)
         }));
 
+        let deleted = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTDQD. PROCEDURE DIVISION. EXEC CICS DELETEQ TD QUEUE('OUTQ') END-EXEC. STOP RUN.",
+        );
+        let deleted = deleted
+            .hir
+            .unwrap_or_else(|| panic!("DELETEQ TD: {:?}", deleted.diagnostics));
+        let deleted = deleted
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed DELETEQ TD");
+        assert_eq!(deleted.operation, HirCicsOperation::DeleteTransientData);
+        assert!(deleted.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Queue
+                && operand.value == HirCicsValue::Literal("OUTQ".into())
+        }));
+
         let length_of = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTDQL. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(6). PROCEDURE DIVISION. EXEC CICS WRITEQ TD QUEUE('OUTQ') FROM(DATA-X) LENGTH(LENGTH OF DATA-X) END-EXEC. STOP RUN.",
         );
@@ -2721,6 +2832,62 @@ mod tests {
                 "{command}: {:?}",
                 analysis.diagnostics
             );
+        }
+        let remote = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTDQR. PROCEDURE DIVISION. EXEC CICS DELETEQ TD QUEUE('OUTQ') SYSID('R001') END-EXEC. STOP RUN.",
+        );
+        assert!(remote.hir.is_none());
+        assert!(remote.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("typed lowering is unready for SYSID")
+        }));
+    }
+
+    #[test]
+    fn cics_getmain_resolves_bounded_task_local_storage() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. 01 LEN-X PIC S9(9) COMP VALUE 4. 01 INIT-X PIC X VALUE 'Z'. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) FLENGTH(LEN-X) INITIMG(INIT-X) NOSUSPEND RESP(RESP-X) END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("GETMAIN: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed GETMAIN");
+        assert_eq!(command.operation, HirCicsOperation::Getmain);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Flength
+                && matches!(
+                    &operand.value,
+                    HirCicsValue::Data(reference) if reference.qualified_name == "LEN-X"
+                )
+        }));
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::InitImage
+                && matches!(
+                    &operand.value,
+                    HirCicsValue::Data(reference) if reference.qualified_name == "INIT-X"
+                )
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::SetPointer && output.target.qualified_name == "PTR-X"
+        }));
+        assert!(command.options.contains(&HirCicsOption::NoSuspend));
+
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) LENGTH(4) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. 01 LEN-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) FLENGTH(LEN-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X PIC X(4). PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) FLENGTH(4) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) FLENGTH(2147483648) END-EXEC. STOP RUN.",
+        ] {
+            let analysis = analyze(source);
+            assert!(analysis.hir.is_none(), "{source}");
         }
     }
 
@@ -3157,6 +3324,427 @@ mod tests {
     }
 
     #[test]
+    fn cics_start_and_retrieve_lower_the_bounded_local_data_route() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. INTERVAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(16) VALUE 'PAYLOAD'. 01 LENGTH-X PIC S9(4) COMP VALUE 7. 01 WHEN-X PIC S9(6) COMP-3 VALUE 0. 01 USER-X PIC X(8) VALUE 'TARGET'. 01 RTRANS-X PIC X(4). 01 RTERM-X PIC X(4). 01 QUEUE-X PIC X(8). 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') REQID('REQ0001') FROM(DATA-X) LENGTH(LENGTH-X) INTERVAL(WHEN-X) RTRANSID('BACK') RTERMID('T001') QUEUE('WORKQ') USERID(USER-X) FMH PROTECT RESP(RESP-X) RESP2(RESP2-X) END-EXEC. EXEC CICS RETRIEVE INTO(DATA-X) LENGTH(LENGTH-X) RTRANSID(RTRANS-X) RTERMID(RTERM-X) QUEUE(QUEUE-X) WAIT RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("START/RETRIEVE: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 2);
+        assert_eq!(commands[0].operation, HirCicsOperation::Start);
+        assert_eq!(commands[1].operation, HirCicsOperation::Retrieve);
+        assert!(commands[0].options.contains(&HirCicsOption::Fmh));
+        assert!(commands[0].options.contains(&HirCicsOption::Protect));
+        assert!(commands[1].options.contains(&HirCicsOption::Wait));
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::ReqId
+                && operand.value == HirCicsValue::Literal("REQ0001".into())
+        }));
+        for name in [
+            HirCicsOperandName::ReturnTransId,
+            HirCicsOperandName::ReturnTermId,
+            HirCicsOperandName::Queue,
+            HirCicsOperandName::UserId,
+        ] {
+            assert!(
+                commands[0]
+                    .operands
+                    .iter()
+                    .any(|operand| operand.name == name)
+            );
+        }
+        assert!(commands[0].operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::UserId,
+                    value: HirCicsValue::Data(reference),
+                } if reference.qualified_name == "USER-X"
+            )
+        }));
+        assert!(commands[0].operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::Interval,
+                    value: HirCicsValue::Data(reference),
+                } if reference.qualified_name == "WHEN-X"
+            )
+        }));
+        assert!(
+            commands[1]
+                .outputs
+                .iter()
+                .any(|output| output.name == HirCicsOutputName::Into)
+        );
+        assert!(
+            commands[1]
+                .outputs
+                .iter()
+                .any(|output| output.name == HirCicsOutputName::Length)
+        );
+        for name in [
+            HirCicsOutputName::ReturnTransId,
+            HirCicsOutputName::ReturnTermId,
+            HirCicsOutputName::Queue,
+        ] {
+            assert!(commands[1].outputs.iter().any(|output| output.name == name));
+        }
+
+        let terminal = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. LATER. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') REQID('REQ0002') FROM(DATA-X) TERMID('T001') END-EXEC. STOP RUN.",
+        )
+        .hir
+        .expect("START TERMID must lower");
+        assert!(terminal.statements.iter().any(|statement| matches!(
+            statement.resolved.as_ref(),
+            Some(HirResolvedStatement::Cics(HirCicsStatement { operands, .. }))
+                if operands.iter().any(|operand| operand.name == HirCicsOperandName::TermId)
+        )));
+    }
+
+    #[test]
+    fn cics_start_after_and_at_preserve_literal_and_dynamic_unit_forms() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. STARTUNIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8) VALUE 'PAYLOAD'. 01 TIME-X PIC S9(9) COMP VALUE 1. PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') REQID('AFTER001') FROM(DATA-X) AFTER HOURS(1) SECONDS(3) END-EXEC. EXEC CICS START TRANSID('NEXT') REQID('AT000001') FROM(DATA-X) AT MINUTES(62) END-EXEC. EXEC CICS START TRANSID('NEXT') REQID('DYN00001') FROM(DATA-X) AFTER MINUTES(TIME-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("START units: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 3);
+        assert!(commands[0].options.contains(&HirCicsOption::After));
+        assert!(commands[1].options.contains(&HirCicsOption::At));
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Hours && operand.value == HirCicsValue::Integer(1)
+        }));
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Seconds && operand.value == HirCicsValue::Integer(3)
+        }));
+        assert!(commands[1].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Minutes
+                && operand.value == HirCicsValue::Integer(62)
+        }));
+        assert!(commands[2].operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::Minutes,
+                    value: HirCicsValue::Data(reference),
+                } if reference.qualified_name == "TIME-X"
+            )
+        }));
+
+        for invalid in [
+            "AFTER",
+            "HOURS(1)",
+            "AFTER AT HOURS(1)",
+            "INTERVAL(1) AFTER HOURS(1)",
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADUNIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). 01 TIME-X PIC S9(9) COMP VALUE 1. PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') FROM(DATA-X) {invalid} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{invalid}");
+        }
+        let out_of_range = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. RANGEERR. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') FROM(DATA-X) AFTER HOURS(100) END-EXEC. STOP RUN.",
+        );
+        assert!(
+            out_of_range.hir.is_some(),
+            "out-of-range values are runtime conditions"
+        );
+    }
+
+    #[test]
+    fn cics_retrieve_set_requires_a_pointer_and_has_output_only_length() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. RETSET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. 01 LENGTH-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS RETRIEVE SET(PTR-X) LENGTH(LENGTH-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("RETRIEVE SET: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed RETRIEVE SET");
+        assert_eq!(command.operation, HirCicsOperation::Retrieve);
+        assert!(command.operands.is_empty());
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::SetPointer && output.target.qualified_name == "PTR-X"
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::Length && output.target.qualified_name == "LENGTH-X"
+        }));
+
+        for invalid in [
+            "SET(DATA-X) LENGTH(LENGTH-X)",
+            "INTO(DATA-X) SET(PTR-X) LENGTH(LENGTH-X)",
+            "SET(PTR-X)",
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADSET. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). 01 PTR-X POINTER. 01 LENGTH-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS RETRIEVE {invalid} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{invalid}");
+        }
+    }
+
+    #[test]
+    fn cics_start_may_defer_request_identity_generation_to_runtime() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. GENREQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8) VALUE 'PAYLOAD'. PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') FROM(DATA-X) PROTECT NOCHECK END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("generated START REQID: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed START");
+        assert_eq!(command.operation, HirCicsOperation::Start);
+        assert!(command.options.contains(&HirCicsOption::Protect));
+        assert!(command.options.contains(&HirCicsOption::NoCheck));
+        assert!(
+            command
+                .operands
+                .iter()
+                .all(|operand| operand.name != HirCicsOperandName::ReqId)
+        );
+    }
+
+    #[test]
+    fn cics_start_without_data_keeps_from_optional_and_rejects_dependent_options() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. NODATA. PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') REQID('NODATA01') AFTER SECONDS(0) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("no-data START: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed START");
+        assert_eq!(command.operation, HirCicsOperation::Start);
+        assert!(command.options.contains(&HirCicsOption::After));
+        assert!(command.operands.iter().all(|operand| {
+            !matches!(
+                operand.name,
+                HirCicsOperandName::From | HirCicsOperandName::Length
+            )
+        }));
+
+        for invalid in ["LENGTH(1)", "FMH"] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADNODAT. PROCEDURE DIVISION. EXEC CICS START TRANSID('NEXT') {invalid} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{invalid}");
+        }
+    }
+
+    #[test]
+    fn cics_cancel_lowers_only_the_bounded_local_start_form() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CANCELL. DATA DIVISION. WORKING-STORAGE SECTION. 01 REQ-X PIC X(8) VALUE 'REQ0001'. 01 TRANS-X PIC X(4) VALUE 'NEXT'. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS CANCEL REQID(REQ-X) TRANSID(TRANS-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("CANCEL: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed CANCEL");
+        assert_eq!(command.operation, HirCicsOperation::Cancel);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::ReqId
+                && matches!(
+                    &operand.value,
+                    HirCicsValue::Data(reference) if reference.qualified_name == "REQ-X"
+                )
+        }));
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::TransId
+                && matches!(
+                    &operand.value,
+                    HirCicsValue::Data(reference) if reference.qualified_name == "TRANS-X"
+                )
+        }));
+
+        for command in [
+            "CANCEL TRANSID('NEXT')",
+            "CANCEL REQID('REQ0001') SYSID('R001')",
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CANBAD. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
+        }
+    }
+
+    #[test]
+    fn cics_delay_lowers_literal_intervals_and_bounded_names() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELAY0. DATA DIVISION. WORKING-STORAGE SECTION. 01 REQ-X PIC X(8) VALUE 'WAIT0002'. 01 WHEN-X PIC S9(6) COMP-3 VALUE 1. PROCEDURE DIVISION. EXEC CICS DELAY END-EXEC. EXEC CICS DELAY INTERVAL(0) END-EXEC. EXEC CICS DELAY INTERVAL(1) END-EXEC. EXEC CICS DELAY INTERVAL(2) REQID('WAIT0001') END-EXEC. EXEC CICS DELAY INTERVAL(3) REQID(REQ-X) END-EXEC. EXEC CICS DELAY INTERVAL(WHEN-X) REQID('WAIT0003') END-EXEC. EXEC CICS DELAY INTERVAL(60) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("DELAY zero: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 7);
+        assert!(
+            commands
+                .iter()
+                .all(|command| command.operation == HirCicsOperation::Delay)
+        );
+        assert!(commands[0].operands.is_empty());
+        assert_eq!(
+            commands[1].operands,
+            [HirCicsNamedOperand {
+                name: HirCicsOperandName::Interval,
+                value: HirCicsValue::Integer(0),
+            }]
+        );
+        assert_eq!(
+            commands[2].operands,
+            [HirCicsNamedOperand {
+                name: HirCicsOperandName::Interval,
+                value: HirCicsValue::Integer(1),
+            }]
+        );
+        for (command, expected) in [(&commands[3], "WAIT0001"), (&commands[4], "REQ-X")] {
+            assert!(command.operands.iter().any(|operand| {
+                operand.name == HirCicsOperandName::ReqId
+                    && match &operand.value {
+                        HirCicsValue::Literal(value) => value == expected,
+                        HirCicsValue::Data(reference) => reference.qualified_name == expected,
+                        _ => false,
+                    }
+            }));
+        }
+        assert!(commands[5].operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::Interval,
+                    value: HirCicsValue::Data(reference),
+                } if reference.qualified_name == "WHEN-X"
+            )
+        }));
+        assert!(commands[6].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Interval
+                && operand.value == HirCicsValue::Integer(60)
+        }));
+
+        for command in [
+            "DELAY FOR",
+            "DELAY HOURS(1)",
+            "DELAY FOR UNTIL HOURS(1)",
+            "DELAY INTERVAL(1) FOR HOURS(1)",
+            "DELAY REQID('WAIT0001')",
+            "DELAY INTERVAL(0) REQID('WAIT0001')",
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. DELBAD. DATA DIVISION. WORKING-STORAGE SECTION. 01 WHEN-X PIC S9(6) COMP-3 VALUE 0. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
+        }
+    }
+
+    #[test]
+    fn cics_delay_for_until_preserve_literal_and_dynamic_units() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELUNIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 TIME-X PIC S9(9) COMP VALUE 3. 01 CLOCK-X PIC S9(6) COMP-3 VALUE 130000. 01 MS-X PIC S9(9) COMP VALUE 250. PROCEDURE DIVISION. EXEC CICS DELAY FOR HOURS(1) SECONDS(TIME-X) END-EXEC. EXEC CICS DELAY UNTIL MINUTES(759) REQID('UNTIL001') END-EXEC. EXEC CICS DELAY TIME(124500) END-EXEC. EXEC CICS DELAY TIME(CLOCK-X) REQID('CLOCK001') END-EXEC. EXEC CICS DELAY FOR MILLISECS(MS-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("DELAY units: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 5);
+        assert!(commands[0].options.contains(&HirCicsOption::For));
+        assert!(commands[1].options.contains(&HirCicsOption::Until));
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Hours && operand.value == HirCicsValue::Integer(1)
+        }));
+        assert!(commands[0].operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::Seconds,
+                    value: HirCicsValue::Data(reference),
+                } if reference.qualified_name == "TIME-X"
+            )
+        }));
+        assert!(commands[1].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Minutes
+                && operand.value == HirCicsValue::Integer(759)
+        }));
+        assert!(commands[2].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::StartTime
+                && operand.value == HirCicsValue::Integer(124_500)
+        }));
+        assert!(commands[3].operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::StartTime,
+                    value: HirCicsValue::Data(reference),
+                } if reference.qualified_name == "CLOCK-X"
+            )
+        }));
+        assert!(commands[4].options.contains(&HirCicsOption::For));
+        assert!(commands[4].operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::Milliseconds,
+                    value: HirCicsValue::Data(reference),
+                } if reference.qualified_name == "MS-X"
+            )
+        }));
+
+        let invalid = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADMS. PROCEDURE DIVISION. EXEC CICS DELAY UNTIL MILLISECS(1) END-EXEC. STOP RUN.",
+        );
+        assert!(invalid.hir.is_none());
+    }
+
+    #[test]
     fn catalog_known_unready_cics_command_fails_before_legacy_lowering() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSWAIT. DATA DIVISION. \
             WORKING-STORAGE SECTION. 01 PTR-X PIC X(8). PROCEDURE DIVISION. \
@@ -3170,47 +3758,14 @@ mod tests {
     }
 
     #[test]
-    fn legacy_cics_compatibility_routes_are_explicit_and_not_typed() {
+    fn application_cics_routes_have_no_remaining_legacy_lowering() {
         let legacy = mainframe_env_ir::CICS_APPLICATION_REGISTRY
             .iter()
             .filter(|descriptor| {
                 descriptor.readiness == CicsApplicationHandlerReadiness::LegacyCompatibility
             })
             .collect::<Vec<_>>();
-        assert_eq!(legacy.len(), 1);
-        assert!(
-            legacy.iter().all(|descriptor| {
-                descriptor.advertised && descriptor.runtime_operation.is_some()
-            })
-        );
-        assert!(legacy.iter().all(|descriptor| {
-            !matches!(
-                descriptor.label_tokens,
-                ["ABEND"]
-                    | ["ASSIGN"]
-                    | ["PURGE", "MESSAGE"]
-                    | ["DEQ"]
-                    | ["ENQ"]
-                    | ["HANDLE", "ABEND"]
-                    | ["HANDLE", "CONDITION"]
-                    | ["LINK"]
-                    | ["XCTL"]
-                    | ["RETURN"]
-                    | ["STARTBR"]
-                    | ["READNEXT"]
-                    | ["READPREV"]
-                    | ["ENDBR"]
-                    | ["DELETE"]
-                    | ["WRITE", "FILE"]
-                    | ["WRITEQ", "TD"]
-                    | ["RECEIVE", "MAP"]
-                    | ["SEND", "MAP"]
-                    | ["SEND", "TEXT"]
-                    | ["READ"]
-                    | ["REWRITE"]
-                    | ["SYNCPOINT"]
-            )
-        }));
+        assert!(legacy.is_empty());
     }
 
     #[test]
@@ -3349,7 +3904,7 @@ mod tests {
 
     #[test]
     fn typed_cics_routes_reject_catalog_options_without_runtime_semantics() {
-        let command = "ASSIGN FACILITY(USER-X)";
+        let command = "ASSIGN USERNAME(USER-X)";
         let source = format!(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLEG. DATA DIVISION. WORKING-STORAGE SECTION. 01 USER-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
         );
@@ -3359,7 +3914,7 @@ mod tests {
             analysis.diagnostics.iter().any(|diagnostic| {
                 let message = diagnostic.public_message();
                 message.contains("catalog-known but typed lowering is unready")
-                    && message.contains("FACILITY")
+                    && message.contains("USERNAME")
             }),
             "{command}: {:?}",
             analysis.diagnostics
@@ -3387,10 +3942,18 @@ mod tests {
             "ASSIGN CWALENG(CWA-LENGTH-X) OPERKEYS(OPERKEYS-X) RESTART(RESTART-X) TWALENG(TWA-LENGTH-X)",
             "ASSIGN ALTSCRNHT(ALTERNATE-HEIGHT-X) ALTSCRNWD(ALTERNATE-WIDTH-X) DEFSCRNHT(DEFAULT-HEIGHT-X) DEFSCRNWD(DEFAULT-WIDTH-X) SCRNHT(SCREEN-HEIGHT-X) SCRNWD(SCREEN-WIDTH-X)",
             "ASSIGN DS3270(DS3270-X) DSSCS(DSSCS-X)",
+            "ASSIGN DESTCOUNT(CWA-LENGTH-X) LDCMNEM(KEY-X) LDCNUM(INDICATOR-X) PAGENUM(TWA-LENGTH-X) PARTNPAGE(KEY-X)",
+            "ASSIGN RETURNPROG(PROGRAM-X)",
+            "ASSIGN INVOKINGPROG(PROGRAM-X)",
+            "ASSIGN INPARTN(KEY-X)",
+            "ASSIGN FACILITY(BRIDGE-X) NETNAME(PROGRAM-X)",
+            "ASSIGN TNADDR(TN-ADDRESS-X)",
             "ASSIGN APLKYBD(INDICATOR-X) APLTEXT(INDICATOR-X) BTRANS(INDICATOR-X) COLOR(INDICATOR-X) EWASUPP(INDICATOR-X) EXTDS(INDICATOR-X) GMMI(INDICATOR-X) HILIGHT(INDICATOR-X)",
             "ASSIGN KATAKANA(INDICATOR-X) MSRCONTROL(INDICATOR-X) OUTLINE(INDICATOR-X) PARTNS(INDICATOR-X) PS(INDICATOR-X) SOSI(INDICATOR-X) TEXTKYBD(INDICATOR-X) TEXTPRINT(INDICATOR-X) UNATTEND(INDICATOR-X) VALIDATION(INDICATOR-X)",
             "ASSIGN FCI(FCI-X)",
             "ASSIGN INITPARM(INITPARM-X) INITPARMLEN(INITPARM-LENGTH-X)",
+            "ASSIGN INPUTMSGLEN(INITPARM-LENGTH-X)",
+            "ASSIGN LANGINUSE(OPSECURITY-X)",
             "ASSIGN LINKLEVEL(LINK-LEVEL-X)",
             "ASSIGN LOCALCCSID(MAJOR-X)",
             "ASSIGN MAPCOLUMN(CWA-LENGTH-X) MAPHEIGHT(CWA-LENGTH-X) MAPLINE(TWA-LENGTH-X) MAPWIDTH(TWA-LENGTH-X)",
@@ -3400,10 +3963,10 @@ mod tests {
             "ASSIGN PRINSYSID(BRIDGE-X)",
             "ASSIGN PROGRAM(PROGRAM-X)",
             "ASSIGN QNAME(BRIDGE-X)",
-            "ASSIGN TASKPRIORITY(PRIORITY-X) USERID(USER-X)",
+            "ASSIGN TASKPRIORITY(PRIORITY-X) TERMPRIORITY(PRIORITY-X) USERID(USER-X)",
         ] {
             let source = format!(
-                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLEG. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABCODE-X PIC X(4). 01 ABDUMP-X PIC X. 01 ABOFFSET-X PIC S9(9) COMP. 01 ABPROGRAM-X PIC X(8). 01 ALTERNATE-HEIGHT-X PIC S9(4) COMP. 01 ALTERNATE-WIDTH-X PIC S9(4) COMP. 01 APP-X PIC X(64). 01 APPL-X PIC X(8). 01 ASRA-PSW-X PIC X(8). 01 ASRA-PSW16-X PIC X(16). 01 ASRA-REGS-X PIC X(64). 01 ASRA-REGS64-X PIC X(128). 01 BRIDGE-X PIC X(4). 01 CHANNEL-X PIC X(16). 01 CWA-LENGTH-X PIC S9(4) COMP. 01 DEFAULT-HEIGHT-X PIC S9(4) COMP. 01 DEFAULT-WIDTH-X PIC S9(4) COMP. 01 DS3270-X PIC X. 01 DSSCS-X PIC X. 01 FCI-X PIC X. 01 INDICATOR-X PIC X. 01 INITPARM-X PIC X(60). 01 INITPARM-LENGTH-X PIC S9(4) COMP. 01 LINK-LEVEL-X PIC S9(4) COMP. 01 MAJOR-X PIC S9(9) COMP. 01 MICRO-X PIC S9(9) COMP. 01 MINOR-X PIC S9(9) COMP. 01 NEXT-TRANS-X PIC X(4). 01 OPERATION-X PIC X(64). 01 OPERKEYS-X PIC X(8). 01 OPSECURITY-X PIC X(3). 01 PARTITION-SET-X PIC X(6). 01 PLATFORM-X PIC X(64). 01 PROGRAM-X PIC X(8). 01 RESTART-X PIC X. 01 SCREEN-HEIGHT-X PIC S9(4) COMP. 01 SCREEN-WIDTH-X PIC S9(4) COMP. 01 USER-X PIC X(8). 01 PRIORITY-X PIC S9(4) COMP. 01 TCTUA-LENGTH-X PIC S9(4) COMP. 01 TWA-LENGTH-X PIC S9(4) COMP. 01 KEY-X PIC X(2). 01 REC-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN. ABEND-HANDLER. STOP RUN."
+                "IDENTIFICATION DIVISION. PROGRAM-ID. CICSLEG. DATA DIVISION. WORKING-STORAGE SECTION. 01 ABCODE-X PIC X(4). 01 ABDUMP-X PIC X. 01 ABOFFSET-X PIC S9(9) COMP. 01 ABPROGRAM-X PIC X(8). 01 ALTERNATE-HEIGHT-X PIC S9(4) COMP. 01 ALTERNATE-WIDTH-X PIC S9(4) COMP. 01 APP-X PIC X(64). 01 APPL-X PIC X(8). 01 ASRA-PSW-X PIC X(8). 01 ASRA-PSW16-X PIC X(16). 01 ASRA-REGS-X PIC X(64). 01 ASRA-REGS64-X PIC X(128). 01 BRIDGE-X PIC X(4). 01 CHANNEL-X PIC X(16). 01 CWA-LENGTH-X PIC S9(4) COMP. 01 DEFAULT-HEIGHT-X PIC S9(4) COMP. 01 DEFAULT-WIDTH-X PIC S9(4) COMP. 01 DS3270-X PIC X. 01 DSSCS-X PIC X. 01 FCI-X PIC X. 01 INDICATOR-X PIC X. 01 INITPARM-X PIC X(60). 01 INITPARM-LENGTH-X PIC S9(4) COMP. 01 LINK-LEVEL-X PIC S9(4) COMP. 01 MAJOR-X PIC S9(9) COMP. 01 MICRO-X PIC S9(9) COMP. 01 MINOR-X PIC S9(9) COMP. 01 NEXT-TRANS-X PIC X(4). 01 OPERATION-X PIC X(64). 01 OPERKEYS-X PIC X(8). 01 OPSECURITY-X PIC X(3). 01 PARTITION-SET-X PIC X(6). 01 PLATFORM-X PIC X(64). 01 PROGRAM-X PIC X(8). 01 RESTART-X PIC X. 01 SCREEN-HEIGHT-X PIC S9(4) COMP. 01 SCREEN-WIDTH-X PIC S9(4) COMP. 01 TN-ADDRESS-X PIC X(39). 01 USER-X PIC X(8). 01 PRIORITY-X PIC S9(4) COMP. 01 TCTUA-LENGTH-X PIC S9(4) COMP. 01 TWA-LENGTH-X PIC S9(4) COMP. 01 KEY-X PIC X(2). 01 REC-X PIC X(8). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN. ABEND-HANDLER. STOP RUN."
             );
             let analysis = analyze(&source);
             let hir = analysis
@@ -3521,12 +4084,26 @@ mod tests {
             "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 SCREEN-X PIC X(2). PROCEDURE DIVISION. EXEC CICS ASSIGN SCRNHT(SCREEN-X) END-EXEC. STOP RUN.",
             "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 SCREEN-X PIC X(2). PROCEDURE DIVISION. EXEC CICS ASSIGN SCRNWD(SCREEN-X) END-EXEC. STOP RUN.",
             "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 DS3270-X PIC X(2). PROCEDURE DIVISION. EXEC CICS ASSIGN DS3270(DS3270-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 DESTCOUNT-X PIC X(2). PROCEDURE DIVISION. EXEC CICS ASSIGN DESTCOUNT(DESTCOUNT-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 LDCMNEM-X PIC X. PROCEDURE DIVISION. EXEC CICS ASSIGN LDCMNEM(LDCMNEM-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 LDCNUM-X PIC X(2). PROCEDURE DIVISION. EXEC CICS ASSIGN LDCNUM(LDCNUM-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 LANGUAGE-X PIC X(2). PROCEDURE DIVISION. EXEC CICS ASSIGN LANGINUSE(LANGUAGE-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 PAGENUM-X PIC X(2). PROCEDURE DIVISION. EXEC CICS ASSIGN PAGENUM(PAGENUM-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 PARTNPAGE-X PIC X. PROCEDURE DIVISION. EXEC CICS ASSIGN PARTNPAGE(PARTNPAGE-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 RETURN-X PIC X(9). PROCEDURE DIVISION. EXEC CICS ASSIGN RETURNPROG(RETURN-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 INVOKING-X PIC X(9). PROCEDURE DIVISION. EXEC CICS ASSIGN INVOKINGPROG(INVOKING-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 PARTITION-X PIC X(3). PROCEDURE DIVISION. EXEC CICS ASSIGN INPARTN(PARTITION-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 FACILITY-X PIC X(3). PROCEDURE DIVISION. EXEC CICS ASSIGN FACILITY(FACILITY-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 NETNAME-X PIC X(7). PROCEDURE DIVISION. EXEC CICS ASSIGN NETNAME(NETNAME-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 TNADDR-X PIC X(38). PROCEDURE DIVISION. EXEC CICS ASSIGN TNADDR(TNADDR-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 TERM-PRIORITY-X PIC X(2). PROCEDURE DIVISION. EXEC CICS ASSIGN TERMPRIORITY(TERM-PRIORITY-X) END-EXEC. STOP RUN.",
             "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 DSSCS-X PIC X(2). PROCEDURE DIVISION. EXEC CICS ASSIGN DSSCS(DSSCS-X) END-EXEC. STOP RUN.",
             "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 FCI-X PIC X(2). PROCEDURE DIVISION. EXEC CICS ASSIGN FCI(FCI-X) END-EXEC. STOP RUN.",
             "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 PRIORITY-X PIC X(2). PROCEDURE DIVISION. EXEC CICS ASSIGN TASKPRIORITY(PRIORITY-X) END-EXEC. STOP RUN.",
             "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 LENGTH-X PIC X(2). PROCEDURE DIVISION. EXEC CICS ASSIGN CWALENG(LENGTH-X) END-EXEC. STOP RUN.",
             "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 INITPARM-X PIC X(59). PROCEDURE DIVISION. EXEC CICS ASSIGN INITPARM(INITPARM-X) END-EXEC. STOP RUN.",
             "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 INITPARM-LENGTH-X PIC X(2). PROCEDURE DIVISION. EXEC CICS ASSIGN INITPARMLEN(INITPARM-LENGTH-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 INPUT-LENGTH-X PIC X(2). PROCEDURE DIVISION. EXEC CICS ASSIGN INPUTMSGLEN(INPUT-LENGTH-X) END-EXEC. STOP RUN.",
             "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 LINK-LEVEL-X PIC X(2). PROCEDURE DIVISION. EXEC CICS ASSIGN LINKLEVEL(LINK-LEVEL-X) END-EXEC. STOP RUN.",
             "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 LOCAL-CCSID-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS ASSIGN LOCALCCSID(LOCAL-CCSID-X) END-EXEC. STOP RUN.",
             "IDENTIFICATION DIVISION. PROGRAM-ID. BADASSIGN. DATA DIVISION. WORKING-STORAGE SECTION. 01 LOCAL-CCSID-X PIC X(4). PROCEDURE DIVISION. EXEC CICS ASSIGN LOCALCCSID(LOCAL-CCSID-X) END-EXEC. STOP RUN.",

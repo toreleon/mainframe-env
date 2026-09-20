@@ -7,6 +7,7 @@ use mainframe_env_ir::{
 pub(super) enum SlotUse {
     Input,
     HalfwordInput,
+    FullwordInput,
     AbcodeInput,
     ProgramNameInput,
     AbstimeInput,
@@ -30,6 +31,7 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::Abstime => SlotUse::AbstimeInput,
         CicsOperandName::DateSep | CicsOperandName::TimeSep => SlotUse::SeparatorInput,
         CicsOperandName::KeyLength => SlotUse::Input,
+        CicsOperandName::Flength => SlotUse::FullwordInput,
         _ => SlotUse::Input,
     }
 }
@@ -39,7 +41,11 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         CicsOutputName::Abstime => SlotUse::AbstimeOutput,
         CicsOutputName::Commarea => SlotUse::Output,
         CicsOutputName::Into => SlotUse::Output,
+        CicsOutputName::SetPointer => SlotUse::PointerOutput,
         CicsOutputName::Ridfld => SlotUse::Output,
+        CicsOutputName::ReturnTransId | CicsOutputName::ReturnTermId | CicsOutputName::Queue => {
+            SlotUse::Output
+        }
         CicsOutputName::Milliseconds => SlotUse::MillisecondsOutput,
         CicsOutputName::Mmddyy | CicsOutputName::Time | CicsOutputName::Yymmdd => {
             SlotUse::FormatTextOutput(8)
@@ -60,6 +66,8 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::Asktime => CicsOperation::Asktime,
         CicsPlanOperation::AsktimeEib => CicsOperation::AsktimeEib,
         CicsPlanOperation::FormatTime => CicsOperation::FormatTime,
+        CicsPlanOperation::Cancel => CicsOperation::Cancel,
+        CicsPlanOperation::Delay => CicsOperation::Delay,
         CicsPlanOperation::ChangeTask => CicsOperation::ChangeTask,
         CicsPlanOperation::Deq => CicsOperation::Deq,
         CicsPlanOperation::Enq => CicsOperation::Enq,
@@ -77,6 +85,8 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::Delete => CicsOperation::Delete,
         CicsPlanOperation::Write => CicsOperation::Write,
         CicsPlanOperation::WriteTransientData => CicsOperation::WriteTransientData,
+        CicsPlanOperation::DeleteTransientData => CicsOperation::DeleteTransientData,
+        CicsPlanOperation::Getmain => CicsOperation::Getmain,
         CicsPlanOperation::ReceiveMap => CicsOperation::ReceiveMap,
         CicsPlanOperation::SendMap => CicsOperation::SendMap,
         CicsPlanOperation::SendText => CicsOperation::SendText,
@@ -89,6 +99,8 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::Suspend => CicsOperation::Suspend,
         CicsPlanOperation::Assign => CicsOperation::Assign,
         CicsPlanOperation::PurgeMessage => CicsOperation::PurgeMessage,
+        CicsPlanOperation::Start => CicsOperation::Start,
+        CicsPlanOperation::Retrieve => CicsOperation::Retrieve,
     }
 }
 
@@ -99,6 +111,10 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::Program => "PROGRAM",
         CicsOperandName::Commarea => "COMMAREA",
         CicsOperandName::TransId => "TRANSID",
+        CicsOperandName::TermId => "TERMID",
+        CicsOperandName::ReturnTransId => "RTRANSID",
+        CicsOperandName::ReturnTermId => "RTERMID",
+        CicsOperandName::UserId => "USERID",
         CicsOperandName::File => "FILE",
         CicsOperandName::Dataset => "DATASET",
         CicsOperandName::From => "FROM",
@@ -108,6 +124,7 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::Mapset => "MAPSET",
         CicsOperandName::Resource => "RESOURCE",
         CicsOperandName::Length => "LENGTH",
+        CicsOperandName::DataLength => "DATALENGTH",
         CicsOperandName::MaxLifetime => "MAXLIFETIME",
         CicsOperandName::Priority => "PRIORITY",
         CicsOperandName::UserCorrData => "USERCORRDATA",
@@ -121,6 +138,15 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::DateSep => "DATESEP",
         CicsOperandName::TimeSep => "TIMESEP",
         CicsOperandName::KeyLength => "KEYLENGTH",
+        CicsOperandName::ReqId => "REQID",
+        CicsOperandName::Interval => "INTERVAL",
+        CicsOperandName::StartTime => "TIME",
+        CicsOperandName::Hours => "HOURS",
+        CicsOperandName::Minutes => "MINUTES",
+        CicsOperandName::Seconds => "SECONDS",
+        CicsOperandName::Milliseconds => "MILLISECS",
+        CicsOperandName::Flength => "FLENGTH",
+        CicsOperandName::InitImage => "INITIMG",
     }
 }
 
@@ -129,6 +155,7 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::Abstime => "ABSTIME",
         CicsOutputName::Commarea => "COMMAREA",
         CicsOutputName::Into => "INTO",
+        CicsOutputName::SetPointer => "SET",
         CicsOutputName::Ridfld => "RIDFLD",
         CicsOutputName::Milliseconds => "MILLISECONDS",
         CicsOutputName::Mmddyy => "MMDDYY",
@@ -141,6 +168,9 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::Yyyymmdd => "YYYYMMDD",
         CicsOutputName::Assign(output) => output.name(),
         CicsOutputName::Length => "LENGTH",
+        CicsOutputName::ReturnTransId => "RTRANSID",
+        CicsOutputName::ReturnTermId => "RTERMID",
+        CicsOutputName::Queue => "QUEUE",
     }
 }
 
@@ -161,5 +191,13 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::TimeSep => "TIMESEP",
         CicsPlanOption::FreeKb => "FREEKB",
         CicsPlanOption::Gteq => "GTEQ",
+        CicsPlanOption::Fmh => "FMH",
+        CicsPlanOption::Protect => "PROTECT",
+        CicsPlanOption::Wait => "WAIT",
+        CicsPlanOption::After => "AFTER",
+        CicsPlanOption::At => "AT",
+        CicsPlanOption::For => "FOR",
+        CicsPlanOption::Until => "UNTIL",
+        CicsPlanOption::NoCheck => "NOCHECK",
     }
 }

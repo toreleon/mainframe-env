@@ -119,8 +119,12 @@ pub(super) fn require_output_shape(
         }
         HirCicsOutputName::Commarea
         | HirCicsOutputName::Into
+        | HirCicsOutputName::SetPointer
         | HirCicsOutputName::Ridfld
         | HirCicsOutputName::Length
+        | HirCicsOutputName::ReturnTransId
+        | HirCicsOutputName::ReturnTermId
+        | HirCicsOutputName::Queue
         | HirCicsOutputName::Assign(_) => Ok(()),
     }
 }

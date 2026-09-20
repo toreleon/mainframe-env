@@ -1,0 +1,49 @@
+use super::{
+    HirCicsValue, Resolution, ResolutionFailure, complete_data_reference, numeric_literal,
+    require_numeric,
+};
+use crate::SemanticModel;
+
+pub(super) fn cics_integer_value(
+    tokens: &[String],
+    semantic: &SemanticModel,
+) -> Resolution<HirCicsValue> {
+    if let [value] = tokens
+        && let Some(literal) = numeric_literal(value)
+        && literal.scale == 0
+    {
+        let magnitude = literal.digits.parse::<i64>().map_err(|_| {
+            ResolutionFailure::Invalid("CICS integer operand is out of range".into())
+        })?;
+        let value = if literal.negative {
+            magnitude.checked_neg().ok_or_else(|| {
+                ResolutionFailure::Invalid("CICS integer operand is out of range".into())
+            })?
+        } else {
+            magnitude
+        };
+        return Ok(HirCicsValue::Integer(value));
+    }
+    let reference = complete_data_reference(tokens, semantic)?;
+    require_numeric(&reference)?;
+    Ok(HirCicsValue::Data(reference))
+}
+
+pub(super) fn cics_cvda_value(
+    tokens: &[String],
+    semantic: &SemanticModel,
+) -> Resolution<HirCicsValue> {
+    if let [function, open, value, close] = tokens
+        && function.eq_ignore_ascii_case("DFHVALUE")
+        && open == "("
+        && close == ")"
+        && matches!(value.as_str(), "TASK" | "UOW" | "LUW")
+    {
+        return Ok(HirCicsValue::Integer(match value.as_str() {
+            "TASK" => 233,
+            "UOW" | "LUW" => 246,
+            _ => unreachable!(),
+        }));
+    }
+    cics_integer_value(tokens, semantic)
+}

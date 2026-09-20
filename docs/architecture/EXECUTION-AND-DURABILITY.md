@@ -128,7 +128,28 @@ through the original provider idempotency identity and only when the returned
 canonical digest matches the journaled result. `Intent` and `UnknownOutcome`
 records stop before provider dispatch. When the CICS replay ledger proves an
 outer result, reconciliation changes the effect to `Completed` before machine
-execution resumes.
+execution resumes. Local LINK, XCTL, and RETURN resolve any explicit COMMAREA
+length before this boundary, so the copied prefix—not adjacent task storage—is
+the payload journaled for dispatch, replacement, or continuation. XCTL target
+EIBCALEN is derived from that exact copied prefix.
+
+Due local CICS START work uses the work row's immutable execution identifier
+as the started task's coordinator identity. At expiration the worker resolves
+the installed transaction and program, restores the principal captured by the
+START row, and creates a facility-less CICS run before driving the ordinary
+online exchange. A lease retry or SQLite reopen before launch or after target
+completion validates the retained execution tuple and completes without
+redispatch. Task conditions and known
+terminal failures belong to the asynchronously created task; unresolved
+infrastructure or effect uncertainty still blocks work completion.
+
+Terminal-associated START resolves the retained virtual-terminal identity at
+both admission and expiration. An occupied terminal returns the work lease to
+the queue; a deleted or principal-replaced terminal discards the asynchronous
+request. Once available, the existing durable session is retasked with the
+START execution and run-unit identities and remains connected after the target
+task finishes. RETRIEVE includes the run's terminal identity in the interval
+record match, preventing cross-terminal consumption.
 
 CICS also retains the exact bounded outer response for every mutating file,
 transient-queue, program-link, enqueue/dequeue, and syncpoint request. The replay key is checked
@@ -165,6 +186,184 @@ an ENQMODEL. Disabled matches abend ENQ, and corrupt or partially installed
 model/catalog state prevents provider open. The pinned source set does not
 establish precedence among overlapping generic models, so installation rejects
 overlap rather than choosing an undocumented winner.
+
+CICS interval START records use `cics-interval-start-v1`, keyed by the exact
+one-to-eight-character request identifier. The version-one payload binds the
+target transaction, issuing principal and run unit, expiration tick, optional
+terminal and originating metadata, bounded data and FMH state, plus canonical
+producer and consumer idempotency identities. Pending, protected-pending,
+ready, consumed, and cancelled are explicit states. Promotion is ordered by expiration
+then request identifier; consumption is one fenced CAS transition and only the
+same canonical consumer request can replay it. The bounded local-data route
+adds one `cics-start-v1` work row for each accepted START record. The core
+workers claim that generation under the ordinary lease/epoch fence and promote
+the matching record to ready; they do not yet create the target CICS task.
+Typed RETRIEVE then consumes the oldest ready record for the target transaction
+through explicit INTO and in/out LENGTH bindings, or through SET with an
+output-only LENGTH. START admission, the work row, interval state, and replay
+receipts share the durable store, so a SQLite reopen preserves the
+producer-to-consumer cycle. Omitted REQID uses a deterministic internal
+identifier for the same row and work ownership; ordinary START returns it in
+EIBREQID, while local NOCHECK intentionally leaves EIBREQID null. Remote
+routing, terminal starts, remote NOCHECK behavior, WAIT, and automatic
+target-task launch remain outside this slice.
+START `AFTER`/`AT` uses the same durable deadline authority as packed
+INTERVAL/TIME. Append-only plan operand tags retain each explicit component and
+append-only option tags retain relative versus absolute mode; literal and
+storage-backed values therefore reach the provider through the same canonical
+component request. The provider applies source-defined single-unit versus
+combined-unit bounds and exact per-component INVREQ response2 values. Every
+valid path persists one resolved expiration tick, so replay and restart never
+recalculate against a later wall-clock observation.
+FROM is optional on the local START schedule. A no-data record still owns the
+same request/work/replay identities so a later worker can honor it, but it has
+no retrievable payload. If RETRIEVE reaches that exact ready record, the consume
+CAS occurs once and the canonical consumer receives ENDDATA 29/0; replay by the
+same consumer remains ENDDATA. RTRANSID, RTERMID, or QUEUE make the record
+metadata-bearing and therefore retrievable with actual length zero. LENGTH and
+FMH cannot appear without FROM.
+The bounded metadata extension
+also accepts local START RTRANSID, RTERMID, and QUEUE names and returns only the
+requested values through exact-width RETRIEVE outputs. A requested value absent
+from the producing START returns ENVDEFERR before the record is consumed, so a
+corrected canonical request can still retrieve it. Those fields use the same
+row codec and producer/consumer replay fence; they add no side queue or worker.
+START's FMH flag is retained in that row. RETRIEVE emits one strict typed
+EIBFMH byte, and the interpreter updates its implicit field to `X'FF'` for FMH
+data or `X'00'` otherwise. Historical replay responses without this additive
+output preserve their prior implicit value.
+
+For SET, the interpreter places its exact remaining task-allocation capacity in
+the canonical host request. The interval authority rejects a larger record
+before its consumed-state CAS. A successful response is copied into a new
+bounded virtual base, and only its checked four- or eight-byte virtual address
+is written to the COBOL pointer. Base bytes, pointer value, and linkage-address
+state use the ordinary machine checkpoint codec, so replay from the same
+pre-response checkpoint recreates the same allocation identity without exposing
+a native address.
+
+The bounded local PROTECT extension keeps its START record in
+`protected-pending` and deliberately creates no shared work row. An explicit
+committing SYNCPOINT first durably finalizes the UOW, then changes every
+matching record from that issuing run to pending and admits deterministic work.
+A finalized retry scans pending records from the same run whose work is still
+absent, closing the state-transition/enqueue crash gap without duplicating work.
+Explicit SYNCPOINT ROLLBACK durably finalizes the rollback before deleting
+protected-pending records, so the REQID can be reused. Typed ABEND performs the
+same bounded deletion before its handler transfer or terminal disposition.
+Known non-command failure/disconnect/timeout and implicit task-end behavior are
+covered below, including recovery after durable terminalization precedes
+product/CICS cleanup.
+
+CANCEL follows the source-defined PROTECT boundary: protected-pending rows are
+not cancelable and return NOTFND, while a committing SYNCPOINT first makes the
+record ordinary pending work. CANCEL after that commit uses the same durable
+tombstone, work cancellation, replay identity, and worker fence as every other
+local START cancellation.
+
+REQID is optional on the typed local START route. When absent, the provider
+hashes a domain separator, the mutation idempotency key, and the canonical
+request digest into an eight-character uppercase identifier. That deterministic
+name closes retries before the outer response journal exists, becomes the
+interval row and work payload identity, and is returned as a strict EIBREQID
+output. The interpreter validates and checkpoints the eight-byte implicit EIB
+field. Explicit names never receive this synthetic output.
+
+Protected START also participates in implicit task-end syncpoints. Normal
+compiled completion and highest-level RETURN transition the issuing run's
+protected rows to pending and idempotently admit work before volatile task
+cleanup. Known execution failure deletes only that run's still-protected rows
+before releasing other task state. A scheduler or data wait suspension performs
+neither transition. Terminal disconnect and idle timeout delete still-protected
+rows in the same caller-held cleanup pass that abandons delays and releases
+enqueue state. Recovery that begins after a terminal execution outcome but
+before product/CICS cleanup reads the retained exchange and machine
+continuation, reconstructs the exact invocation and priority, reloads durable
+CICS undo state, then follows the journaled disposition. `Completed` commits
+protected rows and admits deterministic work; cancelled, timed-out, failed, or
+dead-letter outcomes delete protected rows without work. Handoff completion
+uses its already-applied RETURN finalization and does not repeat the syncpoint.
+Cleanup removes continuation, checkpoint, and exchange state only after that
+disposition-bound CICS transition has been attempted.
+
+An optional local START USERID is part of the canonical producer request and
+the duplicate-REQID fence. Before schedule persistence, the provider authorizes
+the issuing principal for READ against `SURROGAT <userid>.DFHSTART`; denial is a
+known NOTAUTH 70/9 result and creates neither interval nor work state. Success
+stores the selected identity in the versioned interval row for future task
+creation. Without USERID, the existing issuer principal remains bound. User
+existence/revocation conditions and worker-driven target launch are not yet
+implemented by this child.
+
+Typed RETRIEVE WAIT uses the ordinary resumable execution boundary. A no-data
+attempt returns no condition and mutates no interval row; the interpreter moves
+the program counter back to the RETRIEVE statement and records a
+`cics-retrieve` suspension in the durable machine checkpoint. The online
+continuation keeps that exchange open. After a matching START work item is
+promoted, explicit execution re-entry issues a fresh effect and consumes the
+oldest eligible record under the existing CAS/replay identity. Automatic wake,
+deadlock timeout, shutdown/AICB, and process-restart proof remain separate.
+
+Typed local CANCEL requires an explicit REQID and accepts an optional local
+TRANSID solely for routing authorization. It first verifies the matching shared
+work identity, then CAS-transitions only a committed pending record to a
+cancelled replay tombstone and requests cancellation of the queued or claimed
+work. A worker that crossed the claim boundary cannot promote the cancelled
+record. The identical canonical CANCEL request can finish or replay a crash-gap
+cancellation; another request receives NOTFND. Protected-uncommitted, ready,
+consumed, or already-cancelled-by-another-request records are not cancellable.
+The tombstone intentionally defers immediate REQID reuse until the parent
+START/CANCEL lifecycle owns bounded replay retention.
+
+Typed zero-delay DELAY is deliberately stateless. Bare DELAY and a
+compile-time literal `INTERVAL(0)` return NORMAL immediately and never create a
+timer row, work item, checkpoint, or suspension. Positive literal or
+storage-backed packed intervals and typed FOR/UNTIL unit forms use the durable
+path below; they are not inferred from this immediate boundary. Remote forms
+use separate reviewed boundaries.
+
+Positive literal packed `INTERVAL` DELAY uses `cics-delay-v1` provider rows and
+work generation. A hidden task/run-unit plus statement-position identity keeps
+the same source command stable across checkpoint reissue. First admission
+persists one pending cycle and deterministic work row; the shared worker can
+promote only that due cycle under its lease/epoch fence. The interpreter keeps
+the online exchange and continuation attached, reissues the command, and only
+the ready-to-consumed CAS completes it. The same consumer request replays the
+completion, while a later loop encounter creates a new cycle and work identity.
+Provider open strictly validates retained rows, and Memory and SQLite reopen
+preserve the transition. A positive literal delay may also carry a bounded
+application REQID. Another task can atomically turn an unexpired pending cycle
+into early expiration, cancel its queued work, and let the suspended issuer
+complete with NORMAL RESP2 23; issuer cancellation and cancellation after the
+expiration boundary return NOTFND. Disconnect, timeout, return, abend, and
+terminal teardown move an outstanding cycle to an abandoned tombstone and
+cancel queued or claimed work. Version-two rows retain strict version-one
+reads. FOR/UNTIL HOURS/MINUTES/SECONDS reuse the same rows after resolving one
+relative or absolute deadline from the durable and host clocks. An already
+elapsed UNTIL target returns EXPIRED 31 through normal condition policy, whose
+default is ignored; invalid components retain INVREQ RESP2 4/5/6. FOR
+MILLISECS extends the same value with an exact millisecond remainder: pure
+values admit 0–359,999,999, combined values admit 0–999, and sub-50 ms delays
+return EXPIRED before state. Invalid milliseconds return RESP2 22. Automatic
+redispatch, remote routing, PostgreSQL evidence, and retention eligibility
+remain separate obligations. Packed TIME shares the absolute path:
+the compiler preserves either an integer constant or packed numeric storage,
+the interpreter emits its canonical decimal value, and the provider retains a
+domain-separated identity plus the resolved deadline before suspension.
+Packed INTERVAL now follows the same typed storage path under its existing tag;
+literal and dynamic values are both validated at provider execution time so
+INVREQ conditions and no-state failures do not diverge by source form.
+
+After lease-fenced DELAY promotion, the product worker scans the bounded
+durable online-exchange namespace and selects the unique matching run-unit. It
+then resumes the saved machine checkpoint through the ordinary durable
+coordinator before completing the work lease. Promotion and resume are both
+retryable; if execution finalized and cleared its exchange before the work CAS,
+a reclaimed worker treats the missing exchange as completed. Duplicate matches
+fail closed. SQLite reopen reconstructs the installed online application,
+terminal session, exchange, continuation, provider timer, and queued work before
+the same worker path resumes the task. PostgreSQL restart wake remains a
+separate acceptance boundary.
 
 An ENQ wait is not a terminal-input handoff. Its execution remains
 `Suspended`, and both the coordinator checkpoint and product continuation stay

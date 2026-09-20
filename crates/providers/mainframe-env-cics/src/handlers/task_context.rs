@@ -1,7 +1,7 @@
-use super::super::{CicsService, Run, bounded, decimal_payload};
-use mainframe_env_execution_api::{Invocation, RunUnitId};
+use super::super::{CicsService, Run, Session, bounded, decimal_payload};
+use mainframe_env_execution_api::{ExecutionId, Invocation, RunUnitId};
 use mainframe_env_host_api::{CicsDisposition, CicsRequest, CicsResponse, HostProblem};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 const TERMINAL_CAPABILITY_INDICATORS: [(&str, u8); 20] = [
     ("APLKYBD", 0x00),
@@ -27,6 +27,37 @@ const TERMINAL_CAPABILITY_INDICATORS: [(&str, u8); 20] = [
 ];
 
 const LOCAL_CCSID: i64 = 37;
+const BMS_OVERFLOW_OPTIONS: [&str; 5] = ["DESTCOUNT", "LDCMNEM", "LDCNUM", "PAGENUM", "PARTNPAGE"];
+
+pub(in crate::service) fn allocate_terminal_input(
+    sessions: &BTreeMap<String, Session>,
+) -> Result<super::TerminalInput, HostProblem> {
+    const DIGITS: &[u8; 36] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let used = sessions
+        .values()
+        .filter_map(|session| session.input.terminal_id.as_deref())
+        .collect::<BTreeSet<_>>();
+    for ordinal in 0..36_usize.pow(3) {
+        let candidate = [
+            b'T',
+            DIGITS[(ordinal / (36 * 36)) % 36],
+            DIGITS[(ordinal / 36) % 36],
+            DIGITS[ordinal % 36],
+        ];
+        let candidate = String::from_utf8(candidate.to_vec()).expect("ASCII terminal identifier");
+        if !used.contains(candidate.as_str()) {
+            return Ok(super::TerminalInput::identified(candidate));
+        }
+    }
+    Err(HostProblem::ResourceExhausted)
+}
+
+#[derive(Clone)]
+pub(in crate::service) struct CurrentProgramFrame {
+    pub(in crate::service) current: Option<String>,
+    pub(in crate::service) parent_execution_id: Option<ExecutionId>,
+    pub(in crate::service) initial_entry: bool,
+}
 
 pub(in crate::service) fn current_program(invocation: &Invocation) -> Option<String> {
     invocation
@@ -41,14 +72,17 @@ pub(in crate::service) fn synchronize_current_program(
     runs: &mut BTreeMap<RunUnitId, Run>,
     invocation: &Invocation,
 ) -> Result<bool, HostProblem> {
+    let initial_entry = initial_program_entry(invocation)?;
     let Some(run) = runs.get_mut(&invocation.run_unit_id) else {
         return Ok(false);
     };
     if run.invocation.principal.id() != invocation.principal.id() {
         return Err(HostProblem::Unauthorized);
     }
+    run.current_program.parent_execution_id = invocation.parent_execution_id.clone();
+    run.current_program.initial_entry = initial_entry;
     if let Some(program) = current_program(invocation) {
-        run.current_program = Some(program);
+        run.current_program.current = Some(program);
     }
     Ok(true)
 }
@@ -77,9 +111,18 @@ pub(in crate::service) fn assign(
     let map_geometry_requested = ["MAPCOLUMN", "MAPHEIGHT", "MAPLINE", "MAPWIDTH"]
         .iter()
         .any(|name| request.arguments.contains_key(*name));
+    let input_partition_requested = request.arguments.contains_key("INPARTN");
+    let terminal_identity_requested = ["FACILITY", "NETNAME"]
+        .iter()
+        .any(|name| request.arguments.contains_key(*name));
+    let terminal_address_requested = request.arguments.contains_key("TNADDR");
     let terminal_required = screen_requested
         || terminal_indicator_requested
+        || input_partition_requested
+        || terminal_identity_requested
+        || terminal_address_requested
         || request.arguments.contains_key("PARTNSET")
+        || request.arguments.contains_key("TERMPRIORITY")
         || map_geometry_requested;
     let dimensions = if !dpl && (terminal_required || request.arguments.contains_key("FCI")) {
         terminal_dimensions(service, run)?
@@ -94,6 +137,23 @@ pub(in crate::service) fn assign(
     };
     let map_missing =
         !dpl && map_geometry_requested && dimensions.is_some() && map_geometry.is_none();
+    let input_partition = if !dpl && input_partition_requested {
+        terminal_has_positioned_map(service, run)?
+    } else {
+        None
+    };
+    if input_partition == Some(true) {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    let input_partition_missing = input_partition == Some(false);
+    let terminal_identity = if !dpl && terminal_identity_requested && dimensions.is_some() {
+        terminal_identity(service, run)?
+    } else {
+        None
+    };
+    if !dpl && terminal_identity_requested && dimensions.is_some() && terminal_identity.is_none() {
+        return Err(HostProblem::InfrastructureFailure);
+    }
     let intersystem_facility_missing = request.arguments.contains_key("PRINSYSID");
     let ati_missing = !dpl && request.arguments.contains_key("QNAME");
     let bts_missing = ["ACTIVITY", "ACTIVITYID", "PROCESS", "PROCESSTYPE"]
@@ -103,11 +163,21 @@ pub(in crate::service) fn assign(
         && ["DESTID", "DESTIDLENG"]
             .iter()
             .any(|name| request.arguments.contains_key(*name));
+    let bms_overflow_missing = !dpl
+        && BMS_OVERFLOW_OPTIONS
+            .iter()
+            .any(|name| request.arguments.contains_key(*name));
     let link_level = request
         .arguments
         .contains_key("LINKLEVEL")
         .then(|| assign_link_level(run, dpl))
         .transpose()?;
+    if request.arguments.contains_key("INVOKINGPROG") {
+        validate_initial_program(run, dpl)?;
+    }
+    if request.arguments.contains_key("RETURNPROG") {
+        validate_top_level_return_program(run, dpl)?;
+    }
     let dpl_prohibited = dpl
         && (terminal_indicator_requested
             || [
@@ -117,28 +187,46 @@ pub(in crate::service) fn assign(
                 "DEFSCRNWD",
                 "DESTID",
                 "DESTIDLENG",
+                "DESTCOUNT",
+                "FACILITY",
                 "FCI",
+                "INPARTN",
                 "MAPCOLUMN",
                 "MAPHEIGHT",
                 "MAPLINE",
                 "MAPWIDTH",
+                "LDCMNEM",
+                "LDCNUM",
                 "NEXTTRANSID",
                 "OPSECURITY",
                 "PARTNSET",
+                "PAGENUM",
+                "PARTNPAGE",
                 "QNAME",
                 "SCRNHT",
                 "SCRNWD",
                 "TCTUALENG",
+                "TERMPRIORITY",
             ]
             .iter()
             .any(|name| request.arguments.contains_key(*name)));
+    if dpl
+        && ["NETNAME", "TNADDR"]
+            .iter()
+            .any(|name| request.arguments.contains_key(*name))
+        && !dpl_prohibited
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
     let mut response = if dpl_prohibited
         || terminal_missing
         || map_missing
+        || input_partition_missing
         || intersystem_facility_missing
         || ati_missing
         || bts_missing
         || bdi_missing
+        || bms_overflow_missing
     {
         super::condition::respond(
             service,
@@ -151,7 +239,7 @@ pub(in crate::service) fn assign(
                     200
                 } else if terminal_missing || intersystem_facility_missing {
                     5
-                } else if map_missing {
+                } else if map_missing || bms_overflow_missing || input_partition_missing {
                     2
                 } else if ati_missing {
                     4
@@ -189,6 +277,12 @@ pub(in crate::service) fn assign(
         response.outputs.insert(
             "TASKPRIORITY".into(),
             decimal_payload(i64::from(run.invocation.priority))?,
+        );
+    }
+    if request.arguments.contains_key("INPUTMSGLEN") {
+        response.outputs.insert(
+            "INPUTMSGLEN".into(),
+            decimal_payload(session_input_message_length(service, run)?)?,
         );
     }
     if request.arguments.contains_key("ABOFFSET") {
@@ -263,6 +357,11 @@ pub(in crate::service) fn assign(
                     .insert(name.into(), decimal_payload(i64::from(value))?);
             }
         }
+        if request.arguments.contains_key("TERMPRIORITY") {
+            response
+                .outputs
+                .insert("TERMPRIORITY".into(), decimal_payload(0)?);
+        }
         if request.arguments.contains_key("PARTNSET") {
             response
                 .outputs
@@ -288,6 +387,23 @@ pub(in crate::service) fn assign(
             }
         }
     }
+    if let Some(terminal_id) = terminal_identity {
+        if request.arguments.contains_key("FACILITY") {
+            response
+                .outputs
+                .insert("FACILITY".into(), bounded(terminal_id.as_bytes().to_vec())?);
+        }
+        if request.arguments.contains_key("NETNAME") {
+            let mut netname = terminal_id.into_bytes();
+            netname.resize(8, b' ');
+            response.outputs.insert("NETNAME".into(), bounded(netname)?);
+        }
+    }
+    if dimensions.is_some() && request.arguments.contains_key("TNADDR") {
+        response
+            .outputs
+            .insert("TNADDR".into(), bounded(vec![b' '; 39])?);
+    }
     if !dpl_prohibited && request.arguments.contains_key("FCI") {
         response
             .outputs
@@ -296,11 +412,19 @@ pub(in crate::service) fn assign(
     if request.arguments.contains_key("PROGRAM") {
         let program = run
             .current_program
+            .current
             .as_ref()
             .ok_or(HostProblem::InfrastructureFailure)?;
         response
             .outputs
             .insert("PROGRAM".into(), bounded(program.as_bytes().to_vec())?);
+    }
+    for name in ["INVOKINGPROG", "RETURNPROG"] {
+        if request.arguments.contains_key(name) {
+            response
+                .outputs
+                .insert(name.into(), bounded(vec![b' '; 8])?);
+        }
     }
     for (name, length) in [
         ("APPLICATION", 64),
@@ -321,6 +445,11 @@ pub(in crate::service) fn assign(
                 .outputs
                 .insert(name.into(), bounded(b"X".to_vec())?);
         }
+    }
+    if request.arguments.contains_key("LANGINUSE") {
+        response
+            .outputs
+            .insert("LANGINUSE".into(), bounded(b"ENU".to_vec())?);
     }
     for name in ["MAJORVERSION", "MICROVERSION", "MINORVERSION"] {
         if request.arguments.contains_key(name) {
@@ -390,6 +519,15 @@ fn terminal_dimensions(
         .then_some((session.rows, session.columns)))
 }
 
+fn session_input_message_length(service: &CicsService, run: &Run) -> Result<i64, HostProblem> {
+    let state = service.lock()?;
+    let session = state
+        .sessions
+        .get(&run.session)
+        .ok_or(HostProblem::InfrastructureFailure)?;
+    Ok(i64::from(session.input.message_length))
+}
+
 fn positioned_map_geometry(
     service: &CicsService,
     run: &Run,
@@ -420,6 +558,41 @@ fn positioned_map_geometry(
     )))
 }
 
+fn terminal_has_positioned_map(
+    service: &CicsService,
+    run: &Run,
+) -> Result<Option<bool>, HostProblem> {
+    let state = service.lock()?;
+    let session = state
+        .sessions
+        .get(&run.session)
+        .ok_or(HostProblem::InfrastructureFailure)?;
+    if session.principal != run.invocation.principal.id().as_str()
+        || session.run_unit != run.invocation.run_unit_id.as_str()
+        || session.transaction != run.transaction
+    {
+        return Ok(None);
+    }
+    match (session.mapset.is_some(), session.map.is_some()) {
+        (false, false) => Ok(Some(false)),
+        (true, true) => Ok(Some(true)),
+        _ => Err(HostProblem::InfrastructureFailure),
+    }
+}
+
+fn terminal_identity(service: &CicsService, run: &Run) -> Result<Option<String>, HostProblem> {
+    let state = service.lock()?;
+    let session = state
+        .sessions
+        .get(&run.session)
+        .ok_or(HostProblem::InfrastructureFailure)?;
+    Ok((session.principal == run.invocation.principal.id().as_str()
+        && session.run_unit == run.invocation.run_unit_id.as_str()
+        && session.transaction == run.transaction)
+        .then(|| session.input.terminal_id.clone())
+        .flatten())
+}
+
 fn assign_link_level(run: &Run, dpl: bool) -> Result<i64, HostProblem> {
     if dpl {
         Ok(2)
@@ -427,6 +600,37 @@ fn assign_link_level(run: &Run, dpl: bool) -> Result<i64, HostProblem> {
         Ok(1)
     } else {
         Err(HostProblem::InfrastructureFailure)
+    }
+}
+
+fn validate_initial_program(run: &Run, dpl: bool) -> Result<(), HostProblem> {
+    if dpl
+        || run.current_program.parent_execution_id.is_some()
+        || !run.current_program.initial_entry
+    {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(())
+}
+
+fn validate_top_level_return_program(run: &Run, dpl: bool) -> Result<(), HostProblem> {
+    if dpl || run.current_program.parent_execution_id.is_some() {
+        return Err(HostProblem::InfrastructureFailure);
+    }
+    Ok(())
+}
+
+fn initial_program_entry(invocation: &Invocation) -> Result<bool, HostProblem> {
+    let Some(entry) = invocation.bindings.get("cics.program-entry") else {
+        return Ok(false);
+    };
+    if entry.schema() != "mainframe-env.cics.program-entry@1" {
+        return Err(HostProblem::Malformed);
+    }
+    match entry.bytes() {
+        b"initial" => Ok(true),
+        b"xctl" => Ok(false),
+        _ => Err(HostProblem::Malformed),
     }
 }
 
@@ -527,6 +731,20 @@ fn validate_assign_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "UNATTEND",
         "USERID",
         "VALIDATION",
+        "DESTCOUNT",
+        "LDCMNEM",
+        "LDCNUM",
+        "PAGENUM",
+        "PARTNPAGE",
+        "RETURNPROG",
+        "TERMPRIORITY",
+        "LANGINUSE",
+        "INPUTMSGLEN",
+        "INVOKINGPROG",
+        "INPARTN",
+        "FACILITY",
+        "NETNAME",
+        "TNADDR",
     ];
     if request.arguments.len() > 16
         || request.arguments.iter().any(|(name, value)| {

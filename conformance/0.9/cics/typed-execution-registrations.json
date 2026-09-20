@@ -18,11 +18,32 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0009"
     },
     {
+      "operation": "Cancel",
+      "interface": "api",
+      "family": "interval-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0016"
+    },
+    {
       "operation": "ChangeTask",
       "interface": "api",
       "family": "task-control",
       "mutating": false,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0022"
+    },
+    {
+      "operation": "Delay",
+      "interface": "api",
+      "family": "interval-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0039"
+    },
+    {
+      "operation": "DeleteTransientData",
+      "interface": "api",
+      "family": "queue-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0048"
     },
     {
       "operation": "Deq",
@@ -37,6 +58,13 @@
       "family": "task-control",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0064"
+    },
+    {
+      "operation": "Getmain",
+      "interface": "api",
+      "family": "storage-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0094"
     },
     {
       "operation": "HandleAid",
@@ -79,6 +107,13 @@
       "family": "task-control",
       "mutating": true,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0193"
+    },
+    {
+      "operation": "Start",
+      "interface": "api",
+      "family": "interval-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0205"
     },
     {
       "operation": "Suspend",

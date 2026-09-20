@@ -92,6 +92,20 @@ pub(super) fn validate(
         "UNATTEND",
         "USERID",
         "VALIDATION",
+        "DESTCOUNT",
+        "LDCMNEM",
+        "LDCNUM",
+        "PAGENUM",
+        "PARTNPAGE",
+        "RETURNPROG",
+        "TERMPRIORITY",
+        "LANGINUSE",
+        "INPUTMSGLEN",
+        "INVOKINGPROG",
+        "INPARTN",
+        "FACILITY",
+        "NETNAME",
+        "TNADDR",
     ] {
         let Some(value) = clauses.get(name) else {
             continue;
@@ -122,16 +136,20 @@ pub(super) fn validate(
                 | "DEFSCRNHT"
                 | "DEFSCRNWD"
                 | "DESTIDLENG"
+                | "DESTCOUNT"
                 | "ERRORMSGLEN"
                 | "INITPARMLEN"
+                | "INPUTMSGLEN"
                 | "LINKLEVEL"
                 | "MAPCOLUMN"
                 | "MAPHEIGHT"
                 | "MAPLINE"
                 | "MAPWIDTH"
+                | "PAGENUM"
                 | "SCRNHT"
                 | "SCRNWD"
                 | "TCTUALENG"
+                | "TERMPRIORITY"
                 | "TWALENG"
         ) && (target.usage != CobolUsage::Binary || target.length != 2 || target.scale != 0)
         {
@@ -152,20 +170,30 @@ pub(super) fn validate(
             || (name == "ASRAREGS64" && target.length != 128)
             || (name == "BRIDGE" && target.length != 4)
             || (name == "DESTID" && target.length != 8)
+            || (name == "LDCMNEM" && target.length != 2)
+            || (name == "LDCNUM" && target.length != 1)
             || (name == "ERRORMSG" && target.length != 500)
             || (name == "FCI" && target.length != 1)
+            || (name == "FACILITY" && target.length != 4)
             || (name == "INITPARM" && target.length != 60)
+            || (name == "INPARTN" && !(1..=2).contains(&target.length))
+            || (name == "INVOKINGPROG" && target.length != 8)
+            || (name == "LANGINUSE" && target.length != 3)
             || (name == "OPERKEYS" && target.length != 8)
             || (name == "OPSECURITY" && target.length != 3)
             || (name == "ORGABCODE" && target.length != 4)
             || (name == "NEXTTRANSID" && target.length != 4)
+            || (name == "NETNAME" && target.length != 8)
             || (name == "PARTNSET" && target.length != 6)
+            || (name == "PARTNPAGE" && target.length != 2)
             || (name == "PRINSYSID" && target.length != 4)
             || (name == "PROCESS" && target.length != 36)
             || (name == "PROCESSTYPE" && target.length != 8)
             || (name == "PROGRAM" && target.length != 8)
             || (name == "QNAME" && target.length != 4)
             || (name == "RESTART" && target.length != 1)
+            || (name == "RETURNPROG" && target.length != 8)
+            || (name == "TNADDR" && target.length != 39)
             || (matches!(
                 name,
                 "APLKYBD"

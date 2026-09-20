@@ -98,6 +98,22 @@ pub(super) struct PendingOnlineTransfer {
 }
 
 impl ProductServer {
+    pub(super) fn abort_online_machine_run(
+        &self,
+        session: &SessionId,
+        principal: &PrincipalId,
+        now_tick: u64,
+    ) -> Result<(), HostProblem> {
+        let trace = self.cics.terminal_run_trace(session, principal, now_tick)?;
+        self.online_traces
+            .lock()
+            .map_err(|_| HostProblem::InfrastructureFailure)?
+            .entry(session.as_str().into())
+            .or_default()
+            .extend(trace);
+        self.cics.abort_terminal_run(session, principal, now_tick)
+    }
+
     pub(super) fn online_exchange(
         &self,
         session: &SessionId,
@@ -140,20 +156,52 @@ impl ProductServer {
         now_tick: u64,
         preserve_handle_state: bool,
     ) -> Result<(), HostProblem> {
-        let trace = if preserve_handle_state {
-            self.cics
-                .discard_handed_off_terminal_run_if_present(session, principal, now_tick)
-        } else {
-            self.cics
-                .discard_terminal_run_if_present(session, principal, now_tick)
-        }?;
-        self.online_traces
-            .lock()
-            .map_err(|_| HostProblem::InfrastructureFailure)?
-            .entry(session.as_str().into())
-            .or_default()
-            .extend(trace);
-        Ok(())
+        let exchange = self
+            .online_exchange(session)?
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        let mut invocation = self.online_exchange_invocation(&exchange)?;
+        let saved = self.online_machine_continuation(session)?;
+        restore_online_machine_priority(&mut invocation, saved.as_ref());
+        let execution = self
+            .store
+            .get_execution(&invocation.execution_id)
+            .map_err(store_error)?
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        self.cics.restore_terminal_run(
+            invocation,
+            session,
+            &exchange.transaction,
+            exchange.commarea,
+            now_tick,
+        )?;
+        if preserve_handle_state {
+            let trace = self
+                .cics
+                .discard_handed_off_terminal_run_if_present(session, principal, now_tick)?;
+            self.online_traces
+                .lock()
+                .map_err(|_| HostProblem::InfrastructureFailure)?
+                .entry(session.as_str().into())
+                .or_default()
+                .extend(trace);
+            return Ok(());
+        }
+        match execution.state {
+            ExecutionState::Completed => {
+                self.finish_online_machine_run(session, principal, now_tick)
+            }
+            ExecutionState::Cancelled
+            | ExecutionState::TimedOut
+            | ExecutionState::Failed
+            | ExecutionState::DeadLetter => {
+                self.abort_online_machine_run(session, principal, now_tick)
+            }
+            ExecutionState::Admitted
+            | ExecutionState::Queued
+            | ExecutionState::Running
+            | ExecutionState::Suspended
+            | ExecutionState::Completing => Err(HostProblem::InfrastructureFailure),
+        }
     }
 
     fn suspend_online_machine_run(
@@ -459,6 +507,7 @@ impl ProductServer {
             )
             .map_err(|_| HostProblem::ResourceExhausted)?,
         );
+        bindings.insert("cics.program-entry".into(), program_entry_payload(b"xctl")?);
         let mut next = Invocation::new(
             RequestId::new(format!("online-transfer-request-{sequence}"), limits)
                 .map_err(|_| HostProblem::InfrastructureFailure)?,
@@ -538,7 +587,7 @@ impl ProductServer {
             current_version,
         )?;
         match suspension.kind.as_str() {
-            "cics-enqueue" | "cics-scheduler" => return Ok(()),
+            "cics-delay" | "cics-enqueue" | "cics-retrieve" | "cics-scheduler" => return Ok(()),
             "cics-terminal" => {}
             _ => return Err(HostProblem::InfrastructureFailure),
         }
@@ -737,6 +786,33 @@ pub(super) fn restore_online_machine_priority(
     if let Some(priority) = continuation.and_then(|continuation| continuation.priority) {
         invocation.priority = priority;
     }
+}
+
+pub(super) fn restore_online_machine_context(
+    invocation: &mut Invocation,
+    continuation: Option<&OnlineMachineContinuation>,
+) -> Result<(), HostProblem> {
+    restore_online_machine_priority(invocation, continuation);
+    let entry = if invocation.selector.as_str().starts_with("cics:") {
+        b"initial".as_slice()
+    } else if invocation.selector.as_str().starts_with("program:") {
+        b"xctl".as_slice()
+    } else {
+        return Err(HostProblem::InfrastructureFailure);
+    };
+    invocation
+        .bindings
+        .insert("cics.program-entry".into(), program_entry_payload(entry)?);
+    Ok(())
+}
+
+fn program_entry_payload(entry: &[u8]) -> Result<BoundedPayload, HostProblem> {
+    BoundedPayload::new(
+        "mainframe-env.cics.program-entry@1",
+        entry.to_vec(),
+        InvocationLimits::default(),
+    )
+    .map_err(|_| HostProblem::ResourceExhausted)
 }
 
 fn encode_provider_generations(
