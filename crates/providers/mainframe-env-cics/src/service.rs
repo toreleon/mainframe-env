@@ -1715,12 +1715,12 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 41);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 42);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
         match descriptor.family {
-            CicsCommandFamily::TaskControl => {
+            CicsCommandFamily::TaskControl | CicsCommandFamily::StorageControl => {
                 handlers::invoke_task_control(self, run, &request, retention_tick)
             }
             CicsCommandFamily::Time => handlers::invoke_time(self, run, &request),
@@ -4667,6 +4667,7 @@ mod tests {
             ("ENDBR", CicsOperation::EndBrowse),
             ("ENQ", CicsOperation::Enq),
             ("FORMATTIME", CicsOperation::FormatTime),
+            ("GETMAIN", CicsOperation::Getmain),
             ("HANDLE ABEND", CicsOperation::HandleAbend),
             ("HANDLE AID", CicsOperation::HandleAid),
             ("HANDLE CONDITION", CicsOperation::HandleCondition),
@@ -4707,7 +4708,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 41);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 42);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -4719,7 +4720,7 @@ mod tests {
             assert_eq!(command_descriptor(descriptor.operation), descriptor);
             families.insert(format!("{:?}", descriptor.family));
         }
-        assert_eq!(families.len(), 8);
+        assert_eq!(families.len(), 9);
         let asktime = command_descriptor(CicsOperation::Asktime);
         assert_eq!(asktime.syntax, "ASKTIME ABSTIME");
         assert_eq!(
@@ -9157,6 +9158,130 @@ mod tests {
             );
         }
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn getmain_returns_initialized_storage_and_exact_capacity_conditions() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+        let getmain = request(
+            CicsOperation::Getmain,
+            BTreeMap::from([
+                ("FLENGTH".into(), cics_decimal(4)),
+                ("INITIMG".into(), task_value(b"Z")),
+                ("SET".into(), argument(b"PTR-X")),
+                ("SET.MAXLENGTH".into(), cics_decimal(16)),
+                ("SET.LIMIT".into(), cics_decimal(64)),
+            ]),
+            1,
+        );
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, getmain.clone(), 1),
+                getmain.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("NORMAL", 0)
+        );
+        assert_eq!(response.outputs["SET"].bytes(), b"ZZZZ");
+        let replay = service
+            .invoke(
+                &effect(&invocation.run_unit_id, getmain.clone(), 1),
+                getmain,
+            )
+            .unwrap();
+        assert_eq!(replay, response);
+
+        let mut zero = request(
+            CicsOperation::Getmain,
+            BTreeMap::from([
+                ("FLENGTH".into(), cics_decimal(0)),
+                ("SET".into(), argument(b"PTR-X")),
+                ("SET.MAXLENGTH".into(), cics_decimal(16)),
+                ("SET.LIMIT".into(), cics_decimal(64)),
+                ("RESP".into(), argument(b"RESP-X")),
+                ("RESP2".into(), argument(b"RESP2-X")),
+            ]),
+            2,
+        );
+        zero.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let zero = service
+            .invoke(&effect(&invocation.run_unit_id, zero.clone(), 2), zero)
+            .unwrap();
+        assert_eq!(
+            (zero.condition.as_str(), zero.response, zero.response2),
+            ("LENGERR", 22, 1)
+        );
+        assert_eq!(
+            zero.outputs["SET"].schema(),
+            "mainframe-env.cics.pointer-null@1"
+        );
+        assert!(zero.outputs["SET"].bytes().is_empty());
+
+        let exhausted = request(
+            CicsOperation::Getmain,
+            BTreeMap::from([
+                ("FLENGTH".into(), cics_decimal(17)),
+                ("SET".into(), argument(b"PTR-X")),
+                ("SET.MAXLENGTH".into(), cics_decimal(16)),
+                ("SET.LIMIT".into(), cics_decimal(64)),
+            ]),
+            3,
+        );
+        let exhausted = service
+            .invoke(
+                &effect(&invocation.run_unit_id, exhausted.clone(), 3),
+                exhausted,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                exhausted.disposition,
+                exhausted.condition.as_str(),
+                exhausted.response,
+                exhausted.response2
+            ),
+            (CicsDisposition::Ignored, "NOSTG", 42, 2)
+        );
+
+        let mut over_limit = request(
+            CicsOperation::Getmain,
+            BTreeMap::from([
+                ("FLENGTH".into(), cics_decimal(65)),
+                ("SET".into(), argument(b"PTR-X")),
+                ("SET.MAXLENGTH".into(), cics_decimal(64)),
+                ("SET.LIMIT".into(), cics_decimal(64)),
+                ("RESP".into(), argument(b"RESP-X")),
+            ]),
+            4,
+        );
+        over_limit.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: None,
+        };
+        let over_limit = service
+            .invoke(
+                &effect(&invocation.run_unit_id, over_limit.clone(), 4),
+                over_limit,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                over_limit.condition.as_str(),
+                over_limit.response,
+                over_limit.response2
+            ),
+            ("LENGERR", 22, 1)
+        );
+        assert_eq!(
+            over_limit.outputs["SET"].schema(),
+            "mainframe-env.cics.pointer-null@1"
+        );
     }
 
     /// Issue #207: bare separators use slash/colon and compact forms keep compact widths.

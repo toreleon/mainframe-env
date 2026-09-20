@@ -7,6 +7,7 @@ mod program_control;
 mod queue_control;
 mod recovery;
 mod start_task;
+mod storage_control;
 mod task_context;
 mod task_control;
 mod task_enqueue;

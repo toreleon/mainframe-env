@@ -29,6 +29,7 @@ mod output_bindings;
 mod program_control;
 mod program_name;
 mod queue_control;
+mod storage_control;
 mod terminal_control;
 mod transaction_name;
 
@@ -731,6 +732,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         ],
         HirCicsOperation::WriteTransientData => &["QUEUE", "FROM", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::DeleteTransientData => &["QUEUE", "RESP", "RESP2"],
+        HirCicsOperation::Getmain => &["FLENGTH", "INITIMG", "SET", "RESP", "RESP2"],
         HirCicsOperation::ReceiveMap => &["MAP", "MAPSET", "INTO", "RESP", "RESP2"],
         HirCicsOperation::SendMap => &["MAP", "MAPSET", "FROM", "RESP", "RESP2"],
         HirCicsOperation::SendText => &["FROM", "LENGTH", "RESP", "RESP2"],
@@ -807,6 +809,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::StartBrowse => &["GTEQ", "NOHANDLE"],
         HirCicsOperation::Deq => &["UOW", "TASK", "NOHANDLE"],
         HirCicsOperation::Enq => &["UOW", "TASK", "NOSUSPEND", "NOHANDLE"],
+        HirCicsOperation::Getmain => &["NOSUSPEND", "NOHANDLE"],
         HirCicsOperation::Read => &["UPDATE", "NOHANDLE"],
         HirCicsOperation::Rewrite => &["NOHANDLE"],
         HirCicsOperation::Syncpoint => &["ROLLBACK", "NOHANDLE"],
@@ -848,6 +851,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     program_control::validate_constraints(operation, &clauses)?;
     file_operands::validate_constraints(&clauses, operation)?;
     queue_control::validate_constraints(&clauses, operation)?;
+    storage_control::validate_constraints(&clauses, operation, semantic)?;
     terminal_control::validate_constraints(&clauses, operation)?;
     interval_control::validate_constraints(&clauses, &raw_options, operation)?;
     for required in match operation {
@@ -874,6 +878,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::Rewrite
         | HirCicsOperation::WriteTransientData
         | HirCicsOperation::DeleteTransientData
+        | HirCicsOperation::Getmain
         | HirCicsOperation::ReceiveMap
         | HirCicsOperation::SendMap
         | HirCicsOperation::SendText
@@ -997,6 +1002,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     }
     operands.extend(file_operands::resolve(&clauses, operation, semantic)?);
     operands.extend(queue_control::operands(&clauses, operation, semantic)?);
+    operands.extend(storage_control::operands(&clauses, operation, semantic)?);
     operands.extend(terminal_control::operands(&clauses, operation, semantic)?);
     operands.extend(interval_control::operands(&clauses, operation, semantic)?);
     if matches!(operation, HirCicsOperation::Deq | HirCicsOperation::Enq) {

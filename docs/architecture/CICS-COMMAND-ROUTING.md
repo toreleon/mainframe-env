@@ -224,6 +224,13 @@ bytes. Typed local DELETEQ TD accepts only the bounded QUEUE selector, requires
 update access to the same queue resource, and atomically removes the durable
 queue plus its retained-byte accounting. A missing queue returns QIDERR 44/0.
 Remote SYSID routing and TDQUEUE definition-state conditions remain deferred.
+Typed local GETMAIN routes SET plus FLENGTH and optional INITIMG through the
+storage-control family. The interpreter contributes its remaining virtual
+frame/byte capacity, applies the returned initialized bytes to a checkpointed
+virtual base, and writes a checked POINTER or POINTER-32 address. Nonpositive
+or over-limit length clears SET with LENGERR 22/1; unavailable capacity returns
+default-ignored NOSTG 42/2. Native addresses, legacy LENGTH, key/share/executable attributes,
+FREEMAIN, and 64-bit forms remain deferred.
 The typed local BMS subset binds `RECEIVE MAP`, `SEND MAP`, and `SEND TEXT` to
 the terminal family. Map names are prevalidated 1–7 character literals or
 alpha/alphanumeric fields; a `RECEIVE MAP` MAPSET field may be eight bytes so
@@ -346,8 +353,9 @@ differentials, or make 0.9.0 release-ready.
 | `queue-control` | transient-data queue writes and local queue deletion |
 | `recovery` | SYNCPOINT coordination, rollback, and subsystem unit-of-work completion |
 | `interval-control` | bounded local START scheduling/cancellation with facility-less or virtual-terminal target launch plus zero, relative, and absolute DELAY |
+| `storage-control` | bounded task-local virtual storage allocation |
 
-This table describes the eight families already present in the 41-operation runtime
+This table describes the nine families already present in the 42-operation runtime
 collection. The 263-row application registry also assigns every row a
 deterministic future family owner, but that assignment is routing shape rather
 than an executable handler. `CicsService::invoke_run` selects an existing

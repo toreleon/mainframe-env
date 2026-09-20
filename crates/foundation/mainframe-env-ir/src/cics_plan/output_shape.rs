@@ -17,6 +17,10 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
                 | CicsOutputName::ReturnTermId
                 | CicsOutputName::Queue
         ),
+        CicsPlanOperation::Getmain => matches!(
+            output,
+            CicsOutputName::SetPointer | CicsOutputName::Resp | CicsOutputName::Resp2
+        ),
         CicsPlanOperation::FormatTime => matches!(
             output,
             CicsOutputName::Milliseconds

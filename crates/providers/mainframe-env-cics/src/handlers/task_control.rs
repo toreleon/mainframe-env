@@ -246,6 +246,7 @@ pub(in crate::service) fn invoke(
             super::task_enqueue::invoke(service, run, request, retention_tick)
         }
         CicsOperation::HandleCondition => handle_condition(service, run, request),
+        CicsOperation::Getmain => super::storage_control::invoke(service, run, request),
         CicsOperation::HandleAid => handle_aid(service, run, request),
         CicsOperation::HandleAbend => handle_abend(service, run, request),
         CicsOperation::IgnoreCondition => ignore_condition(service, run, request),

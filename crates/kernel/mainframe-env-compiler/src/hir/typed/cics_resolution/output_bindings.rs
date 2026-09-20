@@ -44,7 +44,12 @@ pub(super) fn resolve(
         {
             continue;
         }
-        if name == "SET" && operation != HirCicsOperation::Retrieve {
+        if name == "SET"
+            && !matches!(
+                operation,
+                HirCicsOperation::Retrieve | HirCicsOperation::Getmain
+            )
+        {
             continue;
         }
         if matches!(name, "RTRANSID" | "RTERMID" | "QUEUE")
@@ -57,9 +62,9 @@ pub(super) fn resolve(
             require_writable(&target)?;
             if name == "SET" && !matches!(target.usage, CobolUsage::Pointer | CobolUsage::Pointer32)
             {
-                return Err(super::super::ResolutionFailure::Invalid(
-                    "CICS RETRIEVE SET requires a POINTER or POINTER-32 reference".into(),
-                ));
+                return Err(super::super::ResolutionFailure::Invalid(format!(
+                    "CICS {operation:?} SET requires a POINTER or POINTER-32 reference"
+                )));
             }
             format_time::require_output_shape(identity, &target, clauses, options)?;
             outputs.push(HirCicsOutputBinding {

@@ -15,6 +15,7 @@ mod option_shape;
 mod output_shape;
 mod program_control;
 mod queue_control;
+mod storage_control;
 mod terminal_control;
 
 pub use assign::{CICS_ASSIGN_OUTPUT_NAMES, CicsAssignOutput};
@@ -502,6 +503,7 @@ fn validate_operation_shape(
         CicsPlanOperation::DeleteTransientData => {
             queue_control::invalid_delete_transient_data_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::Getmain => storage_control::invalid_getmain_shape(plan, inputs, outputs),
         CicsPlanOperation::ReceiveMap
         | CicsPlanOperation::SendMap
         | CicsPlanOperation::SendText => terminal_control::invalid_shape(plan, inputs, outputs),
@@ -1942,6 +1944,45 @@ mod tests {
         data_from_pointer.operands[0].value = CicsOperandValue::Literal(b"PTR-X".to_vec());
         assert_eq!(
             encode_cics_effect_plan(&data_from_pointer, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn getmain_requires_flength_and_one_set_pointer_output() {
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Getmain,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::Flength,
+                    value: CicsOperandValue::Integer(16),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::InitImage,
+                    value: CicsOperandValue::Storage(slot(1, "INIT-X")),
+                },
+            ],
+            options: BTreeSet::from([CicsPlanOption::NoSuspend]),
+            outputs: vec![CicsOutputBinding {
+                name: CicsOutputName::SetPointer,
+                target: slot(2, "PTR-X"),
+            }],
+            condition: CicsCondition::Default,
+        };
+        let limits = CicsPlanLimits::default();
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
+
+        let mut missing_set = plan.clone();
+        missing_set.outputs.clear();
+        assert_eq!(
+            encode_cics_effect_plan(&missing_set, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut literal_image = plan;
+        literal_image.operands[1].value = CicsOperandValue::Literal(vec![b'Z']);
+        assert_eq!(
+            encode_cics_effect_plan(&literal_image, limits),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }

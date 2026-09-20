@@ -384,6 +384,12 @@ All notable changes to mainframe-env are documented here.
   and selected compiled-route regressions cover deletion and repeated-delete
   behavior. Remote SYSID and TDQUEUE definition, extrapartition, disabled, and
   locked states remain fail-closed.
+- Added a typed task-local `GETMAIN SET/FLENGTH` subset over interpreter-owned
+  virtual storage. Literal or fullword-binary lengths, one-byte `INITIMG`,
+  `NOSUSPEND`, checkpoint restoration, replay, LENGERR 22/1 pointer clearing,
+  and default-ignored NOSTG 42/2 are covered without exposing native addresses.
+  Legacy LENGTH, key/share/executable policy, FREEMAIN/64, and DPL proof remain
+  fail-closed or pending.
 - Migrated bounded local `RECEIVE MAP`, `SEND MAP`, and `SEND TEXT` subsets to
   typed terminal plans. MAP and optional MAPSET are validated 1–7 character
   selectors, with an eight-byte RECEIVE MAPSET field admitted for a valid name

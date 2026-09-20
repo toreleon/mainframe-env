@@ -1370,6 +1370,11 @@
         "id": "interval-control",
         "rust_variant": "IntervalControl",
         "responsibility": "Durable interval START scheduling, cancellation, and RETRIEVE record semantics."
+      },
+      {
+        "id": "storage-control",
+        "rust_variant": "StorageControl",
+        "responsibility": "Bounded task-local virtual storage allocation and release semantics."
       }
     ],
     "operations": [

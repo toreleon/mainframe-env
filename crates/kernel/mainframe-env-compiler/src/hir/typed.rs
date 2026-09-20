@@ -152,6 +152,7 @@ pub enum HirCicsOperation {
     Asktime,
     AsktimeEib,
     FormatTime,
+    Getmain,
     Cancel,
     Delay,
     ChangeTask,
@@ -231,6 +232,8 @@ pub enum HirCicsOperandName {
     Seconds,
     Milliseconds,
     DataLength,
+    Flength,
+    InitImage,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2839,6 +2842,53 @@ mod tests {
                 .public_message()
                 .contains("typed lowering is unready for SYSID")
         }));
+    }
+
+    #[test]
+    fn cics_getmain_resolves_bounded_task_local_storage() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. 01 LEN-X PIC S9(9) COMP VALUE 4. 01 INIT-X PIC X VALUE 'Z'. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) FLENGTH(LEN-X) INITIMG(INIT-X) NOSUSPEND RESP(RESP-X) END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("GETMAIN: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed GETMAIN");
+        assert_eq!(command.operation, HirCicsOperation::Getmain);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Flength
+                && matches!(
+                    &operand.value,
+                    HirCicsValue::Data(reference) if reference.qualified_name == "LEN-X"
+                )
+        }));
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::InitImage
+                && matches!(
+                    &operand.value,
+                    HirCicsValue::Data(reference) if reference.qualified_name == "INIT-X"
+                )
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::SetPointer && output.target.qualified_name == "PTR-X"
+        }));
+        assert!(command.options.contains(&HirCicsOption::NoSuspend));
+
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) LENGTH(4) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. 01 LEN-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) FLENGTH(LEN-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X PIC X(4). PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) FLENGTH(4) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) FLENGTH(2147483648) END-EXEC. STOP RUN.",
+        ] {
+            let analysis = analyze(source);
+            assert!(analysis.hir.is_none(), "{source}");
+        }
     }
 
     #[test]

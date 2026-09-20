@@ -1,5 +1,36 @@
 use super::*;
 
+pub(super) fn allocation_arguments(
+    machine: &ReferenceMachine,
+    target: &CicsTarget,
+    operation: CicsPlanOperation,
+) -> Result<BTreeMap<String, BoundedPayload>, MachineProblem> {
+    let mut arguments = BTreeMap::from([(
+        "SET.MAXLENGTH".into(),
+        payload(
+            "mainframe-env.cics.decimal@1",
+            allocation_capacity(machine, target)?
+                .to_string()
+                .into_bytes(),
+        )?,
+    )]);
+    if operation == CicsPlanOperation::Getmain {
+        arguments.insert(
+            "SET.LIMIT".into(),
+            payload(
+                "mainframe-env.cics.decimal@1",
+                machine
+                    .invocation
+                    .limits
+                    .max_storage_bytes
+                    .to_string()
+                    .into_bytes(),
+            )?,
+        );
+    }
+    Ok(arguments)
+}
+
 pub(super) fn allocation_capacity(
     machine: &ReferenceMachine,
     target: &CicsTarget,
@@ -14,7 +45,7 @@ pub(super) fn allocation_capacity(
         .saturating_sub(machine.static_base_count)
         >= machine.invocation.limits.max_frames as usize
     {
-        return Err(MachineProblem::ResourceExhausted);
+        return Ok(0);
     }
     machine.address_bytes_for(machine.bases.len(), 0, pointer.length)?;
     let used = machine
@@ -33,6 +64,16 @@ pub(super) fn write_set_output(
     target: &CicsTarget,
     value: &BoundedPayload,
 ) -> Result<(), MachineProblem> {
+    if value.schema() == "mainframe-env.cics.pointer-null@1" {
+        if !value.bytes().is_empty() {
+            return Err(MachineProblem::UnexpectedHostResult);
+        }
+        let CicsTarget::Resolved(slot) = target else {
+            return Err(MachineProblem::UnexpectedHostResult);
+        };
+        let pointer = resolved_slot(machine, slot)?;
+        return machine.write_reference(&pointer, &vec![0; pointer.length]);
+    }
     if value.schema() != "mainframe-env.cics.payload@1" {
         return Err(MachineProblem::UnexpectedHostResult);
     }

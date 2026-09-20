@@ -289,6 +289,7 @@ pub(super) fn execute(
                         | CicsOperandName::Minutes
                         | CicsOperandName::Seconds
                         | CicsOperandName::Milliseconds
+                        | CicsOperandName::Flength
                 ) =>
             {
                 (
@@ -364,14 +365,11 @@ pub(super) fn execute(
             }
             CicsOutputName::Into => into = Some(target),
             CicsOutputName::SetPointer => {
-                let capacity = retrieve::allocation_capacity(machine, &target)?;
-                arguments.insert(
-                    "SET.MAXLENGTH".into(),
-                    payload(
-                        "mainframe-env.cics.decimal@1",
-                        capacity.to_string().into_bytes(),
-                    )?,
-                );
+                arguments.extend(retrieve::allocation_arguments(
+                    machine,
+                    &target,
+                    plan.operation,
+                )?);
                 outputs.insert(key.into(), target);
             }
             CicsOutputName::Ridfld => {
@@ -837,6 +835,11 @@ fn validate_machine_slot(
         return Err(invalid_plan(
             "LENGTH and KEYLENGTH inputs must be halfword binary",
         ));
+    }
+    if matches!(slot_use, SlotUse::FullwordInput)
+        && (layout.category != LayoutCategory::Binary || layout.length != 4 || layout.scale != 0)
+    {
+        return Err(invalid_plan("FLENGTH input must be fullword binary"));
     }
     if let SlotUse::AssignOutput(output) = slot_use {
         assign::validate_output(layout, output)?;

@@ -28,6 +28,8 @@ pub enum CicsOperation {
     Enq,
     EndBrowse,
     FormatTime,
+    /// Allocate one bounded task-local virtual storage area.
+    Getmain,
     HandleAbend,
     /// Install or deactivate one bounded set of terminal AID handlers.
     HandleAid,
@@ -85,6 +87,7 @@ impl CicsOperation {
             Self::Enq => "Enq",
             Self::EndBrowse => "EndBrowse",
             Self::FormatTime => "FormatTime",
+            Self::Getmain => "Getmain",
             Self::HandleAbend => "HandleAbend",
             Self::HandleAid => "HandleAid",
             Self::HandleCondition => "HandleCondition",
@@ -125,6 +128,7 @@ impl CicsOperation {
                 | Self::Delay
                 | Self::Deq
                 | Self::Enq
+                | Self::Getmain
                 | Self::Rewrite
                 | Self::Write
                 | Self::WriteTransientData
@@ -173,6 +177,7 @@ impl CicsOperation {
             ("ENQ", _) => Self::Enq,
             ("ENDBR", _) => Self::EndBrowse,
             ("FORMATTIME", _) => Self::FormatTime,
+            ("GETMAIN", _) => Self::Getmain,
             ("HANDLE", Some("ABEND")) => Self::HandleAbend,
             ("HANDLE", Some("AID")) => Self::HandleAid,
             ("HANDLE", Some("CONDITION")) => Self::HandleCondition,

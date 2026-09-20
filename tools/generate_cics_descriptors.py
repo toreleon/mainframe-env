@@ -86,6 +86,7 @@ EXPECTED_FAMILIES = {
     "queue-control": "QueueControl",
     "recovery": "Recovery",
     "interval-control": "IntervalControl",
+    "storage-control": "StorageControl",
 }
 EXPECTED_RUNTIME_OPERATIONS = [
     ("Abend", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0001"),
@@ -108,6 +109,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("EndBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0058"),
     ("Enq", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0064"),
     ("FormatTime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0080"),
+    ("Getmain", "api", "storage-control", True, f"{OFFICIAL_BASELINE}:api-commands:0094"),
     ("HandleAbend", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0097"),
     ("HandleAid", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0098"),
     ("HandleCondition", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0099"),
@@ -379,6 +381,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Deq",
         "Enq",
         "FormatTime",
+        "Getmain",
         "HandleAbend",
         "HandleAid",
         "HandleCondition",
@@ -525,6 +528,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
     "DeleteTransientData": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "Getmain": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
     "ReceiveMap": frozenset(
@@ -760,6 +766,7 @@ def _load_typed_execution_registrations(
         "DeleteTransientData",
         "Deq",
         "Enq",
+        "Getmain",
         "HandleAid",
         "IgnoreCondition",
         "PopHandle",
@@ -3375,8 +3382,8 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
         for row in catalog["_runtime_operations"]
         if row["interface"] == "api"
     }
-    if len(existing_runtime) != 39:
-        raise DescriptorError("CICS application runtime set must remain exactly 39 rows")
+    if len(existing_runtime) != 40:
+        raise DescriptorError("CICS application runtime set must remain exactly 40 rows")
 
     loaded_batches = []
     for batch_id, start, end, projection_path, review_path in CONTRACT_BATCHES:
@@ -3630,12 +3637,12 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
     if (
         len(registry_rows) != 263
         or len(set(handler_ids)) != 263
-        or len(typed_rows) != 39
+        or len(typed_rows) != 40
         or len(legacy_rows) != 0
         or {row["runtime_operation"] for row in typed_rows}
         != TYPED_RUNTIME_OPERATIONS
-        or len(advertised_rows) != 39
-        or len(unready_rows) != 224
+        or len(advertised_rows) != 40
+        or len(unready_rows) != 223
         or any(row["unready_result"] != "explicit-unsupported" for row in unready_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in typed_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in legacy_rows)

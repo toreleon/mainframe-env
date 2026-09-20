@@ -13,6 +13,8 @@ pub enum CicsPlanOperation {
     AsktimeEib,
     /// Transform one absolute-time value into selected display/binary fields.
     FormatTime,
+    /// Allocate one bounded task-local virtual storage area.
+    Getmain,
     /// Change the issuing task's dispatch priority and optionally yield.
     ChangeTask,
     /// Cancel one unhonored local interval-control START request.
@@ -159,6 +161,10 @@ pub enum CicsOperandName {
     Minutes,
     Seconds,
     Milliseconds,
+    /// `FLENGTH(...)` fullword allocation length.
+    Flength,
+    /// `INITIMG(...)` one-byte initialization image.
+    InitImage,
 }
 
 /// Flag option accepted by the typed CICS pilot.
