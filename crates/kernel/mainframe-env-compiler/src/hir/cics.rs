@@ -209,6 +209,7 @@ impl PlanContext<'_> {
                 HirCicsOperandName::Flength => CicsOperandName::Flength,
                 HirCicsOperandName::InitImage => CicsOperandName::InitImage,
                 HirCicsOperandName::DataPointer => CicsOperandName::DataPointer,
+                HirCicsOperandName::DataArea => CicsOperandName::DataArea,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {

@@ -169,6 +169,8 @@ pub enum CicsOperandName {
     InitImage,
     /// `DATAPOINTER(...)` virtual storage pointer returned by GETMAIN.
     DataPointer,
+    /// `DATA(...)` area whose virtual address identifies GETMAIN storage.
+    DataArea,
 }
 
 /// Flag option accepted by the typed CICS pilot.

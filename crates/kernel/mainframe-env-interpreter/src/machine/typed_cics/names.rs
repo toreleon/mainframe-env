@@ -33,6 +33,7 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::KeyLength => SlotUse::Input,
         CicsOperandName::Flength => SlotUse::FullwordInput,
         CicsOperandName::DataPointer => SlotUse::PointerInput,
+        CicsOperandName::DataArea => SlotUse::Input,
         _ => SlotUse::Input,
     }
 }
@@ -150,6 +151,7 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::Flength => "FLENGTH",
         CicsOperandName::InitImage => "INITIMG",
         CicsOperandName::DataPointer => "DATAPOINTER",
+        CicsOperandName::DataArea => "DATA",
     }
 }
 

@@ -86,6 +86,26 @@ pub(super) fn freemain_argument(
     ))
 }
 
+pub(super) fn freemain_data_argument(
+    machine: &ReferenceMachine,
+    slot: &CicsStorageSlot,
+) -> Result<(&'static str, Vec<u8>), MachineProblem> {
+    let reference = resolved_slot(machine, slot)?;
+    let Some(view) = machine.storage_view(&reference.layout.name).ok() else {
+        return Ok(("mainframe-env.cics.invalid-pointer@1", vec![0; 8]));
+    };
+    if view.base < machine.static_base_count
+        || view.offset != 0
+        || machine.freed_allocations.contains(&view.base)
+    {
+        return Ok(("mainframe-env.cics.invalid-pointer@1", vec![0; 8]));
+    }
+    Ok((
+        "mainframe-env.cics.allocated-pointer@1",
+        machine.address_bytes_for(view.base, view.offset, 8)?,
+    ))
+}
+
 pub(super) fn release_pointer(
     machine: &mut ReferenceMachine,
     value: &BoundedPayload,

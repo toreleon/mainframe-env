@@ -271,6 +271,9 @@ pub(super) fn execute(
             CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::DataPointer => {
                 retrieve::freemain_argument(machine, slot)?
             }
+            CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::DataArea => {
+                retrieve::freemain_data_argument(machine, slot)?
+            }
             CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::UsingAddress => (
                 "mainframe-env.cics.storage-identity@1",
                 format!(

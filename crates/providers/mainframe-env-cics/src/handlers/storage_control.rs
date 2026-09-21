@@ -149,11 +149,14 @@ fn validate_getmain(request: &CicsRequest) -> Result<(), HostProblem> {
 }
 
 fn validate_freemain(request: &CicsRequest) -> Result<&BoundedPayload, HostProblem> {
-    const ALLOWED: &[&str] = &["DATAPOINTER", "OPTION.NOHANDLE", "RESP", "RESP2"];
-    let pointer = request
-        .arguments
-        .get("DATAPOINTER")
-        .ok_or(HostProblem::Malformed)?;
+    const ALLOWED: &[&str] = &["DATA", "DATAPOINTER", "OPTION.NOHANDLE", "RESP", "RESP2"];
+    let pointer = match (
+        request.arguments.get("DATA"),
+        request.arguments.get("DATAPOINTER"),
+    ) {
+        (Some(value), None) | (None, Some(value)) => value,
+        _ => return Err(HostProblem::Malformed),
+    };
     if request.mutation.is_none()
         || !matches!(pointer.bytes().len(), 4 | 8)
         || !matches!(
@@ -163,7 +166,7 @@ fn validate_freemain(request: &CicsRequest) -> Result<&BoundedPayload, HostProbl
         || request.arguments.iter().any(|(name, value)| {
             !ALLOWED.contains(&name.as_str())
                 || match name.as_str() {
-                    "DATAPOINTER" => value.schema() != pointer.schema(),
+                    "DATA" | "DATAPOINTER" => value.schema() != pointer.schema(),
                     "OPTION.NOHANDLE" => {
                         value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
                     }

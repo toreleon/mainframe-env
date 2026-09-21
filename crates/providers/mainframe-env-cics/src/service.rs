@@ -9322,6 +9322,48 @@ mod tests {
             .unwrap();
         assert_eq!(replay, response);
 
+        let data = request(
+            CicsOperation::Freemain,
+            BTreeMap::from([(
+                "DATA".into(),
+                pointer(
+                    "mainframe-env.cics.allocated-pointer@1",
+                    &[0, 0, 0, 3, 0, 0, 0, 0],
+                ),
+            )]),
+            2,
+        );
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, data.clone(), 2),
+                data.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("NORMAL", 0)
+        );
+        assert_eq!(response.outputs["FREEMAIN.POINTER"], data.arguments["DATA"]);
+
+        let both = request(
+            CicsOperation::Freemain,
+            BTreeMap::from([
+                (
+                    "DATA".into(),
+                    pointer("mainframe-env.cics.allocated-pointer@1", &[0; 8]),
+                ),
+                (
+                    "DATAPOINTER".into(),
+                    pointer("mainframe-env.cics.allocated-pointer@1", &[0; 8]),
+                ),
+            ]),
+            3,
+        );
+        assert_eq!(
+            service.invoke(&effect(&invocation.run_unit_id, both.clone(), 3), both),
+            Err(HostProblem::Malformed)
+        );
+
         let mut invalid = request(
             CicsOperation::Freemain,
             BTreeMap::from([
@@ -9332,7 +9374,7 @@ mod tests {
                 ("RESP".into(), argument(b"RESP-X")),
                 ("RESP2".into(), argument(b"RESP2-X")),
             ]),
-            2,
+            4,
         );
         invalid.condition_policy = CicsConditionPolicy::Respond {
             response_field: "RESP-X".into(),
@@ -9340,7 +9382,7 @@ mod tests {
         };
         let invalid = service
             .invoke(
-                &effect(&invocation.run_unit_id, invalid.clone(), 2),
+                &effect(&invocation.run_unit_id, invalid.clone(), 4),
                 invalid,
             )
             .unwrap();

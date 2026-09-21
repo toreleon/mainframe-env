@@ -11179,7 +11179,7 @@ mod tests {
     fn compiled_getmain_and_freemain_preserve_checkpointed_virtual_storage_rules() {
         let artifact = published_source_fixture(
             "GETMAINA",
-            "IDENTIFICATION DIVISION.\nPROGRAM-ID. GETMAINA.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PTR-X POINTER.\n01 ZERO-PTR-X POINTER.\n01 LENGTH-X PIC S9(9) COMP VALUE 4.\n01 ZERO-X PIC S9(9) COMP VALUE 0.\n01 INIT-X PIC X VALUE 'Z'.\n01 OBSERVED-X PIC X(4) VALUE SPACES.\n01 ZERO-RESP-X PIC S9(9) COMP.\n01 ZERO-RESP2-X PIC S9(9) COMP.\n01 FREE-RESP-X PIC S9(9) COMP.\n01 FREE-RESP2-X PIC S9(9) COMP.\nLINKAGE SECTION.\n01 LINK-X PIC X(4).\nPROCEDURE DIVISION.\nEXEC CICS GETMAIN SET(PTR-X) FLENGTH(LENGTH-X) INITIMG(INIT-X) NOSUSPEND END-EXEC.\nSET ADDRESS OF LINK-X TO PTR-X.\nMOVE LINK-X TO OBSERVED-X.\nEXEC CICS GETMAIN SET(ZERO-PTR-X) FLENGTH(ZERO-X) RESP(ZERO-RESP-X) RESP2(ZERO-RESP2-X) END-EXEC.\nEXEC CICS FREEMAIN DATAPOINTER(PTR-X) END-EXEC.\nEXEC CICS FREEMAIN DATAPOINTER(PTR-X) RESP(FREE-RESP-X) RESP2(FREE-RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. GETMAINA.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PTR-X POINTER.\n01 DATA-PTR-X POINTER.\n01 ZERO-PTR-X POINTER.\n01 LENGTH-X PIC S9(9) COMP VALUE 4.\n01 ZERO-X PIC S9(9) COMP VALUE 0.\n01 INIT-X PIC X VALUE 'Z'.\n01 OBSERVED-X PIC X(4) VALUE SPACES.\n01 DATA-OBSERVED-X PIC X(4) VALUE SPACES.\n01 ZERO-RESP-X PIC S9(9) COMP.\n01 ZERO-RESP2-X PIC S9(9) COMP.\n01 FREE-RESP-X PIC S9(9) COMP.\n01 FREE-RESP2-X PIC S9(9) COMP.\n01 STATIC-FREE-RESP-X PIC S9(9) COMP.\n01 STATIC-FREE-RESP2-X PIC S9(9) COMP.\n01 UNASSIGNED-RESP-X PIC S9(9) COMP.\n01 UNASSIGNED-RESP2-X PIC S9(9) COMP.\n01 DATA-FREE-RESP-X PIC S9(9) COMP.\n01 DATA-FREE-RESP2-X PIC S9(9) COMP.\nLINKAGE SECTION.\n01 LINK-X PIC X(4).\n01 LINK-Y PIC X(4).\nPROCEDURE DIVISION.\nEXEC CICS GETMAIN SET(PTR-X) FLENGTH(LENGTH-X) INITIMG(INIT-X) NOSUSPEND END-EXEC.\nSET ADDRESS OF LINK-X TO PTR-X.\nMOVE LINK-X TO OBSERVED-X.\nEXEC CICS GETMAIN SET(ZERO-PTR-X) FLENGTH(ZERO-X) RESP(ZERO-RESP-X) RESP2(ZERO-RESP2-X) END-EXEC.\nEXEC CICS FREEMAIN DATAPOINTER(PTR-X) END-EXEC.\nEXEC CICS FREEMAIN DATAPOINTER(PTR-X) RESP(FREE-RESP-X) RESP2(FREE-RESP2-X) END-EXEC.\nEXEC CICS FREEMAIN DATA(OBSERVED-X) RESP(STATIC-FREE-RESP-X) RESP2(STATIC-FREE-RESP2-X) END-EXEC.\nEXEC CICS FREEMAIN DATA(LINK-Y) RESP(UNASSIGNED-RESP-X) RESP2(UNASSIGNED-RESP2-X) END-EXEC.\nEXEC CICS GETMAIN SET(DATA-PTR-X) FLENGTH(LENGTH-X) INITIMG(INIT-X) END-EXEC.\nSET ADDRESS OF LINK-Y TO DATA-PTR-X.\nMOVE LINK-Y TO DATA-OBSERVED-X.\nEXEC CICS FREEMAIN DATA(LINK-Y) END-EXEC.\nEXEC CICS FREEMAIN DATA(LINK-Y) RESP(DATA-FREE-RESP-X) RESP2(DATA-FREE-RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
         );
         let artifact_ref = ArtifactRef::new(
             format!("sha256:{:x}", Sha256::digest(artifact.payload())),
@@ -11241,7 +11241,12 @@ mod tests {
             .restore_checkpoint(&continuation.checkpoint)
             .unwrap();
         assert!(restored.variable("LINK-X").is_none());
+        assert!(restored.variable("LINK-Y").is_none());
         assert_eq!(restored.variable("OBSERVED-X").unwrap().bytes(), b"ZZZZ");
+        assert_eq!(
+            restored.variable("DATA-OBSERVED-X").unwrap().bytes(),
+            b"ZZZZ"
+        );
         assert!(
             restored
                 .variable("PTR-X")
@@ -11257,6 +11262,14 @@ mod tests {
                 .bytes()
                 .iter()
                 .all(|byte| *byte == 0)
+        );
+        assert!(
+            restored
+                .variable("DATA-PTR-X")
+                .unwrap()
+                .bytes()
+                .iter()
+                .any(|byte| *byte != 0)
         );
         assert_eq!(
             restored.variable("ZERO-RESP-X").unwrap().bytes(),
@@ -11275,6 +11288,30 @@ mod tests {
             &[0, 0, 0, 1]
         );
         assert_eq!(
+            restored.variable("STATIC-FREE-RESP-X").unwrap().bytes(),
+            &[0, 0, 0, 16]
+        );
+        assert_eq!(
+            restored.variable("STATIC-FREE-RESP2-X").unwrap().bytes(),
+            &[0, 0, 0, 1]
+        );
+        assert_eq!(
+            restored.variable("UNASSIGNED-RESP-X").unwrap().bytes(),
+            &[0, 0, 0, 16]
+        );
+        assert_eq!(
+            restored.variable("UNASSIGNED-RESP2-X").unwrap().bytes(),
+            &[0, 0, 0, 1]
+        );
+        assert_eq!(
+            restored.variable("DATA-FREE-RESP-X").unwrap().bytes(),
+            &[0, 0, 0, 16]
+        );
+        assert_eq!(
+            restored.variable("DATA-FREE-RESP2-X").unwrap().bytes(),
+            &[0, 0, 0, 1]
+        );
+        assert_eq!(
             server
                 .cics
                 .terminal_run_trace(&session, &principal, 2)
@@ -11282,7 +11319,7 @@ mod tests {
                 .iter()
                 .filter(|entry| entry.operation == CicsOperation::Getmain)
                 .count(),
-            2
+            3
         );
         assert_eq!(
             server
@@ -11292,7 +11329,7 @@ mod tests {
                 .iter()
                 .filter(|entry| entry.operation == CicsOperation::Freemain)
                 .count(),
-            2
+            6
         );
     }
 

@@ -388,13 +388,15 @@ All notable changes to mainframe-env are documented here.
   virtual storage. Literal or fullword-binary lengths, one-byte `INITIMG`,
   `NOSUSPEND`, checkpoint restoration, replay, LENGERR 22/1 pointer clearing,
   and default-ignored NOSTG 42/2 are covered without exposing native addresses.
-  Legacy LENGTH, key/share/executable policy, FREEMAIN DATA, 64-bit forms, and
-  DPL proof remain fail-closed or pending.
-- Added typed task-local `FREEMAIN DATAPOINTER`. The interpreter validates that
-  the pointer names a live GETMAIN allocation, applies a replay-bound release,
-  checkpoints stale-pointer state, rejects repeat or foreign releases with
-  exact `INVREQ` 16/1, and restores released frame/byte capacity. DATA,
-  key/shared/load ownership, FREEMAIN64, and DPL proof remain pending.
+  Legacy LENGTH, key/share/executable policy, 64-bit forms, and DPL proof remain
+  fail-closed or pending.
+- Added typed task-local `FREEMAIN DATAPOINTER` and `FREEMAIN DATA`. The
+  interpreter validates either the pointer value or the DATA area's current
+  virtual-storage view against a live, offset-zero GETMAIN allocation, applies
+  a replay-bound release, checkpoints stale identity, rejects repeat, static,
+  or foreign releases with exact `INVREQ` 16/1, and restores released
+  frame/byte capacity. Key/shared/load ownership, FREEMAIN64, and DPL proof
+  remain pending.
 - Migrated bounded local `RECEIVE MAP`, `SEND MAP`, and `SEND TEXT` subsets to
   typed terminal plans. MAP and optional MAPSET are validated 1–7 character
   selectors, with an eight-byte RECEIVE MAPSET field admitted for a valid name

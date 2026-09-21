@@ -1991,7 +1991,7 @@ mod tests {
     }
 
     #[test]
-    fn freemain_requires_one_storage_backed_datapointer() {
+    fn freemain_requires_one_storage_backed_data_form() {
         let plan = CicsEffectPlan {
             operation: CicsPlanOperation::Freemain,
             operands: vec![CicsNamedOperand {
@@ -2005,6 +2005,28 @@ mod tests {
         let limits = CicsPlanLimits::default();
         let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
         assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
+
+        let mut data = plan.clone();
+        data.operands[0].name = CicsOperandName::DataArea;
+        let bytes = encode_cics_effect_plan(&data, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), data);
+
+        let mut both = plan.clone();
+        both.operands.push(CicsNamedOperand {
+            name: CicsOperandName::DataArea,
+            value: CicsOperandValue::Storage(slot(2, "LINK-X")),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&both, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+
+        let mut missing = plan.clone();
+        missing.operands.clear();
+        assert_eq!(
+            encode_cics_effect_plan(&missing, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
 
         let mut literal = plan;
         literal.operands[0].value = CicsOperandValue::Literal(vec![0; 8]);

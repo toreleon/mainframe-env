@@ -254,13 +254,14 @@ checked virtual address to POINTER or POINTER-32 storage. Nonpositive or
 over-limit FLENGTH returns LENGERR 22/1 and clears SET; unavailable capacity
 returns NOSTG 42/2, which is ignored by default. Native addresses, legacy LENGTH, storage keys,
 SHARED/EXECUTABLE policy and GETMAIN64 remain outside this subset.
-Typed local FREEMAIN DATAPOINTER accepts one POINTER or POINTER-32 value that
-the current machine can prove names a live, offset-zero GETMAIN allocation.
-Normal completion records the released base in the checkpoint, makes existing
-linkage views inaccessible, and restores its frame/byte capacity. A null,
-static, malformed, foreign, or already-freed pointer returns INVREQ 16/1.
-FREEMAIN DATA, key/shared/load ownership, and FREEMAIN64 remain outside this
-subset.
+Typed local FREEMAIN accepts exactly one of DATAPOINTER or DATA. DATAPOINTER
+requires a POINTER or POINTER-32 value that the current machine can prove names
+a live, offset-zero GETMAIN allocation. DATA accepts a declared COBOL area only
+when its current virtual-storage view begins at such an allocation. Normal
+completion records the released base in the checkpoint, makes existing linkage
+views inaccessible, and restores its frame/byte capacity. A null, static,
+malformed, foreign, unassigned, or already-freed identity returns INVREQ 16/1.
+Key/shared/load ownership and FREEMAIN64 remain outside this subset.
 
 CICS PUSH HANDLE moves the current condition mappings, ignored-condition set,
 and active/canceled typed ABEND exits into one bounded task-local frame, leaving a

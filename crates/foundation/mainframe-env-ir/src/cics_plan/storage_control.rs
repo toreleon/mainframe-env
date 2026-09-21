@@ -35,7 +35,9 @@ pub(super) fn invalid_freemain_shape(
     inputs: &BTreeSet<CicsOperandName>,
     outputs: &BTreeSet<CicsOutputName>,
 ) -> bool {
-    *inputs != BTreeSet::from([CicsOperandName::DataPointer])
+    let pointer_form = *inputs == BTreeSet::from([CicsOperandName::DataPointer]);
+    let data_form = *inputs == BTreeSet::from([CicsOperandName::DataArea]);
+    (!pointer_form && !data_form)
         || !matches!(
             plan.operands.first().map(|operand| &operand.value),
             Some(CicsOperandValue::Storage(_))

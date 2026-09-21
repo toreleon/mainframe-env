@@ -236,6 +236,7 @@ pub enum HirCicsOperandName {
     Flength,
     InitImage,
     DataPointer,
+    DataArea,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2894,7 +2895,7 @@ mod tests {
     }
 
     #[test]
-    fn cics_freemain_resolves_only_a_pointer_input() {
+    fn cics_freemain_resolves_exactly_one_pointer_or_data_input() {
         let analysis = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFREE. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS FREEMAIN DATAPOINTER(PTR-X) RESP(RESP-X) END-EXEC. STOP RUN.",
         );
@@ -2918,9 +2919,33 @@ mod tests {
                 )
         }));
 
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFREE. DATA DIVISION. WORKING-STORAGE SECTION. 01 RESP-X PIC S9(9) COMP. LINKAGE SECTION. 01 LINK-X PIC X(4). PROCEDURE DIVISION. EXEC CICS FREEMAIN DATA(LINK-X) RESP(RESP-X) END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("FREEMAIN DATA: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed FREEMAIN DATA");
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::DataArea
+                && matches!(
+                    &operand.value,
+                    HirCicsValue::Data(reference) if reference.qualified_name == "LINK-X"
+                )
+        }));
+
         for source in [
-            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFREE. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. PROCEDURE DIVISION. EXEC CICS FREEMAIN DATA(PTR-X) END-EXEC. STOP RUN.",
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFREE. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X PIC X(8). PROCEDURE DIVISION. EXEC CICS FREEMAIN DATAPOINTER(PTR-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFREE. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. PROCEDURE DIVISION. EXEC CICS FREEMAIN END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFREE. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. 01 DATA-X PIC X(4). PROCEDURE DIVISION. EXEC CICS FREEMAIN DATA(DATA-X) DATAPOINTER(PTR-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFREE. PROCEDURE DIVISION. EXEC CICS FREEMAIN DATA('ABCD') END-EXEC. STOP RUN.",
         ] {
             let analysis = analyze(source);
             assert!(analysis.hir.is_none(), "{source}");

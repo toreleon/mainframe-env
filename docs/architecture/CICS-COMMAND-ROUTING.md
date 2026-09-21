@@ -230,12 +230,13 @@ frame/byte capacity, applies the returned initialized bytes to a checkpointed
 virtual base, and writes a checked POINTER or POINTER-32 address. Nonpositive
 or over-limit length clears SET with LENGERR 22/1; unavailable capacity returns
 default-ignored NOSTG 42/2. Native addresses, legacy LENGTH, key/share/executable attributes,
-and 64-bit forms remain deferred. Typed FREEMAIN DATAPOINTER accepts only a
-POINTER or POINTER-32 slot. The interpreter proves that its value names a live,
-offset-zero allocation owned by the current task, applies the replay-bound
-release intent, checkpoints the freed identity, and excludes released bytes
-and frames from current capacity accounting. Invalid or repeated release
-returns INVREQ 16/1; DATA and key/shared/load ownership remain deferred.
+and 64-bit forms remain deferred. Typed FREEMAIN accepts exactly one
+DATAPOINTER or DATA slot. The interpreter proves that the pointer value or
+DATA area's current virtual-storage view names the start of a live allocation
+owned by the current task, applies the replay-bound release intent, checkpoints
+the freed identity, and excludes released bytes and frames from current
+capacity accounting. Invalid, static, unassigned, or repeated release returns
+INVREQ 16/1; key/shared/load ownership remains deferred.
 The typed local BMS subset binds `RECEIVE MAP`, `SEND MAP`, and `SEND TEXT` to
 the terminal family. Map names are prevalidated 1–7 character literals or
 alpha/alphanumeric fields; a `RECEIVE MAP` MAPSET field may be eight bytes so
