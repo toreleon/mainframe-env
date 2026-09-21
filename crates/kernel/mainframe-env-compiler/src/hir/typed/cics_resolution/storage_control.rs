@@ -10,7 +10,20 @@ pub(super) fn validate_constraints(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<()> {
-    if operation != HirCicsOperation::Getmain {
+    if operation == HirCicsOperation::Freemain {
+        let Some(tokens) = clauses.get("DATAPOINTER") else {
+            return Err(ResolutionFailure::Invalid(
+                "CICS FREEMAIN requires DATAPOINTER".into(),
+            ));
+        };
+        let pointer = complete_data_reference(tokens, semantic)?;
+        if !matches!(pointer.usage, CobolUsage::Pointer | CobolUsage::Pointer32) {
+            return Err(ResolutionFailure::Invalid(
+                "CICS FREEMAIN DATAPOINTER requires POINTER or POINTER-32 storage".into(),
+            ));
+        }
+        return Ok(());
+    } else if operation != HirCicsOperation::Getmain {
         return Ok(());
     }
     for required in ["SET", "FLENGTH"] {
@@ -59,7 +72,12 @@ pub(super) fn operands(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
-    if operation != HirCicsOperation::Getmain {
+    if operation == HirCicsOperation::Freemain {
+        return Ok(vec![HirCicsNamedOperand {
+            name: HirCicsOperandName::DataPointer,
+            value: HirCicsValue::Data(complete_data_reference(&clauses["DATAPOINTER"], semantic)?),
+        }]);
+    } else if operation != HirCicsOperation::Getmain {
         return Ok(Vec::new());
     }
     let mut operands = vec![HirCicsNamedOperand {

@@ -230,7 +230,12 @@ frame/byte capacity, applies the returned initialized bytes to a checkpointed
 virtual base, and writes a checked POINTER or POINTER-32 address. Nonpositive
 or over-limit length clears SET with LENGERR 22/1; unavailable capacity returns
 default-ignored NOSTG 42/2. Native addresses, legacy LENGTH, key/share/executable attributes,
-FREEMAIN, and 64-bit forms remain deferred.
+and 64-bit forms remain deferred. Typed FREEMAIN DATAPOINTER accepts only a
+POINTER or POINTER-32 slot. The interpreter proves that its value names a live,
+offset-zero allocation owned by the current task, applies the replay-bound
+release intent, checkpoints the freed identity, and excludes released bytes
+and frames from current capacity accounting. Invalid or repeated release
+returns INVREQ 16/1; DATA and key/shared/load ownership remain deferred.
 The typed local BMS subset binds `RECEIVE MAP`, `SEND MAP`, and `SEND TEXT` to
 the terminal family. Map names are prevalidated 1–7 character literals or
 alpha/alphanumeric fields; a `RECEIVE MAP` MAPSET field may be eight bytes so
@@ -353,9 +358,9 @@ differentials, or make 0.9.0 release-ready.
 | `queue-control` | transient-data queue writes and local queue deletion |
 | `recovery` | SYNCPOINT coordination, rollback, and subsystem unit-of-work completion |
 | `interval-control` | bounded local START scheduling/cancellation with facility-less or virtual-terminal target launch plus zero, relative, and absolute DELAY |
-| `storage-control` | bounded task-local virtual storage allocation |
+| `storage-control` | bounded task-local virtual storage allocation and release |
 
-This table describes the nine families already present in the 42-operation runtime
+This table describes the nine families already present in the 43-operation runtime
 collection. The 263-row application registry also assigns every row a
 deterministic future family owner, but that assignment is routing shape rather
 than an executable handler. `CicsService::invoke_run` selects an existing

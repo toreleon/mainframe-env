@@ -504,6 +504,9 @@ fn validate_operation_shape(
             queue_control::invalid_delete_transient_data_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::Getmain => storage_control::invalid_getmain_shape(plan, inputs, outputs),
+        CicsPlanOperation::Freemain => {
+            storage_control::invalid_freemain_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::ReceiveMap
         | CicsPlanOperation::SendMap
         | CicsPlanOperation::SendText => terminal_control::invalid_shape(plan, inputs, outputs),
@@ -1983,6 +1986,30 @@ mod tests {
         literal_image.operands[1].value = CicsOperandValue::Literal(vec![b'Z']);
         assert_eq!(
             encode_cics_effect_plan(&literal_image, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn freemain_requires_one_storage_backed_datapointer() {
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Freemain,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::DataPointer,
+                value: CicsOperandValue::Storage(slot(1, "PTR-X")),
+            }],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let limits = CicsPlanLimits::default();
+        let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
+
+        let mut literal = plan;
+        literal.operands[0].value = CicsOperandValue::Literal(vec![0; 8]);
+        assert_eq!(
+            encode_cics_effect_plan(&literal, limits),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }

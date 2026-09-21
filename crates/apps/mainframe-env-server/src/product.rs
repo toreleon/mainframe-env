@@ -11176,10 +11176,10 @@ mod tests {
     }
 
     #[test]
-    fn compiled_getmain_allocates_checkpointed_initialized_virtual_storage() {
+    fn compiled_getmain_and_freemain_preserve_checkpointed_virtual_storage_rules() {
         let artifact = published_source_fixture(
             "GETMAINA",
-            "IDENTIFICATION DIVISION.\nPROGRAM-ID. GETMAINA.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PTR-X POINTER.\n01 ZERO-PTR-X POINTER.\n01 LENGTH-X PIC S9(9) COMP VALUE 4.\n01 ZERO-X PIC S9(9) COMP VALUE 0.\n01 INIT-X PIC X VALUE 'Z'.\n01 OBSERVED-X PIC X(4) VALUE SPACES.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nLINKAGE SECTION.\n01 LINK-X PIC X(4).\nPROCEDURE DIVISION.\nEXEC CICS GETMAIN SET(PTR-X) FLENGTH(LENGTH-X) INITIMG(INIT-X) NOSUSPEND END-EXEC.\nSET ADDRESS OF LINK-X TO PTR-X.\nMOVE LINK-X TO OBSERVED-X.\nEXEC CICS GETMAIN SET(ZERO-PTR-X) FLENGTH(ZERO-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. GETMAINA.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PTR-X POINTER.\n01 ZERO-PTR-X POINTER.\n01 LENGTH-X PIC S9(9) COMP VALUE 4.\n01 ZERO-X PIC S9(9) COMP VALUE 0.\n01 INIT-X PIC X VALUE 'Z'.\n01 OBSERVED-X PIC X(4) VALUE SPACES.\n01 ZERO-RESP-X PIC S9(9) COMP.\n01 ZERO-RESP2-X PIC S9(9) COMP.\n01 FREE-RESP-X PIC S9(9) COMP.\n01 FREE-RESP2-X PIC S9(9) COMP.\nLINKAGE SECTION.\n01 LINK-X PIC X(4).\nPROCEDURE DIVISION.\nEXEC CICS GETMAIN SET(PTR-X) FLENGTH(LENGTH-X) INITIMG(INIT-X) NOSUSPEND END-EXEC.\nSET ADDRESS OF LINK-X TO PTR-X.\nMOVE LINK-X TO OBSERVED-X.\nEXEC CICS GETMAIN SET(ZERO-PTR-X) FLENGTH(ZERO-X) RESP(ZERO-RESP-X) RESP2(ZERO-RESP2-X) END-EXEC.\nEXEC CICS FREEMAIN DATAPOINTER(PTR-X) END-EXEC.\nEXEC CICS FREEMAIN DATAPOINTER(PTR-X) RESP(FREE-RESP-X) RESP2(FREE-RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
         );
         let artifact_ref = ArtifactRef::new(
             format!("sha256:{:x}", Sha256::digest(artifact.payload())),
@@ -11240,7 +11240,7 @@ mod tests {
         restored
             .restore_checkpoint(&continuation.checkpoint)
             .unwrap();
-        assert_eq!(restored.variable("LINK-X").unwrap().bytes(), b"ZZZZ");
+        assert!(restored.variable("LINK-X").is_none());
         assert_eq!(restored.variable("OBSERVED-X").unwrap().bytes(), b"ZZZZ");
         assert!(
             restored
@@ -11258,8 +11258,22 @@ mod tests {
                 .iter()
                 .all(|byte| *byte == 0)
         );
-        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 22]);
-        assert_eq!(restored.variable("RESP2-X").unwrap().bytes(), &[0, 0, 0, 1]);
+        assert_eq!(
+            restored.variable("ZERO-RESP-X").unwrap().bytes(),
+            &[0, 0, 0, 22]
+        );
+        assert_eq!(
+            restored.variable("ZERO-RESP2-X").unwrap().bytes(),
+            &[0, 0, 0, 1]
+        );
+        assert_eq!(
+            restored.variable("FREE-RESP-X").unwrap().bytes(),
+            &[0, 0, 0, 16]
+        );
+        assert_eq!(
+            restored.variable("FREE-RESP2-X").unwrap().bytes(),
+            &[0, 0, 0, 1]
+        );
         assert_eq!(
             server
                 .cics
@@ -11267,6 +11281,16 @@ mod tests {
                 .unwrap()
                 .iter()
                 .filter(|entry| entry.operation == CicsOperation::Getmain)
+                .count(),
+            2
+        );
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 2)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::Freemain)
                 .count(),
             2
         );

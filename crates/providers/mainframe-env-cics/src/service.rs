@@ -1715,7 +1715,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 42);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 43);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -4667,6 +4667,7 @@ mod tests {
             ("ENDBR", CicsOperation::EndBrowse),
             ("ENQ", CicsOperation::Enq),
             ("FORMATTIME", CicsOperation::FormatTime),
+            ("FREEMAIN", CicsOperation::Freemain),
             ("GETMAIN", CicsOperation::Getmain),
             ("HANDLE ABEND", CicsOperation::HandleAbend),
             ("HANDLE AID", CicsOperation::HandleAid),
@@ -4708,7 +4709,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 42);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 43);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -9282,6 +9283,76 @@ mod tests {
             over_limit.outputs["SET"].schema(),
             "mainframe-env.cics.pointer-null@1"
         );
+    }
+
+    #[test]
+    fn freemain_returns_release_intent_and_exact_invalid_pointer_condition() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+        let pointer = |schema: &str, bytes: &[u8]| {
+            BoundedPayload::new(schema, bytes.to_vec(), InvocationLimits::default()).unwrap()
+        };
+        let valid = request(
+            CicsOperation::Freemain,
+            BTreeMap::from([(
+                "DATAPOINTER".into(),
+                pointer(
+                    "mainframe-env.cics.allocated-pointer@1",
+                    &[0, 0, 0, 2, 0, 0, 0, 0],
+                ),
+            )]),
+            1,
+        );
+        let response = service
+            .invoke(
+                &effect(&invocation.run_unit_id, valid.clone(), 1),
+                valid.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            (response.condition.as_str(), response.response),
+            ("NORMAL", 0)
+        );
+        assert_eq!(
+            response.outputs["FREEMAIN.POINTER"],
+            valid.arguments["DATAPOINTER"]
+        );
+        let replay = service
+            .invoke(&effect(&invocation.run_unit_id, valid.clone(), 1), valid)
+            .unwrap();
+        assert_eq!(replay, response);
+
+        let mut invalid = request(
+            CicsOperation::Freemain,
+            BTreeMap::from([
+                (
+                    "DATAPOINTER".into(),
+                    pointer("mainframe-env.cics.invalid-pointer@1", &[0; 8]),
+                ),
+                ("RESP".into(), argument(b"RESP-X")),
+                ("RESP2".into(), argument(b"RESP2-X")),
+            ]),
+            2,
+        );
+        invalid.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let invalid = service
+            .invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 2),
+                invalid,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                invalid.condition.as_str(),
+                invalid.response,
+                invalid.response2
+            ),
+            ("INVREQ", 16, 1)
+        );
+        assert!(!invalid.outputs.contains_key("FREEMAIN.POINTER"));
     }
 
     /// Issue #207: bare separators use slash/colon and compact forms keep compact widths.

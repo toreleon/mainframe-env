@@ -29,3 +29,23 @@ pub(super) fn invalid_getmain_shape(
             .iter()
             .any(|option| !matches!(option, CicsPlanOption::NoHandle | CicsPlanOption::NoSuspend))
 }
+
+pub(super) fn invalid_freemain_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    *inputs != BTreeSet::from([CicsOperandName::DataPointer])
+        || !matches!(
+            plan.operands.first().map(|operand| &operand.value),
+            Some(CicsOperandValue::Storage(_))
+        )
+        || !outputs.is_subset(&BTreeSet::from([
+            CicsOutputName::Resp,
+            CicsOutputName::Resp2,
+        ]))
+        || plan
+            .options
+            .iter()
+            .any(|option| !matches!(option, CicsPlanOption::NoHandle))
+}

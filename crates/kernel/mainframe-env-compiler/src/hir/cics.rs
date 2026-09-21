@@ -208,6 +208,7 @@ impl PlanContext<'_> {
                 HirCicsOperandName::DataLength => CicsOperandName::DataLength,
                 HirCicsOperandName::Flength => CicsOperandName::Flength,
                 HirCicsOperandName::InitImage => CicsOperandName::InitImage,
+                HirCicsOperandName::DataPointer => CicsOperandName::DataPointer,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -323,6 +324,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::WriteTransientData => CicsPlanOperation::WriteTransientData,
         HirCicsOperation::DeleteTransientData => CicsPlanOperation::DeleteTransientData,
         HirCicsOperation::Getmain => CicsPlanOperation::Getmain,
+        HirCicsOperation::Freemain => CicsPlanOperation::Freemain,
         HirCicsOperation::ReceiveMap => CicsPlanOperation::ReceiveMap,
         HirCicsOperation::SendMap => CicsPlanOperation::SendMap,
         HirCicsOperation::SendText => CicsPlanOperation::SendText,

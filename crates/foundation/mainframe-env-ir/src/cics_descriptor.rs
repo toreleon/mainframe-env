@@ -556,7 +556,7 @@ pub fn cics_application_registry_for_runtime_operation(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 40] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 41] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -877,6 +877,14 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 40] = [
         effects: STORAGE_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::Freemain,
+        namespace: "cics.storage",
+        name: "freemain",
+        major: 1,
+        effects: STORAGE_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
 ];
 
 /// Resolves the executable descriptor for a decoded CICS plan operation.
@@ -925,6 +933,7 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::Delay => &CICS_EXECUTABLE_DESCRIPTORS[37],
         CicsPlanOperation::DeleteTransientData => &CICS_EXECUTABLE_DESCRIPTORS[38],
         CicsPlanOperation::Getmain => &CICS_EXECUTABLE_DESCRIPTORS[39],
+        CicsPlanOperation::Freemain => &CICS_EXECUTABLE_DESCRIPTORS[40],
     }
 }
 
@@ -986,7 +995,7 @@ mod tests {
                 descriptor.readiness == CicsApplicationHandlerReadiness::TypedRuntime
             })
             .collect::<Vec<_>>();
-        assert_eq!(typed.len(), 40);
+        assert_eq!(typed.len(), 41);
         assert!(typed.iter().all(|descriptor| descriptor.advertised
             && descriptor.runtime_operation.is_some()
             && descriptor.legacy_execution_options.is_empty()));
@@ -1004,7 +1013,7 @@ mod tests {
             .iter()
             .filter(|descriptor| descriptor.readiness == CicsApplicationHandlerReadiness::Unready)
             .collect::<Vec<_>>();
-        assert_eq!(unready.len(), 223);
+        assert_eq!(unready.len(), 222);
         assert!(unready.iter().all(|descriptor| !descriptor.advertised
             && descriptor.runtime_operation.is_none()
             && descriptor.legacy_execution_options.is_empty()));
@@ -1229,6 +1238,7 @@ mod tests {
                 CicsPlanOperation::WriteTransientData,
                 CicsPlanOperation::DeleteTransientData,
                 CicsPlanOperation::Getmain,
+                CicsPlanOperation::Freemain,
                 CicsPlanOperation::ReceiveMap,
                 CicsPlanOperation::SendMap,
                 CicsPlanOperation::SendText,

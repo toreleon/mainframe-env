@@ -32,6 +32,7 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::DateSep | CicsOperandName::TimeSep => SlotUse::SeparatorInput,
         CicsOperandName::KeyLength => SlotUse::Input,
         CicsOperandName::Flength => SlotUse::FullwordInput,
+        CicsOperandName::DataPointer => SlotUse::PointerInput,
         _ => SlotUse::Input,
     }
 }
@@ -87,6 +88,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::WriteTransientData => CicsOperation::WriteTransientData,
         CicsPlanOperation::DeleteTransientData => CicsOperation::DeleteTransientData,
         CicsPlanOperation::Getmain => CicsOperation::Getmain,
+        CicsPlanOperation::Freemain => CicsOperation::Freemain,
         CicsPlanOperation::ReceiveMap => CicsOperation::ReceiveMap,
         CicsPlanOperation::SendMap => CicsOperation::SendMap,
         CicsPlanOperation::SendText => CicsOperation::SendText,
@@ -147,6 +149,7 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::Milliseconds => "MILLISECS",
         CicsOperandName::Flength => "FLENGTH",
         CicsOperandName::InitImage => "INITIMG",
+        CicsOperandName::DataPointer => "DATAPOINTER",
     }
 }
 

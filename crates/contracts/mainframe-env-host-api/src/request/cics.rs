@@ -28,6 +28,8 @@ pub enum CicsOperation {
     Enq,
     EndBrowse,
     FormatTime,
+    /// Release one task-local virtual storage area acquired by GETMAIN.
+    Freemain,
     /// Allocate one bounded task-local virtual storage area.
     Getmain,
     HandleAbend,
@@ -87,6 +89,7 @@ impl CicsOperation {
             Self::Enq => "Enq",
             Self::EndBrowse => "EndBrowse",
             Self::FormatTime => "FormatTime",
+            Self::Freemain => "Freemain",
             Self::Getmain => "Getmain",
             Self::HandleAbend => "HandleAbend",
             Self::HandleAid => "HandleAid",
@@ -128,6 +131,7 @@ impl CicsOperation {
                 | Self::Delay
                 | Self::Deq
                 | Self::Enq
+                | Self::Freemain
                 | Self::Getmain
                 | Self::Rewrite
                 | Self::Write
@@ -177,6 +181,7 @@ impl CicsOperation {
             ("ENQ", _) => Self::Enq,
             ("ENDBR", _) => Self::EndBrowse,
             ("FORMATTIME", _) => Self::FormatTime,
+            ("FREEMAIN", _) => Self::Freemain,
             ("GETMAIN", _) => Self::Getmain,
             ("HANDLE", Some("ABEND")) => Self::HandleAbend,
             ("HANDLE", Some("AID")) => Self::HandleAid,

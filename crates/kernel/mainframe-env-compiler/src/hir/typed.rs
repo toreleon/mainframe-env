@@ -152,6 +152,7 @@ pub enum HirCicsOperation {
     Asktime,
     AsktimeEib,
     FormatTime,
+    Freemain,
     Getmain,
     Cancel,
     Delay,
@@ -234,6 +235,7 @@ pub enum HirCicsOperandName {
     DataLength,
     Flength,
     InitImage,
+    DataPointer,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2885,6 +2887,40 @@ mod tests {
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. 01 LEN-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) FLENGTH(LEN-X) END-EXEC. STOP RUN.",
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X PIC X(4). PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) FLENGTH(4) END-EXEC. STOP RUN.",
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSGET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. PROCEDURE DIVISION. EXEC CICS GETMAIN SET(PTR-X) FLENGTH(2147483648) END-EXEC. STOP RUN.",
+        ] {
+            let analysis = analyze(source);
+            assert!(analysis.hir.is_none(), "{source}");
+        }
+    }
+
+    #[test]
+    fn cics_freemain_resolves_only_a_pointer_input() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFREE. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS FREEMAIN DATAPOINTER(PTR-X) RESP(RESP-X) END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("FREEMAIN: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed FREEMAIN");
+        assert_eq!(command.operation, HirCicsOperation::Freemain);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::DataPointer
+                && matches!(
+                    &operand.value,
+                    HirCicsValue::Data(reference) if reference.qualified_name == "PTR-X"
+                )
+        }));
+
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFREE. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. PROCEDURE DIVISION. EXEC CICS FREEMAIN DATA(PTR-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. CICSFREE. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X PIC X(8). PROCEDURE DIVISION. EXEC CICS FREEMAIN DATAPOINTER(PTR-X) END-EXEC. STOP RUN.",
         ] {
             let analysis = analyze(source);
             assert!(analysis.hir.is_none(), "{source}");

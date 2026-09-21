@@ -9,9 +9,18 @@ pub(in crate::service) fn invoke(
     run: &Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
-    if request.operation != CicsOperation::Getmain {
-        return Err(HostProblem::InfrastructureFailure);
+    match request.operation {
+        CicsOperation::Getmain => getmain(service, run, request),
+        CicsOperation::Freemain => freemain(service, run, request),
+        _ => Err(HostProblem::InfrastructureFailure),
     }
+}
+
+fn getmain(
+    service: &CicsService,
+    run: &Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
     validate_getmain(request)?;
     let length = argument_text(request, "FLENGTH")?
         .parse::<i64>()
@@ -64,6 +73,40 @@ pub(in crate::service) fn invoke(
     Ok(response)
 }
 
+fn freemain(
+    service: &CicsService,
+    run: &Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    let pointer = validate_freemain(request)?;
+    if pointer.schema() == "mainframe-env.cics.invalid-pointer@1" {
+        return super::condition(
+            service,
+            run,
+            &request.condition_policy,
+            HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 1,
+            },
+        );
+    }
+    let mut response = service.response(
+        run,
+        CicsDisposition::Complete,
+        "NORMAL",
+        0,
+        0,
+        None,
+        None,
+        Vec::new(),
+    )?;
+    response
+        .outputs
+        .insert("FREEMAIN.POINTER".into(), pointer.clone());
+    Ok(response)
+}
+
 fn validate_getmain(request: &CicsRequest) -> Result<(), HostProblem> {
     const ALLOWED: &[&str] = &[
         "FLENGTH",
@@ -102,6 +145,36 @@ fn validate_getmain(request: &CicsRequest) -> Result<(), HostProblem> {
         Err(HostProblem::Malformed)
     } else {
         Ok(())
+    }
+}
+
+fn validate_freemain(request: &CicsRequest) -> Result<&BoundedPayload, HostProblem> {
+    const ALLOWED: &[&str] = &["DATAPOINTER", "OPTION.NOHANDLE", "RESP", "RESP2"];
+    let pointer = request
+        .arguments
+        .get("DATAPOINTER")
+        .ok_or(HostProblem::Malformed)?;
+    if request.mutation.is_none()
+        || !matches!(pointer.bytes().len(), 4 | 8)
+        || !matches!(
+            pointer.schema(),
+            "mainframe-env.cics.allocated-pointer@1" | "mainframe-env.cics.invalid-pointer@1"
+        )
+        || request.arguments.iter().any(|(name, value)| {
+            !ALLOWED.contains(&name.as_str())
+                || match name.as_str() {
+                    "DATAPOINTER" => value.schema() != pointer.schema(),
+                    "OPTION.NOHANDLE" => {
+                        value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+                    }
+                    "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
+                    _ => true,
+                }
+        })
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(pointer)
     }
 }
 

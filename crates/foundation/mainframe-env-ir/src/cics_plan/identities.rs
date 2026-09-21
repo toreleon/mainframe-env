@@ -13,6 +13,8 @@ pub enum CicsPlanOperation {
     AsktimeEib,
     /// Transform one absolute-time value into selected display/binary fields.
     FormatTime,
+    /// Release one task-local virtual storage area acquired by GETMAIN.
+    Freemain,
     /// Allocate one bounded task-local virtual storage area.
     Getmain,
     /// Change the issuing task's dispatch priority and optionally yield.
@@ -165,6 +167,8 @@ pub enum CicsOperandName {
     Flength,
     /// `INITIMG(...)` one-byte initialization image.
     InitImage,
+    /// `DATAPOINTER(...)` virtual storage pointer returned by GETMAIN.
+    DataPointer,
 }
 
 /// Flag option accepted by the typed CICS pilot.

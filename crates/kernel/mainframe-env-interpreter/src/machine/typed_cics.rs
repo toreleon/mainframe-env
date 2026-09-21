@@ -80,9 +80,13 @@ pub(super) fn write_response_state(
 
 pub(super) fn write_runtime_output(
     machine: &mut ReferenceMachine,
+    operation: CicsOperation,
     name: &str,
     value: &BoundedPayload,
 ) -> Result<bool, MachineProblem> {
+    if retrieve::release_output(machine, operation, name, value)? {
+        return Ok(true);
+    }
     if name != "TASK.PRIORITY" {
         return Ok(false);
     }
@@ -263,6 +267,9 @@ pub(super) fn execute(
                     )
                     .into_bytes(),
                 )
+            }
+            CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::DataPointer => {
+                retrieve::freemain_argument(machine, slot)?
             }
             CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::UsingAddress => (
                 "mainframe-env.cics.storage-identity@1",
