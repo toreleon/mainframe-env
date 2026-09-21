@@ -11439,6 +11439,91 @@ mod tests {
     }
 
     #[test]
+    fn compiled_send_map_length_selects_the_bounded_from_prefix() {
+        let artifact = published_source_fixture(
+            "SENDLEN",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. SENDLEN.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 OUTPUT-X PIC X(8) VALUE 'ABCDEFGH'.\n01 LENGTH-X PIC S9(4) COMP VALUE 4.\nPROCEDURE DIVISION.\nEXEC CICS SEND MAP('SHORT') MAPSET('LENGTHS') FROM(OUTPUT-X) LENGTH(LENGTH-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "SENDLEN".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("SL00".into(), "SENDLEN".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "LENGTHS".into(),
+                    map: "SHORT".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: vec![mainframe_env_cics::BmsFieldDefinition {
+                        name: "VALUE".into(),
+                        row: 1,
+                        column: 1,
+                        length: 4,
+                        initial: Vec::new(),
+                        color: None,
+                        highlight: None,
+                        protected: false,
+                        secret: false,
+                        fset: false,
+                        justify_right: false,
+                        fill_zero: false,
+                        output_offset: Some(0),
+                        attribute_offset: None,
+                    }],
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("send-map-length-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "SL00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation,
+                &session,
+                "SL00",
+                24,
+                80,
+                "send-map-length-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "SENDLEN", 2)
+            .unwrap();
+        let wire = server.cics.tn3270_screen(&session, &principal, 3).unwrap();
+        assert!(wire.windows(4).any(|bytes| bytes == b"ABCD"));
+        assert!(!wire.windows(4).any(|bytes| bytes == b"EFGH"));
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 3)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::SendMap)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
     fn compiled_start_without_data_queues_the_target_without_a_false_payload() {
         let artifact = published_source_fixture(
             "NODATA",

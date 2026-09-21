@@ -14083,6 +14083,75 @@ mod tests {
     }
 
     #[test]
+    fn send_map_length_selects_the_explicit_from_prefix() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, session) = registered(&service);
+        service
+            .register_map(BmsMapDefinition {
+                mapset: "LENGTHS".into(),
+                map: "SHORT".into(),
+                line: 1,
+                column: 1,
+                rows: 24,
+                columns: 80,
+                fields: vec![BmsFieldDefinition {
+                    name: "VALUE".into(),
+                    row: 1,
+                    column: 1,
+                    length: 4,
+                    initial: Vec::new(),
+                    color: None,
+                    highlight: None,
+                    protected: false,
+                    secret: false,
+                    fset: false,
+                    justify_right: false,
+                    fill_zero: false,
+                    output_offset: Some(0),
+                    attribute_offset: None,
+                }],
+            })
+            .unwrap();
+        let send = request(
+            CicsOperation::SendMap,
+            BTreeMap::from([
+                ("MAPSET".into(), argument(b"LENGTHS")),
+                ("MAP".into(), argument(b"SHORT")),
+                ("FROM".into(), argument(b"ABCDEFGH")),
+                ("LENGTH".into(), cics_decimal(4)),
+            ]),
+            1,
+        );
+        let response = service
+            .invoke(&effect(&invocation.run_unit_id, send.clone(), 1), send)
+            .unwrap();
+        assert!(response.payload.bytes().windows(4).any(|bytes| bytes == b"ABCD"));
+        let state = service.lock().unwrap();
+        assert_eq!(
+            state.sessions[session.as_str()].field_values["VALUE"],
+            b"ABCD"
+        );
+        drop(state);
+
+        let missing_from = request(
+            CicsOperation::SendMap,
+            BTreeMap::from([
+                ("MAPSET".into(), argument(b"LENGTHS")),
+                ("MAP".into(), argument(b"SHORT")),
+                ("LENGTH".into(), cics_decimal(4)),
+            ]),
+            2,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, missing_from.clone(), 2),
+                missing_from,
+            ),
+            Err(HostProblem::Malformed)
+        );
+    }
+
+    #[test]
     fn write_length_persists_only_the_selected_record_prefix() {
         let persisted = Arc::new(Mutex::new(None));
         let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));

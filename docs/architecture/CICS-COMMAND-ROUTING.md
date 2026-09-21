@@ -244,13 +244,15 @@ The typed local BMS subset binds `RECEIVE MAP`, `SEND MAP`, and `SEND TEXT` to
 the terminal family. Map names are prevalidated 1–7 character literals or
 alpha/alphanumeric fields; a `RECEIVE MAP` MAPSET field may be eight bytes so
 its runtime value can contain a valid name plus a trailing blank. `SEND MAP`
-requires MAP, defaults MAPSET to MAP, and optionally captures FROM; `RECEIVE
-MAP` requires MAP, applies the same MAPSET default, and optionally writes INTO;
-`SEND TEXT` requires FROM. The provider uses the requested durable map
-definition for terminal-fit validation and input-field normalization. SET
-pointers, omitted-map AID-only receive, implicit symbolic map storage, explicit
-length, paging, device and other terminal controls remain explicit compiler
-rejections.
+requires MAP, defaults MAPSET to MAP, and optionally captures FROM. With an
+explicit FROM, LENGTH accepts a bounded literal, halfword-binary value, or
+matching `LENGTH OF` and selects that exact prefix before symbolic-map
+formatting. `RECEIVE MAP` requires MAP, applies the same MAPSET default, and
+optionally writes INTO; `SEND TEXT` requires FROM. The provider validates the
+canonical request shape and uses the requested durable map definition for
+terminal-fit validation and input-field normalization. SET pointers,
+omitted-map AID-only receive, implicit symbolic map storage, RECEIVE length,
+paging, device and other terminal controls remain explicit compiler rejections.
 `CURSOR` and `FREEKB` are admitted and forwarded but are not yet modeled by the
 terminal provider (`#210`). `ERASE` coincides with the provider's existing
 full-screen replacement behavior (`#203`).

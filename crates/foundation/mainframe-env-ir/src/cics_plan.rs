@@ -1480,6 +1480,10 @@ mod tests {
                     name: CicsOperandName::From,
                     value: CicsOperandValue::Storage(slot(16, "BMS.OUTPUT")),
                 },
+                CicsNamedOperand {
+                    name: CicsOperandName::Length,
+                    value: CicsOperandValue::Integer(4),
+                },
             ],
             options: BTreeSet::from([CicsPlanOption::Erase, CicsPlanOption::Cursor]),
             outputs: Vec::new(),
@@ -1529,6 +1533,14 @@ mod tests {
         literal_transient_record.operands[1].value = CicsOperandValue::Literal(b"DATA".to_vec());
         assert_eq!(
             encode_cics_effect_plan(&literal_transient_record, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut send_map_without_from = send_map.clone();
+        send_map_without_from
+            .operands
+            .retain(|operand| operand.name != CicsOperandName::From);
+        assert_eq!(
+            encode_cics_effect_plan(&send_map_without_from, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
         let mut missing_browse_key_output = read_next.clone();

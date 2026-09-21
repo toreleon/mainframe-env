@@ -3069,11 +3069,11 @@ mod tests {
         }
     }
 
-    /// Issues #203 and #206: CardDemo SEND display controls and LENGTH OF stay typed.
+    /// Issues #203 and #206: CardDemo SEND display controls and bounded lengths stay typed.
     #[test]
     fn cics_send_map_admits_erase_cursor_and_freekb() {
         let analysis = analyze(
-            "IDENTIFICATION DIVISION. PROGRAM-ID. SENDOPT. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') ERASE CURSOR FREEKB END-EXEC. EXEC CICS SEND TEXT FROM(DATA-X) LENGTH(LENGTH OF DATA-X) ERASE FREEKB END-EXEC.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. SENDOPT. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). 01 LENGTH-X PIC S9(4) COMP VALUE 4. PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') FROM(DATA-X) LENGTH(LENGTH-X) ERASE CURSOR FREEKB END-EXEC. EXEC CICS SEND TEXT FROM(DATA-X) LENGTH(LENGTH OF DATA-X) ERASE FREEKB END-EXEC.",
         );
         let hir = analysis
             .hir
@@ -3098,10 +3098,23 @@ mod tests {
             commands[1].options,
             BTreeSet::from([HirCicsOption::Erase, HirCicsOption::FreeKb])
         );
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(operand.value, HirCicsValue::Data(ref reference) if reference.qualified_name == "LENGTH-X")
+        }));
         assert!(commands[1].operands.iter().any(|operand| {
             operand.name == HirCicsOperandName::Length
                 && matches!(operand.value, HirCicsValue::LengthOf(ref reference) if reference.qualified_name == "DATA-X")
         }));
+
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADSEND. PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') LENGTH(4) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADSEND. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). 01 LENGTH-X PIC X(2). PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') FROM(DATA-X) LENGTH(LENGTH-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADSEND. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') FROM(DATA-X) LENGTH(32768) END-EXEC. STOP RUN.",
+        ] {
+            let analysis = analyze(source);
+            assert!(analysis.hir.is_none(), "{source}");
+        }
     }
 
     /// Issue #208: an eight-byte MAPSET data area is resolved at run time.

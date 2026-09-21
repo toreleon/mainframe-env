@@ -69,14 +69,16 @@ contract explicitly permits it.
 - Typed CICS BMS plans admit a bounded local subset of `RECEIVE MAP`, `SEND MAP`,
   and `SEND TEXT`. MAP is a required 1–7 character literal or alpha/alphanumeric
   field for the two map commands; MAPSET is optional and defaults to MAP.
-  `SEND MAP` optionally captures FROM bytes, `RECEIVE MAP` optionally binds a
-  writable INTO area, and `SEND TEXT` requires captured FROM bytes. The provider
-  checks the requested durable map definition, makes a successfully sent map
-  current, and normalizes received named fields against that exact definition.
-  The selected typed route reports EIBFN `1802`, `1804`, or `1806` respectively.
-  SET pointers, omitted-MAP/AID-only receive, implicit symbolic map storage,
-  explicit length, paging, device and remaining terminal-control options are
-  rejected before executable publication.
+  `SEND MAP` optionally captures FROM bytes and admits LENGTH only with that
+  explicit area; a literal, halfword-binary value, or matching `LENGTH OF`
+  selects the formatted prefix. `RECEIVE MAP` optionally binds a writable INTO
+  area, and `SEND TEXT` requires captured FROM bytes. The provider validates the
+  exact SEND request shape, checks the requested durable map definition, makes
+  a successfully sent map current, and normalizes received named fields against
+  that exact definition. The selected typed route reports EIBFN `1802`, `1804`,
+  or `1806` respectively. SET pointers, omitted-MAP/AID-only receive, implicit
+  symbolic map storage, RECEIVE length, paging, device and remaining
+  terminal-control options are rejected before executable publication.
 - Typed `PURGE MESSAGE` has no operands beyond the common condition controls.
   The runtime exposes no full-BMS ACCUM/page-building path, so local execution
   purges the exact reachable empty logical-message state without clearing the

@@ -125,6 +125,7 @@ fn send(
     run: &Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
+    validate_send_request(request)?;
     let map_names = (request.operation == CicsOperation::SendMap)
         .then(|| map_names(request))
         .transpose()?;
@@ -219,6 +220,68 @@ fn send(
         None,
         payload,
     )
+}
+
+fn validate_send_request(request: &CicsRequest) -> Result<(), HostProblem> {
+    const SEND_MAP_ALLOWED: &[&str] = &[
+        "FROM",
+        "LENGTH",
+        "MAP",
+        "MAPSET",
+        "OPTION.CURSOR",
+        "OPTION.ERASE",
+        "OPTION.FREEKB",
+        "OPTION.NOHANDLE",
+        "RESP",
+        "RESP2",
+    ];
+    const SEND_TEXT_ALLOWED: &[&str] = &[
+        "FROM",
+        "LENGTH",
+        "OPTION.ERASE",
+        "OPTION.FREEKB",
+        "OPTION.NOHANDLE",
+        "RESP",
+        "RESP2",
+    ];
+    let allowed = match request.operation {
+        CicsOperation::SendMap => SEND_MAP_ALLOWED,
+        CicsOperation::SendText => SEND_TEXT_ALLOWED,
+        _ => return Err(HostProblem::Malformed),
+    };
+    let required = match request.operation {
+        CicsOperation::SendMap => "MAP",
+        CicsOperation::SendText => "FROM",
+        _ => return Err(HostProblem::Malformed),
+    };
+    if request.mutation.is_none()
+        || !request.arguments.contains_key(required)
+        || request.operation == CicsOperation::SendMap
+            && request.arguments.contains_key("LENGTH")
+            && !request.arguments.contains_key("FROM")
+        || request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
+        || request.arguments.iter().any(|(name, value)| {
+            !allowed.contains(&name.as_str())
+                || match name.as_str() {
+                    "LENGTH" => value.schema() != "mainframe-env.cics.decimal@1",
+                    "OPTION.CURSOR" | "OPTION.ERASE" | "OPTION.FREEKB" | "OPTION.NOHANDLE" => {
+                        value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+                    }
+                    "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
+                    "FROM" | "MAP" | "MAPSET" => !matches!(
+                        value.schema(),
+                        "mainframe-env.cics.argument@1"
+                            | "mainframe-env.cics.literal@1"
+                            | "mainframe-env.cics.storage-value@1"
+                    ),
+                    _ => true,
+                }
+        })
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
 }
 
 fn receive(

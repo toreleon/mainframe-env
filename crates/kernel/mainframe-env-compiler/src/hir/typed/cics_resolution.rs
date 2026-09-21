@@ -735,7 +735,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Freemain => &["DATA", "DATAPOINTER", "RESP", "RESP2"],
         HirCicsOperation::Getmain => &["FLENGTH", "LENGTH", "INITIMG", "SET", "RESP", "RESP2"],
         HirCicsOperation::ReceiveMap => &["MAP", "MAPSET", "INTO", "RESP", "RESP2"],
-        HirCicsOperation::SendMap => &["MAP", "MAPSET", "FROM", "RESP", "RESP2"],
+        HirCicsOperation::SendMap => &["MAP", "MAPSET", "FROM", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::SendText => &["FROM", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::Assign => &["RESP", "RESP2"],
         HirCicsOperation::Cancel => &["REQID", "TRANSID", "RESP", "RESP2"],

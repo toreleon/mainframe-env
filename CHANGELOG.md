@@ -402,10 +402,12 @@ All notable changes to mainframe-env are documented here.
   typed terminal plans. MAP and optional MAPSET are validated 1–7 character
   selectors, with an eight-byte RECEIVE MAPSET field admitted for a valid name
   plus trailing blank. MAPSET defaults to MAP, and FROM/INTO storage is
-  resolved before dispatch. RECEIVE uses the requested durable definition for
+  resolved before dispatch. `SEND MAP LENGTH` accepts a literal, halfword
+  binary value, or matching `LENGTH OF` form and selects only that prefix of an
+  explicit FROM area. RECEIVE uses the requested durable definition for
   terminal-fit and field normalization. SET pointers, omitted-map AID-only
-  receive, implicit symbolic map storage, lengths, paging, device and other
-  terminal controls remain fail-closed.
+  receive, implicit symbolic map storage, RECEIVE length, paging, device and
+  other terminal controls remain fail-closed.
 - Added a typed `PURGE MESSAGE` route for the runtime's reachable empty
   full-BMS logical-message state. Local execution is an idempotent audited
   mutation that preserves the displayed terminal image; DPL execution returns
