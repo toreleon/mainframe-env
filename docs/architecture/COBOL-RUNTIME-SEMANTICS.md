@@ -246,13 +246,16 @@ records and retained-byte accounting. A missing queue returns QIDERR 44/0;
 remote SYSID and definition-driven extrapartition, disabled, or locked states
 remain outside this typed subset.
 
-Typed local GETMAIN requires SET plus a literal or fullword-binary FLENGTH and
-optionally accepts one character INITIMG and NOSUSPEND. The interpreter reports
-its bounded frame/byte capacity, receives initialized bytes through the typed
-host result, allocates one checkpointed virtual base, and writes only the
-checked virtual address to POINTER or POINTER-32 storage. Nonpositive or
-over-limit FLENGTH returns LENGERR 22/1 and clears SET; unavailable capacity
-returns NOSTG 42/2, which is ignored by default. Native addresses, legacy LENGTH, storage keys,
+Typed local GETMAIN requires SET plus exactly one length selector: a literal or
+fullword-binary FLENGTH, or a literal or unsigned-halfword-binary compatibility
+LENGTH capped at 65,520 bytes. It optionally accepts one character INITIMG and
+NOSUSPEND. The interpreter reports its bounded frame/byte capacity, receives
+initialized bytes through the typed host result, allocates one checkpointed
+virtual base, and writes only the checked virtual address to POINTER or
+POINTER-32 storage. Zero or over-limit values return LENGERR 22/1 and clear SET;
+unavailable capacity returns NOSTG 42/2, which is ignored by default. LENGTH
+selects the source-defined below-line compatibility policy, but the virtual
+allocator exposes no native 24-bit address. Native addresses, storage keys,
 SHARED/EXECUTABLE policy and GETMAIN64 remain outside this subset.
 Typed local FREEMAIN accepts exactly one of DATAPOINTER or DATA. DATAPOINTER
 requires a POINTER or POINTER-32 value that the current machine can prove names

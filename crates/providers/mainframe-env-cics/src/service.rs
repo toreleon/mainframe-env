@@ -9195,6 +9195,22 @@ mod tests {
             .unwrap();
         assert_eq!(replay, response);
 
+        let length = request(
+            CicsOperation::Getmain,
+            BTreeMap::from([
+                ("LENGTH".into(), cics_decimal(4)),
+                ("INITIMG".into(), task_value(b"Q")),
+                ("SET".into(), argument(b"PTR-X")),
+                ("SET.MAXLENGTH".into(), cics_decimal(16)),
+                ("SET.LIMIT".into(), cics_decimal(65_535)),
+            ]),
+            2,
+        );
+        let length = service
+            .invoke(&effect(&invocation.run_unit_id, length.clone(), 2), length)
+            .unwrap();
+        assert_eq!(length.outputs["SET"].bytes(), b"QQQQ");
+
         let mut zero = request(
             CicsOperation::Getmain,
             BTreeMap::from([
@@ -9205,14 +9221,14 @@ mod tests {
                 ("RESP".into(), argument(b"RESP-X")),
                 ("RESP2".into(), argument(b"RESP2-X")),
             ]),
-            2,
+            3,
         );
         zero.condition_policy = CicsConditionPolicy::Respond {
             response_field: "RESP-X".into(),
             response2_field: Some("RESP2-X".into()),
         };
         let zero = service
-            .invoke(&effect(&invocation.run_unit_id, zero.clone(), 2), zero)
+            .invoke(&effect(&invocation.run_unit_id, zero.clone(), 3), zero)
             .unwrap();
         assert_eq!(
             (zero.condition.as_str(), zero.response, zero.response2),
@@ -9232,11 +9248,11 @@ mod tests {
                 ("SET.MAXLENGTH".into(), cics_decimal(16)),
                 ("SET.LIMIT".into(), cics_decimal(64)),
             ]),
-            3,
+            4,
         );
         let exhausted = service
             .invoke(
-                &effect(&invocation.run_unit_id, exhausted.clone(), 3),
+                &effect(&invocation.run_unit_id, exhausted.clone(), 4),
                 exhausted,
             )
             .unwrap();
@@ -9259,7 +9275,7 @@ mod tests {
                 ("SET.LIMIT".into(), cics_decimal(64)),
                 ("RESP".into(), argument(b"RESP-X")),
             ]),
-            4,
+            5,
         );
         over_limit.condition_policy = CicsConditionPolicy::Respond {
             response_field: "RESP-X".into(),
@@ -9267,7 +9283,7 @@ mod tests {
         };
         let over_limit = service
             .invoke(
-                &effect(&invocation.run_unit_id, over_limit.clone(), 4),
+                &effect(&invocation.run_unit_id, over_limit.clone(), 5),
                 over_limit,
             )
             .unwrap();
@@ -9282,6 +9298,36 @@ mod tests {
         assert_eq!(
             over_limit.outputs["SET"].schema(),
             "mainframe-env.cics.pointer-null@1"
+        );
+
+        let mut oversized_length = request(
+            CicsOperation::Getmain,
+            BTreeMap::from([
+                ("LENGTH".into(), cics_decimal(65_521)),
+                ("SET".into(), argument(b"PTR-X")),
+                ("SET.MAXLENGTH".into(), cics_decimal(65_535)),
+                ("SET.LIMIT".into(), cics_decimal(65_535)),
+                ("RESP".into(), argument(b"RESP-X")),
+            ]),
+            6,
+        );
+        oversized_length.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: None,
+        };
+        let oversized_length = service
+            .invoke(
+                &effect(&invocation.run_unit_id, oversized_length.clone(), 6),
+                oversized_length,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                oversized_length.condition.as_str(),
+                oversized_length.response,
+                oversized_length.response2
+            ),
+            ("LENGERR", 22, 1)
         );
     }
 

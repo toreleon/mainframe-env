@@ -224,13 +224,16 @@ bytes. Typed local DELETEQ TD accepts only the bounded QUEUE selector, requires
 update access to the same queue resource, and atomically removes the durable
 queue plus its retained-byte accounting. A missing queue returns QIDERR 44/0.
 Remote SYSID routing and TDQUEUE definition-state conditions remain deferred.
-Typed local GETMAIN routes SET plus FLENGTH and optional INITIMG through the
-storage-control family. The interpreter contributes its remaining virtual
+Typed local GETMAIN routes SET plus exactly one FLENGTH or compatibility LENGTH
+and optional INITIMG through the storage-control family. FLENGTH uses signed
+fullword input; LENGTH uses unsigned halfword input and the source-defined
+65,520-byte ceiling. The interpreter contributes its remaining virtual
 frame/byte capacity, applies the returned initialized bytes to a checkpointed
-virtual base, and writes a checked POINTER or POINTER-32 address. Nonpositive
-or over-limit length clears SET with LENGERR 22/1; unavailable capacity returns
-default-ignored NOSTG 42/2. Native addresses, legacy LENGTH, key/share/executable attributes,
-and 64-bit forms remain deferred. Typed FREEMAIN accepts exactly one
+virtual base, and writes a checked POINTER or POINTER-32 address. Zero or
+over-limit length clears SET with LENGERR 22/1; unavailable capacity returns
+default-ignored NOSTG 42/2. LENGTH selects below-line compatibility without
+exposing or claiming a native address. Native addresses, key/share/executable
+attributes, and 64-bit forms remain deferred. Typed FREEMAIN accepts exactly one
 DATAPOINTER or DATA slot. The interpreter proves that the pointer value or
 DATA area's current virtual-storage view names the start of a live allocation
 owned by the current task, applies the replay-bound release intent, checkpoints

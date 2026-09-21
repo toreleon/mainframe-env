@@ -32,16 +32,23 @@ pub(super) fn validate_constraints(
     } else if operation != HirCicsOperation::Getmain {
         return Ok(());
     }
-    for required in ["SET", "FLENGTH"] {
-        if !clauses.contains_key(required) {
-            return Err(ResolutionFailure::Invalid(format!(
-                "CICS GETMAIN requires {required}"
-            )));
-        }
+    if !clauses.contains_key("SET") {
+        return Err(ResolutionFailure::Invalid(
+            "CICS GETMAIN requires SET".into(),
+        ));
     }
-    let length = cics_integer_value(&clauses["FLENGTH"], semantic)?;
-    match length {
-        HirCicsValue::Data(reference)
+    let (name, tokens) = match (clauses.get("FLENGTH"), clauses.get("LENGTH")) {
+        (Some(tokens), None) => ("FLENGTH", tokens),
+        (None, Some(tokens)) => ("LENGTH", tokens),
+        _ => {
+            return Err(ResolutionFailure::Invalid(
+                "CICS GETMAIN requires exactly one of FLENGTH or LENGTH".into(),
+            ));
+        }
+    };
+    let length = cics_integer_value(tokens, semantic)?;
+    match (name, length) {
+        ("FLENGTH", HirCicsValue::Data(reference))
             if reference.usage != CobolUsage::Binary
                 || reference.length != 4
                 || reference.scale != 0 =>
@@ -50,9 +57,24 @@ pub(super) fn validate_constraints(
                 "CICS GETMAIN FLENGTH requires fullword binary storage".into(),
             ));
         }
-        HirCicsValue::Integer(value) if i32::try_from(value).is_err() => {
+        ("FLENGTH", HirCicsValue::Integer(value)) if i32::try_from(value).is_err() => {
             return Err(ResolutionFailure::Invalid(
                 "CICS GETMAIN FLENGTH literal must fit a signed fullword".into(),
+            ));
+        }
+        ("LENGTH", HirCicsValue::Data(reference))
+            if reference.usage != CobolUsage::Binary
+                || reference.length != 2
+                || reference.scale != 0
+                || reference.signed =>
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS GETMAIN LENGTH requires unsigned halfword binary storage".into(),
+            ));
+        }
+        ("LENGTH", HirCicsValue::Integer(value)) if !(0..=65_520).contains(&value) => {
+            return Err(ResolutionFailure::Invalid(
+                "CICS GETMAIN LENGTH literal must be between 0 and 65520".into(),
             ));
         }
         _ => {}
@@ -99,9 +121,14 @@ pub(super) fn operands(
     } else if operation != HirCicsOperation::Getmain {
         return Ok(Vec::new());
     }
+    let (name, tokens) = if let Some(tokens) = clauses.get("FLENGTH") {
+        (HirCicsOperandName::Flength, tokens)
+    } else {
+        (HirCicsOperandName::Length, &clauses["LENGTH"])
+    };
     let mut operands = vec![HirCicsNamedOperand {
-        name: HirCicsOperandName::Flength,
-        value: cics_integer_value(&clauses["FLENGTH"], semantic)?,
+        name,
+        value: cics_integer_value(tokens, semantic)?,
     }];
     if let Some(tokens) = clauses.get("INITIMG") {
         operands.push(HirCicsNamedOperand {

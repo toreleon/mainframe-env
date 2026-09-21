@@ -22,10 +22,17 @@ fn getmain(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     validate_getmain(request)?;
-    let length = argument_text(request, "FLENGTH")?
+    let length_name = if request.arguments.contains_key("FLENGTH") {
+        "FLENGTH"
+    } else {
+        "LENGTH"
+    };
+    let length = argument_text(request, length_name)?
         .parse::<i64>()
         .map_err(|_| HostProblem::Malformed)?;
-    i32::try_from(length).map_err(|_| HostProblem::Malformed)?;
+    if length_name == "FLENGTH" {
+        i32::try_from(length).map_err(|_| HostProblem::Malformed)?;
+    }
     if length <= 0 {
         return length_error(service, run, request);
     }
@@ -33,6 +40,11 @@ fn getmain(
     let limit = argument_text(request, "SET.LIMIT")?
         .parse::<u64>()
         .map_err(|_| HostProblem::Malformed)?;
+    let limit = if length_name == "LENGTH" {
+        limit.min(65_520)
+    } else {
+        limit
+    };
     if requested > limit {
         return length_error(service, run, request);
     }
@@ -110,6 +122,7 @@ fn freemain(
 fn validate_getmain(request: &CicsRequest) -> Result<(), HostProblem> {
     const ALLOWED: &[&str] = &[
         "FLENGTH",
+        "LENGTH",
         "INITIMG",
         "OPTION.NOHANDLE",
         "OPTION.NOSUSPEND",
@@ -119,15 +132,17 @@ fn validate_getmain(request: &CicsRequest) -> Result<(), HostProblem> {
         "SET.MAXLENGTH",
         "SET.LIMIT",
     ];
+    let has_flength = request.arguments.contains_key("FLENGTH");
+    let has_length = request.arguments.contains_key("LENGTH");
     if request.mutation.is_none()
-        || !request.arguments.contains_key("FLENGTH")
+        || has_flength == has_length
         || !request.arguments.contains_key("SET")
         || !request.arguments.contains_key("SET.MAXLENGTH")
         || !request.arguments.contains_key("SET.LIMIT")
         || request.arguments.iter().any(|(name, value)| {
             !ALLOWED.contains(&name.as_str())
                 || match name.as_str() {
-                    "FLENGTH" | "SET.MAXLENGTH" | "SET.LIMIT" => {
+                    "FLENGTH" | "LENGTH" | "SET.MAXLENGTH" | "SET.LIMIT" => {
                         value.schema() != "mainframe-env.cics.decimal@1"
                     }
                     "INITIMG" => {

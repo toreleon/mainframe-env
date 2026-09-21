@@ -6,10 +6,15 @@ pub(super) fn invalid_getmain_shape(
     inputs: &BTreeSet<CicsOperandName>,
     outputs: &BTreeSet<CicsOutputName>,
 ) -> bool {
-    !inputs.contains(&CicsOperandName::Flength)
-        || inputs
-            .iter()
-            .any(|name| !matches!(name, CicsOperandName::Flength | CicsOperandName::InitImage))
+    let flength_form = inputs.contains(&CicsOperandName::Flength);
+    let length_form = inputs.contains(&CicsOperandName::Length);
+    flength_form == length_form
+        || inputs.iter().any(|name| {
+            !matches!(
+                name,
+                CicsOperandName::Flength | CicsOperandName::Length | CicsOperandName::InitImage
+            )
+        })
         || !outputs.contains(&CicsOutputName::SetPointer)
         || !outputs.is_subset(&BTreeSet::from([
             CicsOutputName::SetPointer,
@@ -17,7 +22,7 @@ pub(super) fn invalid_getmain_shape(
             CicsOutputName::Resp2,
         ]))
         || plan.operands.iter().any(|operand| match operand.name {
-            CicsOperandName::Flength => !matches!(
+            CicsOperandName::Flength | CicsOperandName::Length => !matches!(
                 operand.value,
                 CicsOperandValue::Integer(_) | CicsOperandValue::Storage(_)
             ),

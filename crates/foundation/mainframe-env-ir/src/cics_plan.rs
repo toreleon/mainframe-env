@@ -1952,7 +1952,7 @@ mod tests {
     }
 
     #[test]
-    fn getmain_requires_flength_and_one_set_pointer_output() {
+    fn getmain_requires_one_length_form_and_one_set_pointer_output() {
         let plan = CicsEffectPlan {
             operation: CicsPlanOperation::Getmain,
             operands: vec![
@@ -1975,6 +1975,21 @@ mod tests {
         let limits = CicsPlanLimits::default();
         let bytes = encode_cics_effect_plan(&plan, limits).unwrap();
         assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), plan);
+
+        let mut length = plan.clone();
+        length.operands[0].name = CicsOperandName::Length;
+        let bytes = encode_cics_effect_plan(&length, limits).unwrap();
+        assert_eq!(decode_cics_effect_plan(&bytes, limits).unwrap(), length);
+
+        let mut both = plan.clone();
+        both.operands.push(CicsNamedOperand {
+            name: CicsOperandName::Length,
+            value: CicsOperandValue::Integer(16),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&both, limits),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
 
         let mut missing_set = plan.clone();
         missing_set.outputs.clear();

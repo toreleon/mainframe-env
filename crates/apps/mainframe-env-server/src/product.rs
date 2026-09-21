@@ -11334,6 +11334,111 @@ mod tests {
     }
 
     #[test]
+    fn compiled_getmain_length_uses_halfword_compatibility_storage() {
+        let artifact = published_source_fixture(
+            "GETMAINL",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. GETMAINL.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 PTR-X POINTER.\n01 ZERO-PTR-X POINTER.\n01 LENGTH-X PIC 9(4) COMP VALUE 4.\n01 ZERO-X PIC 9(4) COMP VALUE 0.\n01 INIT-X PIC X VALUE 'Q'.\n01 OBSERVED-X PIC X(4) VALUE SPACES.\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nLINKAGE SECTION.\n01 LINK-X PIC X(4).\nPROCEDURE DIVISION.\nEXEC CICS GETMAIN SET(PTR-X) LENGTH(LENGTH-X) INITIMG(INIT-X) END-EXEC.\nSET ADDRESS OF LINK-X TO PTR-X.\nMOVE LINK-X TO OBSERVED-X.\nEXEC CICS GETMAIN SET(ZERO-PTR-X) LENGTH(ZERO-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS FREEMAIN DATA(LINK-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "GETMAINL".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("GL00".into(), "GETMAINL".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "GETMAINL".into(),
+                    map: "GETMAINL".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("getmain-length-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "GL00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "GL00",
+                24,
+                80,
+                "getmain-length-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "GETMAINL", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert!(restored.variable("LINK-X").is_none());
+        assert_eq!(restored.variable("OBSERVED-X").unwrap().bytes(), b"QQQQ");
+        assert!(
+            restored
+                .variable("PTR-X")
+                .unwrap()
+                .bytes()
+                .iter()
+                .any(|byte| *byte != 0)
+        );
+        assert!(
+            restored
+                .variable("ZERO-PTR-X")
+                .unwrap()
+                .bytes()
+                .iter()
+                .all(|byte| *byte == 0)
+        );
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 22]);
+        assert_eq!(restored.variable("RESP2-X").unwrap().bytes(), &[0, 0, 0, 1]);
+        let trace = server
+            .cics
+            .terminal_run_trace(&session, &principal, 2)
+            .unwrap();
+        assert_eq!(
+            trace
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::Getmain)
+                .count(),
+            2
+        );
+        assert_eq!(
+            trace
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::Freemain)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
     fn compiled_start_without_data_queues_the_target_without_a_false_payload() {
         let artifact = published_source_fixture(
             "NODATA",

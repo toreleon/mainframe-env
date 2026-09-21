@@ -384,12 +384,13 @@ All notable changes to mainframe-env are documented here.
   and selected compiled-route regressions cover deletion and repeated-delete
   behavior. Remote SYSID and TDQUEUE definition, extrapartition, disabled, and
   locked states remain fail-closed.
-- Added a typed task-local `GETMAIN SET/FLENGTH` subset over interpreter-owned
-  virtual storage. Literal or fullword-binary lengths, one-byte `INITIMG`,
-  `NOSUSPEND`, checkpoint restoration, replay, LENGERR 22/1 pointer clearing,
-  and default-ignored NOSTG 42/2 are covered without exposing native addresses.
-  Legacy LENGTH, key/share/executable policy, 64-bit forms, and DPL proof remain
-  fail-closed or pending.
+- Added typed task-local `GETMAIN SET` with exactly one FLENGTH or compatibility
+  LENGTH over interpreter-owned virtual storage. FLENGTH accepts signed
+  fullword input; LENGTH accepts unsigned halfword input and enforces its 65,520
+  byte ceiling. One-byte `INITIMG`, `NOSUSPEND`, checkpoint restoration, replay,
+  LENGERR 22/1 pointer clearing, and default-ignored NOSTG 42/2 are covered
+  without exposing native addresses. Key/share/executable policy, 64-bit forms,
+  and DPL proof remain fail-closed or pending.
 - Added typed task-local `FREEMAIN DATAPOINTER` and `FREEMAIN DATA`. The
   interpreter validates either the pointer value or the DATA area's current
   virtual-storage view against a live, offset-zero GETMAIN allocation, applies
