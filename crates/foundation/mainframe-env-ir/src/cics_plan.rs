@@ -1491,10 +1491,16 @@ mod tests {
         };
         let send_text = CicsEffectPlan {
             operation: CicsPlanOperation::SendText,
-            operands: vec![CicsNamedOperand {
-                name: CicsOperandName::From,
-                value: CicsOperandValue::Storage(slot(17, "BMS.TEXT")),
-            }],
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::From,
+                    value: CicsOperandValue::Storage(slot(17, "BMS.TEXT")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Length,
+                    value: CicsOperandValue::Integer(4),
+                },
+            ],
             options: BTreeSet::new(),
             outputs: Vec::new(),
             condition: CicsCondition::Default,

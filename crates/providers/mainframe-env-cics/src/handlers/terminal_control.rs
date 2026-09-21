@@ -129,20 +129,21 @@ fn send(
     let map_names = (request.operation == CicsOperation::SendMap)
         .then(|| map_names(request))
         .transpose()?;
-    let mut state = service.lock()?;
     let mut payload = argument_bytes(request, "FROM")
         .or_else(|| argument_bytes(request, "DATA"))
         .unwrap_or_default();
     if let Some(length) = argument_optional(request, "LENGTH") {
         let length = length
             .trim()
-            .parse::<usize>()
+            .parse::<i64>()
             .map_err(|_| HostProblem::Malformed)?;
+        let length = usize::try_from(length).map_err(|_| length_problem(request.operation))?;
         if length > payload.len() {
-            return Err(HostProblem::Malformed);
+            return Err(length_problem(request.operation));
         }
         payload.truncate(length);
     }
+    let mut state = service.lock()?;
     let mut field_protection = None;
     let mut field_modified = None;
     let mut field_values = None;
@@ -220,6 +221,18 @@ fn send(
         None,
         payload,
     )
+}
+
+fn length_problem(operation: CicsOperation) -> HostProblem {
+    if operation == CicsOperation::SendText {
+        HostProblem::Condition {
+            name: "LENGERR".into(),
+            response: 22,
+            response2: 0,
+        }
+    } else {
+        HostProblem::Malformed
+    }
 }
 
 fn validate_send_request(request: &CicsRequest) -> Result<(), HostProblem> {

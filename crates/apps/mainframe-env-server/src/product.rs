@@ -11524,6 +11524,79 @@ mod tests {
     }
 
     #[test]
+    fn compiled_send_text_length_selects_the_bounded_from_prefix() {
+        let artifact = published_source_fixture(
+            "SENDTXT",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. SENDTXT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 OUTPUT-X PIC X(10) VALUE 'HELLOWORLD'.\n01 LENGTH-X PIC S9(4) COMP VALUE 5.\nPROCEDURE DIVISION.\nEXEC CICS SEND TEXT FROM(OUTPUT-X) LENGTH(LENGTH-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "SENDTXT".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("ST00".into(), "SENDTXT".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "SENDTXT".into(),
+                    map: "SENDTXT".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("send-text-length-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "ST00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation,
+                &session,
+                "ST00",
+                24,
+                80,
+                "send-text-length-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "SENDTXT", 2)
+            .unwrap();
+        let screen = server
+            .cics
+            .terminal_snapshot(&session, &principal, 3)
+            .unwrap()
+            .screen;
+        assert_eq!(screen, b"HELLO");
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 3)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::SendText)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
     fn compiled_start_without_data_queues_the_target_without_a_false_payload() {
         let artifact = published_source_fixture(
             "NODATA",

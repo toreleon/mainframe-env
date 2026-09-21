@@ -247,9 +247,11 @@ its runtime value can contain a valid name plus a trailing blank. `SEND MAP`
 requires MAP, defaults MAPSET to MAP, and optionally captures FROM. With an
 explicit FROM, LENGTH accepts a bounded literal, halfword-binary value, or
 matching `LENGTH OF` and selects that exact prefix before symbolic-map
-formatting. `RECEIVE MAP` requires MAP, applies the same MAPSET default, and
-optionally writes INTO; `SEND TEXT` requires FROM. The provider validates the
-canonical request shape and uses the requested durable map definition for
+formatting. `SEND TEXT` requires FROM and accepts the same three LENGTH forms;
+an out-of-range runtime value returns LENGERR 22/0 without changing the screen.
+`RECEIVE MAP` requires MAP, applies the same MAPSET default, and optionally
+writes INTO. The provider validates the canonical request shape and uses the
+requested durable map definition for
 terminal-fit validation and input-field normalization. SET pointers,
 omitted-map AID-only receive, implicit symbolic map storage, RECEIVE length,
 paging, device and other terminal controls remain explicit compiler rejections.

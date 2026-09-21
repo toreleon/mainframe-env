@@ -96,7 +96,10 @@ pub(super) fn operands(
                 .is_some_and(|token| token.eq_ignore_ascii_case("OF"))
         {
             HirCicsValue::LengthOf(complete_data_reference(&tokens[2..], semantic)?)
-        } else if operation == HirCicsOperation::SendMap {
+        } else if matches!(
+            operation,
+            HirCicsOperation::SendMap | HirCicsOperation::SendText
+        ) {
             let value = cics_integer_value(tokens, semantic)?;
             match &value {
                 HirCicsValue::Data(reference)
@@ -104,22 +107,20 @@ pub(super) fn operands(
                         || reference.length != 2
                         || reference.scale != 0 =>
                 {
-                    return Err(ResolutionFailure::Invalid(
-                        "CICS SEND MAP LENGTH requires halfword binary storage".into(),
-                    ));
+                    return Err(ResolutionFailure::Invalid(format!(
+                        "CICS {operation:?} LENGTH requires halfword binary storage"
+                    )));
                 }
                 HirCicsValue::Integer(value) if !(0..=32_767).contains(value) => {
-                    return Err(ResolutionFailure::Invalid(
-                        "CICS SEND MAP LENGTH literal must be between 0 and 32767".into(),
-                    ));
+                    return Err(ResolutionFailure::Invalid(format!(
+                        "CICS {operation:?} LENGTH literal must be between 0 and 32767"
+                    )));
                 }
                 _ => {}
             }
             value
         } else {
-            return Err(ResolutionFailure::Invalid(
-                "CICS SEND TEXT LENGTH requires LENGTH OF a data area".into(),
-            ));
+            unreachable!("LENGTH is admitted only for SEND MAP or SEND TEXT")
         };
         operands.push(HirCicsNamedOperand {
             name: HirCicsOperandName::Length,

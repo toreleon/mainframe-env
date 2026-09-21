@@ -14080,6 +14080,39 @@ mod tests {
             service.lock().unwrap().sessions[session.as_str()].screen,
             b"HELLO"
         );
+
+        let mut oversized = request(
+            CicsOperation::SendText,
+            BTreeMap::from([
+                ("FROM".into(), argument(b"DATA")),
+                ("LENGTH".into(), cics_decimal(5)),
+                ("RESP".into(), argument(b"RESP-X")),
+                ("RESP2".into(), argument(b"RESP2-X")),
+            ]),
+            2,
+        );
+        oversized.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let oversized = service
+            .invoke(
+                &effect(&invocation.run_unit_id, oversized.clone(), 2),
+                oversized,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                oversized.condition.as_str(),
+                oversized.response,
+                oversized.response2
+            ),
+            ("LENGERR", 22, 0)
+        );
+        assert_eq!(
+            service.lock().unwrap().sessions[session.as_str()].screen,
+            b"HELLO"
+        );
     }
 
     #[test]
@@ -14125,7 +14158,13 @@ mod tests {
         let response = service
             .invoke(&effect(&invocation.run_unit_id, send.clone(), 1), send)
             .unwrap();
-        assert!(response.payload.bytes().windows(4).any(|bytes| bytes == b"ABCD"));
+        assert!(
+            response
+                .payload
+                .bytes()
+                .windows(4)
+                .any(|bytes| bytes == b"ABCD")
+        );
         let state = service.lock().unwrap();
         assert_eq!(
             state.sessions[session.as_str()].field_values["VALUE"],
