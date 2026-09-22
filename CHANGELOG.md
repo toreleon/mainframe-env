@@ -43,8 +43,10 @@ All notable changes to mainframe-env are documented here.
   contract. It freezes one provider-neutral capability/outcome vocabulary,
   shared effect and lock/CAS ordering, read-version policy, and an accepted
   CICS local/owned-DPL mapping while keeping Db2, IMS, and MQ bindings
-  explicitly pending. It adds no route, profile behavior, universal 2PC, or
-  exactly-once claim.
+  explicitly pending. The existing coordinator exposes the descriptor without
+  dispatching from it, and the CICS recovery handler consumes its context
+  applicability and rejection mapping. It adds no route, profile behavior,
+  universal 2PC, or exactly-once claim.
 
 - Added typed local CICS START `TERMID` through append-only operand tag 38.
   The provider resolves active virtual terminals at command time, returns exact

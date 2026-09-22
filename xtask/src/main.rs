@@ -7395,6 +7395,21 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
         status.success(),
         "transaction participant freshness guard failed",
     )?;
+    let participant_bindings = root.join("tools/check_transaction_participant.py");
+    require(
+        participant_bindings.is_file(),
+        "transaction participant binding guard is missing",
+    )?;
+    let status = Command::new("python3")
+        .arg("-B")
+        .arg(&participant_bindings)
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("transaction participant binding guard: {error}"))?;
+    require(
+        status.success(),
+        "transaction participant binding guard failed",
+    )?;
     check_dehardcoding(root)?;
     if root
         .join("crates/contracts/mainframe-env-host-api/src/canonical.rs")
