@@ -11681,6 +11681,131 @@ mod tests {
     }
 
     #[test]
+    fn compiled_rewrite_file_length_persists_selected_prefix() {
+        let artifact = published_source_fixture(
+            "REWRITEL",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. REWRITEL.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 KEY-X PIC X(3) VALUE '003'.\n01 READ-X PIC X(8).\n01 UPDATE-X PIC X(8) VALUE '003ABCDE'.\n01 LENGTH-X PIC S9(4) COMP VALUE 5.\nPROCEDURE DIVISION.\nEXEC CICS READ FILE('ACCTDAT') INTO(READ-X) RIDFLD(KEY-X) UPDATE END-EXEC.\nEXEC CICS REWRITE FILE('ACCTDAT') FROM(UPDATE-X) LENGTH(LENGTH-X) END-EXEC.\nEXEC CICS SYNCPOINT END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let authentication = || Authentication::Basic {
+            user: "IBMUSER".into(),
+            secret: b"TESTPASS".to_vec(),
+        };
+        server
+            .handle(
+                authentication(),
+                GatewayRequest::DatasetCreate {
+                    dataset: "IBMUSER.ACCTDAT".into(),
+                    attributes: json!({
+                        "dsorg":"KSDS",
+                        "recfm":"V",
+                        "lrecl":16,
+                        "key_offset":0,
+                        "key_length":3
+                    }),
+                },
+            )
+            .unwrap();
+        server
+            .handle(
+                authentication(),
+                GatewayRequest::DatasetWrite {
+                    dataset: "IBMUSER.ACCTDAT".into(),
+                    member: None,
+                    bytes: b"003OLD".to_vec(),
+                },
+            )
+            .unwrap();
+        server
+            .cics
+            .register_file_aliases(&BTreeMap::from([(
+                "ACCTDAT".into(),
+                DatasetName::new("IBMUSER.ACCTDAT", 128).unwrap(),
+            )]))
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "REWRITEL".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("RL00".into(), "REWRITEL".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "REWRITEL".into(),
+                    map: "REWRITEL".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("rewrite-file-length-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "RL00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation,
+                &session,
+                "RL00",
+                24,
+                80,
+                "rewrite-file-length-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "REWRITEL", 2)
+            .unwrap();
+        let result = server
+            .dataset
+            .invoke(DatasetRequest::Read {
+                dataset: DatasetName::new("IBMUSER.ACCTDAT", 128).unwrap(),
+                member: None,
+                key: Some(b"003".to_vec()),
+                max_records: 1,
+                control: Default::default(),
+            })
+            .unwrap();
+        let DatasetResult::Records { records, .. } = result else {
+            panic!("expected rewritten keyed record");
+        };
+        assert_eq!(records, vec![b"003AB".to_vec()]);
+        let trace = server
+            .cics
+            .terminal_run_trace(&session, &principal, 3)
+            .unwrap();
+        assert_eq!(
+            trace
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::Read)
+                .count(),
+            1
+        );
+        assert_eq!(
+            trace
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::Rewrite)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
     fn compiled_write_file_length_persists_only_selected_prefix() {
         let artifact = published_source_fixture(
             "WRITELEN",

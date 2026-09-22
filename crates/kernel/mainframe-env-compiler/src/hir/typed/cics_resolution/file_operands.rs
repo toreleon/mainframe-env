@@ -105,8 +105,12 @@ pub(super) fn resolve(
         ("KEYLENGTH", HirCicsOperandName::KeyLength),
     ] {
         if let Some(tokens) = clauses.get(name) {
-            let value = if operation == HirCicsOperation::Write && name == "LENGTH" {
-                write_length_value(tokens, semantic)?
+            let value = if matches!(
+                operation,
+                HirCicsOperation::Write | HirCicsOperation::Rewrite
+            ) && name == "LENGTH"
+            {
+                file_record_length_value(tokens, operation, semantic)?
             } else if matches!(
                 operation,
                 HirCicsOperation::Write | HirCicsOperation::Delete
@@ -121,17 +125,19 @@ pub(super) fn resolve(
                 }
                 numeric_length_value(tokens, semantic)?
             };
-            if operation == HirCicsOperation::Write
-                && name == "LENGTH"
+            if matches!(
+                operation,
+                HirCicsOperation::Write | HirCicsOperation::Rewrite
+            ) && name == "LENGTH"
                 && let HirCicsValue::LengthOf(length) = &value
                 && !operands.iter().any(|operand| {
                     operand.name == HirCicsOperandName::From
                         && matches!(&operand.value, HirCicsValue::Data(from) if from == length)
                 })
             {
-                return Err(ResolutionFailure::Invalid(
-                    "CICS Write LENGTH OF must name the FROM data area".into(),
-                ));
+                return Err(ResolutionFailure::Invalid(format!(
+                    "CICS {operation:?} LENGTH OF must name the FROM data area"
+                )));
             }
             if matches!(
                 operation,
@@ -156,7 +162,11 @@ pub(super) fn resolve(
     Ok(operands)
 }
 
-fn write_length_value(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsValue> {
+fn file_record_length_value(
+    tokens: &[String],
+    operation: HirCicsOperation,
+    semantic: &SemanticModel,
+) -> Resolution<HirCicsValue> {
     let value = if tokens
         .first()
         .is_some_and(|token| token.eq_ignore_ascii_case("LENGTH"))
@@ -172,14 +182,14 @@ fn write_length_value(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsValue::Data(reference)
             if reference.category != DataCategory::Binary || reference.length != 2 =>
         {
-            return Err(ResolutionFailure::Invalid(
-                "CICS Write LENGTH requires a halfword binary data item".into(),
-            ));
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS {operation:?} LENGTH data item is not a halfword binary data item"
+            )));
         }
         HirCicsValue::Integer(value) if !(0..=32_767).contains(value) => {
-            return Err(ResolutionFailure::Invalid(
-                "CICS Write LENGTH literal must be between 0 and 32767".into(),
-            ));
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS {operation:?} LENGTH literal must be between 0 and 32767"
+            )));
         }
         _ => {}
     }

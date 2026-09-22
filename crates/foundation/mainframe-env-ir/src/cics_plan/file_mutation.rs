@@ -11,7 +11,12 @@ pub(super) fn invalid_shape(
 ) -> bool {
     let resources = usize::from(inputs.contains(&CicsOperandName::File))
         + usize::from(inputs.contains(&CicsOperandName::Dataset));
-    let writing = plan.operation == CicsPlanOperation::Write;
+    let explicit_key_write = plan.operation == CicsPlanOperation::Write;
+    let writes_record = matches!(
+        plan.operation,
+        CicsPlanOperation::Write | CicsPlanOperation::Rewrite
+    );
+    let rewrite = plan.operation == CicsPlanOperation::Rewrite;
     let allowed_inputs = BTreeSet::from([
         CicsOperandName::File,
         CicsOperandName::Dataset,
@@ -22,16 +27,19 @@ pub(super) fn invalid_shape(
     ]);
     resources != 1
         || !inputs.is_subset(&allowed_inputs)
-        || (writing && !inputs.contains(&CicsOperandName::Ridfld))
+        || (explicit_key_write && !inputs.contains(&CicsOperandName::Ridfld))
         || (inputs.contains(&CicsOperandName::KeyLength)
             && !inputs.contains(&CicsOperandName::Ridfld))
-        || writing != inputs.contains(&CicsOperandName::From)
+        || writes_record != inputs.contains(&CicsOperandName::From)
+        || (rewrite
+            && (inputs.contains(&CicsOperandName::Ridfld)
+                || inputs.contains(&CicsOperandName::KeyLength)))
         || plan.operands.iter().any(|operand| match operand.name {
             CicsOperandName::From | CicsOperandName::Ridfld => {
                 !matches!(operand.value, CicsOperandValue::Storage(_))
             }
             CicsOperandName::Length => {
-                !writing
+                !writes_record
                     || !matches!(
                         operand.value,
                         CicsOperandValue::Integer(0..=32_767)

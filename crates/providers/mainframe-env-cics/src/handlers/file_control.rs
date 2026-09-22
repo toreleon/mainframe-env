@@ -263,8 +263,14 @@ fn file(
         None
     };
     validate_key_length(request.operation, key_length, attributes.as_ref())?;
-    let mut length_condition =
-        validate_record_length(request.operation, length, attributes.as_ref())?;
+    let mut length_condition = if matches!(
+        request.operation,
+        CicsOperation::Read | CicsOperation::Write | CicsOperation::Rewrite
+    ) {
+        validate_record_length(request.operation, length, attributes.as_ref())?
+    } else {
+        None
+    };
     let transfer_length = if matches!(
         request.operation,
         CicsOperation::Write | CicsOperation::Rewrite

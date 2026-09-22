@@ -4107,6 +4107,10 @@ mod tests {
                         Ok(HostResult::Dataset(DatasetResult::Mutated { version: 2 }))
                     }
                 }
+                HostRequest::Dataset(DatasetRequest::RewriteRecord { record, .. }) => {
+                    *self.record.lock().unwrap() = Some(record);
+                    Ok(HostResult::Dataset(DatasetResult::Mutated { version: 3 }))
+                }
                 HostRequest::Dataset(DatasetRequest::Read { key, .. }) => {
                     let Some(record) = self.record.lock().unwrap().clone() else {
                         return EffectResult {
@@ -14429,6 +14433,7 @@ mod tests {
                 ("RIDFLD".into(), argument(b"ABC")),
                 ("LENGTH".into(), cics_decimal(8)),
                 ("KEYLENGTH".into(), cics_decimal(3)),
+                ("OPTION.UPDATE".into(), cics_option()),
             ]),
             2,
         );
@@ -14457,6 +14462,23 @@ mod tests {
                 response2: 26,
             })
         );
+
+        let rewrite = request(
+            CicsOperation::Rewrite,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"TESTFILE")),
+                ("FROM".into(), argument(b"ABC67890")),
+                ("LENGTH".into(), cics_decimal(5)),
+            ]),
+            4,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, rewrite.clone(), 4),
+                rewrite,
+            )
+            .unwrap();
+        assert_eq!(*persisted.lock().unwrap(), Some(b"ABC67".to_vec()));
     }
 
     #[test]

@@ -494,7 +494,9 @@ fn validate_operation_shape(
                     _ => false,
                 }
         }
-        CicsPlanOperation::Delete | CicsPlanOperation::Write => {
+        CicsPlanOperation::Delete
+        | CicsPlanOperation::Write
+        | CicsPlanOperation::Rewrite => {
             file_mutation::invalid_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::WriteTransientData => {
@@ -510,17 +512,6 @@ fn validate_operation_shape(
         CicsPlanOperation::ReceiveMap
         | CicsPlanOperation::SendMap
         | CicsPlanOperation::SendText => terminal_control::invalid_shape(plan, inputs, outputs),
-        CicsPlanOperation::Rewrite => {
-            resources != 1
-                || !inputs.contains(&CicsOperandName::From)
-                || inputs.contains(&CicsOperandName::Ridfld)
-                || inputs.contains(&CicsOperandName::KeyLength)
-                || plan.options.iter().any(|option| {
-                    !matches!(option, CicsPlanOption::NoHandle)
-                })
-                || outputs.contains(&CicsOutputName::Into)
-                || outputs.contains(&CicsOutputName::Length)
-        }
         CicsPlanOperation::Syncpoint => {
             !inputs.is_empty()
                 || plan.options.iter().any(|option| {
@@ -1563,6 +1554,28 @@ mod tests {
         });
         assert_eq!(
             encode_cics_effect_plan(&mismatched_write_length, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut rewrite_with_literal_length = rewrite.clone();
+        rewrite_with_literal_length.operands[2].value = CicsOperandValue::Integer(5);
+        assert!(
+            encode_cics_effect_plan(&rewrite_with_literal_length, CicsPlanLimits::default())
+                .is_ok()
+        );
+        let mut rewrite_with_mismatched_length = rewrite.clone();
+        rewrite_with_mismatched_length.operands[2].value =
+            CicsOperandValue::LengthOf(slot(16, "OTHER.RECORD"));
+        assert_eq!(
+            encode_cics_effect_plan(&rewrite_with_mismatched_length, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut rewrite_with_ridfld = rewrite.clone();
+        rewrite_with_ridfld.operands.push(CicsNamedOperand {
+            name: CicsOperandName::Ridfld,
+            value: CicsOperandValue::Storage(slot(16, "FILE.KEY")),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&rewrite_with_ridfld, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
         let mut write_with_key_length = write.clone();
