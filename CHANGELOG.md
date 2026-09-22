@@ -426,6 +426,12 @@ All notable changes to mainframe-env are documented here.
   all three zero-credit CICS candidate projections and recomputed their
   canonical projection digests without changing any of the 18,070 candidate
   facts or their review states.
+- Rebound the three accepted CICS source-review envelopes and generated
+  application-command contract to those refreshed candidate files. The prior
+  independent-verification report identities, all dispositions, readiness
+  states, and command facts remain unchanged; no source replay or credit was
+  claimed. Descriptor test ratchets now reflect the already sealed 41 API
+  operations, including DELETEQ TD, FREEMAIN, and GETMAIN.
 - Migrated the local `WRITEQ TD` compatibility subset to a typed queue-write
   plan. QUEUE is a validated 1–4 character literal or field, FROM is a resolved
   data area, and optional numeric LENGTH or `LENGTH OF` selects the persisted

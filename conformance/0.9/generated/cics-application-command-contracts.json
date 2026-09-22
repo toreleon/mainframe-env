@@ -821,11 +821,11 @@
       "source_input": {
         "projection": {
           "path": "conformance/0.9/generated/cics-application-api-sources-a-candidates.json",
-          "file_sha256": "sha256:f0918433d7f96d51cc7861c12e5d4434cc5f42c977d3cfd8dd264d5d5c512ed7"
+          "file_sha256": "sha256:dbc5ffaafc4e447dbbf0554a10ce62c128009b60a8353fc347c92410859643c1"
         },
         "review": {
           "path": "conformance/0.9/cics/application-api-sources-a-review.json",
-          "file_sha256": "sha256:bd8af2a410dce2d5c5748546ec845c92680238971744abddf5526428184a596f",
+          "file_sha256": "sha256:97334e789a5ebf79d15732320bf0f372fdcb09522f8eb483f205a36095645f2c",
           "review_status": "auto-accepted-with-bounded-ambiguities"
         }
       },
@@ -146086,11 +146086,11 @@
       "source_input": {
         "projection": {
           "path": "conformance/0.9/generated/cics-application-api-sources-b-candidates.json",
-          "file_sha256": "sha256:e83ee1054f46aa872473729e2a10937c2d60ce4429cf606fe9fec4d939f3156b"
+          "file_sha256": "sha256:bd1a4501b759fb5dfc73614f9df962145adf00871141485f1661208f99403bdb"
         },
         "review": {
           "path": "conformance/0.9/cics/application-api-sources-b-review.json",
-          "file_sha256": "sha256:3da42fcb80c25c5ce6c3b7c41958b7f428963da90339398179a52be043dffe63",
+          "file_sha256": "sha256:580daafd5e84401f37df622c7b46cd80319dd032d108f9a895626403569487be",
           "review_status": "auto-accepted-with-bounded-ambiguities"
         }
       },
@@ -273845,11 +273845,11 @@
       "source_input": {
         "projection": {
           "path": "conformance/0.9/generated/cics-application-api-sources-c-candidates.json",
-          "file_sha256": "sha256:828f942b652262830b9d2ce73604fcd9978e0767e26f021cc74f59f9fed13b33"
+          "file_sha256": "sha256:ad41dee8755bbf0322964b7e41040532bce021ce2c5e2115d760fc328856601c"
         },
         "review": {
           "path": "conformance/0.9/cics/application-api-sources-c-review.json",
-          "file_sha256": "sha256:5c8a50eb5c5f822181028a8b0171bb3675bd13ea5fbed63cb2e6d0f457b330b6",
+          "file_sha256": "sha256:194fd819c68ac8f6ec8c9e59cc70c684132944b7534412f71e8b786a29565207",
           "review_status": "auto-accepted-with-bounded-ambiguities"
         }
       },
@@ -446579,5 +446579,5 @@
       ]
     }
   ],
-  "contract_sha256": "sha256:27433be759b1645d67b8ec7fbe0bddfef846db01958ac1465305eff74763a84a"
+  "contract_sha256": "sha256:21f889d73f6690a9617494469538a921fcacda391bc13bf8af30f9564828e083"
 }
