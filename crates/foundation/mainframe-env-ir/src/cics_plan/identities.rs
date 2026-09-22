@@ -218,6 +218,8 @@ pub enum CicsPlanOption {
     Until,
     /// Suppress the generated START request identifier in EIBREQID.
     NoCheck,
+    /// Send only the initialized default data defined by a BMS map.
+    MapOnly,
 }
 
 /// Named result binding written after the host result arrives.

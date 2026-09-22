@@ -244,6 +244,7 @@ fn validate_send_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "OPTION.CURSOR",
         "OPTION.ERASE",
         "OPTION.FREEKB",
+        "OPTION.MAPONLY",
         "OPTION.NOHANDLE",
         "RESP",
         "RESP2",
@@ -272,12 +273,16 @@ fn validate_send_request(request: &CicsRequest) -> Result<(), HostProblem> {
         || request.operation == CicsOperation::SendMap
             && request.arguments.contains_key("LENGTH")
             && !request.arguments.contains_key("FROM")
+        || request.operation == CicsOperation::SendMap
+            && request.arguments.contains_key("OPTION.MAPONLY")
+            && (request.arguments.contains_key("FROM") || request.arguments.contains_key("LENGTH"))
         || request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
         || request.arguments.iter().any(|(name, value)| {
             !allowed.contains(&name.as_str())
                 || match name.as_str() {
                     "LENGTH" => value.schema() != "mainframe-env.cics.decimal@1",
-                    "OPTION.CURSOR" | "OPTION.ERASE" | "OPTION.FREEKB" | "OPTION.NOHANDLE" => {
+                    "OPTION.CURSOR" | "OPTION.ERASE" | "OPTION.FREEKB" | "OPTION.MAPONLY"
+                    | "OPTION.NOHANDLE" => {
                         value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
                     }
                     "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",

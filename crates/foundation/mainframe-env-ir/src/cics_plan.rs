@@ -1062,6 +1062,7 @@ mod tests {
                 CicsPlanOption::DateSep,
                 CicsPlanOption::TimeSep,
                 CicsPlanOption::Wait,
+                CicsPlanOption::MapOnly,
             ] {
                 let mut invalid = base.clone();
                 invalid.options.insert(option);
@@ -1121,6 +1122,8 @@ mod tests {
         assert_eq!(option_from_tag(21), Ok(CicsPlanOption::Until));
         assert_eq!(option_tag(CicsPlanOption::NoCheck), 22);
         assert_eq!(option_from_tag(22), Ok(CicsPlanOption::NoCheck));
+        assert_eq!(option_tag(CicsPlanOption::MapOnly), 23);
+        assert_eq!(option_from_tag(23), Ok(CicsPlanOption::MapOnly));
 
         let plan = read_plan();
         let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
@@ -1549,6 +1552,24 @@ mod tests {
             encode_cics_effect_plan(&send_map_without_from, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
+        let mut send_map_map_only = send_map.clone();
+        send_map_map_only.operands.retain(|operand| {
+            !matches!(
+                operand.name,
+                CicsOperandName::From | CicsOperandName::Length
+            )
+        });
+        send_map_map_only.options.insert(CicsPlanOption::MapOnly);
+        assert!(encode_cics_effect_plan(&send_map_map_only, CicsPlanLimits::default()).is_ok());
+        let mut map_only_with_from = send_map_map_only.clone();
+        map_only_with_from.operands.push(CicsNamedOperand {
+            name: CicsOperandName::From,
+            value: CicsOperandValue::Storage(slot(16, "BMS.OUTPUT")),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&map_only_with_from, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
         let mut missing_browse_key_output = read_next.clone();
         missing_browse_key_output
             .outputs
@@ -1579,6 +1600,7 @@ mod tests {
             write_transient,
             receive_map,
             send_map,
+            send_map_map_only,
             send_text,
             assign,
             purge_message,

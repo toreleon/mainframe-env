@@ -278,6 +278,7 @@ pub enum HirCicsOption {
     For,
     Until,
     NoCheck,
+    MapOnly,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -3120,6 +3121,42 @@ mod tests {
         ] {
             let analysis = analyze(source);
             assert!(analysis.hir.is_none(), "{source}");
+        }
+    }
+
+    #[test]
+    fn cics_send_map_maponly_rejects_application_data() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. SENDDEF. PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') MAPSET('MAIN') MAPONLY END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("SEND MAP MAPONLY: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed SEND MAP MAPONLY");
+        assert_eq!(command.options, BTreeSet::from([HirCicsOption::MapOnly]));
+        assert!(command.operands.iter().all(|operand| !matches!(
+            operand.name,
+            HirCicsOperandName::From | HirCicsOperandName::Length
+        )));
+
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADMAPO. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') FROM(DATA-X) MAPONLY END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADMAPO. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') FROM(DATA-X) LENGTH(4) MAPONLY END-EXEC. STOP RUN.",
+        ] {
+            let analysis = analyze(source);
+            assert!(analysis.hir.is_none(), "{source}");
+            assert!(analysis.diagnostics.iter().any(|diagnostic| {
+                diagnostic
+                    .public_message()
+                    .contains("MAPONLY does not accept FROM or LENGTH")
+            }));
         }
     }
 

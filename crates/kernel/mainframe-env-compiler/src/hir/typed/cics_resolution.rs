@@ -806,7 +806,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
         HirCicsOperation::Retrieve => &["WAIT", "NOHANDLE"],
         HirCicsOperation::FormatTime => &["DATESEP", "TIMESEP", "NOHANDLE"],
-        HirCicsOperation::SendMap => &["ERASE", "CURSOR", "FREEKB", "NOHANDLE"],
+        HirCicsOperation::SendMap => &["ERASE", "CURSOR", "FREEKB", "MAPONLY", "NOHANDLE"],
         HirCicsOperation::SendText => &["ERASE", "FREEKB", "NOHANDLE"],
         HirCicsOperation::StartBrowse => &["GTEQ", "NOHANDLE"],
         HirCicsOperation::Deq => &["UOW", "TASK", "NOHANDLE"],
@@ -854,7 +854,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     file_operands::validate_constraints(&clauses, operation)?;
     queue_control::validate_constraints(&clauses, operation)?;
     storage_control::validate_constraints(&clauses, operation, semantic)?;
-    terminal_control::validate_constraints(&clauses, operation)?;
+    terminal_control::validate_constraints(&clauses, &raw_options, operation)?;
     interval_control::validate_constraints(&clauses, &raw_options, operation)?;
     for required in match operation {
         HirCicsOperation::AddressSet => &["SET", "USING"][..],
@@ -1099,6 +1099,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "FOR" => HirCicsOption::For,
             "UNTIL" => HirCicsOption::Until,
             "NOCHECK" => HirCicsOption::NoCheck,
+            "MAPONLY" => HirCicsOption::MapOnly,
             _ => unreachable!("allowed CICS option"),
         })
         .collect::<BTreeSet<_>>();

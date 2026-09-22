@@ -7,6 +7,7 @@ use crate::{CobolUsage, DataCategory, SemanticModel};
 
 pub(super) fn validate_constraints(
     clauses: &Clauses,
+    options: &[String],
     operation: HirCicsOperation,
 ) -> Resolution<()> {
     let required: &[&str] = match operation {
@@ -27,6 +28,14 @@ pub(super) fn validate_constraints(
     {
         return Err(ResolutionFailure::Invalid(
             "CICS SEND MAP LENGTH requires an explicit FROM data area".into(),
+        ));
+    }
+    if operation == HirCicsOperation::SendMap
+        && options.iter().any(|option| option == "MAPONLY")
+        && (clauses.contains_key("FROM") || clauses.contains_key("LENGTH"))
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS SEND MAP MAPONLY does not accept FROM or LENGTH".into(),
         ));
     }
     Ok(())

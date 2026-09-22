@@ -14191,6 +14191,90 @@ mod tests {
     }
 
     #[test]
+    fn send_map_maponly_selects_defaults_and_rejects_application_data() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, session) = registered(&service);
+        service
+            .register_map(BmsMapDefinition {
+                mapset: "DEFMAPS".into(),
+                map: "WELCOME".into(),
+                line: 1,
+                column: 1,
+                rows: 24,
+                columns: 80,
+                fields: vec![BmsFieldDefinition {
+                    name: "TITLE".into(),
+                    row: 1,
+                    column: 1,
+                    length: 7,
+                    initial: b"WELCOME".to_vec(),
+                    color: None,
+                    highlight: None,
+                    protected: true,
+                    secret: false,
+                    fset: false,
+                    justify_right: false,
+                    fill_zero: false,
+                    output_offset: None,
+                    attribute_offset: None,
+                }],
+            })
+            .unwrap();
+        let send = request(
+            CicsOperation::SendMap,
+            BTreeMap::from([
+                ("MAPSET".into(), argument(b"DEFMAPS")),
+                ("MAP".into(), argument(b"WELCOME")),
+                ("OPTION.MAPONLY".into(), cics_option()),
+            ]),
+            1,
+        );
+        let response = service
+            .invoke(&effect(&invocation.run_unit_id, send.clone(), 1), send)
+            .unwrap();
+        assert!(
+            response
+                .payload
+                .bytes()
+                .windows(7)
+                .any(|bytes| bytes == b"WELCOME")
+        );
+        let state = service.lock().unwrap();
+        assert_eq!(
+            state.sessions[session.as_str()].field_values["TITLE"],
+            b"WELCOME"
+        );
+        drop(state);
+
+        for (sequence, extra) in [
+            (2, ("FROM", argument(b"OVERRIDE"))),
+            (3, ("LENGTH", cics_decimal(4))),
+        ] {
+            let invalid = request(
+                CicsOperation::SendMap,
+                BTreeMap::from([
+                    ("MAPSET".into(), argument(b"DEFMAPS")),
+                    ("MAP".into(), argument(b"WELCOME")),
+                    ("OPTION.MAPONLY".into(), cics_option()),
+                    (extra.0.into(), extra.1),
+                ]),
+                sequence,
+            );
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, invalid.clone(), sequence),
+                    invalid,
+                ),
+                Err(HostProblem::Malformed)
+            );
+        }
+        assert_eq!(
+            service.lock().unwrap().sessions[session.as_str()].field_values["TITLE"],
+            b"WELCOME"
+        );
+    }
+
+    #[test]
     fn write_length_persists_only_the_selected_record_prefix() {
         let persisted = Arc::new(Mutex::new(None));
         let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));

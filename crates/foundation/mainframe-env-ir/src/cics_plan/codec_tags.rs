@@ -222,6 +222,7 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u8 {
         CicsPlanOption::For => 20,
         CicsPlanOption::Until => 21,
         CicsPlanOption::NoCheck => 22,
+        CicsPlanOption::MapOnly => 23,
     }
 }
 
@@ -250,6 +251,7 @@ pub(super) fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodec
         20 => Ok(CicsPlanOption::For),
         21 => Ok(CicsPlanOption::Until),
         22 => Ok(CicsPlanOption::NoCheck),
+        23 => Ok(CicsPlanOption::MapOnly),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

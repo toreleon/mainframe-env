@@ -11524,6 +11524,91 @@ mod tests {
     }
 
     #[test]
+    fn compiled_send_map_maponly_selects_map_defaults() {
+        let artifact = published_source_fixture(
+            "SENDDEF",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. SENDDEF.\nPROCEDURE DIVISION.\nEXEC CICS SEND MAP('WELCOME') MAPSET('DEFMAPS') MAPONLY END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "SENDDEF".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("SD00".into(), "SENDDEF".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "DEFMAPS".into(),
+                    map: "WELCOME".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: vec![mainframe_env_cics::BmsFieldDefinition {
+                        name: "TITLE".into(),
+                        row: 1,
+                        column: 1,
+                        length: 7,
+                        initial: b"WELCOME".to_vec(),
+                        color: None,
+                        highlight: None,
+                        protected: true,
+                        secret: false,
+                        fset: false,
+                        justify_right: false,
+                        fill_zero: false,
+                        output_offset: None,
+                        attribute_offset: None,
+                    }],
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("send-map-maponly-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "SD00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation,
+                &session,
+                "SD00",
+                24,
+                80,
+                "send-map-maponly-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "SENDDEF", 2)
+            .unwrap();
+        let wire = server.cics.tn3270_screen(&session, &principal, 3).unwrap();
+        assert!(wire.windows(7).any(|bytes| bytes == b"WELCOME"));
+        let trace = server
+            .cics
+            .terminal_run_trace(&session, &principal, 3)
+            .unwrap();
+        assert_eq!(
+            trace
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::SendMap)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
     fn compiled_send_text_length_selects_the_bounded_from_prefix() {
         let artifact = published_source_fixture(
             "SENDTXT",
