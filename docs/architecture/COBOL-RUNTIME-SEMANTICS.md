@@ -233,13 +233,14 @@ remote routing, alternate record identities, SET storage, or RLS update-token
 state do not enter this typed route.
 
 Typed keyed file mutation resolves all data-bearing operands before dispatch.
-DELETE reads one explicit RIDFLD storage slot; WRITE FILE reads FROM and
-RIDFLD storage slots, preserving record and key bytes in the typed request.
-Both operations require exactly one FILE/DATASET alias, carry a mutation
-identity, and update EIBFN to `0608` or `0604`. Forms whose key or record is a
-literal, whose DELETE key comes from prior update context, or whose semantics
-depend on TOKEN, remote routing, lengths, alternate identities, mass insert, or
-RLS suspension do not publish the typed executable.
+DELETE reads an explicit RIDFLD storage slot or, after `READ UPDATE`, consumes
+the latest held key for the same file; WRITE FILE reads FROM and RIDFLD storage
+slots, preserving record and key bytes in the typed request. Both operations
+require exactly one FILE/DATASET alias, carry a mutation identity, and update
+EIBFN to `0608` or `0604`. A current-record DELETE without a hold returns
+`INVREQ` 16/31. Forms whose key or record is a literal, or whose semantics
+depend on TOKEN, remote routing, lengths, alternate identities, mass insert,
+or RLS suspension do not publish the typed executable.
 
 Typed local WRITEQ TD captures a 1–4 character QUEUE name and one FROM storage
 area. An omitted LENGTH selects the complete area; a present integer LENGTH
