@@ -276,7 +276,9 @@ to interpreter-owned storage containing the complete record and survives a
 checkpoint restore. Zero length and INTO truncation consume the record and
 return LENGERR 22/0; a negative length or insufficient SET allocation capacity
 does not consume. Missing and empty queues remain distinct as QIDERR 44/0 and
-QZERO 23/0. SYSID, NOSUSPEND, and definition-driven modes remain fail-closed.
+QZERO 23/0. All three typed TDQ commands accept an explicit local-system SYSID;
+any other name returns SYSIDERR 53/0 before authorization or mutation. Remote
+routing, NOSUSPEND, and definition-driven modes remain fail-closed.
 
 Typed local GETMAIN requires SET plus exactly one length selector: a literal or
 fullword-binary FLENGTH, or a literal or unsigned-halfword-binary compatibility

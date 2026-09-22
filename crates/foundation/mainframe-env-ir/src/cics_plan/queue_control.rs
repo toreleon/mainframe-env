@@ -10,6 +10,7 @@ pub(super) fn invalid_write_transient_data_shape(
         CicsOperandName::Queue,
         CicsOperandName::From,
         CicsOperandName::Length,
+        CicsOperandName::SysId,
     ]);
     !inputs.contains(&CicsOperandName::Queue)
         || !inputs.contains(&CicsOperandName::From)
@@ -21,6 +22,7 @@ pub(super) fn invalid_write_transient_data_shape(
             ),
             CicsOperandName::From => !matches!(operand.value, CicsOperandValue::Storage(_)),
             CicsOperandName::Length => matches!(operand.value, CicsOperandValue::Literal(_)),
+            CicsOperandName::SysId => invalid_system_value(&operand.value),
             _ => true,
         })
         || !outputs.is_subset(&BTreeSet::from([
@@ -38,7 +40,11 @@ pub(super) fn invalid_read_transient_data_shape(
     inputs: &BTreeSet<CicsOperandName>,
     outputs: &BTreeSet<CicsOutputName>,
 ) -> bool {
-    let allowed_inputs = BTreeSet::from([CicsOperandName::Queue, CicsOperandName::Length]);
+    let allowed_inputs = BTreeSet::from([
+        CicsOperandName::Queue,
+        CicsOperandName::Length,
+        CicsOperandName::SysId,
+    ]);
     let data_outputs = usize::from(outputs.contains(&CicsOutputName::Into))
         + usize::from(outputs.contains(&CicsOutputName::SetPointer));
     !inputs.contains(&CicsOperandName::Queue)
@@ -50,6 +56,7 @@ pub(super) fn invalid_read_transient_data_shape(
                 CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
             ),
             CicsOperandName::Length => !matches!(operand.value, CicsOperandValue::Storage(_)),
+            CicsOperandName::SysId => invalid_system_value(&operand.value),
             _ => true,
         })
         || outputs.contains(&CicsOutputName::Length) != inputs.contains(&CicsOperandName::Length)
@@ -102,7 +109,7 @@ pub(super) fn invalid_delete_transient_data_shape(
         4
     };
     let mut expected = BTreeSet::from([identity]);
-    if temporary && inputs.contains(&CicsOperandName::SysId) {
+    if inputs.contains(&CicsOperandName::SysId) {
         expected.insert(CicsOperandName::SysId);
     }
     *inputs != expected
@@ -140,4 +147,14 @@ pub(super) fn invalid_delete_transient_data_shape(
             .options
             .iter()
             .any(|option| !matches!(option, CicsPlanOption::NoHandle))
+}
+
+fn invalid_system_value(value: &CicsOperandValue) -> bool {
+    match value {
+        CicsOperandValue::Literal(value) => {
+            !matches!(value.len(), 1..=4) || !value.iter().all(u8::is_ascii_alphanumeric)
+        }
+        CicsOperandValue::Storage(_) => false,
+        _ => true,
+    }
 }

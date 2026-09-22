@@ -9291,6 +9291,131 @@ mod tests {
     }
 
     #[test]
+    fn transient_data_sysid_accepts_only_local_system_before_mutation() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let invocation = invocation_for("tdq-sysid", BTreeMap::new());
+        let session = SessionId::new("tdq-sysid", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "AP01", "S001")
+            .unwrap();
+        let routed = |operation, extra: BTreeMap<String, BoundedPayload>, sequence| {
+            let mut arguments = BTreeMap::from([
+                ("QUEUE".into(), cics_literal(b"SYSQ")),
+                ("SYSID".into(), cics_literal(b"S001")),
+            ]);
+            arguments.extend(extra);
+            request(operation, arguments, sequence)
+        };
+
+        let mut unknown_write = routed(
+            CicsOperation::WriteTransientData,
+            BTreeMap::from([("FROM".into(), argument(b"ONE"))]),
+            1,
+        );
+        unknown_write
+            .arguments
+            .insert("SYSID".into(), cics_literal(b"R001"));
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, unknown_write.clone(), 1),
+                unknown_write,
+            ),
+            Err(HostProblem::Condition {
+                name: "SYSIDERR".into(),
+                response: 53,
+                response2: 0,
+            })
+        );
+        assert!(service.transient_records("SYSQ").unwrap().is_empty());
+
+        let write = routed(
+            CicsOperation::WriteTransientData,
+            BTreeMap::from([("FROM".into(), argument(b"ONE"))]),
+            2,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, write.clone(), 2), write)
+            .unwrap();
+
+        let mut unknown_read = routed(
+            CicsOperation::ReadTransientData,
+            BTreeMap::from([
+                ("INTO".into(), argument(b"DATA-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(3)),
+            ]),
+            3,
+        );
+        unknown_read
+            .arguments
+            .insert("SYSID".into(), cics_literal(b"R001"));
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, unknown_read.clone(), 3),
+                unknown_read,
+            ),
+            Err(HostProblem::Condition {
+                name: "SYSIDERR".into(),
+                response: 53,
+                response2: 0,
+            })
+        );
+        assert_eq!(
+            service.transient_records("SYSQ").unwrap(),
+            [b"ONE".to_vec()]
+        );
+
+        let read = routed(
+            CicsOperation::ReadTransientData,
+            BTreeMap::from([
+                ("INTO".into(), argument(b"DATA-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(3)),
+            ]),
+            4,
+        );
+        assert_eq!(
+            service
+                .invoke(&effect(&invocation.run_unit_id, read.clone(), 4), read)
+                .unwrap()
+                .payload
+                .bytes(),
+            b"ONE"
+        );
+
+        let write = routed(
+            CicsOperation::WriteTransientData,
+            BTreeMap::from([("FROM".into(), argument(b"TWO"))]),
+            5,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, write.clone(), 5), write)
+            .unwrap();
+        let mut unknown_delete = routed(CicsOperation::DeleteTransientData, BTreeMap::new(), 6);
+        unknown_delete
+            .arguments
+            .insert("SYSID".into(), cics_literal(b"R001"));
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, unknown_delete.clone(), 6),
+                unknown_delete,
+            ),
+            Err(HostProblem::Condition {
+                name: "SYSIDERR".into(),
+                response: 53,
+                response2: 0,
+            })
+        );
+        assert_eq!(
+            service.transient_records("SYSQ").unwrap(),
+            [b"TWO".to_vec()]
+        );
+        let delete = routed(CicsOperation::DeleteTransientData, BTreeMap::new(), 7);
+        service
+            .invoke(&effect(&invocation.run_unit_id, delete.clone(), 7), delete)
+            .unwrap();
+    }
+
+    #[test]
     fn deleteq_td_deallocation_survives_sqlite_reopen() {
         let root = std::env::temp_dir().join(format!(
             "mainframe-env-deleteq-td-{}-{:?}",

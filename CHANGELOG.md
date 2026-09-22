@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added explicit local-system `SYSID` routing for typed CICS WRITEQ TD, READQ
+  TD, and DELETEQ TD. Literal or storage-backed 1–4 character names must equal
+  the current CICS system before authorization or mutation; unknown and
+  unsupported remote systems return exact SYSIDERR 53/0 with queue state
+  unchanged.
+
 - Added typed CICS `READQ TD SET` over interpreter-owned virtual storage. SET
   is exactly alternative to INTO, returns a checked POINTER/POINTER-32 address
   to the complete consumed record, participates in checkpoint restore, and

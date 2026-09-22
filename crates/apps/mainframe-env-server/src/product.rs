@@ -11374,6 +11374,112 @@ mod tests {
     }
 
     #[test]
+    fn compiled_tdq_sysid_selects_only_the_local_system() {
+        let artifact = published_source_fixture(
+            "TDQSYSID",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. TDQSYSID.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC X(5) VALUE 'LOCAL'.\n01 INTO-X PIC X(5) VALUE SPACES.\n01 SYSID-X PIC X(4) VALUE 'S001'.\n01 REMOTE-X PIC X(4) VALUE 'R001'.\n01 READ-RESP-X PIC S9(9) COMP.\n01 READ-RESP2-X PIC S9(9) COMP.\n01 DELETE-RESP-X PIC S9(9) COMP.\n01 DELETE-RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS WRITEQ TD QUEUE('SYSQ') FROM(DATA-X) SYSID(SYSID-X) END-EXEC.\nEXEC CICS READQ TD QUEUE('SYSQ') INTO(INTO-X) SYSID(REMOTE-X) RESP(READ-RESP-X) RESP2(READ-RESP2-X) END-EXEC.\nEXEC CICS READQ TD QUEUE('SYSQ') INTO(INTO-X) SYSID(SYSID-X) END-EXEC.\nEXEC CICS WRITEQ TD QUEUE('SYSQ') FROM(DATA-X) SYSID(SYSID-X) END-EXEC.\nEXEC CICS DELETEQ TD QUEUE('SYSQ') SYSID(REMOTE-X) RESP(DELETE-RESP-X) RESP2(DELETE-RESP2-X) END-EXEC.\nEXEC CICS DELETEQ TD QUEUE('SYSQ') SYSID(SYSID-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .racf
+            .define_profile("QUEUE", "CICS.TD.SYSQ", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit("QUEUE", "CICS.TD.SYSQ", "IBMUSER", AccessIntent::Update)
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "TDQSYSID".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("TDSY".into(), "TDQSYSID".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "TDQSYSID".into(),
+                    map: "TDQSYSID".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("tdq-sysid-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "TDSY", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "TDSY",
+                24,
+                80,
+                "tdq-sysid-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "TDQSYSID", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("INTO-X").unwrap().bytes(), b"LOCAL");
+        assert_eq!(
+            restored.variable("READ-RESP-X").unwrap().bytes(),
+            &[0, 0, 0, 53]
+        );
+        assert_eq!(
+            restored.variable("READ-RESP2-X").unwrap().bytes(),
+            &[0, 0, 0, 0]
+        );
+        assert_eq!(
+            restored.variable("DELETE-RESP-X").unwrap().bytes(),
+            &[0, 0, 0, 53]
+        );
+        assert_eq!(
+            restored.variable("DELETE-RESP2-X").unwrap().bytes(),
+            &[0, 0, 0, 0]
+        );
+        assert!(server.cics.transient_records("SYSQ").unwrap().is_empty());
+        let trace = server
+            .cics
+            .terminal_run_trace(&session, &principal, 2)
+            .unwrap();
+        assert_eq!(
+            trace
+                .iter()
+                .filter(|entry| entry.outcome == "SYSIDERR" && entry.response == 53)
+                .count(),
+            2
+        );
+    }
+
+    #[test]
     fn compiled_getmain_and_freemain_preserve_checkpointed_virtual_storage_rules() {
         let artifact = published_source_fixture(
             "GETMAINA",

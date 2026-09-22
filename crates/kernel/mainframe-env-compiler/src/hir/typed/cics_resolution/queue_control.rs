@@ -89,47 +89,20 @@ pub(super) fn operands(
             "CICS {operation:?} {name} requires a 1-{maximum} character name"
         )));
     }
+    let mut operands = vec![HirCicsNamedOperand {
+        name: identity,
+        value: queue,
+    }];
+    if let Some(system) = system_operand(clauses, operation, semantic)? {
+        operands.push(system);
+    }
     if matches!(
         operation,
         HirCicsOperation::DeleteTransientData | HirCicsOperation::DeleteTemporaryStorage
     ) {
-        let mut operands = vec![HirCicsNamedOperand {
-            name: identity,
-            value: queue,
-        }];
-        if let Some(tokens) = clauses.get("SYSID") {
-            let value = cics_value(tokens, semantic)?;
-            let valid = match &value {
-                HirCicsValue::Literal(value) => {
-                    matches!(value.len(), 1..=4)
-                        && value.bytes().all(|byte| byte.is_ascii_alphanumeric())
-                }
-                HirCicsValue::Data(reference) => {
-                    matches!(reference.length, 1..=4)
-                        && matches!(
-                            reference.category,
-                            DataCategory::Alphabetic | DataCategory::Alphanumeric
-                        )
-                }
-                HirCicsValue::Integer(_) | HirCicsValue::LengthOf(_) => false,
-            };
-            if !valid {
-                return Err(ResolutionFailure::Invalid(
-                    "CICS DELETEQ TS SYSID requires a 1-4 character name".into(),
-                ));
-            }
-            operands.push(HirCicsNamedOperand {
-                name: HirCicsOperandName::SysId,
-                value,
-            });
-        }
         return Ok(operands);
     }
     if operation == HirCicsOperation::ReadTransientData {
-        let mut operands = vec![HirCicsNamedOperand {
-            name: HirCicsOperandName::Queue,
-            value: queue,
-        }];
         if let Some(length) = clauses.get("LENGTH") {
             let value = cics_integer_value(length, semantic)?;
             let HirCicsValue::Data(reference) = &value else {
@@ -158,16 +131,10 @@ pub(super) fn operands(
             "CICS WRITEQ TD FROM requires a data area".into(),
         ));
     };
-    let mut operands = vec![
-        HirCicsNamedOperand {
-            name: HirCicsOperandName::Queue,
-            value: queue,
-        },
-        HirCicsNamedOperand {
-            name: HirCicsOperandName::From,
-            value: HirCicsValue::Data(from),
-        },
-    ];
+    operands.push(HirCicsNamedOperand {
+        name: HirCicsOperandName::From,
+        value: HirCicsValue::Data(from),
+    });
     if let Some(length) = clauses.get("LENGTH") {
         let value = if length
             .first()
@@ -186,4 +153,37 @@ pub(super) fn operands(
         });
     }
     Ok(operands)
+}
+
+fn system_operand(
+    clauses: &Clauses,
+    operation: HirCicsOperation,
+    semantic: &SemanticModel,
+) -> Resolution<Option<HirCicsNamedOperand>> {
+    let Some(tokens) = clauses.get("SYSID") else {
+        return Ok(None);
+    };
+    let value = cics_value(tokens, semantic)?;
+    let valid = match &value {
+        HirCicsValue::Literal(value) => {
+            matches!(value.len(), 1..=4) && value.bytes().all(|byte| byte.is_ascii_alphanumeric())
+        }
+        HirCicsValue::Data(reference) => {
+            matches!(reference.length, 1..=4)
+                && matches!(
+                    reference.category,
+                    DataCategory::Alphabetic | DataCategory::Alphanumeric
+                )
+        }
+        HirCicsValue::Integer(_) | HirCicsValue::LengthOf(_) => false,
+    };
+    if !valid {
+        return Err(ResolutionFailure::Invalid(format!(
+            "CICS {operation:?} SYSID requires a 1-4 character name"
+        )));
+    }
+    Ok(Some(HirCicsNamedOperand {
+        name: HirCicsOperandName::SysId,
+        value,
+    }))
 }

@@ -45,7 +45,7 @@ fn read(
             .arguments
             .iter()
             .any(|(name, value)| match name.as_str() {
-                "QUEUE" => !matches!(
+                "QUEUE" | "SYSID" => !matches!(
                     value.schema(),
                     "mainframe-env.cics.literal@1" | "mainframe-env.cics.storage-value@1"
                 ),
@@ -68,6 +68,7 @@ fn read(
         return Err(HostProblem::Malformed);
     }
     let queue = queue_name(request)?;
+    validate_local_system(run, request)?;
     service.authorize(
         run,
         "QUEUE",
@@ -225,7 +226,7 @@ fn temporary_queue_name(request: &CicsRequest) -> Result<String, HostProblem> {
     Ok(queue)
 }
 
-fn validate_temporary_system(run: &Run, request: &CicsRequest) -> Result<(), HostProblem> {
+fn validate_local_system(run: &Run, request: &CicsRequest) -> Result<(), HostProblem> {
     let Some(value) = request.arguments.get("SYSID") else {
         return Ok(());
     };
@@ -279,6 +280,7 @@ fn write(
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
     let queue = queue_name(request)?;
+    validate_local_system(run, request)?;
     service.authorize(
         run,
         "QUEUE",
@@ -381,12 +383,13 @@ fn delete(
     if request.arguments.keys().any(|name| {
         !matches!(
             name.as_str(),
-            "QUEUE" | "TDQUEUE" | "RESP" | "RESP2" | "OPTION.NOHANDLE"
+            "QUEUE" | "TDQUEUE" | "SYSID" | "RESP" | "RESP2" | "OPTION.NOHANDLE"
         )
     }) {
         return Err(HostProblem::Malformed);
     }
     let queue = queue_name(request)?;
+    validate_local_system(run, request)?;
     service.authorize(
         run,
         "QUEUE",
@@ -451,7 +454,7 @@ fn delete_temporary(
         return Err(HostProblem::Malformed);
     }
     let queue = temporary_queue_name(request)?;
-    validate_temporary_system(run, request)?;
+    validate_local_system(run, request)?;
     service.authorize(
         run,
         "QUEUE",

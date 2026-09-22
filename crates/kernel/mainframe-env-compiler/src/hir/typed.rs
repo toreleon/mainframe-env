@@ -3276,7 +3276,7 @@ mod tests {
     /// Issue #206: WRITEQ TD accepts the runtime length of its FROM area.
     #[test]
     fn cics_transient_data_write_resolves_queue_record_and_optional_length() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTDQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(6) VALUE 'ABCDEF'. PROCEDURE DIVISION. EXEC CICS WRITEQ TD QUEUE('OUTQ') FROM(DATA-X) LENGTH(3) END-EXEC. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTDQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(6) VALUE 'ABCDEF'. PROCEDURE DIVISION. EXEC CICS WRITEQ TD QUEUE('OUTQ') FROM(DATA-X) LENGTH(3) SYSID('S001') END-EXEC. STOP RUN.";
         let analysis = analyze(source);
         let hir = analysis
             .hir
@@ -3303,6 +3303,10 @@ mod tests {
         }));
         assert!(command.operands.iter().any(|operand| {
             operand.name == HirCicsOperandName::Length && operand.value == HirCicsValue::Integer(3)
+        }));
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::SysId
+                && operand.value == HirCicsValue::Literal("S001".into())
         }));
 
         let deleted = analyze(
@@ -3356,8 +3360,8 @@ mod tests {
                 "FROM requires a data area",
             ),
             (
-                "WRITEQ TD QUEUE('OUTQ') FROM(DATA-X) SYSID('R1')",
-                "unready for SYSID",
+                "WRITEQ TD QUEUE('OUTQ') FROM(DATA-X) SYSID('TOOLONG')",
+                "SYSID requires a 1-4 character name",
             ),
         ] {
             let analysis = analyze(&format!(
@@ -3373,20 +3377,29 @@ mod tests {
                 analysis.diagnostics
             );
         }
-        let remote = analyze(
+        let routed = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. CICSTDQR. PROCEDURE DIVISION. EXEC CICS DELETEQ TD QUEUE('OUTQ') SYSID('R001') END-EXEC. STOP RUN.",
         );
-        assert!(remote.hir.is_none());
-        assert!(remote.diagnostics.iter().any(|diagnostic| {
-            diagnostic
-                .public_message()
-                .contains("typed lowering is unready for SYSID")
+        let routed = routed
+            .hir
+            .unwrap_or_else(|| panic!("DELETEQ TD SYSID: {:?}", routed.diagnostics));
+        let routed = routed
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed DELETEQ TD SYSID");
+        assert!(routed.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::SysId
+                && operand.value == HirCicsValue::Literal("R001".into())
         }));
     }
 
     #[test]
     fn cics_readq_td_resolves_into_and_inout_length() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. READTDQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 QUEUE-X PIC X(4) VALUE 'IN01'. 01 DATA-X PIC X(6). 01 LENGTH-X PIC S9(4) COMP VALUE 3. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS READQ TD QUEUE(QUEUE-X) INTO(DATA-X) LENGTH(LENGTH-X) RESP(RESP-X) END-EXEC. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. READTDQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 QUEUE-X PIC X(4) VALUE 'IN01'. 01 DATA-X PIC X(6). 01 LENGTH-X PIC S9(4) COMP VALUE 3. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS READQ TD QUEUE(QUEUE-X) INTO(DATA-X) LENGTH(LENGTH-X) SYSID('S001') RESP(RESP-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);
         let hir = analysis
             .hir
@@ -3413,6 +3426,10 @@ mod tests {
                     operand.value,
                     HirCicsValue::Data(ref reference) if reference.qualified_name == "LENGTH-X"
                 )
+        }));
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::SysId
+                && operand.value == HirCicsValue::Literal("S001".into())
         }));
         assert!(command.outputs.iter().any(|output| {
             output.name == HirCicsOutputName::Into && output.target.qualified_name == "DATA-X"
@@ -3462,8 +3479,8 @@ mod tests {
                 "LENGTH requires writable halfword binary storage",
             ),
             (
-                "READQ TD QUEUE('IN01') INTO(DATA-X) SYSID('R001')",
-                "typed lowering is unready for SYSID",
+                "READQ TD QUEUE('IN01') INTO(DATA-X) SYSID('TOOLONG')",
+                "SYSID requires a 1-4 character name",
             ),
         ] {
             let analysis = analyze(&format!(
