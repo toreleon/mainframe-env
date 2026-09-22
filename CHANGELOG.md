@@ -422,6 +422,10 @@ All notable changes to mainframe-env are documented here.
 - Propagated the refreshed map/corpus identities through all three CICS
   extraction plans and recomputed their canonical plan digests without
   changing selectors, bounds, resolutions, or expected projection shapes.
+- Propagated the refreshed map, corpus, and extraction-plan identities through
+  all three zero-credit CICS candidate projections and recomputed their
+  canonical projection digests without changing any of the 18,070 candidate
+  facts or their review states.
 - Migrated the local `WRITEQ TD` compatibility subset to a typed queue-write
   plan. QUEUE is a validated 1–4 character literal or field, FROM is a resolved
   data area, and optional numeric LENGTH or `LENGTH OF` selects the persisted

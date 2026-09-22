@@ -11,13 +11,13 @@
   "inputs": {
     "source_map": {
       "path": "conformance/0.9/cics/application-api-sources-a-map.json",
-      "file_sha256": "sha256:14ea98335ea5cc0f08aa30c44cd411236823d6edeaa5f1aecc485cc8cd22bc4d",
-      "logical_sha256": "sha256:e3e453846334aa92235f21f0028e9c77f084fc4e872d9f592b7af227decac863"
+      "file_sha256": "sha256:04fd48c9f51d1987f7bb95e830fc99742e54d3c21b61a543433b69054873c5b0",
+      "logical_sha256": "sha256:c535f2cac1072e16a0f3e252045cac975934c5e24d405a560a4e0ad14e0de726"
     },
     "source_corpus": {
       "path": "conformance/0.9/cics/application-api-sources-a-corpus.json",
-      "file_sha256": "sha256:be878e45e226d1647750f6ab7defe4afd1d7133a0ddc386cf5be4e9cd46d8ec2",
-      "logical_sha256": "sha256:75542331ed6f8f797baec2f6846b3a021b2187ecd6ab2df75eddc85e89a768f4"
+      "file_sha256": "sha256:849e3f3f23c5adc04a5c348b4f342798cb45111f58a79c735738d5fa706a66c5",
+      "logical_sha256": "sha256:946465b9acf686e94664921a1173304b1773199d358fef217920ab3c3241f4cf"
     },
     "topic_manifest": {
       "path": "conformance/0.9/manifests/cics-application-api-sources-a-topics.json",
@@ -26,8 +26,8 @@
     },
     "extraction_plan": {
       "path": "conformance/0.9/cics/application-api-sources-a-extraction.json",
-      "file_sha256": "sha256:a7f1406b4141e4772c0db3e2eac63677d779f09d119b1e33fb103171f276dd88",
-      "logical_sha256": "sha256:e1b356c6613a375da6abdefc6b8c0ed973bc80a8933a1d77a20b64145231b4db"
+      "file_sha256": "sha256:fb48f8738059f28984315397066660ad794fc4ff74d88cf8e15720a90e65c0c4",
+      "logical_sha256": "sha256:1c7055c8e02c84b986e35ce9b5082b3b5085c54c54d253a87f1d5ae0ff7c7f56"
     },
     "source_supplements": {
       "path": "conformance/0.9/cics/application-api-sources-a-supplements.json",
@@ -191284,5 +191284,5 @@
     }
   ],
   "projection_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-candidates@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of the complete candidate projection with projection_sha256 omitted",
-  "projection_sha256": "sha256:2d0cb707bed46d71e2897fd25b5e64a4d7d79d2deb22851f0ca90dfe9755b889"
+  "projection_sha256": "sha256:74c4c60d21c8c93c888a3e0dacf083e5259b6bc90d5206ac923ab5976925ea96"
 }
