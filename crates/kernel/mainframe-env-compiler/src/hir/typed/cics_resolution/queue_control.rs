@@ -21,7 +21,7 @@ pub(super) fn validate_constraints(
     }
     let (command, required) = match operation {
         HirCicsOperation::WriteTransientData => ("CICS WRITEQ TD", &["QUEUE", "FROM"][..]),
-        HirCicsOperation::ReadTransientData => ("CICS READQ TD", &["QUEUE", "INTO"][..]),
+        HirCicsOperation::ReadTransientData => ("CICS READQ TD", &["QUEUE"][..]),
         HirCicsOperation::DeleteTransientData => ("CICS DELETEQ TD", &["QUEUE"][..]),
         _ => return Ok(()),
     };
@@ -31,6 +31,13 @@ pub(super) fn validate_constraints(
                 "{command} requires {name}"
             )));
         }
+    }
+    if operation == HirCicsOperation::ReadTransientData
+        && usize::from(clauses.contains_key("INTO")) + usize::from(clauses.contains_key("SET")) != 1
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS READQ TD requires exactly one of INTO or SET".into(),
+        ));
     }
     Ok(())
 }

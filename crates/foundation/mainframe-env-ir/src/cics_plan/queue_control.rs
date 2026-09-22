@@ -39,10 +39,11 @@ pub(super) fn invalid_read_transient_data_shape(
     outputs: &BTreeSet<CicsOutputName>,
 ) -> bool {
     let allowed_inputs = BTreeSet::from([CicsOperandName::Queue, CicsOperandName::Length]);
+    let data_outputs = usize::from(outputs.contains(&CicsOutputName::Into))
+        + usize::from(outputs.contains(&CicsOutputName::SetPointer));
     !inputs.contains(&CicsOperandName::Queue)
         || !inputs.is_subset(&allowed_inputs)
-        || !outputs.contains(&CicsOutputName::Into)
-        || outputs.contains(&CicsOutputName::SetPointer)
+        || data_outputs != 1
         || plan.operands.iter().any(|operand| match operand.name {
             CicsOperandName::Queue => !matches!(
                 operand.value,
@@ -70,6 +71,7 @@ pub(super) fn invalid_read_transient_data_shape(
             !matches!(
                 output,
                 CicsOutputName::Into
+                    | CicsOutputName::SetPointer
                     | CicsOutputName::Length
                     | CicsOutputName::Resp
                     | CicsOutputName::Resp2

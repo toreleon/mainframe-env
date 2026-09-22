@@ -733,7 +733,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "RESP2",
         ],
         HirCicsOperation::WriteTransientData => &["QUEUE", "FROM", "LENGTH", "RESP", "RESP2"],
-        HirCicsOperation::ReadTransientData => &["QUEUE", "INTO", "LENGTH", "RESP", "RESP2"],
+        HirCicsOperation::ReadTransientData => &["QUEUE", "INTO", "SET", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::DeleteTransientData => &["QUEUE", "RESP", "RESP2"],
         HirCicsOperation::DeleteTemporaryStorage => &["QNAME", "QUEUE", "SYSID", "RESP", "RESP2"],
         HirCicsOperation::Freemain => &["DATA", "DATAPOINTER", "RESP", "RESP2"],

@@ -48,6 +48,7 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
         CicsPlanOperation::ReadTransientData => matches!(
             output,
             CicsOutputName::Into
+                | CicsOutputName::SetPointer
                 | CicsOutputName::Length
                 | CicsOutputName::Resp
                 | CicsOutputName::Resp2

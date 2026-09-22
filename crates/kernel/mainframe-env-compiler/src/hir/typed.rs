@@ -3421,12 +3421,37 @@ mod tests {
             output.name == HirCicsOutputName::Length && output.target.qualified_name == "LENGTH-X"
         }));
 
+        let set = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. READSET. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER. PROCEDURE DIVISION. EXEC CICS READQ TD QUEUE('IN01') SET(PTR-X) END-EXEC. STOP RUN.",
+        );
+        let set = set
+            .hir
+            .unwrap_or_else(|| panic!("READQ TD SET: {:?}", set.diagnostics));
+        let set = set
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed READQ TD SET");
+        assert!(set.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::SetPointer && output.target.qualified_name == "PTR-X"
+        }));
+
         for (command, expected) in [
             ("READQ TD INTO(DATA-X)", "requires QUEUE"),
-            ("READQ TD QUEUE('IN01')", "requires INTO"),
             (
-                "READQ TD QUEUE('IN01') SET(PTR-X)",
-                "typed lowering is unready for SET",
+                "READQ TD QUEUE('IN01')",
+                "requires exactly one of INTO or SET",
+            ),
+            (
+                "READQ TD QUEUE('IN01') INTO(DATA-X) SET(PTR-X)",
+                "requires exactly one of INTO or SET",
+            ),
+            (
+                "READQ TD QUEUE('IN01') SET(DATA-X)",
+                "SET requires a POINTER or POINTER-32 reference",
             ),
             (
                 "READQ TD QUEUE('IN01') INTO(DATA-X) LENGTH(3)",

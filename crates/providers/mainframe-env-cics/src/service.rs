@@ -9230,6 +9230,67 @@ mod tests {
     }
 
     #[test]
+    fn readq_td_set_returns_owned_record_storage_and_fences_capacity() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+        let write = request(
+            CicsOperation::WriteTransientData,
+            BTreeMap::from([
+                ("QUEUE".into(), argument(b"SETQ")),
+                ("FROM".into(), argument(b"SET-DATA")),
+            ]),
+            1,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, write.clone(), 1), write)
+            .unwrap();
+
+        let too_small = request(
+            CicsOperation::ReadTransientData,
+            BTreeMap::from([
+                ("QUEUE".into(), cics_literal(b"SETQ")),
+                ("SET".into(), argument(b"PTR-X")),
+                ("SET.MAXLENGTH".into(), cics_decimal(4)),
+            ]),
+            2,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, too_small.clone(), 2),
+                too_small,
+            ),
+            Err(HostProblem::Condition {
+                name: "LENGERR".into(),
+                response: 22,
+                response2: 0,
+            })
+        );
+        assert_eq!(
+            service.transient_records("SETQ").unwrap(),
+            [b"SET-DATA".to_vec()]
+        );
+
+        let set = request(
+            CicsOperation::ReadTransientData,
+            BTreeMap::from([
+                ("QUEUE".into(), cics_literal(b"SETQ")),
+                ("SET".into(), argument(b"PTR-X")),
+                ("SET.MAXLENGTH".into(), cics_decimal(1024)),
+                ("LENGTH".into(), cics_decimal(0)),
+            ]),
+            3,
+        );
+        let set = service
+            .invoke(&effect(&invocation.run_unit_id, set.clone(), 3), set)
+            .unwrap();
+        assert!(set.payload.bytes().is_empty());
+        assert_eq!(set.outputs["SET"].bytes(), b"SET-DATA");
+        assert_eq!(set.outputs["LENGTH"].bytes(), b"8");
+        assert_eq!((set.condition.as_str(), set.response), ("LENGERR", 22));
+        assert!(service.transient_records("SETQ").unwrap().is_empty());
+    }
+
+    #[test]
     fn deleteq_td_deallocation_survives_sqlite_reopen() {
         let root = std::env::temp_dir().join(format!(
             "mainframe-env-deleteq-td-{}-{:?}",

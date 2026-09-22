@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `READQ TD SET` over interpreter-owned virtual storage. SET
+  is exactly alternative to INTO, returns a checked POINTER/POINTER-32 address
+  to the complete consumed record, participates in checkpoint restore, and
+  rejects insufficient allocation capacity without consuming the queue.
+
 - Added typed local CICS `READQ TD QUEUE/INTO/LENGTH`. The FIFO read consumes
   exactly one durable record, uses compiler-derived INTO capacity when LENGTH
   is omitted, returns the original record length through writable halfword

@@ -1,5 +1,5 @@
 use super::super::{
-    CicsService, Run, TransientQueue, argument_bytes, argument_text, decimal_payload,
+    CicsService, Run, TransientQueue, argument_bytes, argument_text, bounded, decimal_payload,
     decode_transient, encode_transient, mutation_problem, store_error,
 };
 use mainframe_env_host_api::{
@@ -49,15 +49,21 @@ fn read(
                     value.schema(),
                     "mainframe-env.cics.literal@1" | "mainframe-env.cics.storage-value@1"
                 ),
-                "INTO" | "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
-                "INTO.MAXLENGTH" | "LENGTH" => value.schema() != "mainframe-env.cics.decimal@1",
+                "INTO" | "SET" | "RESP" | "RESP2" => {
+                    value.schema() != "mainframe-env.cics.argument@1"
+                }
+                "INTO.MAXLENGTH" | "SET.MAXLENGTH" | "LENGTH" => {
+                    value.schema() != "mainframe-env.cics.decimal@1"
+                }
                 "OPTION.NOHANDLE" => {
                     value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
                 }
                 _ => true,
             })
-        || !request.arguments.contains_key("INTO")
-        || !request.arguments.contains_key("INTO.MAXLENGTH")
+        || request.arguments.contains_key("INTO") == request.arguments.contains_key("SET")
+        || request.arguments.contains_key("INTO")
+            != request.arguments.contains_key("INTO.MAXLENGTH")
+        || request.arguments.contains_key("SET") != request.arguments.contains_key("SET.MAXLENGTH")
     {
         return Err(HostProblem::Malformed);
     }
@@ -68,10 +74,18 @@ fn read(
         &format!("CICS.TD.{queue}"),
         AccessIntent::Read,
     )?;
-    let into_maximum = signed_decimal(request, "INTO.MAXLENGTH")?
-        .and_then(|value| usize::try_from(value).ok())
-        .filter(|value| *value != 0)
-        .ok_or(HostProblem::Malformed)?;
+    let set = request.arguments.contains_key("SET");
+    let destination_maximum = signed_decimal(
+        request,
+        if set {
+            "SET.MAXLENGTH"
+        } else {
+            "INTO.MAXLENGTH"
+        },
+    )?
+    .and_then(|value| usize::try_from(value).ok())
+    .filter(|value| *value != 0)
+    .ok_or(HostProblem::Malformed)?;
     let requested = signed_decimal(request, "LENGTH")?;
     if requested.is_some_and(|value| value < 0) {
         return Err(HostProblem::Condition {
@@ -99,11 +113,23 @@ fn read(
             response: 23,
             response2: 0,
         })?;
-    let maximum = requested
-        .and_then(|value| usize::try_from(value).ok())
-        .unwrap_or(into_maximum)
-        .min(into_maximum);
-    let truncated = maximum < original.len();
+    let maximum = if set {
+        destination_maximum
+    } else {
+        requested
+            .and_then(|value| usize::try_from(value).ok())
+            .unwrap_or(destination_maximum)
+            .min(destination_maximum)
+    };
+    if set && original.len() > maximum {
+        return Err(HostProblem::Condition {
+            name: "LENGERR".into(),
+            response: 22,
+            response2: 0,
+        });
+    }
+    let truncated = !set && maximum < original.len();
+    let zero_length = requested == Some(0);
     let mut value = original.clone();
     value.truncate(maximum);
     let mut next = current;
@@ -133,8 +159,12 @@ fn read(
     let mut response = service.response(
         run,
         CicsDisposition::Complete,
-        if truncated { "LENGERR" } else { "NORMAL" },
-        if truncated { 22 } else { 0 },
+        if truncated || zero_length {
+            "LENGERR"
+        } else {
+            "NORMAL"
+        },
+        if truncated || zero_length { 22 } else { 0 },
         0,
         None,
         None,
@@ -147,6 +177,10 @@ fn read(
                 i64::try_from(original.len()).map_err(|_| HostProblem::ResourceExhausted)?,
             )?,
         );
+    }
+    if set {
+        response.outputs.insert("SET".into(), bounded(original)?);
+        response.payload = bounded(Vec::new())?;
     }
     Ok(response)
 }
