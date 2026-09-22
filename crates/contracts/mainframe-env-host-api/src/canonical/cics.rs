@@ -16,6 +16,9 @@ impl Canonical for CicsOperation {
             Self::Deq => out.variant("CicsOperation", "Deq", 0),
             Self::Delete => out.variant("CicsOperation", "Delete", 0),
             Self::DeleteTransientData => out.variant("CicsOperation", "DeleteTransientData", 0),
+            Self::DeleteTemporaryStorage => {
+                out.variant("CicsOperation", "DeleteTemporaryStorage", 0)
+            }
             Self::Enq => out.variant("CicsOperation", "Enq", 0),
             Self::EndBrowse => out.variant("CicsOperation", "EndBrowse", 0),
             Self::FormatTime => out.variant("CicsOperation", "FormatTime", 0),

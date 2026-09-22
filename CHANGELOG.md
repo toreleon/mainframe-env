@@ -451,6 +451,13 @@ All notable changes to mainframe-env are documented here.
   and selected compiled-route regressions cover deletion and repeated-delete
   behavior. Remote SYSID and TDQUEUE definition, extrapartition, disabled, and
   locked states remain fail-closed.
+- Added typed local `DELETEQ TS QUEUE` through append-only operation tag 41.
+  The runtime authorizes the 1–8 character queue resource, validates the
+  durable `cics-tsq` row before versioned deletion, frees all stored items, and
+  returns exact `QIDERR` 44/0 or all-zero-name `INVREQ` 16/0 through ordinary
+  condition handling. Replay and SQLite reopen preserve a single deletion;
+  QNAME, SYSID, TSMODEL/shared-pool state, locking, and WRITEQ/READQ TS remain
+  pending.
 - Added typed task-local `GETMAIN SET` with exactly one FLENGTH or compatibility
   LENGTH over interpreter-owned virtual storage. FLENGTH accepts signed
   fullword input; LENGTH accepts unsigned halfword input and enforces its 65,520

@@ -30,6 +30,7 @@ pub(super) fn resolve(
         ["WRITE", "FILE"] => HirCicsOperation::Write,
         ["WRITEQ", "TD"] => HirCicsOperation::WriteTransientData,
         ["DELETEQ", "TD"] => HirCicsOperation::DeleteTransientData,
+        ["DELETEQ", "TS"] => HirCicsOperation::DeleteTemporaryStorage,
         ["RECEIVE", "MAP"] => HirCicsOperation::ReceiveMap,
         ["SEND", "MAP"] => HirCicsOperation::SendMap,
         ["SEND", "TEXT"] => HirCicsOperation::SendText,

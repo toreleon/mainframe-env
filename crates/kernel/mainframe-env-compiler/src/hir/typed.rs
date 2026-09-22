@@ -174,6 +174,7 @@ pub enum HirCicsOperation {
     Write,
     WriteTransientData,
     DeleteTransientData,
+    DeleteTemporaryStorage,
     ReceiveMap,
     SendMap,
     SendText,
@@ -3311,6 +3312,69 @@ mod tests {
                 .public_message()
                 .contains("typed lowering is unready for SYSID")
         }));
+    }
+
+    #[test]
+    fn cics_deleteq_ts_resolves_local_queue_names() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 QUEUE-X PIC X(8) VALUE 'WORKQ'. PROCEDURE DIVISION. EXEC CICS DELETEQ TS QUEUE('TEMPQ') END-EXEC. EXEC CICS DELETEQ TS QUEUE(QUEUE-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("DELETEQ TS: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 2);
+        assert!(
+            commands
+                .iter()
+                .all(|command| command.operation == HirCicsOperation::DeleteTemporaryStorage)
+        );
+        assert_eq!(
+            commands[0].operands[0],
+            HirCicsNamedOperand {
+                name: HirCicsOperandName::Queue,
+                value: HirCicsValue::Literal("TEMPQ".into()),
+            }
+        );
+        assert!(matches!(
+            &commands[1].operands[0],
+            HirCicsNamedOperand {
+                name: HirCicsOperandName::Queue,
+                value: HirCicsValue::Data(reference),
+            } if reference.qualified_name == "QUEUE-X"
+        ));
+
+        for (command, expected) in [
+            ("DELETEQ TS", "requires QUEUE"),
+            (
+                "DELETEQ TS QUEUE('TOOLONG09')",
+                "QUEUE requires a 1-8 character name",
+            ),
+            ("DELETEQ TS QNAME('LONGQ')", "unready for QNAME"),
+            (
+                "DELETEQ TS QUEUE('TEMPQ') SYSID('R001')",
+                "unready for SYSID",
+            ),
+        ] {
+            let invalid = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADTS. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(invalid.hir.is_none(), "{command}");
+            assert!(
+                invalid
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                invalid.diagnostics
+            );
+        }
     }
 
     #[test]

@@ -46,6 +46,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0048"
     },
     {
+      "operation": "DeleteTemporaryStorage",
+      "interface": "api",
+      "family": "queue-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0049"
+    },
+    {
       "operation": "Deq",
       "interface": "api",
       "family": "task-control",

@@ -1715,7 +1715,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 43);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 44);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -4681,6 +4681,7 @@ mod tests {
             ("DEQ", CicsOperation::Deq),
             ("DELAY", CicsOperation::Delay),
             ("DELETE", CicsOperation::Delete),
+            ("DELETEQ TS", CicsOperation::DeleteTemporaryStorage),
             ("ENDBR", CicsOperation::EndBrowse),
             ("ENQ", CicsOperation::Enq),
             ("FORMATTIME", CicsOperation::FormatTime),
@@ -4726,7 +4727,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 43);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 44);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -9171,6 +9172,101 @@ mod tests {
             assert!(
                 store
                     .get_provider_state("cics-tdq", "OUTQ")
+                    .unwrap()
+                    .is_none()
+            );
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn deleteq_ts_queue_is_authorized_replay_safe_and_durable() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-deleteq-ts-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            store
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: "cics-tsq".into(),
+                        key: "TEMPQ".into(),
+                        version: 1,
+                        payload: encode_transient(&TransientQueue {
+                            records: vec![("seed-item".into(), b"DURABLE".to_vec())],
+                            version: 1,
+                        })
+                        .unwrap(),
+                    },
+                    None,
+                )
+                .unwrap();
+            let service = service(store.clone());
+            let (invocation, _) = registered(&service);
+            let delete = request(
+                CicsOperation::DeleteTemporaryStorage,
+                BTreeMap::from([("QUEUE".into(), argument(b"TEMPQ"))]),
+                1,
+            );
+            let response = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, delete.clone(), 1),
+                    delete.clone(),
+                )
+                .unwrap();
+            assert_eq!(response.condition, "NORMAL");
+            assert!(
+                store
+                    .get_provider_state("cics-tsq", "TEMPQ")
+                    .unwrap()
+                    .is_none()
+            );
+
+            let replay = service
+                .invoke(&effect(&invocation.run_unit_id, delete.clone(), 1), delete)
+                .unwrap();
+            assert_eq!(replay.condition, "NORMAL");
+
+            for (sequence, queue, condition, response) in [
+                (2, b"MISSING".as_slice(), "QIDERR", 44),
+                (3, [0_u8; 8].as_slice(), "INVREQ", 16),
+            ] {
+                let mut absent = request(
+                    CicsOperation::DeleteTemporaryStorage,
+                    BTreeMap::from([
+                        ("QUEUE".into(), argument(queue)),
+                        ("RESP".into(), argument(b"RESP-X")),
+                        ("RESP2".into(), argument(b"RESP2-X")),
+                    ]),
+                    sequence,
+                );
+                absent.condition_policy = CicsConditionPolicy::Respond {
+                    response_field: "RESP-X".into(),
+                    response2_field: Some("RESP2-X".into()),
+                };
+                let result = service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, absent.clone(), sequence),
+                        absent,
+                    )
+                    .unwrap();
+                assert_eq!(
+                    (result.condition.as_str(), result.response),
+                    (condition, response)
+                );
+                assert_eq!(result.response2, 0);
+            }
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let _service = service(store.clone());
+            assert!(
+                store
+                    .get_provider_state("cics-tsq", "TEMPQ")
                     .unwrap()
                     .is_none()
             );

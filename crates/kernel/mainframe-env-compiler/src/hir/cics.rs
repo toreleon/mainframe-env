@@ -324,6 +324,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::Write => CicsPlanOperation::Write,
         HirCicsOperation::WriteTransientData => CicsPlanOperation::WriteTransientData,
         HirCicsOperation::DeleteTransientData => CicsPlanOperation::DeleteTransientData,
+        HirCicsOperation::DeleteTemporaryStorage => CicsPlanOperation::DeleteTemporaryStorage,
         HirCicsOperation::Getmain => CicsPlanOperation::Getmain,
         HirCicsOperation::Freemain => CicsPlanOperation::Freemain,
         HirCicsOperation::ReceiveMap => CicsPlanOperation::ReceiveMap,

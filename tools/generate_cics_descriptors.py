@@ -105,6 +105,13 @@ EXPECTED_RUNTIME_OPERATIONS = [
         True,
         f"{OFFICIAL_BASELINE}:api-commands:0048",
     ),
+    (
+        "DeleteTemporaryStorage",
+        "api",
+        "queue-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0049",
+    ),
     ("Deq", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0050"),
     ("EndBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0058"),
     ("Enq", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0064"),
@@ -399,6 +406,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Write",
         "WriteTransientData",
         "DeleteTransientData",
+        "DeleteTemporaryStorage",
         "ReceiveMap",
         "SendMap",
         "SendText",
@@ -530,6 +538,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
     "DeleteTransientData": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "DeleteTemporaryStorage": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
     "Getmain": frozenset(
@@ -769,6 +780,7 @@ def _load_typed_execution_registrations(
         "ChangeTask",
         "Delay",
         "DeleteTransientData",
+        "DeleteTemporaryStorage",
         "Deq",
         "Enq",
         "Freemain",
@@ -1077,6 +1089,7 @@ def load_catalog(
                 "Delay",
                 "Deq",
                 "DeleteTransientData",
+                "DeleteTemporaryStorage",
                 "Enq",
                 "Freemain",
                 "Getmain",
@@ -3391,8 +3404,8 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
         for row in catalog["_runtime_operations"]
         if row["interface"] == "api"
     }
-    if len(existing_runtime) != 41:
-        raise DescriptorError("CICS application runtime set must remain exactly 41 rows")
+    if len(existing_runtime) != 42:
+        raise DescriptorError("CICS application runtime set must remain exactly 42 rows")
 
     loaded_batches = []
     for batch_id, start, end, projection_path, review_path in CONTRACT_BATCHES:
@@ -3646,12 +3659,12 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
     if (
         len(registry_rows) != 263
         or len(set(handler_ids)) != 263
-        or len(typed_rows) != 41
+        or len(typed_rows) != 42
         or len(legacy_rows) != 0
         or {row["runtime_operation"] for row in typed_rows}
         != TYPED_RUNTIME_OPERATIONS
-        or len(advertised_rows) != 41
-        or len(unready_rows) != 222
+        or len(advertised_rows) != 42
+        or len(unready_rows) != 221
         or any(row["unready_result"] != "explicit-unsupported" for row in unready_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in typed_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in legacy_rows)

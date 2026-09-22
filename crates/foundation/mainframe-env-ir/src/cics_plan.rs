@@ -547,7 +547,7 @@ fn validate_operation_shape(
         CicsPlanOperation::WriteTransientData => {
             queue_control::invalid_write_transient_data_shape(plan, inputs, outputs)
         }
-        CicsPlanOperation::DeleteTransientData => {
+        CicsPlanOperation::DeleteTransientData | CicsPlanOperation::DeleteTemporaryStorage => {
             queue_control::invalid_delete_transient_data_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::Getmain => storage_control::invalid_getmain_shape(plan, inputs, outputs),
@@ -1181,6 +1181,11 @@ mod tests {
         assert_eq!(option_from_tag(26), Ok(CicsPlanOption::Equal));
         assert_eq!(option_tag(CicsPlanOption::Terminal), 27);
         assert_eq!(option_from_tag(27), Ok(CicsPlanOption::Terminal));
+        assert_eq!(operation_tag(CicsPlanOperation::DeleteTemporaryStorage), 41);
+        assert_eq!(
+            operation_from_tag(41),
+            Ok(CicsPlanOperation::DeleteTemporaryStorage)
+        );
 
         let plan = read_plan();
         let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
@@ -1568,6 +1573,26 @@ mod tests {
             outputs: Vec::new(),
             condition: CicsCondition::Default,
         };
+        let delete_temporary_storage = CicsEffectPlan {
+            operation: CicsPlanOperation::DeleteTemporaryStorage,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::Queue,
+                value: CicsOperandValue::Literal(b"TEMPQ".to_vec()),
+            }],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        assert!(
+            encode_cics_effect_plan(&delete_temporary_storage, CicsPlanLimits::default()).is_ok()
+        );
+        let mut oversized_temporary_queue = delete_temporary_storage.clone();
+        oversized_temporary_queue.operands[0].value =
+            CicsOperandValue::Literal(b"TOOLONG09".to_vec());
+        assert_eq!(
+            encode_cics_effect_plan(&oversized_temporary_queue, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
         let receive_map = CicsEffectPlan {
             operation: CicsPlanOperation::ReceiveMap,
             operands: vec![
@@ -1925,6 +1950,7 @@ mod tests {
             write_with_length,
             write_with_key_length,
             write_transient,
+            delete_temporary_storage,
             receive_map,
             send_map,
             send_map_map_only,

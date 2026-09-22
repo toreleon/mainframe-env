@@ -63,6 +63,8 @@ pub enum CicsPlanOperation {
     WriteTransientData,
     /// Delete every record from one local transient-data queue.
     DeleteTransientData,
+    /// Delete every item from one local temporary-storage queue.
+    DeleteTemporaryStorage,
     /// Receive one mapped terminal input message.
     ReceiveMap,
     /// Send one mapped terminal output message.
@@ -114,7 +116,7 @@ pub enum CicsOperandName {
     From,
     /// `RIDFLD(...)` record identifier.
     Ridfld,
-    /// `QUEUE(...)` transient-data destination.
+    /// `QUEUE(...)` transient-data or temporary-storage resource.
     Queue,
     /// `MAP(...)` BMS map name.
     Map,

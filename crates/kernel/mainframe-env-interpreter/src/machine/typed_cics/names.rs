@@ -88,6 +88,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::Write => CicsOperation::Write,
         CicsPlanOperation::WriteTransientData => CicsOperation::WriteTransientData,
         CicsPlanOperation::DeleteTransientData => CicsOperation::DeleteTransientData,
+        CicsPlanOperation::DeleteTemporaryStorage => CicsOperation::DeleteTemporaryStorage,
         CicsPlanOperation::Getmain => CicsOperation::Getmain,
         CicsPlanOperation::Freemain => CicsOperation::Freemain,
         CicsPlanOperation::ReceiveMap => CicsOperation::ReceiveMap,

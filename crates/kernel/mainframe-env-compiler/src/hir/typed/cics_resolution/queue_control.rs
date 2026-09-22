@@ -12,6 +12,7 @@ pub(super) fn validate_constraints(
     let (command, required) = match operation {
         HirCicsOperation::WriteTransientData => ("CICS WRITEQ TD", &["QUEUE", "FROM"][..]),
         HirCicsOperation::DeleteTransientData => ("CICS DELETEQ TD", &["QUEUE"][..]),
+        HirCicsOperation::DeleteTemporaryStorage => ("CICS DELETEQ TS", &["QUEUE"][..]),
         _ => return Ok(()),
     };
     for name in required {
@@ -31,17 +32,27 @@ pub(super) fn operands(
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
     if !matches!(
         operation,
-        HirCicsOperation::WriteTransientData | HirCicsOperation::DeleteTransientData
+        HirCicsOperation::WriteTransientData
+            | HirCicsOperation::DeleteTransientData
+            | HirCicsOperation::DeleteTemporaryStorage
     ) {
         return Ok(Vec::new());
     }
     let queue = cics_value(&clauses["QUEUE"], semantic)?;
+    let maximum = if operation == HirCicsOperation::DeleteTemporaryStorage {
+        8
+    } else {
+        4
+    };
     let valid_queue = match &queue {
         HirCicsValue::Literal(value) => {
-            matches!(value.len(), 1..=4) && value.bytes().all(|byte| byte.is_ascii_alphanumeric())
+            (1..=maximum).contains(&value.len())
+                && value
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
         }
         HirCicsValue::Data(reference) => {
-            matches!(reference.length, 1..=4)
+            (1..=maximum).contains(&reference.length)
                 && matches!(
                     reference.category,
                     DataCategory::Alphabetic | DataCategory::Alphanumeric
@@ -50,11 +61,14 @@ pub(super) fn operands(
         HirCicsValue::Integer(_) | HirCicsValue::LengthOf(_) => false,
     };
     if !valid_queue {
-        return Err(ResolutionFailure::Invalid(
-            "CICS transient-data QUEUE requires a 1-4 character name".into(),
-        ));
+        return Err(ResolutionFailure::Invalid(format!(
+            "CICS {operation:?} QUEUE requires a 1-{maximum} character name"
+        )));
     }
-    if operation == HirCicsOperation::DeleteTransientData {
+    if matches!(
+        operation,
+        HirCicsOperation::DeleteTransientData | HirCicsOperation::DeleteTemporaryStorage
+    ) {
         return Ok(vec![HirCicsNamedOperand {
             name: HirCicsOperandName::Queue,
             value: queue,

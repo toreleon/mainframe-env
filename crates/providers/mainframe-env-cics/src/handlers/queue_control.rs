@@ -1,6 +1,6 @@
 use super::super::{
-    CicsService, Run, TransientQueue, argument_bytes, argument_text, encode_transient,
-    mutation_problem, store_error,
+    CicsService, Run, TransientQueue, argument_bytes, argument_text, decode_transient,
+    encode_transient, mutation_problem, store_error,
 };
 use mainframe_env_host_api::{
     AccessIntent, CicsDisposition, CicsOperation, CicsRequest, CicsResponse, HostProblem,
@@ -15,8 +15,44 @@ pub(in crate::service) fn invoke(
     match request.operation {
         CicsOperation::WriteTransientData => write(service, run, request),
         CicsOperation::DeleteTransientData => delete(service, run, request),
+        CicsOperation::DeleteTemporaryStorage => delete_temporary(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
+}
+
+fn temporary_queue_name(request: &CicsRequest) -> Result<String, HostProblem> {
+    let value = request
+        .arguments
+        .get("QUEUE")
+        .ok_or(HostProblem::Malformed)?;
+    if !matches!(
+        value.schema(),
+        "mainframe-env.cics.argument@1"
+            | "mainframe-env.cics.literal@1"
+            | "mainframe-env.cics.storage-value@1"
+    ) {
+        return Err(HostProblem::Malformed);
+    }
+    if !value.bytes().is_empty() && value.bytes().iter().all(|byte| *byte == 0) {
+        return Err(HostProblem::Condition {
+            name: "INVREQ".into(),
+            response: 16,
+            response2: 0,
+        });
+    }
+    let queue = std::str::from_utf8(value.bytes())
+        .map_err(|_| HostProblem::Malformed)?
+        .trim()
+        .to_ascii_uppercase();
+    if queue.is_empty()
+        || queue.len() > 8
+        || !queue
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+    {
+        return Err(HostProblem::Malformed);
+    }
+    Ok(queue)
 }
 
 fn queue_name(request: &CicsRequest) -> Result<String, HostProblem> {
@@ -180,6 +216,60 @@ fn delete(
         .transient_bytes
         .checked_sub(released)
         .ok_or(HostProblem::InfrastructureFailure)?;
+    service.response(
+        run,
+        CicsDisposition::Complete,
+        "NORMAL",
+        0,
+        0,
+        None,
+        None,
+        Vec::new(),
+    )
+}
+
+fn delete_temporary(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+) -> Result<CicsResponse, HostProblem> {
+    if request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
+        || request
+            .arguments
+            .iter()
+            .any(|(name, value)| match name.as_str() {
+                "QUEUE" => false,
+                "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
+                "OPTION.NOHANDLE" => {
+                    value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+                }
+                _ => true,
+            })
+    {
+        return Err(HostProblem::Malformed);
+    }
+    let queue = temporary_queue_name(request)?;
+    service.authorize(
+        run,
+        "QUEUE",
+        &format!("CICS.TS.{queue}"),
+        AccessIntent::Update,
+    )?;
+    let current = service
+        .store
+        .get_provider_state("cics-tsq", &queue)
+        .map_err(store_error)?
+        .ok_or_else(|| HostProblem::Condition {
+            name: "QIDERR".into(),
+            response: 44,
+            response2: 0,
+        })?;
+    decode_transient(&current.payload, current.version, service.limits)?;
+    service
+        .store
+        .delete_provider_state("cics-tsq", &queue, current.version)
+        .map_err(store_error)
+        .map_err(mutation_problem)?;
     service.response(
         run,
         CicsDisposition::Complete,
