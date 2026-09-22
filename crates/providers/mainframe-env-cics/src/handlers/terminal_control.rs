@@ -370,6 +370,8 @@ fn receive(
     run: &Run,
     request: &CicsRequest,
 ) -> Result<CicsResponse, HostProblem> {
+    validate_receive_request(request)?;
+    let supplied_input = receive_from(request)?;
     let mut state = service.lock()?;
     let current = state
         .sessions
@@ -398,32 +400,41 @@ fn receive(
             response2: 0,
         });
     }
-    let mut next = current.clone();
-    next.version += 1;
-    let (disposition, target, payload, fields) = if let Some(input) = next.input.payload.take() {
+    let (disposition, target, payload, fields, next) = if let Some(input) = supplied_input {
         let fields = decode_map_payload(&input, service.limits)?;
-        let target = aid_handler_target(&run.aid_handlers, current.aid);
-        (
-            if target.is_some() {
-                CicsDisposition::Handler
-            } else {
-                CicsDisposition::Complete
-            },
-            target,
-            input,
-            fields,
-        )
+        (CicsDisposition::Complete, None, input, fields, None)
     } else {
-        next.suspended = true;
-        (
-            CicsDisposition::Suspended,
-            None,
-            Vec::new(),
-            BTreeMap::new(),
-        )
+        let mut next = current.clone();
+        next.version += 1;
+        let (disposition, target, payload, fields) = if let Some(input) = next.input.payload.take()
+        {
+            let fields = decode_map_payload(&input, service.limits)?;
+            let target = aid_handler_target(&run.aid_handlers, current.aid);
+            (
+                if target.is_some() {
+                    CicsDisposition::Handler
+                } else {
+                    CicsDisposition::Complete
+                },
+                target,
+                input,
+                fields,
+            )
+        } else {
+            next.suspended = true;
+            (
+                CicsDisposition::Suspended,
+                None,
+                Vec::new(),
+                BTreeMap::new(),
+            )
+        };
+        (disposition, target, payload, fields, Some(next))
     };
-    service.persist_session(&run.session, &next, Some(current.version))?;
-    state.sessions.insert(run.session.clone(), next);
+    if let Some(next) = next {
+        service.persist_session(&run.session, &next, Some(current.version))?;
+        state.sessions.insert(run.session.clone(), next);
+    }
     let mut response = service.response(run, disposition, "NORMAL", 0, 0, target, None, payload)?;
     response.aid = current.aid;
     for (name, value) in fields {
@@ -448,6 +459,60 @@ fn receive(
         );
     }
     Ok(response)
+}
+
+fn validate_receive_request(request: &CicsRequest) -> Result<(), HostProblem> {
+    const ALLOWED: &[&str] = &[
+        "FROM",
+        "INTO",
+        "LENGTH",
+        "MAP",
+        "MAPSET",
+        "OPTION.NOHANDLE",
+        "RESP",
+        "RESP2",
+    ];
+    if request.arguments.contains_key("LENGTH") && !request.arguments.contains_key("FROM")
+        || request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
+        || request.arguments.iter().any(|(name, value)| {
+            !ALLOWED.contains(&name.as_str())
+                || match name.as_str() {
+                    "LENGTH" => value.schema() != "mainframe-env.cics.decimal@1",
+                    "OPTION.NOHANDLE" => {
+                        value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
+                    }
+                    "INTO" | "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
+                    "FROM" | "MAP" | "MAPSET" => !matches!(
+                        value.schema(),
+                        "mainframe-env.cics.argument@1"
+                            | "mainframe-env.cics.literal@1"
+                            | "mainframe-env.cics.storage-value@1"
+                    ),
+                    _ => true,
+                }
+        })
+    {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
+}
+
+fn receive_from(request: &CicsRequest) -> Result<Option<Vec<u8>>, HostProblem> {
+    let Some(mut input) = argument_bytes(request, "FROM") else {
+        return Ok(None);
+    };
+    if let Some(length) = argument_optional(request, "LENGTH") {
+        let length = length
+            .trim()
+            .parse::<i64>()
+            .ok()
+            .and_then(|length| usize::try_from(length).ok())
+            .filter(|length| *length <= input.len())
+            .ok_or(HostProblem::Malformed)?;
+        input.truncate(length);
+    }
+    Ok(Some(input))
 }
 
 fn map_names(request: &CicsRequest) -> Result<(String, String), HostProblem> {

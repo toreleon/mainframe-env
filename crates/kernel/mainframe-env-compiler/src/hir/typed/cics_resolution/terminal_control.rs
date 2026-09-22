@@ -30,6 +30,14 @@ pub(super) fn validate_constraints(
             "CICS SEND MAP LENGTH requires an explicit FROM data area".into(),
         ));
     }
+    if operation == HirCicsOperation::ReceiveMap
+        && clauses.contains_key("LENGTH")
+        && !clauses.contains_key("FROM")
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS RECEIVE MAP LENGTH requires an explicit FROM data area".into(),
+        ));
+    }
     if operation == HirCicsOperation::SendMap
         && options.iter().any(|option| option == "DATAONLY")
         && options.iter().any(|option| option == "MAPONLY")
@@ -123,7 +131,7 @@ pub(super) fn operands(
             HirCicsValue::LengthOf(complete_data_reference(&tokens[2..], semantic)?)
         } else if matches!(
             operation,
-            HirCicsOperation::SendMap | HirCicsOperation::SendText
+            HirCicsOperation::ReceiveMap | HirCicsOperation::SendMap | HirCicsOperation::SendText
         ) {
             let value = cics_integer_value(tokens, semantic)?;
             match &value {
@@ -145,8 +153,19 @@ pub(super) fn operands(
             }
             value
         } else {
-            unreachable!("LENGTH is admitted only for SEND MAP or SEND TEXT")
+            unreachable!("LENGTH is admitted only for RECEIVE MAP, SEND MAP, or SEND TEXT")
         };
+        if operation == HirCicsOperation::ReceiveMap
+            && let HirCicsValue::LengthOf(length) = &value
+            && !operands.iter().any(|operand| {
+                operand.name == HirCicsOperandName::From
+                    && matches!(&operand.value, HirCicsValue::Data(from) if from == length)
+            })
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS ReceiveMap LENGTH OF must name the FROM data area".into(),
+            ));
+        }
         operands.push(HirCicsNamedOperand {
             name: HirCicsOperandName::Length,
             value,

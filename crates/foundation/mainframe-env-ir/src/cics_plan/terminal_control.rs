@@ -24,9 +24,15 @@ pub(super) fn invalid_shape(
     !inputs.is_subset(&allowed_inputs)
         || !required.is_subset(inputs)
         || (plan.operation == CicsPlanOperation::ReceiveMap
-            && inputs
-                .iter()
-                .any(|name| !matches!(name, CicsOperandName::Map | CicsOperandName::Mapset)))
+            && inputs.iter().any(|name| {
+                !matches!(
+                    name,
+                    CicsOperandName::Map
+                        | CicsOperandName::Mapset
+                        | CicsOperandName::From
+                        | CicsOperandName::Length
+                )
+            }))
         || (plan.operation == CicsPlanOperation::SendText
             && inputs
                 .iter()

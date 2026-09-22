@@ -3534,6 +3534,63 @@ mod tests {
         }
     }
 
+    #[test]
+    fn cics_receive_map_from_resolves_bounded_input_length() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. RCVFROM. DATA DIVISION. WORKING-STORAGE SECTION. 01 FROM-X PIC X(16). 01 IN-X PIC X(16). 01 LENGTH-X PIC S9(4) COMP VALUE 8. PROCEDURE DIVISION. EXEC CICS RECEIVE MAP('MENU') FROM(FROM-X) LENGTH(LENGTH-X) INTO(IN-X) END-EXEC. EXEC CICS RECEIVE MAP('MENU') FROM(FROM-X) LENGTH(LENGTH OF FROM-X) INTO(IN-X) END-EXEC.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("RECEIVE MAP FROM: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 2);
+        assert!(commands.iter().all(|command| {
+            command.operands.iter().any(|operand| {
+                operand.name == HirCicsOperandName::From
+                    && matches!(
+                        operand.value,
+                        HirCicsValue::Data(ref reference)
+                            if reference.qualified_name == "FROM-X"
+                    )
+            }) && command.outputs.iter().any(|output| {
+                output.name == HirCicsOutputName::Into && output.target.qualified_name == "IN-X"
+            })
+        }));
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference)
+                        if reference.qualified_name == "LENGTH-X"
+                )
+        }));
+        assert!(commands[1].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(
+                    operand.value,
+                    HirCicsValue::LengthOf(ref reference)
+                        if reference.qualified_name == "FROM-X"
+                )
+        }));
+
+        for command in [
+            "RECEIVE MAP('MENU') LENGTH(4) INTO(IN-X)",
+            "RECEIVE MAP('MENU') FROM(FROM-X) LENGTH(32768) INTO(IN-X)",
+            "RECEIVE MAP('MENU') FROM(FROM-X) LENGTH(LENGTH OF IN-X) INTO(IN-X)",
+        ] {
+            let invalid = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADRCV. DATA DIVISION. WORKING-STORAGE SECTION. 01 FROM-X PIC X(16). 01 IN-X PIC X(16). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC."
+            ));
+            assert!(invalid.hir.is_none(), "{command}");
+        }
+    }
+
     /// Issues #203 and #206: CardDemo SEND display controls and bounded lengths stay typed.
     #[test]
     fn cics_send_map_admits_erase_cursor_and_freekb() {

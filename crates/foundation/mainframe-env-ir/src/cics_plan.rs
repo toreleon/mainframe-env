@@ -1585,6 +1585,28 @@ mod tests {
             }],
             condition: CicsCondition::Default,
         };
+        let receive_from = slot(18, "BMS.RECEIVE-FROM");
+        let mut receive_map_from = receive_map.clone();
+        receive_map_from.operands.extend([
+            CicsNamedOperand {
+                name: CicsOperandName::From,
+                value: CicsOperandValue::Storage(receive_from.clone()),
+            },
+            CicsNamedOperand {
+                name: CicsOperandName::Length,
+                value: CicsOperandValue::LengthOf(receive_from),
+            },
+        ]);
+        assert!(encode_cics_effect_plan(&receive_map_from, CicsPlanLimits::default()).is_ok());
+        let mut receive_length_without_from = receive_map.clone();
+        receive_length_without_from.operands.push(CicsNamedOperand {
+            name: CicsOperandName::Length,
+            value: CicsOperandValue::Integer(4),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&receive_length_without_from, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
         let send_map = CicsEffectPlan {
             operation: CicsPlanOperation::SendMap,
             operands: vec![

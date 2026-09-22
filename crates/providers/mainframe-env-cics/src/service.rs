@@ -13924,6 +13924,125 @@ mod tests {
     }
 
     #[test]
+    fn receive_map_from_length_maps_only_the_selected_supplied_area() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, session) = registered(&service);
+        service
+            .register_map(BmsMapDefinition {
+                mapset: "INPUTS".into(),
+                map: "FORM".into(),
+                line: 1,
+                column: 1,
+                rows: 24,
+                columns: 80,
+                fields: vec![BmsFieldDefinition {
+                    name: "VALUE".into(),
+                    row: 1,
+                    column: 1,
+                    length: 4,
+                    initial: Vec::new(),
+                    color: None,
+                    highlight: None,
+                    protected: false,
+                    secret: false,
+                    fset: false,
+                    justify_right: false,
+                    fill_zero: false,
+                    output_offset: None,
+                    attribute_offset: None,
+                }],
+            })
+            .unwrap();
+        service
+            .submit_input(
+                &session,
+                0x7d,
+                &BTreeMap::from([("VALUE".into(), b"TERM".to_vec())]),
+            )
+            .unwrap();
+
+        let mut supplied = Vec::new();
+        field(&mut supplied, b"VALUE").unwrap();
+        field(&mut supplied, b"DATA").unwrap();
+        let selected = supplied.len();
+        field(&mut supplied, b"IGNORED").unwrap();
+        field(&mut supplied, b"TAIL").unwrap();
+        let before = service.lock().unwrap().sessions[session.as_str()].clone();
+        let receive = request(
+            CicsOperation::ReceiveMap,
+            BTreeMap::from([
+                ("MAPSET".into(), argument(b"INPUTS")),
+                ("MAP".into(), argument(b"FORM")),
+                ("FROM".into(), argument(&supplied)),
+                ("LENGTH".into(), cics_decimal(selected as i64)),
+                ("INTO".into(), argument(b"INPUT-X")),
+            ]),
+            1,
+        );
+        let mapped = service
+            .invoke(
+                &effect(&invocation.run_unit_id, receive.clone(), 1),
+                receive,
+            )
+            .unwrap();
+        assert_eq!(mapped.disposition, CicsDisposition::Complete);
+        assert_eq!(mapped.payload.bytes(), &supplied[..selected]);
+        assert_eq!(mapped.outputs["BMS.VALUE"].bytes(), b"DATA");
+        assert_eq!(mapped.outputs["BMS.VALUE.LENGTH"].bytes(), b"4");
+        let after = service.lock().unwrap().sessions[session.as_str()].clone();
+        assert_eq!(after.version, before.version);
+        assert_eq!(after.input.payload, before.input.payload);
+
+        for (sequence, arguments) in [
+            (
+                2,
+                BTreeMap::from([
+                    ("MAPSET".into(), argument(b"INPUTS")),
+                    ("MAP".into(), argument(b"FORM")),
+                    ("LENGTH".into(), cics_decimal(1)),
+                ]),
+            ),
+            (
+                3,
+                BTreeMap::from([
+                    ("MAPSET".into(), argument(b"INPUTS")),
+                    ("MAP".into(), argument(b"FORM")),
+                    ("FROM".into(), argument(&supplied)),
+                    (
+                        "LENGTH".into(),
+                        cics_decimal(i64::try_from(supplied.len()).unwrap() + 1),
+                    ),
+                ]),
+            ),
+        ] {
+            let invalid = request(CicsOperation::ReceiveMap, arguments, sequence);
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, invalid.clone(), sequence),
+                    invalid,
+                ),
+                Err(HostProblem::Malformed)
+            );
+        }
+
+        let terminal = request(
+            CicsOperation::ReceiveMap,
+            BTreeMap::from([
+                ("MAPSET".into(), argument(b"INPUTS")),
+                ("MAP".into(), argument(b"FORM")),
+            ]),
+            4,
+        );
+        let terminal = service
+            .invoke(
+                &effect(&invocation.run_unit_id, terminal.clone(), 4),
+                terminal,
+            )
+            .unwrap();
+        assert_eq!(terminal.outputs["BMS.VALUE"].bytes(), b"TERM");
+    }
+
+    #[test]
     fn bms_send_file_read_and_program_transfer_are_typed() {
         let service = service(Arc::new(MemoryStore::new(Default::default())));
         let (invocation, _) = registered(&service);

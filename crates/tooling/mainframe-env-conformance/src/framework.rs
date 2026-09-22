@@ -2373,6 +2373,75 @@ mod tests {
     }
 
     #[test]
+    fn cics_receive_map_from_length_crosses_the_compiled_selected_route() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. RCVFROM. DATA DIVISION. WORKING-STORAGE SECTION. 01 FROM-X PIC X(8) VALUE 'MAPINPUT'. 01 LENGTH-X PIC S9(4) COMP VALUE 4. 01 IN-X PIC X(8). PROCEDURE DIVISION. EXEC CICS RECEIVE MAP('FORM') MAPSET('INPUTS') FROM(FROM-X) LENGTH(LENGTH-X) INTO(IN-X) END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(receive) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("RECEIVE MAP FROM did not call host");
+        };
+        assert!(matches!(
+            &receive.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::ReceiveMap,
+                arguments,
+                mutation: Some(_),
+                ..
+            }) if arguments["MAP"].bytes() == b"FORM"
+                && arguments["MAPSET"].bytes() == b"INPUTS"
+                && arguments["FROM"].bytes() == b"MAPINPUT"
+                && arguments["LENGTH"].schema() == "mainframe-env.cics.decimal@1"
+                && arguments["LENGTH"].bytes() == b"4"
+                && arguments["INTO"].bytes() == b"IN-X"
+        ));
+
+        let payload = mainframe_env_execution_api::BoundedPayload::new(
+            "mainframe-env.cics.payload@1",
+            b"DATA".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: receive.sequence,
+                    outcome: Ok(HostResult::Cics(CicsResponse {
+                        disposition: CicsDisposition::Complete,
+                        condition: "NORMAL".into(),
+                        response: 0,
+                        response2: 0,
+                        applid: "APP".into(),
+                        sysid: "SYS".into(),
+                        transaction: "T001".into(),
+                        aid: 0,
+                        target: None,
+                        next_transaction: None,
+                        payload,
+                        outputs: BTreeMap::new(),
+                        unit_of_work: None,
+                    })),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("IN-X").unwrap().bytes(), b"DATA    ");
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x18, 0x02]);
+    }
+
+    #[test]
     fn cics_assign_uses_typed_bounded_output_bindings() {
         use mainframe_env_host_api::{
             CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
