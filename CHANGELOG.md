@@ -406,6 +406,9 @@ All notable changes to mainframe-env are documented here.
   instrumented `snapshot` staging API. It continues to require staged archive
   insertion and one final atomic state replacement without depending on the
   retired direct-clone spelling.
+- Updated the CICS command-descriptor schema from seven to the exact nine
+  reviewed runtime families after interval-control and storage-control were
+  frozen into the generator authority.
 - Migrated the local `WRITEQ TD` compatibility subset to a typed queue-write
   plan. QUEUE is a validated 1–4 character literal or field, FROM is a resolved
   data area, and optional numeric LENGTH or `LENGTH OF` selects the persisted
