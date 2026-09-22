@@ -176,7 +176,7 @@ def check(root: Path) -> None:
     typed_execute = between(
         cics_runtime,
         "pub(super) fn execute(\n",
-        "pub(super) fn execute_legacy(\n",
+        "fn legacy_condition_policy(\n",
     )
     reject(
         typed_execute,
@@ -186,7 +186,7 @@ def check(root: Path) -> None:
             "legacy_destination",
             "split_whitespace",
             "reference(",
-            "arguments(",
+            "\n    arguments(",
         ],
         "typed CICS runtime",
     )

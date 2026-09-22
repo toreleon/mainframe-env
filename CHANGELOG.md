@@ -395,6 +395,10 @@ All notable changes to mainframe-env are documented here.
   and storage handlers were added. Deterministic interval normalization now
   lives under the reviewed handler tree with stable public re-exports, and the
   frozen module inventory enumerates every current semantic handler module.
+- Repaired the typed-semantic architecture guard after legacy CICS execution
+  moved behind a module re-export. The guard now bounds typed execution at the
+  first legacy helper and distinguishes a forbidden bare grammar `arguments`
+  call from the typed SET allocation helper.
 - Migrated the local `WRITEQ TD` compatibility subset to a typed queue-write
   plan. QUEUE is a validated 1–4 character literal or field, FROM is a resolved
   data area, and optional numeric LENGTH or `LENGTH OF` selects the persisted
