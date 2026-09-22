@@ -182,6 +182,7 @@ impl PlanContext<'_> {
                 HirCicsOperandName::Ridfld => CicsOperandName::Ridfld,
                 HirCicsOperandName::Queue => CicsOperandName::Queue,
                 HirCicsOperandName::Qname => CicsOperandName::Qname,
+                HirCicsOperandName::SysId => CicsOperandName::SysId,
                 HirCicsOperandName::Map => CicsOperandName::Map,
                 HirCicsOperandName::Mapset => CicsOperandName::Mapset,
                 HirCicsOperandName::Resource => CicsOperandName::Resource,

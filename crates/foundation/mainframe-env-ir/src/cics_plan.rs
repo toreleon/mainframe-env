@@ -1188,6 +1188,8 @@ mod tests {
         );
         assert_eq!(operand_tag(CicsOperandName::Qname), 43);
         assert_eq!(operand_from_tag(43), Ok(CicsOperandName::Qname));
+        assert_eq!(operand_tag(CicsOperandName::SysId), 44);
+        assert_eq!(operand_from_tag(44), Ok(CicsOperandName::SysId));
 
         let plan = read_plan();
         let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
@@ -1609,6 +1611,23 @@ mod tests {
             .push(delete_temporary_storage.operands[0].clone());
         assert_eq!(
             encode_cics_effect_plan(&delete_long_temporary_storage, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut delete_temporary_at_local_system = delete_temporary_storage.clone();
+        delete_temporary_at_local_system
+            .operands
+            .push(CicsNamedOperand {
+                name: CicsOperandName::SysId,
+                value: CicsOperandValue::Literal(b"S001".to_vec()),
+            });
+        assert!(
+            encode_cics_effect_plan(&delete_temporary_at_local_system, CicsPlanLimits::default())
+                .is_ok()
+        );
+        delete_temporary_at_local_system.operands[1].value =
+            CicsOperandValue::Literal(b"TOOLONG".to_vec());
+        assert_eq!(
+            encode_cics_effect_plan(&delete_temporary_at_local_system, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
         let receive_map = CicsEffectPlan {

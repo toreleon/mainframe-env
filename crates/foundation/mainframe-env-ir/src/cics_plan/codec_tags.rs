@@ -148,6 +148,7 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::DataPointer => 41,
         CicsOperandName::DataArea => 42,
         CicsOperandName::Qname => 43,
+        CicsOperandName::SysId => 44,
     }
 }
 
@@ -197,6 +198,7 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         41 => Ok(CicsOperandName::DataPointer),
         42 => Ok(CicsOperandName::DataArea),
         43 => Ok(CicsOperandName::Qname),
+        44 => Ok(CicsOperandName::SysId),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

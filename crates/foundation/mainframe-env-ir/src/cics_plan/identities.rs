@@ -120,6 +120,8 @@ pub enum CicsOperandName {
     Queue,
     /// `QNAME(...)` long temporary-storage resource.
     Qname,
+    /// `SYSID(...)` target CICS system identity.
+    SysId,
     /// `MAP(...)` BMS map name.
     Map,
     /// `MAPSET(...)` BMS mapset name.

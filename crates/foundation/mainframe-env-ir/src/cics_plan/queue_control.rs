@@ -51,8 +51,17 @@ pub(super) fn invalid_delete_transient_data_shape(
     } else {
         4
     };
-    *inputs != BTreeSet::from([identity])
-        || match plan.operands.first().map(|operand| &operand.value) {
+    let mut expected = BTreeSet::from([identity]);
+    if temporary && inputs.contains(&CicsOperandName::SysId) {
+        expected.insert(CicsOperandName::SysId);
+    }
+    *inputs != expected
+        || match plan
+            .operands
+            .iter()
+            .find(|operand| operand.name == identity)
+            .map(|operand| &operand.value)
+        {
             Some(CicsOperandValue::Literal(value)) => {
                 !(1..=maximum).contains(&value.len())
                     || !value
@@ -62,6 +71,17 @@ pub(super) fn invalid_delete_transient_data_shape(
             Some(CicsOperandValue::Storage(_)) => false,
             _ => true,
         }
+        || plan
+            .operands
+            .iter()
+            .find(|operand| operand.name == CicsOperandName::SysId)
+            .is_some_and(|operand| match &operand.value {
+                CicsOperandValue::Literal(value) => {
+                    !matches!(value.len(), 1..=4) || !value.iter().all(u8::is_ascii_alphanumeric)
+                }
+                CicsOperandValue::Storage(_) => false,
+                _ => true,
+            })
         || !outputs.is_subset(&BTreeSet::from([
             CicsOutputName::Resp,
             CicsOutputName::Resp2,

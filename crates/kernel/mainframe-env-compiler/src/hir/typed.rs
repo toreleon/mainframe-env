@@ -207,6 +207,7 @@ pub enum HirCicsOperandName {
     Ridfld,
     Queue,
     Qname,
+    SysId,
     Map,
     Mapset,
     Resource,
@@ -3317,7 +3318,7 @@ mod tests {
 
     #[test]
     fn cics_deleteq_ts_resolves_local_queue_names() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 QUEUE-X PIC X(8) VALUE 'WORKQ'. 01 QNAME-X PIC X(16) VALUE 'LONG-QUEUE'. PROCEDURE DIVISION. EXEC CICS DELETEQ TS QUEUE('TEMPQ') END-EXEC. EXEC CICS DELETEQ TS QUEUE(QUEUE-X) END-EXEC. EXEC CICS DELETEQ TS QNAME('LONG-QUEUE') END-EXEC. EXEC CICS DELETEQ TS QNAME(QNAME-X) END-EXEC. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 QUEUE-X PIC X(8) VALUE 'WORKQ'. 01 QNAME-X PIC X(16) VALUE 'LONG-QUEUE'. PROCEDURE DIVISION. EXEC CICS DELETEQ TS QUEUE('TEMPQ') SYSID('S001') END-EXEC. EXEC CICS DELETEQ TS QUEUE(QUEUE-X) END-EXEC. EXEC CICS DELETEQ TS QNAME('LONG-QUEUE') END-EXEC. EXEC CICS DELETEQ TS QNAME(QNAME-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);
         let hir = analysis
             .hir
@@ -3343,6 +3344,10 @@ mod tests {
                 value: HirCicsValue::Literal("TEMPQ".into()),
             }
         );
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::SysId
+                && operand.value == HirCicsValue::Literal("S001".into())
+        }));
         assert!(matches!(
             &commands[1].operands[0],
             HirCicsNamedOperand {
@@ -3380,8 +3385,8 @@ mod tests {
                 "requires exactly one of QUEUE or QNAME",
             ),
             (
-                "DELETEQ TS QUEUE('TEMPQ') SYSID('R001')",
-                "unready for SYSID",
+                "DELETEQ TS QUEUE('TEMPQ') SYSID('TOOLONG')",
+                "SYSID requires a 1-4 character name",
             ),
         ] {
             let invalid = analyze(&format!(

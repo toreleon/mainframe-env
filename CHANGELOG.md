@@ -457,8 +457,10 @@ All notable changes to mainframe-env are documented here.
   runtime authorizes the selected resource, validates the durable `cics-tsq`
   row before versioned deletion, frees all stored items, and returns exact
   `QIDERR` 44/0 or all-zero-name `INVREQ` 16/0 through ordinary condition
-  handling. Replay and SQLite reopen preserve a single deletion; SYSID,
-  TSMODEL/shared-pool state, locking, and WRITEQ/READQ TS remain pending.
+  handling. An explicit SYSID matching the local system uses the same path;
+  an unknown system returns `SYSIDERR` 53/0 without mutation. Replay and SQLite
+  reopen preserve a single deletion; remote/shared dispatch, TSMODEL state,
+  locking, and WRITEQ/READQ TS remain pending.
 - Added typed task-local `GETMAIN SET` with exactly one FLENGTH or compatibility
   LENGTH over interpreter-owned virtual storage. FLENGTH accepts signed
   fullword input; LENGTH accepts unsigned halfword input and enforces its 65,520

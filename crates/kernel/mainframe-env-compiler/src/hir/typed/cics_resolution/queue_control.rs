@@ -84,10 +84,37 @@ pub(super) fn operands(
         operation,
         HirCicsOperation::DeleteTransientData | HirCicsOperation::DeleteTemporaryStorage
     ) {
-        return Ok(vec![HirCicsNamedOperand {
+        let mut operands = vec![HirCicsNamedOperand {
             name: identity,
             value: queue,
-        }]);
+        }];
+        if let Some(tokens) = clauses.get("SYSID") {
+            let value = cics_value(tokens, semantic)?;
+            let valid = match &value {
+                HirCicsValue::Literal(value) => {
+                    matches!(value.len(), 1..=4)
+                        && value.bytes().all(|byte| byte.is_ascii_alphanumeric())
+                }
+                HirCicsValue::Data(reference) => {
+                    matches!(reference.length, 1..=4)
+                        && matches!(
+                            reference.category,
+                            DataCategory::Alphabetic | DataCategory::Alphanumeric
+                        )
+                }
+                HirCicsValue::Integer(_) | HirCicsValue::LengthOf(_) => false,
+            };
+            if !valid {
+                return Err(ResolutionFailure::Invalid(
+                    "CICS DELETEQ TS SYSID requires a 1-4 character name".into(),
+                ));
+            }
+            operands.push(HirCicsNamedOperand {
+                name: HirCicsOperandName::SysId,
+                value,
+            });
+        }
+        return Ok(operands);
     }
     let HirCicsValue::Data(from) = cics_value(&clauses["FROM"], semantic)? else {
         return Err(ResolutionFailure::Invalid(

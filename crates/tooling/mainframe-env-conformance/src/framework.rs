@@ -2448,7 +2448,7 @@ mod tests {
             HostResult,
         };
 
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 QNAME-X PIC X(16) VALUE 'LONG-QUEUE'. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS DELETEQ TS QUEUE('TEMPQ') RESP(RESP-X) RESP2(RESP2-X) END-EXEC. EXEC CICS DELETEQ TS QNAME(QNAME-X) END-EXEC. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 QNAME-X PIC X(16) VALUE 'LONG-QUEUE'. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS DELETEQ TS QUEUE('TEMPQ') SYSID('S001') RESP(RESP-X) RESP2(RESP2-X) END-EXEC. EXEC CICS DELETEQ TS QNAME(QNAME-X) END-EXEC. STOP RUN.";
         let artifact = compile(source).unwrap();
         let mut machine = ReferenceMachine::from_binary(
             artifact.payload(),
@@ -2469,6 +2469,7 @@ mod tests {
                 mutation: Some(_),
                 ..
             }) if arguments["QUEUE"].bytes() == b"TEMPQ"
+                && arguments["SYSID"].bytes() == b"S001"
                 && arguments["RESP"].bytes() == b"RESP-X"
                 && arguments["RESP2"].bytes() == b"RESP2-X"
         ));

@@ -60,6 +60,38 @@ fn temporary_queue_name(request: &CicsRequest) -> Result<String, HostProblem> {
     Ok(queue)
 }
 
+fn validate_temporary_system(run: &Run, request: &CicsRequest) -> Result<(), HostProblem> {
+    let Some(value) = request.arguments.get("SYSID") else {
+        return Ok(());
+    };
+    if !matches!(
+        value.schema(),
+        "mainframe-env.cics.argument@1"
+            | "mainframe-env.cics.literal@1"
+            | "mainframe-env.cics.storage-value@1"
+    ) {
+        return Err(HostProblem::Malformed);
+    }
+    let system = std::str::from_utf8(value.bytes())
+        .map_err(|_| HostProblem::Malformed)?
+        .trim()
+        .to_ascii_uppercase();
+    if system.is_empty()
+        || system.len() > 4
+        || !system.bytes().all(|byte| byte.is_ascii_alphanumeric())
+    {
+        return Err(HostProblem::Malformed);
+    }
+    if !system.eq_ignore_ascii_case(&run.sysid) {
+        return Err(HostProblem::Condition {
+            name: "SYSIDERR".into(),
+            response: 53,
+            response2: 0,
+        });
+    }
+    Ok(())
+}
+
 fn queue_name(request: &CicsRequest) -> Result<String, HostProblem> {
     let queue = argument_text(request, "QUEUE")
         .or_else(|_| argument_text(request, "TDQUEUE"))?
@@ -243,7 +275,7 @@ fn delete_temporary(
             .arguments
             .iter()
             .any(|(name, value)| match name.as_str() {
-                "QNAME" | "QUEUE" => false,
+                "QNAME" | "QUEUE" | "SYSID" => false,
                 "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
                 "OPTION.NOHANDLE" => {
                     value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
@@ -254,6 +286,7 @@ fn delete_temporary(
         return Err(HostProblem::Malformed);
     }
     let queue = temporary_queue_name(request)?;
+    validate_temporary_system(run, request)?;
     service.authorize(
         run,
         "QUEUE",

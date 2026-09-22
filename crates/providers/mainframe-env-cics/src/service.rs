@@ -9337,6 +9337,85 @@ mod tests {
     }
 
     #[test]
+    fn deleteq_ts_sysid_accepts_only_the_local_system() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        for key in ["LOCALQ", "REMOTEQ"] {
+            store
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: "cics-tsq".into(),
+                        key: key.into(),
+                        version: 1,
+                        payload: encode_transient(&TransientQueue {
+                            records: vec![(format!("seed-{key}"), key.as_bytes().to_vec())],
+                            version: 1,
+                        })
+                        .unwrap(),
+                    },
+                    None,
+                )
+                .unwrap();
+        }
+        let service = service(store.clone());
+        let invocation = invocation_for("deleteq-ts-sysid", BTreeMap::new());
+        let session = SessionId::new("deleteq-ts-sysid", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "S001")
+            .unwrap();
+
+        let local = request(
+            CicsOperation::DeleteTemporaryStorage,
+            BTreeMap::from([
+                ("QUEUE".into(), argument(b"LOCALQ")),
+                ("SYSID".into(), argument(b"S001")),
+            ]),
+            1,
+        );
+        let response = service
+            .invoke(&effect(&invocation.run_unit_id, local.clone(), 1), local)
+            .unwrap();
+        assert_eq!(response.condition, "NORMAL");
+        assert!(
+            store
+                .get_provider_state("cics-tsq", "LOCALQ")
+                .unwrap()
+                .is_none()
+        );
+
+        let mut remote = request(
+            CicsOperation::DeleteTemporaryStorage,
+            BTreeMap::from([
+                ("QUEUE".into(), argument(b"REMOTEQ")),
+                ("SYSID".into(), argument(b"R001")),
+                ("RESP".into(), argument(b"RESP-X")),
+            ]),
+            2,
+        );
+        remote.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: None,
+        };
+        let response = service
+            .invoke(&effect(&invocation.run_unit_id, remote.clone(), 2), remote)
+            .unwrap();
+        assert_eq!(
+            (
+                response.condition.as_str(),
+                response.response,
+                response.response2
+            ),
+            ("SYSIDERR", 53, 0)
+        );
+        assert!(
+            store
+                .get_provider_state("cics-tsq", "REMOTEQ")
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[test]
     fn getmain_returns_initialized_storage_and_exact_capacity_conditions() {
         let service = service(Arc::new(MemoryStore::new(Default::default())));
         let (invocation, _) = registered(&service);
