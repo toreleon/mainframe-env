@@ -248,9 +248,9 @@ returns its source-defined `INVREQ`; DELETE cannot carry KEYLENGTH without
 RIDFLD. READ GTEQ selects the equal or first greater keyed record through a
 request-local cursor that is closed before the command completes. READ GENERIC
 selects only a record sharing the positive KEYLENGTH prefix of RIDFLD; combining
-GENERIC with GTEQ retains first-greater fallback. A non-generic READ GTEQ with
-runtime KEYLENGTH zero selects the first keyed record; zero fails closed for the
-default EQUAL and GENERIC forms.
+GENERIC with GTEQ retains first-greater fallback. READ GTEQ with runtime
+KEYLENGTH zero selects the first keyed record, whether or not GENERIC is also
+present; zero fails closed for default EQUAL and GENERIC without GTEQ.
 Forms whose key or record is a literal, or whose semantics depend on TOKEN,
 remote routing, alternate identities, mass insert, or RLS suspension do not
 publish the typed executable.

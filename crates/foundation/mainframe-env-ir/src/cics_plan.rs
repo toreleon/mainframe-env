@@ -493,7 +493,6 @@ fn validate_operation_shape(
                         && match operand.value {
                             CicsOperandValue::Integer(0) => {
                                 !plan.options.contains(&CicsPlanOption::Gteq)
-                                    || plan.options.contains(&CicsPlanOption::Generic)
                             }
                             CicsOperandValue::Integer(1..=32_767)
                             | CicsOperandValue::Storage(_)
@@ -1651,9 +1650,9 @@ mod tests {
         gteq_read_with_zero_key_length
             .options
             .insert(CicsPlanOption::Generic);
-        assert_eq!(
-            encode_cics_effect_plan(&gteq_read_with_zero_key_length, CicsPlanLimits::default()),
-            Err(CicsPlanCodecProblem::Malformed)
+        assert!(
+            encode_cics_effect_plan(&gteq_read_with_zero_key_length, CicsPlanLimits::default())
+                .is_ok()
         );
         let mut read_with_mismatched_key_length = read.clone();
         read_with_mismatched_key_length

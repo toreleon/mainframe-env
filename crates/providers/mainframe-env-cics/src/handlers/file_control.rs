@@ -661,9 +661,14 @@ fn validate_key_length(
         if operation != CicsOperation::Read {
             return Err(HostProblem::Malformed);
         }
-        let key_length = key_length
-            .filter(|length| *length > 0)
-            .ok_or(HostProblem::Malformed)?;
+        let key_length = key_length.ok_or(HostProblem::Malformed)?;
+        if key_length == 0 {
+            return if gteq {
+                Ok(())
+            } else {
+                Err(HostProblem::Malformed)
+            };
+        }
         if attributes
             .and_then(|attributes| attributes.key_length)
             .is_none_or(|defined| key_length >= defined)
@@ -887,6 +892,14 @@ mod tests {
         assert_eq!(
             validate_key_length(CicsOperation::Read, Some(0), Some(&fixed), false, true),
             Ok(())
+        );
+        assert_eq!(
+            validate_key_length(CicsOperation::Read, Some(0), Some(&fixed), true, true),
+            Ok(())
+        );
+        assert_eq!(
+            validate_key_length(CicsOperation::Read, Some(0), Some(&fixed), true, false),
+            Err(HostProblem::Malformed)
         );
         assert!(matches!(
             validate_key_length(CicsOperation::Read, Some(0), Some(&fixed), false, false),

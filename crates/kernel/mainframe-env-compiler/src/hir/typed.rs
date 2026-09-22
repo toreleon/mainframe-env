@@ -3059,7 +3059,7 @@ mod tests {
     #[test]
     fn cics_read_zero_key_length_requires_gteq() {
         let analysis = analyze(
-            "IDENTIFICATION DIVISION. PROGRAM-ID. READFIRST. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(7). 01 ZERO-X PIC S9(4) COMP VALUE 0. PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(0) GTEQ END-EXEC. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(ZERO-X) GTEQ END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. READFIRST. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(7). 01 ZERO-X PIC S9(4) COMP VALUE 0. PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(0) GTEQ END-EXEC. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(ZERO-X) GTEQ END-EXEC. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(0) GENERIC GTEQ END-EXEC. STOP RUN.",
         );
         let hir = analysis
             .hir
@@ -3076,20 +3076,24 @@ mod tests {
                 _ => None,
             })
             .collect::<Vec<_>>();
-        assert_eq!(commands.len(), 2);
+        assert_eq!(commands.len(), 3);
         assert!(commands[0].operands.iter().any(|operand| {
             operand.name == HirCicsOperandName::KeyLength
                 && operand.value == HirCicsValue::Integer(0)
         }));
-        assert!(commands.iter().all(|command| {
+        assert!(commands[..2].iter().all(|command| {
             command.options.contains(&HirCicsOption::Gteq)
                 && !command.options.contains(&HirCicsOption::Generic)
         }));
+        assert!(commands[2].options.contains(&HirCicsOption::Gteq));
+        assert!(commands[2].options.contains(&HirCicsOption::Generic));
 
-        let invalid = analyze(
+        for source in [
             "IDENTIFICATION DIVISION. PROGRAM-ID. BADFIRST. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(7). PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(0) END-EXEC. STOP RUN.",
-        );
-        assert!(invalid.hir.is_none());
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADFIRST. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(7). PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(0) GENERIC END-EXEC. STOP RUN.",
+        ] {
+            assert!(analyze(source).hir.is_none(), "{source}");
+        }
     }
 
     /// Issue #206: WRITEQ TD accepts the runtime length of its FROM area.

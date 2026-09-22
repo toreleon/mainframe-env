@@ -11684,7 +11684,7 @@ mod tests {
     fn compiled_read_file_gteq_returns_next_keyed_record() {
         let artifact = published_source_fixture(
             "READGTEQ",
-            "IDENTIFICATION DIVISION.\nPROGRAM-ID. READGTEQ.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 KEY-X PIC X(3) VALUE '004'.\n01 ZERO-X PIC S9(4) COMP VALUE 0.\n01 RECORD-X PIC X(7).\n01 FIRST-X PIC X(7).\nPROCEDURE DIVISION.\nEXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) GTEQ END-EXEC.\nEXEC CICS READ FILE('ACCTDAT') INTO(FIRST-X) RIDFLD(KEY-X) KEYLENGTH(ZERO-X) GTEQ END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. READGTEQ.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 KEY-X PIC X(3) VALUE '004'.\n01 ZERO-X PIC S9(4) COMP VALUE 0.\n01 RECORD-X PIC X(7).\n01 FIRST-X PIC X(7).\n01 GENERIC-FIRST-X PIC X(7).\nPROCEDURE DIVISION.\nEXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) GTEQ END-EXEC.\nEXEC CICS READ FILE('ACCTDAT') INTO(FIRST-X) RIDFLD(KEY-X) KEYLENGTH(ZERO-X) GTEQ END-EXEC.\nEXEC CICS READ FILE('ACCTDAT') INTO(GENERIC-FIRST-X) RIDFLD(KEY-X) KEYLENGTH(ZERO-X) GENERIC GTEQ END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
         );
         let artifact_ref = ArtifactRef::new(
             format!("sha256:{:x}", Sha256::digest(artifact.payload())),
@@ -11786,14 +11786,18 @@ mod tests {
         assert_eq!(restored.variable("RECORD-X").unwrap().bytes(), b"005NEXT");
         assert_eq!(restored.variable("FIRST-X").unwrap().bytes(), b"003DATA");
         assert_eq!(
+            restored.variable("GENERIC-FIRST-X").unwrap().bytes(),
+            b"003DATA"
+        );
+        assert_eq!(
             server
                 .cics
-                .terminal_run_trace(&session, &principal, 3)
+                .terminal_run_trace(&session, &principal, 4)
                 .unwrap()
                 .iter()
                 .filter(|entry| entry.operation == CicsOperation::Read)
                 .count(),
-            2
+            3
         );
     }
 
