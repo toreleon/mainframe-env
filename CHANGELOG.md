@@ -480,9 +480,12 @@ All notable changes to mainframe-env are documented here.
   requested durable definition for terminal-fit and field normalization.
   `RECEIVE MAP FROM` accepts an optional literal, halfword-binary, or matching
   `LENGTH OF` value, maps only that supplied prefix, and leaves queued terminal
-  input untouched. SET pointers, TIOAPFX handling, omitted-map AID-only
-  receive, implicit symbolic map storage, paging, device and other terminal
-  controls remain fail-closed.
+  input untouched. Explicit `RECEIVE MAP TERMINAL` selects the originating
+  terminal path, rejects combination with FROM before state mutation, and
+  carries a typed empty option through the compiled selected route. SET
+  pointers, TIOAPFX handling, omitted-map AID-only receive, implicit symbolic
+  map storage, paging, translation, partition, and other device controls remain
+  fail-closed.
 - Updated the locked `rustls` dependency from 0.23.43 to 0.23.45 so the
   release dependency gate is not exposed to `RUSTSEC-2026-0285`.
 - Added a typed `PURGE MESSAGE` route for the runtime's reachable empty

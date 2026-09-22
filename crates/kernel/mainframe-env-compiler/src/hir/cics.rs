@@ -367,5 +367,6 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::NoCheck => CicsPlanOption::NoCheck,
         HirCicsOption::MapOnly => CicsPlanOption::MapOnly,
         HirCicsOption::DataOnly => CicsPlanOption::DataOnly,
+        HirCicsOption::Terminal => CicsPlanOption::Terminal,
     }
 }

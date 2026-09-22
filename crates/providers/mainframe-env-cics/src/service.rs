@@ -14014,6 +14014,15 @@ mod tests {
                     ),
                 ]),
             ),
+            (
+                4,
+                BTreeMap::from([
+                    ("MAPSET".into(), argument(b"INPUTS")),
+                    ("MAP".into(), argument(b"FORM")),
+                    ("FROM".into(), argument(&supplied)),
+                    ("OPTION.TERMINAL".into(), cics_option()),
+                ]),
+            ),
         ] {
             let invalid = request(CicsOperation::ReceiveMap, arguments, sequence);
             assert_eq!(
@@ -14024,18 +14033,22 @@ mod tests {
                 Err(HostProblem::Malformed)
             );
         }
+        let after_invalid = service.lock().unwrap().sessions[session.as_str()].clone();
+        assert_eq!(after_invalid.version, before.version);
+        assert_eq!(after_invalid.input.payload, before.input.payload);
 
         let terminal = request(
             CicsOperation::ReceiveMap,
             BTreeMap::from([
                 ("MAPSET".into(), argument(b"INPUTS")),
                 ("MAP".into(), argument(b"FORM")),
+                ("OPTION.TERMINAL".into(), cics_option()),
             ]),
-            4,
+            5,
         );
         let terminal = service
             .invoke(
-                &effect(&invocation.run_unit_id, terminal.clone(), 4),
+                &effect(&invocation.run_unit_id, terminal.clone(), 5),
                 terminal,
             )
             .unwrap();

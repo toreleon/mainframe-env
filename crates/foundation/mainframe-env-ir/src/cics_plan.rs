@@ -1179,6 +1179,8 @@ mod tests {
         assert_eq!(option_from_tag(25), Ok(CicsPlanOption::Generic));
         assert_eq!(option_tag(CicsPlanOption::Equal), 26);
         assert_eq!(option_from_tag(26), Ok(CicsPlanOption::Equal));
+        assert_eq!(option_tag(CicsPlanOption::Terminal), 27);
+        assert_eq!(option_from_tag(27), Ok(CicsPlanOption::Terminal));
 
         let plan = read_plan();
         let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
@@ -1598,6 +1600,19 @@ mod tests {
             },
         ]);
         assert!(encode_cics_effect_plan(&receive_map_from, CicsPlanLimits::default()).is_ok());
+        let mut receive_map_terminal = receive_map.clone();
+        receive_map_terminal
+            .options
+            .insert(CicsPlanOption::Terminal);
+        assert!(encode_cics_effect_plan(&receive_map_terminal, CicsPlanLimits::default()).is_ok());
+        receive_map_terminal.operands.push(CicsNamedOperand {
+            name: CicsOperandName::From,
+            value: CicsOperandValue::Storage(slot(19, "BMS.TERMINAL-FROM")),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&receive_map_terminal, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
         let mut receive_length_without_from = receive_map.clone();
         receive_length_without_from.operands.push(CicsNamedOperand {
             name: CicsOperandName::Length,

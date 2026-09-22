@@ -226,6 +226,8 @@ pub enum CicsPlanOption {
     DataOnly,
     /// Require a keyed READ to match the complete or generic RIDFLD key.
     Equal,
+    /// Receive mapped input from the terminal that originated the transaction.
+    Terminal,
 }
 
 /// Named result binding written after the host result arrives.

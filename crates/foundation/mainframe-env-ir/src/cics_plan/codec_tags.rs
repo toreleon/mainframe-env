@@ -226,6 +226,7 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u8 {
         CicsPlanOption::DataOnly => 24,
         CicsPlanOption::Generic => 25,
         CicsPlanOption::Equal => 26,
+        CicsPlanOption::Terminal => 27,
     }
 }
 
@@ -258,6 +259,7 @@ pub(super) fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodec
         24 => Ok(CicsPlanOption::DataOnly),
         25 => Ok(CicsPlanOption::Generic),
         26 => Ok(CicsPlanOption::Equal),
+        27 => Ok(CicsPlanOption::Terminal),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

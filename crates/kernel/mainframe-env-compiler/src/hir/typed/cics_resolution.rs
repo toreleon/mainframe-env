@@ -796,7 +796,6 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::WriteTransientData
         | HirCicsOperation::DeleteTransientData
         | HirCicsOperation::Freemain
-        | HirCicsOperation::ReceiveMap
         | HirCicsOperation::Assign
         | HirCicsOperation::PurgeMessage
         | HirCicsOperation::PopHandle
@@ -808,6 +807,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
         HirCicsOperation::Retrieve => &["WAIT", "NOHANDLE"],
         HirCicsOperation::FormatTime => &["DATESEP", "TIMESEP", "NOHANDLE"],
+        HirCicsOperation::ReceiveMap => &["TERMINAL", "NOHANDLE"],
         HirCicsOperation::SendMap => &[
             "DATAONLY", "ERASE", "CURSOR", "FREEKB", "MAPONLY", "NOHANDLE",
         ],
@@ -1099,6 +1099,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "GTEQ" => HirCicsOption::Gteq,
             "GENERIC" => HirCicsOption::Generic,
             "EQUAL" => HirCicsOption::Equal,
+            "TERMINAL" => HirCicsOption::Terminal,
             "FMH" => HirCicsOption::Fmh,
             "PROTECT" => HirCicsOption::Protect,
             "WAIT" => HirCicsOption::Wait,

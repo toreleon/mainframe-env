@@ -282,6 +282,7 @@ pub enum HirCicsOption {
     MapOnly,
     DataOnly,
     Equal,
+    Terminal,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -3589,6 +3590,35 @@ mod tests {
             ));
             assert!(invalid.hir.is_none(), "{command}");
         }
+    }
+
+    #[test]
+    fn cics_receive_map_terminal_selects_originating_terminal_without_from() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. RCVTERM. DATA DIVISION. WORKING-STORAGE SECTION. 01 IN-X PIC X(16). PROCEDURE DIVISION. EXEC CICS RECEIVE MAP('MENU') INTO(IN-X) TERMINAL END-EXEC.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("RECEIVE MAP TERMINAL: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed RECEIVE MAP TERMINAL");
+        assert_eq!(command.operation, HirCicsOperation::ReceiveMap);
+        assert!(command.options.contains(&HirCicsOption::Terminal));
+
+        let invalid = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADTERM. DATA DIVISION. WORKING-STORAGE SECTION. 01 FROM-X PIC X(16). 01 IN-X PIC X(16). PROCEDURE DIVISION. EXEC CICS RECEIVE MAP('MENU') FROM(FROM-X) INTO(IN-X) TERMINAL END-EXEC.",
+        );
+        assert!(invalid.hir.is_none());
+        assert!(invalid.diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .public_message()
+                .contains("TERMINAL does not accept FROM")
+        }));
     }
 
     /// Issues #203 and #206: CardDemo SEND display controls and bounded lengths stay typed.

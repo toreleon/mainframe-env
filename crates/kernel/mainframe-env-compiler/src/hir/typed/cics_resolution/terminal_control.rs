@@ -38,6 +38,14 @@ pub(super) fn validate_constraints(
             "CICS RECEIVE MAP LENGTH requires an explicit FROM data area".into(),
         ));
     }
+    if operation == HirCicsOperation::ReceiveMap
+        && options.iter().any(|option| option == "TERMINAL")
+        && clauses.contains_key("FROM")
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS RECEIVE MAP TERMINAL does not accept FROM".into(),
+        ));
+    }
     if operation == HirCicsOperation::SendMap
         && options.iter().any(|option| option == "DATAONLY")
         && options.iter().any(|option| option == "MAPONLY")

@@ -97,6 +97,10 @@ pub(super) fn invalid_shape(
                     || !inputs.contains(&CicsOperandName::From)
                     || plan.options.contains(&CicsPlanOption::MapOnly)
             }
+            CicsPlanOption::Terminal => {
+                plan.operation != CicsPlanOperation::ReceiveMap
+                    || inputs.contains(&CicsOperandName::From)
+            }
             _ => true,
         })
 }

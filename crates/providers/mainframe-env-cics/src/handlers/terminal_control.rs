@@ -469,16 +469,19 @@ fn validate_receive_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "MAP",
         "MAPSET",
         "OPTION.NOHANDLE",
+        "OPTION.TERMINAL",
         "RESP",
         "RESP2",
     ];
     if request.arguments.contains_key("LENGTH") && !request.arguments.contains_key("FROM")
+        || request.arguments.contains_key("OPTION.TERMINAL")
+            && request.arguments.contains_key("FROM")
         || request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
         || request.arguments.iter().any(|(name, value)| {
             !ALLOWED.contains(&name.as_str())
                 || match name.as_str() {
                     "LENGTH" => value.schema() != "mainframe-env.cics.decimal@1",
-                    "OPTION.NOHANDLE" => {
+                    "OPTION.NOHANDLE" | "OPTION.TERMINAL" => {
                         value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
                     }
                     "INTO" | "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
