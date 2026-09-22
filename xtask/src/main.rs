@@ -8172,6 +8172,7 @@ fn check_schemas(root: &Path) -> TaskResult {
         &json(&spi_fepi_identity_catalog)?,
         &spi_fepi_identity_catalog,
     )?;
+    check_licensed_environment_requirements(root)?;
     let inventory_path = root.join("conformance/0.6/inventory/dataset-programming-surface.json");
     let schema_path = root.join("conformance/0.6/schemas/dataset-programming-surface.schema.json");
     validate_schema_instance(
@@ -8393,6 +8394,57 @@ fn check_schemas(root: &Path) -> TaskResult {
         &json(&surface_audit)?,
         &surface_audit,
     )
+}
+
+fn check_licensed_environment_requirements(root: &Path) -> TaskResult {
+    let environment_requirements = root.join("conformance/0.17/environment/requirements.json");
+    let environment_requirements_schema =
+        root.join("conformance/0.17/schemas/licensed-environment-requirements.schema.json");
+    let environment_requirements_value = json(&environment_requirements)?;
+    validate_schema_instance(
+        &json(&environment_requirements_schema)?,
+        &environment_requirements_value,
+        &environment_requirements,
+    )?;
+    let slots = array(
+        &environment_requirements_value,
+        "slots",
+        &environment_requirements,
+    )?;
+    unique_rows(slots, "slot_id", &environment_requirements)?;
+    require(
+        slots.iter().all(|slot| {
+            slot["environment_status"] == "pending"
+                && slot["differential_status"] == "pending"
+                && slot["recorded_pending"]["numerator"] == 0
+        }),
+        "CER-1701 environment slots must remain pending with zero licensed credit",
+    )?;
+    for (slot_id, denominator) in [
+        ("cobol", 153),
+        ("racf-saf", 48),
+        ("dataset-vsam-ams", 36),
+        ("jes2", 16),
+    ] {
+        require(
+            slots.iter().any(|slot| {
+                slot["slot_id"] == slot_id && slot["recorded_pending"]["denominator"] == denominator
+            }),
+            &format!("CER-1701 changed the historical {slot_id} pending denominator"),
+        )?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod licensed_environment_schema_tests {
+    use super::*;
+
+    #[test]
+    fn cer_1701_environment_requirements_are_schema_valid_and_pending() {
+        let root = repository_root().expect("repository root");
+        check_licensed_environment_requirements(&root).expect("CER-1701 environment authority");
+    }
 }
 
 fn compile_draft_2020_12_schema(schema: &Value, path: &Path) -> TaskResult<jsonschema::Validator> {
