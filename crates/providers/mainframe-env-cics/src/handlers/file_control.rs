@@ -245,7 +245,10 @@ fn file(
     let attributes = if (length.is_some() || key_length.is_some())
         && matches!(
             request.operation,
-            CicsOperation::Read | CicsOperation::Write | CicsOperation::Rewrite
+            CicsOperation::Read
+                | CicsOperation::Write
+                | CicsOperation::Rewrite
+                | CicsOperation::Delete
         ) {
         match service.nested(
             run,
@@ -578,8 +581,10 @@ fn validate_key_length(
     key_length: Option<u32>,
     attributes: Option<&mainframe_env_host_api::DatasetAttributes>,
 ) -> Result<(), HostProblem> {
-    if matches!(operation, CicsOperation::Read | CicsOperation::Write)
-        && let Some(key_length) = key_length
+    if matches!(
+        operation,
+        CicsOperation::Read | CicsOperation::Write | CicsOperation::Delete
+    ) && let Some(key_length) = key_length
         && attributes.and_then(|attributes| attributes.key_length) != Some(key_length)
     {
         return Err(HostProblem::Condition {
@@ -751,6 +756,14 @@ mod tests {
         );
         assert!(matches!(
             validate_key_length(CicsOperation::Write, Some(2), Some(&fixed)),
+            Err(HostProblem::Condition {
+                response: 16,
+                response2: 26,
+                ..
+            })
+        ));
+        assert!(matches!(
+            validate_key_length(CicsOperation::Delete, Some(2), Some(&fixed)),
             Err(HostProblem::Condition {
                 response: 16,
                 response2: 26,

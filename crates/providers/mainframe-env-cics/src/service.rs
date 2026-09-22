@@ -14436,6 +14436,27 @@ mod tests {
             .invoke(&effect(&invocation.run_unit_id, read.clone(), 2), read)
             .unwrap();
         assert_eq!(response.payload.bytes(), b"ABC12");
+
+        let mismatched_delete = request(
+            CicsOperation::Delete,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"TESTFILE")),
+                ("RIDFLD".into(), argument(b"ABC")),
+                ("KEYLENGTH".into(), cics_decimal(2)),
+            ]),
+            3,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, mismatched_delete.clone(), 3),
+                mismatched_delete,
+            ),
+            Err(HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 26,
+            })
+        );
     }
 
     #[test]
