@@ -1541,6 +1541,30 @@ mod tests {
             encode_cics_effect_plan(&literal_write_record, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
+        let mut write_with_length = write.clone();
+        write_with_length.operands.push(CicsNamedOperand {
+            name: CicsOperandName::Length,
+            value: CicsOperandValue::Integer(4),
+        });
+        assert!(encode_cics_effect_plan(&write_with_length, CicsPlanLimits::default()).is_ok());
+        let mut delete_with_length = delete.clone();
+        delete_with_length.operands.push(CicsNamedOperand {
+            name: CicsOperandName::Length,
+            value: CicsOperandValue::Integer(4),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&delete_with_length, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut mismatched_write_length = write.clone();
+        mismatched_write_length.operands.push(CicsNamedOperand {
+            name: CicsOperandName::Length,
+            value: CicsOperandValue::LengthOf(slot(16, "OTHER.RECORD")),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&mismatched_write_length, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
         let mut literal_transient_record = write_transient.clone();
         literal_transient_record.operands[1].value = CicsOperandValue::Literal(b"DATA".to_vec());
         assert_eq!(
@@ -1611,6 +1635,7 @@ mod tests {
             delete,
             current_record_delete,
             write,
+            write_with_length,
             write_transient,
             receive_map,
             send_map,

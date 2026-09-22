@@ -369,9 +369,10 @@ All notable changes to mainframe-env are documented here.
   typed file-mutation plans. RIDFLD and WRITE FROM are resolved data-area
   inputs, FILE/DATASET remains one exact resource alias, and both operations
   carry typed mutation identity. DELETE may instead consume the latest record
-  held by `READ UPDATE`; TOKEN deletes, remote and length forms, generic and
-  alternate record identifiers, mass insert, and RLS wait controls remain
-  deferred.
+  held by `READ UPDATE`. WRITE LENGTH accepts a bounded literal,
+  halfword-binary value, or matching `LENGTH OF` and persists only that prefix;
+  TOKEN deletes, remote forms, generic and alternate record identifiers, mass
+  insert, and RLS wait controls remain deferred.
 - Migrated the local `WRITEQ TD` compatibility subset to a typed queue-write
   plan. QUEUE is a validated 1–4 character literal or field, FROM is a resolved
   data area, and optional numeric LENGTH or `LENGTH OF` selects the persisted

@@ -2,7 +2,7 @@ use super::super::{
     HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsValue, Resolution,
     ResolutionFailure, require_writable,
 };
-use super::{Clauses, cics_value, complete_data_reference, numeric_literal};
+use super::{Clauses, cics_integer_value, cics_value, complete_data_reference, numeric_literal};
 use crate::{DataCategory, SemanticModel};
 
 pub(super) fn validate_constraints(
@@ -100,18 +100,65 @@ pub(super) fn resolve(
         ("KEYLENGTH", HirCicsOperandName::KeyLength),
     ] {
         if let Some(tokens) = clauses.get(name) {
-            if matches!(tokens.as_slice(), [token] if numeric_literal(token).is_some()) {
-                return Err(ResolutionFailure::Invalid(format!(
-                    "CICS typed lowering is unready for {name} numeric literal"
-                )));
+            let value = if operation == HirCicsOperation::Write && name == "LENGTH" {
+                write_length_value(tokens, semantic)?
+            } else {
+                if matches!(tokens.as_slice(), [token] if numeric_literal(token).is_some()) {
+                    return Err(ResolutionFailure::Invalid(format!(
+                        "CICS typed lowering is unready for {name} numeric literal"
+                    )));
+                }
+                numeric_length_value(tokens, semantic)?
+            };
+            if operation == HirCicsOperation::Write
+                && name == "LENGTH"
+                && let HirCicsValue::LengthOf(length) = &value
+                && !operands.iter().any(|operand| {
+                    operand.name == HirCicsOperandName::From
+                        && matches!(&operand.value, HirCicsValue::Data(from) if from == length)
+                })
+            {
+                return Err(ResolutionFailure::Invalid(
+                    "CICS Write LENGTH OF must name the FROM data area".into(),
+                ));
             }
             operands.push(HirCicsNamedOperand {
                 name: identity,
-                value: numeric_length_value(tokens, semantic)?,
+                value,
             });
         }
     }
     Ok(operands)
+}
+
+fn write_length_value(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsValue> {
+    let value = if tokens
+        .first()
+        .is_some_and(|token| token.eq_ignore_ascii_case("LENGTH"))
+        && tokens
+            .get(1)
+            .is_some_and(|token| token.eq_ignore_ascii_case("OF"))
+    {
+        HirCicsValue::LengthOf(complete_data_reference(&tokens[2..], semantic)?)
+    } else {
+        cics_integer_value(tokens, semantic)?
+    };
+    match &value {
+        HirCicsValue::Data(reference)
+            if reference.category != DataCategory::Binary || reference.length != 2 =>
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS Write LENGTH requires a halfword binary data item".into(),
+            ));
+        }
+        HirCicsValue::Integer(value) if !(0..=32_767).contains(value) => {
+            return Err(ResolutionFailure::Invalid(
+                "CICS Write LENGTH literal must be between 0 and 32767".into(),
+            ));
+        }
+        _ => {}
+    }
+    Ok(value)
 }
 
 fn numeric_length_value(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsValue> {

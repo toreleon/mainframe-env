@@ -2708,10 +2708,6 @@ mod tests {
                 "DELETE FILE('ACCTDAT') RIDFLD(KEY-X) TOKEN(KEY-X)",
                 "unready for TOKEN",
             ),
-            (
-                "WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) LENGTH(4)",
-                "unready for LENGTH",
-            ),
         ] {
             let analysis = analyze(&format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. BADMUT. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC."
@@ -2735,6 +2731,55 @@ mod tests {
                 "IDENTIFICATION DIVISION. PROGRAM-ID. BADMUT. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC."
             ));
             assert!(analysis.hir.is_none(), "{command}");
+        }
+    }
+
+    #[test]
+    fn cics_write_file_resolves_bounded_record_lengths() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. WRITELEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3) VALUE '003'. 01 RECORD-X PIC X(8) VALUE '003ABCDE'. 01 LENGTH-X PIC S9(4) COMP VALUE 5. PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) LENGTH(5) END-EXEC. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) LENGTH(LENGTH-X) END-EXEC. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) LENGTH(LENGTH OF RECORD-X) END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("WRITE FILE LENGTH: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command))
+                    if command.operation == HirCicsOperation::Write =>
+                {
+                    Some(command)
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 3);
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length && operand.value == HirCicsValue::Integer(5)
+        }));
+        assert!(commands[1].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference) if reference.qualified_name == "LENGTH-X"
+                )
+        }));
+        assert!(commands[2].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(
+                    operand.value,
+                    HirCicsValue::LengthOf(ref reference)
+                        if reference.qualified_name == "RECORD-X"
+                )
+        }));
+
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADWLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(8). PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) LENGTH(32768) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADWLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(8). 01 LENGTH-X PIC S9(8) COMP. PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) LENGTH(LENGTH-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADWLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(8). 01 OTHER-X PIC X(4). PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) LENGTH(LENGTH OF OTHER-X) END-EXEC. STOP RUN.",
+        ] {
+            assert!(analyze(source).hir.is_none(), "{source}");
         }
     }
 
