@@ -4,6 +4,7 @@
 
 mod abi;
 mod catalog;
+mod generated_statement_catalog;
 mod retention;
 mod service;
 
@@ -13,6 +14,10 @@ pub use catalog::{
     DB2_APPLICATION_CATALOG_CONTRACT, Db2CatalogGeneration, Db2ColumnDefinition, Db2ExtractField,
     Db2ExtractLayout, Db2ForeignKeyDefinition, Db2ResultEncoding, Db2SeedRow, Db2TableDefinition,
     decode_table_definitions_bounded,
+};
+pub use generated_statement_catalog::{
+    DB2_OFFICIAL_STATEMENT_CATALOG_SHA256, DB2_STATEMENT_DESCRIPTORS, Db2StatementDescriptor,
+    Db2StatementId, Db2StatementUnit, db2_statement_descriptor, db2_statement_descriptor_by_row,
 };
 pub use retention::{
     CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,

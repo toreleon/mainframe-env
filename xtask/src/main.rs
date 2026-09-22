@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+mod db2_statement_catalog;
 mod docs;
 mod evidence_seal;
 mod jcl_catalog;
@@ -171,6 +172,7 @@ enum XtaskCommand {
     Coverage(CheckArgs),
     ApplicationPackages(CheckArgs),
     Db2Catalog(CheckArgs),
+    Db2StatementCatalog(CheckArgs),
     BatchControllers(CheckArgs),
     AbiLibraries(CheckArgs),
     ProgramRegistry(CheckArgs),
@@ -322,6 +324,15 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             check_application_packages(root)
         ),
         XtaskCommand::Db2Catalog(args) => checked!("db2-catalog", args, check_db2_catalog(root)),
+        XtaskCommand::Db2StatementCatalog(args) => checked!(
+            "db2-statement-catalog",
+            args,
+            if args.check {
+                db2_statement_catalog::check(root)
+            } else {
+                db2_statement_catalog::generate(root)
+            }
+        ),
         XtaskCommand::BatchControllers(args) => {
             checked!("batch-controllers", args, check_batch_controllers(root))
         }
@@ -634,6 +645,7 @@ fn check_conformance(root: &Path) -> TaskResult {
     check_semantic_identities(root)?;
     check_application_packages(root)?;
     check_db2_catalog(root)?;
+    db2_statement_catalog::check(root)?;
     check_batch_controllers(root)?;
     check_host_abi_libraries(root)?;
     check_program_registry(root)?;

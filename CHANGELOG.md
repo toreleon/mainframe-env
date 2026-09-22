@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added an exhaustive generated Db2 13 statement catalog with typed identities
+  and source locators for all 158 SQL headings and 16 SQL PL rows. The frozen
+  0.2 catalog remains the single source, while the new generator and focused
+  tests fail closed on denominator, identity, locator, or generated-output
+  drift without granting semantic coverage.
+
 - Added typed local CICS START `TERMID` through append-only operand tag 38.
   The provider resolves active virtual terminals at command time, returns exact
   `TERMIDERR` 11/0 for an unknown identifier, persists terminal association,

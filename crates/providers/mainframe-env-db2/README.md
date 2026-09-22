@@ -30,4 +30,5 @@ against the installed catalog. It contains no application table or host-variable
 dispatch. Non-goals are the complete Db2 13 SQL language, optimizer, utility,
 package/plan, and distributed portfolio assigned to later versions. Verify with
 `cargo test -p mainframe-env-db2 --locked`, `cargo xtask db2-catalog --check`,
-and the pinned CardDemo Db2 and authorization gates.
+`cargo xtask db2-statement-catalog --check`, and the pinned CardDemo Db2 and
+authorization gates.
