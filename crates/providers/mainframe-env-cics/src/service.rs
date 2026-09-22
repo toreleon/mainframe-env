@@ -14275,6 +14275,121 @@ mod tests {
     }
 
     #[test]
+    fn send_map_dataonly_uses_supplied_attributes_and_preserves_zero_attribute() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, session) = registered(&service);
+        service
+            .register_map(BmsMapDefinition {
+                mapset: "DATAMAP".into(),
+                map: "UPDATE".into(),
+                line: 1,
+                column: 1,
+                rows: 24,
+                columns: 80,
+                fields: vec![BmsFieldDefinition {
+                    name: "VALUE".into(),
+                    row: 1,
+                    column: 1,
+                    length: 1,
+                    initial: b"Z".to_vec(),
+                    color: None,
+                    highlight: None,
+                    protected: true,
+                    secret: false,
+                    fset: false,
+                    justify_right: false,
+                    fill_zero: false,
+                    output_offset: Some(0),
+                    attribute_offset: Some(1),
+                }],
+            })
+            .unwrap();
+        let send = |sequence, symbolic: &[u8]| {
+            request(
+                CicsOperation::SendMap,
+                BTreeMap::from([
+                    ("MAPSET".into(), argument(b"DATAMAP")),
+                    ("MAP".into(), argument(b"UPDATE")),
+                    ("FROM".into(), argument(symbolic)),
+                    ("OPTION.DATAONLY".into(), cics_option()),
+                ]),
+                sequence,
+            )
+        };
+        let first = send(1, &[b'A', 0xc1]);
+        let response = service
+            .invoke(&effect(&invocation.run_unit_id, first.clone(), 1), first)
+            .unwrap();
+        assert!(response.payload.bytes().contains(&b'A'));
+        {
+            let state = service.lock().unwrap();
+            let current = &state.sessions[session.as_str()];
+            assert_eq!(current.field_values["VALUE"], b"A");
+            assert!(!current.field_protection["VALUE"]);
+            assert!(current.field_modified["VALUE"]);
+            assert!(!current.screen.contains(&b'Z'));
+        }
+
+        let preserve = send(2, &[b'B', 0]);
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, preserve.clone(), 2),
+                preserve,
+            )
+            .unwrap();
+        {
+            let state = service.lock().unwrap();
+            let current = &state.sessions[session.as_str()];
+            assert_eq!(current.field_values["VALUE"], b"B");
+            assert!(!current.field_protection["VALUE"]);
+            assert!(current.field_modified["VALUE"]);
+        }
+
+        let invalid_attribute = send(3, &[b'C', 0x02]);
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, invalid_attribute.clone(), 3),
+                invalid_attribute,
+            ),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            service.lock().unwrap().sessions[session.as_str()].field_values["VALUE"],
+            b"B"
+        );
+
+        for (sequence, arguments) in [
+            (
+                4,
+                BTreeMap::from([
+                    ("MAPSET".into(), argument(b"DATAMAP")),
+                    ("MAP".into(), argument(b"UPDATE")),
+                    ("OPTION.DATAONLY".into(), cics_option()),
+                ]),
+            ),
+            (
+                5,
+                BTreeMap::from([
+                    ("MAPSET".into(), argument(b"DATAMAP")),
+                    ("MAP".into(), argument(b"UPDATE")),
+                    ("FROM".into(), argument(&[b'D', 0xc0])),
+                    ("OPTION.DATAONLY".into(), cics_option()),
+                    ("OPTION.MAPONLY".into(), cics_option()),
+                ]),
+            ),
+        ] {
+            let invalid = request(CicsOperation::SendMap, arguments, sequence);
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, invalid.clone(), sequence),
+                    invalid,
+                ),
+                Err(HostProblem::Malformed)
+            );
+        }
+    }
+
+    #[test]
     fn write_length_persists_only_the_selected_record_prefix() {
         let persisted = Arc::new(Mutex::new(None));
         let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));

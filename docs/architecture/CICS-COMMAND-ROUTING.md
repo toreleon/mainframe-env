@@ -248,14 +248,16 @@ requires MAP, defaults MAPSET to MAP, and optionally captures FROM. With an
 explicit FROM, LENGTH accepts a bounded literal, halfword-binary value, or
 matching `LENGTH OF` and selects that exact prefix before symbolic-map
 formatting. MAPONLY rejects FROM/LENGTH and selects only the initialized map
-defaults. `SEND TEXT` requires FROM and accepts the same three LENGTH forms; an
+defaults. DATAONLY requires explicit symbolic FROM bytes, ignores map defaults,
+applies supplied field attributes, and preserves an existing attribute for
+`X'00'`. `SEND TEXT` requires FROM and accepts the same three LENGTH forms; an
 out-of-range runtime value returns LENGERR 22/0 without changing the screen.
 `RECEIVE MAP` requires MAP, applies the same MAPSET default, and optionally
 writes INTO. The provider validates the canonical request shape and uses the
 requested durable map definition for
 terminal-fit validation and input-field normalization. SET pointers,
 omitted-map AID-only receive, implicit symbolic map storage, RECEIVE length,
-DATAONLY, paging, device and other terminal controls remain explicit compiler
+paging, device and other terminal controls remain explicit compiler
 rejections.
 `CURSOR` and `FREEKB` are admitted and forwarded but are not yet modeled by the
 terminal provider (`#210`). `ERASE` coincides with the provider's existing

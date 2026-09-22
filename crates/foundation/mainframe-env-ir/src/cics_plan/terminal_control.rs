@@ -84,6 +84,12 @@ pub(super) fn invalid_shape(
                 plan.operation != CicsPlanOperation::SendMap
                     || inputs.contains(&CicsOperandName::From)
                     || inputs.contains(&CicsOperandName::Length)
+                    || plan.options.contains(&CicsPlanOption::DataOnly)
+            }
+            CicsPlanOption::DataOnly => {
+                plan.operation != CicsPlanOperation::SendMap
+                    || !inputs.contains(&CicsOperandName::From)
+                    || plan.options.contains(&CicsPlanOption::MapOnly)
             }
             _ => true,
         })

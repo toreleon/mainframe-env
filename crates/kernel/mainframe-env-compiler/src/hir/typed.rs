@@ -279,6 +279,7 @@ pub enum HirCicsOption {
     Until,
     NoCheck,
     MapOnly,
+    DataOnly,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -3157,6 +3158,52 @@ mod tests {
                     .public_message()
                     .contains("MAPONLY does not accept FROM or LENGTH")
             }));
+        }
+    }
+
+    #[test]
+    fn cics_send_map_dataonly_requires_application_data() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. SENDDATA. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(2). PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') MAPSET('MAIN') FROM(DATA-X) LENGTH(LENGTH OF DATA-X) DATAONLY END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("SEND MAP DATAONLY: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed SEND MAP DATAONLY");
+        assert!(command.options.contains(&HirCicsOption::DataOnly));
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::From
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference) if reference.qualified_name == "DATA-X"
+                )
+        }));
+
+        for (source, expected) in [
+            (
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADDATA. PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') DATAONLY END-EXEC. STOP RUN.",
+                "DATAONLY requires an explicit FROM data area",
+            ),
+            (
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADDATA. PROCEDURE DIVISION. EXEC CICS SEND MAP('MENU') DATAONLY MAPONLY END-EXEC. STOP RUN.",
+                "DATAONLY and MAPONLY are mutually exclusive",
+            ),
+        ] {
+            let analysis = analyze(source);
+            assert!(analysis.hir.is_none(), "{source}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| { diagnostic.public_message().contains(expected) })
+            );
         }
     }
 

@@ -11609,6 +11609,91 @@ mod tests {
     }
 
     #[test]
+    fn compiled_send_map_dataonly_uses_symbolic_data_and_attributes() {
+        let artifact = published_source_fixture(
+            "SENDDAT",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. SENDDAT.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 OUTPUT-X.\n  05 VALUE-X PIC X VALUE 'A'.\n  05 ATTR-X PIC X VALUE X'C1'.\nPROCEDURE DIVISION.\nEXEC CICS SEND MAP('UPDATE') MAPSET('DATAMAP') FROM(OUTPUT-X) DATAONLY END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "SENDDAT".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("SU00".into(), "SENDDAT".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "DATAMAP".into(),
+                    map: "UPDATE".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: vec![mainframe_env_cics::BmsFieldDefinition {
+                        name: "VALUE".into(),
+                        row: 1,
+                        column: 1,
+                        length: 1,
+                        initial: b"Z".to_vec(),
+                        color: None,
+                        highlight: None,
+                        protected: true,
+                        secret: false,
+                        fset: false,
+                        justify_right: false,
+                        fill_zero: false,
+                        output_offset: Some(0),
+                        attribute_offset: Some(1),
+                    }],
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("send-map-dataonly-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "SU00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation,
+                &session,
+                "SU00",
+                24,
+                80,
+                "send-map-dataonly-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "SENDDAT", 2)
+            .unwrap();
+        let wire = server.cics.tn3270_screen(&session, &principal, 3).unwrap();
+        assert!(wire.windows(3).any(|bytes| bytes == [0x1d, 0x00, b'A']));
+        assert!(!wire.contains(&b'Z'));
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 3)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::SendMap)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
     fn compiled_send_text_length_selects_the_bounded_from_prefix() {
         let artifact = published_source_fixture(
             "SENDTXT",

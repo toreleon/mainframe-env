@@ -220,6 +220,8 @@ pub enum CicsPlanOption {
     NoCheck,
     /// Send only the initialized default data defined by a BMS map.
     MapOnly,
+    /// Send only application data and its supplied BMS field attributes.
+    DataOnly,
 }
 
 /// Named result binding written after the host result arrives.

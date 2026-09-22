@@ -205,5 +205,6 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::Until => "UNTIL",
         CicsPlanOption::NoCheck => "NOCHECK",
         CicsPlanOption::MapOnly => "MAPONLY",
+        CicsPlanOption::DataOnly => "DATAONLY",
     }
 }

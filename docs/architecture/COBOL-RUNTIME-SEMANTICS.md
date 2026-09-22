@@ -74,13 +74,15 @@ contract explicitly permits it.
   length forms. A literal, halfword-binary value, or matching `LENGTH OF`
   selects the formatted or text prefix, and an out-of-range SEND TEXT value
   returns LENGERR 22/0 before mutation. `SEND MAP MAPONLY` excludes FROM and
-  LENGTH and writes only initialized defaults from the selected map. `RECEIVE
-  MAP` optionally binds a writable INTO area. The provider validates the exact
-  SEND request shape, checks the requested durable map definition, makes
+  LENGTH and writes only initialized defaults from the selected map. `SEND MAP
+  DATAONLY` requires explicit symbolic FROM data, ignores map defaults, and
+  applies each supplied field attribute while preserving the current attribute
+  for `X'00'`. `RECEIVE MAP` optionally binds a writable INTO area. The provider
+  validates the exact SEND request shape, checks the requested durable map definition, makes
   a successfully sent map current, and normalizes received named fields against
   that exact definition. The selected typed route reports EIBFN `1802`, `1804`,
   or `1806` respectively. SET pointers, omitted-MAP/AID-only receive, implicit
-  symbolic map storage, RECEIVE length, DATAONLY, paging, device and remaining
+  symbolic map storage, RECEIVE length, paging, device and remaining
   terminal-control options are rejected before executable publication.
 - Typed `PURGE MESSAGE` has no operands beyond the common condition controls.
   The runtime exposes no full-BMS ACCUM/page-building path, so local execution

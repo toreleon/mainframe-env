@@ -806,7 +806,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
         HirCicsOperation::Retrieve => &["WAIT", "NOHANDLE"],
         HirCicsOperation::FormatTime => &["DATESEP", "TIMESEP", "NOHANDLE"],
-        HirCicsOperation::SendMap => &["ERASE", "CURSOR", "FREEKB", "MAPONLY", "NOHANDLE"],
+        HirCicsOperation::SendMap => &[
+            "DATAONLY", "ERASE", "CURSOR", "FREEKB", "MAPONLY", "NOHANDLE",
+        ],
         HirCicsOperation::SendText => &["ERASE", "FREEKB", "NOHANDLE"],
         HirCicsOperation::StartBrowse => &["GTEQ", "NOHANDLE"],
         HirCicsOperation::Deq => &["UOW", "TASK", "NOHANDLE"],
@@ -1100,6 +1102,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "UNTIL" => HirCicsOption::Until,
             "NOCHECK" => HirCicsOption::NoCheck,
             "MAPONLY" => HirCicsOption::MapOnly,
+            "DATAONLY" => HirCicsOption::DataOnly,
             _ => unreachable!("allowed CICS option"),
         })
         .collect::<BTreeSet<_>>();

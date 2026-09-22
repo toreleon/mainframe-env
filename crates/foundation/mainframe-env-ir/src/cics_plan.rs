@@ -1063,6 +1063,7 @@ mod tests {
                 CicsPlanOption::TimeSep,
                 CicsPlanOption::Wait,
                 CicsPlanOption::MapOnly,
+                CicsPlanOption::DataOnly,
             ] {
                 let mut invalid = base.clone();
                 invalid.options.insert(option);
@@ -1124,6 +1125,8 @@ mod tests {
         assert_eq!(option_from_tag(22), Ok(CicsPlanOption::NoCheck));
         assert_eq!(option_tag(CicsPlanOption::MapOnly), 23);
         assert_eq!(option_from_tag(23), Ok(CicsPlanOption::MapOnly));
+        assert_eq!(option_tag(CicsPlanOption::DataOnly), 24);
+        assert_eq!(option_from_tag(24), Ok(CicsPlanOption::DataOnly));
 
         let plan = read_plan();
         let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
@@ -1570,6 +1573,17 @@ mod tests {
             encode_cics_effect_plan(&map_only_with_from, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
+        let mut send_map_data_only = send_map.clone();
+        send_map_data_only.options.insert(CicsPlanOption::DataOnly);
+        assert!(encode_cics_effect_plan(&send_map_data_only, CicsPlanLimits::default()).is_ok());
+        let mut data_only_without_from = send_map_data_only.clone();
+        data_only_without_from
+            .operands
+            .retain(|operand| operand.name != CicsOperandName::From);
+        assert_eq!(
+            encode_cics_effect_plan(&data_only_without_from, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
         let mut missing_browse_key_output = read_next.clone();
         missing_browse_key_output
             .outputs
@@ -1601,6 +1615,7 @@ mod tests {
             receive_map,
             send_map,
             send_map_map_only,
+            send_map_data_only,
             send_text,
             assign,
             purge_message,

@@ -31,11 +31,27 @@ pub(super) fn validate_constraints(
         ));
     }
     if operation == HirCicsOperation::SendMap
+        && options.iter().any(|option| option == "DATAONLY")
+        && options.iter().any(|option| option == "MAPONLY")
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS SEND MAP DATAONLY and MAPONLY are mutually exclusive".into(),
+        ));
+    }
+    if operation == HirCicsOperation::SendMap
         && options.iter().any(|option| option == "MAPONLY")
         && (clauses.contains_key("FROM") || clauses.contains_key("LENGTH"))
     {
         return Err(ResolutionFailure::Invalid(
             "CICS SEND MAP MAPONLY does not accept FROM or LENGTH".into(),
+        ));
+    }
+    if operation == HirCicsOperation::SendMap
+        && options.iter().any(|option| option == "DATAONLY")
+        && !clauses.contains_key("FROM")
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS SEND MAP DATAONLY requires an explicit FROM data area".into(),
         ));
     }
     Ok(())

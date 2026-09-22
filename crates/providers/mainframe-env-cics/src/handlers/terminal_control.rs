@@ -1,7 +1,7 @@
 use super::super::{
-    CicsService, Run, argument_bytes, argument_optional, argument_text, bounded, decimal_payload,
-    decode_map_payload, encode_symbolic_map_output, field, normalize_bms_input,
-    symbolic_map_modified, symbolic_map_protection, symbolic_map_values,
+    BmsMapDefinition, CicsService, Run, Session, argument_bytes, argument_optional, argument_text,
+    bounded, decimal_payload, decode_map_payload, encode_symbolic_map_output, field,
+    normalize_bms_input, symbolic_map_modified, symbolic_map_protection, symbolic_map_values,
 };
 use super::bms_map::map_fits_terminal;
 use mainframe_env_host_api::{
@@ -14,6 +14,11 @@ pub(in crate::service) struct TerminalInput {
     pub(in crate::service) payload: Option<Vec<u8>>,
     pub(in crate::service) message_length: u32,
     pub(in crate::service) terminal_id: Option<String>,
+}
+
+struct DataOnlyAttributes {
+    protection: BTreeMap<String, bool>,
+    modified: BTreeMap<String, bool>,
 }
 
 impl TerminalInput {
@@ -144,6 +149,11 @@ fn send(
         payload.truncate(length);
     }
     let mut state = service.lock()?;
+    let current = state
+        .sessions
+        .get(&run.session)
+        .cloned()
+        .ok_or(HostProblem::NotFound)?;
     let mut field_protection = None;
     let mut field_modified = None;
     let mut field_values = None;
@@ -153,9 +163,15 @@ fn send(
             .maps
             .get(&(mapset.clone(), map.clone()))
             .ok_or(HostProblem::NotFound)?;
-        field_protection = Some(symbolic_map_protection(definition, &payload));
-        field_modified = Some(symbolic_map_modified(definition, &payload));
-        if payload.is_empty() {
+        if request.arguments.contains_key("OPTION.DATAONLY") {
+            let attributes = data_only_attributes(definition, &payload, &current, mapset, map)?;
+            field_protection = Some(attributes.protection);
+            field_modified = Some(attributes.modified);
+            field_values = Some(symbolic_map_values(definition, &payload)?);
+            payload = encode_symbolic_map_output(definition, &payload)?;
+        } else if payload.is_empty() {
+            field_protection = Some(symbolic_map_protection(definition, &payload));
+            field_modified = Some(symbolic_map_modified(definition, &payload));
             let mut values = BTreeMap::new();
             for item in &definition.fields {
                 field(&mut payload, item.name.as_bytes())?;
@@ -168,22 +184,21 @@ fn send(
             .iter()
             .all(|field| field.output_offset.is_some())
         {
+            field_protection = Some(symbolic_map_protection(definition, &payload));
+            field_modified = Some(symbolic_map_modified(definition, &payload));
             field_values = Some(symbolic_map_values(definition, &payload)?);
             payload = encode_symbolic_map_output(definition, &payload)?;
         } else if definition.fields.iter().any(|field| field.secret) {
             return Err(HostProblem::Unsupported);
         } else {
+            field_protection = Some(symbolic_map_protection(definition, &payload));
+            field_modified = Some(symbolic_map_modified(definition, &payload));
             field_values = Some(decode_map_payload(&payload, service.limits)?);
         }
     }
     if payload.len() > service.limits.max_screen_bytes {
         return Err(HostProblem::ResourceExhausted);
     }
-    let current = state
-        .sessions
-        .get(&run.session)
-        .cloned()
-        .ok_or(HostProblem::NotFound)?;
     let mut next = current.clone();
     if request.operation == CicsOperation::SendMap {
         let (mapset, map) = map_names.as_ref().expect("SEND MAP names");
@@ -223,6 +238,48 @@ fn send(
     )
 }
 
+fn data_only_attributes(
+    map: &BmsMapDefinition,
+    symbolic: &[u8],
+    current: &Session,
+    mapset: &str,
+    map_name: &str,
+) -> Result<DataOnlyAttributes, HostProblem> {
+    let same_map =
+        current.mapset.as_deref() == Some(mapset) && current.map.as_deref() == Some(map_name);
+    let mut protection = BTreeMap::new();
+    let mut modified = BTreeMap::new();
+    for field in &map.fields {
+        let offset = usize::try_from(field.attribute_offset.ok_or(HostProblem::Unsupported)?)
+            .map_err(|_| HostProblem::ResourceExhausted)?;
+        let attribute = symbolic
+            .get(offset)
+            .copied()
+            .ok_or(HostProblem::Malformed)?;
+        let name = field.name.to_ascii_uppercase();
+        let (is_protected, is_modified) = match attribute {
+            0 => (
+                same_map
+                    && current
+                        .field_protection
+                        .get(&name)
+                        .copied()
+                        .unwrap_or(false),
+                same_map && current.field_modified.get(&name).copied().unwrap_or(false),
+            ),
+            0xc0 | 0xc1 | 0xc8 | 0xcc => (false, attribute & 0x01 != 0),
+            0xf0 | 0xf1 | 0xf8 => (true, attribute & 0x01 != 0),
+            _ => return Err(HostProblem::Malformed),
+        };
+        protection.insert(name.clone(), is_protected);
+        modified.insert(name, is_modified);
+    }
+    Ok(DataOnlyAttributes {
+        protection,
+        modified,
+    })
+}
+
 fn length_problem(operation: CicsOperation) -> HostProblem {
     if operation == CicsOperation::SendText {
         HostProblem::Condition {
@@ -242,6 +299,7 @@ fn validate_send_request(request: &CicsRequest) -> Result<(), HostProblem> {
         "MAP",
         "MAPSET",
         "OPTION.CURSOR",
+        "OPTION.DATAONLY",
         "OPTION.ERASE",
         "OPTION.FREEKB",
         "OPTION.MAPONLY",
@@ -276,13 +334,18 @@ fn validate_send_request(request: &CicsRequest) -> Result<(), HostProblem> {
         || request.operation == CicsOperation::SendMap
             && request.arguments.contains_key("OPTION.MAPONLY")
             && (request.arguments.contains_key("FROM") || request.arguments.contains_key("LENGTH"))
+        || request.operation == CicsOperation::SendMap
+            && request.arguments.contains_key("OPTION.DATAONLY")
+            && !request.arguments.contains_key("FROM")
+        || request.arguments.contains_key("OPTION.DATAONLY")
+            && request.arguments.contains_key("OPTION.MAPONLY")
         || request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
         || request.arguments.iter().any(|(name, value)| {
             !allowed.contains(&name.as_str())
                 || match name.as_str() {
                     "LENGTH" => value.schema() != "mainframe-env.cics.decimal@1",
-                    "OPTION.CURSOR" | "OPTION.ERASE" | "OPTION.FREEKB" | "OPTION.MAPONLY"
-                    | "OPTION.NOHANDLE" => {
+                    "OPTION.CURSOR" | "OPTION.DATAONLY" | "OPTION.ERASE" | "OPTION.FREEKB"
+                    | "OPTION.MAPONLY" | "OPTION.NOHANDLE" => {
                         value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()
                     }
                     "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",

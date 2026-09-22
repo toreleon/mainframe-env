@@ -407,10 +407,13 @@ All notable changes to mainframe-env are documented here.
   that prefix of an explicit FROM area; out-of-range SEND TEXT values return
   exact `LENGERR` 22/0 before screen mutation. `SEND MAP MAPONLY` rejects
   application FROM/LENGTH data and writes only the initialized defaults from
-  the selected map. RECEIVE uses the requested durable definition for
+  the selected map. `SEND MAP DATAONLY` requires explicit symbolic FROM data,
+  ignores map defaults, applies supplied field attributes, and preserves the
+  prior field attribute when the supplied byte is `X'00'`. RECEIVE uses the
+  requested durable definition for
   terminal-fit and field normalization. SET pointers, omitted-map AID-only
   receive, implicit symbolic map storage, RECEIVE length, paging, device and
-  other terminal controls, including DATAONLY, remain fail-closed.
+  other terminal controls remain fail-closed.
 - Updated the locked `rustls` dependency from 0.23.43 to 0.23.45 so the
   release dependency gate is not exposed to `RUSTSEC-2026-0285`.
 - Added a typed `PURGE MESSAGE` route for the runtime's reachable empty
