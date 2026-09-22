@@ -1,6 +1,6 @@
 {
   "counts": {
-    "markdown_documents": 187,
+    "markdown_documents": 189,
     "navigation_groups": 5,
     "normative_documents": 39,
     "xtask_commands": 167
@@ -828,6 +828,14 @@
     },
     {
       "normative": false,
+      "path": "docs/delivery/coverage-versions/0.12.0-reuse-spike.md",
+      "relative_links": 0,
+      "sha256": "sha256:dbabfd668e0364421dd9812387dc04815ca282b80c26318ffde3c47d43f5f764",
+      "title": "Db2 0.12 parser and executor reuse spike",
+      "xtask_commands": 0
+    },
+    {
+      "normative": false,
       "path": "docs/delivery/coverage-versions/0.12.0.md",
       "relative_links": 3,
       "sha256": "sha256:792bcb4030f06a8c29f42438f8d81e54cd0c625294d275a6b5919527a47a2864",
@@ -1001,6 +1009,14 @@
       "sha256": "sha256:2a91b82dfbc4d2db4c6dc15dfe5f17bbc2fb24e223ed8fbcd2598daf43816c7a",
       "title": "mainframe-env 0.8.0 review — JES2 execution and real utility semantics",
       "xtask_commands": 4
+    },
+    {
+      "normative": false,
+      "path": "docs/delivery/coverage-versions/status/0.12.0.md",
+      "relative_links": 1,
+      "sha256": "sha256:63a971fe7be8f1911d164d1e7d0fc36a54557934bb52c4c446f8a576784c90ba",
+      "title": "mainframe-env 0.12.0 implementation status",
+      "xtask_commands": 0
     },
     {
       "normative": false,
