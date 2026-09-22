@@ -412,6 +412,10 @@ All notable changes to mainframe-env are documented here.
 - Updated the generated CICS application-contract schema to the current
   readiness split: 41 typed, 0 legacy, 41 advertised, and 222 unready rows,
   with an exact 24-family summary bound.
+- Reconciled the frozen CICS source-map view with newer typed runtime
+  admissions. DELETEQ TD, FREEMAIN, and GETMAIN are excluded from the
+  no-admission compatibility projection, and all three maps now bind the
+  current descriptor digest.
 - Migrated the local `WRITEQ TD` compatibility subset to a typed queue-write
   plan. QUEUE is a validated 1–4 character literal or field, FROM is a resolved
   data area, and optional numeric LENGTH or `LENGTH OF` selects the persisted
