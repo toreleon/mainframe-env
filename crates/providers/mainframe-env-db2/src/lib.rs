@@ -5,12 +5,16 @@
 mod abi;
 mod ast;
 mod catalog;
+mod create_table_syntax;
+mod cursor_syntax;
 mod expression_parser;
 mod generated_statement_catalog;
+mod query_syntax;
 mod retention;
 mod service;
 mod statement;
 mod syntax;
+mod type_system;
 
 pub use abi::db2_abi_library;
 pub use ast::{
