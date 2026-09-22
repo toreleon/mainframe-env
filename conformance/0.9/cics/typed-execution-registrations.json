@@ -149,6 +149,13 @@
       "family": "task-control",
       "mutating": false,
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0214"
+    },
+    {
+      "operation": "WaitEvent",
+      "interface": "api",
+      "family": "task-control",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0233"
     }
   ]
 }

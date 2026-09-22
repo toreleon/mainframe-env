@@ -95,6 +95,10 @@ fn cics_additive_wire_identities_are_frozen_named_variants() {
         hex(&bytes(&CicsOperation::Suspend, b"")),
         "41010d00000000000000436963734f7065726174696f6e01070000000000000053757370656e640000000000000000"
     );
+    assert_eq!(
+        hex(&bytes(&CicsOperation::WaitEvent, b"")),
+        "41010d00000000000000436963734f7065726174696f6e010900000000000000576169744576656e740000000000000000"
+    );
 }
 
 #[test]

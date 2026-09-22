@@ -14,6 +14,7 @@ mod assign;
 mod legacy;
 mod names;
 mod retrieve;
+mod task_wait;
 pub(super) use address::CicsAddressSet;
 pub(super) use legacy::execute_legacy;
 use names::SlotUse;
@@ -86,6 +87,9 @@ pub(super) fn write_runtime_output(
     if retrieve::release_output(machine, operation, name, value)? {
         return Ok(true);
     }
+    if task_wait::apply_posted_output(machine, operation, name, value)? {
+        return Ok(true);
+    }
     if name != "TASK.PRIORITY" {
         return Ok(false);
     }
@@ -149,6 +153,7 @@ pub(super) fn suspension(
         CicsOperation::Enq => ("cics-enqueue", true),
         CicsOperation::Delay => ("cics-delay", true),
         CicsOperation::Retrieve => ("cics-retrieve", true),
+        CicsOperation::WaitEvent => ("cics-event", true),
         CicsOperation::ChangeTask | CicsOperation::Suspend => ("cics-scheduler", false),
         _ => ("cics-terminal", true),
     };
@@ -235,8 +240,11 @@ pub(super) fn execute(
 
     let host_operation = names::host_operation(plan.operation);
     let address_set = address::action(&plan)?;
-    let mut arguments = BTreeMap::new();
+    let mut arguments = task_wait::arguments(machine, &plan)?.unwrap_or_default();
     for operand in &plan.operands {
+        if matches!(operand.name, CicsOperandName::EventControlAddress) {
+            continue;
+        }
         let (schema, bytes) = match &operand.value {
             CicsOperandValue::Literal(bytes) if operand.name == CicsOperandName::Conditions => (
                 if plan.operation == CicsPlanOperation::HandleCondition {

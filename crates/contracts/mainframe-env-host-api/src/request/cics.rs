@@ -70,6 +70,8 @@ pub enum CicsOperation {
     StartBrowse,
     /// Relinquish control until the task is redispatched.
     Suspend,
+    /// Wait for one timer-event control area to be posted.
+    WaitEvent,
     Syncpoint,
     Write,
     WriteTransientData,
@@ -123,6 +125,7 @@ impl CicsOperation {
             Self::Start => "Start",
             Self::StartBrowse => "StartBrowse",
             Self::Suspend => "Suspend",
+            Self::WaitEvent => "WaitEvent",
             Self::Syncpoint => "Syncpoint",
             Self::Write => "Write",
             Self::WriteTransientData => "WriteTransientData",
@@ -160,6 +163,7 @@ impl CicsOperation {
                 | Self::SetFileStatus
                 | Self::Start
                 | Self::Retrieve
+                | Self::WaitEvent
         )
     }
 
@@ -219,6 +223,7 @@ impl CicsOperation {
             ("START", _) => Self::Start,
             ("STARTBR", _) => Self::StartBrowse,
             ("SUSPEND", _) => Self::Suspend,
+            ("WAIT", Some("EVENT")) => Self::WaitEvent,
             ("SYNCPOINT", _) => Self::Syncpoint,
             ("WRITE", _) => Self::Write,
             ("WRITEQ", Some("TD")) => Self::WriteTransientData,

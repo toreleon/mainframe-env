@@ -34,6 +34,7 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::Flength => SlotUse::FullwordInput,
         CicsOperandName::DataPointer => SlotUse::PointerInput,
         CicsOperandName::DataArea => SlotUse::Input,
+        CicsOperandName::EventControlAddress => SlotUse::PointerInput,
         _ => SlotUse::Input,
     }
 }
@@ -103,6 +104,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::SetAssociationUserCorrData => CicsOperation::SetAssociationUserCorrData,
         CicsPlanOperation::Syncpoint => CicsOperation::Syncpoint,
         CicsPlanOperation::Suspend => CicsOperation::Suspend,
+        CicsPlanOperation::WaitEvent => CicsOperation::WaitEvent,
         CicsPlanOperation::Assign => CicsOperation::Assign,
         CicsPlanOperation::PurgeMessage => CicsOperation::PurgeMessage,
         CicsPlanOperation::Start => CicsOperation::Start,
@@ -158,6 +160,8 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::InitImage => "INITIMG",
         CicsOperandName::DataPointer => "DATAPOINTER",
         CicsOperandName::DataArea => "DATA",
+        CicsOperandName::EventControlAddress => "ECADDR",
+        CicsOperandName::WaitName => "NAME",
     }
 }
 

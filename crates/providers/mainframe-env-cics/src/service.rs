@@ -3713,6 +3713,7 @@ impl<'a> Reader<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::CicsEventPostMode;
     use mainframe_env_execution_api::{
         ArtifactRef, ExecutionId, Principal, RequestId, ResourceLimits, Selector, ServiceClass,
         TraceId,
@@ -4565,6 +4566,37 @@ mod tests {
             InvocationLimits::default(),
         )
         .unwrap()
+    }
+
+    fn wait_event_arguments(
+        event: [u8; 4],
+        posted: bool,
+        name: Option<&[u8]>,
+    ) -> BTreeMap<String, BoundedPayload> {
+        let mut arguments = BTreeMap::from([
+            (
+                "ECADDR".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.event-list@1",
+                    event.to_vec(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            ),
+            (
+                "EVENT.POSTED".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.event-posted@1",
+                    vec![u8::from(posted)],
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            ),
+        ]);
+        if let Some(name) = name {
+            arguments.insert("NAME".into(), cics_literal(name));
+        }
+        arguments
     }
 
     fn storage_target(value: &[u8]) -> BoundedPayload {
@@ -12279,6 +12311,185 @@ mod tests {
                 Err(HostProblem::Malformed)
             );
         }
+    }
+
+    #[test]
+    fn wait_event_is_durable_replay_bound_and_condition_exact() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-wait-event-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let invocation = invocation_for("wait-event-reopen", BTreeMap::new());
+        let session = SessionId::new("wait-event-reopen", 64).unwrap();
+        let event = [0x00, 0x10, 0x00, 0x04];
+
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = self::service(store.clone());
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let wait = request(
+                CicsOperation::WaitEvent,
+                wait_event_arguments(event, false, Some(b"EVENT001")),
+                400,
+            );
+            let first = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, wait.clone(), 400),
+                    wait.clone(),
+                )
+                .unwrap();
+            assert_eq!(first.disposition, CicsDisposition::Suspended);
+            assert_eq!(
+                service
+                    .invoke(&effect(&invocation.run_unit_id, wait.clone(), 400), wait)
+                    .unwrap(),
+                first
+            );
+            assert_eq!(
+                store
+                    .list_provider_state("cics-task-wait-v1", 2)
+                    .unwrap()
+                    .len(),
+                1
+            );
+        }
+
+        let store: Arc<dyn ProviderStateStore> =
+            Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+        let service = self::service(store.clone());
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        service
+            .post_task_event(
+                &session,
+                invocation.principal.id(),
+                2,
+                0,
+                CicsEventPostMode::Standard,
+            )
+            .unwrap();
+        assert_eq!(
+            service.post_task_event(
+                &session,
+                invocation.principal.id(),
+                2,
+                0,
+                CicsEventPostMode::Hand,
+            ),
+            Err(HostProblem::Malformed)
+        );
+        let resumed = request(
+            CicsOperation::WaitEvent,
+            wait_event_arguments(event, false, Some(b"EVENT001")),
+            401,
+        );
+        let completed = service
+            .invoke(
+                &effect(&invocation.run_unit_id, resumed.clone(), 401),
+                resumed.clone(),
+            )
+            .unwrap();
+        assert_eq!(completed.disposition, CicsDisposition::Complete);
+        assert_eq!(completed.outputs["EVENT.POSTED"].bytes(), b"0");
+        assert_eq!(
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, resumed.clone(), 401),
+                    resumed
+                )
+                .unwrap(),
+            completed
+        );
+
+        let invalid = request(
+            CicsOperation::WaitEvent,
+            BTreeMap::from([(
+                "ECADDR".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.invalid-event-list@1",
+                    vec![2],
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            )]),
+            402,
+        );
+        let mut invalid = invalid;
+        invalid.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let condition = service
+            .invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 402),
+                invalid,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                condition.condition.as_str(),
+                condition.response,
+                condition.response2,
+            ),
+            ("INVREQ", 16, 2)
+        );
+        let run = service
+            .lock()
+            .unwrap()
+            .runs
+            .get(&invocation.run_unit_id)
+            .unwrap()
+            .clone();
+        handlers::release_task_state(&service, &run).unwrap();
+        assert!(
+            store
+                .list_provider_state("cics-task-wait-v1", 2)
+                .unwrap()
+                .is_empty()
+        );
+        drop(service);
+        drop(store);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn wait_event_is_available_in_dpl_context() {
+        let service = self::service(Arc::new(MemoryStore::new(Default::default())));
+        let context = BoundedPayload::new(
+            "mainframe-env.cics.execution-context@1",
+            b"dpl-without-synconreturn".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let mut invocation = invocation_for(
+            "wait-event-dpl",
+            BTreeMap::from([("cics.execution-context".into(), context)]),
+        );
+        invocation.selector =
+            Selector::new("program:WAITEVT", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("wait-event-dpl", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "ME01", "S001")
+            .unwrap();
+        let wait = request(
+            CicsOperation::WaitEvent,
+            wait_event_arguments([0, 0x10, 0, 4], true, None),
+            403,
+        );
+        let response = service
+            .invoke(&effect(&invocation.run_unit_id, wait.clone(), 403), wait)
+            .unwrap();
+        assert_eq!(response.disposition, CicsDisposition::Complete);
+        assert_eq!(response.outputs["EVENT.POSTED"].bytes(), b"0");
     }
 
     #[test]

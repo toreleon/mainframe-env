@@ -17,6 +17,7 @@ mod output_shape;
 mod program_control;
 mod queue_control;
 mod storage_control;
+mod task_wait;
 mod terminal_control;
 
 pub use assign::{CICS_ASSIGN_OUTPUT_NAMES, CicsAssignOutput};
@@ -577,6 +578,7 @@ fn validate_operation_shape(
         CicsPlanOperation::Suspend => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
+        CicsPlanOperation::WaitEvent => task_wait::invalid_wait_event_shape(plan, inputs, outputs),
         CicsPlanOperation::Assign => {
             !inputs.is_empty()
                 || scheduling_options
@@ -2198,6 +2200,41 @@ mod tests {
             )
             .unwrap(),
             suspend
+        );
+    }
+
+    #[test]
+    fn wait_event_plan_freezes_tags_and_rejects_cross_command_shape() {
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::WaitEvent,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::EventControlAddress,
+                    value: CicsOperandValue::Storage(slot(1, "WAIT.ECB-POINTER")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::WaitName,
+                    value: CicsOperandValue::Literal(b"EVENT001".to_vec()),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        assert_eq!(operation_tag(CicsPlanOperation::WaitEvent), 43);
+        assert_eq!(operand_tag(CicsOperandName::EventControlAddress), 46);
+        assert_eq!(operand_tag(CicsOperandName::WaitName), 47);
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(encoded[6], 43);
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
+            plan
+        );
+        let mut malformed = plan;
+        malformed.operands[0].value = CicsOperandValue::Integer(1);
+        assert_eq!(
+            encode_cics_effect_plan(&malformed, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
         );
     }
 

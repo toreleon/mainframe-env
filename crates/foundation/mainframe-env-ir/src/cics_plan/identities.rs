@@ -83,6 +83,8 @@ pub enum CicsPlanOperation {
     SetAssociationUserCorrData,
     /// Yield the issuing task once for redispatch.
     Suspend,
+    /// Wait for one timer-event control area to be posted.
+    WaitEvent,
     /// Return one bounded set of task, terminal, and invocation context values.
     Assign,
     /// Discard the current full-BMS logical message, if one is being built.
@@ -183,6 +185,10 @@ pub enum CicsOperandName {
     DataPointer,
     /// `DATA(...)` area whose virtual address identifies GETMAIN storage.
     DataArea,
+    /// `ECADDR(...)` pointer to one timer-event control area.
+    EventControlAddress,
+    /// Optional `NAME(...)` reason associated with an event wait.
+    WaitName,
 }
 
 /// Flag option accepted by the typed CICS pilot.

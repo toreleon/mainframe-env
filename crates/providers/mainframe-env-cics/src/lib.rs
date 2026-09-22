@@ -3,11 +3,13 @@
 #![forbid(unsafe_code)]
 
 mod abi;
+mod event_wait;
 mod generated;
 mod retention;
 mod service;
 
 pub use abi::cics_abi_library;
+pub use event_wait::CicsEventPostMode;
 
 pub use retention::{
     CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,

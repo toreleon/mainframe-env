@@ -189,6 +189,7 @@ pub enum HirCicsOperation {
     SetAssociationUserCorrData,
     Syncpoint,
     Suspend,
+    WaitEvent,
     Start,
     Retrieve,
 }
@@ -243,6 +244,8 @@ pub enum HirCicsOperandName {
     InitImage,
     DataPointer,
     DataArea,
+    EventControlAddress,
+    WaitName,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1958,6 +1961,70 @@ mod tests {
         ] {
             let invalid = analyze(&format!(
                 "IDENTIFICATION DIVISION. PROGRAM-ID. BADADDR. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER-32. 01 TEXT-X PIC X(4). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(invalid.hir.is_none(), "{command}");
+            assert!(
+                invalid
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                invalid.diagnostics
+            );
+        }
+    }
+
+    #[test]
+    fn cics_wait_event_resolves_pointer_name_and_rejects_invalid_forms() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. WAITONE. DATA DIVISION. WORKING-STORAGE SECTION. 01 ECB-X PIC S9(9) COMP VALUE 0. 01 ECB-PTR POINTER-32. PROCEDURE DIVISION. SET ECB-PTR TO ADDRESS OF ECB-X. EXEC CICS WAIT EVENT ECADDR(ECB-PTR) NAME('EVENT001') END-EXEC. STOP RUN.";
+        let hir = analyze(source).hir.expect("typed WAIT EVENT HIR");
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command))
+                    if command.operation == HirCicsOperation::WaitEvent =>
+                {
+                    Some(command)
+                }
+                _ => None,
+            })
+            .expect("typed WAIT EVENT command");
+        assert_eq!(
+            command
+                .operands
+                .iter()
+                .map(|operand| operand.name)
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                HirCicsOperandName::EventControlAddress,
+                HirCicsOperandName::WaitName,
+            ])
+        );
+        assert!(matches!(
+            &command.operands[1].value,
+            HirCicsValue::Literal(value) if value == "EVENT001"
+        ));
+
+        for (declaration, command, expected) in [
+            (
+                "01 ECB-PTR POINTER.",
+                "WAIT EVENT ECADDR(ECB-PTR)",
+                "four-byte POINTER-32",
+            ),
+            (
+                "01 ECB-PTR POINTER-32.",
+                "WAIT EVENT ECADDR(ECB-PTR) NAME('TOO-LONG9')",
+                "1-8 alphanumeric",
+            ),
+            (
+                "01 ECB-PTR POINTER-32.",
+                "WAIT EVENT NAME('EVENT001')",
+                "requires ECADDR",
+            ),
+        ] {
+            let invalid = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADWAIT. DATA DIVISION. WORKING-STORAGE SECTION. {declaration} PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
             ));
             assert!(invalid.hir.is_none(), "{command}");
             assert!(

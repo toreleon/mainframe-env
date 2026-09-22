@@ -173,6 +173,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("Start", "api", "interval-control", True, f"{OFFICIAL_BASELINE}:api-commands:0205"),
     ("StartBrowse", "api", "file-control", False, f"{OFFICIAL_BASELINE}:api-commands:0208"),
     ("Suspend", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0214"),
+    ("WaitEvent", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0233"),
     ("Syncpoint", "api", "recovery", True, f"{OFFICIAL_BASELINE}:api-commands:0218"),
     ("Write", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0253"),
     (
@@ -428,6 +429,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Rewrite",
         "SetAssociationUserCorrData",
         "Suspend",
+        "WaitEvent",
         "Syncpoint",
         "Start",
         "Retrieve",
@@ -596,6 +598,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
         {"memory-read", "memory-write", "condition"}
     ),
     "Suspend": frozenset({"memory-write", "suspension", "condition"}),
+    "WaitEvent": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
     "Start": frozenset(
         {"memory-read", "memory-write", "clock", "condition", "transaction"}
     ),
@@ -809,6 +814,7 @@ def _load_typed_execution_registrations(
         "SetAssociationUserCorrData",
         "Start",
         "Suspend",
+        "WaitEvent",
     ]:
         raise DescriptorError(f"{path} registration identities or order differ")
     return normalized
@@ -1119,6 +1125,7 @@ def load_catalog(
                 "SetAssociationUserCorrData",
                 "Start",
                 "Suspend",
+                "WaitEvent",
             }
         ]
     )
@@ -3422,8 +3429,8 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
         for row in catalog["_runtime_operations"]
         if row["interface"] == "api"
     }
-    if len(existing_runtime) != 44:
-        raise DescriptorError("CICS application runtime set must remain exactly 44 rows")
+    if len(existing_runtime) != 45:
+        raise DescriptorError("CICS application runtime set must remain exactly 45 rows")
 
     loaded_batches = []
     for batch_id, start, end, projection_path, review_path in CONTRACT_BATCHES:
@@ -3677,12 +3684,12 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
     if (
         len(registry_rows) != 263
         or len(set(handler_ids)) != 263
-        or len(typed_rows) != 44
+        or len(typed_rows) != 45
         or len(legacy_rows) != 0
         or {row["runtime_operation"] for row in typed_rows}
         != TYPED_RUNTIME_OPERATIONS
-        or len(advertised_rows) != 44
-        or len(unready_rows) != 219
+        or len(advertised_rows) != 45
+        or len(unready_rows) != 218
         or any(row["unready_result"] != "explicit-unsupported" for row in unready_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in typed_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in legacy_rows)

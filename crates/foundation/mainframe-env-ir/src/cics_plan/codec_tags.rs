@@ -53,6 +53,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::DeleteTemporaryStorage => 41,
         CicsPlanOperation::Address => 42,
         CicsPlanOperation::ReadTransientData => 51,
+        CicsPlanOperation::WaitEvent => 43,
     }
 }
 
@@ -102,6 +103,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         41 => Ok(CicsPlanOperation::DeleteTemporaryStorage),
         42 => Ok(CicsPlanOperation::Address),
         51 => Ok(CicsPlanOperation::ReadTransientData),
+        43 => Ok(CicsPlanOperation::WaitEvent),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -154,6 +156,8 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::Qname => 43,
         CicsOperandName::SysId => 44,
         CicsOperandName::CommareaPointer => 45,
+        CicsOperandName::EventControlAddress => 46,
+        CicsOperandName::WaitName => 47,
     }
 }
 
@@ -205,6 +209,8 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         43 => Ok(CicsOperandName::Qname),
         44 => Ok(CicsOperandName::SysId),
         45 => Ok(CicsOperandName::CommareaPointer),
+        46 => Ok(CicsOperandName::EventControlAddress),
+        47 => Ok(CicsOperandName::WaitName),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

@@ -13,6 +13,7 @@ mod task_context;
 mod task_control;
 mod task_enqueue;
 mod task_return;
+mod task_wait;
 mod terminal_control;
 mod terminal_run;
 mod time;
@@ -79,6 +80,7 @@ pub(super) use time::invoke as invoke_time;
 
 pub(super) fn release_task_state(service: &CicsService, run: &Run) -> Result<(), HostProblem> {
     task_enqueue::release_task(service, run)?;
+    task_wait::release_task(service, run)?;
     interval_control::release_task(service, run)
 }
 

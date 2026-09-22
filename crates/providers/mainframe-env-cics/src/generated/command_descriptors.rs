@@ -328,6 +328,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: false,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::WaitEvent,
+        syntax: "WAIT EVENT",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0233",
+        family: CicsCommandFamily::TaskControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::Syncpoint,
         syntax: "SYNCPOINT",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0218",
@@ -401,9 +408,10 @@ pub(crate) const fn command_descriptor(operation: CicsOperation) -> &'static Cic
         CicsOperation::Start => &CICS_COMMAND_DESCRIPTORS[39],
         CicsOperation::StartBrowse => &CICS_COMMAND_DESCRIPTORS[40],
         CicsOperation::Suspend => &CICS_COMMAND_DESCRIPTORS[41],
-        CicsOperation::Syncpoint => &CICS_COMMAND_DESCRIPTORS[42],
-        CicsOperation::Write => &CICS_COMMAND_DESCRIPTORS[43],
-        CicsOperation::WriteTransientData => &CICS_COMMAND_DESCRIPTORS[44],
-        CicsOperation::Xctl => &CICS_COMMAND_DESCRIPTORS[45],
+        CicsOperation::WaitEvent => &CICS_COMMAND_DESCRIPTORS[42],
+        CicsOperation::Syncpoint => &CICS_COMMAND_DESCRIPTORS[43],
+        CicsOperation::Write => &CICS_COMMAND_DESCRIPTORS[44],
+        CicsOperation::WriteTransientData => &CICS_COMMAND_DESCRIPTORS[45],
+        CicsOperation::Xctl => &CICS_COMMAND_DESCRIPTORS[46],
     }
 }

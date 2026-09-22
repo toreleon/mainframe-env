@@ -24,6 +24,12 @@ All notable changes to mainframe-env are documented here.
   reads. Missing and empty queues return exact QIDERR 44/0 and QZERO 23/0;
   SET, SYSID, NOSUSPEND, and TDQUEUE definition modes remain fail-closed.
 
+- Added typed CICS `WAIT EVENT` over checked POINTER-32 event control areas.
+  Append-only operation tag 43 and operand tags 46–47 preserve existing plans;
+  zero-valued events suspend and reissue through the durable coordinator, a
+  standard post survives SQLite reopen, completion marks the ECB and advances
+  with exact EIBFN `1202`, and task cleanup removes the retained wait row.
+
 - Added typed local CICS START `TERMID` through append-only operand tag 38.
   The provider resolves active virtual terminals at command time, returns exact
   `TERMIDERR` 11/0 for an unknown identifier, persists terminal association,

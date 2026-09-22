@@ -14,7 +14,6 @@ use mainframe_env_ir::{
     cics_application_registry_candidates_for_tokens,
 };
 use std::collections::{BTreeMap, BTreeSet};
-
 type Clauses = BTreeMap<String, Vec<String>>;
 mod abend;
 mod address;
@@ -31,23 +30,21 @@ mod program_control;
 mod program_name;
 mod queue_control;
 mod storage_control;
+mod task_wait;
 mod terminal_control;
 mod transaction_name;
 
 use numeric_value::{cics_cvda_value, cics_integer_value};
-
 struct ValidatedCandidate {
     descriptor: &'static CicsApplicationRegistryDescriptor,
     clauses: Clauses,
     options: Vec<String>,
     head_len: usize,
 }
-
 struct CandidateFailure {
     score: (usize, usize, usize),
     detail: String,
 }
-
 pub(super) fn validated_command(
     body: &[String],
     semantic: &SemanticModel,
@@ -143,7 +140,6 @@ pub(super) fn validated_command(
             }
         }
     }
-
     match valid.len() {
         1 => {
             let candidate = valid.into_values().next().expect("one validated candidate");
@@ -775,6 +771,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::SetAssociationUserCorrData => &["USERCORRDATA", "RESP", "RESP2"],
         HirCicsOperation::Syncpoint => &["RESP", "RESP2"],
         HirCicsOperation::Suspend => &["RESP", "RESP2"],
+        HirCicsOperation::WaitEvent => &["ECADDR", "NAME", "RESP", "RESP2"],
         HirCicsOperation::Start => &[
             "TRANSID", "REQID", "FROM", "LENGTH", "INTERVAL", "TIME", "HOURS", "MINUTES",
             "SECONDS", "TERMID", "RTRANSID", "RTERMID", "QUEUE", "USERID", "RESP", "RESP2",
@@ -813,6 +810,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::PushHandle
         | HirCicsOperation::SetAssociationUserCorrData
         | HirCicsOperation::Suspend => &["NOHANDLE"],
+        HirCicsOperation::WaitEvent => &["NOHANDLE"],
         HirCicsOperation::Start => &["AFTER", "AT", "FMH", "PROTECT", "NOCHECK", "NOHANDLE"],
         HirCicsOperation::Cancel => &["NOHANDLE"],
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
@@ -907,6 +905,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::Delay
         | HirCicsOperation::PurgeMessage
         | HirCicsOperation::Suspend => &[][..],
+        HirCicsOperation::WaitEvent => &["ECADDR"][..],
         HirCicsOperation::Cancel => &["REQID"][..],
         HirCicsOperation::Start => &["TRANSID"][..],
         HirCicsOperation::Retrieve => &["LENGTH"][..],
@@ -1027,6 +1026,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     operands.extend(file_operands::resolve(&clauses, operation, semantic)?);
     operands.extend(queue_control::operands(&clauses, operation, semantic)?);
     operands.extend(storage_control::operands(&clauses, operation, semantic)?);
+    operands.extend(task_wait::operands(&clauses, operation, semantic)?);
     operands.extend(terminal_control::operands(&clauses, operation, semantic)?);
     operands.extend(interval_control::operands(&clauses, operation, semantic)?);
     if matches!(operation, HirCicsOperation::Deq | HirCicsOperation::Enq) {

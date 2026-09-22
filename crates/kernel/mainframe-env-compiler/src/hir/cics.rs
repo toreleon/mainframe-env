@@ -213,6 +213,8 @@ impl PlanContext<'_> {
                 HirCicsOperandName::InitImage => CicsOperandName::InitImage,
                 HirCicsOperandName::DataPointer => CicsOperandName::DataPointer,
                 HirCicsOperandName::DataArea => CicsOperandName::DataArea,
+                HirCicsOperandName::EventControlAddress => CicsOperandName::EventControlAddress,
+                HirCicsOperandName::WaitName => CicsOperandName::WaitName,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -311,6 +313,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         }
         HirCicsOperation::Syncpoint => CicsPlanOperation::Syncpoint,
         HirCicsOperation::Suspend => CicsPlanOperation::Suspend,
+        HirCicsOperation::WaitEvent => CicsPlanOperation::WaitEvent,
         HirCicsOperation::Deq => CicsPlanOperation::Deq,
         HirCicsOperation::Enq => CicsPlanOperation::Enq,
         HirCicsOperation::HandleAid => CicsPlanOperation::HandleAid,

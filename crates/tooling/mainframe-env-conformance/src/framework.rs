@@ -4243,6 +4243,100 @@ mod tests {
     }
 
     #[test]
+    fn cics_wait_event_reissues_until_posted_and_updates_the_ecb() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. WAITEVT. DATA DIVISION. WORKING-STORAGE SECTION. 01 ECB-X PIC S9(9) COMP VALUE 0. 01 ECB-PTR POINTER-32. 01 DONE-X PIC X VALUE '0'. PROCEDURE DIVISION. SET ECB-PTR TO ADDRESS OF ECB-X. EXEC CICS WAIT EVENT ECADDR(ECB-PTR) NAME('EVENT001') END-EXEC. MOVE '1' TO DONE-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(wait) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("WAIT EVENT did not call host");
+        };
+        assert!(matches!(
+            &wait.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::WaitEvent,
+                arguments,
+                mutation: Some(_),
+                ..
+            }) if arguments["ECADDR"].schema() == "mainframe-env.cics.event-list@1"
+                && arguments["ECADDR"].bytes().len() == 4
+                && arguments["EVENT.POSTED"].bytes() == [0]
+                && arguments["NAME"].bytes() == b"EVENT001"
+        ));
+        let response = |disposition, outputs| CicsResponse {
+            disposition,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                Vec::new(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            outputs,
+            unit_of_work: None,
+        };
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: wait.sequence,
+                    outcome: Ok(HostResult::Cics(response(
+                        CicsDisposition::Suspended,
+                        BTreeMap::new(),
+                    ))),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Suspended(suspension) if suspension.kind == "cics-event"
+        ));
+        let MachineDrive::HostCall(reissued) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("WAIT EVENT did not reissue after suspension");
+        };
+        let posted = mainframe_env_execution_api::BoundedPayload::new(
+            "mainframe-env.cics.event-index@1",
+            b"0".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: reissued.sequence,
+                    outcome: Ok(HostResult::Cics(response(
+                        CicsDisposition::Complete,
+                        BTreeMap::from([("EVENT.POSTED".into(), posted)]),
+                    ))),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("ECB-X").unwrap().bytes(), &[0x40, 0, 0, 0]);
+        assert_eq!(machine.variable("DONE-X").unwrap().bytes(), b"1");
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x12, 0x02]);
+    }
+
+    #[test]
     fn cics_local_handler_and_entry_commarea_preserve_control_and_bytes() {
         use mainframe_env_host_api::{CicsDisposition, CicsResponse, EffectResult, HostResult};
 

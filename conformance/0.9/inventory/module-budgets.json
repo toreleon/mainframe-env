@@ -275,6 +275,7 @@
     "frozen_service": "crates/providers/mainframe-env-cics/src/service.rs",
     "existing_modules": [
       "crates/providers/mainframe-env-cics/src/abi.rs",
+      "crates/providers/mainframe-env-cics/src/event_wait.rs",
       "crates/providers/mainframe-env-cics/src/lib.rs",
       "crates/providers/mainframe-env-cics/src/retention.rs",
       "crates/providers/mainframe-env-cics/src/service.rs"
@@ -302,6 +303,7 @@
       "crates/providers/mainframe-env-cics/src/handlers/task_enqueue.rs",
       "crates/providers/mainframe-env-cics/src/handlers/task_enqueue/model.rs",
       "crates/providers/mainframe-env-cics/src/handlers/task_return.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/task_wait.rs",
       "crates/providers/mainframe-env-cics/src/handlers/terminal_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/terminal_run.rs",
       "crates/providers/mainframe-env-cics/src/handlers/time.rs"

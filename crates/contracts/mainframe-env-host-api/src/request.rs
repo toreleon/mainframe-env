@@ -2453,6 +2453,7 @@ mod tests {
             CicsOperation::SetFileStatus,
             CicsOperation::StartBrowse,
             CicsOperation::Suspend,
+            CicsOperation::WaitEvent,
             CicsOperation::Syncpoint,
             CicsOperation::Write,
             CicsOperation::WriteTransientData,
