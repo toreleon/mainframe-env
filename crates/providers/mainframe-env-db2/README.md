@@ -46,3 +46,9 @@ append-only arena. Arena nodes can reference only prior nodes, so cycles,
 forward references, excessive depth, lists, literals and node counts fail before
 an AST can be published. Type compatibility and name resolution remain binder
 responsibilities rather than parser guesses.
+
+Statement parsing is added only in complete source-reviewed families. The first
+family owns typed COMMIT, ROLLBACK and SAVEPOINT AST, including WORK,
+named/unnamed savepoint rollback, UNIQUE, and retain-clause structure. It
+rejects other statement families and extra tokens; parsing alone is not an
+execution or transaction-authority path.

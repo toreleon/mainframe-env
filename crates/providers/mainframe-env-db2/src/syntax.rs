@@ -83,6 +83,11 @@ pub enum Db2SyntaxDiagnosticCode {
     UnsupportedToken,
     UnbalancedDelimiter,
     TokenizerFailure,
+    UnsupportedStatement,
+    UnexpectedToken,
+    MissingToken,
+    DuplicateClause,
+    InvalidStatementOperand,
 }
 
 /// Bounded owned diagnostic returned by the lexer.
@@ -94,7 +99,7 @@ pub struct Db2SyntaxDiagnostic {
 }
 
 impl Db2SyntaxDiagnostic {
-    fn new(
+    pub(crate) fn new(
         code: Db2SyntaxDiagnosticCode,
         location: Db2SourceLocation,
         message: impl AsRef<str>,

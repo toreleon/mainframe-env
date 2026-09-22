@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added owned source-reviewed transaction syntax for Db2 COMMIT, ROLLBACK,
+  and SAVEPOINT. The parser preserves optional WORK, unit/savepoint rollback
+  targets, UNIQUE, and both retain clauses, while rejecting duplicate clauses,
+  invalid names, malformed operands, trailing tokens, and multiple statements
+  with bounded located diagnostics.
+
 - Added owned Db2 AST primitives for normalized/delimited identifiers,
   qualified names, static host references, built-in/distinct type syntax,
   literals, operators, and an append-only acyclic expression arena. Constructors
