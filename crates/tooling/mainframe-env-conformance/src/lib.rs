@@ -30,9 +30,14 @@ mod dataset_reference;
 mod decimal_adapter;
 mod framework;
 mod jcl;
+mod licensed_harness;
 mod racf;
 mod racf_oracle;
 mod racf_reference;
 
 pub use decimal_adapter::{DecimalAdapterReceipt, LEDGER_FORMULA_CONTRACT, verify_decimal_adapter};
 pub use framework::*;
+pub use licensed_harness::{
+    OracleCandidateExpectation, OracleHarnessRegistry, OracleHarnessValidation,
+    OracleHarnessValidationKind, validate_oracle_harness_receipt, validate_oracle_harness_registry,
+};

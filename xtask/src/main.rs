@@ -21,20 +21,21 @@ use mainframe_env_conformance::{
     cobol_arithmetic_pilot_runtime, cobol_move_pilot_runtime, dataset_conformance_runtime,
     gnucobol_reference_fixture_digest, import_cics_oracle_capture, licensed_fixture_digest,
     run_dataset_reference_simulation, run_gnucobol_reference_campaign,
-    verify_carddemo_application_package_from_env, verify_carddemo_base_batch_from_env,
-    verify_carddemo_base_online_from_env, verify_carddemo_batch_programs_from_env,
-    verify_carddemo_cics_abi_from_env, verify_carddemo_cics_runtime_from_env,
-    verify_carddemo_control_flow_from_env, verify_carddemo_core_semantics_from_env,
-    verify_carddemo_corpus_from_env, verify_carddemo_data_layouts_from_env,
-    verify_carddemo_dataset_catalog_from_env, verify_carddemo_db2_from_env,
-    verify_carddemo_file_call_semantics_from_env, verify_carddemo_full_from_env,
-    verify_carddemo_host_operands_from_env, verify_carddemo_ims_from_env,
-    verify_carddemo_jcl_from_env, verify_carddemo_mq_authorization_from_env,
-    verify_carddemo_program_routing_from_env, verify_carddemo_resources_from_env,
-    verify_carddemo_security_from_env, verify_carddemo_seeds_from_env,
-    verify_carddemo_source_closures_from_env, verify_carddemo_source_preprocessing_from_env,
-    verify_carddemo_terminal_from_env, verify_carddemo_utilities_from_env,
-    verify_carddemo_vsam_from_env, verify_cobol_assurance_sources, verify_cobol_condition_fixtures,
+    validate_oracle_harness_registry, verify_carddemo_application_package_from_env,
+    verify_carddemo_base_batch_from_env, verify_carddemo_base_online_from_env,
+    verify_carddemo_batch_programs_from_env, verify_carddemo_cics_abi_from_env,
+    verify_carddemo_cics_runtime_from_env, verify_carddemo_control_flow_from_env,
+    verify_carddemo_core_semantics_from_env, verify_carddemo_corpus_from_env,
+    verify_carddemo_data_layouts_from_env, verify_carddemo_dataset_catalog_from_env,
+    verify_carddemo_db2_from_env, verify_carddemo_file_call_semantics_from_env,
+    verify_carddemo_full_from_env, verify_carddemo_host_operands_from_env,
+    verify_carddemo_ims_from_env, verify_carddemo_jcl_from_env,
+    verify_carddemo_mq_authorization_from_env, verify_carddemo_program_routing_from_env,
+    verify_carddemo_resources_from_env, verify_carddemo_security_from_env,
+    verify_carddemo_seeds_from_env, verify_carddemo_source_closures_from_env,
+    verify_carddemo_source_preprocessing_from_env, verify_carddemo_terminal_from_env,
+    verify_carddemo_utilities_from_env, verify_carddemo_vsam_from_env,
+    verify_cobol_assurance_sources, verify_cobol_condition_fixtures,
     verify_cobol_data_runtime_fixtures, verify_cobol_exit, verify_cobol_file_runtime_fixtures,
     verify_cobol_frontend_fixtures, verify_cobol_function_boundary_runtime_fixtures,
     verify_cobol_function_fixtures, verify_cobol_function_runtime_fixtures,
@@ -8432,6 +8433,94 @@ fn check_licensed_environment_requirements(root: &Path) -> TaskResult {
             }),
             &format!("CER-1701 changed the historical {slot_id} pending denominator"),
         )?;
+    }
+    let source_index_path = root.join("conformance/0.2/catalogs/index.json");
+    let source_index = json(&source_index_path)?;
+    let baselines = array(&source_index, "baselines", &source_index_path)?;
+    for slot in slots {
+        for required in array(slot, "required_baselines", &environment_requirements)? {
+            let baseline_id = text(required, "baseline_id", &environment_requirements)?;
+            let baseline = baselines
+                .iter()
+                .find(|baseline| baseline["id"] == baseline_id)
+                .ok_or_else(|| format!("CER-1701 names unknown baseline {baseline_id}"))?;
+            require(
+                required["topic_manifest_sha256"] == baseline["source"]["sha256"]
+                    && required["catalog_sha256"] == baseline["catalog_sha256"],
+                &format!("CER-1701 source identity drifted for {baseline_id}"),
+            )?;
+        }
+    }
+
+    let harness_path = root.join("conformance/0.17/oracles/harnesses.json");
+    let harness_schema_path =
+        root.join("conformance/0.17/schemas/oracle-harness-registry.schema.json");
+    let harness_value = json(&harness_path)?;
+    validate_schema_instance(&json(&harness_schema_path)?, &harness_value, &harness_path)?;
+    let harness_bytes =
+        fs::read(&harness_path).map_err(|error| format!("{}: {error}", harness_path.display()))?;
+    let harness = validate_oracle_harness_registry(&harness_bytes)?;
+    let harness_slots = array(&harness_value, "slots", &harness_path)?;
+    unique_rows(harness_slots, "slot_id", &harness_path)?;
+    require(
+        harness.slot_ids().collect::<BTreeSet<_>>()
+            == slots
+                .iter()
+                .filter_map(|slot| slot["slot_id"].as_str())
+                .collect::<BTreeSet<_>>(),
+        "CER-1701 environment and harness slot sets differ",
+    )?;
+    for harness_slot in harness_slots {
+        let slot_id = text(harness_slot, "slot_id", &harness_path)?;
+        let requirement = slots
+            .iter()
+            .find(|slot| slot["slot_id"] == slot_id)
+            .ok_or_else(|| format!("CER-1701 harness slot {slot_id} has no requirement"))?;
+        let harness_baselines = array(harness_slot, "required_baselines", &harness_path)?
+            .iter()
+            .filter_map(Value::as_str)
+            .collect::<BTreeSet<_>>();
+        let requirement_baselines =
+            array(requirement, "required_baselines", &environment_requirements)?
+                .iter()
+                .filter_map(|baseline| baseline["baseline_id"].as_str())
+                .collect::<BTreeSet<_>>();
+        require(
+            harness_baselines == requirement_baselines,
+            &format!("CER-1701 harness baseline set drifted for {slot_id}"),
+        )?;
+        if let Some(policy_path) = harness_slot["adapter"]["policy_path"].as_str() {
+            require(
+                root.join(policy_path).is_file(),
+                &format!("CER-1701 adapter policy is missing for {slot_id}"),
+            )?;
+        }
+        match harness_slot["fixture"]["digest_rule"].as_str() {
+            Some("cobol-four-fixture-length-prefix-sha256") => require(
+                harness_slot["fixture"]["digest"] == licensed_fixture_digest(),
+                "CER-1701 COBOL independent fixture digest drifted",
+            )?,
+            Some("file-bytes-sha256") => {
+                let fixture_path = harness_slot["fixture"]["path"]
+                    .as_str()
+                    .ok_or_else(|| format!("CER-1701 fixture path is missing for {slot_id}"))?;
+                let actual = format!("sha256:{}", file_digest(&root.join(fixture_path))?);
+                require(
+                    harness_slot["fixture"]["digest"].as_str() == Some(actual.as_str()),
+                    &format!("CER-1701 independent fixture digest drifted for {slot_id}"),
+                )?;
+            }
+            Some("pending") => require(
+                harness_slot["fixture"]["path"].is_null()
+                    && harness_slot["fixture"]["digest"].is_null(),
+                &format!("CER-1701 pending fixture has an identity for {slot_id}"),
+            )?,
+            _ => {
+                return Err(format!(
+                    "CER-1701 fixture digest rule is unknown for {slot_id}"
+                ));
+            }
+        }
     }
     Ok(())
 }
