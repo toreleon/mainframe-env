@@ -391,6 +391,10 @@ All notable changes to mainframe-env are documented here.
   bytes into the declared record area before REWRITE, and the WRITE LENGTH
   source is test-only so the pilot module again meets its reviewed production
   line ceiling and warnings-denied build.
+- Restored the CICS semantic-family module policy after interval, task-start,
+  and storage handlers were added. Deterministic interval normalization now
+  lives under the reviewed handler tree with stable public re-exports, and the
+  frozen module inventory enumerates every current semantic handler module.
 - Migrated the local `WRITEQ TD` compatibility subset to a typed queue-write
   plan. QUEUE is a validated 1–4 character literal or field, FROM is a resolved
   data area, and optional numeric LENGTH or `LENGTH OF` selects the persisted

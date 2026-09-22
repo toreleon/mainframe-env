@@ -2,6 +2,7 @@ mod bms_map;
 mod condition;
 mod file_control;
 mod handle_state;
+mod interval;
 mod interval_control;
 mod program_control;
 mod queue_control;
@@ -49,6 +50,7 @@ pub(super) use file_control::invoke as invoke_file_control;
 pub(super) use handle_state::{
     AbendExit, AbendRecord, HandleFrame, HandleState, decode_session_tail, session_schema_version,
 };
+pub use interval::{CicsIntervalError, CicsIntervalMode, CicsIntervalTime};
 #[cfg(test)]
 pub(super) use interval_control::IntervalStartState;
 pub(super) use interval_control::load as load_interval_records;
