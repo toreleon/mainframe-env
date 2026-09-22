@@ -7,7 +7,7 @@
 //! observable outcome.
 //!
 //! `sync` also leaves every unchanged row untouched: no clone, no map
-//! rebuild. A profile of the `carddemo-operator-submit` gate found the
+//! rebuild. A profile of the operator-submit integration gate found the
 //! per-row cost of the first incremental-sync change was dominated by
 //! recomputing a SHA-256 digest for every row on every sync, including
 //! unchanged ones (~10 of ~13.4 us/row); cloning unchanged entries into a
