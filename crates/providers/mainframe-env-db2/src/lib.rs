@@ -7,6 +7,7 @@ mod catalog;
 mod generated_statement_catalog;
 mod retention;
 mod service;
+mod syntax;
 
 pub use abi::db2_abi_library;
 
@@ -26,3 +27,7 @@ pub use retention::{
     Db2ReplayRetentionState, describe_db2_replay_row,
 };
 pub use service::{Db2Limits, Db2ReplayClock, Db2Service, db2_providers};
+pub use syntax::{
+    Db2LexedStatement, Db2SourceLocation, Db2SourceSpan, Db2StringKind, Db2Symbol,
+    Db2SyntaxDiagnostic, Db2SyntaxDiagnosticCode, Db2SyntaxLimits, Db2Token, Db2TokenKind, lex_db2,
+};

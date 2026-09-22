@@ -32,3 +32,9 @@ package/plan, and distributed portfolio assigned to later versions. Verify with
 `cargo test -p mainframe-env-db2 --locked`, `cargo xtask db2-catalog --check`,
 `cargo xtask db2-statement-catalog --check`, and the pinned CardDemo Db2 and
 authorization gates.
+
+The 0.12 syntax path begins with a bounded private `sqlparser-rs` tokenizer.
+It immediately converts into owned Db2 tokens, source spans and diagnostics;
+third-party AST, errors, catalogs and types are not public or durable state.
+The lexer is not an execution route and grants no statement recognition credit
+until later owned parser and Conformance IR slices bind complete syntax.

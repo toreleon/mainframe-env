@@ -6,6 +6,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added a bounded Db2 lexical boundary backed privately by `sqlparser-rs`
+  0.63.0. Public results contain only owned tokens, spans, string/symbol kinds,
+  host variables, and diagnostics; byte, token, token-size, and nesting limits
+  fail closed before any future parser or executor can consume the input.
+
 - Added an exhaustive generated Db2 13 statement catalog with typed identities
   and source locators for all 158 SQL headings and 16 SQL PL rows. The frozen
   0.2 catalog remains the single source, while the new generator and focused

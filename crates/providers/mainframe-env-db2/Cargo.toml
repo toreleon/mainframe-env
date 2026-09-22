@@ -13,6 +13,7 @@ mainframe-env-store-api.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+sqlparser.workspace = true
 
 [dev-dependencies]
 mainframe-env-store.workspace = true
