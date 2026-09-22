@@ -402,6 +402,10 @@ All notable changes to mainframe-env are documented here.
 - Removed an application-specific profile name from the production dataset
   replay-index documentation; the optimization and replay behavior remain
   generic and unchanged.
+- Updated the durable-retention architecture guard for the memory store's
+  instrumented `snapshot` staging API. It continues to require staged archive
+  insertion and one final atomic state replacement without depending on the
+  retired direct-clone spelling.
 - Migrated the local `WRITEQ TD` compatibility subset to a typed queue-write
   plan. QUEUE is a validated 1–4 character literal or field, FROM is a resolved
   data area, and optional numeric LENGTH or `LENGTH OF` selects the persisted
