@@ -386,6 +386,11 @@ All notable changes to mainframe-env are documented here.
   READ GTEQ also accepts source-defined KEYLENGTH zero to select the first keyed
   record, including with GENERIC, while zero remains rejected for default EQUAL
   and GENERIC without GTEQ.
+- Repaired the CICS file/UOW conformance pilot after typed REWRITE began
+  requiring a storage-backed FROM area. Mutation fixtures now move their exact
+  bytes into the declared record area before REWRITE, and the WRITE LENGTH
+  source is test-only so the pilot module again meets its reviewed production
+  line ceiling and warnings-denied build.
 - Migrated the local `WRITEQ TD` compatibility subset to a typed queue-write
   plan. QUEUE is a validated 1–4 character literal or field, FROM is a resolved
   data area, and optional numeric LENGTH or `LENGTH OF` selects the persisted
