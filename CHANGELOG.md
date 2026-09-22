@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added a public resolved common Db2 scalar-type boundary with validated
+  precision, scale, length, time-zone, and nullability shapes plus deterministic
+  assignment/comparison compatibility classifications. Unsupported distinct,
+  LOB, ROWID, XML, CCSID/collation, bit-data, and context-dependent datetime
+  conversions remain explicit for later catalog/binder families.
+
 - Added public owned syntax surfaces for three source-reviewed common Db2
   slices: a bounded single-subselect SELECT core, named-table CREATE TABLE with
   common defaults and table constraints, and prepared-statement DECLARE CURSOR

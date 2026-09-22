@@ -66,3 +66,10 @@ pub use syntax::{
     Db2LexedStatement, Db2SourceLocation, Db2SourceSpan, Db2StringKind, Db2Symbol,
     Db2SyntaxDiagnostic, Db2SyntaxDiagnosticCode, Db2SyntaxLimits, Db2Token, Db2TokenKind, lex_db2,
 };
+pub use type_system::{
+    Db2AssignmentCompatibility, Db2AssignmentContext, Db2AssignmentNullability,
+    Db2ComparisonCompatibility, Db2ComparisonContext, Db2ConversionKind, Db2Nullability,
+    Db2ResolvedType, Db2ScalarType, Db2TimeZone, Db2TypeAttributes, Db2TypeError, Db2TypeErrorCode,
+    classify_db2_assignment, classify_db2_comparison, resolve_db2_type,
+    resolve_db2_type_with_attributes,
+};

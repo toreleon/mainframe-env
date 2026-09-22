@@ -76,3 +76,10 @@ UNIQUE, and FOREIGN KEY constraints with the declared ON DELETE actions. The
 public prepared DECLARE CURSOR surface preserves explicit/default scroll,
 sensitivity, holdability, returnability, target, and rowset positioning. Both
 fail closed outside their recorded subsets and grant no whole-row credit.
+
+The public common type boundary resolves parser syntax into validated numeric,
+character, graphic, binary, and datetime shapes while preserving precision,
+scale, length, time zone, and nullability. Its assignment and comparison
+classifications are deterministic but perform no conversion. Distinct types,
+LOBs, ROWID, XML, arrays, explicit CCSID/collation and context-sensitive
+datetime strings remain explicit binder/catalog obligations.
