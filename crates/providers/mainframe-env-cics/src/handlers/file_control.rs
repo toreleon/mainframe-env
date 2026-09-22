@@ -451,8 +451,21 @@ fn file(
     if service.consume_file_fault(operation, &logical_name, CicsFileFaultPoint::AfterIntent)? {
         return Err(HostProblem::InfrastructureFailure);
     }
-    let result = service
-        .nested(run, HostRequest::Dataset(host_request))
+    let result =
+        if operation == CicsOperation::Read && request.arguments.contains_key("OPTION.GTEQ") {
+            let key = argument_bytes(request, "RIDFLD")
+                .map(|mut value| {
+                    if let Some(key_length) = key_length {
+                        value.truncate(key_length as usize);
+                    }
+                    encode_dataset_bytes(ccsid, &value)
+                })
+                .transpose()?
+                .ok_or(HostProblem::Malformed)?;
+            read_gteq(service, run, dataset.clone(), key)
+        } else {
+            service.nested(run, HostRequest::Dataset(host_request))
+        }
         .map_err(|problem| match (operation, problem) {
             (CicsOperation::Read, HostProblem::NotFound) => HostProblem::Condition {
                 name: "NOTFND".into(),
@@ -566,6 +579,48 @@ fn file(
         );
     }
     Ok(response)
+}
+
+fn read_gteq(
+    service: &CicsService,
+    run: &mut Run,
+    dataset: DatasetName,
+    key: Vec<u8>,
+) -> Result<HostResult, HostProblem> {
+    let start = service.nested(
+        run,
+        HostRequest::Dataset(DatasetRequest::StartBrowse {
+            dataset: dataset.clone(),
+            key,
+            relation: mainframe_env_host_api::KeyRelation::GreaterOrEqual,
+        }),
+    )?;
+    let HostResult::Dataset(DatasetResult::Browse { cursor, .. }) = start else {
+        return Err(HostProblem::ProviderFailure);
+    };
+    let read = service.nested(
+        run,
+        HostRequest::Dataset(DatasetRequest::ReadNext {
+            dataset: dataset.clone(),
+            cursor: cursor.clone(),
+            reverse: false,
+            control: Default::default(),
+        }),
+    );
+    let close = service.nested(
+        run,
+        HostRequest::Dataset(DatasetRequest::EndBrowse { dataset, cursor }),
+    );
+    close?;
+    let result = read?;
+    if matches!(
+        &result,
+        HostResult::Dataset(DatasetResult::Browse { record: None, .. })
+    ) {
+        Err(HostProblem::NotFound)
+    } else {
+        Ok(result)
+    }
 }
 
 fn decimal_argument(request: &CicsRequest, name: &str) -> Result<Option<u32>, HostProblem> {

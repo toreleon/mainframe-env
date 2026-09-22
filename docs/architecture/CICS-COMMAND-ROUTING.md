@@ -221,7 +221,9 @@ explicit-key DELETE KEYLENGTH uses the same positive halfword forms against
 RIDFLD and is validated against the durable definition. All use the same single
 FILE/DATASET resource binding and typed mutation envelope. TOKEN correlation,
 SYSID, generic and alternate record identities, WRITE MASSINSERT, and RLS
-NOSUSPEND remain fail-closed.
+NOSUSPEND remain fail-closed. READ GTEQ uses a bounded transient dataset cursor
+to select the equal key or first greater keyed record, and closes that cursor
+before returning the record.
 The typed local WRITEQ TD subset requires a bounded QUEUE selector and FROM
 storage input, with optional numeric LENGTH or `LENGTH OF` that input. The
 provider writes exactly the selected prefix under the request's mutation

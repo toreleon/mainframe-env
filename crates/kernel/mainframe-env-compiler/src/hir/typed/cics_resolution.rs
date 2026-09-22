@@ -814,7 +814,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Deq => &["UOW", "TASK", "NOHANDLE"],
         HirCicsOperation::Enq => &["UOW", "TASK", "NOSUSPEND", "NOHANDLE"],
         HirCicsOperation::Getmain => &["NOSUSPEND", "NOHANDLE"],
-        HirCicsOperation::Read => &["UPDATE", "NOHANDLE"],
+        HirCicsOperation::Read => &["GTEQ", "UPDATE", "NOHANDLE"],
         HirCicsOperation::Rewrite => &["NOHANDLE"],
         HirCicsOperation::Syncpoint => &["ROLLBACK", "NOHANDLE"],
     };

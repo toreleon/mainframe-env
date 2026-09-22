@@ -2607,7 +2607,7 @@ mod tests {
         }
     }
 
-    /// Issue #204: GTEQ is scoped to typed STARTBR and preserves its typed route.
+    /// Issue #204: GTEQ is scoped to typed keyed selection routes.
     #[test]
     fn cics_startbr_gteq_is_typed_and_operation_scoped() {
         let valid = analyze(
@@ -2627,8 +2627,25 @@ mod tests {
         assert_eq!(command.operation, HirCicsOperation::StartBrowse);
         assert_eq!(command.options, BTreeSet::from([HirCicsOption::Gteq]));
 
-        let invalid = analyze(
+        let read = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. RDGTEQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 REC-X PIC X(8). PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) GTEQ END-EXEC.",
+        );
+        let hir = read
+            .hir
+            .unwrap_or_else(|| panic!("READ GTEQ: {:?}", read.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed READ");
+        assert_eq!(command.operation, HirCicsOperation::Read);
+        assert_eq!(command.options, BTreeSet::from([HirCicsOption::Gteq]));
+
+        let invalid = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. WRGTEQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 REC-X PIC X(8). PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(REC-X) RIDFLD(KEY-X) GTEQ END-EXEC.",
         );
         assert!(invalid.hir.is_none());
     }
@@ -2984,6 +3001,31 @@ mod tests {
         ] {
             assert!(analyze(source).hir.is_none(), "{source}");
         }
+    }
+
+    #[test]
+    fn cics_read_gteq_is_typed_and_operation_scoped() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. READGTEQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3) VALUE '004'. 01 RECORD-X PIC X(7). PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) GTEQ END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("READ GTEQ: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed READ GTEQ");
+        assert_eq!(command.operation, HirCicsOperation::Read);
+        assert!(command.options.contains(&HirCicsOption::Gteq));
+
+        let wrong_operation = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADGTEQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(7). PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) GTEQ END-EXEC. STOP RUN.",
+        );
+        assert!(wrong_operation.hir.is_none());
     }
 
     /// Issue #206: WRITEQ TD accepts the runtime length of its FROM area.

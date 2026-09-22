@@ -376,7 +376,9 @@ All notable changes to mainframe-env are documented here.
   READ, WRITE, and explicit-key DELETE KEYLENGTH accept the same positive
   halfword forms against RIDFLD and preserve exact `INVREQ` 16/26 for a
   definition mismatch. TOKEN deletes, remote forms, generic and alternate
-  record identifiers, mass insert, and RLS wait controls remain deferred.
+  record identifiers, mass insert, and RLS wait controls remain deferred. READ
+  GTEQ uses the existing bounded dataset cursor primitive to return the equal
+  key or first greater keyed record without retaining browse state.
 - Migrated the local `WRITEQ TD` compatibility subset to a typed queue-write
   plan. QUEUE is a validated 1–4 character literal or field, FROM is a resolved
   data area, and optional numeric LENGTH or `LENGTH OF` selects the persisted

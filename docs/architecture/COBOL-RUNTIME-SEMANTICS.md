@@ -245,7 +245,8 @@ RIDFLD area and must match the durable key definition. These operations require
 exactly one FILE/DATASET alias, carry a mutation identity, and update the
 operation-specific EIBFN. A current-record DELETE or REWRITE without a hold
 returns its source-defined `INVREQ`; DELETE cannot carry KEYLENGTH without
-RIDFLD.
+RIDFLD. READ GTEQ selects the equal or first greater keyed record through a
+request-local cursor that is closed before the command completes.
 Forms whose key or record is a literal, or whose semantics depend on TOKEN,
 remote routing, alternate identities, mass insert, or RLS suspension do not
 publish the typed executable.

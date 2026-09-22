@@ -507,7 +507,12 @@ fn validate_operation_shape(
                     _ => false,
                 }
                 || plan.options.iter().any(|option| {
-                    !matches!(option, CicsPlanOption::NoHandle | CicsPlanOption::Update)
+                    !matches!(
+                        option,
+                        CicsPlanOption::Gteq
+                            | CicsPlanOption::NoHandle
+                            | CicsPlanOption::Update
+                    )
                 })
                 || !matches!(
                     operand_value(plan, CicsOperandName::Length),
@@ -1074,6 +1079,9 @@ mod tests {
             outputs: Vec::new(),
             condition: CicsCondition::Default,
         };
+        let mut gteq_read = read.clone();
+        gteq_read.options.insert(CicsPlanOption::Gteq);
+        assert!(encode_cics_effect_plan(&gteq_read, CicsPlanLimits::default()).is_ok());
         for base in [read, rewrite, syncpoint] {
             assert!(encode_cics_effect_plan(&base, CicsPlanLimits::default()).is_ok());
             for option in [
@@ -1087,6 +1095,9 @@ mod tests {
                 CicsPlanOption::MapOnly,
                 CicsPlanOption::DataOnly,
             ] {
+                if base.operation == CicsPlanOperation::Read && option == CicsPlanOption::Gteq {
+                    continue;
+                }
                 let mut invalid = base.clone();
                 invalid.options.insert(option);
                 assert_eq!(
