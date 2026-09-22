@@ -14700,6 +14700,32 @@ mod tests {
         service
             .invoke(&effect(&invocation.run_unit_id, end.clone(), 5), end)
             .unwrap();
+        let equal_start = request(
+            CicsOperation::StartBrowse,
+            BTreeMap::from([
+                ("DATASET".into(), argument(b"CARDDAT")),
+                ("RIDFLD".into(), argument(b"AA")),
+                ("OPTION.EQUAL".into(), argument(b"")),
+            ]),
+            6,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, equal_start.clone(), 6),
+                equal_start,
+            )
+            .unwrap();
+        let equal_end = request(
+            CicsOperation::EndBrowse,
+            BTreeMap::from([("DATASET".into(), argument(b"CARDDAT"))]),
+            7,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, equal_end.clone(), 7),
+                equal_end,
+            )
+            .unwrap();
 
         let requests = trace.requests.lock().unwrap();
         assert!(matches!(
@@ -14725,6 +14751,18 @@ mod tests {
         ));
         assert!(matches!(
             &requests[4],
+            DatasetRequest::EndBrowse { cursor, .. } if cursor == "CURSOR-1"
+        ));
+        assert!(matches!(
+            &requests[5],
+            DatasetRequest::StartBrowse {
+                dataset,
+                relation: mainframe_env_host_api::KeyRelation::Equal,
+                ..
+            } if dataset.as_str() == "CARDDEMO.CARDDAT"
+        ));
+        assert!(matches!(
+            &requests[6],
             DatasetRequest::EndBrowse { cursor, .. } if cursor == "CURSOR-1"
         ));
         drop(requests);

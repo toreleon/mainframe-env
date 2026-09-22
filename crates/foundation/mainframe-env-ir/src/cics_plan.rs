@@ -1459,6 +1459,14 @@ mod tests {
             outputs: Vec::new(),
             condition: CicsCondition::Default,
         };
+        let mut equal_start_browse = start_browse.clone();
+        equal_start_browse.options.insert(CicsPlanOption::Equal);
+        assert!(encode_cics_effect_plan(&equal_start_browse, CicsPlanLimits::default()).is_ok());
+        equal_start_browse.options.insert(CicsPlanOption::Gteq);
+        assert_eq!(
+            encode_cics_effect_plan(&equal_start_browse, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
         let mutation_key = slot(12, "FILE.KEY");
         let delete = CicsEffectPlan {
             operation: CicsPlanOperation::Delete,

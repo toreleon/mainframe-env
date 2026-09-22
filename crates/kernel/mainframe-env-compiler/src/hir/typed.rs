@@ -2629,6 +2629,23 @@ mod tests {
         assert_eq!(command.operation, HirCicsOperation::StartBrowse);
         assert_eq!(command.options, BTreeSet::from([HirCicsOption::Gteq]));
 
+        let equal = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BREQUAL. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). PROCEDURE DIVISION. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) EQUAL END-EXEC.",
+        );
+        let hir = equal
+            .hir
+            .unwrap_or_else(|| panic!("STARTBR EQUAL: {:?}", equal.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed STARTBR EQUAL");
+        assert_eq!(command.operation, HirCicsOperation::StartBrowse);
+        assert_eq!(command.options, BTreeSet::from([HirCicsOption::Equal]));
+
         let read = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. RDGTEQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 REC-X PIC X(8). PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) GTEQ END-EXEC.",
         );
@@ -2650,6 +2667,10 @@ mod tests {
             "IDENTIFICATION DIVISION. PROGRAM-ID. WRGTEQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 REC-X PIC X(8). PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(REC-X) RIDFLD(KEY-X) GTEQ END-EXEC.",
         );
         assert!(invalid.hir.is_none());
+        let conflicting = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADREL. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). PROCEDURE DIVISION. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) EQUAL GTEQ END-EXEC.",
+        );
+        assert!(conflicting.hir.is_none());
     }
 
     /// Issue #205: DELETE may select the record held by READ UPDATE.

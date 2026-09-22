@@ -3395,13 +3395,13 @@ mod tests {
     }
 
     #[test]
-    fn cics_default_file_browse_preserves_cursor_key_across_typed_operations() {
+    fn cics_equal_file_browse_preserves_cursor_key_across_typed_operations() {
         use mainframe_env_host_api::{
             CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
             HostResult,
         };
 
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBROWSE. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2) VALUE 'AA'. 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) END-EXEC. EXEC CICS READNEXT FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS READPREV FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS ENDBR FILE('ACCTDAT') END-EXEC. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSBROWSE. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2) VALUE 'AA'. 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) EQUAL END-EXEC. EXEC CICS READNEXT FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS READPREV FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) END-EXEC. EXEC CICS ENDBR FILE('ACCTDAT') END-EXEC. STOP RUN.";
         let artifact = compile(source).unwrap();
         let mut machine = ReferenceMachine::from_binary(
             artifact.payload(),
@@ -3447,6 +3447,7 @@ mod tests {
                 ..
             }) if arguments["FILE"].bytes() == b"ACCTDAT"
                 && arguments["RIDFLD"].bytes() == b"AA"
+                && arguments.contains_key("OPTION.EQUAL")
         ));
 
         let MachineDrive::HostCall(next) = machine.drive(

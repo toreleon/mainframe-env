@@ -39,9 +39,13 @@ pub(super) fn invalid_shape(
             None => ridfld_output.is_some(),
         }
         || reading != outputs.contains(&CicsOutputName::Into)
+        || (plan.options.contains(&CicsPlanOption::Equal)
+            && plan.options.contains(&CicsPlanOption::Gteq))
         || plan.options.iter().any(|option| match option {
             CicsPlanOption::NoHandle => false,
-            CicsPlanOption::Gteq => plan.operation != CicsPlanOperation::StartBrowse,
+            CicsPlanOption::Gteq | CicsPlanOption::Equal => {
+                plan.operation != CicsPlanOperation::StartBrowse
+            }
             _ => true,
         })
 }

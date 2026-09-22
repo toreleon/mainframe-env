@@ -360,9 +360,10 @@ All notable changes to mainframe-env are documented here.
   higher-level, and DPL ownership remain deferred.
 - Migrated the default-cursor `STARTBR`/`READNEXT`/`READPREV`/`ENDBR` file
   browse subset to typed plans. The compiler binds exactly one FILE/DATASET
-  resource and a writable RIDFLD, admits STARTBR's default-equivalent `GTEQ`,
-  models RIDFLD as the same input/output slot on reads, and writes the returned
-  record into a pre-resolved INTO area.
+  resource and a writable RIDFLD, admits STARTBR's default-equivalent `GTEQ`
+  and exact-key `EQUAL` relations as an exclusive choice, models RIDFLD as the
+  same input/output slot on reads, and writes the returned record into a
+  pre-resolved INTO area.
   REQID/SYSID, alternate key modes and lengths, SET, and UPDATE/TOKEN/RLS
   semantics remain fail-closed.
 - Migrated the explicit-key `DELETE` and `WRITE FILE` compatibility subsets to

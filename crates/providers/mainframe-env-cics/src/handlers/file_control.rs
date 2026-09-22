@@ -423,7 +423,11 @@ fn file(
                 ccsid,
                 &argument_bytes(request, "RIDFLD").unwrap_or_default(),
             )?,
-            relation: mainframe_env_host_api::KeyRelation::GreaterOrEqual,
+            relation: if equal {
+                mainframe_env_host_api::KeyRelation::Equal
+            } else {
+                mainframe_env_host_api::KeyRelation::GreaterOrEqual
+            },
         },
         CicsOperation::ReadNext | CicsOperation::ReadPrev => DatasetRequest::ReadNext {
             dataset: dataset.clone(),
@@ -706,7 +710,7 @@ fn validate_search_relation(
     equal: bool,
     gteq: bool,
 ) -> Result<(), HostProblem> {
-    if equal && (operation != CicsOperation::Read || gteq) {
+    if equal && (!matches!(operation, CicsOperation::Read | CicsOperation::StartBrowse) || gteq) {
         Err(HostProblem::Malformed)
     } else {
         Ok(())
@@ -861,6 +865,14 @@ mod tests {
         );
         assert_eq!(
             validate_search_relation(CicsOperation::Write, true, false),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            validate_search_relation(CicsOperation::StartBrowse, true, false),
+            Ok(())
+        );
+        assert_eq!(
+            validate_search_relation(CicsOperation::StartBrowse, true, true),
             Err(HostProblem::Malformed)
         );
         assert!(matches!(

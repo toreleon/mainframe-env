@@ -224,8 +224,9 @@ continuation; malformed schemas, unsupported DPL context, and unowned options
 fail before continuation mutation.
 
 The typed default file-browse loop gives RIDFLD explicit storage identity.
-STARTBR reads its initial key but has no record output. READNEXT and READPREV
-send the current key, write the returned payload to INTO, and require a
+STARTBR reads its initial key but has no record output; explicit EQUAL requires
+an exact starting key while GTEQ retains equal-or-next positioning. READNEXT
+and READPREV send the current key, write the returned payload to INTO, and require a
 `mainframe-env.cics.payload@1` RIDFLD output before updating that same key
 slot. ENDBR carries only the resolved FILE/DATASET identity. The sequence
 updates EIBFN to `060C`, `060E`, `0610`, and `0612`; forms needing named cursor,

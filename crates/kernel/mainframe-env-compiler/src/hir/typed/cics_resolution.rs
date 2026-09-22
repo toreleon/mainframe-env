@@ -810,7 +810,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "DATAONLY", "ERASE", "CURSOR", "FREEKB", "MAPONLY", "NOHANDLE",
         ],
         HirCicsOperation::SendText => &["ERASE", "FREEKB", "NOHANDLE"],
-        HirCicsOperation::StartBrowse => &["GTEQ", "NOHANDLE"],
+        HirCicsOperation::StartBrowse => &["EQUAL", "GTEQ", "NOHANDLE"],
         HirCicsOperation::Deq => &["UOW", "TASK", "NOHANDLE"],
         HirCicsOperation::Enq => &["UOW", "TASK", "NOSUSPEND", "NOHANDLE"],
         HirCicsOperation::Getmain => &["NOSUSPEND", "NOHANDLE"],

@@ -204,11 +204,11 @@ automatic wake, process-restart WAIT resume, terminal association, and automatic
 task launch remain fail-closed or deferred.
 The typed default-cursor file-browse subset binds STARTBR, READNEXT, READPREV,
 and ENDBR to exactly one FILE/DATASET alias. STARTBR captures a writable
-RIDFLD without returning a record and admits the default-equivalent `GTEQ`
-relation; READNEXT and READPREV require INTO and
+RIDFLD without returning a record and admits the default-equivalent `GTEQ` or
+exact-key `EQUAL` relation as an exclusive choice; READNEXT and READPREV require INTO and
 model RIDFLD as the same input/output storage identity so the host-updated key
 feeds the next browse request; ENDBR closes the resource browse. REQID/SYSID,
-KEYLENGTH/LENGTH, SET, alternate RBA/RRN/XRBA and other generic key modes, and
+KEYLENGTH/LENGTH, SET, alternate RBA/RRN/XRBA and generic key modes, and
 UPDATE/TOKEN/RLS locking remain explicit compiler rejections.
 The typed keyed-mutation subset admits DELETE with either an explicit RIDFLD or
 the record held by the task's latest `READ UPDATE` on that file. WRITE FILE

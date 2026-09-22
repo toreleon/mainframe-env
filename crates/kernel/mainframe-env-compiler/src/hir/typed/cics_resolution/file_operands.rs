@@ -47,13 +47,15 @@ pub(super) fn validate_constraints(
             "CICS Read GENERIC requires KEYLENGTH".into(),
         ));
     }
-    if operation == HirCicsOperation::Read
-        && options.iter().any(|option| option == "EQUAL")
+    if matches!(
+        operation,
+        HirCicsOperation::Read | HirCicsOperation::StartBrowse
+    ) && options.iter().any(|option| option == "EQUAL")
         && options.iter().any(|option| option == "GTEQ")
     {
-        return Err(ResolutionFailure::Invalid(
-            "CICS Read EQUAL and GTEQ are mutually exclusive".into(),
-        ));
+        return Err(ResolutionFailure::Invalid(format!(
+            "CICS {operation:?} EQUAL and GTEQ are mutually exclusive"
+        )));
     }
     if operation == HirCicsOperation::Read
         && !options.iter().any(|option| option == "GTEQ")
