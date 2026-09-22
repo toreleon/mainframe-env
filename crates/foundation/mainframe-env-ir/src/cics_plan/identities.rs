@@ -224,6 +224,8 @@ pub enum CicsPlanOption {
     MapOnly,
     /// Send only application data and its supplied BMS field attributes.
     DataOnly,
+    /// Require a keyed READ to match the complete or generic RIDFLD key.
+    Equal,
 }
 
 /// Named result binding written after the host result arrives.

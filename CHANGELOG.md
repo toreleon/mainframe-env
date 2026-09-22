@@ -380,6 +380,8 @@ All notable changes to mainframe-env are documented here.
   GTEQ uses the existing bounded dataset cursor primitive to return the equal
   key or first greater keyed record without retaining browse state; READ
   GENERIC uses a positive partial KEYLENGTH and returns only a matching prefix.
+  Explicit READ EQUAL now selects the same source-defined exact complete- or
+  generic-key behavior as the default relation and conflicts with GTEQ.
   READ GTEQ also accepts source-defined KEYLENGTH zero to select the first keyed
   record, including with GENERIC, while zero remains rejected for default EQUAL
   and GENERIC without GTEQ.

@@ -488,6 +488,8 @@ fn validate_operation_shape(
                 || !outputs.contains(&CicsOutputName::Into)
                 || (plan.options.contains(&CicsPlanOption::Generic)
                     && !inputs.contains(&CicsOperandName::KeyLength))
+                || (plan.options.contains(&CicsPlanOption::Equal)
+                    && plan.options.contains(&CicsPlanOption::Gteq))
                 || plan.operands.iter().any(|operand| {
                     operand.name == CicsOperandName::KeyLength
                         && match operand.value {
@@ -516,6 +518,7 @@ fn validate_operation_shape(
                         option,
                         CicsPlanOption::Generic
                             | CicsPlanOption::Gteq
+                            | CicsPlanOption::Equal
                             | CicsPlanOption::NoHandle
                             | CicsPlanOption::Update
                     )
@@ -1088,10 +1091,14 @@ mod tests {
         let mut gteq_read = read.clone();
         gteq_read.options.insert(CicsPlanOption::Gteq);
         assert!(encode_cics_effect_plan(&gteq_read, CicsPlanLimits::default()).is_ok());
+        let mut equal_read = read.clone();
+        equal_read.options.insert(CicsPlanOption::Equal);
+        assert!(encode_cics_effect_plan(&equal_read, CicsPlanLimits::default()).is_ok());
         for base in [read, rewrite, syncpoint] {
             assert!(encode_cics_effect_plan(&base, CicsPlanLimits::default()).is_ok());
             for option in [
                 CicsPlanOption::Gteq,
+                CicsPlanOption::Equal,
                 CicsPlanOption::Erase,
                 CicsPlanOption::Cursor,
                 CicsPlanOption::FreeKb,
@@ -1101,7 +1108,9 @@ mod tests {
                 CicsPlanOption::MapOnly,
                 CicsPlanOption::DataOnly,
             ] {
-                if base.operation == CicsPlanOperation::Read && option == CicsPlanOption::Gteq {
+                if base.operation == CicsPlanOperation::Read
+                    && matches!(option, CicsPlanOption::Gteq | CicsPlanOption::Equal)
+                {
                     continue;
                 }
                 let mut invalid = base.clone();
@@ -1168,6 +1177,8 @@ mod tests {
         assert_eq!(option_from_tag(24), Ok(CicsPlanOption::DataOnly));
         assert_eq!(option_tag(CicsPlanOption::Generic), 25);
         assert_eq!(option_from_tag(25), Ok(CicsPlanOption::Generic));
+        assert_eq!(option_tag(CicsPlanOption::Equal), 26);
+        assert_eq!(option_from_tag(26), Ok(CicsPlanOption::Equal));
 
         let plan = read_plan();
         let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
@@ -1682,6 +1693,14 @@ mod tests {
         let mut generic_read = read.clone();
         generic_read.options.insert(CicsPlanOption::Generic);
         assert!(encode_cics_effect_plan(&generic_read, CicsPlanLimits::default()).is_ok());
+        generic_read.options.insert(CicsPlanOption::Equal);
+        assert!(encode_cics_effect_plan(&generic_read, CicsPlanLimits::default()).is_ok());
+        let mut conflicting_relation = generic_read.clone();
+        conflicting_relation.options.insert(CicsPlanOption::Gteq);
+        assert_eq!(
+            encode_cics_effect_plan(&conflicting_relation, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
         let mut generic_read_without_key_length = generic_read.clone();
         generic_read_without_key_length
             .operands

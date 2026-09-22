@@ -26,6 +26,7 @@ pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
             option,
             CicsPlanOption::Generic
                 | CicsPlanOption::Gteq
+                | CicsPlanOption::Equal
                 | CicsPlanOption::NoHandle
                 | CicsPlanOption::Update
         ),

@@ -264,6 +264,8 @@ fn file(
     };
     let generic = request.arguments.contains_key("OPTION.GENERIC");
     let gteq = request.arguments.contains_key("OPTION.GTEQ");
+    let equal = request.arguments.contains_key("OPTION.EQUAL");
+    validate_search_relation(request.operation, equal, gteq)?;
     validate_key_length(
         request.operation,
         key_length,
@@ -699,6 +701,18 @@ fn validate_key_length(
     Ok(())
 }
 
+fn validate_search_relation(
+    operation: CicsOperation,
+    equal: bool,
+    gteq: bool,
+) -> Result<(), HostProblem> {
+    if equal && (operation != CicsOperation::Read || gteq) {
+        Err(HostProblem::Malformed)
+    } else {
+        Ok(())
+    }
+}
+
 fn validate_record_length(
     operation: CicsOperation,
     length: Option<u32>,
@@ -837,6 +851,18 @@ mod tests {
             Ok(Some(("LENGERR", 22, 12)))
         );
         let fixed = attributes(RecordFormat::Fixed, 8);
+        assert_eq!(
+            validate_search_relation(CicsOperation::Read, true, false),
+            Ok(())
+        );
+        assert_eq!(
+            validate_search_relation(CicsOperation::Read, true, true),
+            Err(HostProblem::Malformed)
+        );
+        assert_eq!(
+            validate_search_relation(CicsOperation::Write, true, false),
+            Err(HostProblem::Malformed)
+        );
         assert!(matches!(
             validate_record_length(CicsOperation::Rewrite, Some(7), Some(&fixed)),
             Err(HostProblem::Condition {

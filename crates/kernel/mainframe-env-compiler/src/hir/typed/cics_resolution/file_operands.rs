@@ -48,6 +48,14 @@ pub(super) fn validate_constraints(
         ));
     }
     if operation == HirCicsOperation::Read
+        && options.iter().any(|option| option == "EQUAL")
+        && options.iter().any(|option| option == "GTEQ")
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS Read EQUAL and GTEQ are mutually exclusive".into(),
+        ));
+    }
+    if operation == HirCicsOperation::Read
         && !options.iter().any(|option| option == "GTEQ")
         && matches!(
             clauses.get("KEYLENGTH").map(Vec::as_slice),

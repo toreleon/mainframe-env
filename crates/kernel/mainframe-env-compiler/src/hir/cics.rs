@@ -356,6 +356,7 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::FreeKb => CicsPlanOption::FreeKb,
         HirCicsOption::Gteq => CicsPlanOption::Gteq,
         HirCicsOption::Generic => CicsPlanOption::Generic,
+        HirCicsOption::Equal => CicsPlanOption::Equal,
         HirCicsOption::Fmh => CicsPlanOption::Fmh,
         HirCicsOption::Protect => CicsPlanOption::Protect,
         HirCicsOption::Wait => CicsPlanOption::Wait,
