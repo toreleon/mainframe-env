@@ -113,7 +113,7 @@ pub(super) fn resolve(
                 file_record_length_value(tokens, operation, semantic)?
             } else if matches!(
                 operation,
-                HirCicsOperation::Write | HirCicsOperation::Delete
+                HirCicsOperation::Read | HirCicsOperation::Write | HirCicsOperation::Delete
             ) && name == "KEYLENGTH"
             {
                 file_key_length_value(tokens, operation, semantic)?
@@ -141,7 +141,7 @@ pub(super) fn resolve(
             }
             if matches!(
                 operation,
-                HirCicsOperation::Write | HirCicsOperation::Delete
+                HirCicsOperation::Read | HirCicsOperation::Write | HirCicsOperation::Delete
             ) && name == "KEYLENGTH"
                 && let HirCicsValue::LengthOf(length) = &value
                 && !operands.iter().any(|operand| {
@@ -217,7 +217,7 @@ fn file_key_length_value(
             if reference.category != DataCategory::Binary || reference.length != 2 =>
         {
             return Err(ResolutionFailure::Invalid(format!(
-                "CICS {operation:?} KEYLENGTH requires a halfword binary data item"
+                "CICS {operation:?} KEYLENGTH data item is not a halfword binary data item"
             )));
         }
         HirCicsValue::Integer(value) if !(1..=32_767).contains(value) => {

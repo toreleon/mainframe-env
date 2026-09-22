@@ -476,9 +476,36 @@ fn validate_operation_shape(
         | CicsPlanOperation::EndBrowse => browse::invalid_shape(plan, inputs, outputs),
         CicsPlanOperation::Read => {
             resources != 1
+                || !inputs.is_subset(&BTreeSet::from([
+                    CicsOperandName::File,
+                    CicsOperandName::Dataset,
+                    CicsOperandName::Ridfld,
+                    CicsOperandName::Length,
+                    CicsOperandName::KeyLength,
+                ]))
                 || !inputs.contains(&CicsOperandName::Ridfld)
                 || inputs.contains(&CicsOperandName::From)
                 || !outputs.contains(&CicsOutputName::Into)
+                || plan.operands.iter().any(|operand| {
+                    operand.name == CicsOperandName::KeyLength
+                        && !matches!(
+                            operand.value,
+                            CicsOperandValue::Integer(1..=32_767)
+                                | CicsOperandValue::Storage(_)
+                                | CicsOperandValue::LengthOf(_)
+                        )
+                })
+                || match (
+                    operand_value(plan, CicsOperandName::Ridfld),
+                    operand_value(plan, CicsOperandName::KeyLength),
+                ) {
+                    (
+                        Some(CicsOperandValue::Storage(ridfld)),
+                        Some(CicsOperandValue::LengthOf(length)),
+                    ) => ridfld != length,
+                    (Some(_), Some(CicsOperandValue::LengthOf(_))) => true,
+                    _ => false,
+                }
                 || plan.options.iter().any(|option| {
                     !matches!(option, CicsPlanOption::NoHandle | CicsPlanOption::Update)
                 })
@@ -975,7 +1002,7 @@ mod tests {
             operands: vec![
                 CicsNamedOperand {
                     name: CicsOperandName::Ridfld,
-                    value: CicsOperandValue::Literal(b"003".to_vec()),
+                    value: CicsOperandValue::Storage(slot(5, "REQUEST.KEY")),
                 },
                 CicsNamedOperand {
                     name: CicsOperandName::File,
@@ -1578,6 +1605,28 @@ mod tests {
             encode_cics_effect_plan(&rewrite_with_ridfld, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
+        let mut read_with_zero_key_length = read.clone();
+        read_with_zero_key_length
+            .operands
+            .iter_mut()
+            .find(|operand| operand.name == CicsOperandName::KeyLength)
+            .unwrap()
+            .value = CicsOperandValue::Integer(0);
+        assert_eq!(
+            encode_cics_effect_plan(&read_with_zero_key_length, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut read_with_mismatched_key_length = read.clone();
+        read_with_mismatched_key_length
+            .operands
+            .iter_mut()
+            .find(|operand| operand.name == CicsOperandName::KeyLength)
+            .unwrap()
+            .value = CicsOperandValue::LengthOf(slot(16, "OTHER.KEY"));
+        assert_eq!(
+            encode_cics_effect_plan(&read_with_mismatched_key_length, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
         let mut write_with_key_length = write.clone();
         write_with_key_length.operands.push(CicsNamedOperand {
             name: CicsOperandName::KeyLength,
@@ -1719,8 +1768,13 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(
-            decoded.operands[1].value,
-            CicsOperandValue::Literal(ref bytes) if bytes == b"003"
+            decoded
+                .operands
+                .iter()
+                .find(|operand| operand.name == CicsOperandName::Ridfld)
+                .map(|operand| &operand.value),
+            Some(CicsOperandValue::Storage(slot))
+                if slot.qualified_layout_name == "REQUEST.KEY"
         ));
         assert_eq!(CICS_ASSIGN_OUTPUT_NAMES.len(), 92);
         assert!(
