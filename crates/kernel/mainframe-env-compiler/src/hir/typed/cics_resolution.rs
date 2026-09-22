@@ -814,7 +814,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::Deq => &["UOW", "TASK", "NOHANDLE"],
         HirCicsOperation::Enq => &["UOW", "TASK", "NOSUSPEND", "NOHANDLE"],
         HirCicsOperation::Getmain => &["NOSUSPEND", "NOHANDLE"],
-        HirCicsOperation::Read => &["GTEQ", "UPDATE", "NOHANDLE"],
+        HirCicsOperation::Read => &["GENERIC", "GTEQ", "UPDATE", "NOHANDLE"],
         HirCicsOperation::Rewrite => &["NOHANDLE"],
         HirCicsOperation::Syncpoint => &["ROLLBACK", "NOHANDLE"],
     };
@@ -853,7 +853,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         )));
     }
     program_control::validate_constraints(operation, &clauses)?;
-    file_operands::validate_constraints(&clauses, operation)?;
+    file_operands::validate_constraints(&clauses, &raw_options, operation)?;
     queue_control::validate_constraints(&clauses, operation)?;
     storage_control::validate_constraints(&clauses, operation, semantic)?;
     terminal_control::validate_constraints(&clauses, &raw_options, operation)?;
@@ -1093,6 +1093,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "TIMESEP" => HirCicsOption::TimeSep,
             "FREEKB" => HirCicsOption::FreeKb,
             "GTEQ" => HirCicsOption::Gteq,
+            "GENERIC" => HirCicsOption::Generic,
             "FMH" => HirCicsOption::Fmh,
             "PROTECT" => HirCicsOption::Protect,
             "WAIT" => HirCicsOption::Wait,

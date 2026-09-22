@@ -378,7 +378,8 @@ All notable changes to mainframe-env are documented here.
   definition mismatch. TOKEN deletes, remote forms, generic and alternate
   record identifiers, mass insert, and RLS wait controls remain deferred. READ
   GTEQ uses the existing bounded dataset cursor primitive to return the equal
-  key or first greater keyed record without retaining browse state.
+  key or first greater keyed record without retaining browse state; READ
+  GENERIC uses a positive partial KEYLENGTH and returns only a matching prefix.
 - Migrated the local `WRITEQ TD` compatibility subset to a typed queue-write
   plan. QUEUE is a validated 1–4 character literal or field, FROM is a resolved
   data area, and optional numeric LENGTH or `LENGTH OF` selects the persisted

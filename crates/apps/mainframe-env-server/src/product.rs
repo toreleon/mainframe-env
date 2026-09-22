@@ -11797,6 +11797,127 @@ mod tests {
     }
 
     #[test]
+    fn compiled_read_file_generic_matches_prefix_and_reports_notfnd() {
+        let artifact = published_source_fixture(
+            "READGEN",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. READGEN.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 KEY-X PIC X(3) VALUE '00Z'.\n01 KEY-LENGTH-X PIC S9(4) COMP VALUE 2.\n01 RECORD-X PIC X(7).\n01 MISS-X PIC X(7).\n01 RESP-X PIC S9(9) COMP.\n01 RESP2-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(KEY-LENGTH-X) GENERIC END-EXEC.\nMOVE '01Z' TO KEY-X.\nEXEC CICS READ FILE('ACCTDAT') INTO(MISS-X) RIDFLD(KEY-X) KEYLENGTH(KEY-LENGTH-X) GENERIC RESP(RESP-X) RESP2(RESP2-X) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        let authentication = || Authentication::Basic {
+            user: "IBMUSER".into(),
+            secret: b"TESTPASS".to_vec(),
+        };
+        server
+            .handle(
+                authentication(),
+                GatewayRequest::DatasetCreate {
+                    dataset: "IBMUSER.ACCTDAT".into(),
+                    attributes: json!({
+                        "dsorg":"KSDS",
+                        "recfm":"F",
+                        "lrecl":7,
+                        "key_offset":0,
+                        "key_length":3
+                    }),
+                },
+            )
+            .unwrap();
+        for bytes in [b"003DATA".to_vec(), b"005NEXT".to_vec()] {
+            server
+                .handle(
+                    authentication(),
+                    GatewayRequest::DatasetWrite {
+                        dataset: "IBMUSER.ACCTDAT".into(),
+                        member: None,
+                        bytes,
+                    },
+                )
+                .unwrap();
+        }
+        server
+            .cics
+            .register_file_aliases(&BTreeMap::from([(
+                "ACCTDAT".into(),
+                DatasetName::new("IBMUSER.ACCTDAT", 128).unwrap(),
+            )]))
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "READGEN".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("RE00".into(), "READGEN".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "READGEN".into(),
+                    map: "READGEN".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("read-file-generic-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "RE00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "RE00",
+                24,
+                80,
+                "read-file-generic-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "READGEN", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("RECORD-X").unwrap().bytes(), b"003DATA");
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 13]);
+        assert_eq!(
+            restored.variable("RESP2-X").unwrap().bytes(),
+            &[0, 0, 0, 80]
+        );
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 3)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::Read)
+                .count(),
+            2
+        );
+    }
+
+    #[test]
     fn compiled_read_file_length_writes_actual_record_length() {
         let artifact = published_source_fixture(
             "READLEN",

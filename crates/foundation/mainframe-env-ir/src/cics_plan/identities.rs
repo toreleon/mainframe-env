@@ -206,6 +206,8 @@ pub enum CicsPlanOption {
     FreeKb,
     /// Start a file browse at the first key greater than or equal to RIDFLD.
     Gteq,
+    /// Match a keyed READ by the KEYLENGTH prefix of RIDFLD.
+    Generic,
     /// Mark START data as containing function management headers.
     Fmh,
     /// Defer START work admission until a successful syncpoint.

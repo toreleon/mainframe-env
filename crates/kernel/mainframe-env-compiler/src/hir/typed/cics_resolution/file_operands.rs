@@ -7,6 +7,7 @@ use crate::{DataCategory, SemanticModel};
 
 pub(super) fn validate_constraints(
     clauses: &Clauses,
+    options: &[String],
     operation: HirCicsOperation,
 ) -> Resolution<()> {
     let required: &[&str] = match operation {
@@ -37,6 +38,14 @@ pub(super) fn validate_constraints(
         return Err(ResolutionFailure::Invalid(format!(
             "CICS {operation:?} KEYLENGTH requires RIDFLD"
         )));
+    }
+    if operation == HirCicsOperation::Read
+        && options.iter().any(|option| option == "GENERIC")
+        && !clauses.contains_key("KEYLENGTH")
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS Read GENERIC requires KEYLENGTH".into(),
+        ));
     }
     Ok(())
 }

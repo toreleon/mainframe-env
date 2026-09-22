@@ -24,7 +24,10 @@ pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
         }
         CicsPlanOperation::Read => !matches!(
             option,
-            CicsPlanOption::Gteq | CicsPlanOption::NoHandle | CicsPlanOption::Update
+            CicsPlanOption::Generic
+                | CicsPlanOption::Gteq
+                | CicsPlanOption::NoHandle
+                | CicsPlanOption::Update
         ),
         _ => !matches!(option, CicsPlanOption::NoHandle),
     })

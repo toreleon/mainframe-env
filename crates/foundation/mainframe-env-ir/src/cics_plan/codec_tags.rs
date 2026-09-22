@@ -224,6 +224,7 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u8 {
         CicsPlanOption::NoCheck => 22,
         CicsPlanOption::MapOnly => 23,
         CicsPlanOption::DataOnly => 24,
+        CicsPlanOption::Generic => 25,
     }
 }
 
@@ -254,6 +255,7 @@ pub(super) fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodec
         22 => Ok(CicsPlanOption::NoCheck),
         23 => Ok(CicsPlanOption::MapOnly),
         24 => Ok(CicsPlanOption::DataOnly),
+        25 => Ok(CicsPlanOption::Generic),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

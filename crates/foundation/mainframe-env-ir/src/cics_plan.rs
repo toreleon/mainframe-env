@@ -486,6 +486,8 @@ fn validate_operation_shape(
                 || !inputs.contains(&CicsOperandName::Ridfld)
                 || inputs.contains(&CicsOperandName::From)
                 || !outputs.contains(&CicsOutputName::Into)
+                || (plan.options.contains(&CicsPlanOption::Generic)
+                    && !inputs.contains(&CicsOperandName::KeyLength))
                 || plan.operands.iter().any(|operand| {
                     operand.name == CicsOperandName::KeyLength
                         && !matches!(
@@ -509,7 +511,8 @@ fn validate_operation_shape(
                 || plan.options.iter().any(|option| {
                     !matches!(
                         option,
-                        CicsPlanOption::Gteq
+                        CicsPlanOption::Generic
+                            | CicsPlanOption::Gteq
                             | CicsPlanOption::NoHandle
                             | CicsPlanOption::Update
                     )
@@ -1160,6 +1163,8 @@ mod tests {
         assert_eq!(option_from_tag(23), Ok(CicsPlanOption::MapOnly));
         assert_eq!(option_tag(CicsPlanOption::DataOnly), 24);
         assert_eq!(option_from_tag(24), Ok(CicsPlanOption::DataOnly));
+        assert_eq!(option_tag(CicsPlanOption::Generic), 25);
+        assert_eq!(option_from_tag(25), Ok(CicsPlanOption::Generic));
 
         let plan = read_plan();
         let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
@@ -1654,6 +1659,23 @@ mod tests {
             .retain(|output| output.name != CicsOutputName::Length);
         assert_eq!(
             encode_cics_effect_plan(&read_with_literal_length, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut generic_read = read.clone();
+        generic_read.options.insert(CicsPlanOption::Generic);
+        assert!(encode_cics_effect_plan(&generic_read, CicsPlanLimits::default()).is_ok());
+        let mut generic_read_without_key_length = generic_read.clone();
+        generic_read_without_key_length
+            .operands
+            .retain(|operand| operand.name != CicsOperandName::KeyLength);
+        assert_eq!(
+            encode_cics_effect_plan(&generic_read_without_key_length, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut generic_write = write.clone();
+        generic_write.options.insert(CicsPlanOption::Generic);
+        assert_eq!(
+            encode_cics_effect_plan(&generic_write, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
         let mut write_with_key_length = write.clone();

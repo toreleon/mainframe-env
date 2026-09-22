@@ -246,7 +246,9 @@ exactly one FILE/DATASET alias, carry a mutation identity, and update the
 operation-specific EIBFN. A current-record DELETE or REWRITE without a hold
 returns its source-defined `INVREQ`; DELETE cannot carry KEYLENGTH without
 RIDFLD. READ GTEQ selects the equal or first greater keyed record through a
-request-local cursor that is closed before the command completes.
+request-local cursor that is closed before the command completes. READ GENERIC
+selects only a record sharing the positive KEYLENGTH prefix of RIDFLD; combining
+GENERIC with GTEQ retains first-greater fallback.
 Forms whose key or record is a literal, or whose semantics depend on TOKEN,
 remote routing, alternate identities, mass insert, or RLS suspension do not
 publish the typed executable.

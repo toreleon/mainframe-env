@@ -270,6 +270,7 @@ pub enum HirCicsOption {
     TimeSep,
     FreeKb,
     Gteq,
+    Generic,
     Fmh,
     Protect,
     Wait,
@@ -3026,6 +3027,33 @@ mod tests {
             "IDENTIFICATION DIVISION. PROGRAM-ID. BADGTEQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(7). PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) GTEQ END-EXEC. STOP RUN.",
         );
         assert!(wrong_operation.hir.is_none());
+    }
+
+    #[test]
+    fn cics_read_generic_requires_bounded_key_length() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. READGEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3) VALUE '00Z'. 01 RECORD-X PIC X(7). 01 KEY-LENGTH-X PIC S9(4) COMP VALUE 2. PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(KEY-LENGTH-X) GENERIC END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("READ GENERIC: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed READ GENERIC");
+        assert_eq!(command.operation, HirCicsOperation::Read);
+        assert!(command.options.contains(&HirCicsOption::Generic));
+
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADGEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(7). PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) GENERIC END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADGEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 RECORD-X PIC X(7). 01 KEY-LENGTH-X PIC S9(4) COMP VALUE 2. PROCEDURE DIVISION. EXEC CICS WRITE FILE('ACCTDAT') FROM(RECORD-X) RIDFLD(KEY-X) KEYLENGTH(KEY-LENGTH-X) GENERIC END-EXEC. STOP RUN.",
+        ] {
+            assert!(analyze(source).hir.is_none(), "{source}");
+        }
     }
 
     /// Issue #206: WRITEQ TD accepts the runtime length of its FROM area.
