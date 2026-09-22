@@ -242,7 +242,12 @@ fn file(
         })?;
     let length = decimal_argument(request, "LENGTH")?;
     let key_length = signed_decimal_argument(request, "KEYLENGTH")?;
-    let attributes = if (length.is_some() || key_length.is_some())
+    let attributes = if (length.is_some()
+        || key_length.is_some()
+        || matches!(
+            request.operation,
+            CicsOperation::ReadNext | CicsOperation::ReadPrev
+        ))
         && matches!(
             request.operation,
             CicsOperation::Read
@@ -250,6 +255,8 @@ fn file(
                 | CicsOperation::Rewrite
                 | CicsOperation::Delete
                 | CicsOperation::StartBrowse
+                | CicsOperation::ReadNext
+                | CicsOperation::ReadPrev
         ) {
         match service.nested(
             run,
@@ -276,7 +283,11 @@ fn file(
     )?;
     let mut length_condition = if matches!(
         request.operation,
-        CicsOperation::Read | CicsOperation::Write | CicsOperation::Rewrite
+        CicsOperation::Read
+            | CicsOperation::ReadNext
+            | CicsOperation::ReadPrev
+            | CicsOperation::Write
+            | CicsOperation::Rewrite
     ) {
         validate_record_length(request.operation, length, attributes.as_ref())?
     } else {
@@ -576,7 +587,11 @@ fn file(
     if let Some(key) = browse_key {
         response.outputs.insert("RIDFLD".into(), bounded(key)?);
     }
-    if operation == CicsOperation::Read && length.is_some() {
+    if matches!(
+        operation,
+        CicsOperation::Read | CicsOperation::ReadNext | CicsOperation::ReadPrev
+    ) && length.is_some()
+    {
         response.outputs.insert(
             "LENGTH".into(),
             super::super::decimal_payload(i64::from(actual_length))?,
@@ -795,7 +810,10 @@ fn validate_record_length(
         };
     }
     if !variable && length != attributes.logical_record_length {
-        let response2 = if operation == CicsOperation::Read {
+        let response2 = if matches!(
+            operation,
+            CicsOperation::Read | CicsOperation::ReadNext | CicsOperation::ReadPrev
+        ) {
             13
         } else {
             14
@@ -831,8 +849,10 @@ fn apply_read_length(
     condition: &mut Option<(&'static str, i32, i32)>,
 ) -> Result<u32, HostProblem> {
     let actual = u32::try_from(payload.len()).map_err(|_| HostProblem::ResourceExhausted)?;
-    if operation == CicsOperation::Read
-        && let Some(maximum) = length
+    if matches!(
+        operation,
+        CicsOperation::Read | CicsOperation::ReadNext | CicsOperation::ReadPrev
+    ) && let Some(maximum) = length
         && actual > maximum
     {
         payload.truncate(maximum as usize);
@@ -879,9 +899,36 @@ mod tests {
         assert_eq!(payload, b"ABCD");
         assert_eq!(condition, Some(("LENGERR", 22, 11)));
 
+        assert!(matches!(
+            validate_record_length(CicsOperation::ReadNext, None, Some(&variable)),
+            Err(HostProblem::Condition {
+                response: 22,
+                response2: 10,
+                ..
+            })
+        ));
+        let mut browse_payload = b"ABCDEFGH".to_vec();
+        let mut browse_condition =
+            validate_record_length(CicsOperation::ReadNext, Some(4), Some(&variable)).unwrap();
+        assert_eq!(
+            apply_read_length(
+                CicsOperation::ReadNext,
+                Some(4),
+                &mut browse_payload,
+                &mut browse_condition,
+            ),
+            Ok(8)
+        );
+        assert_eq!(browse_payload, b"ABCD");
+        assert_eq!(browse_condition, Some(("LENGERR", 22, 11)));
+
         let fixed = attributes(RecordFormat::Fixed, 8);
         assert_eq!(
             validate_record_length(CicsOperation::Read, Some(10), Some(&fixed)),
+            Ok(Some(("LENGERR", 22, 13)))
+        );
+        assert_eq!(
+            validate_record_length(CicsOperation::ReadPrev, Some(10), Some(&fixed)),
             Ok(Some(("LENGERR", 22, 13)))
         );
     }

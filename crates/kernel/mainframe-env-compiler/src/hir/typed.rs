@@ -2609,6 +2609,46 @@ mod tests {
         }
     }
 
+    #[test]
+    fn cics_browse_length_is_one_halfword_input_output_binding() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. BROWLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2) VALUE 'AA'. 01 RECORD-X PIC X(4). 01 LENGTH-X PIC S9(4) COMP VALUE 2. PROCEDURE DIVISION. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) END-EXEC. EXEC CICS READNEXT FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) LENGTH(LENGTH-X) END-EXEC. EXEC CICS READPREV FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) LENGTH(LENGTH-X) END-EXEC.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("browse LENGTH: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 3);
+        for command in &commands[1..] {
+            let length = command
+                .operands
+                .iter()
+                .find(|operand| operand.name == HirCicsOperandName::Length)
+                .expect("browse LENGTH input");
+            assert!(matches!(
+                length.value,
+                HirCicsValue::Data(ref reference) if reference.qualified_name == "LENGTH-X"
+            ));
+            assert!(command.outputs.iter().any(|output| {
+                output.name == HirCicsOutputName::Length
+                    && output.target.qualified_name == "LENGTH-X"
+            }));
+        }
+
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADBLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2). 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) LENGTH(KEY-X) END-EXEC.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADBLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2). 01 RECORD-X PIC X(4). PROCEDURE DIVISION. EXEC CICS READNEXT FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) LENGTH(2) END-EXEC.",
+        ] {
+            assert!(analyze(source).hir.is_none(), "{source}");
+        }
+    }
+
     /// Issue #204: GTEQ is scoped to typed keyed selection routes.
     #[test]
     fn cics_startbr_gteq_is_typed_and_operation_scoped() {

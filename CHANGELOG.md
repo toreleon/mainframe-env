@@ -367,6 +367,10 @@ All notable changes to mainframe-env are documented here.
   requires KEYLENGTH for GENERIC, preserves prefix-only EQUAL positioning,
   supports GENERIC GTEQ and KEYLENGTH zero first-record positioning, and maps
   definition/full-key violations to exact INVREQ 16/25, 16/26, or 16/42.
+  READNEXT and READPREV LENGTH now use one writable halfword as input capacity
+  and actual-length output, truncate oversized records with LENGERR 22/11,
+  reject omitted variable-record lengths with 22/10, and preserve fixed-record
+  mismatch 22/13.
   REQID/SYSID, alternate key modes, SET, and UPDATE/TOKEN/RLS semantics remain
   fail-closed.
 - Migrated the explicit-key `DELETE` and `WRITE FILE` compatibility subsets to

@@ -1452,6 +1452,28 @@ mod tests {
             operation: CicsPlanOperation::ReadPrev,
             ..read_next.clone()
         };
+        let browse_length = slot(12, "BROWSE.LENGTH");
+        let mut length_read_next = read_next.clone();
+        length_read_next.operands.push(CicsNamedOperand {
+            name: CicsOperandName::Length,
+            value: CicsOperandValue::Storage(browse_length.clone()),
+        });
+        length_read_next.outputs.push(CicsOutputBinding {
+            name: CicsOutputName::Length,
+            target: browse_length,
+        });
+        assert!(encode_cics_effect_plan(&length_read_next, CicsPlanLimits::default()).is_ok());
+        let mut mismatched_length = length_read_next.clone();
+        mismatched_length
+            .outputs
+            .iter_mut()
+            .find(|output| output.name == CicsOutputName::Length)
+            .expect("browse LENGTH output")
+            .target = slot(13, "OTHER.LENGTH");
+        assert_eq!(
+            encode_cics_effect_plan(&mismatched_length, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
         let end_browse = CicsEffectPlan {
             operation: CicsPlanOperation::EndBrowse,
             operands: vec![start_browse.operands[0].clone()],

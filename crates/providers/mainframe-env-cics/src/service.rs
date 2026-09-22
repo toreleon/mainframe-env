@@ -14749,25 +14749,26 @@ mod tests {
                 ..
             } if dataset.as_str() == "CARDDEMO.CARDDAT"
         ));
+        assert!(matches!(&requests[1], DatasetRequest::Attributes { .. }));
         assert!(matches!(
-            &requests[1],
+            &requests[2],
             DatasetRequest::ReadNext { cursor, .. } if cursor == "CURSOR-1"
         ));
         assert!(matches!(
-            &requests[2],
+            &requests[3],
             DatasetRequest::RewriteRecord { key, record, .. }
                 if key == b"AA" && record == b"AA22"
         ));
         assert!(matches!(
-            &requests[3],
+            &requests[4],
             DatasetRequest::DeleteRecord { key, .. } if key == b"AA"
         ));
         assert!(matches!(
-            &requests[4],
+            &requests[5],
             DatasetRequest::EndBrowse { cursor, .. } if cursor == "CURSOR-1"
         ));
         assert!(matches!(
-            &requests[5],
+            &requests[6],
             DatasetRequest::StartBrowse {
                 dataset,
                 relation: mainframe_env_host_api::KeyRelation::Equal,
@@ -14775,7 +14776,7 @@ mod tests {
             } if dataset.as_str() == "CARDDEMO.CARDDAT"
         ));
         assert!(matches!(
-            &requests[6],
+            &requests[7],
             DatasetRequest::EndBrowse { cursor, .. } if cursor == "CURSOR-1"
         ));
         drop(requests);
@@ -14909,6 +14910,85 @@ mod tests {
             DatasetRequest::StartBrowse { key, relation, .. }
                 if key.is_empty()
                     && *relation == mainframe_env_host_api::KeyRelation::GreaterOrEqual
+        ));
+    }
+
+    #[test]
+    fn browse_length_truncates_and_returns_actual_record_length() {
+        let trace = Arc::new(DatasetTrace::default());
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service =
+            CicsService::open(traced_authorities(trace.clone()), store, Default::default())
+                .unwrap();
+        let (invocation, _) = registered(&service);
+        service
+            .register_file_aliases(&BTreeMap::from([(
+                "CARDDAT".into(),
+                DatasetName::new("CARDDEMO.CARDDAT", 128).unwrap(),
+            )]))
+            .unwrap();
+
+        let start = request(
+            CicsOperation::StartBrowse,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"CARDDAT")),
+                ("RIDFLD".into(), argument(b"AA")),
+            ]),
+            1,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, start.clone(), 1), start)
+            .unwrap();
+
+        let next = request(
+            CicsOperation::ReadNext,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"CARDDAT")),
+                ("LENGTH".into(), cics_decimal(2)),
+            ]),
+            2,
+        );
+        let truncated = service
+            .invoke(&effect(&invocation.run_unit_id, next.clone(), 2), next)
+            .unwrap();
+        assert_eq!(truncated.condition, "LENGERR");
+        assert_eq!((truncated.response, truncated.response2), (22, 11));
+        assert_eq!(truncated.payload.bytes(), b"AA");
+        assert_eq!(truncated.outputs["LENGTH"].bytes(), b"4");
+
+        let previous = request(
+            CicsOperation::ReadPrev,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"CARDDAT")),
+                ("LENGTH".into(), cics_decimal(6)),
+            ]),
+            3,
+        );
+        let fixed_mismatch = service
+            .invoke(
+                &effect(&invocation.run_unit_id, previous.clone(), 3),
+                previous,
+            )
+            .unwrap();
+        assert_eq!(fixed_mismatch.condition, "LENGERR");
+        assert_eq!(
+            (fixed_mismatch.response, fixed_mismatch.response2),
+            (22, 13)
+        );
+        assert_eq!(fixed_mismatch.payload.bytes(), b"AA11");
+        assert_eq!(fixed_mismatch.outputs["LENGTH"].bytes(), b"4");
+
+        let requests = trace.requests.lock().unwrap();
+        assert!(matches!(requests[0], DatasetRequest::StartBrowse { .. }));
+        assert!(matches!(requests[1], DatasetRequest::Attributes { .. }));
+        assert!(matches!(
+            requests[2],
+            DatasetRequest::ReadNext { reverse: false, .. }
+        ));
+        assert!(matches!(requests[3], DatasetRequest::Attributes { .. }));
+        assert!(matches!(
+            requests[4],
+            DatasetRequest::ReadNext { reverse: true, .. }
         ));
     }
 

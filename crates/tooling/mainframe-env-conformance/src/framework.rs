@@ -3607,6 +3607,103 @@ mod tests {
     }
 
     #[test]
+    fn cics_browse_length_is_updated_after_truncated_selected_route() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. BROWLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(2) VALUE 'AA'. 01 RECORD-X PIC X(4). 01 LENGTH-X PIC S9(4) COMP VALUE 2. 01 RESP-X PIC S9(8) COMP. 01 RESP2-X PIC S9(8) COMP. PROCEDURE DIVISION. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) END-EXEC. EXEC CICS READNEXT FILE('ACCTDAT') INTO(RECORD-X) RIDFLD(KEY-X) LENGTH(LENGTH-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let payload = |schema: &str, bytes: &[u8]| {
+            mainframe_env_execution_api::BoundedPayload::new(
+                schema,
+                bytes.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+
+        let MachineDrive::HostCall(start) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("STARTBR did not call host");
+        };
+        let MachineDrive::HostCall(next) = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: start.sequence,
+                outcome: Ok(HostResult::Cics(CicsResponse {
+                    disposition: CicsDisposition::Complete,
+                    condition: "NORMAL".into(),
+                    response: 0,
+                    response2: 0,
+                    applid: "APP".into(),
+                    sysid: "SYS".into(),
+                    transaction: "T001".into(),
+                    aid: 0,
+                    target: None,
+                    next_transaction: None,
+                    payload: payload("mainframe-env.cics.payload@1", b""),
+                    outputs: BTreeMap::new(),
+                    unit_of_work: None,
+                })),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        ) else {
+            panic!("READNEXT did not call host");
+        };
+        assert!(matches!(
+            &next.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::ReadNext,
+                arguments,
+                mutation: None,
+                ..
+            }) if arguments["LENGTH"].schema() == "mainframe-env.cics.decimal@1"
+                && arguments["LENGTH"].bytes() == b"2"
+        ));
+
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: next.sequence,
+                    outcome: Ok(HostResult::Cics(CicsResponse {
+                        disposition: CicsDisposition::Complete,
+                        condition: "LENGERR".into(),
+                        response: 22,
+                        response2: 11,
+                        applid: "APP".into(),
+                        sysid: "SYS".into(),
+                        transaction: "T001".into(),
+                        aid: 0,
+                        target: None,
+                        next_transaction: None,
+                        payload: payload("mainframe-env.cics.payload@1", b"AA"),
+                        outputs: BTreeMap::from([(
+                            "LENGTH".into(),
+                            payload("mainframe-env.cics.decimal@1", b"4"),
+                        )]),
+                        unit_of_work: None,
+                    })),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("RECORD-X").unwrap().bytes(), b"AA  ");
+        assert_eq!(machine.variable("LENGTH-X").unwrap().bytes(), &[0, 4]);
+        assert_eq!(machine.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 22]);
+        assert_eq!(machine.variable("RESP2-X").unwrap().bytes(), &[0, 0, 0, 11]);
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x06, 0x0e]);
+    }
+
+    #[test]
     fn cics_keyed_write_and_delete_use_typed_mutation_inputs() {
         use mainframe_env_host_api::{
             CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,

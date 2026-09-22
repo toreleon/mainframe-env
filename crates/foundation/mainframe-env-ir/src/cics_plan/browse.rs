@@ -23,6 +23,8 @@ pub(super) fn invalid_shape(
         .iter()
         .find(|operand| operand.name == CicsOperandName::Ridfld);
     let ridfld_output = output_target(&plan.outputs, CicsOutputName::Ridfld);
+    let length = operand_value(plan, CicsOperandName::Length);
+    let length_output = output_target(&plan.outputs, CicsOutputName::Length);
     let reading = matches!(
         plan.operation,
         CicsPlanOperation::ReadNext | CicsPlanOperation::ReadPrev
@@ -41,6 +43,11 @@ pub(super) fn invalid_shape(
             None => ridfld_output.is_some(),
         }
         || reading != outputs.contains(&CicsOutputName::Into)
+        || match length {
+            Some(CicsOperandValue::Storage(slot)) if reading => length_output != Some(slot),
+            Some(_) => true,
+            None => length_output.is_some(),
+        }
         || (generic && (!starting || !inputs.contains(&CicsOperandName::KeyLength)))
         || (plan.options.contains(&CicsPlanOption::Equal)
             && plan.options.contains(&CicsPlanOption::Gteq))

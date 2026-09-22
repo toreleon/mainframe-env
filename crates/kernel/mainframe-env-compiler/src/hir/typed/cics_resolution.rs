@@ -1054,13 +1054,15 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             name: HirCicsOutputName::Length,
             target,
         });
-    } else if operation == HirCicsOperation::Read
-        && let Some(HirCicsNamedOperand {
-            value: HirCicsValue::Data(target),
-            ..
-        }) = operands
-            .iter()
-            .find(|operand| operand.name == HirCicsOperandName::Length)
+    } else if matches!(
+        operation,
+        HirCicsOperation::Read | HirCicsOperation::ReadNext | HirCicsOperation::ReadPrev
+    ) && let Some(HirCicsNamedOperand {
+        value: HirCicsValue::Data(target),
+        ..
+    }) = operands
+        .iter()
+        .find(|operand| operand.name == HirCicsOperandName::Length)
     {
         require_writable(target)?;
         outputs.push(HirCicsOutputBinding {
