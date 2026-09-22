@@ -735,7 +735,7 @@ impl ProductServer {
             Default::default(),
             enterprise_replay_clock,
         )?;
-        let program_provider: Arc<dyn HostProvider> = program.clone();
+        cics.bind_artifact_store(artifacts.clone())?;
         let mut enterprise_providers = db2_providers(db2.clone(), InvocationLimits::default());
         enterprise_providers.extend(ims_providers(ims.clone(), InvocationLimits::default()));
         enterprise_providers.extend(mq_providers(mq.clone(), InvocationLimits::default()));
@@ -743,7 +743,7 @@ impl ProductServer {
         let host = scoped_host(
             &racf,
             &dataset,
-            program_provider,
+            program.clone(),
             enterprise_providers,
             true,
             Some(cics_provider(cics.clone(), InvocationLimits::default())),
@@ -6312,7 +6312,8 @@ mod tests {
         encode_online_machine_continuation, encode_online_machine_continuation_with_transfer,
     };
     use mainframe_env_cics::{
-        CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION, CicsEventPostMode,
+        CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION, CicsApplicationEntryDefinition,
+        CicsEventPostMode, CicsJavaStatus, CicsProgramDefinition,
     };
     use mainframe_env_compiler::CobolCompiler;
     use mainframe_env_compiler_api::{
@@ -14874,6 +14875,177 @@ mod tests {
         assert_eq!(eib_time[3] & 0x0f, 0x0c);
         assert_ne!(eib_date, &[0; 4]);
         assert_ne!(eib_time, &[0; 4]);
+        assert_eq!(
+            server
+                .store
+                .get_execution(&invocation.execution_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            ExecutionState::Suspended
+        );
+    }
+
+    #[test]
+    fn online_invoke_application_crosses_compiled_selected_provider_route() {
+        let limits = SourceLimits::default();
+        let source = b"IDENTIFICATION DIVISION.\nPROGRAM-ID. APPINVOK.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 INVOKE-AREA PIC X(160) VALUE X'7B22706172616D65746572223A6E756C6C2C22646473223A5B5D7D'.\n01 INVOKE-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS INVOKE APPLICATION('PAYMENTS') OPERATION('RUN') PLATFORM('BANKING') COMMAREA(INVOKE-AREA) LENGTH(LENGTH OF INVOKE-AREA) END-EXEC.\nMOVE EIBFN TO INVOKE-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n";
+        let path = LogicalPath::new("APPINVOK.cbl", limits.max_path_bytes).unwrap();
+        let bundle = SourceBundle::new(
+            &path,
+            vec![
+                SourceFile::input(
+                    "APPINVOK.cbl",
+                    source.to_vec(),
+                    SourceFormat::Free,
+                    SourceEncoding::Utf8,
+                    limits,
+                )
+                .unwrap(),
+            ],
+            BTreeMap::new(),
+            Vec::new(),
+            limits,
+        )
+        .unwrap();
+        let CompilerResult::Published { artifact, .. } = CobolCompiler::default()
+            .compile(CompilerRequest {
+                source: bundle,
+                mode: CompilationMode::Executable,
+                target: CompileTarget::new("reference").unwrap(),
+                options: CompileOptions::new(BTreeMap::new()).unwrap(),
+            })
+            .unwrap()
+        else {
+            panic!("INVOKE APPLICATION fixture did not publish");
+        };
+        let server = ProductServer::memory(config()).unwrap();
+        server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .racf
+            .define_profile("FACILITY", "CICS.PROGRAM.IEFBR14", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "FACILITY",
+                "CICS.PROGRAM.IEFBR14",
+                "IBMUSER",
+                AccessIntent::Execute,
+            )
+            .unwrap();
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "APPINVOK".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("IV00".into(), "APPINVOK".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "APPINVK".into(),
+                    map: "APPINVK".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        server
+            .cics
+            .register_program_definitions(&[CicsProgramDefinition {
+                name: "IEFBR14".into(),
+                generation: 1,
+                artifact: artifact_ref.clone(),
+                semantic_identity: artifact.semantic_id().to_reference(),
+                entry_offset: 0,
+                enabled: true,
+                remote: false,
+                reload: false,
+                java_status: CicsJavaStatus::NotJava,
+            }])
+            .unwrap();
+        server
+            .cics
+            .register_application_entries(&[CicsApplicationEntryDefinition {
+                application: "PAYMENTS".into(),
+                platform: "BANKING".into(),
+                major_version: 1,
+                minor_version: 0,
+                micro_version: 0,
+                operation: "RUN".into(),
+                program: "IEFBR14".into(),
+                program_generation: 1,
+                program_artifact: artifact_ref.clone(),
+                application_identity: format!(
+                    "sha256:{:x}",
+                    Sha256::digest(b"PAYMENTS-BANKING-1.0.0")
+                ),
+                available: true,
+            }])
+            .unwrap();
+        let session = SessionId::new("typed-invoke-application", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "IV00", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "IV00",
+                24,
+                80,
+                "typed-invoke-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let context = server
+            .cics
+            .terminal_execution(&session, &principal, 2)
+            .unwrap();
+        server
+            .begin_online_exchange(&session, "APPINVOK", &context)
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "APPINVOK", 2)
+            .unwrap();
+
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation.clone(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(
+            restored.variable("INVOKE-FN").unwrap().bytes(),
+            &[0x0e, 0x10]
+        );
+        assert!(
+            restored
+                .variable("INVOKE-AREA")
+                .unwrap()
+                .bytes()
+                .starts_with(b"{\"return_code\":0")
+        );
         assert_eq!(
             server
                 .store

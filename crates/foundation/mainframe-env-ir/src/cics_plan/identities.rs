@@ -39,6 +39,8 @@ pub enum CicsPlanOperation {
     IgnoreCondition,
     /// Invoke one installed program at the next logical level and return.
     Link,
+    /// Select and invoke one installed application operation at the next logical level.
+    InvokeApplication,
     /// Transfer to one installed program at the same logical level without returning.
     Xctl,
     /// Return from the current top-level task and optionally schedule its next transaction.
@@ -203,6 +205,18 @@ pub enum CicsOperandName {
     NumEvents,
     /// `PURGEABILITY(...)` CVDA value.
     Purgeability,
+    /// `APPLICATION(...)` installed application name.
+    Application,
+    /// `PLATFORM(...)` installed platform name.
+    Platform,
+    /// `OPERATION(...)` application entry-point operation name.
+    ApplicationOperation,
+    /// `MAJORVERSION(...)` application major version.
+    MajorVersion,
+    /// `MINORVERSION(...)` application minor version.
+    MinorVersion,
+    /// `CHANNEL(...)` application invocation channel name.
+    Channel,
 }
 
 /// Flag option accepted by the typed CICS pilot.
@@ -272,6 +286,10 @@ pub enum CicsPlanOption {
     Auxiliary,
     /// Select main storage when creating a temporary-storage queue.
     Main,
+    /// Require the named application major and minor version exactly.
+    ExactMatch,
+    /// Select the highest minor version at or above the named minimum.
+    Minimum,
 }
 
 /// Named result binding written after the host result arrives.

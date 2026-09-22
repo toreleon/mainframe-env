@@ -48,6 +48,8 @@ pub enum CicsOperation {
     /// Ignore one bounded set of reviewed EIBRESP conditions for this program level.
     IgnoreCondition,
     Inquire,
+    /// Select and invoke one installed application operation.
+    InvokeApplication,
     Link,
     /// Restore one suspended HANDLE/IGNORE specification snapshot.
     PopHandle,
@@ -114,6 +116,7 @@ impl CicsOperation {
             Self::HandleCondition => "HandleCondition",
             Self::IgnoreCondition => "IgnoreCondition",
             Self::Inquire => "Inquire",
+            Self::InvokeApplication => "InvokeApplication",
             Self::Link => "Link",
             Self::PopHandle => "PopHandle",
             Self::PushHandle => "PushHandle",
@@ -161,6 +164,7 @@ impl CicsOperation {
                 | Self::Write
                 | Self::WriteTransientData
                 | Self::Link
+                | Self::InvokeApplication
                 | Self::ReceiveMap
                 | Self::ReadTransientData
                 | Self::PurgeMessage
@@ -219,6 +223,7 @@ impl CicsOperation {
             ("HANDLE", Some("CONDITION")) => Self::HandleCondition,
             ("IGNORE", Some("CONDITION")) => Self::IgnoreCondition,
             ("INQUIRE", _) => Self::Inquire,
+            ("INVOKE", Some("APPLICATION")) => Self::InvokeApplication,
             ("LINK", _) => Self::Link,
             ("POP", Some("HANDLE")) => Self::PopHandle,
             ("PUSH", Some("HANDLE")) => Self::PushHandle,

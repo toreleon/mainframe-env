@@ -124,6 +124,13 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("HandleCondition", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0099"),
     ("IgnoreCondition", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0100"),
     (
+        "InvokeApplication",
+        "api",
+        "program-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0106",
+    ),
+    (
         "Inquire",
         "spi-compatibility",
         "program-control",
@@ -420,6 +427,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "HandleAid",
         "HandleCondition",
         "IgnoreCondition",
+        "InvokeApplication",
         "Link",
         "Xctl",
         "Return",
@@ -523,6 +531,15 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "HandleAid": frozenset({"memory-read", "memory-write", "condition"}),
     "HandleCondition": frozenset({"memory-read", "memory-write", "condition"}),
     "IgnoreCondition": frozenset({"memory-read", "memory-write", "condition"}),
+    "InvokeApplication": frozenset(
+        {
+            "memory-read",
+            "memory-write",
+            "program-control",
+            "condition",
+            "transaction",
+        }
+    ),
     "Link": frozenset(
         {
             "memory-read",
@@ -837,6 +854,7 @@ def _load_typed_execution_registrations(
         "Getmain",
         "HandleAid",
         "IgnoreCondition",
+        "InvokeApplication",
         "PopHandle",
         "PurgeMessage",
         "PushHandle",

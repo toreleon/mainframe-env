@@ -29,6 +29,7 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::Abcode => SlotUse::AbcodeInput,
         CicsOperandName::Program => SlotUse::ProgramNameInput,
         CicsOperandName::Abstime => SlotUse::AbstimeInput,
+        CicsOperandName::MajorVersion | CicsOperandName::MinorVersion => SlotUse::FullwordInput,
         CicsOperandName::DateSep | CicsOperandName::TimeSep => SlotUse::SeparatorInput,
         CicsOperandName::KeyLength => SlotUse::Input,
         CicsOperandName::Flength => SlotUse::FullwordInput,
@@ -83,6 +84,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::HandleAbend => CicsOperation::HandleAbend,
         CicsPlanOperation::HandleCondition => CicsOperation::HandleCondition,
         CicsPlanOperation::IgnoreCondition => CicsOperation::IgnoreCondition,
+        CicsPlanOperation::InvokeApplication => CicsOperation::InvokeApplication,
         CicsPlanOperation::Link => CicsOperation::Link,
         CicsPlanOperation::Xctl => CicsOperation::Xctl,
         CicsPlanOperation::Return => CicsOperation::Return,
@@ -173,6 +175,12 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::NumEvents => "NUMEVENTS",
         CicsOperandName::Purgeability => "PURGEABILITY",
         CicsOperandName::Item => "ITEM",
+        CicsOperandName::Application => "APPLICATION",
+        CicsOperandName::Platform => "PLATFORM",
+        CicsOperandName::ApplicationOperation => "OPERATION",
+        CicsOperandName::MajorVersion => "MAJORVERSION",
+        CicsOperandName::MinorVersion => "MINORVERSION",
+        CicsOperandName::Channel => "CHANNEL",
     }
 }
 
@@ -237,5 +245,7 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::RewriteTemporary => "REWRITE",
         CicsPlanOption::Auxiliary => "AUXILIARY",
         CicsPlanOption::Main => "MAIN",
+        CicsPlanOption::ExactMatch => "EXACTMATCH",
+        CicsPlanOption::Minimum => "MINIMUM",
     }
 }

@@ -25,6 +25,10 @@ pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
         CicsPlanOperation::ReceiveMap => {
             !matches!(option, CicsPlanOption::NoHandle | CicsPlanOption::Terminal)
         }
+        CicsPlanOperation::InvokeApplication => !matches!(
+            option,
+            CicsPlanOption::NoHandle | CicsPlanOption::ExactMatch | CicsPlanOption::Minimum
+        ),
         CicsPlanOperation::Read => !matches!(
             option,
             CicsPlanOption::Generic

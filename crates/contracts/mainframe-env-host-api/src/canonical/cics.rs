@@ -32,6 +32,7 @@ impl Canonical for CicsOperation {
             Self::HandleCondition => out.variant("CicsOperation", "HandleCondition", 0),
             Self::IgnoreCondition => out.variant("CicsOperation", "IgnoreCondition", 0),
             Self::Inquire => out.variant("CicsOperation", "Inquire", 0),
+            Self::InvokeApplication => out.variant("CicsOperation", "InvokeApplication", 0),
             Self::Link => out.variant("CicsOperation", "Link", 0),
             Self::PopHandle => out.variant("CicsOperation", "PopHandle", 0),
             Self::PushHandle => out.variant("CicsOperation", "PushHandle", 0),

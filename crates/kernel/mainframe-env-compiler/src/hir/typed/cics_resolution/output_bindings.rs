@@ -113,8 +113,10 @@ pub(super) fn resolve(
             });
         }
     }
-    if operation == HirCicsOperation::Link
-        && let Some(output) = program_control::link_commarea_output(clauses, semantic)?
+    if matches!(
+        operation,
+        HirCicsOperation::Link | HirCicsOperation::InvokeApplication
+    ) && let Some(output) = program_control::link_commarea_output(clauses, semantic)?
     {
         outputs.push(output);
     }

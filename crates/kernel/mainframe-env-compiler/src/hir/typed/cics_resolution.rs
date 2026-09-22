@@ -690,6 +690,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::IgnoreCondition
         | HirCicsOperation::PopHandle
         | HirCicsOperation::PushHandle => &["RESP", "RESP2"],
+        HirCicsOperation::InvokeApplication => program_control::INVOKE_CLAUSES,
         HirCicsOperation::Link | HirCicsOperation::Xctl => &[
             "PROGRAM",
             "COMMAREA",
@@ -791,6 +792,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     let allowed_options: &[&str] = match operation {
         HirCicsOperation::Abend => &["CANCEL", "NODUMP", "NOHANDLE"],
         HirCicsOperation::HandleAbend => &["CANCEL", "RESET", "NOHANDLE"],
+        HirCicsOperation::InvokeApplication => &["EXACTMATCH", "MINIMUM", "NOHANDLE"],
         HirCicsOperation::Address
         | HirCicsOperation::AddressSet
         | HirCicsOperation::Asktime
@@ -876,7 +878,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             descriptor.label_tokens.join(" ")
         )));
     }
-    program_control::validate_constraints(operation, &clauses)?;
+    program_control::validate(operation, &clauses, &raw_options)?;
     file_operands::validate_constraints(&clauses, &raw_options, operation)?;
     queue_control::validate_constraints(&clauses, &raw_options, operation)?;
     storage_control::validate_constraints(&clauses, operation, semantic)?;
@@ -920,7 +922,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::Assign
         | HirCicsOperation::Delay
         | HirCicsOperation::PurgeMessage
-        | HirCicsOperation::Suspend => &[][..],
+        | HirCicsOperation::Suspend
+        | HirCicsOperation::InvokeApplication => &[][..],
         HirCicsOperation::WaitEvent | HirCicsOperation::WaitExternal => &[][..],
         HirCicsOperation::Cancel => &["REQID"][..],
         HirCicsOperation::Start => &["TRANSID"][..],
@@ -1104,41 +1107,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             ) && is_condition_name(option))
                 && !(operation == HirCicsOperation::HandleAid && is_aid_name(option))
         })
-        .map(|option| match option.as_str() {
-            "CANCEL" => HirCicsOption::Cancel,
-            "NODUMP" => HirCicsOption::NoDump,
-            "RESET" => HirCicsOption::Reset,
-            "UPDATE" => HirCicsOption::Update,
-            "ROLLBACK" => HirCicsOption::Rollback,
-            "NOHANDLE" => HirCicsOption::NoHandle,
-            "TASK" => HirCicsOption::Task,
-            "UOW" => HirCicsOption::Uow,
-            "NOSUSPEND" => HirCicsOption::NoSuspend,
-            "ERASE" => HirCicsOption::Erase,
-            "CURSOR" => HirCicsOption::Cursor,
-            "DATESEP" => HirCicsOption::DateSep,
-            "TIMESEP" => HirCicsOption::TimeSep,
-            "FREEKB" => HirCicsOption::FreeKb,
-            "GTEQ" => HirCicsOption::Gteq,
-            "GENERIC" => HirCicsOption::Generic,
-            "EQUAL" => HirCicsOption::Equal,
-            "TERMINAL" => HirCicsOption::Terminal,
-            "NEXT" => HirCicsOption::Next,
-            "REWRITE" => HirCicsOption::RewriteTemporary,
-            "AUXILIARY" => HirCicsOption::Auxiliary,
-            "MAIN" => HirCicsOption::Main,
-            "FMH" => HirCicsOption::Fmh,
-            "PROTECT" => HirCicsOption::Protect,
-            "WAIT" => HirCicsOption::Wait,
-            "AFTER" => HirCicsOption::After,
-            "AT" => HirCicsOption::At,
-            "FOR" => HirCicsOption::For,
-            "UNTIL" => HirCicsOption::Until,
-            "NOCHECK" => HirCicsOption::NoCheck,
-            "MAPONLY" => HirCicsOption::MapOnly,
-            "DATAONLY" => HirCicsOption::DataOnly,
-            option => task_wait::option(option),
-        })
+        .map(|option| operation::resolve_option(option))
         .collect::<BTreeSet<_>>();
     let response = output(&outputs, HirCicsOutputName::Resp).cloned();
     let response2 = output(&outputs, HirCicsOutputName::Resp2).cloned();

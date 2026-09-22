@@ -164,6 +164,7 @@ pub enum HirCicsOperation {
     HandleAbend,
     HandleCondition,
     IgnoreCondition,
+    InvokeApplication,
     Link,
     Xctl,
     Return,
@@ -253,6 +254,12 @@ pub enum HirCicsOperandName {
     EcbList,
     NumEvents,
     Purgeability,
+    Application,
+    Platform,
+    ApplicationOperation,
+    MajorVersion,
+    MinorVersion,
+    Channel,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -305,6 +312,8 @@ pub enum HirCicsOption {
     RewriteTemporary,
     Auxiliary,
     Main,
+    ExactMatch,
+    Minimum,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -2528,6 +2537,57 @@ mod tests {
             let message = diagnostic.public_message();
             message.contains("LINK") && message.contains("CHANNEL")
         }));
+    }
+
+    #[test]
+    fn cics_invoke_application_resolves_version_and_commarea_contract() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSINVK. DATA DIVISION. WORKING-STORAGE SECTION. 01 AREA-X PIC X(16) VALUE 'REQUEST'. 01 MAJOR-X PIC S9(9) COMP VALUE 1. 01 MINOR-X PIC S9(9) COMP VALUE 2. PROCEDURE DIVISION. EXEC CICS INVOKE APPLICATION('PAYMENTS') OPERATION('AUTHORIZE') PLATFORM('BANKING') MAJORVERSION(MAJOR-X) MINORVERSION(MINOR-X) MINIMUM COMMAREA(AREA-X) LENGTH(7) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("INVOKE APPLICATION: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("resolved INVOKE APPLICATION command");
+        assert_eq!(command.operation, HirCicsOperation::InvokeApplication);
+        assert!(command.operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::Application,
+                    value: HirCicsValue::Literal(value),
+                } if value == "PAYMENTS"
+            )
+        }));
+        assert!(command.operands.iter().any(|operand| {
+            matches!(
+                operand,
+                HirCicsNamedOperand {
+                    name: HirCicsOperandName::MinorVersion,
+                    value: HirCicsValue::Data(reference),
+                } if reference.qualified_name == "MINOR-X"
+            )
+        }));
+        assert_eq!(command.options, BTreeSet::from([HirCicsOption::Minimum]));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::Commarea && output.target.qualified_name == "AREA-X"
+        }));
+
+        for invalid in [
+            "EXEC CICS INVOKE APPLICATION('PAYMENTS') OPERATION('AUTHORIZE') MAJORVERSION(1) END-EXEC",
+            "EXEC CICS INVOKE APPLICATION('PAYMENTS') OPERATION('AUTHORIZE') EXACTMATCH END-EXEC",
+            "EXEC CICS INVOKE APPLICATION('PAYMENTS') OPERATION('AUTHORIZE') COMMAREA(AREA-X) CHANNEL('DATA') END-EXEC",
+        ] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADINVK. DATA DIVISION. WORKING-STORAGE SECTION. 01 AREA-X PIC X(16). PROCEDURE DIVISION. {invalid}. STOP RUN."
+            );
+            assert!(analyze(&source).hir.is_none(), "accepted {invalid}");
+        }
     }
 
     #[test]

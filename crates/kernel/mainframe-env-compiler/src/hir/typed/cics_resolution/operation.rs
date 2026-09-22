@@ -1,4 +1,4 @@
-use super::super::{HirCicsOperation, Resolution, ResolutionFailure};
+use super::super::{HirCicsOperation, HirCicsOption, Resolution, ResolutionFailure};
 use mainframe_env_ir::CicsApplicationRegistryDescriptor;
 
 pub(super) fn resolve(
@@ -20,6 +20,7 @@ pub(super) fn resolve(
         ["HANDLE", "AID"] => HirCicsOperation::HandleAid,
         ["HANDLE", "CONDITION"] => HirCicsOperation::HandleCondition,
         ["IGNORE", "CONDITION"] => HirCicsOperation::IgnoreCondition,
+        ["INVOKE", "APPLICATION"] => HirCicsOperation::InvokeApplication,
         ["LINK"] => HirCicsOperation::Link,
         ["XCTL"] => HirCicsOperation::Xctl,
         ["RETURN"] => HirCicsOperation::Return,
@@ -55,4 +56,46 @@ pub(super) fn resolve(
         ["RETRIEVE"] => HirCicsOperation::Retrieve,
         _ => return Err(ResolutionFailure::Unsupported),
     })
+}
+
+pub(super) fn resolve_option(option: &str) -> HirCicsOption {
+    match option {
+        "CANCEL" => HirCicsOption::Cancel,
+        "NODUMP" => HirCicsOption::NoDump,
+        "RESET" => HirCicsOption::Reset,
+        "UPDATE" => HirCicsOption::Update,
+        "ROLLBACK" => HirCicsOption::Rollback,
+        "NOHANDLE" => HirCicsOption::NoHandle,
+        "TASK" => HirCicsOption::Task,
+        "UOW" => HirCicsOption::Uow,
+        "NOSUSPEND" => HirCicsOption::NoSuspend,
+        "ERASE" => HirCicsOption::Erase,
+        "CURSOR" => HirCicsOption::Cursor,
+        "DATESEP" => HirCicsOption::DateSep,
+        "TIMESEP" => HirCicsOption::TimeSep,
+        "FREEKB" => HirCicsOption::FreeKb,
+        "GTEQ" => HirCicsOption::Gteq,
+        "GENERIC" => HirCicsOption::Generic,
+        "EQUAL" => HirCicsOption::Equal,
+        "TERMINAL" => HirCicsOption::Terminal,
+        "FMH" => HirCicsOption::Fmh,
+        "PROTECT" => HirCicsOption::Protect,
+        "WAIT" => HirCicsOption::Wait,
+        "AFTER" => HirCicsOption::After,
+        "AT" => HirCicsOption::At,
+        "FOR" => HirCicsOption::For,
+        "UNTIL" => HirCicsOption::Until,
+        "NOCHECK" => HirCicsOption::NoCheck,
+        "MAPONLY" => HirCicsOption::MapOnly,
+        "DATAONLY" => HirCicsOption::DataOnly,
+        "NEXT" => HirCicsOption::Next,
+        "REWRITE" => HirCicsOption::RewriteTemporary,
+        "AUXILIARY" => HirCicsOption::Auxiliary,
+        "MAIN" => HirCicsOption::Main,
+        "PURGEABLE" => HirCicsOption::Purgeable,
+        "NOTPURGEABLE" => HirCicsOption::NotPurgeable,
+        "EXACTMATCH" => HirCicsOption::ExactMatch,
+        "MINIMUM" => HirCicsOption::Minimum,
+        _ => unreachable!("allowed CICS option"),
+    }
 }

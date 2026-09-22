@@ -46,7 +46,7 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
                 | CicsOutputName::Resp
                 | CicsOutputName::Resp2
         ),
-        CicsPlanOperation::Link => matches!(
+        CicsPlanOperation::Link | CicsPlanOperation::InvokeApplication => matches!(
             output,
             CicsOutputName::Commarea | CicsOutputName::Resp | CicsOutputName::Resp2
         ),

@@ -21,11 +21,12 @@ pub use retention::{
 };
 pub use service::{
     BmsFieldDefinition, BmsMapDefinition, CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION,
-    CicsContinuation, CicsEnqueueModelDefinition, CicsFileDefinition, CicsFileStatus,
-    CicsIntervalError, CicsIntervalMode, CicsIntervalTime, CicsLimits, CicsReplayClock,
-    CicsService, CicsStartTask, CicsStartTerminal, CicsTerminalExecution, CicsTerminalSnapshot,
-    CicsTraceEntry, CicsTransientDataQueueDefinition, CicsTransientDataQueueKind,
-    CicsTransientDataQueueOpen, cics_provider,
+    CicsApplicationEntryDefinition, CicsContinuation, CicsEnqueueModelDefinition,
+    CicsFileDefinition, CicsFileStatus, CicsIntervalError, CicsIntervalMode, CicsIntervalTime,
+    CicsJavaStatus, CicsLimits, CicsProgramDefinition, CicsReplayClock, CicsService, CicsStartTask,
+    CicsStartTerminal, CicsTerminalExecution, CicsTerminalSnapshot, CicsTraceEntry,
+    CicsTransientDataQueueDefinition, CicsTransientDataQueueKind, CicsTransientDataQueueOpen,
+    cics_provider,
 };
 
 #[cfg(feature = "fault-injection")]

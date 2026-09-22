@@ -74,6 +74,11 @@ All notable changes to mainframe-env are documented here.
   durable coordinator, a standard post survives SQLite reopen, completion marks
   the ECB and advances with exact EIBFN `1202`, and task cleanup removes the
   retained wait row.
+- Added typed CICS `INVOKE APPLICATION` with durable installed-application
+  version selection, immutable program artifact/semantic identity checks,
+  exact/minimum matching, bounded COMMAREA or channel identity, SAF/audit,
+  restart-safe catalog reads, and compiled selected-route EIBFN `0E10` proof.
+  LOAD and RELEASE remain fail-closed pending their own program-control slices.
 
 - Added typed local CICS START `TERMID` through append-only operand tag 38.
   The provider resolves active virtual terminals at command time, returns exact

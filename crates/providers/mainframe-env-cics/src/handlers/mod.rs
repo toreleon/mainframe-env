@@ -59,6 +59,10 @@ pub(super) use interval_control::load as load_interval_records;
 pub use interval_control::{CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION};
 pub(super) use interval_control::{IntervalStartRecord, invoke as invoke_interval_control};
 pub(super) use program_control::invoke as invoke_program_control;
+pub use program_control::{CicsApplicationEntryDefinition, CicsJavaStatus, CicsProgramDefinition};
+pub(super) use program_control::{
+    load_application_entries, load_program_definitions, validate_application_catalog,
+};
 pub(super) use queue_control::invoke as invoke_queue_control;
 pub(super) use recovery::invoke as invoke_recovery;
 pub use start_task::{CicsStartTask, CicsStartTerminal};

@@ -219,6 +219,12 @@ impl PlanContext<'_> {
                 HirCicsOperandName::EcbList => CicsOperandName::EcbList,
                 HirCicsOperandName::NumEvents => CicsOperandName::NumEvents,
                 HirCicsOperandName::Purgeability => CicsOperandName::Purgeability,
+                HirCicsOperandName::Application => CicsOperandName::Application,
+                HirCicsOperandName::Platform => CicsOperandName::Platform,
+                HirCicsOperandName::ApplicationOperation => CicsOperandName::ApplicationOperation,
+                HirCicsOperandName::MajorVersion => CicsOperandName::MajorVersion,
+                HirCicsOperandName::MinorVersion => CicsOperandName::MinorVersion,
+                HirCicsOperandName::Channel => CicsOperandName::Channel,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -326,6 +332,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::HandleAbend => CicsPlanOperation::HandleAbend,
         HirCicsOperation::HandleCondition => CicsPlanOperation::HandleCondition,
         HirCicsOperation::IgnoreCondition => CicsPlanOperation::IgnoreCondition,
+        HirCicsOperation::InvokeApplication => CicsPlanOperation::InvokeApplication,
         HirCicsOperation::Link => CicsPlanOperation::Link,
         HirCicsOperation::Xctl => CicsPlanOperation::Xctl,
         HirCicsOperation::Return => CicsPlanOperation::Return,
@@ -391,5 +398,7 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::RewriteTemporary => CicsPlanOption::RewriteTemporary,
         HirCicsOption::Auxiliary => CicsPlanOption::Auxiliary,
         HirCicsOption::Main => CicsPlanOption::Main,
+        HirCicsOption::ExactMatch => CicsPlanOption::ExactMatch,
+        HirCicsOption::Minimum => CicsPlanOption::Minimum,
     }
 }

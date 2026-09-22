@@ -57,6 +57,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::WaitExternal => 44,
         CicsPlanOperation::ReadTemporaryStorage => 49,
         CicsPlanOperation::WriteTemporaryStorage => 50,
+        CicsPlanOperation::InvokeApplication => 46,
     }
 }
 
@@ -110,6 +111,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         44 => Ok(CicsPlanOperation::WaitExternal),
         49 => Ok(CicsPlanOperation::ReadTemporaryStorage),
         50 => Ok(CicsPlanOperation::WriteTemporaryStorage),
+        46 => Ok(CicsPlanOperation::InvokeApplication),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -168,6 +170,12 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::NumEvents => 49,
         CicsOperandName::Purgeability => 50,
         CicsOperandName::Item => 70,
+        CicsOperandName::Application => 56,
+        CicsOperandName::Platform => 57,
+        CicsOperandName::ApplicationOperation => 58,
+        CicsOperandName::MajorVersion => 59,
+        CicsOperandName::MinorVersion => 60,
+        CicsOperandName::Channel => 61,
     }
 }
 
@@ -225,6 +233,12 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         49 => Ok(CicsOperandName::NumEvents),
         50 => Ok(CicsOperandName::Purgeability),
         70 => Ok(CicsOperandName::Item),
+        56 => Ok(CicsOperandName::Application),
+        57 => Ok(CicsOperandName::Platform),
+        58 => Ok(CicsOperandName::ApplicationOperation),
+        59 => Ok(CicsOperandName::MajorVersion),
+        60 => Ok(CicsOperandName::MinorVersion),
+        61 => Ok(CicsOperandName::Channel),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -265,6 +279,8 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u8 {
         CicsPlanOption::RewriteTemporary => 45,
         CicsPlanOption::Auxiliary => 46,
         CicsPlanOption::Main => 47,
+        CicsPlanOption::ExactMatch => 36,
+        CicsPlanOption::Minimum => 37,
     }
 }
 
@@ -304,6 +320,8 @@ pub(super) fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodec
         45 => Ok(CicsPlanOption::RewriteTemporary),
         46 => Ok(CicsPlanOption::Auxiliary),
         47 => Ok(CicsPlanOption::Main),
+        36 => Ok(CicsPlanOption::ExactMatch),
+        37 => Ok(CicsPlanOption::Minimum),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

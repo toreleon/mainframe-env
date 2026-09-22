@@ -471,6 +471,9 @@ fn validate_operation_shape(
                 || outputs.contains(&CicsOutputName::Into)
         }
         CicsPlanOperation::Link => program_control::invalid_link_shape(plan, inputs, outputs),
+        CicsPlanOperation::InvokeApplication => {
+            program_control::invalid_invoke_application_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::Xctl => program_control::invalid_xctl_shape(plan, inputs, outputs),
         CicsPlanOperation::Return => program_control::invalid_return_shape(plan, inputs, outputs),
         CicsPlanOperation::StartBrowse
@@ -1237,6 +1240,26 @@ mod tests {
         assert_eq!(option_from_tag(46), Ok(CicsPlanOption::Auxiliary));
         assert_eq!(option_tag(CicsPlanOption::Main), 47);
         assert_eq!(option_from_tag(47), Ok(CicsPlanOption::Main));
+        assert_eq!(operation_tag(CicsPlanOperation::InvokeApplication), 46);
+        assert_eq!(
+            operation_from_tag(46),
+            Ok(CicsPlanOperation::InvokeApplication)
+        );
+        for (operand, tag) in [
+            (CicsOperandName::Application, 56),
+            (CicsOperandName::Platform, 57),
+            (CicsOperandName::ApplicationOperation, 58),
+            (CicsOperandName::MajorVersion, 59),
+            (CicsOperandName::MinorVersion, 60),
+            (CicsOperandName::Channel, 61),
+        ] {
+            assert_eq!(operand_tag(operand), tag);
+            assert_eq!(operand_from_tag(tag), Ok(operand));
+        }
+        assert_eq!(option_tag(CicsPlanOption::ExactMatch), 36);
+        assert_eq!(option_from_tag(36), Ok(CicsPlanOption::ExactMatch));
+        assert_eq!(option_tag(CicsPlanOption::Minimum), 37);
+        assert_eq!(option_from_tag(37), Ok(CicsPlanOption::Minimum));
 
         let plan = read_plan();
         let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();

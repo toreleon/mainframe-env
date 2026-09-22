@@ -28,12 +28,13 @@ use mainframe_env_host_api::{
     CicsConditionPolicy, ClockRequest, DatasetRequest, DatasetResult, ProgramRequest,
 };
 use mainframe_env_store_api::{
-    ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError, WorkStore,
+    ArtifactStore, ProviderStateRecord, ProviderStateStore, ProviderStateWrite, StoreError,
+    WorkStore,
 };
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CicsLimits {
@@ -264,6 +265,8 @@ struct State {
     runs: BTreeMap<RunUnitId, Run>,
     maps: BTreeMap<(String, String), BmsMapDefinition>,
     programs: BTreeSet<String>,
+    program_definitions: BTreeMap<String, BTreeMap<u64, CicsProgramDefinition>>,
+    application_entries: Vec<CicsApplicationEntryDefinition>,
     file_aliases: BTreeMap<String, CicsFileDefinition>,
     file_statuses: BTreeMap<String, DurableFileStatus>,
     enqueue_models: BTreeMap<String, CicsEnqueueModelDefinition>,
@@ -296,6 +299,7 @@ pub struct CicsService {
     state: Mutex<State>,
     replay_clock: Option<Arc<dyn CicsReplayClock>>,
     work_store: Option<Arc<dyn WorkStore>>,
+    artifacts: OnceLock<Arc<dyn ArtifactStore>>,
     replay_unknown_after_persist: AtomicBool,
 }
 
@@ -388,6 +392,9 @@ impl CicsService {
                 return Err(HostProblem::InfrastructureFailure);
             }
         }
+        let program_definitions = handlers::load_program_definitions(store.as_ref(), limits)?;
+        let application_entries = handlers::load_application_entries(store.as_ref(), limits)?;
+        handlers::validate_application_catalog(&program_definitions, &application_entries)?;
         let mut file_aliases = BTreeMap::new();
         for row in store
             .list_provider_state("cics-file-alias", limits.max_file_aliases)
@@ -422,12 +429,15 @@ impl CicsService {
             limits,
             replay_clock,
             work_store,
+            artifacts: OnceLock::new(),
             replay_unknown_after_persist: AtomicBool::new(false),
             state: Mutex::new(State {
                 sessions,
                 runs: BTreeMap::new(),
                 maps,
                 programs,
+                program_definitions,
+                application_entries,
                 file_aliases,
                 file_statuses,
                 enqueue_models,
@@ -1236,49 +1246,6 @@ impl CicsService {
         Ok(())
     }
 
-    pub fn register_programs(&self, programs: &BTreeSet<String>) -> Result<(), HostProblem> {
-        let normalized = programs
-            .iter()
-            .map(|program| normalize_terminal_name(program, 128))
-            .collect::<Result<BTreeSet<_>, _>>()?;
-        if normalized.len() != programs.len() {
-            return Err(HostProblem::IdempotencyConflict);
-        }
-        let mut state = self.lock()?;
-        let additions = normalized
-            .iter()
-            .filter(|program| !state.programs.contains(*program))
-            .count();
-        if state
-            .programs
-            .len()
-            .checked_add(additions)
-            .is_none_or(|total| total > self.limits.max_programs)
-        {
-            return Err(HostProblem::ResourceExhausted);
-        }
-        let writes = normalized
-            .iter()
-            .filter(|program| !state.programs.contains(*program))
-            .map(|program| ProviderStateWrite {
-                record: ProviderStateRecord {
-                    namespace: "cics-program".into(),
-                    key: program.clone(),
-                    version: 1,
-                    payload: Vec::new(),
-                },
-                expected_version: None,
-            })
-            .collect::<Vec<_>>();
-        if !writes.is_empty() {
-            self.store
-                .put_provider_states_atomic(writes)
-                .map_err(store_error)?;
-        }
-        state.programs.extend(normalized);
-        Ok(())
-    }
-
     pub fn register_file_aliases(
         &self,
         aliases: &BTreeMap<String, DatasetName>,
@@ -1715,7 +1682,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 50);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 51);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -3725,7 +3692,8 @@ mod tests {
     use mainframe_env_racf::{MemorySecretResolver, RacfService, racf_providers};
     use mainframe_env_store::{MemoryStore, PostgresStateStore, SqliteStateStore};
     use mainframe_env_store_api::{
-        AuditSink, EffectDigestFormat, EffectIntentMetadata, EffectRecord, EffectState, WorkState,
+        ArtifactRecord, ArtifactStore, AuditSink, EffectDigestFormat, EffectIntentMetadata,
+        EffectRecord, EffectState, ExecutableArtifactMetadata, WorkState,
     };
     use mainframe_env_store_api::{ProviderStateMutation, ProviderStateWrite};
     use std::collections::BTreeSet;
@@ -4591,6 +4559,42 @@ mod tests {
         payload
     }
 
+    fn install_program_artifact(store: &dyn ArtifactStore, bytes: &[u8]) -> (ArtifactRef, String) {
+        let digest: [u8; 32] = Sha256::digest(bytes).into();
+        let artifact = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(bytes)),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let semantic_identity = format!(
+            "semantic-sha256:{:x}",
+            Sha256::digest([b"semantic", bytes].concat())
+        );
+        let executable = ExecutableArtifactMetadata {
+            artifact_contract: "mainframe-env.artifact@3".into(),
+            compatibility_profile: "mainframe-env.cobol.reference@1".into(),
+            compiler_generation: "mainframe-env-cobol-test".into(),
+            target: "reference".into(),
+            options: BTreeMap::new(),
+            host_interfaces: BTreeSet::from(["mainframe-env.cics@1".into()]),
+            ir_contract: "mainframe-env.ir@1".into(),
+            dialect_contracts: Some(BTreeSet::from(["mainframe-env.cobol@1".into()])),
+            semantic_identity: semantic_identity.clone(),
+            manifest_payload_digest: [0; 32],
+        }
+        .bind_to_payload(&digest);
+        store
+            .put_artifact(ArtifactRecord {
+                artifact: artifact.clone(),
+                media_type: "application/vnd.mainframe-env.core-mir".into(),
+                payload_digest: digest,
+                payload: bytes.to_vec(),
+                executable: Some(executable),
+            })
+            .unwrap();
+        (artifact, semantic_identity)
+    }
+
     fn condition_list(names: &[&str]) -> BoundedPayload {
         BoundedPayload::new(
             "mainframe-env.cics.condition-list@1",
@@ -4904,6 +4908,10 @@ mod tests {
             ("HANDLE CONDITION", CicsOperation::HandleCondition),
             ("IGNORE CONDITION ERROR", CicsOperation::IgnoreCondition),
             ("INQUIRE PROGRAM(PGM)", CicsOperation::Inquire),
+            (
+                "INVOKE APPLICATION('PAYMENTS')",
+                CicsOperation::InvokeApplication,
+            ),
             ("LINK", CicsOperation::Link),
             ("POP HANDLE", CicsOperation::PopHandle),
             ("PUSH HANDLE", CicsOperation::PushHandle),
@@ -4941,8 +4949,264 @@ mod tests {
     }
 
     #[test]
+    fn invoke_application_selects_immutable_versions_and_survives_restart() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+        let artifact_store: Arc<dyn ArtifactStore> = store.clone();
+        let cics = service(provider_store.clone());
+        cics.bind_artifact_store(artifact_store.clone()).unwrap();
+        let (first_artifact, first_semantic) = install_program_artifact(store.as_ref(), b"FIRST");
+        let (second_artifact, second_semantic) =
+            install_program_artifact(store.as_ref(), b"SECOND");
+        let (major_artifact, major_semantic) = install_program_artifact(store.as_ref(), b"MAJOR");
+        let programs = [
+            ("APPV1", 1, first_artifact.clone(), first_semantic),
+            ("APPV2", 2, second_artifact.clone(), second_semantic),
+            ("APPV3", 3, major_artifact.clone(), major_semantic),
+        ]
+        .map(
+            |(name, generation, artifact, semantic_identity)| CicsProgramDefinition {
+                name: name.into(),
+                generation,
+                artifact,
+                semantic_identity,
+                entry_offset: 0,
+                enabled: true,
+                remote: false,
+                reload: false,
+                java_status: CicsJavaStatus::NotJava,
+            },
+        );
+        cics.register_program_definitions(&programs).unwrap();
+        let identity = |marker: u8| format!("sha256:{:064x}", marker);
+        cics.register_application_entries(&[
+            CicsApplicationEntryDefinition {
+                application: "PAYMENTS".into(),
+                platform: "BANKING".into(),
+                major_version: 1,
+                minor_version: 0,
+                micro_version: 4,
+                operation: "AUTHORIZE".into(),
+                program: "APPV1".into(),
+                program_generation: 1,
+                program_artifact: first_artifact,
+                application_identity: identity(1),
+                available: true,
+            },
+            CicsApplicationEntryDefinition {
+                application: "PAYMENTS".into(),
+                platform: "BANKING".into(),
+                major_version: 1,
+                minor_version: 2,
+                micro_version: 1,
+                operation: "AUTHORIZE".into(),
+                program: "APPV2".into(),
+                program_generation: 2,
+                program_artifact: second_artifact,
+                application_identity: identity(2),
+                available: true,
+            },
+            CicsApplicationEntryDefinition {
+                application: "PAYMENTS".into(),
+                platform: "BANKING".into(),
+                major_version: 2,
+                minor_version: 0,
+                micro_version: 3,
+                operation: "AUTHORIZE".into(),
+                program: "APPV3".into(),
+                program_generation: 3,
+                program_artifact: major_artifact,
+                application_identity: identity(3),
+                available: true,
+            },
+        ])
+        .unwrap();
+        let platform = BoundedPayload::new(
+            "mainframe-env.cics.platform@1",
+            b"BANKING".to_vec(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let invocation = invocation_for(
+            "invoke-app",
+            BTreeMap::from([("cics.platform".into(), platform)]),
+        );
+        let session = SessionId::new("invoke-app-session", 64).unwrap();
+        cics.create_session(&session, 24, 80).unwrap();
+        cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let base_arguments = BTreeMap::from([
+            ("APPLICATION".into(), cics_literal(b"PAYMENTS")),
+            ("OPERATION".into(), cics_literal(b"AUTHORIZE")),
+            ("COMMAREA".into(), task_value(b"REQUEST!")),
+            ("LENGTH".into(), cics_decimal(7)),
+        ]);
+        let default_request = request(CicsOperation::InvokeApplication, base_arguments.clone(), 1);
+        let default_response = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, default_request.clone(), 1),
+                default_request,
+            )
+            .unwrap();
+        assert_eq!(default_response.target.as_deref(), Some("APPV3"));
+        assert_eq!(
+            default_response.outputs["APPLICATION.VERSION"].bytes(),
+            b"2.0.3"
+        );
+        assert_eq!(default_response.outputs["COMMAREA"].bytes(), b"CHILD");
+
+        let mut minimum_arguments = base_arguments.clone();
+        minimum_arguments.insert("MAJORVERSION".into(), cics_decimal(1));
+        minimum_arguments.insert("MINORVERSION".into(), cics_decimal(0));
+        minimum_arguments.insert("OPTION.MINIMUM".into(), cics_option());
+        let minimum_request = request(CicsOperation::InvokeApplication, minimum_arguments, 2);
+        let minimum_response = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, minimum_request.clone(), 2),
+                minimum_request,
+            )
+            .unwrap();
+        assert_eq!(minimum_response.target.as_deref(), Some("APPV2"));
+
+        drop(cics);
+        let reopened = service(provider_store);
+        reopened.bind_artifact_store(artifact_store).unwrap();
+        let restarted = invocation_for(
+            "invoke-restart",
+            BTreeMap::from([(
+                "cics.platform".into(),
+                BoundedPayload::new(
+                    "mainframe-env.cics.platform@1",
+                    b"BANKING".to_vec(),
+                    InvocationLimits::default(),
+                )
+                .unwrap(),
+            )]),
+        );
+        let restarted_session = SessionId::new("invoke-restart-session", 64).unwrap();
+        reopened.create_session(&restarted_session, 24, 80).unwrap();
+        reopened
+            .register_run(
+                restarted.clone(),
+                &restarted_session,
+                "MENU",
+                "MEAPPL",
+                "MESYS",
+            )
+            .unwrap();
+        let mut exact_arguments = base_arguments;
+        exact_arguments.insert("MAJORVERSION".into(), cics_decimal(1));
+        exact_arguments.insert("MINORVERSION".into(), cics_decimal(0));
+        exact_arguments.insert("OPTION.EXACTMATCH".into(), cics_option());
+        let exact_request = request(CicsOperation::InvokeApplication, exact_arguments, 3);
+        let exact_response = reopened
+            .invoke(
+                &effect(&restarted.run_unit_id, exact_request.clone(), 3),
+                exact_request,
+            )
+            .unwrap();
+        assert_eq!(exact_response.target.as_deref(), Some("APPV1"));
+        assert_eq!(
+            exact_response.outputs["APPLICATION.VERSION"].bytes(),
+            b"1.0.4"
+        );
+    }
+
+    #[test]
+    fn invoke_application_catalog_reopens_from_sqlite() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-invoke-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let artifact;
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+            let artifact_store: Arc<dyn ArtifactStore> = store.clone();
+            let cics = service(provider_store);
+            cics.bind_artifact_store(artifact_store).unwrap();
+            let (installed, semantic_identity) =
+                install_program_artifact(store.as_ref(), b"SQLITE");
+            artifact = installed.clone();
+            cics.register_program_definitions(&[CicsProgramDefinition {
+                name: "SQLAPP".into(),
+                generation: 7,
+                artifact: installed.clone(),
+                semantic_identity,
+                entry_offset: 0,
+                enabled: true,
+                remote: false,
+                reload: false,
+                java_status: CicsJavaStatus::NotJava,
+            }])
+            .unwrap();
+            cics.register_application_entries(&[CicsApplicationEntryDefinition {
+                application: "PAYMENTS".into(),
+                platform: "BANKING".into(),
+                major_version: 6,
+                minor_version: 2,
+                micro_version: 9,
+                operation: "AUTHORIZE".into(),
+                program: "SQLAPP".into(),
+                program_generation: 7,
+                program_artifact: installed,
+                application_identity: format!("sha256:{:064x}", 7),
+                available: true,
+            }])
+            .unwrap();
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let provider_store: Arc<dyn ProviderStateStore> = store.clone();
+            let artifact_store: Arc<dyn ArtifactStore> = store;
+            let cics = service(provider_store);
+            cics.bind_artifact_store(artifact_store).unwrap();
+            let invocation = invocation_for(
+                "invoke-sqlite",
+                BTreeMap::from([(
+                    "cics.platform".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.platform@1",
+                        b"BANKING".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                )]),
+            );
+            let session = SessionId::new("invoke-sqlite-session", 64).unwrap();
+            cics.create_session(&session, 24, 80).unwrap();
+            cics.register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let request = request(
+                CicsOperation::InvokeApplication,
+                BTreeMap::from([
+                    ("APPLICATION".into(), cics_literal(b"PAYMENTS")),
+                    ("OPERATION".into(), cics_literal(b"AUTHORIZE")),
+                ]),
+                1,
+            );
+            let response = cics
+                .invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), 1),
+                    request,
+                )
+                .unwrap();
+            assert_eq!(response.target.as_deref(), Some("SQLAPP"));
+            assert_eq!(
+                response.outputs["PROGRAM.CONTENT"].bytes(),
+                artifact.as_str().as_bytes()
+            );
+            assert_eq!(response.outputs["APPLICATION.VERSION"].bytes(), b"6.2.9");
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 50);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 51);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();

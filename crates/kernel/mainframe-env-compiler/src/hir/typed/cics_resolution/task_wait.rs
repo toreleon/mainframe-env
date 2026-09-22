@@ -1,7 +1,6 @@
 use super::{
-    Clauses, HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsOption,
-    HirCicsValue, Resolution, ResolutionFailure, cics_integer_value, cics_value,
-    complete_data_reference,
+    Clauses, HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsValue, Resolution,
+    ResolutionFailure, cics_integer_value, cics_value, complete_data_reference,
 };
 use crate::{CobolUsage, DataCategory, SemanticModel};
 use std::collections::BTreeMap;
@@ -44,14 +43,6 @@ pub(super) fn resolve(
         }
     }
     operands(clauses, operation, semantic)
-}
-
-pub(super) fn option(name: &str) -> HirCicsOption {
-    match name {
-        "PURGEABLE" => HirCicsOption::Purgeable,
-        "NOTPURGEABLE" => HirCicsOption::NotPurgeable,
-        _ => unreachable!("allowed CICS option"),
-    }
 }
 
 fn validate_constraints(

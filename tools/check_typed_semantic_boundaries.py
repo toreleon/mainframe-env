@@ -190,7 +190,7 @@ def check(root: Path) -> None:
         ],
         "typed CICS runtime",
     )
-    validation = between(cics_runtime, "fn plan(operation: &Operation)", "pub(super) fn legacy_arguments")
+    validation = between(cics_runtime, "fn plan(operation: &Operation)", "fn invalid_plan(")
     reject(
         validation,
         ["CicsOperation::from_tokens", "legacy_arguments(", "legacy_destination("],
