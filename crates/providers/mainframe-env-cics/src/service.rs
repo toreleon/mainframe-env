@@ -14441,6 +14441,7 @@ mod tests {
             .invoke(&effect(&invocation.run_unit_id, read.clone(), 2), read)
             .unwrap();
         assert_eq!(response.payload.bytes(), b"ABC12");
+        assert_eq!(response.outputs["LENGTH"].bytes(), b"5");
 
         let mismatched_delete = request(
             CicsOperation::Delete,

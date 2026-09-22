@@ -369,8 +369,10 @@ All notable changes to mainframe-env are documented here.
   typed file-mutation plans. RIDFLD and WRITE FROM are resolved data-area
   inputs, FILE/DATASET remains one exact resource alias, and both operations
   carry typed mutation identity. DELETE may instead consume the latest record
-  held by `READ UPDATE`. WRITE and REWRITE LENGTH accept a bounded literal,
-  halfword-binary value, or matching `LENGTH OF` and persist only that prefix;
+  held by `READ UPDATE`. READ LENGTH is a writable halfword capacity that
+  returns the actual record length. WRITE and REWRITE LENGTH accept a bounded
+  literal, halfword-binary value, or matching `LENGTH OF` and persist only that
+  prefix;
   READ, WRITE, and explicit-key DELETE KEYLENGTH accept the same positive
   halfword forms against RIDFLD and preserve exact `INVREQ` 16/26 for a
   definition mismatch. TOKEN deletes, remote forms, generic and alternate

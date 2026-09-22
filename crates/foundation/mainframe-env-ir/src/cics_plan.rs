@@ -509,6 +509,10 @@ fn validate_operation_shape(
                 || plan.options.iter().any(|option| {
                     !matches!(option, CicsPlanOption::NoHandle | CicsPlanOption::Update)
                 })
+                || !matches!(
+                    operand_value(plan, CicsOperandName::Length),
+                    None | Some(CicsOperandValue::Storage(_))
+                )
                 || outputs.contains(&CicsOutputName::Length)
                     != matches!(
                         operand_value(plan, CicsOperandName::Length),
@@ -1625,6 +1629,20 @@ mod tests {
             .value = CicsOperandValue::LengthOf(slot(16, "OTHER.KEY"));
         assert_eq!(
             encode_cics_effect_plan(&read_with_mismatched_key_length, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut read_with_literal_length = read.clone();
+        read_with_literal_length
+            .operands
+            .iter_mut()
+            .find(|operand| operand.name == CicsOperandName::Length)
+            .unwrap()
+            .value = CicsOperandValue::Integer(8);
+        read_with_literal_length
+            .outputs
+            .retain(|output| output.name != CicsOutputName::Length);
+        assert_eq!(
+            encode_cics_effect_plan(&read_with_literal_length, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
         let mut write_with_key_length = write.clone();

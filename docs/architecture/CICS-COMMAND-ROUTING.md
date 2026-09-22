@@ -215,12 +215,13 @@ the record held by the task's latest `READ UPDATE` on that file. WRITE FILE
 requires explicit FROM and RIDFLD data areas; REWRITE consumes the held record
 identity and an explicit FROM area. Optional WRITE or REWRITE LENGTH is a
 bounded literal, halfword-binary value, or matching `LENGTH OF` and selects the
-exact record prefix before mutation. Optional READ, WRITE, or explicit-key
-DELETE KEYLENGTH uses the same positive halfword forms against RIDFLD and is
-validated against the durable definition. All use the same single FILE/DATASET
-resource binding and typed mutation envelope. TOKEN correlation, SYSID, generic
-and alternate record identities, WRITE MASSINSERT, and RLS NOSUSPEND remain
-fail-closed.
+exact record prefix before mutation. READ LENGTH is the same writable halfword
+capacity on input and actual-record-length output. Optional READ, WRITE, or
+explicit-key DELETE KEYLENGTH uses the same positive halfword forms against
+RIDFLD and is validated against the durable definition. All use the same single
+FILE/DATASET resource binding and typed mutation envelope. TOKEN correlation,
+SYSID, generic and alternate record identities, WRITE MASSINSERT, and RLS
+NOSUSPEND remain fail-closed.
 The typed local WRITEQ TD subset requires a bounded QUEUE selector and FROM
 storage input, with optional numeric LENGTH or `LENGTH OF` that input. The
 provider writes exactly the selected prefix under the request's mutation

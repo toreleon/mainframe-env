@@ -4885,6 +4885,13 @@ mod tests {
                 .iter()
                 .any(|output| output.name == HirCicsOutputName::Length)
         );
+
+        for invalid in ["LENGTH(8)", "LENGTH(LENGTH OF REC-X)"] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADRLEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 REC-X PIC X(8). 01 KEY-X PIC X(3). PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) {invalid} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{invalid}");
+        }
     }
 
     #[test]
