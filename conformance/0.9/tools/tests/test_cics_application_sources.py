@@ -133,7 +133,7 @@ class CicsApplicationSourcesTests(unittest.TestCase):
         )
         self.assertEqual(
             corpus["corpus_sha256"],
-            "sha256:75542331ed6f8f797baec2f6846b3a021b2187ecd6ab2df75eddc85e89a768f4",
+            "sha256:946465b9acf686e94664921a1173304b1773199d358fef217920ab3c3241f4cf",
         )
         self.assertEqual(
             corpus["topic_manifest"]["file_sha256"],

@@ -416,6 +416,9 @@ All notable changes to mainframe-env are documented here.
   admissions. DELETEQ TD, FREEMAIN, and GETMAIN are excluded from the
   no-admission compatibility projection, and all three maps now bind the
   current descriptor digest.
+- Propagated the regenerated CICS map identities into the three zero-credit
+  source corpora and their independently recomputed corpus digests. No topic,
+  retained HTML, source fact, or browser receipt changed.
 - Migrated the local `WRITEQ TD` compatibility subset to a typed queue-write
   plan. QUEUE is a validated 1–4 character literal or field, FROM is a resolved
   data area, and optional numeric LENGTH or `LENGTH OF` selects the persisted

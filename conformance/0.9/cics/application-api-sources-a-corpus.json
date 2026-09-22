@@ -9,7 +9,7 @@
   "differential_credit": 0,
   "mapping": {
     "path": "conformance/0.9/cics/application-api-sources-a-map.json",
-    "sha256": "sha256:e3e453846334aa92235f21f0028e9c77f084fc4e872d9f592b7af227decac863"
+    "sha256": "sha256:c535f2cac1072e16a0f3e252045cac975934c5e24d405a560a4e0ad14e0de726"
   },
   "topic_manifest": {
     "path": "conformance/0.9/manifests/cics-application-api-sources-a-topics.json",
@@ -521,5 +521,5 @@
     }
   ],
   "corpus_digest_definition": "SHA-256 over ASCII domain mainframe-env.cics-source-corpus@1, one NUL byte (0x00), then UTF-8 JSON with ensure_ascii=true, sort_keys=true and separators=(',', ':') of mapping, topic_manifest, counts, mapped topics, linked topics, manual topics, excluded navigation, and source gaps",
-  "corpus_sha256": "sha256:75542331ed6f8f797baec2f6846b3a021b2187ecd6ab2df75eddc85e89a768f4"
+  "corpus_sha256": "sha256:946465b9acf686e94664921a1173304b1773199d358fef217920ab3c3241f4cf"
 }

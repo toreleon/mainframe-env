@@ -237,7 +237,7 @@ class CicsSourceMapTests(unittest.TestCase):
         )
         self.assertEqual(
             mapping["mapping_sha256"],
-            "sha256:e3e453846334aa92235f21f0028e9c77f084fc4e872d9f592b7af227decac863",
+            "sha256:c535f2cac1072e16a0f3e252045cac975934c5e24d405a560a4e0ad14e0de726",
         )
 
     def test_external_toc_projection_is_structural_and_digest_checked(self):
