@@ -6,6 +6,13 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added a bounded owned parser for the common Db2 expression substrate. It
+  produces only the existing expression arena for literals, qualified names,
+  host variables and indicators, parameter markers, scalar calls, casts,
+  arithmetic, concatenation, comparisons, Boolean operators, NULL predicates,
+  and CASE forms. Malformed, trailing, over-limit, and unsupported forms fail
+  explicitly; wildcard syntax is confined to a single function argument.
+
 - Added owned common dynamic-SQL syntax for PREPARE, EXECUTE, and EXECUTE
   IMMEDIATE. Static-host forms preserve SQLDA naming modes, attribute indicators,
   prepared-statement names, bounded USING variables, descriptors, and source

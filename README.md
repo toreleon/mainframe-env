@@ -25,6 +25,11 @@ the P1 hardening items in the
 [pre-0.9 deep review](docs/reviews/PRE-0.9.0-DEEP-REVIEW.md) are closed. A clean
 test run is necessary but does not override those findings.
 
+The independent [0.12.0 implementation status](docs/delivery/coverage-versions/status/0.12.0.md)
+tracks incremental Db2 parser and engine slices. These development slices do
+not change the published release, claim licensed equivalence, or grant whole-row
+catalog credit before every applicable obligation passes.
+
 ## Quick start
 
 The repository pins Rust 1.98.0. Install the toolchain declared in
