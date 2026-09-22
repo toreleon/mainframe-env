@@ -1,6 +1,6 @@
 use super::{
     CicsEffectPlan, CicsOperandName, CicsOperandValue, CicsOutputName, CicsPlanOperation,
-    CicsPlanOption, output_target,
+    CicsPlanOption, operand_value, output_target,
 };
 use std::collections::BTreeSet;
 
@@ -27,6 +27,8 @@ pub(super) fn invalid_shape(
         plan.operation,
         CicsPlanOperation::ReadNext | CicsPlanOperation::ReadPrev
     );
+    let starting = plan.operation == CicsPlanOperation::StartBrowse;
+    let generic = plan.options.contains(&CicsPlanOption::Generic);
     let positions = matches!(plan.operation, CicsPlanOperation::StartBrowse) || reading;
     resources != 1
         || !inputs.is_subset(&allowed_inputs)
@@ -39,11 +41,37 @@ pub(super) fn invalid_shape(
             None => ridfld_output.is_some(),
         }
         || reading != outputs.contains(&CicsOutputName::Into)
+        || (generic && (!starting || !inputs.contains(&CicsOperandName::KeyLength)))
         || (plan.options.contains(&CicsPlanOption::Equal)
             && plan.options.contains(&CicsPlanOption::Gteq))
+        || (starting
+            && plan.operands.iter().any(|operand| {
+                operand.name == CicsOperandName::KeyLength
+                    && match operand.value {
+                        CicsOperandValue::Integer(0) => {
+                            !plan.options.contains(&CicsPlanOption::Gteq)
+                        }
+                        CicsOperandValue::Integer(1..=32_767)
+                        | CicsOperandValue::Storage(_)
+                        | CicsOperandValue::LengthOf(_) => false,
+                        _ => true,
+                    }
+            }))
+        || (starting
+            && match (
+                operand_value(plan, CicsOperandName::Ridfld),
+                operand_value(plan, CicsOperandName::KeyLength),
+            ) {
+                (
+                    Some(CicsOperandValue::Storage(ridfld)),
+                    Some(CicsOperandValue::LengthOf(length)),
+                ) => ridfld != length,
+                (Some(_), Some(CicsOperandValue::LengthOf(_))) => true,
+                _ => false,
+            })
         || plan.options.iter().any(|option| match option {
             CicsPlanOption::NoHandle => false,
-            CicsPlanOption::Gteq | CicsPlanOption::Equal => {
+            CicsPlanOption::Gteq | CicsPlanOption::Equal | CicsPlanOption::Generic => {
                 plan.operation != CicsPlanOperation::StartBrowse
             }
             _ => true,

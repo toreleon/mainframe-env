@@ -3538,6 +3538,75 @@ mod tests {
     }
 
     #[test]
+    fn cics_generic_start_browse_crosses_the_compiled_selected_route() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. BRGEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3) VALUE 'AAZ'. 01 KEY-LENGTH-X PIC S9(4) COMP VALUE 2. PROCEDURE DIVISION. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) KEYLENGTH(KEY-LENGTH-X) GENERIC EQUAL END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+
+        let MachineDrive::HostCall(start) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("generic STARTBR did not call host");
+        };
+        assert!(matches!(
+            &start.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::StartBrowse,
+                arguments,
+                mutation: None,
+                ..
+            }) if arguments["FILE"].bytes() == b"ACCTDAT"
+                && arguments["RIDFLD"].bytes() == b"AAZ"
+                && arguments["KEYLENGTH"].schema() == "mainframe-env.cics.decimal@1"
+                && arguments["KEYLENGTH"].bytes() == b"2"
+                && arguments.contains_key("OPTION.GENERIC")
+                && arguments.contains_key("OPTION.EQUAL")
+        ));
+
+        let payload = mainframe_env_execution_api::BoundedPayload::new(
+            "mainframe-env.cics.payload@1",
+            Vec::new(),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: start.sequence,
+                    outcome: Ok(HostResult::Cics(CicsResponse {
+                        disposition: CicsDisposition::Complete,
+                        condition: "NORMAL".into(),
+                        response: 0,
+                        response2: 0,
+                        applid: "APP".into(),
+                        sysid: "SYS".into(),
+                        transaction: "T001".into(),
+                        aid: 0,
+                        target: None,
+                        next_transaction: None,
+                        payload,
+                        outputs: BTreeMap::new(),
+                        unit_of_work: None,
+                    })),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x06, 0x0c]);
+    }
+
+    #[test]
     fn cics_keyed_write_and_delete_use_typed_mutation_inputs() {
         use mainframe_env_host_api::{
             CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,

@@ -39,8 +39,10 @@ pub(super) fn validate_constraints(
             "CICS {operation:?} KEYLENGTH requires RIDFLD"
         )));
     }
-    if operation == HirCicsOperation::Read
-        && options.iter().any(|option| option == "GENERIC")
+    if matches!(
+        operation,
+        HirCicsOperation::Read | HirCicsOperation::StartBrowse
+    ) && options.iter().any(|option| option == "GENERIC")
         && !clauses.contains_key("KEYLENGTH")
     {
         return Err(ResolutionFailure::Invalid(
@@ -57,8 +59,10 @@ pub(super) fn validate_constraints(
             "CICS {operation:?} EQUAL and GTEQ are mutually exclusive"
         )));
     }
-    if operation == HirCicsOperation::Read
-        && !options.iter().any(|option| option == "GTEQ")
+    if matches!(
+        operation,
+        HirCicsOperation::Read | HirCicsOperation::StartBrowse
+    ) && !options.iter().any(|option| option == "GTEQ")
         && matches!(
             clauses.get("KEYLENGTH").map(Vec::as_slice),
             Some([token]) if numeric_literal(token)
@@ -144,7 +148,10 @@ pub(super) fn resolve(
                 file_record_length_value(tokens, operation, semantic)?
             } else if matches!(
                 operation,
-                HirCicsOperation::Read | HirCicsOperation::Write | HirCicsOperation::Delete
+                HirCicsOperation::Read
+                    | HirCicsOperation::Write
+                    | HirCicsOperation::Delete
+                    | HirCicsOperation::StartBrowse
             ) && name == "KEYLENGTH"
             {
                 file_key_length_value(tokens, operation, semantic)?
@@ -172,7 +179,10 @@ pub(super) fn resolve(
             }
             if matches!(
                 operation,
-                HirCicsOperation::Read | HirCicsOperation::Write | HirCicsOperation::Delete
+                HirCicsOperation::Read
+                    | HirCicsOperation::Write
+                    | HirCicsOperation::Delete
+                    | HirCicsOperation::StartBrowse
             ) && name == "KEYLENGTH"
                 && let HirCicsValue::LengthOf(length) = &value
                 && !operands.iter().any(|operand| {
@@ -252,7 +262,10 @@ fn file_key_length_value(
             )));
         }
         HirCicsValue::Integer(value)
-            if !(if operation == HirCicsOperation::Read {
+            if !(if matches!(
+                operation,
+                HirCicsOperation::Read | HirCicsOperation::StartBrowse
+            ) {
                 0..=32_767
             } else {
                 1..=32_767

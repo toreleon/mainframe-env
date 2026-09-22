@@ -363,9 +363,12 @@ All notable changes to mainframe-env are documented here.
   resource and a writable RIDFLD, admits STARTBR's default-equivalent `GTEQ`
   and exact-key `EQUAL` relations as an exclusive choice, models RIDFLD as the
   same input/output slot on reads, and writes the returned record into a
-  pre-resolved INTO area.
-  REQID/SYSID, alternate key modes and lengths, SET, and UPDATE/TOKEN/RLS
-  semantics remain fail-closed.
+  pre-resolved INTO area. STARTBR now also accepts bounded KEYLENGTH forms,
+  requires KEYLENGTH for GENERIC, preserves prefix-only EQUAL positioning,
+  supports GENERIC GTEQ and KEYLENGTH zero first-record positioning, and maps
+  definition/full-key violations to exact INVREQ 16/25, 16/26, or 16/42.
+  REQID/SYSID, alternate key modes, SET, and UPDATE/TOKEN/RLS semantics remain
+  fail-closed.
 - Migrated the explicit-key `DELETE` and `WRITE FILE` compatibility subsets to
   typed file-mutation plans. RIDFLD and WRITE FROM are resolved data-area
   inputs, FILE/DATASET remains one exact resource alias, and both operations

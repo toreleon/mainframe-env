@@ -4035,6 +4035,19 @@ mod tests {
                 HostRequest::Dataset(request) => {
                     self.trace.requests.lock().unwrap().push(request.clone());
                     match request {
+                        DatasetRequest::Attributes { .. } => {
+                            Ok(HostResult::Dataset(DatasetResult::Attributes {
+                                attributes: DatasetAttributes {
+                                    organization: DatasetOrganization::KeySequenced,
+                                    record_format: RecordFormat::Fixed,
+                                    logical_record_length: 4,
+                                    key_offset: Some(0),
+                                    key_length: Some(3),
+                                    ccsid: None,
+                                },
+                                version: 1,
+                            }))
+                        }
                         DatasetRequest::Read { key, .. } => {
                             let identity = key.unwrap_or_else(|| b"AA".to_vec());
                             Ok(HostResult::Dataset(DatasetResult::Records {
@@ -14770,6 +14783,133 @@ mod tests {
         assert_eq!(origins.len(), 2);
         assert_eq!(origins[0].1, "outer-3");
         assert_eq!(origins[1].1, "outer-4");
+    }
+
+    #[test]
+    fn start_browse_generic_key_length_selects_prefix_and_first_record() {
+        let trace = Arc::new(DatasetTrace::default());
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service =
+            CicsService::open(traced_authorities(trace.clone()), store, Default::default())
+                .unwrap();
+        let (invocation, _) = registered(&service);
+        service
+            .register_file_aliases(&BTreeMap::from([(
+                "CARDDAT".into(),
+                DatasetName::new("CARDDEMO.CARDDAT", 128).unwrap(),
+            )]))
+            .unwrap();
+
+        let generic_equal = request(
+            CicsOperation::StartBrowse,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"CARDDAT")),
+                ("RIDFLD".into(), argument(b"AAZ")),
+                ("KEYLENGTH".into(), cics_decimal(2)),
+                ("OPTION.GENERIC".into(), cics_option()),
+                ("OPTION.EQUAL".into(), cics_option()),
+            ]),
+            1,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, generic_equal.clone(), 1),
+                generic_equal,
+            )
+            .unwrap();
+        let end = request(
+            CicsOperation::EndBrowse,
+            BTreeMap::from([("FILE".into(), argument(b"CARDDAT"))]),
+            2,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, end.clone(), 2), end)
+            .unwrap();
+
+        let missing_prefix = request(
+            CicsOperation::StartBrowse,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"CARDDAT")),
+                ("RIDFLD".into(), argument(b"BBZ")),
+                ("KEYLENGTH".into(), cics_decimal(2)),
+                ("OPTION.GENERIC".into(), cics_option()),
+                ("OPTION.EQUAL".into(), cics_option()),
+            ]),
+            3,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, missing_prefix.clone(), 3),
+                missing_prefix,
+            ),
+            Err(HostProblem::Condition {
+                name: "NOTFND".into(),
+                response: 13,
+                response2: 80,
+            })
+        );
+
+        let first = request(
+            CicsOperation::StartBrowse,
+            BTreeMap::from([
+                ("FILE".into(), argument(b"CARDDAT")),
+                ("RIDFLD".into(), argument(b"ZZ")),
+                ("KEYLENGTH".into(), cics_decimal(0)),
+                ("OPTION.GENERIC".into(), cics_option()),
+                ("OPTION.GTEQ".into(), cics_option()),
+            ]),
+            4,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, first.clone(), 4), first)
+            .unwrap();
+
+        for (sequence, key_length, generic, response2) in
+            [(5, 1, false, 26), (6, 3, true, 25), (7, -1, true, 42)]
+        {
+            let mut arguments = BTreeMap::from([
+                ("FILE".into(), argument(b"CARDDAT")),
+                ("RIDFLD".into(), argument(b"AAZ")),
+                ("KEYLENGTH".into(), cics_decimal(key_length)),
+            ]);
+            if generic {
+                arguments.insert("OPTION.GENERIC".into(), cics_option());
+                arguments.insert("OPTION.EQUAL".into(), cics_option());
+            }
+            let invalid = request(CicsOperation::StartBrowse, arguments, sequence);
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, invalid.clone(), sequence),
+                    invalid,
+                ),
+                Err(HostProblem::Condition {
+                    name: "INVREQ".into(),
+                    response: 16,
+                    response2,
+                })
+            );
+        }
+
+        let requests = trace.requests.lock().unwrap();
+        assert!(matches!(requests[0], DatasetRequest::Attributes { .. }));
+        assert!(matches!(
+            &requests[1],
+            DatasetRequest::StartBrowse { key, relation, .. }
+                if key == b"AA" && *relation == mainframe_env_host_api::KeyRelation::GreaterOrEqual
+        ));
+        assert!(matches!(requests[2], DatasetRequest::ReadNext { .. }));
+        assert!(matches!(requests[3], DatasetRequest::EndBrowse { .. }));
+        assert!(matches!(
+            &requests[4],
+            DatasetRequest::StartBrowse { key, relation, .. }
+                if key == b"AA" && *relation == mainframe_env_host_api::KeyRelation::GreaterOrEqual
+        ));
+        assert!(matches!(
+            &requests[11],
+            DatasetRequest::StartBrowse { key, relation, .. }
+                if key.is_empty()
+                    && *relation == mainframe_env_host_api::KeyRelation::GreaterOrEqual
+        ));
     }
 
     /// Issue #205: current-record DELETE consumes exactly one READ UPDATE hold.

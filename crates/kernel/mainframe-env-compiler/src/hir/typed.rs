@@ -2646,6 +2646,34 @@ mod tests {
         assert_eq!(command.operation, HirCicsOperation::StartBrowse);
         assert_eq!(command.options, BTreeSet::from([HirCicsOption::Equal]));
 
+        let generic = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BRGEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3) VALUE 'AAZ'. 01 KEY-LENGTH-X PIC S9(4) COMP VALUE 2. PROCEDURE DIVISION. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) KEYLENGTH(KEY-LENGTH-X) GENERIC EQUAL END-EXEC.",
+        );
+        let hir = generic
+            .hir
+            .unwrap_or_else(|| panic!("STARTBR GENERIC: {:?}", generic.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed STARTBR GENERIC");
+        assert_eq!(command.operation, HirCicsOperation::StartBrowse);
+        assert_eq!(
+            command.options,
+            BTreeSet::from([HirCicsOption::Equal, HirCicsOption::Generic])
+        );
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::KeyLength
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference)
+                        if reference.qualified_name == "KEY-LENGTH-X"
+                )
+        }));
+
         let read = analyze(
             "IDENTIFICATION DIVISION. PROGRAM-ID. RDGTEQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 REC-X PIC X(8). PROCEDURE DIVISION. EXEC CICS READ FILE('ACCTDAT') INTO(REC-X) RIDFLD(KEY-X) GTEQ END-EXEC.",
         );
@@ -2671,6 +2699,15 @@ mod tests {
             "IDENTIFICATION DIVISION. PROGRAM-ID. BADREL. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). PROCEDURE DIVISION. EXEC CICS STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) EQUAL GTEQ END-EXEC.",
         );
         assert!(conflicting.hir.is_none());
+        for command in [
+            "STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) GENERIC",
+            "STARTBR FILE('ACCTDAT') RIDFLD(KEY-X) KEYLENGTH(0) GENERIC EQUAL",
+        ] {
+            let invalid = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADGEN. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC."
+            ));
+            assert!(invalid.hir.is_none(), "{command}");
+        }
     }
 
     /// Issue #205: DELETE may select the record held by READ UPDATE.

@@ -1467,6 +1467,32 @@ mod tests {
             encode_cics_effect_plan(&equal_start_browse, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
+        let mut generic_start_browse = start_browse.clone();
+        generic_start_browse.operands.push(CicsNamedOperand {
+            name: CicsOperandName::KeyLength,
+            value: CicsOperandValue::Integer(2),
+        });
+        generic_start_browse.options.insert(CicsPlanOption::Generic);
+        generic_start_browse.options.insert(CicsPlanOption::Equal);
+        assert!(encode_cics_effect_plan(&generic_start_browse, CicsPlanLimits::default()).is_ok());
+        generic_start_browse
+            .operands
+            .retain(|operand| operand.name != CicsOperandName::KeyLength);
+        assert_eq!(
+            encode_cics_effect_plan(&generic_start_browse, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut first_start_browse = start_browse.clone();
+        first_start_browse.operands.push(CicsNamedOperand {
+            name: CicsOperandName::KeyLength,
+            value: CicsOperandValue::Integer(0),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&first_start_browse, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        first_start_browse.options.insert(CicsPlanOption::Gteq);
+        assert!(encode_cics_effect_plan(&first_start_browse, CicsPlanLimits::default()).is_ok());
         let mutation_key = slot(12, "FILE.KEY");
         let delete = CicsEffectPlan {
             operation: CicsPlanOperation::Delete,
