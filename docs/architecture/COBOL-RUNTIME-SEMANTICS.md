@@ -237,11 +237,12 @@ DELETE reads an explicit RIDFLD storage slot or, after `READ UPDATE`, consumes
 the latest held key for the same file; WRITE FILE reads FROM and RIDFLD storage
 slots, preserving record and key bytes in the typed request. Optional WRITE
 LENGTH is a bounded literal, halfword-binary value, or matching `LENGTH OF` and
-selects the exact FROM prefix before the durable mutation. Optional WRITE
-KEYLENGTH accepts a positive literal, halfword-binary value, or `LENGTH OF` the
-RIDFLD area and must match the durable key definition. Both operations require
-exactly one FILE/DATASET alias, carry a mutation identity, and update EIBFN to
-`0608` or `0604`. A current-record DELETE without a hold returns `INVREQ` 16/31.
+selects the exact FROM prefix before the durable mutation. Optional WRITE or
+explicit-key DELETE KEYLENGTH accepts a positive literal, halfword-binary value,
+or `LENGTH OF` the RIDFLD area and must match the durable key definition. Both
+operations require exactly one FILE/DATASET alias, carry a mutation identity,
+and update EIBFN to `0608` or `0604`. A current-record DELETE without a hold
+returns `INVREQ` 16/31 and cannot carry KEYLENGTH.
 Forms whose key or record is a literal, or whose semantics depend on TOKEN,
 remote routing, alternate identities, mass insert, or RLS suspension do not
 publish the typed executable.

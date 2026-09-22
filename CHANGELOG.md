@@ -371,10 +371,10 @@ All notable changes to mainframe-env are documented here.
   carry typed mutation identity. DELETE may instead consume the latest record
   held by `READ UPDATE`. WRITE LENGTH accepts a bounded literal,
   halfword-binary value, or matching `LENGTH OF` and persists only that prefix;
-  WRITE KEYLENGTH accepts the same positive halfword forms against RIDFLD and
-  preserves exact `INVREQ` 16/26 for a definition mismatch. TOKEN deletes,
-  remote forms, generic and alternate record identifiers, mass insert, and RLS
-  wait controls remain deferred.
+  WRITE and explicit-key DELETE KEYLENGTH accept the same positive halfword
+  forms against RIDFLD and preserve exact `INVREQ` 16/26 for a definition
+  mismatch. TOKEN deletes, remote forms, generic and alternate record
+  identifiers, mass insert, and RLS wait controls remain deferred.
 - Migrated the local `WRITEQ TD` compatibility subset to a typed queue-write
   plan. QUEUE is a validated 1–4 character literal or field, FROM is a resolved
   data area, and optional numeric LENGTH or `LENGTH OF` selects the persisted

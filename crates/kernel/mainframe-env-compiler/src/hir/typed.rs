@@ -2834,6 +2834,58 @@ mod tests {
         }
     }
 
+    #[test]
+    fn cics_delete_file_resolves_bounded_key_lengths() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. DELETEKEY. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3) VALUE '003'. 01 KEY-LENGTH-X PIC S9(4) COMP VALUE 3. PROCEDURE DIVISION. EXEC CICS DELETE FILE('ACCTDAT') RIDFLD(KEY-X) KEYLENGTH(3) END-EXEC. EXEC CICS DELETE FILE('ACCTDAT') RIDFLD(KEY-X) KEYLENGTH(KEY-LENGTH-X) END-EXEC. EXEC CICS DELETE FILE('ACCTDAT') RIDFLD(KEY-X) KEYLENGTH(LENGTH OF KEY-X) END-EXEC. STOP RUN.",
+        );
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("DELETE FILE KEYLENGTH: {:?}", analysis.diagnostics));
+        let commands = hir
+            .statements
+            .iter()
+            .filter_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command))
+                    if command.operation == HirCicsOperation::Delete =>
+                {
+                    Some(command)
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 3);
+        assert!(commands[0].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::KeyLength
+                && operand.value == HirCicsValue::Integer(3)
+        }));
+        assert!(commands[1].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::KeyLength
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference)
+                        if reference.qualified_name == "KEY-LENGTH-X"
+                )
+        }));
+        assert!(commands[2].operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::KeyLength
+                && matches!(
+                    operand.value,
+                    HirCicsValue::LengthOf(ref reference)
+                        if reference.qualified_name == "KEY-X"
+                )
+        }));
+
+        for source in [
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADDKEY. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). PROCEDURE DIVISION. EXEC CICS DELETE FILE('ACCTDAT') RIDFLD(KEY-X) KEYLENGTH(0) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADDKEY. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 KEY-LENGTH-X PIC S9(8) COMP. PROCEDURE DIVISION. EXEC CICS DELETE FILE('ACCTDAT') RIDFLD(KEY-X) KEYLENGTH(KEY-LENGTH-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADDKEY. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-X PIC X(3). 01 OTHER-X PIC X(2). PROCEDURE DIVISION. EXEC CICS DELETE FILE('ACCTDAT') RIDFLD(KEY-X) KEYLENGTH(LENGTH OF OTHER-X) END-EXEC. STOP RUN.",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. BADDKEY. DATA DIVISION. WORKING-STORAGE SECTION. 01 KEY-LENGTH-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS DELETE FILE('ACCTDAT') KEYLENGTH(KEY-LENGTH-X) END-EXEC. STOP RUN.",
+        ] {
+            assert!(analyze(source).hir.is_none(), "{source}");
+        }
+    }
+
     /// Issue #206: WRITEQ TD accepts the runtime length of its FROM area.
     #[test]
     fn cics_transient_data_write_resolves_queue_record_and_optional_length() {

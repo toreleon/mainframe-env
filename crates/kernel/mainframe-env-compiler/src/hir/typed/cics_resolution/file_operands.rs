@@ -33,6 +33,11 @@ pub(super) fn validate_constraints(
             )));
         }
     }
+    if clauses.contains_key("KEYLENGTH") && !clauses.contains_key("RIDFLD") {
+        return Err(ResolutionFailure::Invalid(format!(
+            "CICS {operation:?} KEYLENGTH requires RIDFLD"
+        )));
+    }
     Ok(())
 }
 
@@ -102,8 +107,12 @@ pub(super) fn resolve(
         if let Some(tokens) = clauses.get(name) {
             let value = if operation == HirCicsOperation::Write && name == "LENGTH" {
                 write_length_value(tokens, semantic)?
-            } else if operation == HirCicsOperation::Write && name == "KEYLENGTH" {
-                write_key_length_value(tokens, semantic)?
+            } else if matches!(
+                operation,
+                HirCicsOperation::Write | HirCicsOperation::Delete
+            ) && name == "KEYLENGTH"
+            {
+                file_key_length_value(tokens, operation, semantic)?
             } else {
                 if matches!(tokens.as_slice(), [token] if numeric_literal(token).is_some()) {
                     return Err(ResolutionFailure::Invalid(format!(
@@ -124,17 +133,19 @@ pub(super) fn resolve(
                     "CICS Write LENGTH OF must name the FROM data area".into(),
                 ));
             }
-            if operation == HirCicsOperation::Write
-                && name == "KEYLENGTH"
+            if matches!(
+                operation,
+                HirCicsOperation::Write | HirCicsOperation::Delete
+            ) && name == "KEYLENGTH"
                 && let HirCicsValue::LengthOf(length) = &value
                 && !operands.iter().any(|operand| {
                     operand.name == HirCicsOperandName::Ridfld
                         && matches!(&operand.value, HirCicsValue::Data(key) if key == length)
                 })
             {
-                return Err(ResolutionFailure::Invalid(
-                    "CICS Write KEYLENGTH OF must name the RIDFLD data area".into(),
-                ));
+                return Err(ResolutionFailure::Invalid(format!(
+                    "CICS {operation:?} KEYLENGTH OF must name the RIDFLD data area"
+                )));
             }
             operands.push(HirCicsNamedOperand {
                 name: identity,
@@ -175,7 +186,11 @@ fn write_length_value(tokens: &[String], semantic: &SemanticModel) -> Resolution
     Ok(value)
 }
 
-fn write_key_length_value(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsValue> {
+fn file_key_length_value(
+    tokens: &[String],
+    operation: HirCicsOperation,
+    semantic: &SemanticModel,
+) -> Resolution<HirCicsValue> {
     let value = if tokens
         .first()
         .is_some_and(|token| token.eq_ignore_ascii_case("LENGTH"))
@@ -191,14 +206,14 @@ fn write_key_length_value(tokens: &[String], semantic: &SemanticModel) -> Resolu
         HirCicsValue::Data(reference)
             if reference.category != DataCategory::Binary || reference.length != 2 =>
         {
-            return Err(ResolutionFailure::Invalid(
-                "CICS Write KEYLENGTH requires a halfword binary data item".into(),
-            ));
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS {operation:?} KEYLENGTH requires a halfword binary data item"
+            )));
         }
         HirCicsValue::Integer(value) if !(1..=32_767).contains(value) => {
-            return Err(ResolutionFailure::Invalid(
-                "CICS Write KEYLENGTH literal must be between 1 and 32767".into(),
-            ));
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS {operation:?} KEYLENGTH literal must be between 1 and 32767"
+            )));
         }
         _ => {}
     }

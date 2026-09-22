@@ -719,7 +719,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "RESP2",
         ],
         HirCicsOperation::EndBrowse => &["FILE", "DATASET", "RESP", "RESP2"],
-        HirCicsOperation::Delete => &["FILE", "DATASET", "RIDFLD", "RESP", "RESP2"],
+        HirCicsOperation::Delete => &["FILE", "DATASET", "RIDFLD", "KEYLENGTH", "RESP", "RESP2"],
         HirCicsOperation::Write => &[
             "FILE",
             "DATASET",

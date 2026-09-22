@@ -1589,6 +1589,25 @@ mod tests {
             encode_cics_effect_plan(&mismatched_write_key_length, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
+        let mut delete_with_key_length = delete.clone();
+        delete_with_key_length.operands.push(CicsNamedOperand {
+            name: CicsOperandName::KeyLength,
+            value: CicsOperandValue::Integer(3),
+        });
+        assert!(
+            encode_cics_effect_plan(&delete_with_key_length, CicsPlanLimits::default()).is_ok()
+        );
+        let mut current_delete_with_key_length = current_record_delete.clone();
+        current_delete_with_key_length
+            .operands
+            .push(CicsNamedOperand {
+                name: CicsOperandName::KeyLength,
+                value: CicsOperandValue::Integer(3),
+            });
+        assert_eq!(
+            encode_cics_effect_plan(&current_delete_with_key_length, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
         let mut literal_transient_record = write_transient.clone();
         literal_transient_record.operands[1].value = CicsOperandValue::Literal(b"DATA".to_vec());
         assert_eq!(
@@ -1657,6 +1676,7 @@ mod tests {
             read_prev,
             end_browse,
             delete,
+            delete_with_key_length,
             current_record_delete,
             write,
             write_with_length,

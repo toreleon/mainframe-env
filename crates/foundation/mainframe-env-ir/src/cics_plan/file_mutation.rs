@@ -23,6 +23,8 @@ pub(super) fn invalid_shape(
     resources != 1
         || !inputs.is_subset(&allowed_inputs)
         || (writing && !inputs.contains(&CicsOperandName::Ridfld))
+        || (inputs.contains(&CicsOperandName::KeyLength)
+            && !inputs.contains(&CicsOperandName::Ridfld))
         || writing != inputs.contains(&CicsOperandName::From)
         || plan.operands.iter().any(|operand| match operand.name {
             CicsOperandName::From | CicsOperandName::Ridfld => {
@@ -37,7 +39,7 @@ pub(super) fn invalid_shape(
                             | CicsOperandValue::LengthOf(_)
                     )
             }
-            CicsOperandName::KeyLength if writing => !matches!(
+            CicsOperandName::KeyLength => !matches!(
                 operand.value,
                 CicsOperandValue::Integer(1..=32_767)
                     | CicsOperandValue::Storage(_)
@@ -82,7 +84,7 @@ pub(super) fn invalid_shape(
                     value: CicsOperandValue::LengthOf(length),
                     ..
                 }),
-            ) if writing => ridfld != length,
+            ) => ridfld != length,
             _ => false,
         }
         || !outputs.is_subset(&BTreeSet::from([
