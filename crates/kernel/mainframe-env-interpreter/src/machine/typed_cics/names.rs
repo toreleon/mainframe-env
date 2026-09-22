@@ -64,6 +64,7 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
 pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperation {
     match operation {
         CicsPlanOperation::Abend => CicsOperation::Abend,
+        CicsPlanOperation::Address => CicsOperation::Address,
         CicsPlanOperation::AddressSet => CicsOperation::AddressSet,
         CicsPlanOperation::Asktime => CicsOperation::Asktime,
         CicsPlanOperation::AsktimeEib => CicsOperation::AsktimeEib,
@@ -126,6 +127,7 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::Queue => "QUEUE",
         CicsOperandName::Qname => "QNAME",
         CicsOperandName::SysId => "SYSID",
+        CicsOperandName::CommareaPointer => "COMMAREA",
         CicsOperandName::Map => "MAP",
         CicsOperandName::Mapset => "MAPSET",
         CicsOperandName::Resource => "RESOURCE",

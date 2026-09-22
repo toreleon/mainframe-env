@@ -564,6 +564,12 @@ All notable changes to mainframe-env are documented here.
   compiler distinguishes pointer references from `ADDRESS OF` data areas, the
   provider validates only opaque storage identities, and the interpreter
   applies checked virtual aliases after successful audited dispatch.
+- Added typed CICS `ADDRESS COMMAREA` through append-only operation tag 42 and
+  pointer-target operand tag 45. A four-byte POINTER/POINTER-32 receives a
+  checked virtual address for the current program's DFHCOMMAREA; an absent or
+  unassigned COMMAREA receives exact `X'FF000000'`. The address can be consumed
+  by the existing ADDRESS SET route without exposing a native process address;
+  ACEE, CWA, EIB, TCTUA, and TWA remain pending.
 - Added source-backed CICS `ABEND NODUMP` admission and explicit terminal dump
   disposition. Valid nonreserved ABCODE values request a dump, omitted or
   invalid codes and NODUMP suppress it, and retained older outcomes remain

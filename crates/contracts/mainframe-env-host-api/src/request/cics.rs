@@ -7,6 +7,8 @@ use std::collections::BTreeMap;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CicsOperation {
     Abend,
+    /// Return checked virtual addresses for task storage areas.
+    Address,
     /// Copy one checked virtual pointer/address relationship.
     AddressSet,
     Asktime,
@@ -78,6 +80,7 @@ impl CicsOperation {
     pub const fn runtime_name(self) -> &'static str {
         match self {
             Self::Abend => "Abend",
+            Self::Address => "Address",
             Self::AddressSet => "AddressSet",
             Self::Asktime => "Asktime",
             Self::AsktimeEib => "AsktimeEib",
@@ -167,6 +170,7 @@ impl CicsOperation {
         Some(match (first, words.get(1).map(String::as_str)) {
             ("ABEND", _) => Self::Abend,
             ("ADDRESS", Some("SET")) => Self::AddressSet,
+            ("ADDRESS", _) => Self::Address,
             ("ASKTIME", _)
                 if words
                     .iter()

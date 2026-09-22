@@ -17,6 +17,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 type Clauses = BTreeMap<String, Vec<String>>;
 mod abend;
+mod address;
 mod assign_validation;
 mod file_operands;
 mod format_time;
@@ -663,6 +664,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     let operation = operation::resolve(descriptor)?;
     let allowed_clauses: &[&str] = match operation {
         HirCicsOperation::Abend => &["ABCODE", "RESP", "RESP2"],
+        HirCicsOperation::Address => &["COMMAREA", "RESP", "RESP2"],
         HirCicsOperation::AddressSet => &["SET", "USING", "RESP", "RESP2"],
         HirCicsOperation::Asktime => &["ABSTIME", "RESP", "RESP2"],
         HirCicsOperation::AsktimeEib => &["RESP", "RESP2"],
@@ -779,7 +781,8 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     let allowed_options: &[&str] = match operation {
         HirCicsOperation::Abend => &["CANCEL", "NODUMP", "NOHANDLE"],
         HirCicsOperation::HandleAbend => &["CANCEL", "RESET", "NOHANDLE"],
-        HirCicsOperation::AddressSet
+        HirCicsOperation::Address
+        | HirCicsOperation::AddressSet
         | HirCicsOperation::Asktime
         | HirCicsOperation::AsktimeEib
         | HirCicsOperation::ChangeTask
@@ -863,6 +866,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     terminal_control::validate_constraints(&clauses, &raw_options, operation)?;
     interval_control::validate_constraints(&clauses, &raw_options, operation)?;
     for required in match operation {
+        HirCicsOperation::Address => &["COMMAREA"][..],
         HirCicsOperation::AddressSet => &["SET", "USING"][..],
         HirCicsOperation::Asktime => &["ABSTIME"][..],
         HirCicsOperation::FormatTime => &["ABSTIME"][..],
@@ -920,6 +924,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         operands.extend(handle_abend::operands(&clauses, &raw_options, semantic)?);
     }
     operands.extend(program_control::operands(operation, &clauses, semantic)?);
+    if operation == HirCicsOperation::Address {
+        operands.extend(address::operands(&clauses, semantic)?);
+    }
     if operation == HirCicsOperation::AddressSet {
         let (set_is_address, set) = cics_address_value(&clauses["SET"], semantic)?;
         let (using_is_address, using) = cics_address_value(&clauses["USING"], semantic)?;

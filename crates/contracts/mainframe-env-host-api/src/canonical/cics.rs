@@ -6,6 +6,7 @@ impl Canonical for CicsOperation {
     fn encode(&self, out: &mut Encoder<'_>) -> Result<(), HostProblem> {
         match self {
             Self::Abend => out.variant("CicsOperation", "Abend", 0),
+            Self::Address => out.variant("CicsOperation", "Address", 0),
             Self::AddressSet => out.variant("CicsOperation", "AddressSet", 0),
             Self::Asktime => out.variant("CicsOperation", "Asktime", 0),
             Self::AsktimeEib => out.variant("CicsOperation", "AsktimeEib", 0),

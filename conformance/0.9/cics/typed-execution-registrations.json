@@ -4,6 +4,13 @@
   "application_identity_set_sha256": "sha256:a18057164564781563252d53586a8afbc401f2783950db456b3b98177fc60b94",
   "registrations": [
     {
+      "operation": "Address",
+      "interface": "api",
+      "family": "task-control",
+      "mutating": false,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0005"
+    },
+    {
       "operation": "AddressSet",
       "interface": "api",
       "family": "task-control",

@@ -4128,6 +4128,121 @@ mod tests {
     }
 
     #[test]
+    fn cics_address_commarea_returns_present_and_null_virtual_addresses() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let response = || CicsResponse {
+            disposition: CicsDisposition::Complete,
+            condition: "NORMAL".into(),
+            response: 0,
+            response2: 0,
+            applid: "APP".into(),
+            sysid: "SYS".into(),
+            transaction: "T001".into(),
+            aid: 0,
+            target: None,
+            next_transaction: None,
+            payload: mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.payload@1",
+                Vec::new(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+            outputs: BTreeMap::new(),
+            unit_of_work: None,
+        };
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. ADDRCOMM. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER-32. LINKAGE SECTION. 01 DFHCOMMAREA PIC X(4). 01 LINK-X PIC X(4). PROCEDURE DIVISION USING DFHCOMMAREA. EXEC CICS ADDRESS COMMAREA(PTR-X) END-EXEC. EXEC CICS ADDRESS SET(ADDRESS OF LINK-X) USING(PTR-X) END-EXEC. DISPLAY LINK-X. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut run = invocation(&artifact, 1024);
+        run.bindings.insert(
+            "cics.commarea".into(),
+            mainframe_env_execution_api::BoundedPayload::new(
+                "mainframe-env.cics.commarea@1",
+                b"KEEP".to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        let mut machine =
+            ReferenceMachine::from_binary(artifact.payload(), run, CodecLimits::default()).unwrap();
+        let MachineDrive::HostCall(address) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("ADDRESS COMMAREA did not call host");
+        };
+        assert!(matches!(
+            &address.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::Address,
+                arguments,
+                mutation: None,
+                ..
+            }) if arguments["COMMAREA"].schema() == "mainframe-env.cics.storage-target@1"
+                && arguments["USING.ADDRESS"].schema()
+                    == "mainframe-env.cics.storage-identity@1"
+        ));
+        let MachineDrive::HostCall(address_set) = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: address.sequence,
+                outcome: Ok(HostResult::Cics(response())),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        ) else {
+            panic!("ADDRESS SET did not call host");
+        };
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x02, 0x02]);
+        assert!(matches!(
+            &address_set.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::AddressSet,
+                ..
+            })
+        ));
+        let completed = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: address_set.sequence,
+                outcome: Ok(HostResult::Cics(response())),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        );
+        let MachineDrive::Completed(completed) = completed else {
+            panic!("ADDRESS COMMAREA program did not complete");
+        };
+        assert_eq!(completed.output.bytes(), b"KEEP\n");
+
+        let absent = compile(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. NOAREA. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER-32. PROCEDURE DIVISION. EXEC CICS ADDRESS COMMAREA(PTR-X) END-EXEC. STOP RUN.",
+        )
+        .unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            absent.payload(),
+            invocation(&absent, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(address) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("absent ADDRESS COMMAREA did not call host");
+        };
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: address.sequence,
+                    outcome: Ok(HostResult::Cics(response())),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_eq!(machine.variable("PTR-X").unwrap().bytes(), &[0xff, 0, 0, 0]);
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x02, 0x02]);
+    }
+
+    #[test]
     fn cics_local_handler_and_entry_commarea_preserve_control_and_bytes() {
         use mainframe_env_host_api::{CicsDisposition, CicsResponse, EffectResult, HostResult};
 

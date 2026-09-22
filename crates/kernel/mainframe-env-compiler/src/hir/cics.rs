@@ -183,6 +183,7 @@ impl PlanContext<'_> {
                 HirCicsOperandName::Queue => CicsOperandName::Queue,
                 HirCicsOperandName::Qname => CicsOperandName::Qname,
                 HirCicsOperandName::SysId => CicsOperandName::SysId,
+                HirCicsOperandName::CommareaPointer => CicsOperandName::CommareaPointer,
                 HirCicsOperandName::Map => CicsOperandName::Map,
                 HirCicsOperandName::Mapset => CicsOperandName::Mapset,
                 HirCicsOperandName::Resource => CicsOperandName::Resource,
@@ -295,6 +296,7 @@ impl PlanContext<'_> {
 const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
     match operation {
         HirCicsOperation::Abend => CicsPlanOperation::Abend,
+        HirCicsOperation::Address => CicsPlanOperation::Address,
         HirCicsOperation::AddressSet => CicsPlanOperation::AddressSet,
         HirCicsOperation::Asktime => CicsPlanOperation::Asktime,
         HirCicsOperation::AsktimeEib => CicsPlanOperation::AsktimeEib,

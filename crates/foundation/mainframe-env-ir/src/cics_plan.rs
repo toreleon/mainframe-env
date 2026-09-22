@@ -4,6 +4,7 @@ use crate::StorageId;
 use std::collections::BTreeSet;
 use std::fmt;
 
+mod address;
 mod assign;
 mod browse;
 mod codec_tags;
@@ -375,6 +376,7 @@ fn validate_operation_shape(
         .any(|output| !output_shape::allowed(plan.operation, *output));
     let malformed = match plan.operation {
         CicsPlanOperation::Abend => handle_abend::invalid_abend_shape(plan, inputs, outputs),
+        CicsPlanOperation::Address => address::invalid_shape(plan, inputs, outputs),
         CicsPlanOperation::AddressSet => {
             let pointer_from_data = inputs.len() == 2
                 && inputs.contains(&CicsOperandName::SetPointer)
@@ -1190,6 +1192,10 @@ mod tests {
         assert_eq!(operand_from_tag(43), Ok(CicsOperandName::Qname));
         assert_eq!(operand_tag(CicsOperandName::SysId), 44);
         assert_eq!(operand_from_tag(44), Ok(CicsOperandName::SysId));
+        assert_eq!(operation_tag(CicsPlanOperation::Address), 42);
+        assert_eq!(operation_from_tag(42), Ok(CicsPlanOperation::Address));
+        assert_eq!(operand_tag(CicsOperandName::CommareaPointer), 45);
+        assert_eq!(operand_from_tag(45), Ok(CicsOperandName::CommareaPointer));
 
         let plan = read_plan();
         let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
@@ -2348,6 +2354,41 @@ mod tests {
         missing.operands.clear();
         assert_eq!(
             encode_cics_effect_plan(&missing, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn address_commarea_plan_requires_pointer_and_optional_source_area() {
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Address,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::CommareaPointer,
+                    value: CicsOperandValue::Storage(slot(1, "PTR-X")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::UsingAddress,
+                    value: CicsOperandValue::Storage(slot(2, "DFHCOMMAREA")),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap(),
+            plan
+        );
+        let mut absent = plan.clone();
+        absent
+            .operands
+            .retain(|operand| operand.name != CicsOperandName::UsingAddress);
+        assert!(encode_cics_effect_plan(&absent, CicsPlanLimits::default()).is_ok());
+        absent.operands.clear();
+        assert_eq!(
+            encode_cics_effect_plan(&absent, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }

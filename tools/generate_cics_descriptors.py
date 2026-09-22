@@ -90,6 +90,7 @@ EXPECTED_FAMILIES = {
 }
 EXPECTED_RUNTIME_OPERATIONS = [
     ("Abend", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0001"),
+    ("Address", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0005"),
     ("AddressSet", "api", "task-control", False, f"{OFFICIAL_BASELINE}:api-commands:0006"),
     ("AsktimeEib", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0009"),
     ("Asktime", "api", "time", False, f"{OFFICIAL_BASELINE}:api-commands:0010"),
@@ -380,6 +381,7 @@ POLICY_BINDINGS = {
 TYPED_RUNTIME_OPERATIONS = frozenset(
     {
         "Abend",
+        "Address",
         "Cancel",
         "ChangeTask",
         "Delay",
@@ -475,6 +477,7 @@ TYPED_RUNTIME_IR_EFFECTS = {
         }
     ),
     "AddressSet": frozenset({"memory-read", "memory-write", "condition"}),
+    "Address": frozenset({"memory-read", "memory-write", "condition"}),
     "Asktime": frozenset({"memory-write", "clock", "condition"}),
     "AsktimeEib": frozenset({"memory-write", "clock", "condition"}),
     "ChangeTask": frozenset(
@@ -774,6 +777,7 @@ def _load_typed_execution_registrations(
             }
         )
     if [row["operation"] for row in normalized] != [
+        "Address",
         "AddressSet",
         "AsktimeEib",
         "Cancel",
@@ -1083,6 +1087,7 @@ def load_catalog(
             if row[0]
             not in {
                 "ChangeTask",
+                "Address",
                 "AddressSet",
                 "AsktimeEib",
                 "Cancel",
@@ -3404,8 +3409,8 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
         for row in catalog["_runtime_operations"]
         if row["interface"] == "api"
     }
-    if len(existing_runtime) != 42:
-        raise DescriptorError("CICS application runtime set must remain exactly 42 rows")
+    if len(existing_runtime) != 43:
+        raise DescriptorError("CICS application runtime set must remain exactly 43 rows")
 
     loaded_batches = []
     for batch_id, start, end, projection_path, review_path in CONTRACT_BATCHES:
@@ -3659,12 +3664,12 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
     if (
         len(registry_rows) != 263
         or len(set(handler_ids)) != 263
-        or len(typed_rows) != 42
+        or len(typed_rows) != 43
         or len(legacy_rows) != 0
         or {row["runtime_operation"] for row in typed_rows}
         != TYPED_RUNTIME_OPERATIONS
-        or len(advertised_rows) != 42
-        or len(unready_rows) != 221
+        or len(advertised_rows) != 43
+        or len(unready_rows) != 220
         or any(row["unready_result"] != "explicit-unsupported" for row in unready_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in typed_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in legacy_rows)

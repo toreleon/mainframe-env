@@ -5,6 +5,8 @@ use super::CicsAssignOutput;
 pub enum CicsPlanOperation {
     /// Terminate the issuing task abnormally or transfer to its active exit.
     Abend,
+    /// Return checked virtual addresses for task storage areas.
+    Address,
     /// Copy one checked virtual pointer/address relationship.
     AddressSet,
     /// Refresh the EIB clock fields and return one absolute-time value.
@@ -122,6 +124,8 @@ pub enum CicsOperandName {
     Qname,
     /// `SYSID(...)` target CICS system identity.
     SysId,
+    /// `ADDRESS COMMAREA(pointer-reference)` output target.
+    CommareaPointer,
     /// `MAP(...)` BMS map name.
     Map,
     /// `MAPSET(...)` BMS mapset name.

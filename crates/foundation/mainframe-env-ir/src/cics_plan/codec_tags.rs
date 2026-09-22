@@ -51,6 +51,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::Getmain => 39,
         CicsPlanOperation::Freemain => 40,
         CicsPlanOperation::DeleteTemporaryStorage => 41,
+        CicsPlanOperation::Address => 42,
     }
 }
 
@@ -98,6 +99,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         39 => Ok(CicsPlanOperation::Getmain),
         40 => Ok(CicsPlanOperation::Freemain),
         41 => Ok(CicsPlanOperation::DeleteTemporaryStorage),
+        42 => Ok(CicsPlanOperation::Address),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -149,6 +151,7 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::DataArea => 42,
         CicsOperandName::Qname => 43,
         CicsOperandName::SysId => 44,
+        CicsOperandName::CommareaPointer => 45,
     }
 }
 
@@ -199,6 +202,7 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         42 => Ok(CicsOperandName::DataArea),
         43 => Ok(CicsOperandName::Qname),
         44 => Ok(CicsOperandName::SysId),
+        45 => Ok(CicsOperandName::CommareaPointer),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

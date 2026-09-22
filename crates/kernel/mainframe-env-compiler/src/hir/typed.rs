@@ -148,6 +148,7 @@ pub struct HirComputeStatement {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HirCicsOperation {
     Abend,
+    Address,
     AddressSet,
     Asktime,
     AsktimeEib,
@@ -208,6 +209,7 @@ pub enum HirCicsOperandName {
     Queue,
     Qname,
     SysId,
+    CommareaPointer,
     Map,
     Mapset,
     Resource,
@@ -1901,6 +1903,71 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn cics_address_commarea_resolves_pointer_and_optional_area() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSADDR. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER-32. LINKAGE SECTION. 01 DFHCOMMAREA PIC X(8). PROCEDURE DIVISION USING DFHCOMMAREA. EXEC CICS ADDRESS COMMAREA(PTR-X) END-EXEC. STOP RUN.";
+        let hir = analyze(source).hir.expect("typed ADDRESS COMMAREA HIR");
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed ADDRESS command");
+        assert_eq!(command.operation, HirCicsOperation::Address);
+        assert_eq!(
+            command
+                .operands
+                .iter()
+                .map(|operand| operand.name)
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                HirCicsOperandName::CommareaPointer,
+                HirCicsOperandName::UsingAddress,
+            ])
+        );
+
+        let absent = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. NOAREA. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER-32. PROCEDURE DIVISION. EXEC CICS ADDRESS COMMAREA(PTR-X) END-EXEC. STOP RUN.",
+        );
+        let absent = absent.hir.expect("ADDRESS without COMMAREA");
+        let command = absent
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed absent ADDRESS command");
+        assert_eq!(command.operands.len(), 1);
+        assert_eq!(
+            command.operands[0].name,
+            HirCicsOperandName::CommareaPointer
+        );
+
+        for (command, expected) in [
+            (
+                "ADDRESS COMMAREA(TEXT-X)",
+                "requires a four-byte POINTER or POINTER-32 reference",
+            ),
+            ("ADDRESS EIB(PTR-X)", "typed lowering is unready for EIB"),
+        ] {
+            let invalid = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADADDR. DATA DIVISION. WORKING-STORAGE SECTION. 01 PTR-X POINTER-32. 01 TEXT-X PIC X(4). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(invalid.hir.is_none(), "{command}");
+            assert!(
+                invalid
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                invalid.diagnostics
+            );
+        }
     }
 
     #[test]
@@ -4577,14 +4644,13 @@ mod tests {
 
     #[test]
     fn catalog_known_unready_cics_command_fails_before_legacy_lowering() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSWAIT. DATA DIVISION. \
-            WORKING-STORAGE SECTION. 01 PTR-X PIC X(8). PROCEDURE DIVISION. \
-            EXEC CICS ADDRESS ACEE(PTR-X) END-EXEC. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. CICSWAIT. PROCEDURE DIVISION. \
+            EXEC CICS RESETBR END-EXEC. STOP RUN.";
         let analysis = analyze(source);
         assert!(analysis.hir.is_none());
         assert!(analysis.diagnostics.iter().any(|diagnostic| {
             let message = diagnostic.public_message();
-            message.contains("ADDRESS") && message.contains("handler is unready")
+            message.contains("RESETBR") && message.contains("handler is unready")
         }));
     }
 

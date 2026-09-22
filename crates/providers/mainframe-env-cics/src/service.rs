@@ -1715,7 +1715,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 44);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 45);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -4671,6 +4671,7 @@ mod tests {
     fn shared_catalog_recognizes_all_frozen_forms() {
         let cases = [
             ("ABEND", CicsOperation::Abend),
+            ("ADDRESS", CicsOperation::Address),
             ("ADDRESS SET", CicsOperation::AddressSet),
             ("ASKTIME", CicsOperation::AsktimeEib),
             ("ASKTIME ABSTIME(ABS-TIME)", CicsOperation::Asktime),
@@ -4727,7 +4728,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 44);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 45);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -11977,6 +11978,56 @@ mod tests {
                 service.invoke(
                     &effect(&invocation.run_unit_id, malformed.clone(), sequence),
                     malformed,
+                ),
+                Err(HostProblem::Malformed)
+            );
+        }
+    }
+
+    #[test]
+    fn address_commarea_validates_virtual_pointer_metadata() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+        for (sequence, arguments) in [
+            (
+                325,
+                BTreeMap::from([
+                    ("COMMAREA".into(), storage_target(b"artifact:1:PTR-X")),
+                    (
+                        "USING.ADDRESS".into(),
+                        enqueue_identity(b"artifact:2:DFHCOMMAREA"),
+                    ),
+                ]),
+            ),
+            (
+                326,
+                BTreeMap::from([("COMMAREA".into(), storage_target(b"artifact:1:PTR-X"))]),
+            ),
+        ] {
+            let request = request(CicsOperation::Address, arguments, sequence);
+            assert_eq!(
+                service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, request.clone(), sequence),
+                        request,
+                    )
+                    .unwrap()
+                    .disposition,
+                CicsDisposition::Complete
+            );
+        }
+        for (sequence, arguments) in [
+            (327, BTreeMap::new()),
+            (
+                328,
+                BTreeMap::from([("COMMAREA".into(), argument(b"WRONG-SCHEMA"))]),
+            ),
+        ] {
+            let request = request(CicsOperation::Address, arguments, sequence);
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, request.clone(), sequence),
+                    request,
                 ),
                 Err(HostProblem::Malformed)
             );

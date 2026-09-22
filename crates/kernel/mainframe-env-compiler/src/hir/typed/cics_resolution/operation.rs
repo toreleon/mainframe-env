@@ -7,6 +7,7 @@ pub(super) fn resolve(
     Ok(match descriptor.label_tokens {
         ["ABEND"] => HirCicsOperation::Abend,
         ["ADDRESS", "SET"] => HirCicsOperation::AddressSet,
+        ["ADDRESS"] => HirCicsOperation::Address,
         ["ASKTIME", "ABSTIME"] => HirCicsOperation::Asktime,
         ["ASKTIME"] => HirCicsOperation::AsktimeEib,
         ["FORMATTIME"] => HirCicsOperation::FormatTime,
