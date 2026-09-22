@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added owned Db2 AST primitives for normalized/delimited identifiers,
+  qualified names, static host references, built-in/distinct type syntax,
+  literals, operators, and an append-only acyclic expression arena. Constructors
+  enforce identifier, name-part, literal, list, node, reference, and depth
+  bounds without exposing `sqlparser-rs` types.
+
 - Added a bounded Db2 lexical boundary backed privately by `sqlparser-rs`
   0.63.0. Public results contain only owned tokens, spans, string/symbol kinds,
   host variables, and diagnostics; byte, token, token-size, and nesting limits

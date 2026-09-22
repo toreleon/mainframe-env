@@ -38,3 +38,11 @@ It immediately converts into owned Db2 tokens, source spans and diagnostics;
 third-party AST, errors, catalogs and types are not public or durable state.
 The lexer is not an execution route and grants no statement recognition credit
 until later owned parser and Conformance IR slices bind complete syntax.
+
+Owned AST primitives normalize ordinary identifiers while preserving delimited
+identifiers, retain qualified names, host variables and indicator variables,
+represent built-in/distinct type syntax, and store expressions in a bounded
+append-only arena. Arena nodes can reference only prior nodes, so cycles,
+forward references, excessive depth, lists, literals and node counts fail before
+an AST can be published. Type compatibility and name resolution remain binder
+responsibilities rather than parser guesses.

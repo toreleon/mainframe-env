@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 mod abi;
+mod ast;
 mod catalog;
 mod generated_statement_catalog;
 mod retention;
@@ -10,6 +11,12 @@ mod service;
 mod syntax;
 
 pub use abi::db2_abi_library;
+pub use ast::{
+    Db2AstError, Db2AstErrorCode, Db2AstLimits, Db2BinaryOperator, Db2BuiltInDataType,
+    Db2BuiltInType, Db2DataType, Db2Expression, Db2ExpressionArena, Db2ExpressionId,
+    Db2ExpressionKind, Db2HostReference, Db2Identifier, Db2Literal, Db2QualifiedName,
+    Db2UnaryOperator,
+};
 
 pub use catalog::{
     DB2_APPLICATION_CATALOG_CONTRACT, Db2CatalogGeneration, Db2ColumnDefinition, Db2ExtractField,
