@@ -12,6 +12,18 @@ const REGISTRY_SCHEMA: &str =
     include_str!("../../../../conformance/0.17/schemas/oracle-harness-registry.schema.json");
 const RECEIPT_SCHEMA: &str =
     include_str!("../../../../conformance/0.17/schemas/oracle-harness-receipt.schema.json");
+const COBOL_RECEIPT_SCHEMA: &str = include_str!(
+    "../../../../conformance/spec/schemas/cobol-licensed-differential-receipt.schema.json"
+);
+const RACF_RECEIPT_SCHEMA: &str =
+    include_str!("../../../../conformance/0.5/schemas/racf-oracle-campaign.schema.json");
+const DATASET_RECEIPT_SCHEMA: &str =
+    include_str!("../../../../conformance/0.6/schemas/dataset-oracle-receipt.schema.json");
+const JES_RECEIPT_SCHEMA: &str = include_str!(
+    "../../../../conformance/0.8/schemas/jes-licensed-differential-receipt.schema.json"
+);
+const CICS_RECEIPT_SCHEMA: &str =
+    include_str!("../../../../conformance/0.9/schemas/cics-oracle-capture.schema.json");
 const REQUIRED_SLOTS: [&str; 10] = [
     "cobol",
     "racf-saf",
@@ -103,6 +115,7 @@ struct OracleHarnessSlot {
     normalization_policy_id: String,
     normalization_policy_digest: Option<String>,
     expected_cases: Option<u64>,
+    max_raw_capture_bytes: u64,
     protected_attestation_required: bool,
 }
 
@@ -156,6 +169,7 @@ struct RawNormalization {
 #[derive(Debug, Deserialize)]
 struct RawBounds {
     expected_cases: Option<u64>,
+    max_raw_capture_bytes: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -208,7 +222,9 @@ struct NamedDigest {
 #[derive(Debug, Deserialize)]
 struct RawCompatibility {
     legacy_schema_version: String,
+    legacy_receipt_digest: String,
     read_rule: String,
+    subsystem_validator_status: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -307,6 +323,7 @@ pub fn validate_oracle_harness_registry(bytes: &[u8]) -> Result<OracleHarnessReg
             normalization_policy_id: entry.normalization.policy_id,
             normalization_policy_digest: entry.normalization.policy_digest,
             expected_cases: entry.bounds.expected_cases,
+            max_raw_capture_bytes: entry.bounds.max_raw_capture_bytes,
             protected_attestation_required: entry.capture.protected_attestation_required,
         };
         if slots.insert(entry.slot_id.clone(), slot).is_some() {
@@ -339,6 +356,7 @@ pub fn validate_oracle_harness_receipt(
     receipt_bytes: &[u8],
     environment_bytes: &[u8],
     registry_bytes: &[u8],
+    legacy_receipt_bytes: &[u8],
     expected: &OracleCandidateExpectation,
 ) -> Result<OracleHarnessValidation, String> {
     let registry = validate_oracle_harness_registry(registry_bytes)?;
@@ -384,6 +402,18 @@ pub fn validate_oracle_harness_receipt(
     {
         return Err("oracle receipt uses an unsupported historical read version".into());
     }
+    if legacy_receipt_bytes.is_empty()
+        || u64::try_from(legacy_receipt_bytes.len()).unwrap_or(u64::MAX)
+            > slot.max_raw_capture_bytes
+        || receipt.compatibility.legacy_receipt_digest != digest(legacy_receipt_bytes)
+    {
+        return Err("oracle receipt legacy artifact binding is missing or drifted".into());
+    }
+    validate_legacy_receipt_schema(
+        &receipt.compatibility.legacy_schema_version,
+        legacy_receipt_bytes,
+        usize::try_from(slot.max_raw_capture_bytes).unwrap_or(usize::MAX),
+    )?;
     if receipt.bindings.fixture_digest != slot.fixture_digest.as_deref().unwrap_or_default()
         || receipt.normalization.policy_id != slot.normalization_policy_id
         || receipt.bindings.normalization_policy_digest
@@ -408,6 +438,7 @@ pub fn validate_oracle_harness_receipt(
                 || (slot.protected_attestation_required
                     && receipt.origin.protected_attestation_digest.is_none())
                 || receipt.receipt_state != "campaign-captured"
+                || receipt.compatibility.subsystem_validator_status != "pass"
                 || zero_bound_identity(&receipt)
             {
                 return Err(
@@ -421,6 +452,7 @@ pub fn validate_oracle_harness_receipt(
                 || environment.licensed_execution
                 || receipt.origin.protected_attestation_digest.is_some()
                 || receipt.receipt_state != "plumbing-valid"
+                || receipt.compatibility.subsystem_validator_status != "synthetic-fixture-pass"
             {
                 return Err("local or synthetic receipt cannot claim a licensed origin".into());
             }
@@ -543,6 +575,23 @@ fn validate_document(
     Ok(value)
 }
 
+fn validate_legacy_receipt_schema(
+    version: &str,
+    bytes: &[u8],
+    max_bytes: usize,
+) -> Result<(), String> {
+    let schema = match version {
+        "mainframe-env.cobol-licensed-differential-receipt@1" => COBOL_RECEIPT_SCHEMA,
+        "mainframe-env.racf-oracle-campaign@1" => RACF_RECEIPT_SCHEMA,
+        "mainframe-env.dataset-oracle-receipt@1" => DATASET_RECEIPT_SCHEMA,
+        "mainframe-env.jes-licensed-differential-receipt@1" => JES_RECEIPT_SCHEMA,
+        "mainframe-env.cics-oracle-capture@1" => CICS_RECEIPT_SCHEMA,
+        _ => return Err("oracle receipt historical schema version has no shared reader".into()),
+    };
+    validate_document(bytes, max_bytes, schema, "historical oracle receipt")?;
+    Ok(())
+}
+
 fn named_digest_map(
     values: &[NamedDigest],
     label: &str,
@@ -658,6 +707,39 @@ fn normalization_policy_digest(policy_id: &str, rules: &[Value]) -> Result<Strin
 mod tests {
     use super::*;
 
+    const ENVIRONMENT: &[u8] =
+        include_bytes!("../../../../conformance/0.17/fixtures/synthetic-environment.json");
+    const LEGACY_CAPTURE: &[u8] =
+        include_bytes!("../../../../conformance/0.17/fixtures/synthetic-cics-capture.json");
+    const RECEIPT: &[u8] =
+        include_bytes!("../../../../conformance/0.17/fixtures/synthetic-receipt.json");
+    const REGISTRY: &[u8] = include_bytes!("../../../../conformance/0.17/oracles/harnesses.json");
+
+    fn expectation() -> OracleCandidateExpectation {
+        OracleCandidateExpectation {
+            slot_id: "cics".into(),
+            source_commit: "5ab706b1dd069e26db7cb9a2b66e921c9001fc39".into(),
+            source_tree_digest:
+                "sha256:c4e5c4d7d40d6c5618ae4cde2e478d18a531f690f4eebacf44cf16959f70c984".into(),
+            artifacts: BTreeMap::from([(
+                "synthetic-candidate-artifact".into(),
+                "sha256:6a1c9843c16282e72cc4acfd454948e3c2ca56898510d21e12fb0c52e5e34a04".into(),
+            )]),
+            catalogs: BTreeMap::from([(
+                "ibm-cics-ts-6x-2026-08-31".into(),
+                "sha256:fccd2a8e5cc24dd08aeb32754daf14ed80e9f1b20b5d9e762a1b0cfe429ceeba".into(),
+            )]),
+            conformance_spec_digest:
+                "sha256:039a321b1319aaea8e7905f6e50e6fa88c995a9f08a15bd1fcd78fd8a9f4bfa6".into(),
+            fixture_digest:
+                "sha256:5cce953c42c1ddeca1166750f5b7a1bffb2765c4db40f289c64d8af1567b5a5b".into(),
+            oracle_adapter_digest:
+                "sha256:7bde0441642fff59ab28af46e815c7c1ba4f65e47ca1066aad7536a910b9873d".into(),
+            normalization_policy_digest:
+                "sha256:111f3304ea7c6c9f3a7d380756ebb7cc5180283b59fa4e38dc8f12d358cd2ce9".into(),
+        }
+    }
+
     #[test]
     fn checked_in_registry_is_complete_and_zero_credit() {
         let bytes = include_bytes!("../../../../conformance/0.17/oracles/harnesses.json");
@@ -678,5 +760,148 @@ mod tests {
             .unwrap();
         db2["adapter"]["state"] = Value::String("ready".into());
         assert!(validate_oracle_harness_registry(&serde_json::to_vec(&value).unwrap()).is_err());
+    }
+
+    #[test]
+    fn synthetic_envelope_and_legacy_cics_reader_validate_with_zero_credit() {
+        let validation = validate_oracle_harness_receipt(
+            RECEIPT,
+            ENVIRONMENT,
+            REGISTRY,
+            LEGACY_CAPTURE,
+            &expectation(),
+        )
+        .unwrap();
+        assert_eq!(validation.kind(), OracleHarnessValidationKind::PlumbingOnly);
+        assert_eq!(validation.licensed_differential_credit(), 0);
+
+        let capture: crate::CicsOracleCapture = serde_json::from_slice(LEGACY_CAPTURE).unwrap();
+        let required = capture
+            .observations
+            .iter()
+            .map(|observation| observation.scenario_id.clone())
+            .collect::<BTreeSet<_>>();
+        let observations = capture
+            .observations
+            .iter()
+            .map(|observation| (observation.scenario_id.clone(), observation.clone()))
+            .collect::<BTreeMap<_, _>>();
+        let expected = crate::CicsOracleExpectation {
+            candidate_digest: &capture.candidate_digest,
+            spec_digest: &capture.spec_digest,
+            fixture_digest: &capture.fixture_digest,
+            source_review_digest: &capture.source_review_digest,
+            environment_manifest_digest: &capture.environment_manifest_digest,
+            comparison_policy: &capture.comparison_policy,
+            required_scenarios: &required,
+            expected_observations: &observations,
+        };
+        let legacy = crate::import_cics_oracle_capture(LEGACY_CAPTURE, &expected, None).unwrap();
+        assert_eq!(legacy.licensed_credit(), 0);
+    }
+
+    #[test]
+    fn candidate_environment_legacy_and_case_mutations_fail_closed() {
+        let mut wrong_candidate = expectation();
+        wrong_candidate.source_commit = "9999999999999999999999999999999999999999".into();
+        assert!(
+            validate_oracle_harness_receipt(
+                RECEIPT,
+                ENVIRONMENT,
+                REGISTRY,
+                LEGACY_CAPTURE,
+                &wrong_candidate,
+            )
+            .unwrap_err()
+            .contains("candidate/source/artifact")
+        );
+
+        let mut wrong_environment: Value = serde_json::from_slice(ENVIRONMENT).unwrap();
+        wrong_environment["manifest_id"] = Value::String("cer1701.changed-environment@1".into());
+        assert!(
+            validate_oracle_harness_receipt(
+                RECEIPT,
+                &serde_json::to_vec(&wrong_environment).unwrap(),
+                REGISTRY,
+                LEGACY_CAPTURE,
+                &expectation(),
+            )
+            .unwrap_err()
+            .contains("environment or registry binding")
+        );
+
+        let mut wrong_legacy = LEGACY_CAPTURE.to_vec();
+        wrong_legacy.push(b'\n');
+        assert!(
+            validate_oracle_harness_receipt(
+                RECEIPT,
+                ENVIRONMENT,
+                REGISTRY,
+                &wrong_legacy,
+                &expectation(),
+            )
+            .unwrap_err()
+            .contains("legacy artifact binding")
+        );
+
+        let mut missing_case: Value = serde_json::from_slice(RECEIPT).unwrap();
+        missing_case["execution"]["observed_cases"] = Value::from(11);
+        assert!(
+            validate_oracle_harness_receipt(
+                &serde_json::to_vec(&missing_case).unwrap(),
+                ENVIRONMENT,
+                REGISTRY,
+                LEGACY_CAPTURE,
+                &expectation(),
+            )
+            .unwrap_err()
+            .contains("case closure")
+        );
+    }
+
+    #[test]
+    fn pending_and_self_declared_licensed_slots_cannot_be_promoted() {
+        let mut pending: Value = serde_json::from_slice(RECEIPT).unwrap();
+        pending["slot_id"] = Value::String("db2".into());
+        let mut pending_expectation = expectation();
+        pending_expectation.slot_id = "db2".into();
+        assert!(
+            validate_oracle_harness_receipt(
+                &serde_json::to_vec(&pending).unwrap(),
+                ENVIRONMENT,
+                REGISTRY,
+                LEGACY_CAPTURE,
+                &pending_expectation,
+            )
+            .unwrap_err()
+            .contains("still pending")
+        );
+
+        let mut forged: Value = serde_json::from_slice(RECEIPT).unwrap();
+        forged["receipt_state"] = Value::String("campaign-captured".into());
+        forged["origin"]["kind"] = Value::String("licensed-ibm".into());
+        forged["origin"]["protected_attestation_digest"] = Value::String(
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+        );
+        for field in [
+            "fixture_independence",
+            "environment",
+            "normalizer",
+            "receipt",
+        ] {
+            forged["review"][field] = Value::String("accepted".into());
+        }
+        forged["compatibility"]["subsystem_validator_status"] = Value::String("pass".into());
+        assert!(
+            validate_oracle_harness_receipt(
+                &serde_json::to_vec(&forged).unwrap(),
+                ENVIRONMENT,
+                REGISTRY,
+                LEGACY_CAPTURE,
+                &expectation(),
+            )
+            .unwrap_err()
+            .contains("protected exact-candidate")
+        );
     }
 }

@@ -1,9 +1,9 @@
 {
   "counts": {
-    "markdown_documents": 192,
+    "markdown_documents": 193,
     "navigation_groups": 5,
     "normative_documents": 40,
-    "xtask_commands": 176
+    "xtask_commands": 182
   },
   "documents": [
     {
@@ -18,7 +18,7 @@
       "normative": false,
       "path": "CHANGELOG.md",
       "relative_links": 1,
-      "sha256": "sha256:57dd2ee38481ab0e3f637bf73d2037805a54dd73dffbe7908070350d94bc9a61",
+      "sha256": "sha256:727b3ca874392f8fbe55b8a92ed9c1ddeb3b4e1ffd48b614c915d367243611bf",
       "title": "Changelog",
       "xtask_commands": 6
     },
@@ -1045,6 +1045,14 @@
       "sha256": "sha256:8eea5c205d72a78044f43acc2dc86d26a9b92e6cc6b4091a7b38ba1bed94d373",
       "title": "mainframe-env 0.16.0 implementation status",
       "xtask_commands": 0
+    },
+    {
+      "normative": false,
+      "path": "docs/delivery/coverage-versions/status/0.17.0.md",
+      "relative_links": 0,
+      "sha256": "sha256:c441df27af46af6f943923ca3948014111641f1c7a572aa1df8c46218e6bacba",
+      "title": "mainframe-env 0.17.0 implementation status",
+      "xtask_commands": 6
     },
     {
       "normative": false,

@@ -17,10 +17,11 @@ use clap::{Args, CommandFactory, Parser, Subcommand};
 use mainframe_env_conformance::{
     CicsOracleExpectation, CicsOracleImport, CicsOracleObservation, CicsPilotRuntime,
     CobolArithmeticPilotRuntime, CobolMovePilotRuntime, DatasetConformanceRuntime,
-    RACF_ORACLE_RELATIVE_PATH, RacfOracleCampaign, cics_pilot_runtime,
-    cobol_arithmetic_pilot_runtime, cobol_move_pilot_runtime, dataset_conformance_runtime,
-    gnucobol_reference_fixture_digest, import_cics_oracle_capture, licensed_fixture_digest,
-    run_dataset_reference_simulation, run_gnucobol_reference_campaign,
+    OracleCandidateExpectation, OracleHarnessValidationKind, RACF_ORACLE_RELATIVE_PATH,
+    RacfOracleCampaign, cics_pilot_runtime, cobol_arithmetic_pilot_runtime,
+    cobol_move_pilot_runtime, dataset_conformance_runtime, gnucobol_reference_fixture_digest,
+    import_cics_oracle_capture, licensed_fixture_digest, run_dataset_reference_simulation,
+    run_gnucobol_reference_campaign, validate_oracle_harness_receipt,
     validate_oracle_harness_registry, verify_carddemo_application_package_from_env,
     verify_carddemo_base_batch_from_env, verify_carddemo_base_online_from_env,
     verify_carddemo_batch_programs_from_env, verify_carddemo_cics_abi_from_env,
@@ -196,6 +197,7 @@ enum XtaskCommand {
     DatasetOracle(CheckArgs),
     JesOracle(CheckArgs),
     JesOracleCandidate,
+    LicensedHarness(CheckArgs),
     CobolLanguage(CheckArgs),
     CobolExit(CheckArgs),
     CobolReference(CobolReferenceArgs),
@@ -428,6 +430,9 @@ fn execute_command(root: &Path, command: XtaskCommand) -> (&'static str, bool, T
             false,
             print_jes_oracle_candidate(root),
         ),
+        XtaskCommand::LicensedHarness(args) => {
+            checked!("licensed-harness", args, check_licensed_harness(root))
+        }
         XtaskCommand::CobolLanguage(args) => checked!(
             "cobol-language",
             args,
@@ -8525,6 +8530,66 @@ fn check_licensed_environment_requirements(root: &Path) -> TaskResult {
     Ok(())
 }
 
+fn check_licensed_harness(root: &Path) -> TaskResult {
+    check_licensed_environment_requirements(root)?;
+    let registry_path = root.join("conformance/0.17/oracles/harnesses.json");
+    let environment_path = root.join("conformance/0.17/fixtures/synthetic-environment.json");
+    let receipt_path = root.join("conformance/0.17/fixtures/synthetic-receipt.json");
+    let legacy_path = root.join("conformance/0.17/fixtures/synthetic-cics-capture.json");
+    let registry = fs::read(&registry_path)
+        .map_err(|error| format!("{}: {error}", registry_path.display()))?;
+    let environment = fs::read(&environment_path)
+        .map_err(|error| format!("{}: {error}", environment_path.display()))?;
+    let receipt =
+        fs::read(&receipt_path).map_err(|error| format!("{}: {error}", receipt_path.display()))?;
+    let legacy =
+        fs::read(&legacy_path).map_err(|error| format!("{}: {error}", legacy_path.display()))?;
+    let expectation = OracleCandidateExpectation {
+        slot_id: "cics".into(),
+        source_commit: "5ab706b1dd069e26db7cb9a2b66e921c9001fc39".into(),
+        source_tree_digest:
+            "sha256:c4e5c4d7d40d6c5618ae4cde2e478d18a531f690f4eebacf44cf16959f70c984".into(),
+        artifacts: BTreeMap::from([(
+            "synthetic-candidate-artifact".into(),
+            "sha256:6a1c9843c16282e72cc4acfd454948e3c2ca56898510d21e12fb0c52e5e34a04".into(),
+        )]),
+        catalogs: BTreeMap::from([(
+            "ibm-cics-ts-6x-2026-08-31".into(),
+            format!(
+                "sha256:{}",
+                file_digest(&root.join("conformance/0.2/catalogs/cics.json"))?
+            ),
+        )]),
+        conformance_spec_digest: format!(
+            "sha256:{}",
+            file_digest(&root.join("conformance/spec/v1/spec.json"))?
+        ),
+        fixture_digest: format!(
+            "sha256:{}",
+            file_digest(&root.join("conformance/0.9/cics/pilot-fixtures.json"))?
+        ),
+        oracle_adapter_digest: format!(
+            "sha256:{}",
+            file_digest(&root.join("conformance/0.9/oracles/cics-licensed-differential.json"))?
+        ),
+        normalization_policy_digest:
+            "sha256:111f3304ea7c6c9f3a7d380756ebb7cc5180283b59fa4e38dc8f12d358cd2ce9".into(),
+    };
+    let validation =
+        validate_oracle_harness_receipt(&receipt, &environment, &registry, &legacy, &expectation)?;
+    require(
+        validation.kind() == OracleHarnessValidationKind::PlumbingOnly
+            && validation.licensed_differential_credit() == 0,
+        "CER-1701 synthetic fixture attempted to claim licensed differential credit",
+    )?;
+    println!(
+        "licensed-harness slot={} receipt={} plumbing=pass licensed-credit=0 differential=pending",
+        validation.slot_id(),
+        validation.receipt_digest()
+    );
+    Ok(())
+}
+
 #[cfg(test)]
 mod licensed_environment_schema_tests {
     use super::*;
@@ -8533,6 +8598,12 @@ mod licensed_environment_schema_tests {
     fn cer_1701_environment_requirements_are_schema_valid_and_pending() {
         let root = repository_root().expect("repository root");
         check_licensed_environment_requirements(&root).expect("CER-1701 environment authority");
+    }
+
+    #[test]
+    fn cer_1701_synthetic_harness_is_zero_credit() {
+        let root = repository_root().expect("repository root");
+        check_licensed_harness(&root).expect("CER-1701 synthetic harness");
     }
 }
 

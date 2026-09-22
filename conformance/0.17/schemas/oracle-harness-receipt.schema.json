@@ -57,7 +57,7 @@
         "legacy_schema_version": {"$ref": "#/$defs/id"},
         "legacy_receipt_digest": {"$ref": "#/$defs/digest"},
         "read_rule": {"const": "exact-v1-plus-cer1701-envelope"},
-        "subsystem_validator_status": {"const": "pass"}
+        "subsystem_validator_status": {"enum": ["pass", "synthetic-fixture-pass"]}
       }
     },
     "execution": {
@@ -130,6 +130,7 @@
         "properties": {
           "receipt_state": {"const": "campaign-captured"},
           "origin": {"properties": {"protected_attestation_digest": {"$ref": "#/$defs/digest"}}},
+          "compatibility": {"properties": {"subsystem_validator_status": {"const": "pass"}}},
           "review": {"properties": {"fixture_independence": {"const": "accepted"}, "environment": {"const": "accepted"}, "normalizer": {"const": "accepted"}, "receipt": {"const": "accepted"}}}
         }
       },
@@ -137,6 +138,7 @@
         "properties": {
           "receipt_state": {"const": "plumbing-valid"},
           "origin": {"properties": {"protected_attestation_digest": {"type": "null"}}},
+          "compatibility": {"properties": {"subsystem_validator_status": {"const": "synthetic-fixture-pass"}}},
           "review": {"properties": {"fixture_independence": {"const": "synthetic-only"}, "environment": {"const": "synthetic-only"}, "normalizer": {"const": "synthetic-only"}, "receipt": {"const": "synthetic-only"}}}
         }
       }
