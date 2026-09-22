@@ -399,6 +399,9 @@ All notable changes to mainframe-env are documented here.
   moved behind a module re-export. The guard now bounds typed execution at the
   first legacy helper and distinguishes a forbidden bare grammar `arguments`
   call from the typed SET allocation helper.
+- Removed an application-specific profile name from the production dataset
+  replay-index documentation; the optimization and replay behavior remain
+  generic and unchanged.
 - Migrated the local `WRITEQ TD` compatibility subset to a typed queue-write
   plan. QUEUE is a validated 1–4 character literal or field, FROM is a resolved
   data area, and optional numeric LENGTH or `LENGTH OF` selects the persisted
