@@ -56,3 +56,10 @@ execution or transaction-authority path.
 SQL identifiers and host identifiers remain distinct. SQL names apply Db2
 ordinary/delimited rules; host identifiers preserve host-language spelling,
 including COBOL hyphens, for the host binder to resolve with its own ABI rules.
+
+The common dynamic-SQL parser owns static-host PREPARE, EXECUTE, and EXECUTE
+IMMEDIATE structure, including SQLDA naming modes, attribute indicators, USING
+lists and descriptors. It rejects PL/I string expressions, SQL PL array
+elements, multi-row source buffers, and forbidden source indicators until their
+separate obligations land; this partial family support grants no whole-row
+recognition credit.

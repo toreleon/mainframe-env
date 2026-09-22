@@ -6,6 +6,12 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added owned common dynamic-SQL syntax for PREPARE, EXECUTE, and EXECUTE
+  IMMEDIATE. Static-host forms preserve SQLDA naming modes, attribute indicators,
+  prepared-statement names, bounded USING variables, descriptors, and source
+  strings; PL/I expressions, arrays, multi-row buffers, indicators where
+  forbidden, and malformed or extra operands fail explicitly.
+
 - Added a distinct bounded Db2 host-identifier contract. Host-language spelling
   is preserved, including COBOL hyphens, and host variables/indicators no longer
   pass through SQL ordinary-identifier folding or character rules.
