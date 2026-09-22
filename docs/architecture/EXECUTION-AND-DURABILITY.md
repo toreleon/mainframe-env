@@ -572,6 +572,22 @@ function; it is never silently coerced.
 - Read operations declare snapshot/consistency requirements.
 - Exactly-once product claims are prohibited.
 
+## Early transaction participants
+
+The additive
+[transaction participant contract](../contracts/TRANSACTION-PARTICIPANT-V1.md)
+freezes the capability and obligation descriptor consumed before CICS, Db2,
+IMS, or MQ mutating adapters join a shared unit of work. The descriptor does
+not add a dispatcher or coordinator. This execution coordinator remains the
+single owner of canonical effect intent/result state, live controls, recovery
+leases, and post-dispatch uncertainty; each accepted participant owns only its
+versioned resource, UOW, undo, replay, migration, and retention state.
+
+The contract's effect and logical lock/CAS orders are shared across providers.
+An adapter with a pending descriptor cannot integrate merely because provider
+state or a private unit-of-work operation exists. Version 1 accepts the current
+CICS mapping and keeps Db2, IMS, and MQ capability-pending.
+
 ## Distributed evolution
 
 Horizontal execution changes store and queue adapters, not compiler, machine,

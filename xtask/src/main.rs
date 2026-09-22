@@ -7362,6 +7362,39 @@ fn check_architecture_fast(root: &Path) -> TaskResult {
     }
     check_declared_dependency_graph(root)?;
     check_common_execution_route(root)?;
+    let participant_contract = root.join("conformance/0.16/contracts/transaction-participant.json");
+    let participant_schema =
+        root.join("conformance/0.16/schemas/transaction-participant.schema.json");
+    validate_schema_instance(
+        &json(&participant_schema)?,
+        &json(&participant_contract)?,
+        &participant_contract,
+    )?;
+    let participant_fixtures =
+        root.join("conformance/0.16/fixtures/transaction-participant-compatibility.json");
+    let participant_fixture_schema =
+        root.join("conformance/0.16/schemas/transaction-participant-fixtures.schema.json");
+    validate_schema_instance(
+        &json(&participant_fixture_schema)?,
+        &json(&participant_fixtures)?,
+        &participant_fixtures,
+    )?;
+    let participant_generator = root.join("tools/generate_transaction_participant.py");
+    require(
+        participant_generator.is_file(),
+        "transaction participant generator is missing",
+    )?;
+    let status = Command::new("python3")
+        .arg("-B")
+        .arg(&participant_generator)
+        .arg("--check")
+        .current_dir(root)
+        .status()
+        .map_err(|error| format!("transaction participant freshness guard: {error}"))?;
+    require(
+        status.success(),
+        "transaction participant freshness guard failed",
+    )?;
     check_dehardcoding(root)?;
     if root
         .join("crates/contracts/mainframe-env-host-api/src/canonical.rs")

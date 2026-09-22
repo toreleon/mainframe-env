@@ -39,6 +39,13 @@ All notable changes to mainframe-env are documented here.
   lifecycle, and recovery semantics blocked until exact command bodies are
   mapped and digest-pinned.
 
+- Added the additive `mainframe-env.transaction-participant@1` INT-1601 early
+  contract. It freezes one provider-neutral capability/outcome vocabulary,
+  shared effect and lock/CAS ordering, read-version policy, and an accepted
+  CICS local/owned-DPL mapping while keeping Db2, IMS, and MQ bindings
+  explicitly pending. It adds no route, profile behavior, universal 2PC, or
+  exactly-once claim.
+
 - Added typed local CICS START `TERMID` through append-only operand tag 38.
   The provider resolves active virtual terminals at command time, returns exact
   `TERMIDERR` 11/0 for an unknown identifier, persists terminal association,
