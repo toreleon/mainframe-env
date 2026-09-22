@@ -338,7 +338,7 @@ fn host_variable(
             "Db2 host-variable name cannot be delimited",
         ));
     }
-    let mut name = word.value.to_ascii_uppercase();
+    let mut name = word.value.clone();
     let mut end = first.span;
     cursor += 1;
     loop {
@@ -355,7 +355,7 @@ fn host_variable(
             break;
         }
         name.push('-');
-        name.push_str(&word.value.to_ascii_uppercase());
+        name.push_str(&word.value);
         end = word_token.span;
         cursor += 2;
     }
@@ -564,6 +564,16 @@ mod tests {
             })
             .collect::<Vec<_>>();
         assert_eq!(variables, ["HV-ID", "HV_NAME", "HV-IND"]);
+        let preserved = lex("VALUES :Mixed-Field INTO :Output-Field").unwrap();
+        let variables = preserved
+            .tokens()
+            .iter()
+            .filter_map(|token| match &token.kind {
+                Db2TokenKind::HostVariable(name) => Some(name.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(variables, ["Mixed-Field", "Output-Field"]);
     }
 
     #[test]

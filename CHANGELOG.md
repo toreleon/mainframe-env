@@ -6,6 +6,10 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added a distinct bounded Db2 host-identifier contract. Host-language spelling
+  is preserved, including COBOL hyphens, and host variables/indicators no longer
+  pass through SQL ordinary-identifier folding or character rules.
+
 - Added owned source-reviewed transaction syntax for Db2 COMMIT, ROLLBACK,
   and SAVEPOINT. The parser preserves optional WORK, unit/savepoint rollback
   targets, UNIQUE, and both retain clauses, while rejecting duplicate clauses,

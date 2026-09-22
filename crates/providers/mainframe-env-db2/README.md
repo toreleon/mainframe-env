@@ -52,3 +52,7 @@ family owns typed COMMIT, ROLLBACK and SAVEPOINT AST, including WORK,
 named/unnamed savepoint rollback, UNIQUE, and retain-clause structure. It
 rejects other statement families and extra tokens; parsing alone is not an
 execution or transaction-authority path.
+
+SQL identifiers and host identifiers remain distinct. SQL names apply Db2
+ordinary/delimited rules; host identifiers preserve host-language spelling,
+including COBOL hyphens, for the host binder to resolve with its own ABI rules.
