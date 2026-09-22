@@ -1565,6 +1565,30 @@ mod tests {
             encode_cics_effect_plan(&mismatched_write_length, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
+        let mut write_with_key_length = write.clone();
+        write_with_key_length.operands.push(CicsNamedOperand {
+            name: CicsOperandName::KeyLength,
+            value: CicsOperandValue::Integer(3),
+        });
+        assert!(encode_cics_effect_plan(&write_with_key_length, CicsPlanLimits::default()).is_ok());
+        let mut zero_write_key_length = write.clone();
+        zero_write_key_length.operands.push(CicsNamedOperand {
+            name: CicsOperandName::KeyLength,
+            value: CicsOperandValue::Integer(0),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&zero_write_key_length, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut mismatched_write_key_length = write.clone();
+        mismatched_write_key_length.operands.push(CicsNamedOperand {
+            name: CicsOperandName::KeyLength,
+            value: CicsOperandValue::LengthOf(slot(16, "OTHER.KEY")),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&mismatched_write_key_length, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
         let mut literal_transient_record = write_transient.clone();
         literal_transient_record.operands[1].value = CicsOperandValue::Literal(b"DATA".to_vec());
         assert_eq!(
@@ -1636,6 +1660,7 @@ mod tests {
             current_record_delete,
             write,
             write_with_length,
+            write_with_key_length,
             write_transient,
             receive_map,
             send_map,

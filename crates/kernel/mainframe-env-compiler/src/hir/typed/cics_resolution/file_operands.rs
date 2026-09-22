@@ -102,6 +102,8 @@ pub(super) fn resolve(
         if let Some(tokens) = clauses.get(name) {
             let value = if operation == HirCicsOperation::Write && name == "LENGTH" {
                 write_length_value(tokens, semantic)?
+            } else if operation == HirCicsOperation::Write && name == "KEYLENGTH" {
+                write_key_length_value(tokens, semantic)?
             } else {
                 if matches!(tokens.as_slice(), [token] if numeric_literal(token).is_some()) {
                     return Err(ResolutionFailure::Invalid(format!(
@@ -120,6 +122,18 @@ pub(super) fn resolve(
             {
                 return Err(ResolutionFailure::Invalid(
                     "CICS Write LENGTH OF must name the FROM data area".into(),
+                ));
+            }
+            if operation == HirCicsOperation::Write
+                && name == "KEYLENGTH"
+                && let HirCicsValue::LengthOf(length) = &value
+                && !operands.iter().any(|operand| {
+                    operand.name == HirCicsOperandName::Ridfld
+                        && matches!(&operand.value, HirCicsValue::Data(key) if key == length)
+                })
+            {
+                return Err(ResolutionFailure::Invalid(
+                    "CICS Write KEYLENGTH OF must name the RIDFLD data area".into(),
                 ));
             }
             operands.push(HirCicsNamedOperand {
@@ -154,6 +168,36 @@ fn write_length_value(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsValue::Integer(value) if !(0..=32_767).contains(value) => {
             return Err(ResolutionFailure::Invalid(
                 "CICS Write LENGTH literal must be between 0 and 32767".into(),
+            ));
+        }
+        _ => {}
+    }
+    Ok(value)
+}
+
+fn write_key_length_value(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsValue> {
+    let value = if tokens
+        .first()
+        .is_some_and(|token| token.eq_ignore_ascii_case("LENGTH"))
+        && tokens
+            .get(1)
+            .is_some_and(|token| token.eq_ignore_ascii_case("OF"))
+    {
+        HirCicsValue::LengthOf(complete_data_reference(&tokens[2..], semantic)?)
+    } else {
+        cics_integer_value(tokens, semantic)?
+    };
+    match &value {
+        HirCicsValue::Data(reference)
+            if reference.category != DataCategory::Binary || reference.length != 2 =>
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS Write KEYLENGTH requires a halfword binary data item".into(),
+            ));
+        }
+        HirCicsValue::Integer(value) if !(1..=32_767).contains(value) => {
+            return Err(ResolutionFailure::Invalid(
+                "CICS Write KEYLENGTH literal must be between 1 and 32767".into(),
             ));
         }
         _ => {}

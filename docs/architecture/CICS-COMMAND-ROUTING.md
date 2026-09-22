@@ -214,10 +214,11 @@ The typed keyed-mutation subset admits DELETE with either an explicit RIDFLD or
 the record held by the task's latest `READ UPDATE` on that file. WRITE FILE
 requires explicit FROM and RIDFLD data areas; optional LENGTH is a bounded
 literal, halfword-binary value, or matching `LENGTH OF` and selects the exact
-record prefix before mutation. Both use the same single FILE/DATASET resource
-binding and typed mutation envelope. TOKEN correlation, SYSID/KEYLENGTH,
-generic and alternate record identities, WRITE MASSINSERT, and RLS NOSUSPEND
-remain fail-closed.
+record prefix before mutation. Optional KEYLENGTH uses the same positive
+halfword forms against RIDFLD and is validated against the durable definition.
+Both use the same single FILE/DATASET resource binding and typed mutation
+envelope. TOKEN correlation, SYSID, generic and alternate record identities,
+WRITE MASSINSERT, and RLS NOSUSPEND remain fail-closed.
 The typed local WRITEQ TD subset requires a bounded QUEUE selector and FROM
 storage input, with optional numeric LENGTH or `LENGTH OF` that input. The
 provider writes exactly the selected prefix under the request's mutation
