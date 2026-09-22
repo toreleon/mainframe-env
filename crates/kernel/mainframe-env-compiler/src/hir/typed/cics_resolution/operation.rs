@@ -26,6 +26,7 @@ pub(super) fn resolve(
         ["STARTBR"] => HirCicsOperation::StartBrowse,
         ["READNEXT"] => HirCicsOperation::ReadNext,
         ["READPREV"] => HirCicsOperation::ReadPrev,
+        ["READQ", "TD"] => HirCicsOperation::ReadTransientData,
         ["ENDBR"] => HirCicsOperation::EndBrowse,
         ["DELETE"] => HirCicsOperation::Delete,
         ["WRITE", "FILE"] => HirCicsOperation::Write,

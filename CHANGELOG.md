@@ -6,6 +6,13 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed local CICS `READQ TD QUEUE/INTO/LENGTH`. The FIFO read consumes
+  exactly one durable record, uses compiler-derived INTO capacity when LENGTH
+  is omitted, returns the original record length through writable halfword
+  storage, and preserves IBM's consume-and-LENGERR rules for zero or truncated
+  reads. Missing and empty queues return exact QIDERR 44/0 and QZERO 23/0;
+  SET, SYSID, NOSUSPEND, and TDQUEUE definition modes remain fail-closed.
+
 - Added typed local CICS START `TERMID` through append-only operand tag 38.
   The provider resolves active virtual terminals at command time, returns exact
   `TERMIDERR` 11/0 for an unknown identifier, persists terminal association,

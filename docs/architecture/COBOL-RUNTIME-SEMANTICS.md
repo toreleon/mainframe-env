@@ -269,6 +269,13 @@ authorization for that queue resource, and atomically removes its durable
 records and retained-byte accounting. A missing queue returns QIDERR 44/0;
 remote SYSID and definition-driven extrapartition, disabled, or locked states
 remain outside this typed subset.
+Typed local READQ TD accepts exactly one INTO destination and an optional
+writable halfword LENGTH. It consumes the oldest durable record, returns the
+original record length, and uses either the supplied positive maximum or the
+compiler-derived INTO extent. Zero length and truncation consume the record and
+return LENGERR 22/0; a negative length does not consume. Missing and empty
+queues remain distinct as QIDERR 44/0 and QZERO 23/0. SET, SYSID, NOSUSPEND,
+and definition-driven modes remain fail-closed.
 
 Typed local GETMAIN requires SET plus exactly one length selector: a literal or
 fullword-binary FLENGTH, or a literal or unsigned-halfword-binary compatibility

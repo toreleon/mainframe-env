@@ -45,6 +45,13 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
                 | CicsOutputName::Resp
                 | CicsOutputName::Resp2
         ),
+        CicsPlanOperation::ReadTransientData => matches!(
+            output,
+            CicsOutputName::Into
+                | CicsOutputName::Length
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
         CicsPlanOperation::ReceiveMap => matches!(
             output,
             CicsOutputName::Into | CicsOutputName::Resp | CicsOutputName::Resp2

@@ -1,9 +1,32 @@
 use super::super::{
-    HirCicsOperation, HirCicsOutputBinding, HirCicsOutputName, Resolution, require_writable,
+    HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsOutputBinding,
+    HirCicsOutputName, HirCicsValue, HirDataReference, Resolution, require_writable,
 };
 use super::{Clauses, complete_data_reference, format_time, program_control};
 use crate::{CobolUsage, SemanticModel};
 use mainframe_env_ir::CicsAssignOutput;
+
+pub(super) fn inout_length(
+    operands: &[HirCicsNamedOperand],
+    operation: HirCicsOperation,
+) -> Option<&HirDataReference> {
+    matches!(
+        operation,
+        HirCicsOperation::Read
+            | HirCicsOperation::ReadNext
+            | HirCicsOperation::ReadPrev
+            | HirCicsOperation::ReadTransientData
+    )
+    .then(|| {
+        operands.iter().find_map(|operand| match &operand.value {
+            HirCicsValue::Data(target) if operand.name == HirCicsOperandName::Length => {
+                Some(target)
+            }
+            _ => None,
+        })
+    })
+    .flatten()
+}
 
 pub(super) fn resolve(
     clauses: &Clauses,
@@ -47,7 +70,9 @@ pub(super) fn resolve(
         if name == "SET"
             && !matches!(
                 operation,
-                HirCicsOperation::Retrieve | HirCicsOperation::Getmain
+                HirCicsOperation::Retrieve
+                    | HirCicsOperation::Getmain
+                    | HirCicsOperation::ReadTransientData
             )
         {
             continue;

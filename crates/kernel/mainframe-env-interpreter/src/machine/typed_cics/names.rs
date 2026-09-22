@@ -84,6 +84,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::StartBrowse => CicsOperation::StartBrowse,
         CicsPlanOperation::ReadNext => CicsOperation::ReadNext,
         CicsPlanOperation::ReadPrev => CicsOperation::ReadPrev,
+        CicsPlanOperation::ReadTransientData => CicsOperation::ReadTransientData,
         CicsPlanOperation::EndBrowse => CicsOperation::EndBrowse,
         CicsPlanOperation::Delete => CicsOperation::Delete,
         CicsPlanOperation::Write => CicsOperation::Write,

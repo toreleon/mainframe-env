@@ -67,6 +67,8 @@ pub enum CicsPlanOperation {
     DeleteTransientData,
     /// Delete every item from one local temporary-storage queue.
     DeleteTemporaryStorage,
+    /// Read and consume one record from a local transient-data queue.
+    ReadTransientData,
     /// Receive one mapped terminal input message.
     ReceiveMap,
     /// Send one mapped terminal output message.

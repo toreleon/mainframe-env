@@ -33,6 +33,54 @@ pub(super) fn invalid_write_transient_data_shape(
             .any(|option| !matches!(option, CicsPlanOption::NoHandle))
 }
 
+pub(super) fn invalid_read_transient_data_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let allowed_inputs = BTreeSet::from([CicsOperandName::Queue, CicsOperandName::Length]);
+    !inputs.contains(&CicsOperandName::Queue)
+        || !inputs.is_subset(&allowed_inputs)
+        || !outputs.contains(&CicsOutputName::Into)
+        || outputs.contains(&CicsOutputName::SetPointer)
+        || plan.operands.iter().any(|operand| match operand.name {
+            CicsOperandName::Queue => !matches!(
+                operand.value,
+                CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+            ),
+            CicsOperandName::Length => !matches!(operand.value, CicsOperandValue::Storage(_)),
+            _ => true,
+        })
+        || outputs.contains(&CicsOutputName::Length) != inputs.contains(&CicsOperandName::Length)
+        || match plan
+            .operands
+            .iter()
+            .find(|operand| operand.name == CicsOperandName::Length)
+            .map(|operand| &operand.value)
+        {
+            Some(CicsOperandValue::Storage(slot)) => plan
+                .outputs
+                .iter()
+                .find(|output| output.name == CicsOutputName::Length)
+                .is_none_or(|output| output.target != *slot),
+            Some(_) => true,
+            None => false,
+        }
+        || outputs.iter().any(|output| {
+            !matches!(
+                output,
+                CicsOutputName::Into
+                    | CicsOutputName::Length
+                    | CicsOutputName::Resp
+                    | CicsOutputName::Resp2
+            )
+        })
+        || plan
+            .options
+            .iter()
+            .any(|option| !matches!(option, CicsPlanOption::NoHandle))
+}
+
 pub(super) fn invalid_delete_transient_data_shape(
     plan: &CicsEffectPlan,
     inputs: &BTreeSet<CicsOperandName>,

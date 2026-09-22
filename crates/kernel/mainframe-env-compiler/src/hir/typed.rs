@@ -170,6 +170,7 @@ pub enum HirCicsOperation {
     StartBrowse,
     ReadNext,
     ReadPrev,
+    ReadTransientData,
     EndBrowse,
     Delete,
     Write,
@@ -3381,6 +3382,78 @@ mod tests {
                 .public_message()
                 .contains("typed lowering is unready for SYSID")
         }));
+    }
+
+    #[test]
+    fn cics_readq_td_resolves_into_and_inout_length() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. READTDQ. DATA DIVISION. WORKING-STORAGE SECTION. 01 QUEUE-X PIC X(4) VALUE 'IN01'. 01 DATA-X PIC X(6). 01 LENGTH-X PIC S9(4) COMP VALUE 3. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS READQ TD QUEUE(QUEUE-X) INTO(DATA-X) LENGTH(LENGTH-X) RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("READQ TD: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed READQ TD");
+        assert_eq!(command.operation, HirCicsOperation::ReadTransientData);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Queue
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference) if reference.qualified_name == "QUEUE-X"
+                )
+        }));
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::Length
+                && matches!(
+                    operand.value,
+                    HirCicsValue::Data(ref reference) if reference.qualified_name == "LENGTH-X"
+                )
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::Into && output.target.qualified_name == "DATA-X"
+        }));
+        assert!(command.outputs.iter().any(|output| {
+            output.name == HirCicsOutputName::Length && output.target.qualified_name == "LENGTH-X"
+        }));
+
+        for (command, expected) in [
+            ("READQ TD INTO(DATA-X)", "requires QUEUE"),
+            ("READQ TD QUEUE('IN01')", "requires INTO"),
+            (
+                "READQ TD QUEUE('IN01') SET(PTR-X)",
+                "typed lowering is unready for SET",
+            ),
+            (
+                "READQ TD QUEUE('IN01') INTO(DATA-X) LENGTH(3)",
+                "LENGTH requires writable halfword binary storage",
+            ),
+            (
+                "READQ TD QUEUE('IN01') INTO(DATA-X) LENGTH(BAD-LENGTH-X)",
+                "LENGTH requires writable halfword binary storage",
+            ),
+            (
+                "READQ TD QUEUE('IN01') INTO(DATA-X) SYSID('R001')",
+                "typed lowering is unready for SYSID",
+            ),
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADRTD. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(6). 01 BAD-LENGTH-X PIC S9(9) COMP. 01 PTR-X POINTER. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
     }
 
     #[test]

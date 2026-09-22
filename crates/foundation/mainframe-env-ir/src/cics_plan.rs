@@ -549,6 +549,9 @@ fn validate_operation_shape(
         CicsPlanOperation::WriteTransientData => {
             queue_control::invalid_write_transient_data_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::ReadTransientData => {
+            queue_control::invalid_read_transient_data_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::DeleteTransientData | CicsPlanOperation::DeleteTemporaryStorage => {
             queue_control::invalid_delete_transient_data_shape(plan, inputs, outputs)
         }
@@ -1196,6 +1199,11 @@ mod tests {
         assert_eq!(operation_from_tag(42), Ok(CicsPlanOperation::Address));
         assert_eq!(operand_tag(CicsOperandName::CommareaPointer), 45);
         assert_eq!(operand_from_tag(45), Ok(CicsOperandName::CommareaPointer));
+        assert_eq!(operation_tag(CicsPlanOperation::ReadTransientData), 51);
+        assert_eq!(
+            operation_from_tag(51),
+            Ok(CicsPlanOperation::ReadTransientData)
+        );
 
         let plan = read_plan();
         let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();

@@ -733,6 +733,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "RESP2",
         ],
         HirCicsOperation::WriteTransientData => &["QUEUE", "FROM", "LENGTH", "RESP", "RESP2"],
+        HirCicsOperation::ReadTransientData => &["QUEUE", "INTO", "LENGTH", "RESP", "RESP2"],
         HirCicsOperation::DeleteTransientData => &["QUEUE", "RESP", "RESP2"],
         HirCicsOperation::DeleteTemporaryStorage => &["QNAME", "QUEUE", "SYSID", "RESP", "RESP2"],
         HirCicsOperation::Freemain => &["DATA", "DATAPOINTER", "RESP", "RESP2"],
@@ -798,6 +799,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::Delete
         | HirCicsOperation::Write
         | HirCicsOperation::WriteTransientData
+        | HirCicsOperation::ReadTransientData
         | HirCicsOperation::DeleteTransientData
         | HirCicsOperation::DeleteTemporaryStorage
         | HirCicsOperation::Freemain
@@ -889,6 +891,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::Read
         | HirCicsOperation::Rewrite
         | HirCicsOperation::WriteTransientData
+        | HirCicsOperation::ReadTransientData
         | HirCicsOperation::DeleteTransientData
         | HirCicsOperation::DeleteTemporaryStorage
         | HirCicsOperation::Freemain
@@ -1066,16 +1069,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             name: HirCicsOutputName::Length,
             target,
         });
-    } else if matches!(
-        operation,
-        HirCicsOperation::Read | HirCicsOperation::ReadNext | HirCicsOperation::ReadPrev
-    ) && let Some(HirCicsNamedOperand {
-        value: HirCicsValue::Data(target),
-        ..
-    }) = operands
-        .iter()
-        .find(|operand| operand.name == HirCicsOperandName::Length)
-    {
+    } else if let Some(target) = output_bindings::inout_length(&operands, operation) {
         require_writable(target)?;
         outputs.push(HirCicsOutputBinding {
             name: HirCicsOutputName::Length,

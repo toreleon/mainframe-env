@@ -54,6 +54,8 @@ pub enum CicsOperation {
     Read,
     ReadNext,
     ReadPrev,
+    /// Read and consume one record from a local transient-data queue.
+    ReadTransientData,
     ReceiveMap,
     Retrieve,
     Return,
@@ -109,6 +111,7 @@ impl CicsOperation {
             Self::Read => "Read",
             Self::ReadNext => "ReadNext",
             Self::ReadPrev => "ReadPrev",
+            Self::ReadTransientData => "ReadTransientData",
             Self::ReceiveMap => "ReceiveMap",
             Self::Retrieve => "Retrieve",
             Self::Return => "Return",
@@ -145,6 +148,7 @@ impl CicsOperation {
                 | Self::WriteTransientData
                 | Self::Link
                 | Self::ReceiveMap
+                | Self::ReadTransientData
                 | Self::PurgeMessage
                 | Self::SendMap
                 | Self::SendText
@@ -202,6 +206,7 @@ impl CicsOperation {
             ("PUSH", Some("HANDLE")) => Self::PushHandle,
             ("PURGE", Some("MESSAGE")) => Self::PurgeMessage,
             ("READ", _) => Self::Read,
+            ("READQ", Some("TD")) => Self::ReadTransientData,
             ("READNEXT", _) => Self::ReadNext,
             ("READPREV", _) => Self::ReadPrev,
             ("RECEIVE", Some("MAP")) => Self::ReceiveMap,

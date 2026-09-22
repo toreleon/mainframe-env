@@ -556,7 +556,7 @@ pub fn cics_application_registry_for_runtime_operation(
 }
 
 /// Complete registry for the bounded typed CICS executable pilot.
-pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 43] = [
+pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 44] = [
     CicsExecutableDescriptor {
         operation: CicsPlanOperation::Deq,
         namespace: "cics.task",
@@ -901,6 +901,14 @@ pub const CICS_EXECUTABLE_DESCRIPTORS: [CicsExecutableDescriptor; 43] = [
         effects: ADDRESS_SET_EFFECTS,
         runtime_import: CICS_RUNTIME_IMPORT,
     },
+    CicsExecutableDescriptor {
+        operation: CicsPlanOperation::ReadTransientData,
+        namespace: "cics.queue",
+        name: "read-transient-data",
+        major: 1,
+        effects: QUEUE_WRITE_EFFECTS,
+        runtime_import: CICS_RUNTIME_IMPORT,
+    },
 ];
 
 /// Resolves the executable descriptor for a decoded CICS plan operation.
@@ -952,6 +960,7 @@ pub const fn cics_executable_descriptor(
         CicsPlanOperation::Freemain => &CICS_EXECUTABLE_DESCRIPTORS[40],
         CicsPlanOperation::DeleteTemporaryStorage => &CICS_EXECUTABLE_DESCRIPTORS[41],
         CicsPlanOperation::Address => &CICS_EXECUTABLE_DESCRIPTORS[42],
+        CicsPlanOperation::ReadTransientData => &CICS_EXECUTABLE_DESCRIPTORS[43],
     }
 }
 
@@ -1251,6 +1260,7 @@ mod tests {
                 CicsPlanOperation::StartBrowse,
                 CicsPlanOperation::ReadNext,
                 CicsPlanOperation::ReadPrev,
+                CicsPlanOperation::ReadTransientData,
                 CicsPlanOperation::EndBrowse,
                 CicsPlanOperation::Delete,
                 CicsPlanOperation::Write,

@@ -68,6 +68,15 @@ pub(super) fn write_response_state(
     Ok(())
 }
 
+pub(super) fn into_payload_schema<'a>(
+    operation: CicsOperation,
+    response: &'a CicsResponse,
+) -> Option<&'a str> {
+    (operation != CicsOperation::ReadTransientData
+        || matches!(response.condition.as_str(), "NORMAL" | "LENGERR"))
+    .then(|| response.payload.schema())
+}
+
 pub(super) fn write_runtime_output(
     machine: &mut ReferenceMachine,
     operation: CicsOperation,
@@ -365,7 +374,24 @@ pub(super) fn execute(
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }
-            CicsOutputName::Into => into = Some(target),
+            CicsOutputName::Into => {
+                if plan.operation == CicsPlanOperation::ReadTransientData {
+                    let CicsTarget::Resolved(slot) = &target else {
+                        return Err(MachineProblem::UnexpectedHostResult);
+                    };
+                    arguments.insert(
+                        "INTO.MAXLENGTH".into(),
+                        payload(
+                            "mainframe-env.cics.decimal@1",
+                            resolved_slot(machine, slot)?
+                                .length
+                                .to_string()
+                                .into_bytes(),
+                        )?,
+                    );
+                }
+                into = Some(target);
+            }
             CicsOutputName::SetPointer => {
                 arguments.extend(retrieve::allocation_arguments(
                     machine,

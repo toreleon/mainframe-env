@@ -52,6 +52,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::Freemain => 40,
         CicsPlanOperation::DeleteTemporaryStorage => 41,
         CicsPlanOperation::Address => 42,
+        CicsPlanOperation::ReadTransientData => 51,
     }
 }
 
@@ -100,6 +101,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         40 => Ok(CicsPlanOperation::Freemain),
         41 => Ok(CicsPlanOperation::DeleteTemporaryStorage),
         42 => Ok(CicsPlanOperation::Address),
+        51 => Ok(CicsPlanOperation::ReadTransientData),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

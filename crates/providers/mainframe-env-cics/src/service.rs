@@ -1715,7 +1715,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 45);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 46);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -4697,6 +4697,7 @@ mod tests {
             ("POP HANDLE", CicsOperation::PopHandle),
             ("PUSH HANDLE", CicsOperation::PushHandle),
             ("READ", CicsOperation::Read),
+            ("READQ TD", CicsOperation::ReadTransientData),
             ("READNEXT", CicsOperation::ReadNext),
             ("READPREV", CicsOperation::ReadPrev),
             ("RECEIVE MAP", CicsOperation::ReceiveMap),
@@ -4728,7 +4729,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 45);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 46);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -9115,6 +9116,116 @@ mod tests {
                 missing.response2
             ),
             ("QIDERR", 44, 0)
+        );
+    }
+
+    #[test]
+    fn readq_td_consumes_fifo_records_and_reports_lengths_and_empty_state() {
+        let service = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&service);
+        for (sequence, value) in [(1, b"ABCDE".as_slice()), (2, b"XYZ".as_slice())] {
+            let write = request(
+                CicsOperation::WriteTransientData,
+                BTreeMap::from([
+                    ("QUEUE".into(), argument(b"IN01")),
+                    ("FROM".into(), argument(value)),
+                ]),
+                sequence,
+            );
+            service
+                .invoke(
+                    &effect(&invocation.run_unit_id, write.clone(), sequence),
+                    write,
+                )
+                .unwrap();
+        }
+
+        let truncated = request(
+            CicsOperation::ReadTransientData,
+            BTreeMap::from([
+                ("QUEUE".into(), cics_literal(b"IN01")),
+                ("INTO".into(), argument(b"DATA-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(6)),
+                ("LENGTH".into(), cics_decimal(3)),
+            ]),
+            3,
+        );
+        let truncated = service
+            .invoke(
+                &effect(&invocation.run_unit_id, truncated.clone(), 3),
+                truncated,
+            )
+            .unwrap();
+        assert_eq!(truncated.payload.bytes(), b"ABC");
+        assert_eq!(truncated.outputs["LENGTH"].bytes(), b"5");
+        assert_eq!(
+            (
+                truncated.condition.as_str(),
+                truncated.response,
+                truncated.response2
+            ),
+            ("LENGERR", 22, 0)
+        );
+        assert_eq!(
+            service.transient_records("IN01").unwrap(),
+            [b"XYZ".to_vec()]
+        );
+
+        let zero = request(
+            CicsOperation::ReadTransientData,
+            BTreeMap::from([
+                ("QUEUE".into(), cics_literal(b"IN01")),
+                ("INTO".into(), argument(b"DATA-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(6)),
+                ("LENGTH".into(), cics_decimal(0)),
+            ]),
+            4,
+        );
+        let zero = service
+            .invoke(&effect(&invocation.run_unit_id, zero.clone(), 4), zero)
+            .unwrap();
+        assert!(zero.payload.bytes().is_empty());
+        assert_eq!(zero.outputs["LENGTH"].bytes(), b"3");
+        assert_eq!((zero.condition.as_str(), zero.response), ("LENGERR", 22));
+        assert!(service.transient_records("IN01").unwrap().is_empty());
+
+        let empty = request(
+            CicsOperation::ReadTransientData,
+            BTreeMap::from([
+                ("QUEUE".into(), cics_literal(b"IN01")),
+                ("INTO".into(), argument(b"DATA-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(6)),
+            ]),
+            5,
+        );
+        assert_eq!(
+            service.invoke(&effect(&invocation.run_unit_id, empty.clone(), 5), empty),
+            Err(HostProblem::Condition {
+                name: "QZERO".into(),
+                response: 23,
+                response2: 0,
+            })
+        );
+
+        let missing = request(
+            CicsOperation::ReadTransientData,
+            BTreeMap::from([
+                ("QUEUE".into(), cics_literal(b"NONE")),
+                ("INTO".into(), argument(b"DATA-X")),
+                ("INTO.MAXLENGTH".into(), cics_decimal(6)),
+            ]),
+            6,
+        );
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, missing.clone(), 6),
+                missing,
+            ),
+            Err(HostProblem::Condition {
+                name: "QIDERR".into(),
+                response: 44,
+                response2: 0,
+            })
         );
     }
 

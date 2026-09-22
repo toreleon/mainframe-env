@@ -37,6 +37,7 @@ impl Canonical for CicsOperation {
             Self::Read => out.variant("CicsOperation", "Read", 0),
             Self::ReadNext => out.variant("CicsOperation", "ReadNext", 0),
             Self::ReadPrev => out.variant("CicsOperation", "ReadPrev", 0),
+            Self::ReadTransientData => out.variant("CicsOperation", "ReadTransientData", 0),
             Self::ReceiveMap => out.variant("CicsOperation", "ReceiveMap", 0),
             Self::Retrieve => out.variant("CicsOperation", "Retrieve", 0),
             Self::Return => out.variant("CicsOperation", "Return", 0),

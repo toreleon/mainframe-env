@@ -236,7 +236,13 @@ identity, so retries compare the semantic record rather than ignored trailing
 bytes. Typed local DELETEQ TD accepts only the bounded QUEUE selector, requires
 update access to the same queue resource, and atomically removes the durable
 queue plus its retained-byte accounting. A missing queue returns QIDERR 44/0.
-Remote SYSID routing and TDQUEUE definition-state conditions remain deferred.
+Typed local READQ TD consumes the oldest durable record into one writable INTO
+area. Optional halfword LENGTH is both the caller's maximum and the original
+record-length output; omitted LENGTH uses the compiler-resolved INTO extent.
+Zero or truncated reads consume and return LENGERR 22/0, while negative length
+preserves the queue. Missing and empty queues return QIDERR 44/0 and QZERO 23/0.
+SET, SYSID, NOSUSPEND, remote routing, and TDQUEUE definition-state conditions
+remain deferred.
 Typed local GETMAIN routes SET plus exactly one FLENGTH or compatibility LENGTH
 and optional INITIMG through the storage-control family. FLENGTH uses signed
 fullword input; LENGTH uses unsigned halfword input and the source-defined
