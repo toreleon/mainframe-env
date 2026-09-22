@@ -8070,6 +8070,14 @@ fn check_schemas(root: &Path) -> TaskResult {
         compile_draft_2020_12_schema(&value, file)?;
     }
     validate_0_2_schema_artifacts(root)?;
+    let zosmf_normalization_path = root.join("conformance/0.11/catalogs/zosmf-normalization.json");
+    let zosmf_normalization_schema =
+        root.join("conformance/0.11/schemas/zosmf-normalization.schema.json");
+    validate_schema_instance(
+        &json(&zosmf_normalization_schema)?,
+        &json(&zosmf_normalization_path)?,
+        &zosmf_normalization_path,
+    )?;
     let inventory_path = root.join("conformance/0.6/inventory/dataset-programming-surface.json");
     let schema_path = root.join("conformance/0.6/schemas/dataset-programming-surface.schema.json");
     validate_schema_instance(
