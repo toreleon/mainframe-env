@@ -1,6 +1,6 @@
 use crate::{
-    EffectRequest, EffectResult, HostLimits, HostProblem, MAX_CANONICAL_EFFECT_BYTES,
-    RegistrySnapshot, canonical_audit_resource_digest, canonical_request_size,
+    EffectRequest, EffectResult, HostLimits, HostProblem, HostResult, MAX_CANONICAL_EFFECT_BYTES,
+    RegistrySnapshot, SecurityDecision, canonical_audit_resource_digest, canonical_request_size,
     canonical_result_size,
 };
 use mainframe_env_execution_api::CapabilityId;
@@ -156,6 +156,7 @@ impl ScopedHostService {
             }
         };
         let decision = match &result {
+            Ok(HostResult::Security(SecurityDecision::Deny)) => AuditDecision::Deny,
             Ok(_) => AuditDecision::Success,
             Err(HostProblem::Unauthorized) => AuditDecision::Deny,
             Err(HostProblem::Cancelled) => AuditDecision::Cancelled,

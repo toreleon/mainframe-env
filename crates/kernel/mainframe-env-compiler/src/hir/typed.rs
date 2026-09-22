@@ -177,6 +177,7 @@ pub enum HirCicsOperation {
     WriteTransientData,
     DeleteTransientData,
     DeleteTemporaryStorage,
+    ReadTemporaryStorage,
     ReceiveMap,
     SendMap,
     SendText,
@@ -212,6 +213,7 @@ pub enum HirCicsOperandName {
     Queue,
     Qname,
     SysId,
+    Item,
     CommareaPointer,
     Map,
     Mapset,
@@ -298,6 +300,7 @@ pub enum HirCicsOption {
     Terminal,
     Purgeable,
     NotPurgeable,
+    Next,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -321,6 +324,7 @@ pub enum HirCicsOutputName {
     ReturnTransId,
     ReturnTermId,
     Queue,
+    NumItems,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -3735,6 +3739,62 @@ mod tests {
                 "{command}: {:?}",
                 invalid.diagnostics
             );
+        }
+    }
+
+    #[test]
+    fn cics_readq_ts_local_forms_are_typed() {
+        let analysis = analyze(
+            "IDENTIFICATION DIVISION. PROGRAM-ID. READTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 QNAME-X PIC X(16) VALUE 'LONG-QUEUE'. 01 DATA-X PIC X(8). 01 PTR-X POINTER. 01 ITEM-X PIC S9(4) COMP VALUE 1. 01 LENGTH-X PIC S9(4) COMP VALUE 8. 01 COUNT-X PIC S9(4) COMP. PROCEDURE DIVISION. EXEC CICS READQ TS QUEUE('TEMPQ') INTO(DATA-X) ITEM(ITEM-X) LENGTH(LENGTH-X) NUMITEMS(COUNT-X) SYSID('S001') END-EXEC. EXEC CICS READQ TS QNAME(QNAME-X) SET(PTR-X) LENGTH(LENGTH-X) NEXT END-EXEC. STOP RUN.",
+        );
+        assert!(
+            analysis.hir.is_some(),
+            "READQ TS should lower through typed HIR: {:?}",
+            analysis.diagnostics
+        );
+
+        for (command, expected) in [
+            (
+                "READQ TS QUEUE('TEMPQ')",
+                "requires exactly one of INTO or SET",
+            ),
+            (
+                "READQ TS QUEUE('TEMPQ') INTO(DATA-X) SET(PTR-X) LENGTH(LENGTH-X)",
+                "requires exactly one of INTO or SET",
+            ),
+            ("READQ TS QUEUE('TEMPQ') SET(PTR-X)", "SET requires LENGTH"),
+            (
+                "READQ TS QUEUE('TEMPQ') INTO(DATA-X) ITEM(1) NEXT",
+                "ITEM and NEXT are mutually exclusive",
+            ),
+            (
+                "READQ TS QUEUE('TEMPQ') INTO(DATA-X) LENGTH(DATA-X)",
+                "LENGTH requires a halfword binary data item",
+            ),
+            (
+                "READQ TS QUEUE('TEMPQ') INTO(DATA-X) NUMITEMS(DATA-X)",
+                "NUMITEMS requires a halfword binary data item",
+            ),
+        ] {
+            let invalid = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADRTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). 01 PTR-X POINTER. 01 LENGTH-X PIC S9(4) COMP VALUE 8. PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(invalid.hir.is_none(), "{command}");
+            assert!(
+                invalid
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                invalid.diagnostics
+            );
+        }
+        for item in ["0", "-1"] {
+            let source = format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. RTSITEM. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC X(8). PROCEDURE DIVISION. EXEC CICS READQ TS QUEUE('TEMPQ') INTO(DATA-X) ITEM({item}) END-EXEC. STOP RUN."
+            );
+            let accepted = analyze(&source);
+            assert!(accepted.hir.is_some(), "{item}: {:?}", accepted.diagnostics);
         }
     }
 

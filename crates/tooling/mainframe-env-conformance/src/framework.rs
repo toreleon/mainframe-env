@@ -2529,6 +2529,131 @@ mod tests {
     }
 
     #[test]
+    fn cics_readq_ts_crosses_the_compiled_selected_route() {
+        use mainframe_env_host_api::{
+            CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,
+            HostResult,
+        };
+
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. READTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 QNAME-X PIC X(16) VALUE 'LONG-QUEUE'. 01 DATA-X PIC X(8). 01 PTR-X POINTER. 01 ITEM-X PIC S9(4) COMP VALUE 1. 01 LENGTH-X PIC S9(4) COMP VALUE 8. 01 COUNT-X PIC S9(4) COMP. 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS READQ TS QUEUE('TEMPQ') INTO(DATA-X) ITEM(ITEM-X) LENGTH(LENGTH-X) NUMITEMS(COUNT-X) SYSID('S001') RESP(RESP-X) RESP2(RESP2-X) END-EXEC. EXEC CICS READQ TS QNAME(QNAME-X) SET(PTR-X) LENGTH(LENGTH-X) NEXT END-EXEC. STOP RUN.";
+        let artifact = compile(source).unwrap();
+        let mut machine = ReferenceMachine::from_binary(
+            artifact.payload(),
+            invocation(&artifact, 1024),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let MachineDrive::HostCall(item) =
+            machine.drive(MachineResume::Start, Quantum::new(64, 1024).unwrap())
+        else {
+            panic!("READQ TS ITEM did not call host");
+        };
+        assert!(matches!(
+            &item.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::ReadTemporaryStorage,
+                arguments,
+                mutation: Some(_),
+                ..
+            }) if arguments["QUEUE"].bytes() == b"TEMPQ"
+                && arguments["ITEM"].bytes() == b"1"
+                && arguments["LENGTH"].bytes() == b"8"
+                && arguments["SYSID"].bytes() == b"S001"
+                && arguments.contains_key("NUMITEMS")
+                && !arguments.contains_key("OPTION.NEXT")
+        ));
+        let payload = |schema: &str, bytes: &[u8]| {
+            mainframe_env_execution_api::BoundedPayload::new(
+                schema,
+                bytes.to_vec(),
+                InvocationLimits::default(),
+            )
+            .unwrap()
+        };
+        let response =
+            |bytes: &[u8],
+             outputs: BTreeMap<String, mainframe_env_execution_api::BoundedPayload>| {
+                CicsResponse {
+                    disposition: CicsDisposition::Complete,
+                    condition: "NORMAL".into(),
+                    response: 0,
+                    response2: 0,
+                    applid: "APP".into(),
+                    sysid: "S001".into(),
+                    transaction: "T001".into(),
+                    aid: 0,
+                    target: None,
+                    next_transaction: None,
+                    payload: payload("mainframe-env.cics.payload@1", bytes),
+                    outputs,
+                    unit_of_work: None,
+                }
+            };
+        let MachineDrive::HostCall(next) = machine.drive(
+            MachineResume::HostResult(EffectResult {
+                sequence: item.sequence,
+                outcome: Ok(HostResult::Cics(response(
+                    b"ABCD",
+                    BTreeMap::from([
+                        (
+                            "LENGTH".into(),
+                            payload("mainframe-env.cics.decimal@1", b"4"),
+                        ),
+                        (
+                            "NUMITEMS".into(),
+                            payload("mainframe-env.cics.decimal@1", b"2"),
+                        ),
+                    ]),
+                ))),
+            }),
+            Quantum::new(64, 1024).unwrap(),
+        ) else {
+            panic!("READQ TS NEXT did not call host");
+        };
+        assert_eq!(machine.variable("DATA-X").unwrap().bytes(), b"ABCD    ");
+        assert_eq!(machine.variable("LENGTH-X").unwrap().bytes(), &[0, 4]);
+        assert_eq!(machine.variable("COUNT-X").unwrap().bytes(), &[0, 2]);
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x0a, 0x04]);
+        assert!(matches!(
+            &next.request,
+            HostRequest::Cics(CicsRequest {
+                operation: CicsOperation::ReadTemporaryStorage,
+                arguments,
+                mutation: Some(_),
+                ..
+            }) if arguments["QNAME"].bytes() == b"LONG-QUEUE      "
+                && arguments["OPTION.NEXT"].bytes().is_empty()
+                && arguments.contains_key("SET")
+                && arguments.contains_key("SET.MAXLENGTH")
+        ));
+        assert!(matches!(
+            machine.drive(
+                MachineResume::HostResult(EffectResult {
+                    sequence: next.sequence,
+                    outcome: Ok(HostResult::Cics(response(
+                        &[],
+                        BTreeMap::from([
+                            (
+                                "SET".into(),
+                                payload("mainframe-env.cics.payload@1", b"XYZ"),
+                            ),
+                            (
+                                "LENGTH".into(),
+                                payload("mainframe-env.cics.decimal@1", b"3"),
+                            ),
+                        ]),
+                    ))),
+                }),
+                Quantum::new(64, 1024).unwrap(),
+            ),
+            MachineDrive::Completed(_)
+        ));
+        assert_ne!(machine.variable("PTR-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(machine.variable("LENGTH-X").unwrap().bytes(), &[0, 3]);
+        assert_eq!(machine.variable("EIBFN").unwrap().bytes(), &[0x0a, 0x04]);
+    }
+
+    #[test]
     fn cics_receive_map_terminal_crosses_the_compiled_selected_route() {
         use mainframe_env_host_api::{
             CicsDisposition, CicsOperation, CicsRequest, CicsResponse, EffectResult, HostRequest,

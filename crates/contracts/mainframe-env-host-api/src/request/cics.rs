@@ -28,6 +28,8 @@ pub enum CicsOperation {
     DeleteTransientData,
     /// Delete every item from one local temporary-storage queue.
     DeleteTemporaryStorage,
+    /// Read one item from one local temporary-storage queue.
+    ReadTemporaryStorage,
     /// Acquire or wait for one task enqueue resource.
     Enq,
     EndBrowse,
@@ -98,6 +100,7 @@ impl CicsOperation {
             Self::Delete => "Delete",
             Self::DeleteTransientData => "DeleteTransientData",
             Self::DeleteTemporaryStorage => "DeleteTemporaryStorage",
+            Self::ReadTemporaryStorage => "ReadTemporaryStorage",
             Self::Enq => "Enq",
             Self::EndBrowse => "EndBrowse",
             Self::FormatTime => "FormatTime",
@@ -143,6 +146,7 @@ impl CicsOperation {
             Self::Delete
                 | Self::DeleteTransientData
                 | Self::DeleteTemporaryStorage
+                | Self::ReadTemporaryStorage
                 | Self::Cancel
                 | Self::Delay
                 | Self::Deq
@@ -199,6 +203,7 @@ impl CicsOperation {
             ("DELETE", _) => Self::Delete,
             ("DELETEQ", Some("TD")) => Self::DeleteTransientData,
             ("DELETEQ", Some("TS")) => Self::DeleteTemporaryStorage,
+            ("READQ", Some("TS")) => Self::ReadTemporaryStorage,
             ("ENQ", _) => Self::Enq,
             ("ENDBR", _) => Self::EndBrowse,
             ("FORMATTIME", _) => Self::FormatTime,

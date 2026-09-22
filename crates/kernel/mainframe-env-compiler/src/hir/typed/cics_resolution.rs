@@ -2,8 +2,7 @@
 use super::{
     HirCicsConditionPolicy, HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation,
     HirCicsOption, HirCicsOutputBinding, HirCicsOutputName, HirCicsStatement, HirCicsValue,
-    HirDataReference, Resolution, ResolutionFailure, data_reference_at, numeric_literal,
-    require_numeric, require_writable,
+    Resolution, ResolutionFailure, numeric_literal, require_numeric, require_writable,
 };
 use crate::{CobolUsage, SemanticModel};
 use mainframe_env_ir::{
@@ -33,8 +32,11 @@ mod storage_control;
 mod task_wait;
 mod terminal_control;
 mod transaction_name;
+mod value;
 
 use numeric_value::{cics_cvda_value, cics_integer_value};
+use value::{cics_address_value, cics_value, complete_data_reference, output};
+
 struct ValidatedCandidate {
     descriptor: &'static CicsApplicationRegistryDescriptor,
     clauses: Clauses,
@@ -736,6 +738,9 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         }
         HirCicsOperation::DeleteTransientData => &["QUEUE", "SYSID", "RESP", "RESP2"],
         HirCicsOperation::DeleteTemporaryStorage => &["QNAME", "QUEUE", "SYSID", "RESP", "RESP2"],
+        HirCicsOperation::ReadTemporaryStorage => &[
+            "QNAME", "QUEUE", "INTO", "SET", "LENGTH", "NUMITEMS", "ITEM", "SYSID", "RESP", "RESP2",
+        ],
         HirCicsOperation::Freemain => &["DATA", "DATAPOINTER", "RESP", "RESP2"],
         HirCicsOperation::Getmain => &["FLENGTH", "LENGTH", "INITIMG", "SET", "RESP", "RESP2"],
         HirCicsOperation::ReceiveMap => {
@@ -812,6 +817,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::Suspend
         | HirCicsOperation::WaitEvent => &["NOHANDLE"],
         HirCicsOperation::WaitExternal => task_wait::WAIT_EXTERNAL_OPTIONS,
+        HirCicsOperation::ReadTemporaryStorage => &["NEXT", "NOHANDLE"],
         HirCicsOperation::Start => &["AFTER", "AT", "FMH", "PROTECT", "NOCHECK", "NOHANDLE"],
         HirCicsOperation::Cancel => &["NOHANDLE"],
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
@@ -866,7 +872,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
     }
     program_control::validate_constraints(operation, &clauses)?;
     file_operands::validate_constraints(&clauses, &raw_options, operation)?;
-    queue_control::validate_constraints(&clauses, operation)?;
+    queue_control::validate_constraints(&clauses, &raw_options, operation)?;
     storage_control::validate_constraints(&clauses, operation, semantic)?;
     terminal_control::validate_constraints(&clauses, &raw_options, operation)?;
     interval_control::validate_constraints(&clauses, &raw_options, operation)?;
@@ -898,6 +904,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         | HirCicsOperation::ReadTransientData
         | HirCicsOperation::DeleteTransientData
         | HirCicsOperation::DeleteTemporaryStorage
+        | HirCicsOperation::ReadTemporaryStorage
         | HirCicsOperation::Freemain
         | HirCicsOperation::Getmain
         | HirCicsOperation::ReceiveMap
@@ -1066,6 +1073,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         operands.extend(format_time::operands(&clauses, semantic)?);
     }
     let mut outputs = output_bindings::resolve(&clauses, &raw_options, operation, semantic)?;
+    outputs.extend(queue_control::outputs(&clauses, operation, semantic)?);
     if operation == HirCicsOperation::Retrieve {
         let target = complete_data_reference(&clauses["LENGTH"], semantic)?;
         require_writable(&target)?;
@@ -1108,6 +1116,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
             "GENERIC" => HirCicsOption::Generic,
             "EQUAL" => HirCicsOption::Equal,
             "TERMINAL" => HirCicsOption::Terminal,
+            "NEXT" => HirCicsOption::Next,
             "FMH" => HirCicsOption::Fmh,
             "PROTECT" => HirCicsOption::Protect,
             "WAIT" => HirCicsOption::Wait,
@@ -1148,51 +1157,4 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         outputs,
         condition_policy,
     })
-}
-
-fn cics_value(tokens: &[String], semantic: &SemanticModel) -> Resolution<HirCicsValue> {
-    if let [value] = tokens
-        && value.len() >= 2
-        && value.starts_with(['\'', '"'])
-        && value.as_bytes().first() == value.as_bytes().last()
-    {
-        return Ok(HirCicsValue::Literal(value[1..value.len() - 1].into()));
-    }
-    if matches!(tokens, [value] if numeric_literal(value).is_some()) {
-        return Err(ResolutionFailure::Unsupported);
-    }
-    complete_data_reference(tokens, semantic).map(HirCicsValue::Data)
-}
-
-fn cics_address_value(
-    tokens: &[String],
-    semantic: &SemanticModel,
-) -> Resolution<(bool, HirDataReference)> {
-    if tokens.len() > 2
-        && tokens[0].eq_ignore_ascii_case("ADDRESS")
-        && tokens[1].eq_ignore_ascii_case("OF")
-    {
-        complete_data_reference(&tokens[2..], semantic).map(|reference| (true, reference))
-    } else {
-        complete_data_reference(tokens, semantic).map(|reference| (false, reference))
-    }
-}
-
-fn complete_data_reference(
-    tokens: &[String],
-    semantic: &SemanticModel,
-) -> Resolution<HirDataReference> {
-    let (reference, end) = data_reference_at(tokens, 0, semantic)?;
-    if end == tokens.len() {
-        Ok(reference)
-    } else {
-        Err(ResolutionFailure::Unsupported)
-    }
-}
-
-fn output(outputs: &[HirCicsOutputBinding], name: HirCicsOutputName) -> Option<&HirDataReference> {
-    outputs
-        .iter()
-        .find(|output| output.name == name)
-        .map(|output| &output.target)
 }

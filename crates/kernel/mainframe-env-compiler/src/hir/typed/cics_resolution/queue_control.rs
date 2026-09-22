@@ -1,21 +1,44 @@
 use super::super::{
-    HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsValue, Resolution,
-    ResolutionFailure, require_writable,
+    HirCicsNamedOperand, HirCicsOperandName, HirCicsOperation, HirCicsOutputBinding,
+    HirCicsOutputName, HirCicsValue, Resolution, ResolutionFailure, require_writable,
 };
 use super::{Clauses, cics_integer_value, cics_value, complete_data_reference};
 use crate::{CobolUsage, DataCategory, SemanticModel};
 
 pub(super) fn validate_constraints(
     clauses: &Clauses,
+    options: &[String],
     operation: HirCicsOperation,
 ) -> Resolution<()> {
-    if operation == HirCicsOperation::DeleteTemporaryStorage {
+    if matches!(
+        operation,
+        HirCicsOperation::DeleteTemporaryStorage | HirCicsOperation::ReadTemporaryStorage
+    ) {
         if usize::from(clauses.contains_key("QUEUE")) + usize::from(clauses.contains_key("QNAME"))
             != 1
         {
-            return Err(ResolutionFailure::Invalid(
-                "CICS DELETEQ TS requires exactly one of QUEUE or QNAME".into(),
-            ));
+            return Err(ResolutionFailure::Invalid(format!(
+                "CICS {operation:?} requires exactly one of QUEUE or QNAME"
+            )));
+        }
+        if operation == HirCicsOperation::ReadTemporaryStorage {
+            if usize::from(clauses.contains_key("INTO")) + usize::from(clauses.contains_key("SET"))
+                != 1
+            {
+                return Err(ResolutionFailure::Invalid(
+                    "CICS READQ TS requires exactly one of INTO or SET".into(),
+                ));
+            }
+            if clauses.contains_key("SET") && !clauses.contains_key("LENGTH") {
+                return Err(ResolutionFailure::Invalid(
+                    "CICS READQ TS SET requires LENGTH".into(),
+                ));
+            }
+            if clauses.contains_key("ITEM") && options.iter().any(|option| option == "NEXT") {
+                return Err(ResolutionFailure::Invalid(
+                    "CICS READQ TS ITEM and NEXT are mutually exclusive".into(),
+                ));
+            }
         }
         return Ok(());
     }
@@ -53,17 +76,24 @@ pub(super) fn operands(
             | HirCicsOperation::ReadTransientData
             | HirCicsOperation::DeleteTransientData
             | HirCicsOperation::DeleteTemporaryStorage
+            | HirCicsOperation::ReadTemporaryStorage
     ) {
         return Ok(Vec::new());
     }
-    let (name, identity, maximum) =
-        if operation == HirCicsOperation::DeleteTemporaryStorage && clauses.contains_key("QNAME") {
-            ("QNAME", HirCicsOperandName::Qname, 16)
-        } else if operation == HirCicsOperation::DeleteTemporaryStorage {
-            ("QUEUE", HirCicsOperandName::Queue, 8)
-        } else {
-            ("QUEUE", HirCicsOperandName::Queue, 4)
-        };
+    let (name, identity, maximum) = if matches!(
+        operation,
+        HirCicsOperation::DeleteTemporaryStorage | HirCicsOperation::ReadTemporaryStorage
+    ) && clauses.contains_key("QNAME")
+    {
+        ("QNAME", HirCicsOperandName::Qname, 16)
+    } else if matches!(
+        operation,
+        HirCicsOperation::DeleteTemporaryStorage | HirCicsOperation::ReadTemporaryStorage
+    ) {
+        ("QUEUE", HirCicsOperandName::Queue, 8)
+    } else {
+        ("QUEUE", HirCicsOperandName::Queue, 4)
+    };
     let queue = cics_value(&clauses[name], semantic)?;
     let valid_queue = match &queue {
         HirCicsValue::Literal(value) => {
@@ -75,6 +105,8 @@ pub(super) fn operands(
         HirCicsValue::Data(reference) => {
             (if name == "QNAME" {
                 reference.length == 16
+            } else if operation == HirCicsOperation::ReadTemporaryStorage {
+                reference.length == 8
             } else {
                 (1..=maximum).contains(&reference.length)
             }) && matches!(
@@ -121,6 +153,43 @@ pub(super) fn operands(
             }
             operands.push(HirCicsNamedOperand {
                 name: HirCicsOperandName::Length,
+                value,
+            });
+        }
+        return Ok(operands);
+    }
+    if operation == HirCicsOperation::ReadTemporaryStorage {
+        let into = clauses
+            .get("INTO")
+            .map(|tokens| complete_data_reference(tokens, semantic))
+            .transpose()?;
+        let length = if let Some(tokens) = clauses.get("LENGTH") {
+            let value = complete_data_reference(tokens, semantic)?;
+            require_halfword("LENGTH", &value)?;
+            require_writable(&value)?;
+            HirCicsValue::Data(value)
+        } else {
+            HirCicsValue::LengthOf(into.ok_or_else(|| {
+                ResolutionFailure::Invalid("CICS READQ TS SET requires LENGTH".into())
+            })?)
+        };
+        operands.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::Length,
+            value: length,
+        });
+        if let Some(tokens) = clauses.get("ITEM") {
+            let value = cics_integer_value(tokens, semantic)?;
+            match &value {
+                HirCicsValue::Integer(-32_768..=32_767) => {}
+                HirCicsValue::Data(reference) => require_halfword("ITEM", reference)?,
+                _ => {
+                    return Err(ResolutionFailure::Invalid(
+                        "CICS READQ TS ITEM requires a halfword value".into(),
+                    ));
+                }
+            }
+            operands.push(HirCicsNamedOperand {
+                name: HirCicsOperandName::Item,
                 value,
             });
         }
@@ -186,4 +255,33 @@ fn system_operand(
         name: HirCicsOperandName::SysId,
         value,
     }))
+}
+
+pub(super) fn outputs(
+    clauses: &Clauses,
+    operation: HirCicsOperation,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsOutputBinding>> {
+    if operation != HirCicsOperation::ReadTemporaryStorage {
+        return Ok(Vec::new());
+    }
+    let Some(tokens) = clauses.get("NUMITEMS") else {
+        return Ok(Vec::new());
+    };
+    let target = complete_data_reference(tokens, semantic)?;
+    require_halfword("NUMITEMS", &target)?;
+    require_writable(&target)?;
+    Ok(vec![HirCicsOutputBinding {
+        name: HirCicsOutputName::NumItems,
+        target,
+    }])
+}
+
+fn require_halfword(name: &str, reference: &super::super::HirDataReference) -> Resolution<()> {
+    if reference.category != DataCategory::Binary || reference.length != 2 || reference.scale != 0 {
+        return Err(ResolutionFailure::Invalid(format!(
+            "CICS READQ TS {name} requires a halfword binary data item"
+        )));
+    }
+    Ok(())
 }

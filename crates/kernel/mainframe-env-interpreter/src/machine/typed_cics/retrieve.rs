@@ -140,8 +140,24 @@ pub(super) fn release_output(
     Ok(true)
 }
 
+pub(super) fn release_temporary_storage_set(machine: &mut ReferenceMachine) {
+    let mut releases = Vec::new();
+    for marker in machine.static_base_count..machine.bases.len().saturating_sub(2) {
+        if machine.bases[marker].is_empty()
+            && machine.bases[marker + 1].is_empty()
+            && machine.freed_allocations.contains(&marker)
+            && machine.freed_allocations.contains(&(marker + 1))
+            && !machine.freed_allocations.contains(&(marker + 2))
+        {
+            releases.push(marker + 2);
+        }
+    }
+    machine.freed_allocations.extend(releases);
+}
+
 pub(super) fn write_set_output(
     machine: &mut ReferenceMachine,
+    operation: CicsOperation,
     target: &CicsTarget,
     value: &BoundedPayload,
 ) -> Result<(), MachineProblem> {
@@ -166,7 +182,14 @@ pub(super) fn write_set_output(
         return Err(MachineProblem::UnexpectedHostResult);
     };
     let pointer = resolved_slot(machine, slot)?;
-    let base = machine.bases.len();
+    let base = if operation == CicsOperation::ReadTemporaryStorage {
+        let marker = machine.bases.len();
+        machine.bases.extend([Vec::new(), Vec::new()]);
+        machine.freed_allocations.extend([marker, marker + 1]);
+        marker + 2
+    } else {
+        machine.bases.len()
+    };
     let address = machine.address_bytes_for(base, 0, pointer.length)?;
     machine.bases.push(value.bytes().to_vec());
     machine.write_reference(&pointer, &address)

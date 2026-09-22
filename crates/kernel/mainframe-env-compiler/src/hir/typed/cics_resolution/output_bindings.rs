@@ -16,6 +16,7 @@ pub(super) fn inout_length(
             | HirCicsOperation::ReadNext
             | HirCicsOperation::ReadPrev
             | HirCicsOperation::ReadTransientData
+            | HirCicsOperation::ReadTemporaryStorage
     )
     .then(|| {
         operands.iter().find_map(|operand| match &operand.value {
@@ -73,6 +74,7 @@ pub(super) fn resolve(
                 HirCicsOperation::Retrieve
                     | HirCicsOperation::Getmain
                     | HirCicsOperation::ReadTransientData
+                    | HirCicsOperation::ReadTemporaryStorage
             )
         {
             continue;

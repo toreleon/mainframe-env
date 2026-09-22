@@ -125,6 +125,7 @@ pub(super) fn require_output_shape(
         | HirCicsOutputName::ReturnTransId
         | HirCicsOutputName::ReturnTermId
         | HirCicsOutputName::Queue
+        | HirCicsOutputName::NumItems
         | HirCicsOutputName::Assign(_) => Ok(()),
     }
 }

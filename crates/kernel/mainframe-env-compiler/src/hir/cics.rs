@@ -183,6 +183,7 @@ impl PlanContext<'_> {
                 HirCicsOperandName::Queue => CicsOperandName::Queue,
                 HirCicsOperandName::Qname => CicsOperandName::Qname,
                 HirCicsOperandName::SysId => CicsOperandName::SysId,
+                HirCicsOperandName::Item => CicsOperandName::Item,
                 HirCicsOperandName::CommareaPointer => CicsOperandName::CommareaPointer,
                 HirCicsOperandName::Map => CicsOperandName::Map,
                 HirCicsOperandName::Mapset => CicsOperandName::Mapset,
@@ -257,6 +258,7 @@ impl PlanContext<'_> {
                 HirCicsOutputName::ReturnTransId => CicsOutputName::ReturnTransId,
                 HirCicsOutputName::ReturnTermId => CicsOutputName::ReturnTermId,
                 HirCicsOutputName::Queue => CicsOutputName::Queue,
+                HirCicsOutputName::NumItems => CicsOutputName::NumItems,
             },
             target: self.slot(&output.target)?,
         })
@@ -337,6 +339,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::WriteTransientData => CicsPlanOperation::WriteTransientData,
         HirCicsOperation::DeleteTransientData => CicsPlanOperation::DeleteTransientData,
         HirCicsOperation::DeleteTemporaryStorage => CicsPlanOperation::DeleteTemporaryStorage,
+        HirCicsOperation::ReadTemporaryStorage => CicsPlanOperation::ReadTemporaryStorage,
         HirCicsOperation::Getmain => CicsPlanOperation::Getmain,
         HirCicsOperation::Freemain => CicsPlanOperation::Freemain,
         HirCicsOperation::ReceiveMap => CicsPlanOperation::ReceiveMap,
@@ -383,5 +386,6 @@ const fn plan_option(option: HirCicsOption) -> CicsPlanOption {
         HirCicsOption::Terminal => CicsPlanOption::Terminal,
         HirCicsOption::Purgeable => CicsPlanOption::Purgeable,
         HirCicsOption::NotPurgeable => CicsPlanOption::NotPurgeable,
+        HirCicsOption::Next => CicsPlanOption::Next,
     }
 }

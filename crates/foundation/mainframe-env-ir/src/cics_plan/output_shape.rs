@@ -17,6 +17,15 @@ pub(super) const fn allowed(operation: CicsPlanOperation, output: CicsOutputName
                 | CicsOutputName::ReturnTermId
                 | CicsOutputName::Queue
         ),
+        CicsPlanOperation::ReadTemporaryStorage => matches!(
+            output,
+            CicsOutputName::Into
+                | CicsOutputName::SetPointer
+                | CicsOutputName::Length
+                | CicsOutputName::NumItems
+                | CicsOutputName::Resp
+                | CicsOutputName::Resp2
+        ),
         CicsPlanOperation::Getmain => matches!(
             output,
             CicsOutputName::SetPointer | CicsOutputName::Resp | CicsOutputName::Resp2

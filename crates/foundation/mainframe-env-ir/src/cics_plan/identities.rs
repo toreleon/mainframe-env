@@ -69,6 +69,8 @@ pub enum CicsPlanOperation {
     DeleteTemporaryStorage,
     /// Read and consume one record from a local transient-data queue.
     ReadTransientData,
+    /// Read one item from a local temporary-storage queue.
+    ReadTemporaryStorage,
     /// Receive one mapped terminal input message.
     ReceiveMap,
     /// Send one mapped terminal output message.
@@ -130,6 +132,8 @@ pub enum CicsOperandName {
     Qname,
     /// `SYSID(...)` target CICS system identity.
     SysId,
+    /// `ITEM(...)` temporary-storage item number.
+    Item,
     /// `ADDRESS COMMAREA(pointer-reference)` output target.
     CommareaPointer,
     /// `MAP(...)` BMS map name.
@@ -258,6 +262,8 @@ pub enum CicsPlanOption {
     Purgeable,
     /// Ignore deadlock timeout or ordinary purge while this wait is active.
     NotPurgeable,
+    /// Read the next temporary-storage item after the queue-wide cursor.
+    Next,
 }
 
 /// Named result binding written after the host result arrives.
@@ -301,4 +307,6 @@ pub enum CicsOutputName {
     ReturnTermId,
     /// Retrieved `QUEUE(...)` metadata destination.
     Queue,
+    /// Current temporary-storage queue item count.
+    NumItems,
 }

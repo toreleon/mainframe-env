@@ -55,6 +55,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u8 {
         CicsPlanOperation::ReadTransientData => 51,
         CicsPlanOperation::WaitEvent => 43,
         CicsPlanOperation::WaitExternal => 44,
+        CicsPlanOperation::ReadTemporaryStorage => 49,
     }
 }
 
@@ -106,6 +107,7 @@ pub(super) fn operation_from_tag(value: u8) -> Result<CicsPlanOperation, CicsPla
         51 => Ok(CicsPlanOperation::ReadTransientData),
         43 => Ok(CicsPlanOperation::WaitEvent),
         44 => Ok(CicsPlanOperation::WaitExternal),
+        49 => Ok(CicsPlanOperation::ReadTemporaryStorage),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -163,6 +165,7 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u8 {
         CicsOperandName::EcbList => 48,
         CicsOperandName::NumEvents => 49,
         CicsOperandName::Purgeability => 50,
+        CicsOperandName::Item => 70,
     }
 }
 
@@ -219,6 +222,7 @@ pub(super) fn operand_from_tag(value: u8) -> Result<CicsOperandName, CicsPlanCod
         48 => Ok(CicsOperandName::EcbList),
         49 => Ok(CicsOperandName::NumEvents),
         50 => Ok(CicsOperandName::Purgeability),
+        70 => Ok(CicsOperandName::Item),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -255,6 +259,7 @@ pub(super) const fn option_tag(value: CicsPlanOption) -> u8 {
         CicsPlanOption::Terminal => 27,
         CicsPlanOption::Purgeable => 28,
         CicsPlanOption::NotPurgeable => 29,
+        CicsPlanOption::Next => 44,
     }
 }
 
@@ -290,6 +295,7 @@ pub(super) fn option_from_tag(value: u8) -> Result<CicsPlanOption, CicsPlanCodec
         27 => Ok(CicsPlanOption::Terminal),
         28 => Ok(CicsPlanOption::Purgeable),
         29 => Ok(CicsPlanOption::NotPurgeable),
+        44 => Ok(CicsPlanOption::Next),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -322,6 +328,7 @@ pub(super) const fn output_tag(value: CicsOutputName) -> u8 {
         CicsOutputName::ReturnTermId => 93,
         CicsOutputName::Queue => 94,
         CicsOutputName::SetPointer => 95,
+        CicsOutputName::NumItems => 110,
     }
 }
 
@@ -345,6 +352,7 @@ pub(super) fn output_from_tag(value: u8) -> Result<CicsOutputName, CicsPlanCodec
         93 => Ok(CicsOutputName::ReturnTermId),
         94 => Ok(CicsOutputName::Queue),
         95 => Ok(CicsOutputName::SetPointer),
+        110 => Ok(CicsOutputName::NumItems),
         13..=90 => CicsAssignOutput::from_tag(value - ASSIGN_OUTPUT_TAG_BASE)
             .map(CicsOutputName::Assign)
             .ok_or(CicsPlanCodecProblem::Malformed),

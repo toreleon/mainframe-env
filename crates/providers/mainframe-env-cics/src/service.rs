@@ -1715,7 +1715,7 @@ impl CicsService {
             AccessIntent::Execute,
         )?;
         let descriptor = command_descriptor(request.operation);
-        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 48);
+        debug_assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 49);
         debug_assert_eq!(descriptor.operation, request.operation);
         debug_assert_eq!(descriptor.mutating, request.operation.is_mutating());
         debug_assert!(!descriptor.syntax.is_empty() && !descriptor.official_row.is_empty());
@@ -3725,7 +3725,7 @@ mod tests {
     use mainframe_env_racf::{MemorySecretResolver, RacfService, racf_providers};
     use mainframe_env_store::{MemoryStore, PostgresStateStore, SqliteStateStore};
     use mainframe_env_store_api::{
-        EffectDigestFormat, EffectIntentMetadata, EffectRecord, EffectState, WorkState,
+        AuditSink, EffectDigestFormat, EffectIntentMetadata, EffectRecord, EffectState, WorkState,
     };
     use mainframe_env_store_api::{ProviderStateMutation, ProviderStateWrite};
     use std::collections::BTreeSet;
@@ -3880,6 +3880,10 @@ mod tests {
         descriptor: CapabilityDescriptor,
     }
 
+    struct QueueSecurityAuthority {
+        descriptor: CapabilityDescriptor,
+    }
+
     type CommandSecurityTrace = Arc<Mutex<Vec<(String, String, AccessIntent)>>>;
 
     struct CommandSecurityAuthority {
@@ -3961,6 +3965,29 @@ mod tests {
                 }
                 HostRequest::Clock(ClockRequest::UtcTimestamp) => {
                     Ok(HostResult::Clock("20260830123456789".into()))
+                }
+                _ => Err(HostProblem::Unsupported),
+            };
+            EffectResult {
+                sequence: effect.sequence,
+                outcome,
+            }
+        }
+    }
+
+    impl HostProvider for QueueSecurityAuthority {
+        fn descriptor(&self) -> &CapabilityDescriptor {
+            &self.descriptor
+        }
+
+        fn invoke(&self, _: &Invocation, effect: EffectRequest) -> EffectResult {
+            let outcome = match effect.request {
+                HostRequest::Security(SecurityRequest::Authorize { class, .. }) => {
+                    Ok(HostResult::Security(if class == "QUEUE" {
+                        SecurityDecision::Deny
+                    } else {
+                        SecurityDecision::Allow
+                    }))
                 }
                 _ => Err(HostProblem::Unsupported),
             };
@@ -4840,6 +4867,7 @@ mod tests {
             ("PUSH HANDLE", CicsOperation::PushHandle),
             ("READ", CicsOperation::Read),
             ("READQ TD", CicsOperation::ReadTransientData),
+            ("READQ TS", CicsOperation::ReadTemporaryStorage),
             ("READNEXT", CicsOperation::ReadNext),
             ("READPREV", CicsOperation::ReadPrev),
             ("RECEIVE MAP", CicsOperation::ReceiveMap),
@@ -4871,7 +4899,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 48);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 49);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -9999,7 +10027,7 @@ mod tests {
         let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
         {
             let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
-            let service = service(store);
+            let service = service(store.clone());
             let (invocation, _) = registered(&service);
             let write = request(
                 CicsOperation::WriteTransientData,
@@ -10283,6 +10311,315 @@ mod tests {
                 .get_provider_state("cics-tsq", "REMOTEQ")
                 .unwrap()
                 .is_some()
+        );
+    }
+
+    #[test]
+    fn readq_ts_item_next_length_replay_and_sqlite_reopen_are_exact() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-readq-ts-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            store
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: "cics-tsq".into(),
+                        key: "TEMPQ".into(),
+                        version: 1,
+                        payload: encode_transient(&TransientQueue {
+                            records: vec![
+                                ("seed-1".into(), b"AA".to_vec()),
+                                ("seed-2".into(), b"BBBB".to_vec()),
+                                ("seed-3".into(), b"CCC".to_vec()),
+                            ],
+                            version: 1,
+                        })
+                        .unwrap(),
+                    },
+                    None,
+                )
+                .unwrap();
+            let service = service(store.clone());
+            let invocation = invocation_for("readq-ts", BTreeMap::new());
+            let session = SessionId::new("readq-ts", 64).unwrap();
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "S001")
+                .unwrap();
+
+            let mut item = request(
+                CicsOperation::ReadTemporaryStorage,
+                BTreeMap::from([
+                    ("QUEUE".into(), cics_literal(b"TEMPQ")),
+                    ("INTO".into(), argument(b"DATA-X")),
+                    ("ITEM".into(), cics_decimal(2)),
+                    ("LENGTH".into(), cics_decimal(1)),
+                    ("NUMITEMS".into(), argument(b"COUNT-X")),
+                    ("RESP".into(), argument(b"RESP-X")),
+                ]),
+                1,
+            );
+            item.condition_policy = CicsConditionPolicy::Respond {
+                response_field: "RESP-X".into(),
+                response2_field: None,
+            };
+            let truncated = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, item.clone(), 1),
+                    item.clone(),
+                )
+                .unwrap();
+            assert_eq!(
+                (
+                    truncated.condition.as_str(),
+                    truncated.response,
+                    truncated.response2,
+                    truncated.payload.bytes()
+                ),
+                ("LENGERR", 22, 0, b"B".as_slice())
+            );
+            assert_eq!(truncated.outputs["LENGTH"].bytes(), b"4");
+            assert!(!truncated.outputs.contains_key("NUMITEMS"));
+            let replay = service
+                .invoke(&effect(&invocation.run_unit_id, item.clone(), 1), item)
+                .unwrap();
+            assert_eq!(replay, truncated);
+
+            let next = request(
+                CicsOperation::ReadTemporaryStorage,
+                BTreeMap::from([
+                    ("QUEUE".into(), cics_literal(b"TEMPQ")),
+                    ("INTO".into(), argument(b"DATA-X")),
+                    ("LENGTH".into(), cics_decimal(8)),
+                    ("OPTION.NEXT".into(), cics_option()),
+                ]),
+                2,
+            );
+            let response = service
+                .invoke(&effect(&invocation.run_unit_id, next.clone(), 2), next)
+                .unwrap();
+            assert_eq!(response.payload.bytes(), b"CCC");
+
+            let first = request(
+                CicsOperation::ReadTemporaryStorage,
+                BTreeMap::from([
+                    ("QUEUE".into(), cics_literal(b"TEMPQ")),
+                    ("INTO".into(), argument(b"DATA-X")),
+                    ("ITEM".into(), cics_decimal(1)),
+                    ("LENGTH".into(), cics_decimal(8)),
+                    ("NUMITEMS".into(), argument(b"COUNT-X")),
+                ]),
+                3,
+            );
+            let response = service
+                .invoke(&effect(&invocation.run_unit_id, first.clone(), 3), first)
+                .unwrap();
+            assert_eq!(response.payload.bytes(), b"AA");
+            assert_eq!(response.outputs["NUMITEMS"].bytes(), b"3");
+
+            let mut remote = request(
+                CicsOperation::ReadTemporaryStorage,
+                BTreeMap::from([
+                    ("QUEUE".into(), cics_literal(b"TEMPQ")),
+                    ("INTO".into(), argument(b"DATA-X")),
+                    ("LENGTH".into(), cics_decimal(8)),
+                    ("SYSID".into(), cics_literal(b"R001")),
+                    ("RESP".into(), argument(b"RESP-X")),
+                    ("RESP2".into(), argument(b"RESP2-X")),
+                ]),
+                4,
+            );
+            remote.condition_policy = CicsConditionPolicy::Respond {
+                response_field: "RESP-X".into(),
+                response2_field: Some("RESP2-X".into()),
+            };
+            let response = service
+                .invoke(&effect(&invocation.run_unit_id, remote.clone(), 4), remote)
+                .unwrap();
+            assert_eq!(
+                (
+                    response.condition.as_str(),
+                    response.response,
+                    response.response2
+                ),
+                ("SYSIDERR", 53, 4)
+            );
+            let audits = store
+                .audit_records(&invocation.execution_id, 0, 64)
+                .unwrap();
+            assert!(audits.iter().any(|record| {
+                record.capability.as_str() == "host.security.authorize"
+                    && record.decision == mainframe_env_execution_api::AuditDecision::Success
+            }));
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            let invocation = invocation_for("readq-ts-reopen", BTreeMap::new());
+            let session = SessionId::new("readq-ts-reopen", 64).unwrap();
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "S001")
+                .unwrap();
+            for (sequence, expected) in [(5, b"BBBB".as_slice()), (6, b"CCC".as_slice())] {
+                let next = request(
+                    CicsOperation::ReadTemporaryStorage,
+                    BTreeMap::from([
+                        ("QUEUE".into(), cics_literal(b"TEMPQ")),
+                        ("INTO".into(), argument(b"DATA-X")),
+                        ("LENGTH".into(), cics_decimal(8)),
+                    ]),
+                    sequence,
+                );
+                let response = service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, next.clone(), sequence),
+                        next,
+                    )
+                    .unwrap();
+                assert_eq!(response.payload.bytes(), expected);
+            }
+            let mut beyond = request(
+                CicsOperation::ReadTemporaryStorage,
+                BTreeMap::from([
+                    ("QUEUE".into(), cics_literal(b"TEMPQ")),
+                    ("INTO".into(), argument(b"DATA-X")),
+                    ("LENGTH".into(), cics_decimal(8)),
+                    ("RESP".into(), argument(b"RESP-X")),
+                ]),
+                7,
+            );
+            beyond.condition_policy = CicsConditionPolicy::Respond {
+                response_field: "RESP-X".into(),
+                response2_field: None,
+            };
+            let response = service
+                .invoke(&effect(&invocation.run_unit_id, beyond.clone(), 7), beyond)
+                .unwrap();
+            assert_eq!(
+                (
+                    response.condition.as_str(),
+                    response.response,
+                    response.response2
+                ),
+                ("ITEMERR", 26, 0)
+            );
+            for (sequence, queue, condition, code) in [
+                (8, b"MISSING".as_slice(), "QIDERR", 44),
+                (9, [0_u8; 8].as_slice(), "INVREQ", 16),
+            ] {
+                let mut read = request(
+                    CicsOperation::ReadTemporaryStorage,
+                    BTreeMap::from([
+                        ("QUEUE".into(), cics_literal(queue)),
+                        ("INTO".into(), argument(b"DATA-X")),
+                        ("LENGTH".into(), cics_decimal(8)),
+                        ("RESP".into(), argument(b"RESP-X")),
+                    ]),
+                    sequence,
+                );
+                read.condition_policy = CicsConditionPolicy::Respond {
+                    response_field: "RESP-X".into(),
+                    response2_field: None,
+                };
+                let response = service
+                    .invoke(
+                        &effect(&invocation.run_unit_id, read.clone(), sequence),
+                        read,
+                    )
+                    .unwrap();
+                assert_eq!(
+                    (
+                        response.condition.as_str(),
+                        response.response,
+                        response.response2
+                    ),
+                    (condition, code, 0)
+                );
+            }
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn readq_ts_queue_saf_denial_is_audited_before_cursor_mutation() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        store
+            .put_provider_state(
+                ProviderStateRecord {
+                    namespace: "cics-tsq".into(),
+                    key: "DENIEDQ".into(),
+                    version: 1,
+                    payload: encode_transient(&TransientQueue {
+                        records: vec![("seed".into(), b"SECRET".to_vec())],
+                        version: 1,
+                    })
+                    .unwrap(),
+                },
+                None,
+            )
+            .unwrap();
+        let provider = Arc::new(QueueSecurityAuthority {
+            descriptor: descriptor("host.security.authorize"),
+        }) as Arc<dyn HostProvider>;
+        let host = Arc::new(ScopedHostService::new(
+            Arc::new(
+                RegistrySnapshot::new(1, vec![provider], InvocationLimits::default()).unwrap(),
+            ),
+            HostLimits::default(),
+        ));
+        let service = CicsService::open(host, store.clone(), CicsLimits::default()).unwrap();
+        let invocation = invocation_for("readq-ts-denied", BTreeMap::new());
+        let session = SessionId::new("readq-ts-denied", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "S001")
+            .unwrap();
+        let mut read = request(
+            CicsOperation::ReadTemporaryStorage,
+            BTreeMap::from([
+                ("QUEUE".into(), cics_literal(b"DENIEDQ")),
+                ("INTO".into(), argument(b"DATA-X")),
+                ("LENGTH".into(), cics_decimal(8)),
+                ("RESP".into(), argument(b"RESP-X")),
+                ("RESP2".into(), argument(b"RESP2-X")),
+            ]),
+            1,
+        );
+        read.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let response = service
+            .invoke(&effect(&invocation.run_unit_id, read.clone(), 1), read)
+            .unwrap();
+        assert_eq!(
+            (
+                response.condition.as_str(),
+                response.response,
+                response.response2
+            ),
+            ("NOTAUTH", 70, 101)
+        );
+        assert_eq!(
+            store
+                .get_provider_state("cics-tsq", "DENIEDQ")
+                .unwrap()
+                .unwrap()
+                .version,
+            1
+        );
+        assert!(
+            store
+                .audit_records(&invocation.execution_id, 0, 16)
+                .unwrap()
+                .iter()
+                .any(|record| record.decision == mainframe_env_execution_api::AuditDecision::Deny)
         );
     }
 

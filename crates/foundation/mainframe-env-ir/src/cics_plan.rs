@@ -556,6 +556,9 @@ fn validate_operation_shape(
         CicsPlanOperation::DeleteTransientData | CicsPlanOperation::DeleteTemporaryStorage => {
             queue_control::invalid_delete_transient_data_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::ReadTemporaryStorage => {
+            queue_control::invalid_read_temporary_storage_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::Getmain => storage_control::invalid_getmain_shape(plan, inputs, outputs),
         CicsPlanOperation::Freemain => {
             storage_control::invalid_freemain_shape(plan, inputs, outputs)
@@ -1209,6 +1212,17 @@ mod tests {
             operation_from_tag(51),
             Ok(CicsPlanOperation::ReadTransientData)
         );
+        assert_eq!(operation_tag(CicsPlanOperation::ReadTemporaryStorage), 49);
+        assert_eq!(
+            operation_from_tag(49),
+            Ok(CicsPlanOperation::ReadTemporaryStorage)
+        );
+        assert_eq!(operand_tag(CicsOperandName::Item), 70);
+        assert_eq!(operand_from_tag(70), Ok(CicsOperandName::Item));
+        assert_eq!(option_tag(CicsPlanOption::Next), 44);
+        assert_eq!(option_from_tag(44), Ok(CicsPlanOption::Next));
+        assert_eq!(output_tag(CicsOutputName::NumItems), 110);
+        assert_eq!(output_from_tag(110), Ok(CicsOutputName::NumItems));
 
         let plan = read_plan();
         let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
@@ -1244,6 +1258,85 @@ mod tests {
         unknown_value_tag[12] = u8::MAX;
         assert_eq!(
             decode_cics_effect_plan(&unknown_value_tag, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn readq_ts_plan_requires_exact_identity_destination_and_item_mode() {
+        let length = slot(70, "LENGTH-X");
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::ReadTemporaryStorage,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::Queue,
+                    value: CicsOperandValue::Literal(b"TEMPQ".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Length,
+                    value: CicsOperandValue::Storage(length.clone()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::Item,
+                    value: CicsOperandValue::Integer(1),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: vec![
+                CicsOutputBinding {
+                    name: CicsOutputName::Into,
+                    target: slot(71, "DATA-X"),
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::Length,
+                    target: length,
+                },
+                CicsOutputBinding {
+                    name: CicsOutputName::NumItems,
+                    target: slot(72, "COUNT-X"),
+                },
+            ],
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        let decoded = decode_cics_effect_plan(&encoded, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            encode_cics_effect_plan(&decoded, CicsPlanLimits::default()),
+            Ok(encoded)
+        );
+
+        let mut next_and_item = plan.clone();
+        next_and_item.options.insert(CicsPlanOption::Next);
+        assert_eq!(
+            encode_cics_effect_plan(&next_and_item, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut conflicting_identity = plan.clone();
+        conflicting_identity.operands.push(CicsNamedOperand {
+            name: CicsOperandName::Qname,
+            value: CicsOperandValue::Literal(b"LONG-QUEUE".to_vec()),
+        });
+        assert_eq!(
+            encode_cics_effect_plan(&conflicting_identity, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        for item in [0, -1] {
+            let mut runtime_item = plan.clone();
+            runtime_item
+                .operands
+                .iter_mut()
+                .find(|operand| operand.name == CicsOperandName::Item)
+                .unwrap()
+                .value = CicsOperandValue::Integer(item);
+            assert!(encode_cics_effect_plan(&runtime_item, CicsPlanLimits::default()).is_ok());
+        }
+        let mut set_without_length = plan;
+        set_without_length.outputs[0].name = CicsOutputName::SetPointer;
+        set_without_length
+            .outputs
+            .retain(|output| output.name != CicsOutputName::Length);
+        assert_eq!(
+            encode_cics_effect_plan(&set_without_length, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }

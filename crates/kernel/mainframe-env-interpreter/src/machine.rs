@@ -1985,7 +1985,7 @@ impl ReferenceMachine {
                     let Some(target) = outputs.get(name) else {
                         continue;
                     };
-                    typed_cics::write_output(self, name, target, value)?;
+                    typed_cics::write_output(self, operation, name, target, value)?;
                 }
                 eib::write_context(self, operation, &response)?;
                 self.deferred_drive = match response.disposition {

@@ -150,6 +150,13 @@ EXPECTED_RUNTIME_OPERATIONS = [
         True,
         f"{OFFICIAL_BASELINE}:api-commands:0159",
     ),
+    (
+        "ReadTemporaryStorage",
+        "api",
+        "queue-control",
+        True,
+        f"{OFFICIAL_BASELINE}:api-commands:0160",
+    ),
     ("ReceiveMap", "api", "terminal-control", True, f"{OFFICIAL_BASELINE}:api-commands:0163"),
     ("Retrieve", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0175"),
     ("Return", "api", "task-control", True, f"{OFFICIAL_BASELINE}:api-commands:0178"),
@@ -419,6 +426,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "WriteTransientData",
         "DeleteTransientData",
         "DeleteTemporaryStorage",
+        "ReadTemporaryStorage",
         "ReceiveMap",
         "SendMap",
         "SendText",
@@ -562,6 +570,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
     "DeleteTemporaryStorage": frozenset(
+        {"memory-read", "memory-write", "condition", "transaction"}
+    ),
+    "ReadTemporaryStorage": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
     "Getmain": frozenset(
@@ -819,6 +830,7 @@ def _load_typed_execution_registrations(
         "PurgeMessage",
         "PushHandle",
         "ReadTransientData",
+        "ReadTemporaryStorage",
         "SetAssociationUserCorrData",
         "Start",
         "Suspend",
@@ -1122,6 +1134,7 @@ def load_catalog(
                 "Deq",
                 "DeleteTransientData",
                 "DeleteTemporaryStorage",
+                "ReadTemporaryStorage",
                 "Enq",
                 "Freemain",
                 "Getmain",
@@ -3459,8 +3472,8 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
         for row in catalog["_runtime_operations"]
         if row["interface"] == "api"
     }
-    if len(existing_runtime) != 46:
-        raise DescriptorError("CICS application runtime set must remain exactly 46 rows")
+    if len(existing_runtime) != len(TYPED_RUNTIME_OPERATIONS):
+        raise DescriptorError("CICS application runtime set differs from typed operations")
 
     loaded_batches = []
     for batch_id, start, end, projection_path, review_path in CONTRACT_BATCHES:
@@ -3714,12 +3727,12 @@ def build_contracts(root: Path = ROOT) -> dict[str, Any]:
     if (
         len(registry_rows) != 263
         or len(set(handler_ids)) != 263
-        or len(typed_rows) != 46
+        or len(typed_rows) != len(TYPED_RUNTIME_OPERATIONS)
         or len(legacy_rows) != 0
         or {row["runtime_operation"] for row in typed_rows}
         != TYPED_RUNTIME_OPERATIONS
-        or len(advertised_rows) != 46
-        or len(unready_rows) != 217
+        or len(advertised_rows) != len(TYPED_RUNTIME_OPERATIONS)
+        or len(unready_rows) != 263 - len(TYPED_RUNTIME_OPERATIONS)
         or any(row["unready_result"] != "explicit-unsupported" for row in unready_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in typed_rows)
         or any(not row["advertised"] or row["runtime_operation"] is None for row in legacy_rows)

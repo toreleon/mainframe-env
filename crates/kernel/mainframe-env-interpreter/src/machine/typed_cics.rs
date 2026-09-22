@@ -212,7 +212,9 @@ pub(super) fn validate_machine(machine: &ReferenceMachine) -> Result<(), Machine
                 let slot_use = if matches!(operand.value, CicsOperandValue::Storage(_))
                     && matches!(
                         operand.name,
-                        CicsOperandName::Length | CicsOperandName::KeyLength
+                        CicsOperandName::Length
+                            | CicsOperandName::KeyLength
+                            | CicsOperandName::Item
                     ) {
                     SlotUse::HalfwordInput
                 } else {
@@ -237,6 +239,9 @@ pub(super) fn execute(
     let plan = plan(operation)?;
     validate_declared_slots(operation, &plan)?;
     validate_runtime_plan(machine, operation, &plan)?;
+    if plan.operation == CicsPlanOperation::ReadTemporaryStorage {
+        retrieve::release_temporary_storage_set(machine);
+    }
 
     let host_operation = names::host_operation(plan.operation);
     let address_set = address::action(&plan)?;
@@ -314,6 +319,7 @@ pub(super) fn execute(
                         | CicsOperandName::Flength
                         | CicsOperandName::NumEvents
                         | CicsOperandName::Purgeability
+                        | CicsOperandName::Item
                 ) =>
             {
                 (
@@ -384,6 +390,7 @@ pub(super) fn execute(
             | CicsOutputName::ReturnTransId
             | CicsOutputName::ReturnTermId
             | CicsOutputName::Queue
+            | CicsOutputName::NumItems
             | CicsOutputName::Assign(_) => {
                 outputs.insert(key.into(), target);
             }
@@ -533,14 +540,15 @@ pub(super) fn write_target(
 
 pub(super) fn write_output(
     machine: &mut ReferenceMachine,
+    operation: CicsOperation,
     name: &str,
     target: &CicsTarget,
     value: &BoundedPayload,
 ) -> Result<(), MachineProblem> {
     if name == "SET" {
-        return retrieve::write_set_output(machine, target, value);
+        return retrieve::write_set_output(machine, operation, target, value);
     }
-    if matches!(name, "ABSTIME" | "MILLISECONDS" | "LENGTH")
+    if matches!(name, "ABSTIME" | "MILLISECONDS" | "LENGTH" | "NUMITEMS")
         && value.schema() != "mainframe-env.cics.decimal@1"
         || matches!(
             name,
@@ -727,7 +735,7 @@ fn validate_runtime_plan(
             let slot_use = if matches!(operand.value, CicsOperandValue::Storage(_))
                 && matches!(
                     operand.name,
-                    CicsOperandName::Length | CicsOperandName::KeyLength
+                    CicsOperandName::Length | CicsOperandName::KeyLength | CicsOperandName::Item
                 ) {
                 SlotUse::HalfwordInput
             } else {
@@ -1306,6 +1314,7 @@ mod tests {
         .unwrap();
         write_output(
             &mut machine,
+            CicsOperation::FormatTime,
             "MMDDYY",
             &CicsTarget::Resolved(slot.clone()),
             &payload("mainframe-env.cics.payload@1", b"083026".to_vec()).unwrap(),
@@ -1315,6 +1324,27 @@ mod tests {
             machine.read_reference(&resolved_slot(&machine, &slot).unwrap()),
             Ok(b"083026XX".to_vec())
         );
+    }
+
+    #[test]
+    fn readq_ts_set_allocation_expires_at_the_next_readq() {
+        let (mut machine, slot) = machine_with_alphanumeric_slot("PTR-X", 4);
+        write_output(
+            &mut machine,
+            CicsOperation::ReadTemporaryStorage,
+            "SET",
+            &CicsTarget::Resolved(slot.clone()),
+            &payload("mainframe-env.cics.payload@1", b"ITEM".to_vec()).unwrap(),
+        )
+        .unwrap();
+        let pointer = machine
+            .read_reference(&resolved_slot(&machine, &slot).unwrap())
+            .unwrap();
+        let (base, offset) = machine.decode_address(&pointer).unwrap().unwrap();
+        assert_eq!(offset, 0);
+        assert!(!machine.freed_allocations.contains(&base));
+        retrieve::release_temporary_storage_set(&mut machine);
+        assert!(machine.freed_allocations.contains(&base));
     }
 
     #[test]

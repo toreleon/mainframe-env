@@ -37,6 +37,7 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         CicsOperandName::EventControlAddress => SlotUse::PointerInput,
         CicsOperandName::EcbList => SlotUse::PointerInput,
         CicsOperandName::NumEvents | CicsOperandName::Purgeability => SlotUse::FullwordInput,
+        CicsOperandName::Item => SlotUse::HalfwordInput,
         _ => SlotUse::Input,
     }
 }
@@ -57,9 +58,10 @@ pub(super) const fn output_slot_use(name: CicsOutputName) -> SlotUse {
         }
         CicsOutputName::Mmddyyyy | CicsOutputName::Yyyymmdd => SlotUse::FormatTextOutput(10),
         CicsOutputName::Yyddd => SlotUse::FormatTextOutput(6),
-        CicsOutputName::Resp | CicsOutputName::Resp2 | CicsOutputName::Length => {
-            SlotUse::NumericOutput
-        }
+        CicsOutputName::Resp
+        | CicsOutputName::Resp2
+        | CicsOutputName::Length
+        | CicsOutputName::NumItems => SlotUse::NumericOutput,
         CicsOutputName::Assign(output) => SlotUse::AssignOutput(output),
     }
 }
@@ -94,6 +96,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::WriteTransientData => CicsOperation::WriteTransientData,
         CicsPlanOperation::DeleteTransientData => CicsOperation::DeleteTransientData,
         CicsPlanOperation::DeleteTemporaryStorage => CicsOperation::DeleteTemporaryStorage,
+        CicsPlanOperation::ReadTemporaryStorage => CicsOperation::ReadTemporaryStorage,
         CicsPlanOperation::Getmain => CicsOperation::Getmain,
         CicsPlanOperation::Freemain => CicsOperation::Freemain,
         CicsPlanOperation::ReceiveMap => CicsOperation::ReceiveMap,
@@ -168,6 +171,7 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::EcbList => "ECBLIST",
         CicsOperandName::NumEvents => "NUMEVENTS",
         CicsOperandName::Purgeability => "PURGEABILITY",
+        CicsOperandName::Item => "ITEM",
     }
 }
 
@@ -192,6 +196,7 @@ pub(super) const fn output(name: CicsOutputName) -> &'static str {
         CicsOutputName::ReturnTransId => "RTRANSID",
         CicsOutputName::ReturnTermId => "RTERMID",
         CicsOutputName::Queue => "QUEUE",
+        CicsOutputName::NumItems => "NUMITEMS",
     }
 }
 
@@ -227,5 +232,6 @@ pub(super) const fn option(option: CicsPlanOption) -> &'static str {
         CicsPlanOption::Terminal => "TERMINAL",
         CicsPlanOption::Purgeable => "PURGEABLE",
         CicsPlanOption::NotPurgeable => "NOTPURGEABLE",
+        CicsPlanOption::Next => "NEXT",
     }
 }
