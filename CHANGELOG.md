@@ -409,6 +409,9 @@ All notable changes to mainframe-env are documented here.
 - Updated the CICS command-descriptor schema from seven to the exact nine
   reviewed runtime families after interval-control and storage-control were
   frozen into the generator authority.
+- Updated the generated CICS application-contract schema to the current
+  readiness split: 41 typed, 0 legacy, 41 advertised, and 222 unready rows,
+  with an exact 24-family summary bound.
 - Migrated the local `WRITEQ TD` compatibility subset to a typed queue-write
   plan. QUEUE is a validated 1–4 character literal or field, FROM is a resolved
   data area, and optional numeric LENGTH or `LENGTH OF` selects the persisted
