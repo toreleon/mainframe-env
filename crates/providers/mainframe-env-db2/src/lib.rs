@@ -29,10 +29,25 @@ pub use catalog::{
     Db2ExtractLayout, Db2ForeignKeyDefinition, Db2ResultEncoding, Db2SeedRow, Db2TableDefinition,
     decode_table_definitions_bounded,
 };
+pub use create_table_syntax::{
+    Db2ColumnDefault, Db2CreateTableColumn, Db2CreateTableConstraint, Db2CreateTableStatement,
+    Db2DefaultSpelling, Db2ForeignKeyConstraint, Db2OnDeleteAction, Db2TableConstraintKind,
+    parse_db2_create_table_statement,
+};
+pub use cursor_syntax::{
+    Db2CursorHoldability, Db2CursorOrientation, Db2CursorReturnTarget, Db2CursorReturnability,
+    Db2CursorRowsetPositioning, Db2CursorSensitivity, Db2DeclareCursorPreparedStatement,
+    Db2SensitiveCursorKind, parse_db2_declare_cursor_prepared,
+};
 pub use expression_parser::{Db2ParsedExpression, parse_db2_expression};
 pub use generated_statement_catalog::{
     DB2_OFFICIAL_STATEMENT_CATALOG_SHA256, DB2_STATEMENT_DESCRIPTORS, Db2StatementDescriptor,
     Db2StatementId, Db2StatementUnit, db2_statement_descriptor, db2_statement_descriptor_by_row,
+};
+pub use query_syntax::{
+    Db2FetchClause, Db2FetchPosition, Db2NamedTableSource, Db2OffsetClause, Db2OrderByItem,
+    Db2OrderDirection, Db2OrderKey, Db2QueryExpression, Db2SelectCore, Db2SelectItem,
+    Db2SelectQuantifier, parse_db2_select_core,
 };
 pub use retention::{
     CICS_NESTED_EFFECT_ORIGIN_BINDING, CICS_NESTED_EFFECT_ORIGIN_SCHEMA,

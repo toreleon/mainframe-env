@@ -6,6 +6,13 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added public owned syntax surfaces for three source-reviewed common Db2
+  slices: a bounded single-subselect SELECT core, named-table CREATE TABLE with
+  common defaults and table constraints, and prepared-statement DECLARE CURSOR
+  with scroll/sensitivity/hold/return/rowset structure. They reject undeclared
+  forms explicitly and remain disconnected from binding and execution, so the
+  partial catalog rows receive no whole-row recognition or execution credit.
+
 - Added a bounded owned parser for the common Db2 expression substrate. It
   produces only the existing expression arena for literals, qualified names,
   host variables and indicators, parameter markers, scalar calls, casts,

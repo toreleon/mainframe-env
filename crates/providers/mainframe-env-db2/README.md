@@ -63,3 +63,16 @@ lists and descriptors. It rejects PL/I string expressions, SQL PL array
 elements, multi-row source buffers, and forbidden source indicators until their
 separate obligations land; this partial family support grants no whole-row
 recognition credit.
+
+The public SELECT-core syntax surface owns one bounded subselect with
+quantifiers, expression/wildcard items, named sources, WHERE, GROUP BY, HAVING,
+ORDER BY, OFFSET, and FETCH. It accumulates expression-node limits across the
+statement and rejects joins, aliases, CTEs, set operations, subqueries, SELECT
+INTO, and undeclared outer clauses. It is not a binder, plan, or execution path.
+
+The public common CREATE TABLE syntax surface owns named columns, built-in or
+distinct type syntax, NOT NULL, constant/NULL defaults, and table PRIMARY KEY,
+UNIQUE, and FOREIGN KEY constraints with the declared ON DELETE actions. The
+public prepared DECLARE CURSOR surface preserves explicit/default scroll,
+sensitivity, holdability, returnability, target, and rowset positioning. Both
+fail closed outside their recorded subsets and grant no whole-row credit.

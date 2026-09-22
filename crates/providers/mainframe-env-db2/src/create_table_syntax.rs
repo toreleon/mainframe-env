@@ -5,11 +5,6 @@
 //! source-reviewed common subset below and never returns raw tokens or a
 //! generic-success node.
 
-#![allow(
-    dead_code,
-    reason = "shared crate exports are manager-owned during the isolated syntax slice"
-)]
-
 use crate::{
     Db2AstLimits, Db2BuiltInDataType, Db2BuiltInType, Db2DataType, Db2Identifier, Db2Literal,
     Db2QualifiedName, Db2SourceLocation, Db2SourceSpan, Db2Symbol, Db2SyntaxDiagnostic,
