@@ -21,10 +21,15 @@ pub(in crate::service) fn invoke(
 }
 
 fn temporary_queue_name(request: &CicsRequest) -> Result<String, HostProblem> {
-    let value = request
-        .arguments
-        .get("QUEUE")
-        .ok_or(HostProblem::Malformed)?;
+    if request.arguments.contains_key("QUEUE") == request.arguments.contains_key("QNAME") {
+        return Err(HostProblem::Malformed);
+    }
+    let (name, maximum) = if request.arguments.contains_key("QNAME") {
+        ("QNAME", 16)
+    } else {
+        ("QUEUE", 8)
+    };
+    let value = request.arguments.get(name).ok_or(HostProblem::Malformed)?;
     if !matches!(
         value.schema(),
         "mainframe-env.cics.argument@1"
@@ -45,7 +50,7 @@ fn temporary_queue_name(request: &CicsRequest) -> Result<String, HostProblem> {
         .trim()
         .to_ascii_uppercase();
     if queue.is_empty()
-        || queue.len() > 8
+        || queue.len() > maximum
         || !queue
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
@@ -238,7 +243,7 @@ fn delete_temporary(
             .arguments
             .iter()
             .any(|(name, value)| match name.as_str() {
-                "QUEUE" => false,
+                "QNAME" | "QUEUE" => false,
                 "RESP" | "RESP2" => value.schema() != "mainframe-env.cics.argument@1",
                 "OPTION.NOHANDLE" => {
                     value.schema() != "mainframe-env.cics.option@1" || !value.bytes().is_empty()

@@ -38,12 +38,20 @@ pub(super) fn invalid_delete_transient_data_shape(
     inputs: &BTreeSet<CicsOperandName>,
     outputs: &BTreeSet<CicsOutputName>,
 ) -> bool {
-    let maximum = if plan.operation == super::CicsPlanOperation::DeleteTemporaryStorage {
+    let temporary = plan.operation == super::CicsPlanOperation::DeleteTemporaryStorage;
+    let identity = if temporary && inputs.contains(&CicsOperandName::Qname) {
+        CicsOperandName::Qname
+    } else {
+        CicsOperandName::Queue
+    };
+    let maximum = if identity == CicsOperandName::Qname {
+        16
+    } else if temporary {
         8
     } else {
         4
     };
-    *inputs != BTreeSet::from([CicsOperandName::Queue])
+    *inputs != BTreeSet::from([identity])
         || match plan.operands.first().map(|operand| &operand.value) {
             Some(CicsOperandValue::Literal(value)) => {
                 !(1..=maximum).contains(&value.len())

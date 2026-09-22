@@ -9180,7 +9180,7 @@ mod tests {
     }
 
     #[test]
-    fn deleteq_ts_queue_is_authorized_replay_safe_and_durable() {
+    fn deleteq_ts_names_are_authorized_replay_safe_and_durable() {
         let root = std::env::temp_dir().join(format!(
             "mainframe-env-deleteq-ts-{}-{:?}",
             std::process::id(),
@@ -9198,6 +9198,21 @@ mod tests {
                         version: 1,
                         payload: encode_transient(&TransientQueue {
                             records: vec![("seed-item".into(), b"DURABLE".to_vec())],
+                            version: 1,
+                        })
+                        .unwrap(),
+                    },
+                    None,
+                )
+                .unwrap();
+            store
+                .put_provider_state(
+                    ProviderStateRecord {
+                        namespace: "cics-tsq".into(),
+                        key: "LONG-QUEUE".into(),
+                        version: 1,
+                        payload: encode_transient(&TransientQueue {
+                            records: vec![("seed-long-item".into(), b"LONG".to_vec())],
                             version: 1,
                         })
                         .unwrap(),
@@ -9260,6 +9275,47 @@ mod tests {
                 );
                 assert_eq!(result.response2, 0);
             }
+
+            let conflicting = request(
+                CicsOperation::DeleteTemporaryStorage,
+                BTreeMap::from([
+                    ("QUEUE".into(), argument(b"TEMPQ")),
+                    ("QNAME".into(), argument(b"LONG-QUEUE")),
+                ]),
+                4,
+            );
+            assert_eq!(
+                service.invoke(
+                    &effect(&invocation.run_unit_id, conflicting.clone(), 4),
+                    conflicting,
+                ),
+                Err(HostProblem::Malformed)
+            );
+            assert!(
+                store
+                    .get_provider_state("cics-tsq", "LONG-QUEUE")
+                    .unwrap()
+                    .is_some()
+            );
+
+            let delete_long = request(
+                CicsOperation::DeleteTemporaryStorage,
+                BTreeMap::from([("QNAME".into(), argument(b"LONG-QUEUE"))]),
+                5,
+            );
+            let response = service
+                .invoke(
+                    &effect(&invocation.run_unit_id, delete_long.clone(), 5),
+                    delete_long,
+                )
+                .unwrap();
+            assert_eq!(response.condition, "NORMAL");
+            assert!(
+                store
+                    .get_provider_state("cics-tsq", "LONG-QUEUE")
+                    .unwrap()
+                    .is_none()
+            );
         }
         {
             let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
@@ -9267,6 +9323,12 @@ mod tests {
             assert!(
                 store
                     .get_provider_state("cics-tsq", "TEMPQ")
+                    .unwrap()
+                    .is_none()
+            );
+            assert!(
+                store
+                    .get_provider_state("cics-tsq", "LONG-QUEUE")
                     .unwrap()
                     .is_none()
             );

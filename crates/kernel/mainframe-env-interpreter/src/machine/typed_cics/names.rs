@@ -124,6 +124,7 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::From => "FROM",
         CicsOperandName::Ridfld => "RIDFLD",
         CicsOperandName::Queue => "QUEUE",
+        CicsOperandName::Qname => "QNAME",
         CicsOperandName::Map => "MAP",
         CicsOperandName::Mapset => "MAPSET",
         CicsOperandName::Resource => "RESOURCE",

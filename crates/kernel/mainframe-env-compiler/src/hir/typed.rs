@@ -206,6 +206,7 @@ pub enum HirCicsOperandName {
     From,
     Ridfld,
     Queue,
+    Qname,
     Map,
     Mapset,
     Resource,
@@ -3316,7 +3317,7 @@ mod tests {
 
     #[test]
     fn cics_deleteq_ts_resolves_local_queue_names() {
-        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 QUEUE-X PIC X(8) VALUE 'WORKQ'. PROCEDURE DIVISION. EXEC CICS DELETEQ TS QUEUE('TEMPQ') END-EXEC. EXEC CICS DELETEQ TS QUEUE(QUEUE-X) END-EXEC. STOP RUN.";
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 QUEUE-X PIC X(8) VALUE 'WORKQ'. 01 QNAME-X PIC X(16) VALUE 'LONG-QUEUE'. PROCEDURE DIVISION. EXEC CICS DELETEQ TS QUEUE('TEMPQ') END-EXEC. EXEC CICS DELETEQ TS QUEUE(QUEUE-X) END-EXEC. EXEC CICS DELETEQ TS QNAME('LONG-QUEUE') END-EXEC. EXEC CICS DELETEQ TS QNAME(QNAME-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);
         let hir = analysis
             .hir
@@ -3329,7 +3330,7 @@ mod tests {
                 _ => None,
             })
             .collect::<Vec<_>>();
-        assert_eq!(commands.len(), 2);
+        assert_eq!(commands.len(), 4);
         assert!(
             commands
                 .iter()
@@ -3349,14 +3350,35 @@ mod tests {
                 value: HirCicsValue::Data(reference),
             } if reference.qualified_name == "QUEUE-X"
         ));
+        assert_eq!(
+            commands[2].operands[0],
+            HirCicsNamedOperand {
+                name: HirCicsOperandName::Qname,
+                value: HirCicsValue::Literal("LONG-QUEUE".into()),
+            }
+        );
+        assert!(matches!(
+            &commands[3].operands[0],
+            HirCicsNamedOperand {
+                name: HirCicsOperandName::Qname,
+                value: HirCicsValue::Data(reference),
+            } if reference.qualified_name == "QNAME-X"
+        ));
 
         for (command, expected) in [
-            ("DELETEQ TS", "requires QUEUE"),
+            ("DELETEQ TS", "requires exactly one of QUEUE or QNAME"),
             (
                 "DELETEQ TS QUEUE('TOOLONG09')",
                 "QUEUE requires a 1-8 character name",
             ),
-            ("DELETEQ TS QNAME('LONGQ')", "unready for QNAME"),
+            (
+                "DELETEQ TS QNAME('TOO-LONG-QUEUE-NAME')",
+                "QNAME requires a 1-16 character name",
+            ),
+            (
+                "DELETEQ TS QUEUE('TEMPQ') QNAME('LONG-QUEUE')",
+                "requires exactly one of QUEUE or QNAME",
+            ),
             (
                 "DELETEQ TS QUEUE('TEMPQ') SYSID('R001')",
                 "unready for SYSID",

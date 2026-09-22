@@ -1186,6 +1186,8 @@ mod tests {
             operation_from_tag(41),
             Ok(CicsPlanOperation::DeleteTemporaryStorage)
         );
+        assert_eq!(operand_tag(CicsOperandName::Qname), 43);
+        assert_eq!(operand_from_tag(43), Ok(CicsOperandName::Qname));
 
         let plan = read_plan();
         let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
@@ -1591,6 +1593,22 @@ mod tests {
             CicsOperandValue::Literal(b"TOOLONG09".to_vec());
         assert_eq!(
             encode_cics_effect_plan(&oversized_temporary_queue, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut delete_long_temporary_storage = delete_temporary_storage.clone();
+        delete_long_temporary_storage.operands[0] = CicsNamedOperand {
+            name: CicsOperandName::Qname,
+            value: CicsOperandValue::Literal(b"LONG-QUEUE".to_vec()),
+        };
+        assert!(
+            encode_cics_effect_plan(&delete_long_temporary_storage, CicsPlanLimits::default())
+                .is_ok()
+        );
+        delete_long_temporary_storage
+            .operands
+            .push(delete_temporary_storage.operands[0].clone());
+        assert_eq!(
+            encode_cics_effect_plan(&delete_long_temporary_storage, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
         let receive_map = CicsEffectPlan {

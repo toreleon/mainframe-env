@@ -181,6 +181,7 @@ impl PlanContext<'_> {
                 HirCicsOperandName::From => CicsOperandName::From,
                 HirCicsOperandName::Ridfld => CicsOperandName::Ridfld,
                 HirCicsOperandName::Queue => CicsOperandName::Queue,
+                HirCicsOperandName::Qname => CicsOperandName::Qname,
                 HirCicsOperandName::Map => CicsOperandName::Map,
                 HirCicsOperandName::Mapset => CicsOperandName::Mapset,
                 HirCicsOperandName::Resource => CicsOperandName::Resource,

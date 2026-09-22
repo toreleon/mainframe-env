@@ -9,10 +9,19 @@ pub(super) fn validate_constraints(
     clauses: &Clauses,
     operation: HirCicsOperation,
 ) -> Resolution<()> {
+    if operation == HirCicsOperation::DeleteTemporaryStorage {
+        if usize::from(clauses.contains_key("QUEUE")) + usize::from(clauses.contains_key("QNAME"))
+            != 1
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS DELETEQ TS requires exactly one of QUEUE or QNAME".into(),
+            ));
+        }
+        return Ok(());
+    }
     let (command, required) = match operation {
         HirCicsOperation::WriteTransientData => ("CICS WRITEQ TD", &["QUEUE", "FROM"][..]),
         HirCicsOperation::DeleteTransientData => ("CICS DELETEQ TD", &["QUEUE"][..]),
-        HirCicsOperation::DeleteTemporaryStorage => ("CICS DELETEQ TS", &["QUEUE"][..]),
         _ => return Ok(()),
     };
     for name in required {
@@ -38,12 +47,15 @@ pub(super) fn operands(
     ) {
         return Ok(Vec::new());
     }
-    let queue = cics_value(&clauses["QUEUE"], semantic)?;
-    let maximum = if operation == HirCicsOperation::DeleteTemporaryStorage {
-        8
-    } else {
-        4
-    };
+    let (name, identity, maximum) =
+        if operation == HirCicsOperation::DeleteTemporaryStorage && clauses.contains_key("QNAME") {
+            ("QNAME", HirCicsOperandName::Qname, 16)
+        } else if operation == HirCicsOperation::DeleteTemporaryStorage {
+            ("QUEUE", HirCicsOperandName::Queue, 8)
+        } else {
+            ("QUEUE", HirCicsOperandName::Queue, 4)
+        };
+    let queue = cics_value(&clauses[name], semantic)?;
     let valid_queue = match &queue {
         HirCicsValue::Literal(value) => {
             (1..=maximum).contains(&value.len())
@@ -52,17 +64,20 @@ pub(super) fn operands(
                     .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
         }
         HirCicsValue::Data(reference) => {
-            (1..=maximum).contains(&reference.length)
-                && matches!(
-                    reference.category,
-                    DataCategory::Alphabetic | DataCategory::Alphanumeric
-                )
+            (if name == "QNAME" {
+                reference.length == 16
+            } else {
+                (1..=maximum).contains(&reference.length)
+            }) && matches!(
+                reference.category,
+                DataCategory::Alphabetic | DataCategory::Alphanumeric
+            )
         }
         HirCicsValue::Integer(_) | HirCicsValue::LengthOf(_) => false,
     };
     if !valid_queue {
         return Err(ResolutionFailure::Invalid(format!(
-            "CICS {operation:?} QUEUE requires a 1-{maximum} character name"
+            "CICS {operation:?} {name} requires a 1-{maximum} character name"
         )));
     }
     if matches!(
@@ -70,7 +85,7 @@ pub(super) fn operands(
         HirCicsOperation::DeleteTransientData | HirCicsOperation::DeleteTemporaryStorage
     ) {
         return Ok(vec![HirCicsNamedOperand {
-            name: HirCicsOperandName::Queue,
+            name: identity,
             value: queue,
         }]);
     }

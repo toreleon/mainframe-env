@@ -118,6 +118,8 @@ pub enum CicsOperandName {
     Ridfld,
     /// `QUEUE(...)` transient-data or temporary-storage resource.
     Queue,
+    /// `QNAME(...)` long temporary-storage resource.
+    Qname,
     /// `MAP(...)` BMS map name.
     Map,
     /// `MAPSET(...)` BMS mapset name.
