@@ -47,6 +47,18 @@ pub(super) fn validate_constraints(
             "CICS Read GENERIC requires KEYLENGTH".into(),
         ));
     }
+    if operation == HirCicsOperation::Read
+        && !options.iter().any(|option| option == "GTEQ")
+        && matches!(
+            clauses.get("KEYLENGTH").map(Vec::as_slice),
+            Some([token]) if numeric_literal(token)
+                .is_some_and(|literal| literal.digits.bytes().all(|byte| byte == b'0'))
+        )
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS Read KEYLENGTH(0) requires GTEQ".into(),
+        ));
+    }
     Ok(())
 }
 
@@ -229,9 +241,17 @@ fn file_key_length_value(
                 "CICS {operation:?} KEYLENGTH data item is not a halfword binary data item"
             )));
         }
-        HirCicsValue::Integer(value) if !(1..=32_767).contains(value) => {
+        HirCicsValue::Integer(value)
+            if !(if operation == HirCicsOperation::Read {
+                0..=32_767
+            } else {
+                1..=32_767
+            })
+            .contains(value) =>
+        {
+            let minimum = i64::from(operation != HirCicsOperation::Read);
             return Err(ResolutionFailure::Invalid(format!(
-                "CICS {operation:?} KEYLENGTH literal must be between 1 and 32767"
+                "CICS {operation:?} KEYLENGTH literal must be between {minimum} and 32767"
             )));
         }
         _ => {}

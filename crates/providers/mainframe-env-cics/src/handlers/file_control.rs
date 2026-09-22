@@ -264,7 +264,13 @@ fn file(
     };
     let generic = request.arguments.contains_key("OPTION.GENERIC");
     let gteq = request.arguments.contains_key("OPTION.GTEQ");
-    validate_key_length(request.operation, key_length, attributes.as_ref(), generic)?;
+    validate_key_length(
+        request.operation,
+        key_length,
+        attributes.as_ref(),
+        generic,
+        gteq,
+    )?;
     let mut length_condition = if matches!(
         request.operation,
         CicsOperation::Read | CicsOperation::Write | CicsOperation::Rewrite
@@ -649,6 +655,7 @@ fn validate_key_length(
     key_length: Option<u32>,
     attributes: Option<&mainframe_env_host_api::DatasetAttributes>,
     generic: bool,
+    gteq: bool,
 ) -> Result<(), HostProblem> {
     if generic {
         if operation != CicsOperation::Read {
@@ -667,6 +674,9 @@ fn validate_key_length(
                 response2: 25,
             });
         }
+        return Ok(());
+    }
+    if operation == CicsOperation::Read && gteq && key_length == Some(0) {
         return Ok(());
     }
     if matches!(
@@ -831,7 +841,7 @@ mod tests {
             })
         ));
         assert!(matches!(
-            validate_key_length(CicsOperation::Read, Some(2), Some(&fixed), false),
+            validate_key_length(CicsOperation::Read, Some(2), Some(&fixed), false, false),
             Err(HostProblem::Condition {
                 response: 16,
                 response2: 26,
@@ -839,11 +849,11 @@ mod tests {
             })
         ));
         assert_eq!(
-            validate_key_length(CicsOperation::Read, Some(3), Some(&fixed), false),
+            validate_key_length(CicsOperation::Read, Some(3), Some(&fixed), false, false),
             Ok(())
         );
         assert!(matches!(
-            validate_key_length(CicsOperation::Write, Some(2), Some(&fixed), false),
+            validate_key_length(CicsOperation::Write, Some(2), Some(&fixed), false, false),
             Err(HostProblem::Condition {
                 response: 16,
                 response2: 26,
@@ -851,7 +861,7 @@ mod tests {
             })
         ));
         assert!(matches!(
-            validate_key_length(CicsOperation::Delete, Some(2), Some(&fixed), false),
+            validate_key_length(CicsOperation::Delete, Some(2), Some(&fixed), false, false),
             Err(HostProblem::Condition {
                 response: 16,
                 response2: 26,
@@ -859,11 +869,11 @@ mod tests {
             })
         ));
         assert_eq!(
-            validate_key_length(CicsOperation::Read, Some(2), Some(&fixed), true),
+            validate_key_length(CicsOperation::Read, Some(2), Some(&fixed), true, false),
             Ok(())
         );
         assert!(matches!(
-            validate_key_length(CicsOperation::Read, Some(3), Some(&fixed), true),
+            validate_key_length(CicsOperation::Read, Some(3), Some(&fixed), true, false),
             Err(HostProblem::Condition {
                 response: 16,
                 response2: 25,
@@ -871,9 +881,21 @@ mod tests {
             })
         ));
         assert_eq!(
-            validate_key_length(CicsOperation::Read, None, Some(&fixed), true),
+            validate_key_length(CicsOperation::Read, None, Some(&fixed), true, false),
             Err(HostProblem::Malformed)
         );
+        assert_eq!(
+            validate_key_length(CicsOperation::Read, Some(0), Some(&fixed), false, true),
+            Ok(())
+        );
+        assert!(matches!(
+            validate_key_length(CicsOperation::Read, Some(0), Some(&fixed), false, false),
+            Err(HostProblem::Condition {
+                response: 16,
+                response2: 26,
+                ..
+            })
+        ));
         assert_eq!(
             validate_record_length(CicsOperation::Write, Some(5), Some(&fixed)),
             Ok(Some(("LENGERR", 22, 14)))

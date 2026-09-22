@@ -490,12 +490,16 @@ fn validate_operation_shape(
                     && !inputs.contains(&CicsOperandName::KeyLength))
                 || plan.operands.iter().any(|operand| {
                     operand.name == CicsOperandName::KeyLength
-                        && !matches!(
-                            operand.value,
+                        && match operand.value {
+                            CicsOperandValue::Integer(0) => {
+                                !plan.options.contains(&CicsPlanOption::Gteq)
+                                    || plan.options.contains(&CicsPlanOption::Generic)
+                            }
                             CicsOperandValue::Integer(1..=32_767)
-                                | CicsOperandValue::Storage(_)
-                                | CicsOperandValue::LengthOf(_)
-                        )
+                            | CicsOperandValue::Storage(_)
+                            | CicsOperandValue::LengthOf(_) => false,
+                            _ => true,
+                        }
                 })
                 || match (
                     operand_value(plan, CicsOperandName::Ridfld),
@@ -1634,6 +1638,21 @@ mod tests {
             .value = CicsOperandValue::Integer(0);
         assert_eq!(
             encode_cics_effect_plan(&read_with_zero_key_length, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+        let mut gteq_read_with_zero_key_length = read_with_zero_key_length.clone();
+        gteq_read_with_zero_key_length
+            .options
+            .insert(CicsPlanOption::Gteq);
+        assert!(
+            encode_cics_effect_plan(&gteq_read_with_zero_key_length, CicsPlanLimits::default())
+                .is_ok()
+        );
+        gteq_read_with_zero_key_length
+            .options
+            .insert(CicsPlanOption::Generic);
+        assert_eq!(
+            encode_cics_effect_plan(&gteq_read_with_zero_key_length, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)
         );
         let mut read_with_mismatched_key_length = read.clone();

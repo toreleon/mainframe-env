@@ -380,6 +380,8 @@ All notable changes to mainframe-env are documented here.
   GTEQ uses the existing bounded dataset cursor primitive to return the equal
   key or first greater keyed record without retaining browse state; READ
   GENERIC uses a positive partial KEYLENGTH and returns only a matching prefix.
+  READ GTEQ also accepts source-defined KEYLENGTH zero to select the first keyed
+  record, while zero remains rejected for default EQUAL and GENERIC forms.
 - Migrated the local `WRITEQ TD` compatibility subset to a typed queue-write
   plan. QUEUE is a validated 1–4 character literal or field, FROM is a resolved
   data area, and optional numeric LENGTH or `LENGTH OF` selects the persisted
