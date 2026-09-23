@@ -170,6 +170,8 @@ pub enum HirCicsOperation {
     QueryDCounter,
     RewindCounter,
     RewindDCounter,
+    UpdateCounter,
+    UpdateDCounter,
     ChangeTask,
     Deq,
     Enq,

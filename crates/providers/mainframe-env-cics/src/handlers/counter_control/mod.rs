@@ -6,6 +6,7 @@ mod get;
 mod query;
 mod rewind;
 mod state;
+mod update;
 
 use super::super::{CicsService, Run};
 use mainframe_env_execution_api::{BoundedPayload, InvocationLimits};
@@ -50,6 +51,9 @@ pub(in crate::service) fn invoke(
         }
         CicsOperation::RewindCounter | CicsOperation::RewindDCounter => {
             rewind::invoke(service, run, request)
+        }
+        CicsOperation::UpdateCounter | CicsOperation::UpdateDCounter => {
+            update::invoke(service, run, request)
         }
         _ => Err(HostProblem::InfrastructureFailure),
     }
@@ -122,6 +126,7 @@ fn selector(request: &CicsRequest) -> Result<(String, CounterKey), HostProblem> 
             | CicsOperation::GetDCounter
             | CicsOperation::QueryDCounter
             | CicsOperation::RewindDCounter
+            | CicsOperation::UpdateDCounter
     ) {
         "DCOUNTER"
     } else {
@@ -244,6 +249,7 @@ fn response(
                     | CicsOperation::GetCounter
                     | CicsOperation::QueryCounter
                     | CicsOperation::RewindCounter
+                    | CicsOperation::UpdateCounter
             ) {
                 i128::from(value as u32 as i32)
             } else {

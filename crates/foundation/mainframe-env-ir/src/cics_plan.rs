@@ -655,6 +655,9 @@ fn validate_operation_shape(
         CicsPlanOperation::RewindCounter | CicsPlanOperation::RewindDCounter => {
             counter_control::invalid_rewind_shape(plan, inputs, outputs)
         }
+        CicsPlanOperation::UpdateCounter | CicsPlanOperation::UpdateDCounter => {
+            counter_control::invalid_update_shape(plan, inputs, outputs)
+        }
         CicsPlanOperation::Suspend => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }

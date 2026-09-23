@@ -26890,4 +26890,113 @@ mod tests {
             .unwrap();
         assert_eq!(result.outputs["VALUE"].bytes(), b"0");
     }
+
+    #[test]
+    fn named_counter_update_compares_before_atomic_replacement() {
+        let cics = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&cics);
+        let define = request(
+            CicsOperation::DefineCounter,
+            BTreeMap::from([
+                ("COUNTER".into(), cics_literal(b"CURRENT")),
+                ("VALUE".into(), cics_decimal(2)),
+                ("MAXIMUM".into(), cics_decimal(5)),
+            ]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, define.clone(), 1), define)
+            .unwrap();
+        let rejected = request(
+            CicsOperation::UpdateCounter,
+            BTreeMap::from([
+                ("COUNTER".into(), cics_literal(b"CURRENT")),
+                ("VALUE".into(), cics_decimal(4)),
+                ("COMPAREMIN".into(), cics_decimal(3)),
+            ]),
+            2,
+        );
+        assert_eq!(
+            cics.invoke(
+                &effect(&invocation.run_unit_id, rejected.clone(), 2),
+                rejected
+            ),
+            Err(HostProblem::Condition {
+                name: "SUPPRESSED".into(),
+                response: 72,
+                response2: 103,
+            })
+        );
+        let update = request(
+            CicsOperation::UpdateCounter,
+            BTreeMap::from([
+                ("COUNTER".into(), cics_literal(b"CURRENT")),
+                ("VALUE".into(), cics_decimal(6)),
+                ("COMPAREMIN".into(), cics_decimal(5)),
+                ("COMPAREMAX".into(), cics_decimal(2)),
+            ]),
+            3,
+        );
+        let first = cics
+            .invoke(
+                &effect(&invocation.run_unit_id, update.clone(), 3),
+                update.clone(),
+            )
+            .unwrap();
+        assert_eq!(first.condition, "NORMAL");
+        assert_eq!(
+            cics.invoke(&effect(&invocation.run_unit_id, update.clone(), 3), update)
+                .unwrap(),
+            first
+        );
+        let query = CicsRequest {
+            operation: CicsOperation::QueryCounter,
+            arguments: BTreeMap::from([
+                ("COUNTER".into(), cics_literal(b"CURRENT")),
+                ("VALUE".into(), argument(b"")),
+            ]),
+            condition_policy: CicsConditionPolicy::Default,
+            mutation: None,
+        };
+        let result = cics
+            .invoke(&effect(&invocation.run_unit_id, query.clone(), 4), query)
+            .unwrap();
+        assert_eq!(result.outputs["VALUE"].bytes(), b"6");
+    }
+
+    #[test]
+    fn named_counter_update_accepts_fullword_limit_sentinel() {
+        let cics = service(Arc::new(MemoryStore::new(Default::default())));
+        let (invocation, _) = registered(&cics);
+        let define = request(
+            CicsOperation::DefineCounter,
+            BTreeMap::from([("COUNTER".into(), cics_literal(b"SENTINEL"))]),
+            1,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, define.clone(), 1), define)
+            .unwrap();
+        let update = request(
+            CicsOperation::UpdateCounter,
+            BTreeMap::from([
+                ("COUNTER".into(), cics_literal(b"SENTINEL")),
+                ("VALUE".into(), cics_decimal(i32::MIN as i64)),
+            ]),
+            2,
+        );
+        cics.invoke(&effect(&invocation.run_unit_id, update.clone(), 2), update)
+            .unwrap();
+        let query = CicsRequest {
+            operation: CicsOperation::QueryCounter,
+            arguments: BTreeMap::from([
+                ("COUNTER".into(), cics_literal(b"SENTINEL")),
+                ("VALUE".into(), argument(b"")),
+            ]),
+            condition_policy: CicsConditionPolicy::Default,
+            mutation: None,
+        };
+        let result = cics
+            .invoke(&effect(&invocation.run_unit_id, query.clone(), 3), query)
+            .unwrap();
+        assert_eq!(result.condition, "NORMAL");
+        assert_eq!(result.outputs["VALUE"].bytes(), b"-2147483648");
+    }
 }

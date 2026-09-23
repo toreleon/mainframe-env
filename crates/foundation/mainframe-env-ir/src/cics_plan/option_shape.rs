@@ -58,7 +58,9 @@ pub(super) fn has_unsupported(plan: &CicsEffectPlan) -> bool {
         | CicsPlanOperation::QueryCounter
         | CicsPlanOperation::QueryDCounter
         | CicsPlanOperation::RewindCounter
-        | CicsPlanOperation::RewindDCounter => !matches!(
+        | CicsPlanOperation::RewindDCounter
+        | CicsPlanOperation::UpdateCounter
+        | CicsPlanOperation::UpdateDCounter => !matches!(
             option,
             CicsPlanOption::NoHandle | CicsPlanOption::CounterNoSuspend
         ),

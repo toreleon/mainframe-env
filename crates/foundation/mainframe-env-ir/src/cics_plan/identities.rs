@@ -49,6 +49,10 @@ pub enum CicsPlanOperation {
     RewindCounter,
     /// IBM REWIND named-counter command.
     RewindDCounter,
+    /// IBM UPDATE named-counter command.
+    UpdateCounter,
+    /// IBM UPDATE named-counter command.
+    UpdateDCounter,
     /// Release one task-owned enqueue.
     Deq,
     /// Acquire one task-owned enqueue.

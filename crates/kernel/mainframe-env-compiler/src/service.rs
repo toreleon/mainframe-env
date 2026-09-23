@@ -1589,6 +1589,8 @@ mod tests {
                 CicsPlanOperation::QueryDCounter => crate::HirCicsOperation::QueryDCounter,
                 CicsPlanOperation::RewindCounter => crate::HirCicsOperation::RewindCounter,
                 CicsPlanOperation::RewindDCounter => crate::HirCicsOperation::RewindDCounter,
+                CicsPlanOperation::UpdateCounter => crate::HirCicsOperation::UpdateCounter,
+                CicsPlanOperation::UpdateDCounter => crate::HirCicsOperation::UpdateDCounter,
                 CicsPlanOperation::ChangeTask => crate::HirCicsOperation::ChangeTask,
                 CicsPlanOperation::Deq => crate::HirCicsOperation::Deq,
                 CicsPlanOperation::Enq => crate::HirCicsOperation::Enq,

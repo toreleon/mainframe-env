@@ -23,6 +23,11 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS UPDATE COUNTER and UPDATE DCOUNTER with conditional
+  compare, one-past-maximum value, source-defined bounds, atomic durable
+  replacement, SAF, and fenced replay. IBM CICS TS 6.x application API
+  `dfhp4_updatecounter.html`, rows 0226/0227.
+
 - Added typed CICS REWIND COUNTER and REWIND DCOUNTER with conditional
   at-limit reset, optional increment probe, `SUPPRESSED 102`, durable CAS,
   SAF, and fenced replay. IBM CICS TS 6.x application API

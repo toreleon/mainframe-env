@@ -42,6 +42,10 @@ pub enum CicsOperation {
     RewindCounter,
     /// Execute IBM REWIND against an unsigned doubleword named counter.
     RewindDCounter,
+    /// Execute IBM UPDATE against a signed fullword named counter.
+    UpdateCounter,
+    /// Execute IBM UPDATE against an unsigned doubleword named counter.
+    UpdateDCounter,
     /// Release one matching task enqueue ownership level.
     Deq,
     /// Delete the current file record.
@@ -196,6 +200,8 @@ impl CicsOperation {
             Self::QueryDCounter => "QueryDCounter",
             Self::RewindCounter => "RewindCounter",
             Self::RewindDCounter => "RewindDCounter",
+            Self::UpdateCounter => "UpdateCounter",
+            Self::UpdateDCounter => "UpdateDCounter",
             Self::Deq => "Deq",
             Self::Delete => "Delete",
             Self::DocumentCreate => "DocumentCreate",
@@ -288,6 +294,8 @@ impl CicsOperation {
                 | Self::QueryDCounter
                 | Self::RewindCounter
                 | Self::RewindDCounter
+                | Self::UpdateCounter
+                | Self::UpdateDCounter
         )
     }
 
@@ -316,6 +324,8 @@ impl CicsOperation {
                 | Self::GetDCounter
                 | Self::RewindCounter
                 | Self::RewindDCounter
+                | Self::UpdateCounter
+                | Self::UpdateDCounter
                 | Self::Deq
                 | Self::Enq
                 | Self::Freemain
@@ -401,6 +411,8 @@ impl CicsOperation {
             ("QUERY", Some("DCOUNTER")) => Self::QueryDCounter,
             ("REWIND", Some("COUNTER")) => Self::RewindCounter,
             ("REWIND", Some("DCOUNTER")) => Self::RewindDCounter,
+            ("UPDATE", Some("COUNTER")) => Self::UpdateCounter,
+            ("UPDATE", Some("DCOUNTER")) => Self::UpdateDCounter,
             ("DELETE", _) => Self::Delete,
             ("DOCUMENT", Some("CREATE")) => Self::DocumentCreate,
             ("DOCUMENT", Some("DELETE")) => Self::DocumentDelete,

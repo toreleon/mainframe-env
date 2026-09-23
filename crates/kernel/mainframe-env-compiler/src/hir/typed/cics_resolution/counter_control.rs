@@ -18,6 +18,8 @@ pub(super) const fn is_counter(operation: HirCicsOperation) -> bool {
             | HirCicsOperation::QueryDCounter
             | HirCicsOperation::RewindCounter
             | HirCicsOperation::RewindDCounter
+            | HirCicsOperation::UpdateCounter
+            | HirCicsOperation::UpdateDCounter
     )
 }
 
@@ -59,6 +61,24 @@ pub(super) fn allowed_clauses(operation: HirCicsOperation) -> &'static [&'static
         ],
         HirCicsOperation::RewindCounter => &["COUNTER", "POOL", "INCREMENT", "RESP", "RESP2"],
         HirCicsOperation::RewindDCounter => &["DCOUNTER", "POOL", "INCREMENT", "RESP", "RESP2"],
+        HirCicsOperation::UpdateCounter => &[
+            "COUNTER",
+            "POOL",
+            "VALUE",
+            "COMPAREMIN",
+            "COMPAREMAX",
+            "RESP",
+            "RESP2",
+        ],
+        HirCicsOperation::UpdateDCounter => &[
+            "DCOUNTER",
+            "POOL",
+            "VALUE",
+            "COMPAREMIN",
+            "COMPAREMAX",
+            "RESP",
+            "RESP2",
+        ],
         _ => unreachable!("counter clause contract requested for another operation"),
     }
 }
@@ -84,6 +104,8 @@ pub(super) fn required(operation: HirCicsOperation) -> &'static [&'static str] {
         HirCicsOperation::QueryDCounter => &["DCOUNTER"],
         HirCicsOperation::RewindCounter => &["COUNTER"],
         HirCicsOperation::RewindDCounter => &["DCOUNTER"],
+        HirCicsOperation::UpdateCounter => &["COUNTER", "VALUE"],
+        HirCicsOperation::UpdateDCounter => &["DCOUNTER", "VALUE"],
         _ => unreachable!("counter required clause contract requested for another operation"),
     }
 }
@@ -158,6 +180,15 @@ pub(super) fn operands(
         HirCicsOperation::RewindCounter | HirCicsOperation::RewindDCounter
     ) {
         &[("INCREMENT", HirCicsOperandName::CounterIncrement)]
+    } else if matches!(
+        operation,
+        HirCicsOperation::UpdateCounter | HirCicsOperation::UpdateDCounter
+    ) {
+        &[
+            ("VALUE", HirCicsOperandName::CounterValue),
+            ("COMPAREMIN", HirCicsOperandName::CounterCompareMin),
+            ("COMPAREMAX", HirCicsOperandName::CounterCompareMax),
+        ]
     } else if matches!(
         operation,
         HirCicsOperation::DefineCounter | HirCicsOperation::DefineDCounter
@@ -277,10 +308,12 @@ fn validate_number(
         HirCicsOperation::DefineDCounter
             | HirCicsOperation::GetDCounter
             | HirCicsOperation::RewindDCounter
+            | HirCicsOperation::UpdateDCounter
     );
     let valid = match value {
         HirCicsValue::Integer(value) => {
-            *value >= 0 && (doubleword || *value <= i64::from(i32::MAX))
+            (*value >= 0 && (doubleword || *value <= i64::from(i32::MAX)))
+                || (!doubleword && label == "VALUE" && *value == i64::from(i32::MIN))
         }
         HirCicsValue::Data(reference) => {
             reference.usage == CobolUsage::Binary

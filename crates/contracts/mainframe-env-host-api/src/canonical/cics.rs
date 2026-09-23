@@ -24,6 +24,8 @@ impl Canonical for CicsOperation {
             Self::QueryDCounter => out.variant("CicsOperation", "QueryDCounter", 0),
             Self::RewindCounter => out.variant("CicsOperation", "RewindCounter", 0),
             Self::RewindDCounter => out.variant("CicsOperation", "RewindDCounter", 0),
+            Self::UpdateCounter => out.variant("CicsOperation", "UpdateCounter", 0),
+            Self::UpdateDCounter => out.variant("CicsOperation", "UpdateDCounter", 0),
             Self::Deq => out.variant("CicsOperation", "Deq", 0),
             Self::Delete => out.variant("CicsOperation", "Delete", 0),
             Self::DocumentCreate => out.variant("CicsOperation", "DocumentCreate", 0),

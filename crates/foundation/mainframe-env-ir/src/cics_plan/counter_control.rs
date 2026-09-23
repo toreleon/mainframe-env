@@ -45,7 +45,10 @@ pub(super) fn invalid_define_shape(
             | CicsOperandName::CounterMinimum
             | CicsOperandName::CounterMaximum => match &operand.value {
                 CicsOperandValue::Integer(value) => {
-                    *value < 0
+                    (*value < 0
+                        && !(operand.name == CicsOperandName::CounterValue
+                            && plan.operation == CicsPlanOperation::DefineCounter
+                            && *value == i64::from(i32::MIN)))
                         || plan.operation == CicsPlanOperation::DefineCounter
                             && *value > i64::from(i32::MAX)
                 }
@@ -202,6 +205,59 @@ pub(super) fn invalid_rewind_shape(
                 CicsOperandValue::Integer(value) => {
                     *value < 0
                         || plan.operation == CicsPlanOperation::RewindCounter
+                            && *value > i64::from(i32::MAX)
+                }
+                CicsOperandValue::Storage(_) => false,
+                _ => true,
+            },
+            _ => true,
+        })
+}
+
+pub(super) fn invalid_update_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    !inputs.contains(&CicsOperandName::CounterName)
+        || !inputs.contains(&CicsOperandName::CounterValue)
+        || !inputs.is_subset(&BTreeSet::from([
+            CicsOperandName::CounterName,
+            CicsOperandName::CounterPool,
+            CicsOperandName::CounterValue,
+            CicsOperandName::CounterCompareMin,
+            CicsOperandName::CounterCompareMax,
+        ]))
+        || !outputs.is_subset(&BTreeSet::from([
+            CicsOutputName::Resp,
+            CicsOutputName::Resp2,
+        ]))
+        || plan.options.iter().any(|option| {
+            !matches!(
+                option,
+                CicsPlanOption::NoHandle | CicsPlanOption::CounterNoSuspend
+            )
+        })
+        || plan.operands.iter().any(|operand| match operand.name {
+            CicsOperandName::CounterName => match &operand.value {
+                CicsOperandValue::Literal(bytes) => invalid_name(bytes),
+                CicsOperandValue::Storage(_) => false,
+                _ => true,
+            },
+            CicsOperandName::CounterPool => match &operand.value {
+                CicsOperandValue::Literal(bytes) => invalid_pool(bytes),
+                CicsOperandValue::Storage(_) => false,
+                _ => true,
+            },
+            CicsOperandName::CounterValue
+            | CicsOperandName::CounterCompareMin
+            | CicsOperandName::CounterCompareMax => match &operand.value {
+                CicsOperandValue::Integer(value) => {
+                    (*value < 0
+                        && !(operand.name == CicsOperandName::CounterValue
+                            && plan.operation == CicsPlanOperation::UpdateCounter
+                            && *value == i64::from(i32::MIN)))
+                        || plan.operation == CicsPlanOperation::UpdateCounter
                             && *value > i64::from(i32::MAX)
                 }
                 CicsOperandValue::Storage(_) => false,

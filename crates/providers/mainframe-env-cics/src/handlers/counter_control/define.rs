@@ -125,11 +125,15 @@ pub(super) fn number(
     };
     let text = std::str::from_utf8(value.bytes()).map_err(|_| invreq(response2))?;
     let number = match kind {
-        CounterKind::Fullword => text
-            .parse::<i32>()
-            .ok()
-            .filter(|number| *number >= 0)
-            .map(|number| number as u64),
+        CounterKind::Fullword => text.parse::<i32>().ok().and_then(|number| {
+            if number >= 0 {
+                Some(number as u64)
+            } else if name == "VALUE" && number == i32::MIN {
+                Some(i32::MAX as u64 + 1)
+            } else {
+                None
+            }
+        }),
         CounterKind::Doubleword => text.parse::<u64>().ok(),
     }
     .ok_or_else(|| invreq(response2))?;

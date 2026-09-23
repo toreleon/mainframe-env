@@ -109,6 +109,8 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::QueryDCounter => 125,
         CicsPlanOperation::RewindCounter => 126,
         CicsPlanOperation::RewindDCounter => 127,
+        CicsPlanOperation::UpdateCounter => 128,
+        CicsPlanOperation::UpdateDCounter => 129,
     }
 }
 
@@ -205,6 +207,8 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         125 => Ok(CicsPlanOperation::QueryDCounter),
         126 => Ok(CicsPlanOperation::RewindCounter),
         127 => Ok(CicsPlanOperation::RewindDCounter),
+        128 => Ok(CicsPlanOperation::UpdateCounter),
+        129 => Ok(CicsPlanOperation::UpdateDCounter),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

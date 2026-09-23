@@ -10,14 +10,16 @@ pub(super) const fn counter_shape(operation: Option<CicsPlanOperation>) -> Optio
             | CicsPlanOperation::DeleteCounter
             | CicsPlanOperation::GetCounter
             | CicsPlanOperation::QueryCounter
-            | CicsPlanOperation::RewindCounter,
+            | CicsPlanOperation::RewindCounter
+            | CicsPlanOperation::UpdateCounter,
         ) => Some((4, true)),
         Some(
             CicsPlanOperation::DefineDCounter
             | CicsPlanOperation::DeleteDCounter
             | CicsPlanOperation::GetDCounter
             | CicsPlanOperation::QueryDCounter
-            | CicsPlanOperation::RewindDCounter,
+            | CicsPlanOperation::RewindDCounter
+            | CicsPlanOperation::UpdateDCounter,
         ) => Some((8, false)),
         _ => None,
     }
@@ -204,6 +206,8 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::QueryDCounter => CicsOperation::QueryDCounter,
         CicsPlanOperation::RewindCounter => CicsOperation::RewindCounter,
         CicsPlanOperation::RewindDCounter => CicsOperation::RewindDCounter,
+        CicsPlanOperation::UpdateCounter => CicsOperation::UpdateCounter,
+        CicsPlanOperation::UpdateDCounter => CicsOperation::UpdateDCounter,
         CicsPlanOperation::ChangeTask => CicsOperation::ChangeTask,
         CicsPlanOperation::Deq => CicsOperation::Deq,
         CicsPlanOperation::Enq => CicsOperation::Enq,
@@ -459,6 +463,7 @@ pub(super) const fn operand_for(
             | CicsPlanOperation::GetDCounter
             | CicsPlanOperation::QueryDCounter
             | CicsPlanOperation::RewindDCounter
+            | CicsPlanOperation::UpdateDCounter
     ) && matches!(name, CicsOperandName::CounterName)
     {
         "DCOUNTER"

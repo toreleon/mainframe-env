@@ -118,6 +118,8 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("QueryDCounter", "api", "counter-control", False, f"{OFFICIAL_BASELINE}:api-commands:0154"),
     ("RewindCounter", "api", "counter-control", True, f"{OFFICIAL_BASELINE}:api-commands:0179"),
     ("RewindDCounter", "api", "counter-control", True, f"{OFFICIAL_BASELINE}:api-commands:0180"),
+    ("UpdateCounter", "api", "counter-control", True, f"{OFFICIAL_BASELINE}:api-commands:0226"),
+    ("UpdateDCounter", "api", "counter-control", True, f"{OFFICIAL_BASELINE}:api-commands:0227"),
     ("Delete", "api", "file-control", True, f"{OFFICIAL_BASELINE}:api-commands:0040"),
     (
         "DeleteTransientData",
@@ -568,6 +570,8 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "QueryDCounter",
         "RewindCounter",
         "RewindDCounter",
+        "UpdateCounter",
+        "UpdateDCounter",
         "AddressSet",
         "Asktime",
         "AsktimeEib",
@@ -824,6 +828,12 @@ TYPED_RUNTIME_IR_EFFECTS = {
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
     ),
     "RewindDCounter": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "UpdateCounter": frozenset(
+        {"memory-read", "memory-write", "suspension", "condition", "transaction"}
+    ),
+    "UpdateDCounter": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
     ),
     "WaitJournalName": frozenset(
@@ -1163,6 +1173,8 @@ def _load_typed_execution_registrations(
         "QueryDCounter",
         "RewindCounter",
         "RewindDCounter",
+        "UpdateCounter",
+        "UpdateDCounter",
         "DeleteTemporaryStorage",
         "DeleteTransientData",
         "Deq",
@@ -1521,6 +1533,8 @@ def load_catalog(
         "QueryDCounter",
         "RewindCounter",
         "RewindDCounter",
+        "UpdateCounter",
+        "UpdateDCounter",
                 "Deq",
                 "DeleteTransientData",
                 "DeleteTemporaryStorage",
