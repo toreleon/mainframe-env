@@ -268,6 +268,8 @@ pub enum CicsPlanOperation {
     WebEndBrowse,
     /// Stage one HTTP header for the next Web message.
     WebWrite,
+    /// Send one checked Web client request or server response.
+    WebSend,
     /// Synchronize the issuing task with one named journal output request.
     WaitJournalName,
     /// Synchronize the issuing task with output for one numbered journal.
@@ -731,6 +733,32 @@ pub enum CicsOperandName {
     WebBrowseStartName,
     /// HTTP header value to stage for WEB WRITE.
     WebHeaderValue,
+    /// Outbound HTTP client method.
+    WebMethod,
+    /// IMMEDIATE or EVENTUAL server response action.
+    WebAction,
+    /// CLOSE or NOCLOSE message disposition.
+    WebCloseStatus,
+    /// Document token used as the response or request body.
+    WebDocumentToken,
+    /// HTTP server response status code.
+    WebStatusCode,
+    /// HTTP server response reason phrase.
+    WebStatusText,
+    /// Byte length of the reason phrase.
+    WebStatusLength,
+    /// Message body source buffer.
+    WebFrom,
+    /// Byte length of the message body source.
+    WebFromLength,
+    /// Explicit client request path.
+    WebPathInput,
+    /// Escaped client request query string.
+    WebQueryInput,
+    /// HTTP message media type.
+    WebMediaType,
+    /// Client URIMAP selected for this request.
+    WebSendUriMap,
 }
 
 /// Flag option accepted by the typed CICS pilot.

@@ -666,6 +666,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::WebReadNext => web_control::READ_NEXT_CLAUSES,
         HirCicsOperation::WebEndBrowse => web_control::END_BROWSE_CLAUSES,
         HirCicsOperation::WebWrite => web_control::WRITE_CLAUSES,
+        HirCicsOperation::WebSend => web_control::SEND_CLAUSES,
         HirCicsOperation::Freemain => &["DATA", "DATAPOINTER", "RESP", "RESP2"],
         HirCicsOperation::Getmain => &["FLENGTH", "LENGTH", "INITIMG", "SET", "RESP", "RESP2"],
         HirCicsOperation::ReceiveMap => {
@@ -778,6 +779,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::WebReadNext => &["NOHANDLE"],
         HirCicsOperation::WebEndBrowse => web_control::END_BROWSE_OPTIONS,
         HirCicsOperation::WebWrite => &["NOHANDLE"],
+        HirCicsOperation::WebSend => &["NOHANDLE"],
         HirCicsOperation::Start => &["AFTER", "AT", "FMH", "PROTECT", "NOCHECK", "NOHANDLE"],
         HirCicsOperation::Cancel => &["NOHANDLE"],
         HirCicsOperation::Delay => &["FOR", "UNTIL", "NOHANDLE"],
@@ -955,6 +957,7 @@ pub(super) fn resolve(tokens: &[String], semantic: &SemanticModel) -> Resolution
         HirCicsOperation::WebReadNext => &["NAMELENGTH", "VALUE", "VALUELENGTH"][..],
         HirCicsOperation::WebEndBrowse => &[][..],
         HirCicsOperation::WebWrite => &["HTTPHEADER", "NAMELENGTH", "VALUE", "VALUELENGTH"][..],
+        HirCicsOperation::WebSend => &[][..],
         HirCicsOperation::Cancel => &["REQID"][..],
         HirCicsOperation::Start => &["TRANSID"][..],
         HirCicsOperation::Retrieve => &["LENGTH"][..],

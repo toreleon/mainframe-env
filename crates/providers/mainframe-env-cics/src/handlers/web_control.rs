@@ -12,15 +12,32 @@ mod open;
 mod parse_url;
 mod read;
 mod read_next;
+mod send;
 mod start_browse;
 mod write;
 pub use model::{
-    CicsWebEndpoint, CicsWebInboundRequest, CicsWebTransport, CicsWebUriMapDefinition,
-    CicsWebVersion,
+    CicsWebEndpoint, CicsWebInboundRequest, CicsWebRequest, CicsWebResponse, CicsWebServerResponse,
+    CicsWebTransport, CicsWebUriMapDefinition, CicsWebVersion,
 };
 pub(in crate::service) use model::{WebState, load as load_web_state};
 
 impl CicsService {
+    /// Return the exact server response staged by WEB SEND for a registered task.
+    pub fn web_server_response(
+        &self,
+        run_unit: &mainframe_env_execution_api::RunUnitId,
+    ) -> Result<Option<CicsWebServerResponse>, HostProblem> {
+        let state = self.lock()?;
+        if !state.runs.contains_key(run_unit) {
+            return Err(HostProblem::Unauthorized);
+        }
+        Ok(state
+            .web
+            .server_responses
+            .get(run_unit.as_str())
+            .map(|reply| reply.response.clone()))
+    }
+
     /// Bind one bounded inbound HTTP request to an already registered CICS task.
     /// The host adapter supplies this context before compiled Web commands run.
     pub fn bind_web_inbound_request(
@@ -244,7 +261,21 @@ pub(super) fn release_task(service: &CicsService, run: &Run) -> Result<(), HostP
         })
         .map(|(key, headers)| (key.clone(), headers.clone()))
         .collect::<Vec<_>>();
-    if owned.is_empty() && owned_browses.is_empty() && owned_headers.is_empty() {
+    let owned_responses = state
+        .web
+        .client_responses
+        .iter()
+        .filter(|(_, response)| {
+            response.owner_execution == run.invocation.execution_id.as_str()
+                && response.owner_run_unit == run.invocation.run_unit_id.as_str()
+        })
+        .map(|(key, response)| (key.clone(), response.clone()))
+        .collect::<Vec<_>>();
+    if owned.is_empty()
+        && owned_browses.is_empty()
+        && owned_headers.is_empty()
+        && owned_responses.is_empty()
+    {
         return Ok(());
     }
     let mut deletes: Vec<ProviderStateMutation> = owned
@@ -271,6 +302,15 @@ pub(super) fn release_task(service: &CicsService, run: &Run) -> Result<(), HostP
                 namespace: model::HEADER_NAMESPACE.into(),
                 key: key.clone(),
                 expected_version: headers.version,
+            }),
+    );
+    deletes.extend(
+        owned_responses
+            .iter()
+            .map(|(key, response)| ProviderStateMutation::Delete {
+                namespace: model::CLIENT_RESPONSE_NAMESPACE.into(),
+                key: key.clone(),
+                expected_version: response.version,
             }),
     );
     service
@@ -301,6 +341,14 @@ pub(super) fn release_task(service: &CicsService, run: &Run) -> Result<(), HostP
             .checked_sub(model::encode_header_stage(headers)?.len())
             .ok_or(HostProblem::InfrastructureFailure)?;
         state.web.pending_headers.remove(key);
+    }
+    for (key, response) in &owned_responses {
+        state.web.bytes = state
+            .web
+            .bytes
+            .checked_sub(model::encode_client_response(response)?.len())
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        state.web.client_responses.remove(key);
     }
     drop(state);
     if let Some(transport) = transport {
@@ -336,6 +384,7 @@ pub(in crate::service) fn invoke(
         CicsOperation::WebWrite => {
             write::invoke(service, run, request, run.invocation.deadline_tick)
         }
+        CicsOperation::WebSend => send::invoke(service, run, request, run.invocation.deadline_tick),
         CicsOperation::WebStartBrowse => {
             start_browse::invoke(service, run, request, run.invocation.deadline_tick)
         }

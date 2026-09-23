@@ -11609,10 +11609,10 @@ mod tests {
     }
 
     #[test]
-    fn compiled_web_write_stages_selected_response_header() {
+    fn compiled_web_write_and_send_select_server_response() {
         let artifact = published_source_fixture(
             "WEBOPEN",
-            "IDENTIFICATION DIVISION.\nPROGRAM-ID. WEBOPEN.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 HOST-X PIC X(11) VALUE 'example.com'.\n01 HOST-LEN PIC S9(9) COMP VALUE 11.\n01 TOKEN-X PIC X(8).\n01 METHOD-LEN PIC S9(9) COMP VALUE 8.\n01 SCHEME-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS WEB WRITE HTTPHEADER('X-Test') NAMELENGTH(6) VALUE(HOST-X) VALUELENGTH(11) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. WEBOPEN.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 HOST-X PIC X(11) VALUE 'example.com'.\n01 HOST-LEN PIC S9(9) COMP VALUE 11.\n01 BODY-X PIC X(4) VALUE 'DATA'.\n01 BODY-LEN PIC S9(9) COMP VALUE 4.\n01 TOKEN-X PIC X(8).\n01 METHOD-LEN PIC S9(9) COMP VALUE 8.\n01 SCHEME-X PIC S9(9) COMP.\nPROCEDURE DIVISION.\nEXEC CICS WEB WRITE HTTPHEADER('X-Test') NAMELENGTH(6) VALUE(HOST-X) VALUELENGTH(11) END-EXEC.\nEXEC CICS WEB SEND FROM(BODY-X) FROMLENGTH(BODY-LEN) ACTION(EVENTUAL) END-EXEC.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
         );
         let artifact_ref = ArtifactRef::new(
             format!("sha256:{:x}", Sha256::digest(artifact.payload())),
@@ -11621,6 +11621,14 @@ mod tests {
         .unwrap();
         let server = ProductServer::memory(config()).unwrap();
         server.bootstrap_user("IBMUSER", b"TESTPASS").unwrap();
+        server
+            .racf
+            .define_profile("URIMAP", "ORDERS", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit("URIMAP", "ORDERS", "IBMUSER", AccessIntent::Read)
+            .unwrap();
         server
             .install_online_application(OnlineApplicationDefinition {
                 programs: vec![OnlineProgramDefinition {
@@ -11688,6 +11696,23 @@ mod tests {
                 .list_provider_state("cics-web-header-stage-v1", 8)
                 .unwrap()
                 .len(),
+            0
+        );
+        let reply = server
+            .cics
+            .web_server_response(&invocation.run_unit_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(reply.body, b"DATA");
+        assert_eq!(reply.headers, vec![("X-Test".into(), "example.com".into())]);
+        assert_eq!(
+            server
+                .cics
+                .terminal_run_trace(&session, &principal, 2)
+                .unwrap()
+                .iter()
+                .filter(|entry| entry.operation == CicsOperation::WebWrite)
+                .count(),
             1
         );
         assert_eq!(
@@ -11696,7 +11721,7 @@ mod tests {
                 .terminal_run_trace(&session, &principal, 2)
                 .unwrap()
                 .iter()
-                .filter(|entry| entry.operation == CicsOperation::WebWrite)
+                .filter(|entry| entry.operation == CicsOperation::WebSend)
                 .count(),
             1
         );

@@ -249,6 +249,8 @@ pub enum CicsOperation {
     WebEndBrowse,
     /// Stage one HTTP header for a client request or server response.
     WebWrite,
+    /// Send a checked HTTP client request or stage a server response.
+    WebSend,
     /// Synchronize this task with output for one named journal.
     WaitJournalName,
     /// Synchronize this task with output for one numbered journal.
@@ -400,6 +402,7 @@ impl CicsOperation {
             Self::WebReadNext => "WebReadNext",
             Self::WebEndBrowse => "WebEndBrowse",
             Self::WebWrite => "WebWrite",
+            Self::WebSend => "WebSend",
             Self::WaitJournalName => "WaitJournalName",
             Self::WaitJournalNum => "WaitJournalNum",
             Self::WriteJournalName => "WriteJournalName",
@@ -459,6 +462,7 @@ impl CicsOperation {
                 | Self::WebReadNext
                 | Self::WebEndBrowse
                 | Self::WebWrite
+                | Self::WebSend
                 | Self::ResetBrowse
                 | Self::DeleteTransientData
                 | Self::DeleteTemporaryStorage
@@ -688,6 +692,7 @@ impl CicsOperation {
             ("WEB", Some("READNEXT")) => Self::WebReadNext,
             ("WEB", Some("ENDBROWSE")) => Self::WebEndBrowse,
             ("WEB", Some("WRITE")) => Self::WebWrite,
+            ("WEB", Some("SEND")) => Self::WebSend,
             ("WAIT", Some("JOURNALNAME")) => Self::WaitJournalName,
             ("WAIT", Some("JOURNALNUM")) => Self::WaitJournalNum,
             ("WRITE", Some("JOURNALNAME")) => Self::WriteJournalName,

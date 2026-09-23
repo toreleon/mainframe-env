@@ -165,8 +165,8 @@ pub(super) use terminal_control::{
 pub(in crate::service) use terminal_run::terminal_secret_digest;
 pub(super) use time::invoke as invoke_time;
 pub use web_control::{
-    CicsWebEndpoint, CicsWebInboundRequest, CicsWebTransport, CicsWebUriMapDefinition,
-    CicsWebVersion,
+    CicsWebEndpoint, CicsWebInboundRequest, CicsWebRequest, CicsWebResponse, CicsWebServerResponse,
+    CicsWebTransport, CicsWebUriMapDefinition, CicsWebVersion,
 };
 pub(in crate::service) use web_control::{WebState, load_web_state};
 pub use web_service_control::CicsWebServiceDefinition;

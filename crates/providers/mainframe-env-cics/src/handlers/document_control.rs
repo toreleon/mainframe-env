@@ -613,6 +613,26 @@ fn document_for_token<'a>(
         })
 }
 
+pub(in crate::service) fn web_document_body(
+    service: &CicsService,
+    run: &Run,
+    token: &[u8],
+) -> Result<Vec<u8>, HostProblem> {
+    let state = service.lock()?;
+    let document = document_for_token(&state.documents, run, token, 1)?;
+    let mut body = Vec::new();
+    for segment in &document.segments {
+        let length = body
+            .len()
+            .checked_add(segment.bytes.len())
+            .filter(|length| *length <= service.limits.max_web_bytes)
+            .ok_or(HostProblem::ResourceExhausted)?;
+        body.reserve(length - body.len());
+        body.extend_from_slice(&segment.bytes);
+    }
+    Ok(body)
+}
+
 fn replay_write(
     run: &Run,
     request: &CicsRequest,

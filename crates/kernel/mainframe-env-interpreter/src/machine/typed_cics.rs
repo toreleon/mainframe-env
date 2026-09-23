@@ -375,6 +375,9 @@ pub(super) fn execute(
                         | CicsOperandName::WebRealmLength
                         | CicsOperandName::WebNameLength
                         | CicsOperandName::WebValueLength
+                        | CicsOperandName::WebStatusCode
+                        | CicsOperandName::WebStatusLength
+                        | CicsOperandName::WebFromLength
                         | CicsOperandName::WebPortNumber
                 ) || web_service_control::numeric_operand(operand.name) =>
             {

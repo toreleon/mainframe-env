@@ -662,6 +662,7 @@ fn validate_operation_shape(
         CicsPlanOperation::WebReadNext => web_control::invalid_read_next_shape(plan, inputs, outputs),
         CicsPlanOperation::WebEndBrowse => web_control::invalid_end_browse_shape(plan, inputs, outputs),
         CicsPlanOperation::WebWrite => web_control::invalid_write_shape(plan, inputs, outputs),
+        CicsPlanOperation::WebSend => web_control::invalid_send_shape(plan, inputs, outputs),
         CicsPlanOperation::Syncpoint => {
             !inputs.is_empty()
                 || plan.options.iter().any(|option| {
@@ -2393,6 +2394,47 @@ mod tests {
             .retain(|operand| operand.name != CicsOperandName::WebValueLength);
         assert_eq!(
             encode_cics_effect_plan(&invalid, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn web_send_codec_roundtrips_client_request_and_rejects_v1() {
+        assert_eq!(operation_tag(CicsPlanOperation::WebSend), 101);
+        assert_eq!(operation_from_tag(101), Ok(CicsPlanOperation::WebSend));
+        assert_eq!(operand_tag(CicsOperandName::WebMethod), 278);
+        assert_eq!(operand_from_tag(278), Ok(CicsOperandName::WebMethod));
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::WebSend,
+            operands: vec![
+                CicsNamedOperand {
+                    name: CicsOperandName::WebPathLength,
+                    value: CicsOperandValue::Integer(6),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::WebSessionToken,
+                    value: CicsOperandValue::Storage(slot(0, "TOKEN-X")),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::WebMethod,
+                    value: CicsOperandValue::Literal(b"GET".to_vec()),
+                },
+                CicsNamedOperand {
+                    name: CicsOperandName::WebPathInput,
+                    value: CicsOperandValue::Literal(b"/ready".to_vec()),
+                },
+            ],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let bytes = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&bytes, CicsPlanLimits::default()),
+            Ok(plan.clone())
+        );
+        assert_eq!(
+            encode_cics_effect_plan_version(&plan, CicsPlanLimits::default(), LEGACY_VERSION),
             Err(CicsPlanCodecProblem::Malformed)
         );
     }

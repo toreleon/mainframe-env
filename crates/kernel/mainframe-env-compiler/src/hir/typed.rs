@@ -6960,6 +6960,54 @@ mod tests {
     }
 
     #[test]
+    fn web_send_lowers_client_and_server_message_roles() {
+        let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. WEBSEND. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOKEN-X PIC X(8). 01 PATH-X PIC X(5) VALUE '/ping'. 01 PATH-LEN PIC S9(9) COMP VALUE 5. 01 BODY-X PIC X(4) VALUE 'DATA'. 01 BODY-LEN PIC S9(9) COMP VALUE 4. 01 STATUS-X PIC S9(4) COMP VALUE 201. PROCEDURE DIVISION. ";
+        for (source, client) in [
+            (
+                "WEB SEND SESSTOKEN(TOKEN-X) METHOD(GET) PATH(PATH-X) PATHLENGTH(PATH-LEN)",
+                true,
+            ),
+            (
+                "WEB SEND FROM(BODY-X) FROMLENGTH(BODY-LEN) STATUSCODE(STATUS-X) ACTION(EVENTUAL)",
+                false,
+            ),
+        ] {
+            let analysis = analyze(&format!(
+                "{declarations}EXEC CICS {source} END-EXEC. STOP RUN."
+            ));
+            let hir = analysis
+                .hir
+                .unwrap_or_else(|| panic!("{source}: {:?}", analysis.diagnostics));
+            let command = hir
+                .statements
+                .iter()
+                .find_map(|statement| match statement.resolved.as_ref() {
+                    Some(HirResolvedStatement::Cics(command)) => Some(command),
+                    _ => None,
+                })
+                .expect("typed WEB SEND");
+            assert_eq!(command.operation, HirCicsOperation::WebSend);
+            assert_eq!(
+                command
+                    .operands
+                    .iter()
+                    .any(|operand| operand.name == HirCicsOperandName::WebSessionToken),
+                client
+            );
+        }
+        for source in [
+            "WEB SEND SESSTOKEN(TOKEN-X) PATH(PATH-X) PATHLENGTH(PATH-LEN)",
+            "WEB SEND SESSTOKEN(TOKEN-X) METHOD(GET) FROM(BODY-X) FROMLENGTH(BODY-LEN) PATH(PATH-X) PATHLENGTH(PATH-LEN)",
+            "WEB SEND FROM(BODY-X)",
+        ] {
+            let analysis = analyze(&format!(
+                "{declarations}EXEC CICS {source} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{source}");
+        }
+    }
+
+    #[test]
     fn web_write_lowers_header_bytes_and_fullword_lengths() {
         let declarations = "IDENTIFICATION DIVISION. PROGRAM-ID. WEBWRITE. DATA DIVISION. WORKING-STORAGE SECTION. 01 HEADER-X PIC X(6) VALUE 'X-Test'. 01 VALUE-X PIC X(5) VALUE 'alpha'. 01 TOKEN-X PIC X(8). PROCEDURE DIVISION. ";
         for source in [

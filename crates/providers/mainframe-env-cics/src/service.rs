@@ -6706,7 +6706,7 @@ mod tests {
 
     #[test]
     fn generated_command_descriptors_are_total_and_family_routed() {
-        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 139);
+        assert_eq!(CICS_COMMAND_DESCRIPTORS.len(), 140);
         let mut operations = BTreeSet::new();
         let mut rows = BTreeSet::new();
         let mut families = BTreeSet::new();
@@ -7828,6 +7828,316 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn web_send_client_dispatches_checked_request_once_and_stages_response() {
+        struct TransportProbe {
+            calls: AtomicUsize,
+            requests: Mutex<Vec<CicsWebRequest>>,
+        }
+        impl CicsWebTransport for TransportProbe {
+            fn open(
+                &self,
+                _: &CicsWebEndpoint,
+                _: &Invocation,
+            ) -> Result<CicsWebVersion, HostProblem> {
+                Ok(CicsWebVersion { major: 1, minor: 1 })
+            }
+            fn release(
+                &self,
+                _: &CicsWebEndpoint,
+                _: [u8; 8],
+                _: bool,
+                _: &Invocation,
+            ) -> Result<(), HostProblem> {
+                Ok(())
+            }
+            fn exchange(
+                &self,
+                _: &CicsWebEndpoint,
+                _: [u8; 8],
+                request: &CicsWebRequest,
+                _: &Invocation,
+            ) -> Result<CicsWebResponse, HostProblem> {
+                self.calls.fetch_add(1, Ordering::SeqCst);
+                self.requests.lock().unwrap().push(request.clone());
+                Ok(CicsWebResponse {
+                    version: CicsWebVersion { major: 1, minor: 1 },
+                    status: 200,
+                    reason: "OK".into(),
+                    headers: vec![("X-Reply".into(), "yes".into())],
+                    body: b"pong".to_vec(),
+                })
+            }
+        }
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store.clone());
+        let transport = Arc::new(TransportProbe {
+            calls: AtomicUsize::new(0),
+            requests: Mutex::new(Vec::new()),
+        });
+        service.install_web_transport(transport.clone()).unwrap();
+        let invocation = invocation_for("web-send-client", BTreeMap::new());
+        let session = SessionId::new("web-send-client", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        let open = request(
+            CicsOperation::WebOpen,
+            BTreeMap::from([
+                ("HOST".into(), cics_literal(b"example.com")),
+                ("HOSTLENGTH".into(), cics_decimal(11)),
+                ("SCHEME".into(), cics_literal(b"HTTP")),
+                ("SESSTOKEN".into(), argument(b"TOKEN-X")),
+            ]),
+            1,
+        );
+        let opened = service
+            .invoke(&effect(&invocation.run_unit_id, open.clone(), 1), open)
+            .unwrap();
+        let token = opened.outputs["SESSTOKEN"].bytes();
+        let write = request(
+            CicsOperation::WebWrite,
+            BTreeMap::from([
+                ("HTTPHEADER".into(), cics_literal(b"X-App")),
+                ("NAMELENGTH".into(), cics_decimal(5)),
+                ("VALUE".into(), cics_literal(b"ready")),
+                ("VALUELENGTH".into(), cics_decimal(5)),
+                ("SESSTOKEN".into(), argument(token)),
+            ]),
+            2,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, write.clone(), 2), write)
+            .unwrap();
+        let send = request(
+            CicsOperation::WebSend,
+            BTreeMap::from([
+                ("SESSTOKEN".into(), argument(token)),
+                ("METHOD".into(), cics_literal(b"GET")),
+                ("PATH".into(), cics_literal(b"/ping")),
+                ("PATHLENGTH".into(), cics_decimal(5)),
+            ]),
+            3,
+        );
+        service.inject_replay_unknown_after_persist_once();
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, send.clone(), 3),
+                send.clone()
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let replayed = service
+            .invoke(
+                &effect(&invocation.run_unit_id, send.clone(), 3),
+                send.clone(),
+            )
+            .unwrap();
+        assert_eq!(replayed.condition, "NORMAL");
+        assert_eq!(transport.calls.load(Ordering::SeqCst), 1);
+        let outbound = transport.requests.lock().unwrap()[0].clone();
+        assert_eq!(
+            (outbound.method.as_str(), outbound.path.as_str()),
+            ("GET", "/ping")
+        );
+        assert_eq!(outbound.headers, vec![("X-App".into(), "ready".into())]);
+        let state = service.lock().unwrap();
+        let response = state.web.client_responses.values().next().unwrap();
+        assert_eq!(response.response.body, b"pong");
+        assert!(!response.received);
+        drop(state);
+        assert!(
+            store
+                .list_provider_state("cics-web-header-stage-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            store
+                .list_provider_state("cics-web-dispatch-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+        let mut pipeline = request(CicsOperation::WebSend, send.arguments.clone(), 4);
+        pipeline.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let rejected = service
+            .invoke(
+                &effect(&invocation.run_unit_id, pipeline.clone(), 4),
+                pipeline,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                rejected.condition.as_str(),
+                rejected.response,
+                rejected.response2
+            ),
+            ("INVREQ", 16, 79)
+        );
+        assert_eq!(transport.calls.load(Ordering::SeqCst), 1);
+        let close = request(
+            CicsOperation::WebClose,
+            BTreeMap::from([("SESSTOKEN".into(), argument(token))]),
+            5,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, close.clone(), 5), close)
+            .unwrap();
+        assert!(
+            store
+                .list_provider_state("cics-web-client-response-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn web_send_server_consumes_staged_headers_and_replays_eventual_response() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-web-send-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", directory.join("state.db").display());
+        let store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+        let service = service(store.clone());
+        let invocation = invocation_for("web-send-server", BTreeMap::new());
+        let session = SessionId::new("web-send-server", 64).unwrap();
+        service.create_session(&session, 24, 80).unwrap();
+        service
+            .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+            .unwrap();
+        service
+            .bind_web_inbound_request(
+                &invocation.run_unit_id,
+                CicsWebInboundRequest {
+                    http: true,
+                    scheme: "HTTP".into(),
+                    host: "example.com".into(),
+                    port: 80,
+                    method: "GET".into(),
+                    version: CicsWebVersion { major: 1, minor: 1 },
+                    path: "/".into(),
+                    query: String::new(),
+                    urimap: None,
+                    body: Vec::new(),
+                    headers: Vec::new(),
+                },
+            )
+            .unwrap();
+        let write = request(
+            CicsOperation::WebWrite,
+            BTreeMap::from([
+                ("HTTPHEADER".into(), cics_literal(b"X-App")),
+                ("NAMELENGTH".into(), cics_decimal(5)),
+                ("VALUE".into(), cics_literal(b"ready")),
+                ("VALUELENGTH".into(), cics_decimal(5)),
+            ]),
+            1,
+        );
+        service
+            .invoke(&effect(&invocation.run_unit_id, write.clone(), 1), write)
+            .unwrap();
+        let send = request(
+            CicsOperation::WebSend,
+            BTreeMap::from([
+                ("FROM".into(), cics_literal(b"DATA")),
+                ("FROMLENGTH".into(), cics_decimal(4)),
+                ("STATUSCODE".into(), cics_decimal(201)),
+                ("ACTION".into(), cics_literal(b"EVENTUAL")),
+                ("MEDIATYPE".into(), cics_literal(b"text/plain")),
+            ]),
+            2,
+        );
+        service.inject_replay_unknown_after_persist_once();
+        assert_eq!(
+            service.invoke(
+                &effect(&invocation.run_unit_id, send.clone(), 2),
+                send.clone()
+            ),
+            Err(HostProblem::UnknownOutcome)
+        );
+        let replayed = service
+            .invoke(&effect(&invocation.run_unit_id, send.clone(), 2), send)
+            .unwrap();
+        assert_eq!(replayed.condition, "NORMAL");
+        let response = service
+            .web_server_response(&invocation.run_unit_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (
+                response.status,
+                response.reason.as_str(),
+                response.body.as_slice()
+            ),
+            (201, "Created", b"DATA".as_slice())
+        );
+        assert_eq!(
+            response.headers,
+            vec![
+                ("X-App".into(), "ready".into()),
+                ("Content-Type".into(), "text/plain".into())
+            ]
+        );
+        assert!(response.eventual);
+        assert!(
+            store
+                .list_provider_state("cics-web-header-stage-v1", 8)
+                .unwrap()
+                .is_empty()
+        );
+        let reopened_store = Arc::new(SqliteStateStore::open(&url, 8 * 1024 * 1024, 4096).unwrap());
+        let reopened =
+            CicsService::open(authorities(), reopened_store, CicsLimits::default()).unwrap();
+        let persisted = reopened
+            .lock()
+            .unwrap()
+            .web
+            .server_responses
+            .values()
+            .next()
+            .unwrap()
+            .clone();
+        assert_eq!(persisted.response.body, b"DATA");
+        let mut invalid = request(
+            CicsOperation::WebSend,
+            BTreeMap::from([
+                ("FROM".into(), cics_literal(b"DATA")),
+                ("FROMLENGTH".into(), cics_decimal(4)),
+                ("STATUSCODE".into(), cics_decimal(204)),
+            ]),
+            3,
+        );
+        invalid.condition_policy = CicsConditionPolicy::Respond {
+            response_field: "RESP-X".into(),
+            response2_field: Some("RESP2-X".into()),
+        };
+        let rejected = service
+            .invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 3),
+                invalid,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                rejected.condition.as_str(),
+                rejected.response,
+                rejected.response2
+            ),
+            ("INVREQ", 16, 72)
+        );
+        drop(reopened);
+        drop(service);
+        drop(store);
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

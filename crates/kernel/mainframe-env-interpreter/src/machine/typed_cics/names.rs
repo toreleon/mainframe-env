@@ -154,6 +154,8 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         | CicsOperandName::WebVersionLength
         | CicsOperandName::WebRealmLength => SlotUse::FullwordInput,
         CicsOperandName::WebNameLength | CicsOperandName::WebValueLength => SlotUse::FullwordInput,
+        CicsOperandName::WebStatusLength | CicsOperandName::WebFromLength => SlotUse::FullwordInput,
+        CicsOperandName::WebStatusCode => SlotUse::HalfwordInput,
         CicsOperandName::WebPortNumber => SlotUse::FullwordInput,
         _ => SlotUse::Input,
     }
@@ -376,6 +378,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::WebReadNext => CicsOperation::WebReadNext,
         CicsPlanOperation::WebEndBrowse => CicsOperation::WebEndBrowse,
         CicsPlanOperation::WebWrite => CicsOperation::WebWrite,
+        CicsPlanOperation::WebSend => CicsOperation::WebSend,
     }
 }
 
@@ -621,6 +624,19 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::WebValueLength => "VALUELENGTH",
         CicsOperandName::WebBrowseStartName => "BROWSESTARTNAME",
         CicsOperandName::WebHeaderValue => "VALUE",
+        CicsOperandName::WebMethod => "METHOD",
+        CicsOperandName::WebAction => "ACTION",
+        CicsOperandName::WebCloseStatus => "CLOSESTATUS",
+        CicsOperandName::WebDocumentToken => "DOCTOKEN",
+        CicsOperandName::WebStatusCode => "STATUSCODE",
+        CicsOperandName::WebStatusText => "STATUSTEXT",
+        CicsOperandName::WebStatusLength => "STATUSLEN",
+        CicsOperandName::WebFrom => "FROM",
+        CicsOperandName::WebFromLength => "FROMLENGTH",
+        CicsOperandName::WebPathInput => "PATH",
+        CicsOperandName::WebQueryInput => "QUERYSTRING",
+        CicsOperandName::WebMediaType => "MEDIATYPE",
+        CicsOperandName::WebSendUriMap => "URIMAP",
         CicsOperandName::WebPortNumber => "PORTNUMBER",
         CicsOperandName::WebScheme => "SCHEME",
         CicsOperandName::WebUriMap => "URIMAP",

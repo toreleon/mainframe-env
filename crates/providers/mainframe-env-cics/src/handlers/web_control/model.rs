@@ -9,10 +9,20 @@ pub(super) const SESSION_NAMESPACE: &str = "cics-web-session-v1";
 pub(super) const URIMAP_NAMESPACE: &str = "cics-web-urimap-v1";
 pub(super) const BROWSE_NAMESPACE: &str = "cics-web-browse-v1";
 pub(super) const HEADER_NAMESPACE: &str = "cics-web-header-stage-v1";
+pub(super) const CLIENT_RESPONSE_NAMESPACE: &str = "cics-web-client-response-v1";
+pub(super) const SERVER_RESPONSE_NAMESPACE: &str = "cics-web-server-response-v1";
+pub(super) const DISPATCH_NAMESPACE: &str = "cics-web-dispatch-v1";
 const SESSION_MAGIC: &[u8; 8] = b"MECWEB01";
 const URIMAP_MAGIC: &[u8; 8] = b"MECWURI1";
 const BROWSE_MAGIC: &[u8; 8] = b"MECWBR01";
 const HEADER_MAGIC: &[u8; 8] = b"MECWHDR1";
+
+mod message;
+pub use message::{CicsWebRequest, CicsWebResponse, CicsWebServerResponse};
+pub(in crate::service) use message::{WebClientResponseState, WebServerReply};
+pub(super) use message::{
+    decode_client_response, decode_server_reply, encode_client_response, encode_server_reply,
+};
 
 /// A bounded HTTP endpoint selected by WEB OPEN, independent of the transport.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -88,6 +98,18 @@ pub trait CicsWebTransport: Send + Sync {
         pooled: bool,
         invocation: &Invocation,
     ) -> Result<(), HostProblem>;
+
+    /// Dispatch one checked client request and return the complete bounded response.
+    /// A transport that has no exchange implementation fails closed.
+    fn exchange(
+        &self,
+        _endpoint: &CicsWebEndpoint,
+        _token: [u8; 8],
+        _request: &CicsWebRequest,
+        _invocation: &Invocation,
+    ) -> Result<CicsWebResponse, HostProblem> {
+        Err(HostProblem::ProviderFailure)
+    }
 }
 
 /// Installed client URIMAP used by WEB OPEN.
@@ -150,6 +172,8 @@ pub(in crate::service) struct WebState {
     pub sessions: BTreeMap<String, WebClientSession>,
     pub browses: BTreeMap<String, WebBrowse>,
     pub pending_headers: BTreeMap<String, WebHeaderStage>,
+    pub client_responses: BTreeMap<String, WebClientResponseState>,
+    pub server_responses: BTreeMap<String, WebServerReply>,
     pub inbound: BTreeMap<String, CicsWebInboundRequest>,
     pub urimaps: BTreeMap<String, CicsWebUriMapDefinition>,
     pub transport: Option<Arc<dyn CicsWebTransport>>,
@@ -164,6 +188,8 @@ pub(in crate::service) fn load(
         sessions: BTreeMap::new(),
         browses: BTreeMap::new(),
         pending_headers: BTreeMap::new(),
+        client_responses: BTreeMap::new(),
+        server_responses: BTreeMap::new(),
         inbound: BTreeMap::new(),
         urimaps: BTreeMap::new(),
         transport: None,
@@ -224,6 +250,38 @@ pub(in crate::service) fn load(
         let headers = decode_header_stage(&row.payload, row.version)?;
         if row.key != header_stage_key(&headers.owner_run_unit, headers.client_token)
             || state.pending_headers.insert(row.key, headers).is_some()
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        state.bytes = state
+            .bytes
+            .checked_add(row.payload.len())
+            .filter(|total| *total <= limits.max_web_bytes)
+            .ok_or(HostProblem::ResourceExhausted)?;
+    }
+    for row in store
+        .list_provider_state(CLIENT_RESPONSE_NAMESPACE, limits.max_web_sessions)
+        .map_err(store_error)?
+    {
+        let response = decode_client_response(&row.payload, row.version)?;
+        if row.key != token_key(response.token)
+            || state.client_responses.insert(row.key, response).is_some()
+        {
+            return Err(HostProblem::InfrastructureFailure);
+        }
+        state.bytes = state
+            .bytes
+            .checked_add(row.payload.len())
+            .filter(|total| *total <= limits.max_web_bytes)
+            .ok_or(HostProblem::ResourceExhausted)?;
+    }
+    for row in store
+        .list_provider_state(SERVER_RESPONSE_NAMESPACE, limits.max_web_sessions)
+        .map_err(store_error)?
+    {
+        let response = decode_server_reply(&row.payload, row.version)?;
+        if row.key != response.owner_run_unit
+            || state.server_responses.insert(row.key, response).is_some()
         {
             return Err(HostProblem::InfrastructureFailure);
         }

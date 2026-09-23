@@ -89,6 +89,7 @@ pub(super) fn invoke(
     }
     let header_key = model::header_stage_key(run.invocation.run_unit_id.as_str(), Some(token));
     let staged = state.web.pending_headers.get(&header_key).cloned();
+    let client_response = state.web.client_responses.get(&key).cloned();
     let mut mutations = vec![
         ProviderStateMutation::Delete {
             namespace: model::SESSION_NAMESPACE.into(),
@@ -102,6 +103,13 @@ pub(super) fn invoke(
             namespace: model::HEADER_NAMESPACE.into(),
             key: header_key.clone(),
             expected_version: headers.version,
+        });
+    }
+    if let Some(client_response) = &client_response {
+        mutations.push(ProviderStateMutation::Delete {
+            namespace: model::CLIENT_RESPONSE_NAMESPACE.into(),
+            key: key.clone(),
+            expected_version: client_response.version,
         });
     }
     if service
@@ -126,6 +134,14 @@ pub(super) fn invoke(
             .checked_sub(model::encode_header_stage(&headers)?.len())
             .ok_or(HostProblem::InfrastructureFailure)?;
         state.web.pending_headers.remove(&header_key);
+    }
+    if let Some(client_response) = client_response {
+        state.web.bytes = state
+            .web
+            .bytes
+            .checked_sub(model::encode_client_response(&client_response)?.len())
+            .ok_or(HostProblem::InfrastructureFailure)?;
+        state.web.client_responses.remove(&key);
     }
     drop(state);
     if service

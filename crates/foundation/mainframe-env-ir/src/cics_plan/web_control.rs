@@ -439,3 +439,115 @@ pub(super) fn invalid_write_shape(
             )
         })
 }
+
+pub(super) fn invalid_send_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    let client = inputs.contains(&CicsOperandName::WebSessionToken);
+    let body = inputs.contains(&CicsOperandName::WebFrom);
+    let document = inputs.contains(&CicsOperandName::WebDocumentToken);
+    let allowed = BTreeSet::from([
+        CicsOperandName::WebSessionToken,
+        CicsOperandName::WebMethod,
+        CicsOperandName::WebAction,
+        CicsOperandName::WebCloseStatus,
+        CicsOperandName::WebDocumentToken,
+        CicsOperandName::WebStatusCode,
+        CicsOperandName::WebStatusText,
+        CicsOperandName::WebStatusLength,
+        CicsOperandName::WebFrom,
+        CicsOperandName::WebFromLength,
+        CicsOperandName::WebPathInput,
+        CicsOperandName::WebPathLength,
+        CicsOperandName::WebQueryInput,
+        CicsOperandName::WebQueryStringLength,
+        CicsOperandName::WebMediaType,
+        CicsOperandName::WebSendUriMap,
+    ]);
+    !inputs.is_subset(&allowed)
+        || !plan
+            .options
+            .iter()
+            .all(|option| *option == CicsPlanOption::NoHandle)
+        || outputs
+            .iter()
+            .any(|output| !matches!(output, CicsOutputName::Resp | CicsOutputName::Resp2))
+        || body && document
+        || body != inputs.contains(&CicsOperandName::WebFromLength)
+        || inputs.contains(&CicsOperandName::WebPathInput)
+            != inputs.contains(&CicsOperandName::WebPathLength)
+        || inputs.contains(&CicsOperandName::WebQueryInput)
+            != inputs.contains(&CicsOperandName::WebQueryStringLength)
+        || inputs.contains(&CicsOperandName::WebStatusText)
+            != inputs.contains(&CicsOperandName::WebStatusLength)
+        || client != inputs.contains(&CicsOperandName::WebMethod)
+        || client
+            && [
+                CicsOperandName::WebStatusCode,
+                CicsOperandName::WebStatusText,
+                CicsOperandName::WebStatusLength,
+                CicsOperandName::WebAction,
+            ]
+            .into_iter()
+            .any(|name| inputs.contains(&name))
+        || !client
+            && [
+                CicsOperandName::WebPathInput,
+                CicsOperandName::WebPathLength,
+                CicsOperandName::WebQueryInput,
+                CicsOperandName::WebQueryStringLength,
+                CicsOperandName::WebSendUriMap,
+            ]
+            .into_iter()
+            .any(|name| inputs.contains(&name))
+        || !client && !body && !document
+        || [
+            CicsOperandName::WebMethod,
+            CicsOperandName::WebAction,
+            CicsOperandName::WebCloseStatus,
+        ]
+        .into_iter()
+        .any(|name| {
+            operand_value(plan, name)
+                .is_some_and(|value| !matches!(value, CicsOperandValue::Literal(_)))
+        })
+        || [
+            CicsOperandName::WebSessionToken,
+            CicsOperandName::WebDocumentToken,
+            CicsOperandName::WebStatusText,
+            CicsOperandName::WebFrom,
+            CicsOperandName::WebPathInput,
+            CicsOperandName::WebQueryInput,
+            CicsOperandName::WebMediaType,
+            CicsOperandName::WebSendUriMap,
+        ]
+        .into_iter()
+        .any(|name| {
+            operand_value(plan, name).is_some_and(|value| {
+                !matches!(
+                    value,
+                    CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+                )
+            })
+        })
+        || [
+            CicsOperandName::WebStatusCode,
+            CicsOperandName::WebStatusLength,
+            CicsOperandName::WebFromLength,
+            CicsOperandName::WebPathLength,
+            CicsOperandName::WebQueryStringLength,
+        ]
+        .into_iter()
+        .any(|name| {
+            operand_value(plan, name).is_some_and(|value| {
+                !matches!(
+                    value,
+                    CicsOperandValue::Integer(_)
+                        | CicsOperandValue::Storage(_)
+                        | CicsOperandValue::LengthOf(_)
+                )
+            })
+        })
+}

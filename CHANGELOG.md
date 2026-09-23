@@ -38,6 +38,15 @@ All notable changes to mainframe-env are documented here.
 
 ### Added
 
+- Added typed CICS `WEB SEND` for durable server response selection and
+  checked client request exchange, with staged headers, SAF, replay, and
+  explicit post-dispatch uncertainty. IBM CICS TS 6.x baseline
+  `ibm-cics-ts-6x-2026-08-31:api-commands` row `0250` binds
+  `dfhp4_websend.html` at
+  `sha256:f91baca7b4277d6c86ab5517442b6479bb7422733845e254c3583026627b839b`
+  and `dfhp4_websendclient.html` at
+  `sha256:863d5f1585433c192080c326cdb1f0695350462cfd37f3b7f9ed4a3e72b4488f`.
+
 - Added typed CICS `WEB WRITE HTTPHEADER` with bounded ordered staging for
   server responses and client requests, forbidden generated client headers,
   durable replay and a compiled route. IBM CICS TS 6.x baseline
