@@ -185,6 +185,8 @@ pub enum CicsOperation {
     SpoolWrite,
     /// Write a bounded user trace entry by numeric trace identifier.
     EnterTraceNum,
+    /// Record a configured user event monitoring point.
+    Monitor,
     /// Schedule one interval-control START record.
     Start,
     StartBrowse,
@@ -337,6 +339,7 @@ impl CicsOperation {
             Self::SpoolRead => "SpoolRead",
             Self::SpoolWrite => "SpoolWrite",
             Self::EnterTraceNum => "EnterTraceNum",
+            Self::Monitor => "Monitor",
             Self::Start => "Start",
             Self::StartBrowse => "StartBrowse",
             Self::Suspend => "Suspend",
@@ -485,6 +488,7 @@ impl CicsOperation {
                 | Self::SpoolRead
                 | Self::SpoolWrite
                 | Self::EnterTraceNum
+                | Self::Monitor
                 | Self::Start
                 | Self::Retrieve
                 | Self::WaitEvent
@@ -607,6 +611,7 @@ impl CicsOperation {
             ("SPOOLREAD", _) => Self::SpoolRead,
             ("SPOOLWRITE", _) => Self::SpoolWrite,
             ("ENTER", Some("TRACENUM")) => Self::EnterTraceNum,
+            ("MONITOR", _) => Self::Monitor,
             ("START", _) => Self::Start,
             ("STARTBR", _) => Self::StartBrowse,
             ("SUSPEND", _) => Self::Suspend,

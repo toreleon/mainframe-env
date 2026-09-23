@@ -354,6 +354,13 @@
       "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0142"
     },
     {
+      "operation": "Monitor",
+      "interface": "api",
+      "family": "diagnostics",
+      "mutating": true,
+      "official_row": "ibm-cics-ts-6x-2026-08-31:api-commands:0143"
+    },
+    {
       "operation": "PopHandle",
       "interface": "api",
       "family": "task-control",

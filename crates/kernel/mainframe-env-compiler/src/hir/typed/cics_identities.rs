@@ -52,6 +52,7 @@ pub enum HirCicsOperation {
     SpoolRead,
     SpoolWrite,
     EnterTraceNum,
+    Monitor,
     Syncpoint,
     Unlock,
     Suspend,
@@ -329,6 +330,10 @@ pub enum HirCicsOperandName {
     RouteTitle,
     RouteList,
     Opclass,
+    MonitorPoint,
+    MonitorEntryName,
+    MonitorData1,
+    MonitorData2,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]

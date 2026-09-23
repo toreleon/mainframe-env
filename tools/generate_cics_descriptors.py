@@ -291,6 +291,7 @@ EXPECTED_RUNTIME_OPERATIONS = [
     ("SpoolWrite", "api", "spool-control", True, f"{OFFICIAL_BASELINE}:api-commands:0204"),
     ("RemoveSubevent", "api", "event-control", True, f"{OFFICIAL_BASELINE}:api-commands:0166"),
     ("EnterTraceNum", "api", "diagnostics", True, f"{OFFICIAL_BASELINE}:api-commands:0066"),
+    ("Monitor", "api", "diagnostics", True, f"{OFFICIAL_BASELINE}:api-commands:0143"),
     (
         "SetFileStatus",
         "spi-compatibility",
@@ -689,6 +690,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "SpoolRead",
         "SpoolWrite",
         "EnterTraceNum",
+        "Monitor",
         "Suspend",
         "WaitEvent",
         "WaitExternal",
@@ -1074,6 +1076,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
     "EnterTraceNum": frozenset(
         {"memory-read", "memory-write", "condition", "transaction"}
     ),
+    "Monitor": frozenset(
+        {"memory-read", "memory-write", "clock", "condition", "transaction"}
+    ),
     "Suspend": frozenset({"memory-write", "suspension", "condition"}),
     "WaitEvent": frozenset(
         {"memory-read", "memory-write", "suspension", "condition", "transaction"}
@@ -1335,6 +1340,7 @@ def _load_typed_execution_registrations(
         "IssueSend",
         "IssueWait",
         "Load",
+        "Monitor",
         "PopHandle",
         "PurgeMessage",
         "PushHandle",
@@ -3288,7 +3294,7 @@ def _resource_scope(family: str) -> str:
     }.get(family, "cics-transaction")
 
 
-def _capabilities(family: str, mutating: bool | None) -> list[str]:
+def _capabilities(family: str, mutating: bool | None, label: str) -> list[str]:
     dependencies = {"host.cics.execute", "host.security.authorize", "host.audit"}
     if family == "file-control":
         if mutating is not True:
@@ -3304,7 +3310,7 @@ def _capabilities(family: str, mutating: bool | None) -> list[str]:
             dependencies.add("host.spool.read")
         if mutating is not False:
             dependencies.add("host.spool.write")
-    elif family in {"time", "interval-control"}:
+    elif family in {"time", "interval-control"} or label == "MONITOR":
         dependencies.add("host.clock")
     return sorted(dependencies)
 
@@ -3341,6 +3347,8 @@ def _ir_effects(
     elif family == "spool-control":
         effects.add("spool")
     elif family in {"time", "interval-control"}:
+        effects.add("clock")
+    elif label == "MONITOR":
         effects.add("clock")
     effects.update(_resolved_memory_effects(options))
     if label.startswith(("DELAY", "SUSPEND", "WAIT")):
@@ -3622,7 +3630,7 @@ def _semantic_contract(
         capability = {
             "status": "bounded-ambiguity",
             "route": "host.cics.execute",
-            "required": _capabilities(family, None),
+            "required": _capabilities(family, None, command["label"]),
         }
         effect = {
             "status": "bounded-ambiguity",
@@ -3671,7 +3679,7 @@ def _semantic_contract(
         capability = {
             "status": "bounded-ambiguity" if option_sensitive else "resolved",
             "route": "host.cics.execute",
-            "required": _capabilities(family, None if option_sensitive else mutating),
+            "required": _capabilities(family, None if option_sensitive else mutating, command["label"]),
         }
         effect = {
             "status": "bounded-ambiguity" if option_sensitive else "resolved",

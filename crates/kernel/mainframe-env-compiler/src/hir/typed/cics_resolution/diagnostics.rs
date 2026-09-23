@@ -15,6 +15,7 @@ pub(super) fn allowed_clauses(operation: HirCicsOperation) -> &'static [&'static
             "RESP",
             "RESP2",
         ],
+        HirCicsOperation::Monitor => &["POINT", "DATA1", "DATA2", "ENTRYNAME", "RESP", "RESP2"],
         _ => unreachable!("non-diagnostic operation"),
     }
 }
@@ -22,6 +23,7 @@ pub(super) fn allowed_clauses(operation: HirCicsOperation) -> &'static [&'static
 pub(super) fn allowed_options(operation: HirCicsOperation) -> &'static [&'static str] {
     match operation {
         HirCicsOperation::EnterTraceNum => &["EXCEPTION", "NOHANDLE"],
+        HirCicsOperation::Monitor => &["NOHANDLE"],
         _ => unreachable!("non-diagnostic operation"),
     }
 }
@@ -29,6 +31,7 @@ pub(super) fn allowed_options(operation: HirCicsOperation) -> &'static [&'static
 pub(super) fn required(operation: HirCicsOperation) -> &'static [&'static str] {
     match operation {
         HirCicsOperation::EnterTraceNum => &["TRACENUM"],
+        HirCicsOperation::Monitor => &["POINT"],
         _ => unreachable!("non-diagnostic operation"),
     }
 }
@@ -38,12 +41,15 @@ pub(super) fn operands(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsNamedOperand>> {
+    if operation == HirCicsOperation::Monitor {
+        return monitor_operands(clauses, semantic);
+    }
     if operation != HirCicsOperation::EnterTraceNum {
         return Ok(Vec::new());
     }
     let number = cics_integer_value(&clauses["TRACENUM"], semantic)?;
     if let HirCicsValue::Data(reference) = &number {
-        require_halfword("TRACENUM", reference)?;
+        require_halfword("ENTER TRACENUM", "TRACENUM", reference)?;
     }
     let mut result = vec![HirCicsNamedOperand {
         name: HirCicsOperandName::TraceNum,
@@ -57,7 +63,7 @@ pub(super) fn operands(
     }
     if let Some(tokens) = clauses.get("FROMLENGTH") {
         let reference = complete_data_reference(tokens, semantic)?;
-        require_halfword("FROMLENGTH", &reference)?;
+        require_halfword("ENTER TRACENUM", "FROMLENGTH", &reference)?;
         result.push(HirCicsNamedOperand {
             name: HirCicsOperandName::TraceFromLength,
             value: HirCicsValue::Data(reference),
@@ -89,7 +95,66 @@ pub(super) fn operands(
     Ok(result)
 }
 
-fn require_halfword(name: &str, reference: &super::super::HirDataReference) -> Resolution<()> {
+fn monitor_operands(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    let point = cics_integer_value(&clauses["POINT"], semantic)?;
+    if let HirCicsValue::Data(reference) = &point {
+        require_halfword("MONITOR", "POINT", reference)?;
+    }
+    let mut result = vec![HirCicsNamedOperand {
+        name: HirCicsOperandName::MonitorPoint,
+        value: point,
+    }];
+    if let Some(tokens) = clauses.get("ENTRYNAME") {
+        let value = cics_value(tokens, semantic)?;
+        let valid = match &value {
+            HirCicsValue::Literal(text) => text.len() == 8,
+            HirCicsValue::Data(reference) => {
+                reference.length == 8
+                    && matches!(
+                        reference.category,
+                        DataCategory::Alphabetic | DataCategory::Alphanumeric
+                    )
+            }
+            _ => false,
+        };
+        if !valid {
+            return Err(ResolutionFailure::Invalid(
+                "CICS MONITOR ENTRYNAME requires eight characters".into(),
+            ));
+        }
+        result.push(HirCicsNamedOperand {
+            name: HirCicsOperandName::MonitorEntryName,
+            value,
+        });
+    }
+    for (name, identity) in [
+        ("DATA1", HirCicsOperandName::MonitorData1),
+        ("DATA2", HirCicsOperandName::MonitorData2),
+    ] {
+        if let Some(tokens) = clauses.get(name) {
+            let reference = complete_data_reference(tokens, semantic)?;
+            if reference.length != 4 {
+                return Err(ResolutionFailure::Invalid(format!(
+                    "CICS MONITOR {name} requires four-byte storage"
+                )));
+            }
+            result.push(HirCicsNamedOperand {
+                name: identity,
+                value: HirCicsValue::Data(reference),
+            });
+        }
+    }
+    Ok(result)
+}
+
+fn require_halfword(
+    command: &str,
+    name: &str,
+    reference: &super::super::HirDataReference,
+) -> Resolution<()> {
     if reference.length == 2
         && reference.scale == 0
         && matches!(
@@ -100,7 +165,7 @@ fn require_halfword(name: &str, reference: &super::super::HirDataReference) -> R
         Ok(())
     } else {
         Err(ResolutionFailure::Invalid(format!(
-            "CICS ENTER TRACENUM {name} requires halfword binary storage"
+            "CICS {command} {name} requires halfword binary storage"
         )))
     }
 }

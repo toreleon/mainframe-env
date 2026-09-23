@@ -352,6 +352,13 @@ an optional eight-character resource, source bytes, and halfword length in
 `EXCEPTION` always records to the internal destination even when it is off.
 The retained entry records its selected destination set, exact bytes, run,
 and principal. A `CICSDIAG` SAF update check precedes durable mutation.
+`MONITOR` uses additive trusted MCT definitions keyed by entry name and point.
+The supported local actions update one counter, start or stop one clock, or
+move bytes from a checked COBOL pointer into a bounded user character field.
+Clock actions read the host clock; MOVE uses the four-byte DATA2 length or the
+registered default. Missing DATA2 returns INVREQ/6 after the move, matching
+the source's successful-operation condition. Point, data, and definition
+errors retain their distinct INVREQ secondary codes.
 
 Typed `SPOOLOPEN INPUT` requires a writable eight-character TOKEN, an
 eight-character USERID value, optional one-character CLASS, and RESP or

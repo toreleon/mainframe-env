@@ -602,6 +602,7 @@ mod tests {
                 CicsPlanOperation::DeleteCounter,
                 CicsPlanOperation::DeleteDCounter,
                 CicsPlanOperation::EnterTraceNum,
+                CicsPlanOperation::Monitor,
                 CicsPlanOperation::Xctl,
                 CicsPlanOperation::Return,
                 CicsPlanOperation::StartBrowse,

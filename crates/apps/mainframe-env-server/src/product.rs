@@ -6314,6 +6314,7 @@ mod tests {
     use mainframe_env_cics::{
         CICS_DELAY_WORK_GENERATION, CICS_START_WORK_GENERATION, CicsApplicationEntryDefinition,
         CicsEventPostMode, CicsJavaStatus, CicsPartitionDefinition, CicsPartitionSetDefinition,
+        CicsEventPostMode, CicsJavaStatus, CicsMonitorAction, CicsMonitorPointDefinition,
         CicsProgramDefinition,
     };
     use mainframe_env_compiler::CobolCompiler;
@@ -12664,6 +12665,133 @@ mod tests {
         assert_eq!(snapshot.traces.len(), 1);
         assert_eq!(snapshot.traces[0].data, b"TRACE");
         assert_eq!(snapshot.traces[0].identifier, "123");
+    }
+
+    #[test]
+    fn compiled_monitor_updates_configured_emp_with_4804() {
+        let artifact = published_source_fixture(
+            "MONITOR",
+            "IDENTIFICATION DIVISION.\nPROGRAM-ID. MONITOR.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 DATA-X PIC S9(9) COMP VALUE 5.\n01 TEXT-X PIC X(4) VALUE 'ABCD'.\n01 PTR-X POINTER.\n01 LENGTH-X PIC S9(9) COMP VALUE 4.\n01 RESP-X PIC S9(9) COMP.\n01 MON-FN PIC X(2).\n01 MOVE-FN PIC X(2).\nPROCEDURE DIVISION.\nEXEC CICS MONITOR POINT(11) DATA1(DATA-X) RESP(RESP-X) END-EXEC.\nMOVE EIBFN TO MON-FN.\nSET PTR-X TO ADDRESS OF TEXT-X.\nEXEC CICS MONITOR POINT(12) DATA1(PTR-X) DATA2(LENGTH-X) RESP(RESP-X) END-EXEC.\nMOVE EIBFN TO MOVE-FN.\nEXEC CICS SUSPEND END-EXEC.\nSTOP RUN.\n",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        server
+            .racf
+            .define_profile("CICSDIAG", "CICS.DIAG.MONITOR.USER.011", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "CICSDIAG",
+                "CICS.DIAG.MONITOR.USER.011",
+                "IBMUSER",
+                AccessIntent::Update,
+            )
+            .unwrap();
+        server
+            .racf
+            .define_profile("CICSDIAG", "CICS.DIAG.MONITOR.USER.012", "IBMUSER", None)
+            .unwrap();
+        server
+            .racf
+            .permit(
+                "CICSDIAG",
+                "CICS.DIAG.MONITOR.USER.012",
+                "IBMUSER",
+                AccessIntent::Update,
+            )
+            .unwrap();
+        server
+            .cics
+            .register_diagnostic_resources(
+                &[],
+                &[
+                    CicsMonitorPointDefinition {
+                        entry_name: "USER".into(),
+                        point: 11,
+                        action: CicsMonitorAction::AddCounter { slot: 1 },
+                    },
+                    CicsMonitorPointDefinition {
+                        entry_name: "USER".into(),
+                        point: 12,
+                        action: CicsMonitorAction::Move {
+                            offset: 0,
+                            maximum_length: 4,
+                        },
+                    },
+                ],
+            )
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "MONITOR".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("MONI".into(), "MONITOR".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "MONITOR".into(),
+                    map: "MONITOR".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let session = SessionId::new("monitor-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "MONI", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "MONI",
+                24,
+                80,
+                "monitor-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &principal, "MONITOR", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(restored.variable("MON-FN").unwrap().bytes(), &[0x48, 0x04]);
+        assert_eq!(restored.variable("MOVE-FN").unwrap().bytes(), &[0x48, 0x04]);
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(
+            server.cics.diagnostic_snapshot().unwrap().monitor_counters["USER:001"],
+            5
+        );
+        assert_eq!(
+            server.cics.diagnostic_snapshot().unwrap().monitor_text["USER"],
+            b"ABCD"
+        );
     }
 
     #[test]

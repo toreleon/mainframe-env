@@ -1218,6 +1218,7 @@ class CicsDescriptorTests(unittest.TestCase):
                 "ROUTE",
                 "LINK",
                 "LOAD",
+                "MONITOR",
                 "RELEASE",
                 "POP HANDLE",
                 "PUSH HANDLE",

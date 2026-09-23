@@ -171,6 +171,10 @@ pub(super) fn validate_machine_slot(
                 "counter number has the wrong binary width or sign",
             ));
         }
+    if matches!(slot_use, SlotUse::MonitorDataInput) && layout.length != 4 {
+        return Err(invalid_plan(
+            "MONITOR DATA1 and DATA2 must occupy four bytes",
+        ));
     }
     if matches!(slot_use, SlotUse::FullwordOutput)
         && (layout.category != LayoutCategory::Binary || layout.length != 4 || layout.scale != 0)

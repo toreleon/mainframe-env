@@ -678,6 +678,7 @@ fn validate_operation_shape(
             counter_control::invalid_update_shape(plan, inputs, outputs)
         }
         CicsPlanOperation::EnterTraceNum => diagnostics::invalid_trace_num_shape(plan, inputs, outputs),
+        CicsPlanOperation::Monitor => diagnostics::invalid_monitor_shape(plan, inputs, outputs),
         CicsPlanOperation::Suspend => {
             !inputs.is_empty() || scheduling_options || outputs.contains(&CicsOutputName::Into)
         }
@@ -2530,6 +2531,36 @@ mod tests {
         );
         let mut invalid = plan;
         invalid.operands[0].name = CicsOperandName::TraceResource;
+        assert_eq!(
+            encode_cics_effect_plan(&invalid, CicsPlanLimits::default()),
+            Err(CicsPlanCodecProblem::Malformed)
+        );
+    }
+
+    #[test]
+    fn monitor_uses_reserved_v2_tags_and_rejects_missing_point() {
+        assert_eq!(operation_tag(CicsPlanOperation::Monitor), 152);
+        assert_eq!(operand_tag(CicsOperandName::MonitorPoint), 580);
+        assert_eq!(operand_tag(CicsOperandName::MonitorEntryName), 581);
+        assert_eq!(operand_tag(CicsOperandName::MonitorData1), 582);
+        assert_eq!(operand_tag(CicsOperandName::MonitorData2), 583);
+        let plan = CicsEffectPlan {
+            operation: CicsPlanOperation::Monitor,
+            operands: vec![CicsNamedOperand {
+                name: CicsOperandName::MonitorPoint,
+                value: CicsOperandValue::Integer(11),
+            }],
+            options: BTreeSet::new(),
+            outputs: Vec::new(),
+            condition: CicsCondition::Default,
+        };
+        let encoded = encode_cics_effect_plan(&plan, CicsPlanLimits::default()).unwrap();
+        assert_eq!(
+            decode_cics_effect_plan(&encoded, CicsPlanLimits::default()),
+            Ok(plan.clone())
+        );
+        let mut invalid = plan;
+        invalid.operands.clear();
         assert_eq!(
             encode_cics_effect_plan(&invalid, CicsPlanLimits::default()),
             Err(CicsPlanCodecProblem::Malformed)

@@ -1,5 +1,6 @@
 //! Bounded durable diagnostic records and command control.
 
+mod monitor;
 mod state;
 mod trace_number;
 
@@ -141,6 +142,7 @@ pub(in crate::service) fn invoke(
 ) -> Result<CicsResponse, HostProblem> {
     match request.operation {
         CicsOperation::EnterTraceNum => trace_number::invoke(service, run, request),
+        CicsOperation::Monitor => monitor::invoke(service, run, request),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }

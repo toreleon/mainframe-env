@@ -11,6 +11,7 @@ use mainframe_env_ir::{
 
 mod address;
 mod assign;
+mod diagnostics;
 mod legacy;
 mod names;
 mod registry;
@@ -279,6 +280,18 @@ pub(super) fn execute(
             CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::SpoolOutDescr => {
                 spool_control::out_descriptor_argument(machine, slot)
             }
+            CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::MonitorData1 => {
+                if let Some(bytes) = diagnostics::monitor_pointer_bytes(machine, slot)? {
+                    arguments.insert(
+                        "DATA1.BYTES".into(),
+                        payload("mainframe-env.cics.monitor-data@1", bytes)?,
+                    );
+                }
+                (
+                    "mainframe-env.cics.storage-value@1",
+                    read_slot(machine, slot)?,
+                )
+            }
             CicsOperandValue::Storage(slot) if operand.name == CicsOperandName::UsingAddress => (
                 "mainframe-env.cics.storage-identity@1",
                 format!(
@@ -345,6 +358,7 @@ pub(super) fn execute(
                         | CicsOperandName::CounterMaximum
                         | CicsOperandName::TraceNum
                         | CicsOperandName::TraceFromLength
+                | CicsOperandName::MonitorPoint
                 ) || web_service_control::numeric_operand(operand.name) =>
             {
                 (

@@ -59,6 +59,7 @@ pub(super) enum SlotUse {
     SpoolOutDescrInput,
     SpoolMaxFlengthInput,
     SpoolToFlengthOutput,
+    MonitorDataInput,
 }
 
 pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
@@ -140,6 +141,8 @@ pub(super) const fn input_slot_use(name: CicsOperandName) -> SlotUse {
         | CicsOperandName::CounterCompareMin
         | CicsOperandName::CounterCompareMax => SlotUse::CounterNumber,
         CicsOperandName::TraceNum | CicsOperandName::TraceFromLength => SlotUse::HalfwordInput,
+        CicsOperandName::MonitorPoint => SlotUse::HalfwordInput,
+        CicsOperandName::MonitorData1 | CicsOperandName::MonitorData2 => SlotUse::MonitorDataInput,
         _ => SlotUse::Input,
     }
 }
@@ -290,6 +293,7 @@ pub(super) const fn host_operation(operation: CicsPlanOperation) -> CicsOperatio
         CicsPlanOperation::SpoolRead => CicsOperation::SpoolRead,
         CicsPlanOperation::SpoolWrite => CicsOperation::SpoolWrite,
         CicsPlanOperation::EnterTraceNum => CicsOperation::EnterTraceNum,
+        CicsPlanOperation::Monitor => CicsOperation::Monitor,
         CicsPlanOperation::Syncpoint => CicsOperation::Syncpoint,
         CicsPlanOperation::Suspend => CicsOperation::Suspend,
         CicsPlanOperation::WaitEvent => CicsOperation::WaitEvent,
@@ -534,6 +538,10 @@ pub(super) const fn operand(name: CicsOperandName) -> &'static str {
         CicsOperandName::TraceFrom => "FROM",
         CicsOperandName::TraceFromLength => "FROMLENGTH",
         CicsOperandName::TraceResource => "RESOURCE",
+        CicsOperandName::MonitorPoint => "POINT",
+        CicsOperandName::MonitorEntryName => "ENTRYNAME",
+        CicsOperandName::MonitorData1 => "DATA1",
+        CicsOperandName::MonitorData2 => "DATA2",
     }
 }
 

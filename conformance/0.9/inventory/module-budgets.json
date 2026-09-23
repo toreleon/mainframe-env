@@ -295,6 +295,7 @@
       "crates/providers/mainframe-env-cics/src/handlers/counter_control/state.rs",
       "crates/providers/mainframe-env-cics/src/handlers/diagnostics.rs",
       "crates/providers/mainframe-env-cics/src/handlers/diagnostics/state.rs",
+      "crates/providers/mainframe-env-cics/src/handlers/diagnostics/monitor.rs",
       "crates/providers/mainframe-env-cics/src/handlers/diagnostics/trace_number.rs",
       "crates/providers/mainframe-env-cics/src/handlers/document_control.rs",
       "crates/providers/mainframe-env-cics/src/handlers/document_control/insert.rs",

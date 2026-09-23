@@ -385,6 +385,10 @@ impl PlanContext<'_> {
                 HirCicsOperandName::TraceFrom => CicsOperandName::TraceFrom,
                 HirCicsOperandName::TraceFromLength => CicsOperandName::TraceFromLength,
                 HirCicsOperandName::TraceResource => CicsOperandName::TraceResource,
+                HirCicsOperandName::MonitorPoint => CicsOperandName::MonitorPoint,
+                HirCicsOperandName::MonitorEntryName => CicsOperandName::MonitorEntryName,
+                HirCicsOperandName::MonitorData1 => CicsOperandName::MonitorData1,
+                HirCicsOperandName::MonitorData2 => CicsOperandName::MonitorData2,
             },
             value: match &operand.value {
                 HirCicsValue::Literal(value) => {
@@ -530,6 +534,7 @@ const fn plan_operation(operation: HirCicsOperation) -> CicsPlanOperation {
         HirCicsOperation::SpoolRead => CicsPlanOperation::SpoolRead,
         HirCicsOperation::SpoolWrite => CicsPlanOperation::SpoolWrite,
         HirCicsOperation::EnterTraceNum => CicsPlanOperation::EnterTraceNum,
+        HirCicsOperation::Monitor => CicsPlanOperation::Monitor,
         HirCicsOperation::Syncpoint => CicsPlanOperation::Syncpoint,
         HirCicsOperation::Suspend => CicsPlanOperation::Suspend,
         HirCicsOperation::WaitEvent => CicsPlanOperation::WaitEvent,

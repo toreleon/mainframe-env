@@ -140,6 +140,7 @@ pub(super) const fn operation_tag(value: CicsPlanOperation) -> u16 {
         CicsPlanOperation::UpdateCounter => 128,
         CicsPlanOperation::UpdateDCounter => 129,
         CicsPlanOperation::EnterTraceNum => 151,
+        CicsPlanOperation::Monitor => 152,
     }
 }
 
@@ -267,6 +268,7 @@ pub(super) fn operation_from_tag(value: u16) -> Result<CicsPlanOperation, CicsPl
         128 => Ok(CicsPlanOperation::UpdateCounter),
         129 => Ok(CicsPlanOperation::UpdateDCounter),
         151 => Ok(CicsPlanOperation::EnterTraceNum),
+        152 => Ok(CicsPlanOperation::Monitor),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }
@@ -481,6 +483,10 @@ pub(super) const fn operand_tag(value: CicsOperandName) -> u16 {
         CicsOperandName::TraceFrom => 577,
         CicsOperandName::TraceFromLength => 578,
         CicsOperandName::TraceResource => 579,
+        CicsOperandName::MonitorPoint => 580,
+        CicsOperandName::MonitorEntryName => 581,
+        CicsOperandName::MonitorData1 => 582,
+        CicsOperandName::MonitorData2 => 583,
     }
 }
 
@@ -694,6 +700,10 @@ pub(super) fn operand_from_tag(value: u16) -> Result<CicsOperandName, CicsPlanCo
         577 => Ok(CicsOperandName::TraceFrom),
         578 => Ok(CicsOperandName::TraceFromLength),
         579 => Ok(CicsOperandName::TraceResource),
+        580 => Ok(CicsOperandName::MonitorPoint),
+        581 => Ok(CicsOperandName::MonitorEntryName),
+        582 => Ok(CicsOperandName::MonitorData1),
+        583 => Ok(CicsOperandName::MonitorData2),
         _ => Err(CicsPlanCodecProblem::Malformed),
     }
 }

@@ -4100,6 +4100,53 @@ mod tests {
     }
 
     #[test]
+    fn cics_monitor_resolves_point_and_four_byte_data() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. MONIT. DATA DIVISION. WORKING-STORAGE SECTION. 01 POINT-X PIC S9(4) COMP VALUE 11. 01 DATA-X PIC S9(9) COMP VALUE 5. 01 ENTRY-X PIC X(8) VALUE 'USER    '. PROCEDURE DIVISION. EXEC CICS MONITOR POINT(POINT-X) DATA1(DATA-X) ENTRYNAME(ENTRY-X) NOHANDLE END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("MONITOR: {:?}", analysis.diagnostics));
+        let command = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed MONITOR");
+        assert_eq!(command.operation, HirCicsOperation::Monitor);
+        assert!(command.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::MonitorData1
+                && matches!(operand.value, HirCicsValue::Data(ref value) if value.qualified_name == "DATA-X")
+        }));
+        for (command, expected) in [
+            ("MONITOR DATA1(DATA-X) NOHANDLE", "requires option POINT"),
+            ("MONITOR POINT(BAD-POINT-X) NOHANDLE", "halfword binary"),
+            (
+                "MONITOR POINT(11) DATA1(BAD-DATA-X) NOHANDLE",
+                "four-byte storage",
+            ),
+            (
+                "MONITOR POINT(11) ENTRYNAME(BAD-ENTRY-X) NOHANDLE",
+                "eight characters",
+            ),
+        ] {
+            let analysis = analyze(&format!(
+                "IDENTIFICATION DIVISION. PROGRAM-ID. BADMON. DATA DIVISION. WORKING-STORAGE SECTION. 01 DATA-X PIC S9(9) COMP. 01 BAD-DATA-X PIC S9(4) COMP. 01 BAD-POINT-X PIC S9(9) COMP. 01 BAD-ENTRY-X PIC X(4). PROCEDURE DIVISION. EXEC CICS {command} END-EXEC. STOP RUN."
+            ));
+            assert!(analysis.hir.is_none(), "{command}");
+            assert!(
+                analysis
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.public_message().contains(expected)),
+                "{command}: {:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
+    #[test]
     fn cics_deleteq_ts_resolves_local_queue_names() {
         let source = "IDENTIFICATION DIVISION. PROGRAM-ID. DELTS. DATA DIVISION. WORKING-STORAGE SECTION. 01 QUEUE-X PIC X(8) VALUE 'WORKQ'. 01 QNAME-X PIC X(16) VALUE 'LONG-QUEUE'. PROCEDURE DIVISION. EXEC CICS DELETEQ TS QUEUE('TEMPQ') SYSID('S001') END-EXEC. EXEC CICS DELETEQ TS QUEUE(QUEUE-X) END-EXEC. EXEC CICS DELETEQ TS QNAME('LONG-QUEUE') END-EXEC. EXEC CICS DELETEQ TS QNAME(QNAME-X) END-EXEC. STOP RUN.";
         let analysis = analyze(source);

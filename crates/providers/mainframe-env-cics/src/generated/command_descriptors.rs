@@ -735,6 +735,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::Monitor,
+        syntax: "MONITOR",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0143",
+        family: CicsCommandFamily::Diagnostics,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::SetFileStatus,
         syntax: "SET FILE",
         official_row: "ibm-cics-ts-6x-2026-08-31:spi-commands-unique:0224",

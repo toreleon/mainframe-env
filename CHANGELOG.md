@@ -118,6 +118,10 @@ All notable changes to mainframe-env are documented here.
 - Added typed CICS `DELETE EVENT` for input and composite events. Deletion
   unlinks child predicates atomically, preserves the children of a deleted
   composite, rejects system and timer events, and replays durably.
+- Added typed CICS MONITOR for installed user event points. It retains bounded
+  counter, clock, and character-field updates, replays committed results, and
+  applies an authorized point definition. Source: CICS TS 6.x application API
+  sources-b, `dfhp4_monitor.html`, catalog row 0143.
 
 - Added typed CICS UNLOCK for task-owned no-token and TOKEN update contexts.
   READ UPDATE can return a fullword TOKEN, whose durable counter prevents reuse

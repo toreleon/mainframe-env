@@ -15251,6 +15251,229 @@ mod tests {
         );
     }
 
+    #[test]
+    fn monitor_applies_registered_emp_and_replays_counter_update() {
+        let store = Arc::new(MemoryStore::new(Default::default()));
+        let provider: Arc<dyn ProviderStateStore> = store.clone();
+        let service = service(provider);
+        service
+            .register_diagnostic_resources(
+                &[],
+                &[
+                    CicsMonitorPointDefinition {
+                        entry_name: "USER".into(),
+                        point: 11,
+                        action: CicsMonitorAction::AddCounter { slot: 1 },
+                    },
+                    CicsMonitorPointDefinition {
+                        entry_name: "USER".into(),
+                        point: 12,
+                        action: CicsMonitorAction::Move {
+                            offset: 0,
+                            maximum_length: 4,
+                        },
+                    },
+                ],
+            )
+            .unwrap();
+        let (invocation, _) = registered(&service);
+        let update = request(
+            CicsOperation::Monitor,
+            BTreeMap::from([
+                ("POINT".into(), cics_decimal(11)),
+                ("DATA1".into(), enqueue_value(&5_i32.to_be_bytes())),
+            ]),
+            1,
+        );
+        service
+            .invoke(
+                &effect(&invocation.run_unit_id, update.clone(), 1),
+                update.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            service.diagnostic_snapshot().unwrap().monitor_counters["USER:001"],
+            5
+        );
+        store
+            .delete_provider_state("cics-effect-replay-v1", "outer-1", 1)
+            .unwrap();
+        service
+            .invoke(&effect(&invocation.run_unit_id, update.clone(), 1), update)
+            .unwrap();
+        assert_eq!(
+            service.diagnostic_snapshot().unwrap().monitor_counters["USER:001"],
+            5
+        );
+
+        let move_request = request(
+            CicsOperation::Monitor,
+            BTreeMap::from([
+                ("POINT".into(), cics_decimal(12)),
+                ("DATA1".into(), enqueue_value(&[0, 0, 0, 1])),
+                (
+                    "DATA1.BYTES".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.monitor-data@1",
+                        b"ABCD".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+            ]),
+            2,
+        );
+        let result = service
+            .invoke(
+                &effect(&invocation.run_unit_id, move_request.clone(), 2),
+                move_request,
+            )
+            .unwrap_err();
+        assert_eq!(
+            result,
+            HostProblem::Condition {
+                name: "INVREQ".into(),
+                response: 16,
+                response2: 6
+            }
+        );
+        assert_eq!(
+            service.diagnostic_snapshot().unwrap().monitor_text["USER"],
+            b"ABCD"
+        );
+    }
+
+    #[test]
+    fn monitor_clock_state_survives_sqlite_reopen_and_stop() {
+        let root = std::env::temp_dir().join(format!(
+            "mainframe-env-cics-monitor-clock-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let url = format!("sqlite://{}?mode=rwc", root.join("state.db").display());
+        let points = [
+            CicsMonitorPointDefinition {
+                entry_name: "USER".into(),
+                point: 20,
+                action: CicsMonitorAction::StartClock { slot: 1 },
+            },
+            CicsMonitorPointDefinition {
+                entry_name: "USER".into(),
+                point: 21,
+                action: CicsMonitorAction::StopClock { slot: 1 },
+            },
+        ];
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            service.register_diagnostic_resources(&[], &points).unwrap();
+            let (invocation, _) = registered(&service);
+            let start = request(
+                CicsOperation::Monitor,
+                BTreeMap::from([("POINT".into(), cics_decimal(20))]),
+                1,
+            );
+            service
+                .invoke(&effect(&invocation.run_unit_id, start.clone(), 1), start)
+                .unwrap();
+            assert!(
+                service
+                    .diagnostic_snapshot()
+                    .unwrap()
+                    .monitor_clocks
+                    .contains_key("USER:001")
+            );
+        }
+        {
+            let store = Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            let invocation = invocation_for("monitor-reopen", BTreeMap::new());
+            let session = SessionId::new("monitor-reopen", 64).unwrap();
+            service.create_session(&session, 24, 80).unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let stop = request(
+                CicsOperation::Monitor,
+                BTreeMap::from([("POINT".into(), cics_decimal(21))]),
+                2,
+            );
+            service
+                .invoke(&effect(&invocation.run_unit_id, stop.clone(), 2), stop)
+                .unwrap();
+            let snapshot = service.diagnostic_snapshot().unwrap();
+            assert!(!snapshot.monitor_clocks.contains_key("USER:001"));
+            assert_eq!(snapshot.monitor_counters["USER:001"], 0);
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn monitor_denial_and_invalid_point_leave_state_unchanged() {
+        let (authorities, seen) = diagnostic_authorities(true);
+        let service = CicsService::open(
+            authorities,
+            Arc::new(MemoryStore::new(Default::default())),
+            CicsLimits::default(),
+        )
+        .unwrap();
+        service
+            .register_diagnostic_resources(
+                &[],
+                &[CicsMonitorPointDefinition {
+                    entry_name: "USER".into(),
+                    point: 11,
+                    action: CicsMonitorAction::AddCounter { slot: 1 },
+                }],
+            )
+            .unwrap();
+        let (invocation, _) = registered(&service);
+        let mut denied = request(
+            CicsOperation::Monitor,
+            BTreeMap::from([
+                ("POINT".into(), cics_decimal(11)),
+                ("DATA1".into(), enqueue_value(&5_i32.to_be_bytes())),
+            ]),
+            1,
+        );
+        denied.condition_policy = CicsConditionPolicy::NoHandle;
+        let result = service
+            .invoke(&effect(&invocation.run_unit_id, denied.clone(), 1), denied)
+            .unwrap();
+        assert_eq!(result.condition, "NOTAUTH");
+        assert!(
+            service
+                .diagnostic_snapshot()
+                .unwrap()
+                .monitor_counters
+                .is_empty()
+        );
+        assert!(
+            seen.lock()
+                .unwrap()
+                .iter()
+                .any(|(class, resource, intent)| {
+                    class == "CICSDIAG"
+                        && resource == "CICS.DIAG.MONITOR.USER.011"
+                        && *intent == AccessIntent::Update
+                })
+        );
+        let mut invalid = request(
+            CicsOperation::Monitor,
+            BTreeMap::from([("POINT".into(), cics_decimal(0))]),
+            2,
+        );
+        invalid.condition_policy = CicsConditionPolicy::NoHandle;
+        let result = service
+            .invoke(
+                &effect(&invocation.run_unit_id, invalid.clone(), 2),
+                invalid,
+            )
+            .unwrap();
+        assert_eq!((result.response, result.response2), (16, 1));
+    }
+
     fn open_staged_spool_report(
         service: &CicsService,
         invocation: &Invocation,

@@ -235,6 +235,11 @@ pub(super) fn absolute_milliseconds(instant: ClockInstant) -> Result<i64, HostPr
         .ok_or(HostProblem::ResourceExhausted)
 }
 
+pub(super) fn monitor_milliseconds(timestamp: &str) -> Result<u64, HostProblem> {
+    u64::try_from(absolute_milliseconds(parse_clock_timestamp(timestamp)?)?)
+        .map_err(|_| HostProblem::ProviderFailure)
+}
+
 fn eib_date_time(instant: ClockInstant) -> Result<(i64, i64), HostProblem> {
     let century = match instant.year {
         1900..=1999 => 0,

@@ -190,6 +190,8 @@ pub enum CicsPlanOperation {
     SpoolWrite,
     /// Write one numeric user trace entry to the active local destinations.
     EnterTraceNum,
+    /// Apply one installed local user event monitoring definition.
+    Monitor,
     /// Yield the issuing task once for redispatch.
     Suspend,
     /// Wait for one timer-event control area to be posted.
@@ -640,6 +642,10 @@ pub enum CicsOperandName {
     TraceFrom,
     TraceFromLength,
     TraceResource,
+    MonitorPoint,
+    MonitorEntryName,
+    MonitorData1,
+    MonitorData2,
     /// Optional SPOOLWRITE transfer length.
     SpoolFlength,
 }
