@@ -271,6 +271,8 @@ pub enum CicsOperation {
     Unlock,
     /// Verify one standard password with the installed SAF authority.
     VerifyPassword,
+    /// Verify a length-selected password or phrase with the installed SAF authority.
+    VerifyPhrase,
     Write,
     WriteTransientData,
     Xctl,
@@ -423,6 +425,7 @@ impl CicsOperation {
             Self::WriteJournalNum => "WriteJournalNum",
             Self::Unlock => "Unlock",
             Self::VerifyPassword => "VerifyPassword",
+            Self::VerifyPhrase => "VerifyPhrase",
             Self::Write => "Write",
             Self::WriteTransientData => "WriteTransientData",
             Self::Xctl => "Xctl",
@@ -551,6 +554,7 @@ impl CicsOperation {
                 | Self::TransformXmlToData
                 | Self::Unlock
                 | Self::VerifyPassword
+                | Self::VerifyPhrase
                 | Self::SetFileStatus
                 | Self::SpoolClose
                 | Self::SpoolOpenInput
@@ -735,6 +739,7 @@ impl CicsOperation {
             ("WRITE", Some("JOURNALNUM")) => Self::WriteJournalNum,
             ("UNLOCK", _) => Self::Unlock,
             ("VERIFY", Some("PASSWORD")) => Self::VerifyPassword,
+            ("VERIFY", Some("PHRASE")) => Self::VerifyPhrase,
             ("WRITE", _) => Self::Write,
             ("WRITEQ", Some("TD")) => Self::WriteTransientData,
             ("XCTL", _) => Self::Xctl,

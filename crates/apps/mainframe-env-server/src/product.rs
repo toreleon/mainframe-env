@@ -23117,4 +23117,93 @@ mod tests {
                 .any(|audit| audit.action == "VERIFY")
         );
     }
+
+    #[test]
+    fn compiled_verify_phrase_selects_phrase_credential_with_740a() {
+        let artifact = published_source_fixture(
+            "VPHRASE",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. VPHRASE. DATA DIVISION. WORKING-STORAGE SECTION. 01 PHRASE-X PIC X(20) VALUE 'LONG-PHRASE-1234'. 01 DAYS-X PIC S9(4) COMP. 01 RESP-X PIC S9(9) COMP. 01 ESM-X PIC S9(9) COMP. 01 VERIFY-FN PIC X(2). PROCEDURE DIVISION. EXEC CICS VERIFY PHRASE(PHRASE-X) PHRASELEN(16) USERID('PHUSER') DAYSLEFT(DAYS-X) ESMRESP(ESM-X) RESP(RESP-X) END-EXEC. MOVE EIBFN TO VERIFY-FN. EXEC CICS SUSPEND END-EXEC. STOP RUN.",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        let admin = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        server
+            .racf
+            .execute_command(
+                &mainframe_env_racf::CommandContext::new(
+                    admin.clone(),
+                    "ADD-PHUSER",
+                    "VERIFY-PHRASE-TEST",
+                    1,
+                )
+                .unwrap(),
+                "ADDUSER PHUSER PHRASE('LONG-PHRASE-1234')",
+            )
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "VPHRASE".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("VPH".into(), "VPHRASE".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "VPHRASE".into(),
+                    map: "VPHRASE".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("verify-phrase-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "VPH", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "VPH",
+                24,
+                80,
+                "verify-phrase-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &admin, "VPHRASE", 2)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(
+            restored.variable("VERIFY-FN").unwrap().bytes(),
+            &[0x74, 0x0a]
+        );
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(restored.variable("ESM-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(restored.variable("DAYS-X").unwrap().bytes(), &[0xff, 0xff]);
+    }
 }

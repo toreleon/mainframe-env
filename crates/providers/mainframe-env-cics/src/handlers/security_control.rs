@@ -29,6 +29,7 @@ pub(in crate::service) fn invoke(
     match request.operation {
         CicsOperation::QuerySecurity => query_security(service, run, request, tick),
         CicsOperation::VerifyPassword => verify::password(service, run, request, tick),
+        CicsOperation::VerifyPhrase => verify::phrase(service, run, request, tick),
         _ => Err(HostProblem::InfrastructureFailure),
     }
 }

@@ -34,6 +34,21 @@ pub(super) const VERIFY_PASSWORD_CLAUSES: &[&str] = &[
     "RESP",
     "RESP2",
 ];
+pub(super) const VERIFY_PHRASE_CLAUSES: &[&str] = &[
+    "PHRASE",
+    "PHRASELEN",
+    "USERID",
+    "GROUPID",
+    "CHANGETIME",
+    "DAYSLEFT",
+    "ESMREASON",
+    "ESMRESP",
+    "EXPIRYTIME",
+    "INVALIDCOUNT",
+    "LASTUSETIME",
+    "RESP",
+    "RESP2",
+];
 
 pub(super) fn validate(
     clauses: &Clauses,
@@ -42,6 +57,9 @@ pub(super) fn validate(
 ) -> Resolution<()> {
     if operation == HirCicsOperation::VerifyPassword {
         return validate_verify_password(clauses, semantic);
+    }
+    if operation == HirCicsOperation::VerifyPhrase {
+        return validate_verify_phrase(clauses, semantic);
     }
     if operation != HirCicsOperation::QuerySecurity {
         return Ok(());
@@ -95,6 +113,9 @@ pub(super) fn operands(
     if operation == HirCicsOperation::VerifyPassword {
         return verify_password_operands(clauses, semantic);
     }
+    if operation == HirCicsOperation::VerifyPhrase {
+        return verify_phrase_operands(clauses, semantic);
+    }
     if operation != HirCicsOperation::QuerySecurity {
         return Ok(Vec::new());
     }
@@ -131,8 +152,11 @@ pub(super) fn outputs(
     operation: HirCicsOperation,
     semantic: &SemanticModel,
 ) -> Resolution<Vec<HirCicsOutputBinding>> {
-    if operation == HirCicsOperation::VerifyPassword {
-        return verify_password_outputs(clauses, semantic);
+    if matches!(
+        operation,
+        HirCicsOperation::VerifyPassword | HirCicsOperation::VerifyPhrase
+    ) {
+        return verify_credential_outputs(clauses, semantic, operation);
     }
     if operation != HirCicsOperation::QuerySecurity {
         return Ok(Vec::new());
@@ -160,7 +184,7 @@ pub(super) fn outputs(
 fn fullword(reference: &HirDataReference, name: &str) -> Resolution<()> {
     if reference.usage != CobolUsage::Binary || reference.length != 4 || reference.scale != 0 {
         return Err(ResolutionFailure::Invalid(format!(
-            "CICS QUERY SECURITY {name} requires fullword binary storage"
+            "CICS {name} requires fullword binary storage"
         )));
     }
     Ok(())
@@ -222,10 +246,16 @@ fn verify_password_operands(
     Ok(out)
 }
 
-fn verify_password_outputs(
+fn verify_credential_outputs(
     clauses: &Clauses,
     semantic: &SemanticModel,
+    operation: HirCicsOperation,
 ) -> Resolution<Vec<HirCicsOutputBinding>> {
+    let label = if operation == HirCicsOperation::VerifyPhrase {
+        "VERIFY PHRASE"
+    } else {
+        "VERIFY PASSWORD"
+    };
     let mut out = Vec::new();
     for (name, identity, width) in [
         ("CHANGETIME", HirCicsOutputName::SecurityChangeTime, 8),
@@ -247,7 +277,7 @@ fn verify_password_outputs(
                     || !reference.signed
                 {
                     return Err(ResolutionFailure::Invalid(format!(
-                        "CICS VERIFY PASSWORD {name} requires PIC S9(15) COMP-3 storage"
+                        "CICS {label} {name} requires PIC S9(15) COMP-3 storage"
                     )));
                 }
             } else if reference.usage != CobolUsage::Binary
@@ -255,12 +285,90 @@ fn verify_password_outputs(
                 || reference.scale != 0
             {
                 return Err(ResolutionFailure::Invalid(format!(
-                    "CICS VERIFY PASSWORD {name} requires {width}-byte binary storage"
+                    "CICS {label} {name} requires {width}-byte binary storage"
                 )));
             }
             out.push(HirCicsOutputBinding {
                 name: identity,
                 target: reference,
+            });
+        }
+    }
+    Ok(out)
+}
+
+fn validate_verify_phrase(clauses: &Clauses, semantic: &SemanticModel) -> Resolution<()> {
+    if !["PHRASE", "PHRASELEN", "USERID"]
+        .iter()
+        .all(|name| clauses.contains_key(*name))
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS VERIFY PHRASE requires PHRASE, PHRASELEN, and USERID".into(),
+        ));
+    }
+    let phrase = complete_data_reference(&clauses["PHRASE"], semantic).map_err(|_| {
+        ResolutionFailure::Invalid("CICS VERIFY PHRASE requires resolved phrase storage".into())
+    })?;
+    if !(1..=100).contains(&phrase.length)
+        || !matches!(
+            phrase.category,
+            DataCategory::Alphabetic | DataCategory::Alphanumeric
+        )
+    {
+        return Err(ResolutionFailure::Invalid(
+            "CICS VERIFY PHRASE requires a 1- to 100-character data area".into(),
+        ));
+    }
+    let length = cics_integer_value(&clauses["PHRASELEN"], semantic)?;
+    match length {
+        HirCicsValue::Integer(value)
+            if !(1..=100).contains(&value) || value as usize > phrase.length =>
+        {
+            return Err(ResolutionFailure::Invalid(
+                "CICS VERIFY PHRASE PHRASELEN must fit the phrase data area and be 1 through 100"
+                    .into(),
+            ));
+        }
+        HirCicsValue::Data(ref reference) => fullword(reference, "PHRASELEN")?,
+        _ => {}
+    }
+    for name in ["USERID", "GROUPID"] {
+        if let Some(value) = clauses.get(name) {
+            let resolved = cics_value(value, semantic)?;
+            if matches!(resolved, HirCicsValue::Literal(ref literal) if literal.is_empty() || literal.len() > 8)
+                || matches!(resolved, HirCicsValue::Data(ref reference) if reference.length != 8)
+            {
+                return Err(ResolutionFailure::Invalid(format!(
+                    "CICS VERIFY PHRASE {name} requires up to eight characters"
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn verify_phrase_operands(
+    clauses: &Clauses,
+    semantic: &SemanticModel,
+) -> Resolution<Vec<HirCicsNamedOperand>> {
+    let mut out = vec![
+        HirCicsNamedOperand {
+            name: HirCicsOperandName::SecurityPhrase,
+            value: HirCicsValue::Data(complete_data_reference(&clauses["PHRASE"], semantic)?),
+        },
+        HirCicsNamedOperand {
+            name: HirCicsOperandName::SecurityPhraseLen,
+            value: cics_integer_value(&clauses["PHRASELEN"], semantic)?,
+        },
+    ];
+    for (name, identity) in [
+        ("USERID", HirCicsOperandName::SecurityUserId),
+        ("GROUPID", HirCicsOperandName::SecurityGroupId),
+    ] {
+        if let Some(value) = clauses.get(name) {
+            out.push(HirCicsNamedOperand {
+                name: identity,
+                value: cics_value(value, semantic)?,
             });
         }
     }

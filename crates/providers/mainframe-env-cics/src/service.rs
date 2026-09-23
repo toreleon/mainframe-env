@@ -33920,4 +33920,98 @@ mod tests {
         }
         std::fs::remove_dir_all(root).unwrap();
     }
+
+    struct PhraseVerifyAuthority(Arc<AtomicUsize>);
+
+    impl crate::CicsSecurityAuthority for PhraseVerifyAuthority {
+        fn query_access(
+            &self,
+            _: &PrincipalId,
+            _: &PrincipalId,
+            _: &str,
+            _: &str,
+            _: u64,
+            _: &str,
+        ) -> Result<crate::CicsSecurityAccess, HostProblem> {
+            Err(HostProblem::Unsupported)
+        }
+
+        fn verify_credential(
+            &self,
+            request: crate::CicsCredentialRequest<'_>,
+        ) -> Result<crate::CicsCredentialVerification, HostProblem> {
+            assert_eq!(request.kind, crate::CicsCredentialKind::Phrase);
+            assert_eq!(request.credential, b"LONG-PHRASE-1234");
+            self.0.fetch_add(1, Ordering::SeqCst);
+            Ok(crate::CicsCredentialVerification {
+                failure: None,
+                details: Some(crate::CicsCredentialDetails {
+                    changed_tick: 3,
+                    days_left: -1,
+                    expiry_tick: -1,
+                    invalid_count: 0,
+                    last_use_tick: 2,
+                }),
+                esm_response: 0,
+                esm_reason: 0,
+            })
+        }
+    }
+
+    #[test]
+    fn verify_phrase_honors_length_and_never_dispatches_malformed_values() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let calls = Arc::new(AtomicUsize::new(0));
+        service
+            .bind_security_authority(Arc::new(PhraseVerifyAuthority(calls.clone())))
+            .unwrap();
+        let (invocation, _) = registered(&service);
+        let mut phrase = request(
+            CicsOperation::VerifyPhrase,
+            BTreeMap::from([
+                (
+                    "PHRASE".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.secret@1",
+                        b"LONG-PHRASE-1234    ".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                ("PHRASELEN".into(), cics_decimal(16)),
+                ("USERID".into(), cics_literal(b"IBMUSER")),
+                ("DAYSLEFT".into(), argument(b"DAYS-X")),
+            ]),
+            12,
+        );
+        phrase.condition_policy = CicsConditionPolicy::NoHandle;
+        let result = service
+            .invoke(
+                &effect(&invocation.run_unit_id, phrase.clone(), 12),
+                phrase.clone(),
+            )
+            .unwrap();
+        assert_eq!(result.condition, "NORMAL");
+        assert_eq!(result.outputs["DAYSLEFT"].bytes(), b"-1");
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        phrase
+            .arguments
+            .insert("PHRASELEN".into(), cics_decimal(101));
+        phrase.mutation.as_mut().unwrap().sequence = 13;
+        phrase.mutation.as_mut().unwrap().idempotency_key =
+            IdempotencyKey::new("outer-13", InvocationLimits::default()).unwrap();
+        let rejected = service
+            .invoke(&effect(&invocation.run_unit_id, phrase.clone(), 13), phrase)
+            .unwrap();
+        assert_eq!(
+            (
+                rejected.condition.as_str(),
+                rejected.response,
+                rejected.response2
+            ),
+            ("LENGERR", 22, 1)
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
 }

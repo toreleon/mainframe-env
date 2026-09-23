@@ -801,6 +801,7 @@ TYPED_RUNTIME_OPERATIONS = frozenset(
         "Syncpoint",
         "Unlock",
         "VerifyPassword",
+        "VerifyPhrase",
         "Start",
         "Retrieve",
         "TransformDataToJson",
@@ -1166,6 +1167,9 @@ TYPED_RUNTIME_IR_EFFECTS = {
         {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
     ),
     "VerifyPassword": frozenset(
+        {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
+    ),
+    "VerifyPhrase": frozenset(
         {"memory-read", "memory-write", "security-profile", "condition", "transaction"}
     ),
     "Cancel": frozenset({"memory-read", "memory-write", "condition", "transaction"}),
@@ -1550,6 +1554,7 @@ def _load_typed_execution_registrations(
         "TransformXmlToData",
         "Unlock",
         "VerifyPassword",
+        "VerifyPhrase",
         "WaitEvent",
         "WaitExternal",
         "WaitJournalName",

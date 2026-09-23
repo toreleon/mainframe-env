@@ -90,6 +90,7 @@ pub(super) fn resolve(
         ["PURGE", "MESSAGE"] => HirCicsOperation::PurgeMessage,
         ["QUERY", "SECURITY"] => HirCicsOperation::QuerySecurity,
         ["VERIFY", "PASSWORD"] => HirCicsOperation::VerifyPassword,
+        ["VERIFY", "PHRASE"] => HirCicsOperation::VerifyPhrase,
         ["POP", "HANDLE"] => HirCicsOperation::PopHandle,
         ["PUSH", "HANDLE"] => HirCicsOperation::PushHandle,
         ["READ"] => HirCicsOperation::Read,

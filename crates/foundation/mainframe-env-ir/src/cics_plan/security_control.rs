@@ -83,3 +83,50 @@ pub(super) fn invalid_verify_password_shape(
             ),
         })
 }
+
+pub(super) fn invalid_verify_phrase_shape(
+    plan: &CicsEffectPlan,
+    inputs: &BTreeSet<CicsOperandName>,
+    outputs: &BTreeSet<CicsOutputName>,
+) -> bool {
+    !inputs.contains(&CicsOperandName::SecurityUserId)
+        || !inputs.contains(&CicsOperandName::SecurityPhrase)
+        || !inputs.contains(&CicsOperandName::SecurityPhraseLen)
+        || !inputs.is_subset(&BTreeSet::from([
+            CicsOperandName::SecurityUserId,
+            CicsOperandName::SecurityGroupId,
+            CicsOperandName::SecurityPhrase,
+            CicsOperandName::SecurityPhraseLen,
+        ]))
+        || outputs.iter().any(|name| {
+            !matches!(
+                name,
+                CicsOutputName::SecurityChangeTime
+                    | CicsOutputName::SecurityDaysLeft
+                    | CicsOutputName::SecurityEsmReason
+                    | CicsOutputName::SecurityEsmResp
+                    | CicsOutputName::SecurityExpiryTime
+                    | CicsOutputName::SecurityInvalidCount
+                    | CicsOutputName::SecurityLastUseTime
+                    | CicsOutputName::Resp
+                    | CicsOutputName::Resp2
+            )
+        })
+        || plan
+            .options
+            .iter()
+            .any(|option| *option != CicsPlanOption::NoHandle)
+        || plan.operands.iter().any(|operand| match operand.name {
+            CicsOperandName::SecurityPhrase => {
+                !matches!(operand.value, CicsOperandValue::Storage(_))
+            }
+            CicsOperandName::SecurityPhraseLen => !matches!(
+                operand.value,
+                CicsOperandValue::Integer(1..=100) | CicsOperandValue::Storage(_)
+            ),
+            _ => !matches!(
+                operand.value,
+                CicsOperandValue::Literal(_) | CicsOperandValue::Storage(_)
+            ),
+        })
+}

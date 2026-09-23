@@ -855,6 +855,13 @@ pub(crate) const CICS_COMMAND_DESCRIPTORS: &[CicsCommandDescriptor] = &[
         mutating: true,
     },
     CicsCommandDescriptor {
+        operation: CicsOperation::VerifyPhrase,
+        syntax: "VERIFY PHRASE",
+        official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0229",
+        family: CicsCommandFamily::SecurityControl,
+        mutating: true,
+    },
+    CicsCommandDescriptor {
         operation: CicsOperation::WaitEvent,
         syntax: "WAIT EVENT",
         official_row: "ibm-cics-ts-6x-2026-08-31:api-commands:0233",

@@ -212,6 +212,8 @@ pub enum CicsPlanOperation {
     QuerySecurity,
     /// Verify a standard password through the installed SAF authority.
     VerifyPassword,
+    /// Verify a password or phrase selected by its explicit length.
+    VerifyPhrase,
     /// Discard the current full-BMS logical message, if one is being built.
     PurgeMessage,
     /// Schedule one local interval-control START data record.

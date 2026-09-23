@@ -14,7 +14,38 @@ pub(super) fn password(
     request: &CicsRequest,
     retention_tick: u64,
 ) -> Result<CicsResponse, HostProblem> {
-    validate_password_shape(request)?;
+    verify(
+        service,
+        run,
+        request,
+        retention_tick,
+        CicsCredentialKind::Password,
+    )
+}
+
+pub(super) fn phrase(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+    retention_tick: u64,
+) -> Result<CicsResponse, HostProblem> {
+    verify(
+        service,
+        run,
+        request,
+        retention_tick,
+        CicsCredentialKind::Phrase,
+    )
+}
+
+fn verify(
+    service: &CicsService,
+    run: &mut Run,
+    request: &CicsRequest,
+    retention_tick: u64,
+    kind: CicsCredentialKind,
+) -> Result<CicsResponse, HostProblem> {
+    validate_shape(request, kind)?;
     let user = text(request, "USERID")?
         .ok_or(HostProblem::Malformed)?
         .trim_end()
@@ -25,19 +56,35 @@ pub(super) fn password(
     let user = PrincipalId::new(user, InvocationLimits::default())
         .map_err(|_| condition("USERIDERR", 69, 8))?;
     let group = text(request, "GROUPID")?.map(|group| group.trim_end().to_ascii_uppercase());
+    let secret_name = match kind {
+        CicsCredentialKind::Password => "PASSWORD",
+        CicsCredentialKind::Phrase => "PHRASE",
+    };
     let secret = request
         .arguments
-        .get("PASSWORD")
+        .get(secret_name)
         .ok_or(HostProblem::Malformed)?
         .bytes();
-    let length = secret
-        .iter()
-        .rposition(|byte| *byte != b' ')
-        .map_or(0, |at| at + 1);
-    if length == 0 {
+    let length = match kind {
+        CicsCredentialKind::Password => secret
+            .iter()
+            .rposition(|byte| *byte != b' ')
+            .map_or(0, |at| at + 1),
+        CicsCredentialKind::Phrase => {
+            let length = text(request, "PHRASELEN")?
+                .ok_or(HostProblem::Malformed)?
+                .parse::<i64>()
+                .map_err(|_| HostProblem::Malformed)?;
+            if !(1..=100).contains(&length) || length as usize > secret.len() {
+                return Err(condition("LENGERR", 22, 1));
+            }
+            length as usize
+        }
+    };
+    if length == 0 || secret[..length].iter().all(|byte| *byte == b' ') {
         return Err(condition("NOTAUTH", 70, 1));
     }
-    if length > 8 {
+    if kind == CicsCredentialKind::Password && length > 8 {
         return Err(HostProblem::Malformed);
     }
     let secret = &secret[..length];
@@ -66,7 +113,7 @@ pub(super) fn password(
             actor: run.invocation.principal.id(),
             user: &user,
             credential: secret,
-            kind: CicsCredentialKind::Password,
+            kind,
             group: group.as_deref(),
             binding_digest,
             idempotency_key: &idempotency_key,
@@ -140,15 +187,25 @@ fn respond(
     Ok(response)
 }
 
-fn validate_password_shape(request: &CicsRequest) -> Result<(), HostProblem> {
-    if !request.arguments.contains_key("PASSWORD")
+fn validate_shape(request: &CicsRequest, kind: CicsCredentialKind) -> Result<(), HostProblem> {
+    let secret_name = match kind {
+        CicsCredentialKind::Password => "PASSWORD",
+        CicsCredentialKind::Phrase => "PHRASE",
+    };
+    if !request.arguments.contains_key(secret_name)
         || !request.arguments.contains_key("USERID")
+        || kind == CicsCredentialKind::Phrase && !request.arguments.contains_key("PHRASELEN")
         || request.arguments.contains_key("RESP2") && !request.arguments.contains_key("RESP")
         || request
             .arguments
             .iter()
             .any(|(name, value)| match name.as_str() {
-                "PASSWORD" => value.schema() != "mainframe-env.cics.secret@1",
+                "PASSWORD" | "PHRASE" if name == secret_name => {
+                    value.schema() != "mainframe-env.cics.secret@1"
+                }
+                "PHRASELEN" if kind == CicsCredentialKind::Phrase => {
+                    value.schema() != "mainframe-env.cics.decimal@1"
+                }
                 "USERID" | "GROUPID" => !matches!(
                     value.schema(),
                     "mainframe-env.cics.storage-value@1" | "mainframe-env.cics.literal@1"

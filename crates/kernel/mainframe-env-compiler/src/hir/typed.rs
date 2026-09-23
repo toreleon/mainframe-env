@@ -7868,4 +7868,36 @@ mod tests {
                 .is_none()
         );
     }
+
+    #[test]
+    fn cics_verify_phrase_requires_explicit_bounded_length_and_storage_secret() {
+        let source = "IDENTIFICATION DIVISION. PROGRAM-ID. VPHRASE. DATA DIVISION. WORKING-STORAGE SECTION. 01 PHRASE-X PIC X(20) VALUE 'LONG-PHRASE-1234'. 01 DAYS-X PIC S9(4) COMP. 01 RESP-X PIC S9(9) COMP. PROCEDURE DIVISION. EXEC CICS VERIFY PHRASE(PHRASE-X) PHRASELEN(16) USERID('IBMUSER') DAYSLEFT(DAYS-X) RESP(RESP-X) END-EXEC. STOP RUN.";
+        let analysis = analyze(source);
+        let hir = analysis
+            .hir
+            .unwrap_or_else(|| panic!("VERIFY PHRASE: {:?}", analysis.diagnostics));
+        let verify = hir
+            .statements
+            .iter()
+            .find_map(|statement| match statement.resolved.as_ref() {
+                Some(HirResolvedStatement::Cics(command)) => Some(command),
+                _ => None,
+            })
+            .expect("typed VERIFY PHRASE");
+        assert_eq!(verify.operation, HirCicsOperation::VerifyPhrase);
+        assert!(verify.operands.iter().any(|operand| {
+            operand.name == HirCicsOperandName::SecurityPhraseLen
+                && operand.value == HirCicsValue::Integer(16)
+        }));
+        assert!(
+            analyze(&source.replace("PHRASELEN(16)", "PHRASELEN(101)"))
+                .hir
+                .is_none()
+        );
+        assert!(
+            analyze(&source.replace("PHRASE(PHRASE-X)", "PHRASE('SECRET')"))
+                .hir
+                .is_none()
+        );
+    }
 }
