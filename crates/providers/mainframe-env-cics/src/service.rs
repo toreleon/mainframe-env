@@ -34244,6 +34244,269 @@ mod tests {
         ) -> Result<(), HostProblem> {
             Err(HostProblem::Unsupported)
         }
+
+        fn verify_token(
+            &self,
+            request: crate::CicsTokenVerificationRequest<'_>,
+        ) -> Result<crate::CicsTokenVerification, HostProblem> {
+            assert_eq!(request.kind, crate::CicsSecurityTokenKind::Kerberos);
+            assert_eq!(request.token, b"KRB5:CONF:LOCAL-TOKEN");
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Ok(crate::CicsTokenVerification {
+                user: Some("IBMUSER".into()),
+                failure: None,
+                confidential: true,
+                mutual: false,
+                out_token: None,
+                esm_response: 0,
+                esm_reason: 0,
+            })
+        }
+    }
+
+    fn verify_token_request(sequence: u64) -> CicsRequest {
+        let mut request = request(
+            CicsOperation::VerifyToken,
+            BTreeMap::from([
+                (
+                    "TOKEN".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.secret@1",
+                        b"KRB5:CONF:LOCAL-TOKEN".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                ("TOKENLEN".into(), cics_decimal(21)),
+                (
+                    "OPTION.KERBEROS".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.option@1",
+                        Vec::new(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                ("ENCRYPTKEY".into(), argument(b"KEY-X")),
+                ("ISUSERID".into(), argument(b"USER-X")),
+            ]),
+            sequence,
+        );
+        request.condition_policy = CicsConditionPolicy::NoHandle;
+        request
+    }
+
+    fn encryptptkt_request(sequence: u64, key: &[u8]) -> CicsRequest {
+        let mut request = request(
+            CicsOperation::RequestEncryptPassTicket,
+            BTreeMap::from([
+                (
+                    "ENCRYPTKEY".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.storage-value@1",
+                        key.to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                (
+                    "ESMAPPNAME".into(),
+                    BoundedPayload::new(
+                        "mainframe-env.cics.storage-value@1",
+                        b"APP1    ".to_vec(),
+                        InvocationLimits::default(),
+                    )
+                    .unwrap(),
+                ),
+                ("ENCRYPTPTKT".into(), argument(b"PTKT-PTR")),
+                ("FLENGTH".into(), argument(b"LEN-X")),
+                ("SET.MAXLENGTH".into(), cics_decimal(1024)),
+            ]),
+            sequence,
+        );
+        request.condition_policy = CicsConditionPolicy::NoHandle;
+        request
+    }
+
+    #[test]
+    fn token_key_issues_one_encrypted_passticket_and_replays_without_second_saf_call() {
+        use ring::aead::{self, Aad, LessSafeKey, Nonce, UnboundKey};
+        use sha2::{Digest, Sha256};
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let calls = Arc::new(AtomicUsize::new(0));
+        service
+            .bind_security_authority(Arc::new(FixedPassTicketAuthority {
+                calls: calls.clone(),
+                failure: None,
+                cancel: None,
+            }))
+            .unwrap();
+        let (invocation, _) = registered(&service);
+        let verify = verify_token_request(31);
+        let effect_verify = effect(&invocation.run_unit_id, verify.clone(), 31);
+        let verified = service.invoke(&effect_verify, verify.clone()).unwrap();
+        assert_eq!(verified.condition, "NORMAL");
+        assert_eq!(verified.outputs["ISUSERID"].bytes(), b"IBMUSER ");
+        assert_eq!(service.invoke(&effect_verify, verify).unwrap(), verified);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        let handle = verified.outputs["ENCRYPTKEY"].bytes();
+        let request = encryptptkt_request(32, handle);
+        let effect_issue = effect(&invocation.run_unit_id, request.clone(), 32);
+        let issued = service.invoke(&effect_issue, request.clone()).unwrap();
+        assert_eq!(issued.outputs["FLENGTH"].bytes(), b"36");
+        assert_eq!(service.invoke(&effect_issue, request).unwrap(), issued);
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+        let envelope = issued.outputs["ENCRYPTPTKT"].bytes();
+        let key = Sha256::digest(b"KRB5:CONF:LOCAL-TOKEN");
+        let cipher = LessSafeKey::new(UnboundKey::new(&aead::AES_256_GCM, &key).unwrap());
+        let mut data = envelope[12..].to_vec();
+        let clear = cipher
+            .open_in_place(
+                Nonce::try_assume_unique_for_key(&envelope[..12]).unwrap(),
+                Aad::from(b"APP1".as_slice()),
+                &mut data,
+            )
+            .unwrap();
+        assert_eq!(clear, b"ABCDEFGH");
+        let reused = encryptptkt_request(33, handle);
+        let denied = service
+            .invoke(&effect(&invocation.run_unit_id, reused.clone(), 33), reused)
+            .unwrap();
+        assert_eq!(
+            (denied.condition.as_str(), denied.response2),
+            ("INVREQ", 255)
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn token_key_survives_sqlite_restart_and_encrypted_issue_replays() {
+        let directory = std::env::temp_dir().join(format!(
+            "mainframe-env-token-key-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("cics.db");
+        let url = format!("sqlite://{}?mode=rwc", path.display());
+        let calls = Arc::new(AtomicUsize::new(0));
+        let (invocation, session, handle) = {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            service
+                .bind_security_authority(Arc::new(FixedPassTicketAuthority {
+                    calls: calls.clone(),
+                    failure: None,
+                    cancel: None,
+                }))
+                .unwrap();
+            let (invocation, session) = registered(&service);
+            let verify = verify_token_request(41);
+            let response = service
+                .invoke(&effect(&invocation.run_unit_id, verify.clone(), 41), verify)
+                .unwrap();
+            (
+                invocation,
+                session,
+                response.outputs["ENCRYPTKEY"].bytes().to_vec(),
+            )
+        };
+        {
+            let store: Arc<dyn ProviderStateStore> =
+                Arc::new(SqliteStateStore::open(&url, 4 * 1024 * 1024, 65_536).unwrap());
+            let service = service(store);
+            service
+                .bind_security_authority(Arc::new(FixedPassTicketAuthority {
+                    calls: calls.clone(),
+                    failure: None,
+                    cancel: None,
+                }))
+                .unwrap();
+            service
+                .register_run(invocation.clone(), &session, "MENU", "MEAPPL", "MESYS")
+                .unwrap();
+            let issue = encryptptkt_request(42, &handle);
+            let bound = effect(&invocation.run_unit_id, issue.clone(), 42);
+            let first = service.invoke(&bound, issue.clone()).unwrap();
+            assert_eq!(first.outputs["FLENGTH"].bytes(), b"36");
+            assert_eq!(service.invoke(&bound, issue).unwrap(), first);
+            assert_eq!(calls.load(Ordering::SeqCst), 2);
+        }
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_dir(directory);
+    }
+
+    #[test]
+    fn verify_token_replaces_previous_key_and_rejects_malformed_options_before_saf() {
+        let store: Arc<dyn ProviderStateStore> = Arc::new(MemoryStore::new(Default::default()));
+        let service = service(store);
+        let calls = Arc::new(AtomicUsize::new(0));
+        service
+            .bind_security_authority(Arc::new(FixedPassTicketAuthority {
+                calls: calls.clone(),
+                failure: None,
+                cancel: None,
+            }))
+            .unwrap();
+        let (invocation, _) = registered(&service);
+        let first = verify_token_request(51);
+        let first = service
+            .invoke(&effect(&invocation.run_unit_id, first.clone(), 51), first)
+            .unwrap();
+        let old = first.outputs["ENCRYPTKEY"].bytes().to_vec();
+        let second = verify_token_request(52);
+        let second = service
+            .invoke(&effect(&invocation.run_unit_id, second.clone(), 52), second)
+            .unwrap();
+        let new = second.outputs["ENCRYPTKEY"].bytes().to_vec();
+        assert_ne!(old, new);
+        let stale = encryptptkt_request(53, &old);
+        let stale = service
+            .invoke(&effect(&invocation.run_unit_id, stale.clone(), 53), stale)
+            .unwrap();
+        assert_eq!((stale.condition.as_str(), stale.response2), ("INVREQ", 255));
+        let mut malformed = verify_token_request(54);
+        malformed
+            .arguments
+            .insert("TOKENLEN".into(), cics_decimal(0));
+        let malformed = service
+            .invoke(
+                &effect(&invocation.run_unit_id, malformed.clone(), 54),
+                malformed,
+            )
+            .unwrap();
+        assert_eq!(
+            (malformed.condition.as_str(), malformed.response2),
+            ("INVREQ", 60)
+        );
+        let mut bad_encoding = verify_token_request(55);
+        bad_encoding.arguments.insert(
+            "OPTION.BASE64".into(),
+            BoundedPayload::new(
+                "mainframe-env.cics.option@1",
+                Vec::new(),
+                InvocationLimits::default(),
+            )
+            .unwrap(),
+        );
+        let bad_encoding = service
+            .invoke(
+                &effect(&invocation.run_unit_id, bad_encoding.clone(), 55),
+                bad_encoding,
+            )
+            .unwrap();
+        assert_eq!(
+            (bad_encoding.condition.as_str(), bad_encoding.response2),
+            ("INVREQ", 36)
+        );
+        let valid = encryptptkt_request(56, &new);
+        let valid = service
+            .invoke(&effect(&invocation.run_unit_id, valid.clone(), 56), valid)
+            .unwrap();
+        assert_eq!(valid.condition, "NORMAL");
+        assert_eq!(calls.load(Ordering::SeqCst), 3);
     }
 
     fn passticket_request(sequence: u64) -> CicsRequest {

@@ -23562,6 +23562,239 @@ mod tests {
     }
 
     #[test]
+    fn compiled_verify_token_encrypts_passticket_for_the_same_task() {
+        use mainframe_env_racf::{
+            RacrouteRequest, RacrouteResult, SafRequestContext, SafVerifyAction, TokenKind,
+        };
+        let token = b"KRB5:CONF:LOCAL-TOKEN";
+        let artifact = published_source_fixture(
+            "EPTKT",
+            "IDENTIFICATION DIVISION. PROGRAM-ID. EPTKT. DATA DIVISION. WORKING-STORAGE SECTION. 01 TOK-X PIC X(21) VALUE 'KRB5:CONF:LOCAL-TOKEN'. 01 KEY-X PIC X(4). 01 APP-X PIC X(8) VALUE 'APP1'. 01 OUT-X POINTER. 01 LEN-X PIC S9(9) COMP. 01 USER-X PIC X(8). 01 RESP-X PIC S9(9) COMP. 01 RESP2-X PIC S9(9) COMP. 01 ESM-X PIC S9(9) COMP. 01 VERIFY-RESP PIC S9(9) COMP. 01 VERIFY-RESP2 PIC S9(9) COMP. 01 VERIFY-FN PIC X(2). 01 REQUEST-FN PIC X(2). PROCEDURE DIVISION. EXEC CICS VERIFY TOKEN(TOK-X) TOKENLEN(21) TOKENTYPE(DFHVALUE(KERBEROS)) ENCRYPTKEY(KEY-X) ISUSERID(USER-X) ESMRESP(ESM-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. MOVE EIBFN TO VERIFY-FN. MOVE RESP-X TO VERIFY-RESP. MOVE RESP2-X TO VERIFY-RESP2. EXEC CICS REQUEST ENCRYPTPTKT(OUT-X) FLENGTH(LEN-X) ENCRYPTKEY(KEY-X) ESMAPPNAME(APP-X) RESP(RESP-X) RESP2(RESP2-X) END-EXEC. MOVE EIBFN TO REQUEST-FN. EXEC CICS SUSPEND END-EXEC. STOP RUN.",
+        );
+        let artifact_ref = ArtifactRef::new(
+            format!("sha256:{:x}", Sha256::digest(artifact.payload())),
+            InvocationLimits::default(),
+        )
+        .unwrap();
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        let admin = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        server
+            .secrets
+            .insert("secret:token-admin", b"TESTPASS".to_vec());
+        let signed = server
+            .racf
+            .racroute(
+                &SafRequestContext::new(
+                    admin.clone(),
+                    None,
+                    None,
+                    "EPTKT-SIGNON",
+                    "EPTKT-SIGNON",
+                    1,
+                )
+                .unwrap(),
+                RacrouteRequest::Verify {
+                    user: admin.clone(),
+                    credential_reference: SecretRef::new(
+                        "secret:token-admin",
+                        HostLimits::default(),
+                    )
+                    .unwrap(),
+                    action: SafVerifyAction::CreateAcee,
+                    acee_id: None,
+                },
+            )
+            .unwrap();
+        let acee_id = match signed.result {
+            Some(RacrouteResult::Verified {
+                acee: Some(acee), ..
+            }) => acee.id,
+            other => panic!("missing ACEE: {other:?}"),
+        };
+        let built = server
+            .racf
+            .racroute(
+                &SafRequestContext::new(
+                    admin.clone(),
+                    Some(acee_id),
+                    None,
+                    "EPTKT-TOKENBLD",
+                    "EPTKT-TOKENBLD",
+                    2,
+                )
+                .unwrap(),
+                RacrouteRequest::Tokenbld {
+                    owner: admin.clone(),
+                    kind: TokenKind::Custom,
+                    token_reference: "secret:local-kerberos".into(),
+                    token_digest: format!("sha256:{:x}", Sha256::digest(token)),
+                    scopes: BTreeSet::from(["KERBEROS".into()]),
+                    expires_tick: None,
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            built.status.reason,
+            mainframe_env_racf::DecisionReason::Granted
+        );
+        let mapped = server
+            .racf
+            .racroute(
+                &SafRequestContext::new(admin.clone(), None, None, "EPTKT-PROBE", "EPTKT-PROBE", 4)
+                    .unwrap(),
+                RacrouteRequest::Tokenmap {
+                    token_digest: format!("sha256:{:x}", Sha256::digest(token)),
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            mapped.status.reason,
+            mainframe_env_racf::DecisionReason::Granted
+        );
+        server
+            .racf
+            .define_profile(
+                "FACILITY",
+                "IRR.RCVTPTGN",
+                "IBMUSER",
+                Some(AccessIntent::Read),
+            )
+            .unwrap();
+        server
+            .racf
+            .define_profile("PTKTDATA", "APP1", "IBMUSER", Some(AccessIntent::Read))
+            .unwrap();
+        server
+            .racf
+            .execute_command(
+                &mainframe_env_racf::CommandContext::new(
+                    admin.clone(),
+                    "EPTKT-ACTIVATE",
+                    "EPTKT-ACTIVATE",
+                    3,
+                )
+                .unwrap(),
+                "SETROPTS CLASSACT(PTKTDATA)",
+            )
+            .unwrap();
+        server
+            .install_online_application(OnlineApplicationDefinition {
+                programs: vec![OnlineProgramDefinition {
+                    name: "EPTKT".into(),
+                    artifact: artifact_ref.clone(),
+                    payload: artifact.payload().to_vec(),
+                    manifest: VersionedArtifactManifest::V3(artifact.manifest().clone()),
+                    semantic_identity: artifact.semantic_id().to_reference(),
+                }],
+                transactions: BTreeMap::from([("EPT".into(), "EPTKT".into())]),
+                maps: vec![BmsMapDefinition {
+                    mapset: "EPTKT".into(),
+                    map: "EPTKT".into(),
+                    line: 1,
+                    column: 1,
+                    rows: 24,
+                    columns: 80,
+                    fields: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let session = SessionId::new("encrypted-ticket-selected", 64).unwrap();
+        let invocation = server
+            .cics_invocation("IBMUSER", "EPT", Some(artifact_ref))
+            .unwrap();
+        server
+            .cics
+            .launch_terminal(
+                invocation.clone(),
+                &session,
+                "EPT",
+                24,
+                80,
+                "encrypted-ticket-csrf",
+                1,
+                10_000,
+            )
+            .unwrap();
+        server
+            .run_online_exchange(&session, &admin, "EPTKT", 4)
+            .unwrap();
+        let continuation = server
+            .online_machine_continuation(&session)
+            .unwrap()
+            .unwrap();
+        let mut restored =
+            ReferenceMachine::from_binary(artifact.payload(), invocation, CodecLimits::default())
+                .unwrap();
+        restored
+            .restore_checkpoint(&continuation.checkpoint)
+            .unwrap();
+        assert_eq!(
+            restored.variable("VERIFY-FN").unwrap().bytes(),
+            &[0x74, 0x0e]
+        );
+        assert_eq!(
+            restored.variable("REQUEST-FN").unwrap().bytes(),
+            &[0x74, 0x14]
+        );
+        assert_eq!(restored.variable("USER-X").unwrap().bytes(), b"IBMUSER ");
+        assert_eq!(restored.variable("RESP-X").unwrap().bytes(), &[0, 0, 0, 0]);
+        assert_eq!(restored.variable("LEN-X").unwrap().bytes(), &[0, 0, 0, 36]);
+        assert_ne!(restored.variable("OUT-X").unwrap().bytes(), &[0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn basic_auth_token_uses_the_installed_credential_authority() {
+        use mainframe_env_cics::{
+            CicsSecurityAuthority, CicsSecurityTokenKind, CicsTokenVerificationRequest,
+        };
+        let server = ProductServer::memory(config()).unwrap();
+        server
+            .bootstrap_administrator("IBMUSER", b"TESTPASS")
+            .unwrap();
+        let authority = cics_security::RacfCicsSecurityAuthority::new(
+            server.racf.clone(),
+            server.secrets.clone(),
+        );
+        let principal = PrincipalId::new("IBMUSER", InvocationLimits::default()).unwrap();
+        let verified = authority
+            .verify_token(CicsTokenVerificationRequest {
+                actor: &principal,
+                token: b"IBMUSER:TESTPASS",
+                kind: CicsSecurityTokenKind::BasicAuth,
+                application: "APP1",
+                binding_digest: [7; 32],
+                idempotency_key: "BASIC-TOKEN-1",
+                correlation: "BASIC-TOKEN-1",
+                tick: 1,
+            })
+            .unwrap();
+        assert_eq!(verified.user.as_deref(), Some("IBMUSER"));
+        assert_eq!(verified.failure, None);
+        assert_eq!(verified.esm_response, 0);
+        let denied = authority
+            .verify_token(CicsTokenVerificationRequest {
+                actor: &principal,
+                token: b"IBMUSER:BADPASS",
+                kind: CicsSecurityTokenKind::BasicAuth,
+                application: "APP1",
+                binding_digest: [8; 32],
+                idempotency_key: "BASIC-TOKEN-2",
+                correlation: "BASIC-TOKEN-2",
+                tick: 2,
+            })
+            .unwrap();
+        assert_eq!(denied.user, None);
+        assert_eq!(
+            denied.failure,
+            Some(mainframe_env_cics::CicsTokenFailure::Rejected)
+        );
+        assert_eq!(denied.esm_response, 8);
+    }
+
+    #[test]
     fn compiled_signon_binds_terminal_user_without_changing_task_principal() {
         let artifact = published_source_fixture(
             "TSON",
